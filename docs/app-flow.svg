@@ -1,0 +1,148 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="1580" viewBox="0 0 1240 1580" font-family="Segoe UI, Arial, sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#475569"/>
+    </marker>
+    <marker id="arrLoop" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#e11d48"/>
+    </marker>
+  </defs>
+
+  <rect width="1240" height="1580" fill="#f8fafc"/>
+  <text x="40" y="46" font-size="26" font-weight="700" fill="#0f172a">Motiv — App Flow &amp; Page Communication</text>
+  <text x="40" y="72" font-size="14" fill="#64748b">Mobile-first maintenance ticketing. Three roles, one ticket lifecycle. Arrows = data + notifications between role pages (via API routes).</text>
+
+  <!-- Swimlane bands -->
+  <rect x="40"  y="96" width="360" height="1320" rx="10" fill="#eff6ff"/>
+  <rect x="440" y="96" width="360" height="1320" rx="10" fill="#fbf7ee"/>
+  <rect x="840" y="96" width="360" height="1320" rx="10" fill="#ecfdf5"/>
+
+  <!-- Lane headers -->
+  <rect x="40"  y="96" width="360" height="56" rx="10" fill="#2563eb"/>
+  <text x="220" y="131" font-size="17" font-weight="700" fill="#fff" text-anchor="middle">CLIENT / STORE MANAGER</text>
+  <text x="220" y="148" font-size="11" fill="#dbeafe" text-anchor="middle">/client/*</text>
+
+  <rect x="440" y="96" width="360" height="56" rx="10" fill="#9a7b34"/>
+  <text x="620" y="131" font-size="17" font-weight="700" fill="#fff" text-anchor="middle">SUPPLIER  (was admin)</text>
+  <text x="620" y="148" font-size="11" fill="#f3ead4" text-anchor="middle">/supplier/*</text>
+
+  <rect x="840" y="96" width="360" height="56" rx="10" fill="#059669"/>
+  <text x="1020" y="131" font-size="17" font-weight="700" fill="#fff" text-anchor="middle">REGIONAL MANAGER</text>
+  <text x="1020" y="148" font-size="11" fill="#d1fae5" text-anchor="middle">/regional/*</text>
+
+  <!-- Lifelines -->
+  <line x1="220"  y1="152" x2="220"  y2="1400" stroke="#93c5fd" stroke-width="2" stroke-dasharray="4 5"/>
+  <line x1="620"  y1="152" x2="620"  y2="1400" stroke="#d6c08a" stroke-width="2" stroke-dasharray="4 5"/>
+  <line x1="1020" y1="152" x2="1020" y2="1400" stroke="#6ee7b7" stroke-width="2" stroke-dasharray="4 5"/>
+
+  <!-- ===== Step 0: WhatsApp intake ===== -->
+  <rect x="60" y="178" width="320" height="50" rx="8" fill="#dcfce7" stroke="#16a34a"/>
+  <text x="74" y="200" font-size="13" font-weight="600" fill="#14532d">📲 WhatsApp voice note (store mgr)</text>
+  <text x="74" y="218" font-size="11" fill="#166534">Groq transcribes → /api/webhooks/whatsapp</text>
+  <line x1="380" y1="203" x2="620" y2="203" stroke="#475569" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="470" y="196" font-size="11" fill="#475569">auto-creates ticket</text>
+
+  <!-- ===== Step 1: Submit ticket ===== -->
+  <rect x="60" y="250" width="320" height="50" rx="8" fill="#fff" stroke="#2563eb"/>
+  <text x="74" y="272" font-size="13" font-weight="600" fill="#1e3a8a">1 · Submit ticket</text>
+  <text x="74" y="290" font-size="11" fill="#1d4ed8">/client/tickets/new → POST /api/tickets</text>
+  <line x1="380" y1="275" x2="620" y2="275" stroke="#475569" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="380" y1="285" x2="1020" y2="285" stroke="#475569" stroke-width="1.2" stroke-dasharray="3 3" marker-end="url(#arr)"/>
+  <text x="650" y="270" font-size="11" fill="#475569">notify supplier + RM</text>
+
+  <!-- ===== Step 2: Send quote ===== -->
+  <rect x="460" y="322" width="320" height="50" rx="8" fill="#fff" stroke="#9a7b34"/>
+  <text x="474" y="344" font-size="13" font-weight="600" fill="#7c5e1e">2 · Send Quote (excl/incl VAT, PDF auto-fill)</text>
+  <text x="474" y="362" font-size="11" fill="#92703a">SendQuoteForm → POST /api/quotes</text>
+  <line x1="620" y1="372" x2="1020" y2="385" stroke="#475569" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="460" y1="360" x2="220" y2="372" stroke="#475569" stroke-width="1.2" stroke-dasharray="3 3" marker-end="url(#arr)"/>
+  <text x="700" y="372" font-size="11" fill="#475569">notify client + RM</text>
+
+  <!-- ===== Step 3: RM approves quote ===== -->
+  <rect x="860" y="408" width="320" height="50" rx="8" fill="#fff" stroke="#059669"/>
+  <text x="874" y="430" font-size="13" font-weight="600" fill="#065f46">3 · Approve / Decline quote</text>
+  <text x="874" y="448" font-size="11" fill="#047857">QuoteApprovalCard → /api/quotes/[id]/respond</text>
+  <line x1="860" y1="445" x2="620" y2="458" stroke="#475569" stroke-width="1.6" marker-end="url(#arr)"/>
+  <line x1="860" y1="455" x2="220" y2="470" stroke="#475569" stroke-width="1.2" stroke-dasharray="3 3" marker-end="url(#arr)"/>
+  <text x="430" y="450" font-size="11" fill="#475569">accepted → work proceeds · notify both</text>
+  <path d="M1180 433 q40 0 40 -55 q0 -55 -40 -55" fill="none" stroke="#e11d48" stroke-width="1.4" marker-end="url(#arrLoop)"/>
+  <text x="1130" y="378" font-size="10.5" fill="#e11d48">declined ↺ re-quote (step 2)</text>
+
+  <!-- ===== Step 4: in progress ===== -->
+  <rect x="460" y="498" width="320" height="44" rx="8" fill="#fff" stroke="#9a7b34"/>
+  <text x="474" y="518" font-size="13" font-weight="600" fill="#7c5e1e">4 · Mark In Progress</text>
+  <text x="474" y="534" font-size="11" fill="#92703a">UpdateStatusForm → PATCH /api/tickets/[id]</text>
+
+  <!-- ===== Step 5: Variation order ===== -->
+  <rect x="460" y="572" width="320" height="50" rx="8" fill="#eef2ff" stroke="#4f46e5"/>
+  <text x="474" y="594" font-size="13" font-weight="600" fill="#3730a3">5 · Raise Variation Order (extra work)</text>
+  <text x="474" y="612" font-size="11" fill="#4338ca">/api/quotes (type=variation) — RM only</text>
+  <line x1="780" y1="597" x2="1020" y2="597" stroke="#475569" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="824" y="590" font-size="11" fill="#475569">notify RM</text>
+
+  <rect x="860" y="648" width="320" height="46" rx="8" fill="#eef2ff" stroke="#4f46e5"/>
+  <text x="874" y="669" font-size="13" font-weight="600" fill="#065f46">RM approves variation</text>
+  <text x="874" y="685" font-size="11" fill="#4338ca">→ ticket back to in_progress</text>
+  <line x1="860" y1="671" x2="620" y2="640" stroke="#475569" stroke-width="1.4" marker-end="url(#arr)"/>
+
+  <!-- ===== Step 6: Completion ===== -->
+  <rect x="460" y="724" width="320" height="50" rx="8" fill="#fff" stroke="#9a7b34"/>
+  <text x="474" y="746" font-size="13" font-weight="600" fill="#7c5e1e">6 · Submit COC + POC photos</text>
+  <text x="474" y="764" font-size="11" fill="#92703a">SubmitCompletionForm → POST /api/completions</text>
+  <line x1="780" y1="749" x2="1020" y2="749" stroke="#475569" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="824" y="742" font-size="11" fill="#475569">notify RM</text>
+
+  <!-- ===== Step 7: Sign-off ===== -->
+  <rect x="860" y="800" width="320" height="50" rx="8" fill="#fff" stroke="#059669"/>
+  <text x="874" y="822" font-size="13" font-weight="600" fill="#065f46">7 · Review sign-off</text>
+  <text x="874" y="840" font-size="11" fill="#047857">CompletionReviewCard → /api/completions/[id]/review</text>
+  <line x1="860" y1="838" x2="220" y2="860" stroke="#475569" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="360" y="835" font-size="11" fill="#475569">approved → COMPLETED · notify client + supplier</text>
+  <path d="M860 845 q-120 30 -240 30" fill="none" stroke="#e11d48" stroke-width="1.4" marker-end="url(#arrLoop)"/>
+  <text x="640" y="892" font-size="10.5" fill="#e11d48">rejected → snag → snag_in_progress ↺ (step 6)</text>
+
+  <!-- ===== Status spine ===== -->
+  <text x="40" y="952" font-size="15" font-weight="700" fill="#0f172a">Ticket status lifecycle</text>
+  <g font-size="12" font-weight="600" text-anchor="middle">
+    <rect x="48"  y="968" width="92" height="30" rx="15" fill="#dbeafe"/><text x="94"  y="988" fill="#1e40af">open</text>
+    <rect x="160" y="968" width="92" height="30" rx="15" fill="#ede9fe"/><text x="206" y="988" fill="#5b21b6">quoted</text>
+    <rect x="272" y="968" width="100" height="30" rx="15" fill="#dcfce7"/><text x="322" y="988" fill="#166534">accepted</text>
+    <rect x="392" y="968" width="110" height="30" rx="15" fill="#fef3c7"/><text x="447" y="988" fill="#92400e">in_progress</text>
+    <rect x="522" y="968" width="150" height="30" rx="15" fill="#e0e7ff"/><text x="597" y="988" fill="#3730a3">variation_pending</text>
+    <rect x="692" y="968" width="150" height="30" rx="15" fill="#ffedd5"/><text x="767" y="988" fill="#9a3412">pending_sign_off</text>
+    <rect x="862" y="968" width="108" height="30" rx="15" fill="#bbf7d0"/><text x="916" y="988" fill="#14532d">completed</text>
+    <rect x="990" y="968" width="72" height="30" rx="15" fill="#ffe4e6"/><text x="1026" y="988" fill="#9f1239">snag</text>
+  </g>
+  <g stroke="#94a3b8" stroke-width="1.4" marker-end="url(#arr)">
+    <line x1="140" y1="983" x2="158" y2="983"/>
+    <line x1="252" y1="983" x2="270" y2="983"/>
+    <line x1="372" y1="983" x2="390" y2="983"/>
+    <line x1="672" y1="983" x2="690" y2="983"/>
+    <line x1="842" y1="983" x2="860" y2="983"/>
+  </g>
+  <text x="447" y="1022" font-size="10.5" fill="#64748b">in_progress ⇄ variation_pending (returns to in_progress on RM decision)</text>
+  <text x="916" y="1022" font-size="10.5" fill="#64748b" text-anchor="middle">snag → snag_in_progress → re-sign-off</text>
+
+  <!-- ===== Side: Sub Suppliers ===== -->
+  <rect x="460" y="1058" width="320" height="74" rx="10" fill="#fff" stroke="#9a7b34"/>
+  <text x="474" y="1082" font-size="13" font-weight="700" fill="#7c5e1e">Sub Suppliers directory (standalone)</text>
+  <text x="474" y="1102" font-size="11" fill="#92703a">/supplier/suppliers — trade companies (plumbing,</text>
+  <text x="474" y="1118" font-size="11" fill="#92703a">electrical…), grouped by trade · stacked decks</text>
+
+  <!-- ===== Cross-cutting infra ===== -->
+  <rect x="40" y="1170" width="1160" height="120" rx="10" fill="#f1f5f9" stroke="#cbd5e1"/>
+  <text x="60" y="1196" font-size="14" font-weight="700" fill="#0f172a">Cross-cutting (every step)</text>
+  <text x="60" y="1220" font-size="12" fill="#334155">• Notifications fan-out + web-push to other roles: createAdminClient() (service role, bypasses RLS) → notifications table + lib/push (VAPID).</text>
+  <text x="60" y="1242" font-size="12" fill="#334155">• Live UI refresh: RealtimeRefresh (Supabase Realtime) subscribes per role layout to tickets / quotes / completions / notifications.</text>
+  <text x="60" y="1264" font-size="12" fill="#334155">• Route gate: middleware.ts checks role per path. Auth + RLS via Supabase; user-scoped client for own data, admin client for cross-user.</text>
+  <text x="60" y="1284" font-size="12" fill="#334155">• Ticket lists shown as one collapsible stacked deck per status (client / supplier / regional).</text>
+
+  <!-- Legend -->
+  <text x="40" y="1330" font-size="13" font-weight="700" fill="#0f172a">Legend</text>
+  <line x1="110" y1="1326" x2="150" y2="1326" stroke="#475569" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="158" y="1330" font-size="12" fill="#334155">primary action / data</text>
+  <line x1="320" y1="1326" x2="360" y2="1326" stroke="#475569" stroke-width="1.2" stroke-dasharray="3 3" marker-end="url(#arr)"/>
+  <text x="368" y="1330" font-size="12" fill="#334155">notification</text>
+  <line x1="500" y1="1326" x2="540" y2="1326" stroke="#e11d48" stroke-width="1.4" marker-end="url(#arrLoop)"/>
+  <text x="548" y="1330" font-size="12" fill="#334155">rejection / loop-back</text>
+</svg>

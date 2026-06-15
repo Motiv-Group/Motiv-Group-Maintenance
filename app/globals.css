@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    /* Prevent text resize on mobile orientation change */
+    -webkit-text-size-adjust: 100%;
+    /* Tell browsers (incl. Samsung Chrome "Force Dark") that we manage
+       our own colour scheme — do not apply automatic dark-mode inversion */
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-gray-100 text-gray-900 dark:bg-gray-950 dark:text-white;
+  }
+}
+
+@layer utilities {
+  .safe-top    { padding-top: env(safe-area-inset-top); }
+  .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+}
+
+/* ── Report (print) layout ── */
+.report-cover {
+  text-align: center;
+  padding: 5rem 1.5rem 3rem;
+}
+.report-section { margin-top: 1.75rem; }
+
+@media print {
+  /* Hide app chrome (top + bottom nav are <nav> elements) and any no-print UI */
+  nav, .no-print { display: none !important; }
+  html, body, main { background: #fff !important; }
+  .report { max-width: none !important; color: #000 !important; }
+  .report-cover { break-after: page; min-height: 90vh; }
+  .report-section { break-inside: avoid; }
+  table { break-inside: auto; }
+  @page { margin: 14mm; }
+}

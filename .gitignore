@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Next.js build output
+.next/
+out/
+
+# Environment variables (keep these secret!)
+.env.local
+.env*.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Android release signing — NEVER commit these (back them up safely instead)
+android/keystore.properties
+*.keystore
+*.jks
