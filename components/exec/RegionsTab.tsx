@@ -4,23 +4,27 @@ import { useState } from 'react'
 import { Globe2, Trophy, AlertTriangle, ClipboardList, Gauge, Banknote, TrendingUp, CheckCircle2, ShieldAlert, Lock, Coins } from 'lucide-react'
 import type { EstateDashboardData, StoreCard, TrendDelta } from '@/lib/health/data'
 import type { RegionalHealthResult } from '@/lib/health/regionalHealth'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, formatDate } from '@/lib/utils'
 import {
-  Card, SectionCard, KpiRow, Pill, Donut, BreakdownList, DistributionChips, QuickRow,
-  RecommendedAction, StatusLegend, STATUS_TEXT, type Kpi, type Trend,
+  SectionCard, KpiRow, Pill, Donut, BreakdownList, DistributionChips, QuickRow,
+  RecommendedAction, StatusLegend, TrendArrow, STATUS_TEXT, type Kpi, type Trend,
 } from '@/components/exec/ui'
+import { Drawer, DrawerHeader, PrimaryButton } from '@/components/exec/Drawer'
+import { ProvisionButton } from '@/components/exec/ProvisionPanel'
+import { PendingRegionalManagers } from '@/components/exec/PendingRegionalManagers'
+import { TabHeader, DateChip, FilterMenu, STATUS_FILTER_OPTIONS } from '@/components/exec/TabControls'
 
 const tr = (d: TrendDelta): Trend | undefined => d.dir === 'flat' ? undefined : { dir: d.dir, label: `${d.pct}% vs yesterday` }
-import { Drawer, DrawerHeader, PrimaryButton } from '@/components/exec/Drawer'
-import { ProvisionPanel } from '@/components/exec/ProvisionPanel'
 
 const fmtK = (n: number) => n >= 1000 ? `R ${(n / 1000).toFixed(0)}K` : formatCurrency(n)
 
 export function RegionsTab({ data }: { data: EstateDashboardData }) {
   const regions = data.regions
-  const [selId, setSelId] = useState<string | null>(regions[0]?.region.regionId ?? null)
+  const [selId, setSelId] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
-  const selected = regions.find(r => r.region.regionId === selId) ?? regions[0] ?? null
+  const [status, setStatus] = useState('all')
+  const selected = regions.find(r => r.region.regionId === selId) ?? null
+  const shown = status === 'all' ? regions : regions.filter(r => r.region.status === status)
 
   const best = [...regions].sort((a, b) => b.region.finalPortfolioHealth - a.region.finalPortfolioHealth)[0]
   const lowestBreaches = [...regions].sort((a, b) => (a.region.supplierSlaBreaches + a.region.internalSlaBreaches) - (b.region.supplierSlaBreaches + b.region.internalSlaBreaches))[0]
@@ -41,34 +45,36 @@ export function RegionsTab({ data }: { data: EstateDashboardData }) {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold text-white flex items-center gap-2"><Globe2 className="text-[#C6A35D]" size={22} /> Regions</h1>
-        <p className="text-sm text-slate-400 mt-0.5">Regional performance, portfolio health and executive attention areas.</p>
-      </div>
+      <TabHeader icon={<Globe2 size={18} className="text-[#C6A35D]" />} title="Regions" subtitle="Regional performance, portfolio health and executive attention areas.">
+        <DateChip date={formatDate(data.generatedAt)} />
+        <FilterMenu value={status} onChange={setStatus} options={STATUS_FILTER_OPTIONS} />
+        <ProvisionButton mode="exec-regions" regions={regions.map(r => ({ id: r.region.regionId, name: r.regionName }))} label="Manage regions & RMs" />
+      </TabHeader>
 
       <KpiRow kpis={kpis} />
 
-      <ProvisionPanel mode="exec-regions" regions={regions.map(r => ({ id: r.region.regionId, name: r.regionName }))} />
+      <PendingRegionalManagers />
 
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-5 items-start">
+      <div className="space-y-5">
         <div className="space-y-5 min-w-0">
           <SectionCard title="Regional Ranking — highest risk first">
             <div className="overflow-x-auto -mx-1">
               <table className="w-full text-sm min-w-[860px]">
                 <thead>
                   <tr className="text-left text-[11px] text-slate-500 border-b border-white/5">
-                    <th className="py-2 px-2">#</th><th className="px-2">Region</th><th className="px-2">Health</th><th className="px-2">Status</th>
+                    <th className="py-2 px-2">#</th><th className="px-2">Region</th><th className="px-2">Health</th><th className="px-2">Trend</th><th className="px-2">Status</th>
                     <th className="px-2">Stores</th><th className="px-2">Red/Crit</th><th className="px-2">Open</th>
                     <th className="px-2">Sup SLA</th><th className="px-2">Int SLA</th><th className="px-2">Exposure</th><th className="px-2">Main Driver</th><th className="px-2"></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {regions.map(({ rank, region, regionName }) => (
+                  {shown.map(({ rank, region, regionName, trend }) => (
                     <tr key={region.regionId} onClick={() => openRow(region.regionId)}
                       className={`border-b border-white/5 cursor-pointer hover:bg-white/[0.03] ${selId === region.regionId ? 'bg-white/[0.04]' : ''}`}>
                       <td className="py-2.5 px-2 text-slate-500">{rank}</td>
                       <td className="px-2 font-medium text-white whitespace-nowrap">{regionName}</td>
                       <td className={`px-2 font-semibold ${STATUS_TEXT[region.status]}`}>{region.finalPortfolioHealth}%</td>
+                      <td className="px-2"><TrendArrow t={{ dir: trend.dir, label: `${trend.pct}%`, good: trend.dir === 'up' }} /></td>
                       <td className="px-2"><Pill status={region.status} /></td>
                       <td className="px-2 text-slate-300">{region.activeStores}</td>
                       <td className="px-2 text-slate-300">{region.counts.at_risk} / {region.counts.critical}</td>
@@ -84,7 +90,7 @@ export function RegionsTab({ data }: { data: EstateDashboardData }) {
                       </td>
                     </tr>
                   ))}
-                  {regions.length === 0 && <tr><td colSpan={12} className="py-6 text-center text-slate-500">No active regions.</td></tr>}
+                  {shown.length === 0 && <tr><td colSpan={13} className="py-6 text-center text-slate-500">No regions match this filter.</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -109,14 +115,9 @@ export function RegionsTab({ data }: { data: EstateDashboardData }) {
             </SectionCard>
           </div>
         </div>
-
-        {/* Persistent detail panel (xl+) */}
-        <div className="hidden xl:block sticky top-20">
-          <Card className="p-5">{selected ? <RegionDetail data={data} region={selected.region} name={selected.regionName} /> : <p className="text-sm text-slate-500">Select a region.</p>}</Card>
-        </div>
       </div>
 
-      {/* Overlay drawer (< xl) */}
+      {/* Click-to-open slide-over detail */}
       <Drawer open={open} onClose={() => setOpen(false)}>
         {selected && <RegionDetail data={data} region={selected.region} name={selected.regionName} onClose={() => setOpen(false)} />}
       </Drawer>

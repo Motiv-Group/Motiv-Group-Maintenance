@@ -73,6 +73,11 @@ export interface StoreCard extends StoreHealthResult { storeName: string; region
 export interface TrendDelta { dir: 'up' | 'down' | 'flat'; pct: number }
 export interface EstateTrends { openWork: TrendDelta; slaPressure: TrendDelta; cost: TrendDelta; supplierBreaches: TrendDelta }
 export interface ExposureBucket { label: string; value: number }
+export interface SupplierEscalationRow {
+  id: string; supplierId: string; supplierName: string; issue: string
+  actionRequired: string | null; status: string; escalatedBy: string | null; escalatedAt: string
+}
+export interface SeriesPoint { label: string; value: number }
 export interface EstateDashboardData {
   trends: EstateTrends
   estate: EstateHealthResult
@@ -82,7 +87,10 @@ export interface EstateDashboardData {
   topRiskStores: StoreCard[]
   attentionStores: StoreCard[]
   controlledStores: StoreCard[]
-  suppliers: { id: string; name: string; perf: SupplierPerformance; open: number; overdue: number; costExposure: number }[]
+  storeTrends: Record<string, TrendDelta>
+  suppliers: { id: string; name: string; perf: SupplierPerformance; open: number; overdue: number; costExposure: number; trend: TrendDelta }[]
+  supplierSlaSeries: SeriesPoint[]
+  escalations: SupplierEscalationRow[]
   repeatDefects: (RepeatDefect & { storeName: string; regionName: string })[]
   decisions: DecisionItem[]
   pendingDecisionValue: number
@@ -107,6 +115,14 @@ export async function assembleEstateDashboard(companyId: string, now: Date = new
   const storeName = new Map(stores.map(s => [s.id, [s.name, s.sub_store].filter(Boolean).join(' — ')]))
   const tickets = ((ticketsRaw ?? []) as any[]).map(asTicket)
   const supplierName = new Map((suppliersRaw ?? []).map((s: any) => [s.id, s.company_name]))
+
+  // trend baselines + escalations (snapshots written by the daily crons)
+  const [supplierPrev, storePrev, supplierSlaSeries, escalations] = await Promise.all([
+    loadSupplierPrevScore(db, companyId, now),
+    loadStorePrevHealth(db, companyId, now),
+    loadSupplierSlaSeries(db, companyId, now),
+    loadEscalations(db, companyId, supplierName),
+  ])
 
   const ticketsByStore = new Map<string, HealthTicket[]>()
   for (const t of tickets) { const a = ticketsByStore.get(t.store_id) ?? []; a.push(t); ticketsByStore.set(t.store_id, a) }
@@ -169,7 +185,8 @@ export async function assembleEstateDashboard(companyId: string, now: Date = new
       const act = ts.filter(t => isActive(t.status))
       const overdue = act.filter(t => { const s = computeTicketSla(t, rules(t.priority), now); return s.supplierBreached || s.internalBreached }).length
       const costExposure = act.reduce((s, t) => s + (t.quote_value ?? 0), 0)
-      return { id, name: supplierName.get(id) ?? 'Supplier', perf: calculateSupplierPerformance(id, ts, rules, now), open: act.length, overdue, costExposure }
+      const perf = calculateSupplierPerformance(id, ts, rules, now)
+      return { id, name: supplierName.get(id) ?? 'Supplier', perf, open: act.length, overdue, costExposure, trend: delta(perf.performanceScore, supplierPrev.get(id)) }
     })
     .sort((a, b) => a.perf.performanceScore - b.perf.performanceScore)
 
@@ -209,9 +226,13 @@ export async function assembleEstateDashboard(companyId: string, now: Date = new
     supplierBreaches: estate.supplierSlaBreaches,
   }, now)
 
+  const storeTrends: Record<string, TrendDelta> = {}
+  for (const c of cards) storeTrends[c.storeId] = delta(c.finalHealthScore, storePrev.get(c.storeId))
+
   return {
     trends, estate, totalRegions: (regionsRaw ?? []).length, regions: ranking,
-    stores: cards, topRiskStores, attentionStores, controlledStores, suppliers, repeatDefects,
+    stores: cards, topRiskStores, attentionStores, controlledStores, storeTrends,
+    suppliers, supplierSlaSeries, escalations, repeatDefects,
     decisions, pendingDecisionValue, highValueApprovals, exposureBreakdown, generatedAt: now.toISOString(),
   }
 }
@@ -234,6 +255,56 @@ async function loadEstateTrends(
     cost: delta(cur.cost, p?.cost_exposure),
     supplierBreaches: delta(cur.supplierBreaches, p?.supplier_sla_breaches),
   }
+}
+
+// Map supplier_id → yesterday's performance_score (supplier trend arrows).
+async function loadSupplierPrevScore(db: DB, companyId: string, now: Date): Promise<Map<string, number>> {
+  const yesterday = new Date(now.getTime() - DAY).toISOString().slice(0, 10)
+  const { data } = await db.from('supplier_performance_scores')
+    .select('supplier_id, performance_score').eq('company_id', companyId).eq('snapshot_date', yesterday)
+  const m = new Map<string, number>()
+  for (const r of (data ?? []) as any[]) if (r.supplier_id != null && r.performance_score != null) m.set(r.supplier_id, Number(r.performance_score))
+  return m
+}
+
+// Map store_id → yesterday's final_health_score (store trend arrows).
+async function loadStorePrevHealth(db: DB, companyId: string, now: Date): Promise<Map<string, number>> {
+  const yesterday = new Date(now.getTime() - DAY).toISOString().slice(0, 10)
+  const { data } = await db.from('store_health_scores')
+    .select('store_id, final_health_score').eq('company_id', companyId).eq('snapshot_date', yesterday)
+  const m = new Map<string, number>()
+  for (const r of (data ?? []) as any[]) if (r.store_id != null && r.final_health_score != null) m.set(r.store_id, Number(r.final_health_score))
+  return m
+}
+
+// Overall supplier SLA % per day for the last ~6 snapshot dates (SLA-trend sparkline).
+async function loadSupplierSlaSeries(db: DB, companyId: string, now: Date): Promise<{ label: string; value: number }[]> {
+  const from = new Date(now.getTime() - 42 * DAY).toISOString().slice(0, 10)
+  const { data } = await db.from('supplier_performance_scores')
+    .select('snapshot_date, performance_score').eq('company_id', companyId).gte('snapshot_date', from)
+    .order('snapshot_date', { ascending: true })
+  const byDate = new Map<string, number[]>()
+  for (const r of (data ?? []) as any[]) {
+    if (r.performance_score == null) continue
+    const arr = byDate.get(r.snapshot_date) ?? []; arr.push(Number(r.performance_score)); byDate.set(r.snapshot_date, arr)
+  }
+  const dates = [...byDate.keys()].sort().slice(-6)
+  return dates.map(d => {
+    const xs = byDate.get(d)!
+    return { label: new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' }), value: Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) }
+  })
+}
+
+// Recent supplier escalations joined with supplier name.
+async function loadEscalations(db: DB, companyId: string, supplierName: Map<string, string>): Promise<SupplierEscalationRow[]> {
+  const { data } = await db.from('supplier_escalations')
+    .select('id, supplier_id, issue, action_required, status, escalated_by, escalated_at')
+    .eq('company_id', companyId).order('escalated_at', { ascending: false }).limit(20)
+  return ((data ?? []) as any[]).map(r => ({
+    id: r.id, supplierId: r.supplier_id, supplierName: supplierName.get(r.supplier_id) ?? 'Supplier',
+    issue: r.issue, actionRequired: r.action_required ?? null, status: r.status,
+    escalatedBy: r.escalated_by ?? null, escalatedAt: r.escalated_at,
+  }))
 }
 
 // Map region_id → yesterday's final_portfolio_health (for per-region trend arrows).

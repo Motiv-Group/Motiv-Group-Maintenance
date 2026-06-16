@@ -19,6 +19,7 @@ interface SignupForm {
   phone:        string
   address:      string
   company_name: string
+  region_code:  string
   password:     string
   confirm_password: string
 }
@@ -54,6 +55,8 @@ export default function SignupPage() {
           company_name: values.company_name,
           sub_store:    null,
           branch_code:  null,
+          // RMs join an executive's company via their region code (approved later).
+          requested_region_code: role === 'regional_manager' ? (values.region_code ?? '').trim().toUpperCase() : null,
           role,
         },
       },
@@ -187,13 +190,23 @@ export default function SignupPage() {
               error={errors.phone?.message}
               {...register('phone', { required: 'Phone number is required' })}
             />
-            <Input
-              id="company_name"
-              label="Company Name"
-              placeholder="Acme Corporation"
-              error={errors.company_name?.message}
-              {...register('company_name', { required: 'Company name is required' })}
-            />
+            {role === 'executive' ? (
+              <Input
+                id="company_name"
+                label="Company Name"
+                placeholder="Acme Corporation"
+                error={errors.company_name?.message}
+                {...register('company_name', { required: 'Company name is required' })}
+              />
+            ) : (
+              <Input
+                id="region_code"
+                label="Region Code"
+                placeholder="e.g. GP — given by your executive"
+                error={errors.region_code?.message}
+                {...register('region_code', { required: 'Region code is required' })}
+              />
+            )}
             <Input
               id="address"
               label="Address"

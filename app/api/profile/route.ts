@@ -28,8 +28,15 @@ export async function PATCH(request: Request) {
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
   const body = await request.json()
-  const { full_name, phone, role } = body
+  const { full_name, phone, role, address, company_name, sub_store, branch_code, requested_region_code } = body
   const updateData: Record<string, unknown> = { full_name, phone: normalisePhone(phone) }
+  // optional profile fields — only set when provided so partial saves don't blank them
+  if (typeof address === 'string') updateData.address = address
+  if (typeof company_name === 'string') updateData.company_name = company_name
+  if (typeof sub_store === 'string') updateData.sub_store = sub_store
+  if (typeof branch_code === 'string') updateData.branch_code = branch_code
+  // RM can correct the region code they used at signup, while still pending
+  if (typeof requested_region_code === 'string') updateData.requested_region_code = requested_region_code.trim().toUpperCase()
   // role self-selectable on first signup (company assigned by an admin)
   if (typeof role === 'string' && ROLES.includes(role)) updateData.role = role
 

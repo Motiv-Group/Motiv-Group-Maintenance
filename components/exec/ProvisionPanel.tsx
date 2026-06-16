@@ -4,11 +4,35 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { UserPlus, PlusCircle, ChevronDown } from 'lucide-react'
 import { Card } from '@/components/exec/ui'
+import { Drawer, DrawerHeader } from '@/components/exec/Drawer'
 
 type Mode = 'exec-regions' | 'rm-stores' | 'suppliers'
 interface Opt { id: string; name: string }
+interface Props { mode: Mode; regions?: Opt[]; stores?: Opt[] }
 
-export function ProvisionPanel({ mode, regions = [], stores = [] }: { mode: Mode; regions?: Opt[]; stores?: Opt[] }) {
+function title(m: Mode) { return m === 'exec-regions' ? 'Manage regions & RMs' : m === 'rm-stores' ? 'Manage stores & managers' : 'Add suppliers' }
+
+/** The provision forms for a given mode (shared by the inline panel + the button). */
+export function ProvisionForms({ mode, regions = [], stores = [] }: Props) {
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {mode === 'exec-regions' && <>
+        <Form action="add_region" title="Add region" fields={[{ k: 'name', ph: 'Region name' }, { k: 'code', ph: 'Code (e.g. GP)' }]} cta={<><PlusCircle size={14} /> Add</>} />
+        <Form action="invite_rm" title="Invite regional manager" fields={[{ k: 'email', ph: 'RM email', type: 'email' }]} select={{ k: 'regionId', label: 'Region', opts: regions }} cta={<><UserPlus size={14} /> Invite</>} />
+      </>}
+      {mode === 'rm-stores' && <>
+        <Form action="add_store" title="Add store" fields={[{ k: 'branch_code', ph: 'Branch code' }, { k: 'name', ph: 'Store name' }]} cta={<><PlusCircle size={14} /> Add</>} />
+        <Form action="invite_store_manager" title="Invite store manager" fields={[{ k: 'email', ph: 'Manager email', type: 'email' }]} select={{ k: 'storeId', label: 'Store', opts: stores }} cta={<><UserPlus size={14} /> Invite</>} />
+      </>}
+      {mode === 'suppliers' && (
+        <div className="lg:col-span-2"><Form action="add_supplier" title="Add supplier (optionally invite their login)" fields={[{ k: 'companyName', ph: 'Supplier company' }, { k: 'trade', ph: 'Trade (e.g. Electrical)' }, { k: 'email', ph: 'Supplier login email (optional)', type: 'email' }]} cta={<><PlusCircle size={14} /> Add supplier</>} /></div>
+      )}
+    </div>
+  )
+}
+
+/** Collapsible inline card (kept for the RM stores page). */
+export function ProvisionPanel({ mode, regions = [], stores = [] }: Props) {
   const [open, setOpen] = useState(false)
   return (
     <Card className="p-0 overflow-hidden">
@@ -16,26 +40,26 @@ export function ProvisionPanel({ mode, regions = [], stores = [] }: { mode: Mode
         <span className="flex items-center gap-2"><UserPlus size={15} className="text-[#C6A35D]" /> {title(mode)}</span>
         <ChevronDown size={16} className={`text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
-      {open && (
-        <div className="px-5 pb-5 grid grid-cols-1 lg:grid-cols-2 gap-4 border-t border-white/5 pt-4">
-          {mode === 'exec-regions' && <>
-            <Form action="add_region" title="Add region" fields={[{ k: 'name', ph: 'Region name' }, { k: 'code', ph: 'Code (e.g. GP)' }]} cta={<><PlusCircle size={14} /> Add</>} />
-            <Form action="invite_rm" title="Invite regional manager" fields={[{ k: 'email', ph: 'RM email', type: 'email' }]} select={{ k: 'regionId', label: 'Region', opts: regions }} cta={<><UserPlus size={14} /> Invite</>} />
-          </>}
-          {mode === 'rm-stores' && <>
-            <Form action="add_store" title="Add store" fields={[{ k: 'branch_code', ph: 'Branch code' }, { k: 'name', ph: 'Store name' }]} cta={<><PlusCircle size={14} /> Add</>} />
-            <Form action="invite_store_manager" title="Invite store manager" fields={[{ k: 'email', ph: 'Manager email', type: 'email' }]} select={{ k: 'storeId', label: 'Store', opts: stores }} cta={<><UserPlus size={14} /> Invite</>} />
-          </>}
-          {mode === 'suppliers' && (
-            <div className="lg:col-span-2"><Form action="add_supplier" title="Add supplier (optionally invite their login)" fields={[{ k: 'companyName', ph: 'Supplier company' }, { k: 'trade', ph: 'Trade (e.g. Electrical)' }, { k: 'email', ph: 'Supplier login email (optional)', type: 'email' }]} cta={<><PlusCircle size={14} /> Add supplier</>} /></div>
-          )}
-        </div>
-      )}
+      {open && <div className="px-5 pb-5 border-t border-white/5 pt-4"><ProvisionForms mode={mode} regions={regions} stores={stores} /></div>}
     </Card>
   )
 }
 
-function title(m: Mode) { return m === 'exec-regions' ? 'Manage regions & RMs' : m === 'rm-stores' ? 'Manage stores & managers' : 'Add suppliers' }
+/** Top-right button that opens the provision forms in a slide-over. */
+export function ProvisionButton({ mode, regions = [], stores = [], label }: Props & { label?: string }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <button onClick={() => setOpen(true)} className="flex items-center gap-2 text-xs font-medium text-[#0a0e17] bg-[#C6A35D] rounded-xl px-3.5 py-2 hover:brightness-95 transition">
+        <UserPlus size={14} /> {label ?? title(mode)}
+      </button>
+      <Drawer open={open} onClose={() => setOpen(false)}>
+        <DrawerHeader onClose={() => setOpen(false)} title={<h3 className="text-lg font-bold text-white">{title(mode)}</h3>} />
+        <ProvisionForms mode={mode} regions={regions} stores={stores} />
+      </Drawer>
+    </>
+  )
+}
 
 interface FieldDef { k: string; ph: string; type?: string }
 function Form({ action, title, fields, select, cta }: { action: string; title: string; fields: FieldDef[]; select?: { k: string; label: string; opts: Opt[] }; cta: React.ReactNode }) {

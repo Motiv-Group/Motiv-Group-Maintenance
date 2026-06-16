@@ -2,16 +2,24 @@
 import type { ReactNode } from 'react'
 import { X } from 'lucide-react'
 
-/** Overlay drawer for < xl screens. On xl+ use a persistent right column instead. */
+/** Click-to-open slide-over panel, on every screen size. Always mounted so it
+ *  can animate in/out; content is hidden off-canvas when closed. */
 export function Drawer({ open, onClose, children }: { open: boolean; onClose: () => void; children: ReactNode }) {
-  if (!open) return null
   return (
-    <div className="xl:hidden">
-      <div className="fixed inset-0 bg-black/60 z-30" onClick={onClose} />
-      <aside className="fixed right-0 top-0 bottom-0 z-40 w-full sm:w-[380px] bg-[#0e1422] ring-1 ring-white/10 overflow-y-auto">
+    <>
+      <div
+        className={`fixed inset-0 bg-black/60 z-40 transition-opacity duration-300 ${open ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        onClick={onClose}
+        aria-hidden
+      />
+      <aside
+        className={`fixed right-0 top-0 bottom-0 z-50 w-full sm:w-[420px] bg-[#0e1422] ring-1 ring-white/10 overflow-y-auto transition-transform duration-300 ease-out ${open ? 'translate-x-0' : 'translate-x-full'}`}
+        role="dialog"
+        aria-modal="true"
+      >
         <div className="p-5">{children}</div>
       </aside>
-    </div>
+    </>
   )
 }
 
@@ -27,9 +35,9 @@ export function DrawerHeader({ title, onClose, children }: { title: ReactNode; o
   )
 }
 
-export function PrimaryButton({ children, tone = 'danger' }: { children: ReactNode; tone?: 'danger' | 'gold' }) {
+export function PrimaryButton({ children, tone = 'danger', onClick }: { children: ReactNode; tone?: 'danger' | 'gold'; onClick?: () => void }) {
   const cls = tone === 'gold'
     ? 'bg-[#C6A35D] text-[#0a0e17] hover:brightness-95'
     : 'bg-red-600 text-white hover:bg-red-500'
-  return <button className={`w-full mt-4 py-2.5 rounded-xl text-sm font-semibold transition ${cls}`}>{children}</button>
+  return <button onClick={onClick} className={`w-full mt-4 py-2.5 rounded-xl text-sm font-semibold transition ${cls}`}>{children}</button>
 }

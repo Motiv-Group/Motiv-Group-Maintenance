@@ -40,6 +40,38 @@ export async function POST(request: Request) {
         const rm = await inviteUser({ email: body.email, role: 'regional_manager', companyId, roleLabel: 'Regional Manager', link: { regionId: body.regionId } })
         return NextResponse.json({ ok: true, actionLink: rm.actionLink, emailed: rm.emailed })
       }
+      case 'list_pending_rms': {
+        if (!isExec) return forbid()
+        const { data: regions } = await admin.from('regions').select('id, name, region_code').eq('company_id', companyId).eq('active', true)
+        const byCode = new Map((regions ?? []).map((r: any) => [String(r.region_code ?? '').toUpperCase(), r]))
+        const { data: pend } = await admin.from('user_profiles')
+          .select('id, email, full_name, requested_region_code')
+          .eq('role', 'regional_manager').is('company_id', null).not('requested_region_code', 'is', null)
+        const pending = (pend ?? []).map((p: any) => {
+          const region = byCode.get(String(p.requested_region_code ?? '').toUpperCase())
+          return { id: p.id, email: p.email, fullName: p.full_name, code: p.requested_region_code, regionId: region?.id ?? null, regionName: region?.name ?? null }
+        }).filter(p => p.regionId) // only RMs whose code matches one of this exec's regions
+        return NextResponse.json({ pending })
+      }
+      case 'approve_rm': {
+        if (!isExec) return forbid()
+        if (!body.userId) return NextResponse.json({ error: 'Missing user' }, { status: 400 })
+        const { data: rmProfile } = await admin.from('user_profiles').select('id, requested_region_code, company_id').eq('id', body.userId).eq('role', 'regional_manager').single()
+        if (!rmProfile || rmProfile.company_id) return NextResponse.json({ error: 'Not a pending RM' }, { status: 400 })
+        const code = String(rmProfile.requested_region_code ?? '').toUpperCase()
+        const { data: region } = await admin.from('regions').select('id').eq('company_id', companyId).eq('active', true).ilike('region_code', code).maybeSingle()
+        if (!region) return NextResponse.json({ error: 'Region code does not match any of your regions' }, { status: 400 })
+        const { error: upErr } = await admin.from('user_profiles').update({ company_id: companyId, requested_region_code: null }).eq('id', body.userId)
+        if (upErr) return NextResponse.json({ error: upErr.message }, { status: 400 })
+        await admin.from('regional_users').upsert({ user_id: body.userId, region_id: region.id })
+        return NextResponse.json({ ok: true })
+      }
+      case 'reject_rm': {
+        if (!isExec) return forbid()
+        if (!body.userId) return NextResponse.json({ error: 'Missing user' }, { status: 400 })
+        await admin.from('user_profiles').update({ requested_region_code: null }).eq('id', body.userId).is('company_id', null)
+        return NextResponse.json({ ok: true })
+      }
       case 'add_store': {
         if (!isRM) return forbid()
         const regions = await myRegions()

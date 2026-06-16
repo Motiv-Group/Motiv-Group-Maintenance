@@ -3,12 +3,13 @@
 import { useState } from 'react'
 import { Truck, Gauge, AlertTriangle, ClipboardList, Clock, Banknote, ShieldAlert } from 'lucide-react'
 import type { EstateDashboardData } from '@/lib/health/data'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, formatDate } from '@/lib/utils'
 import {
-  Card, SectionCard, KpiRow, Pill, Donut, BreakdownList, QuickRow, RecommendedAction, STATUS_TEXT, type Kpi,
+  SectionCard, KpiRow, Pill, Donut, BreakdownList, QuickRow, RecommendedAction, TrendArrow, STATUS_TEXT, type Kpi,
 } from '@/components/exec/ui'
 import { Drawer, DrawerHeader, PrimaryButton } from '@/components/exec/Drawer'
-import { ProvisionPanel } from '@/components/exec/ProvisionPanel'
+import { ProvisionButton } from '@/components/exec/ProvisionPanel'
+import { TabHeader, DateChip, FilterMenu, ExportButton, exportCsv, STATUS_FILTER_OPTIONS } from '@/components/exec/TabControls'
 
 type Supplier = EstateDashboardData['suppliers'][number]
 const fmtK = (n: number) => n ? (n >= 1000 ? `R ${(n / 1000).toFixed(0)}K` : formatCurrency(n)) : 'R 0'
@@ -29,8 +30,20 @@ export function SuppliersTab({ data }: { data: EstateDashboardData }) {
   const suppliers = data.suppliers
   const [selId, setSelId] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
+  const [status, setStatus] = useState('all')
   const selected = suppliers.find(s => s.id === selId) ?? null
   const openRow = (id: string) => { setSelId(id); setOpen(true) }
+  const shown = status === 'all' ? suppliers : suppliers.filter(s => s.perf.band === status)
+
+  const onExport = () => exportCsv('supplier-performance.csv',
+    ['Supplier', 'SLA%', 'Status', 'Open', 'Overdue', 'Avg Response (hrs)', 'Avg Completion (days)', 'First Time Fix %', 'Repeat %', 'Cost Exposure', 'Escalations'],
+    shown.map(s => [s.name, s.perf.performanceScore, s.perf.band,
+      s.open, s.overdue,
+      s.perf.avgResponseMins == null ? '' : (s.perf.avgResponseMins / 60).toFixed(1),
+      s.perf.avgResolutionMins == null ? '' : (s.perf.avgResolutionMins / 1440).toFixed(1),
+      Math.round(s.perf.firstTimeFixRate * 100),
+      s.perf.assignedTickets ? Math.round(s.perf.repeatDefectInvolvement / s.perf.assignedTickets * 100) : 0,
+      s.costExposure, s.perf.escalationCount]))
 
   const overall = suppliers.length ? Math.round(suppliers.reduce((a, s) => a + s.perf.performanceScore, 0) / suppliers.length) : 100
   const buckets = { hi: 0, mid: 0, lo: 0, risk: 0 }
@@ -50,30 +63,32 @@ export function SuppliersTab({ data }: { data: EstateDashboardData }) {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold text-white flex items-center gap-2"><Truck className="text-[#C6A35D]" size={22} /> Suppliers</h1>
-        <p className="text-sm text-slate-400 mt-0.5">Supplier performance, SLA delivery, response quality and accountability.</p>
-      </div>
+      <TabHeader icon={<Truck size={18} className="text-[#C6A35D]" />} title="Suppliers" subtitle="Supplier performance, SLA delivery, response quality and accountability.">
+        <DateChip date={formatDate(data.generatedAt)} />
+        <FilterMenu value={status} onChange={setStatus} options={STATUS_FILTER_OPTIONS} />
+        <ExportButton onExport={onExport} />
+        <ProvisionButton mode="suppliers" label="Add suppliers" />
+      </TabHeader>
 
       <KpiRow kpis={kpis} />
 
-      <ProvisionPanel mode="suppliers" />
-
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-5 items-start">
+      <div className="space-y-5">
         <div className="space-y-5 min-w-0">
           <SectionCard title="Supplier Performance Ranking — highest risk first">
             <div className="overflow-x-auto -mx-1">
               <table className="w-full text-sm min-w-[900px]">
                 <thead><tr className="text-left text-[11px] text-slate-500 border-b border-white/5">
-                  <th className="py-2 px-2">#</th><th className="px-2">Supplier</th><th className="px-2">SLA%</th><th className="px-2">Status</th>
+                  <th className="py-2 px-2">#</th><th className="px-2">Supplier</th><th className="px-2">SLA%</th><th className="px-2">Trend</th><th className="px-2">Status</th>
                   <th className="px-2">Open</th><th className="px-2">Overdue</th><th className="px-2">Resp (hrs)</th><th className="px-2">Compl (days)</th>
                   <th className="px-2">First-fix</th><th className="px-2">Repeat</th><th className="px-2">Exposure</th><th className="px-2">Escal.</th><th className="px-2"></th>
                 </tr></thead>
                 <tbody>
-                  {suppliers.map((s, i) => (
+                  {shown.map((s, i) => (
                     <tr key={s.id} onClick={() => openRow(s.id)} className={`border-b border-white/5 cursor-pointer hover:bg-white/[0.03] ${selId === s.id ? 'bg-white/[0.04]' : ''}`}>
                       <td className="py-2.5 px-2 text-slate-500">{i + 1}</td><td className="px-2 text-white">{s.name}</td>
-                      <td className={`px-2 font-semibold ${STATUS_TEXT[s.perf.band]}`}>{s.perf.performanceScore}%</td><td className="px-2"><Pill status={s.perf.band} /></td>
+                      <td className={`px-2 font-semibold ${STATUS_TEXT[s.perf.band]}`}>{s.perf.performanceScore}%</td>
+                      <td className="px-2"><TrendArrow t={{ dir: s.trend.dir, label: `${s.trend.pct}%`, good: s.trend.dir === 'up' }} /></td>
+                      <td className="px-2"><Pill status={s.perf.band} /></td>
                       <td className="px-2 text-slate-300">{s.open}</td><td className="px-2 text-red-400">{s.overdue}</td>
                       <td className="px-2 text-slate-300">{s.perf.avgResponseMins == null ? '—' : (s.perf.avgResponseMins / 60).toFixed(1)}</td>
                       <td className="px-2 text-slate-300">{s.perf.avgResolutionMins == null ? '—' : (s.perf.avgResolutionMins / 1440).toFixed(1)}</td>
@@ -83,13 +98,13 @@ export function SuppliersTab({ data }: { data: EstateDashboardData }) {
                       <td className="px-2"><span className={`text-[11px] px-2 py-1 rounded-lg ring-1 ${s.perf.band === 'controlled' ? 'text-slate-300 ring-white/10' : 'text-[#C6A35D] ring-[#C6A35D]/40'}`}>{s.perf.band === 'controlled' ? 'Monitor' : 'Review'}</span></td>
                     </tr>
                   ))}
-                  {!suppliers.length && <tr><td colSpan={13} className="py-6 text-center text-slate-500">No tickets linked to suppliers yet.</td></tr>}
+                  {!shown.length && <tr><td colSpan={14} className="py-6 text-center text-slate-500">No suppliers match this filter.</td></tr>}
                 </tbody>
               </table>
             </div>
           </SectionCard>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
             <SectionCard title="Supplier SLA Distribution">
               <div className="space-y-2 text-sm">
                 <Bucket color="bg-emerald-500" label="≥ 90%" n={buckets.hi} total={suppliers.length} />
@@ -97,6 +112,9 @@ export function SuppliersTab({ data }: { data: EstateDashboardData }) {
                 <Bucket color="bg-[#C6A35D]" label="70 – 79%" n={buckets.lo} total={suppliers.length} />
                 <Bucket color="bg-red-500" label="< 70%" n={buckets.risk} total={suppliers.length} />
               </div>
+            </SectionCard>
+            <SectionCard title="SLA Trend (Overall)">
+              <Sparkline series={data.supplierSlaSeries} />
             </SectionCard>
             <SectionCard title="Top Suppliers by Cost Exposure">
               {topCost.map((s, i) => (
@@ -110,20 +128,60 @@ export function SuppliersTab({ data }: { data: EstateDashboardData }) {
           </div>
 
           <SectionCard title="Recent Supplier Escalations" icon={<ShieldAlert size={15} className="text-red-400" />}>
-            {escalated.slice(0, 5).map(s => (
-              <div key={s.id} className="flex items-center justify-between gap-2 py-2 border-b border-white/5 last:border-0">
-                <div className="min-w-0"><p className="text-sm text-white truncate">{s.name}</p><p className="text-[11px] text-slate-500">{s.perf.slaBreaches} SLA breaches · {s.overdue} overdue</p></div>
-                <Pill status={s.perf.band} />
+            {data.escalations.length > 0 ? (
+              <div className="overflow-x-auto -mx-1">
+                <table className="w-full text-sm min-w-[640px]">
+                  <thead><tr className="text-left text-[11px] text-slate-500 border-b border-white/5">
+                    <th className="py-2 px-2">Supplier</th><th className="px-2">Issue</th><th className="px-2">Escalated On</th><th className="px-2">By</th><th className="px-2">Status</th><th className="px-2">Action Required</th>
+                  </tr></thead>
+                  <tbody>
+                    {data.escalations.slice(0, 6).map(e => (
+                      <tr key={e.id} className="border-b border-white/5">
+                        <td className="py-2 px-2 text-white whitespace-nowrap">{e.supplierName}</td>
+                        <td className="px-2 text-slate-300 max-w-[200px] truncate">{e.issue}</td>
+                        <td className="px-2 text-slate-400 whitespace-nowrap">{formatDate(e.escalatedAt)}</td>
+                        <td className="px-2 text-slate-400 whitespace-nowrap">{e.escalatedBy ?? '—'}</td>
+                        <td className="px-2"><span className={`text-[11px] px-2 py-0.5 rounded-full ${e.status === 'resolved' ? 'bg-emerald-500/15 text-emerald-400' : e.status === 'in_progress' ? 'bg-[#C6A35D]/15 text-[#C6A35D]' : 'bg-red-500/15 text-red-400'}`}>{e.status.replace('_', ' ')}</span></td>
+                        <td className="px-2 text-slate-400 max-w-[200px] truncate">{e.actionRequired ?? '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            ))}
-            {!escalated.length && <p className="text-sm text-slate-500">No escalations.</p>}
+            ) : escalated.length > 0 ? (
+              escalated.slice(0, 5).map(s => (
+                <div key={s.id} className="flex items-center justify-between gap-2 py-2 border-b border-white/5 last:border-0">
+                  <div className="min-w-0"><p className="text-sm text-white truncate">{s.name}</p><p className="text-[11px] text-slate-500">{s.perf.slaBreaches} SLA breaches · {s.overdue} overdue</p></div>
+                  <Pill status={s.perf.band} />
+                </div>
+              ))
+            ) : <p className="text-sm text-slate-500">No escalations logged.</p>}
           </SectionCard>
         </div>
-
-        <div className="hidden xl:block sticky top-20"><Card className="p-5">{selected ? <SupplierDetail s={selected} /> : <p className="text-sm text-slate-500">Select a supplier.</p>}</Card></div>
       </div>
 
       <Drawer open={open} onClose={() => setOpen(false)}>{selected && <SupplierDetail s={selected} onClose={() => setOpen(false)} />}</Drawer>
+    </div>
+  )
+}
+
+/** Minimal SVG line sparkline for the SLA-trend series (flat message until snapshots exist). */
+function Sparkline({ series }: { series: { label: string; value: number }[] }) {
+  if (series.length < 2) return <p className="text-sm text-slate-500 py-6 text-center">Trend builds once daily snapshots run.</p>
+  const w = 240, h = 90, pad = 8
+  const xs = series.map((_, i) => pad + (i * (w - pad * 2)) / (series.length - 1))
+  const ys = series.map(p => h - pad - (Math.max(0, Math.min(100, p.value)) / 100) * (h - pad * 2))
+  const path = xs.map((x, i) => `${i ? 'L' : 'M'}${x.toFixed(1)} ${ys[i].toFixed(1)}`).join(' ')
+  const last = series[series.length - 1].value
+  return (
+    <div>
+      <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-24">
+        <path d={path} fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        {xs.map((x, i) => <circle key={i} cx={x} cy={ys[i]} r="2.5" fill="#10b981" />)}
+      </svg>
+      <div className="flex justify-between text-[10px] text-slate-500 mt-1">
+        <span>{series[0].label}</span><span className="text-emerald-400 font-semibold">{last}%</span><span>{series[series.length - 1].label}</span>
+      </div>
     </div>
   )
 }

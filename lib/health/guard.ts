@@ -34,16 +34,43 @@ export async function requireStoreManagerV3(): Promise<StoreContext> {
 
 export interface RegionalContext { userId: string; companyId: string; regionIds: string[]; fullName: string | null }
 
-/** Gate a v3 regional-manager page + return their region scope. */
+/** Gate a v3 regional-manager DATA page + return their region scope. A signed-up
+ *  but not-yet-approved RM (no company) is sent to the /regional landing, which
+ *  shows a "pending region assignment" screen — never back to /auth/login (that
+ *  would loop with the middleware). */
 export async function requireRegionalV3(): Promise<RegionalContext> {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
   const { data: profile } = await supabase.from('user_profiles').select('role, company_id, full_name').eq('id', user.id).single()
   if (profile?.role !== 'regional_manager') redirect('/auth/login')
-  if (!profile?.company_id) redirect('/auth/login')
+  if (!profile?.company_id) redirect('/regional')
   const { data: links } = await supabase.from('regional_users').select('region_id').eq('user_id', user.id)
-  return { userId: user.id, companyId: profile.company_id, regionIds: (links ?? []).map(l => l.region_id), fullName: profile.full_name ?? null }
+  if (!links?.length) redirect('/regional')
+  return { userId: user.id, companyId: profile.company_id, regionIds: links.map(l => l.region_id), fullName: profile.full_name ?? null }
+}
+
+export interface RegionalUser {
+  userId: string; role: string; companyId: string | null; regionIds: string[]
+  fullName: string | null; requestedRegionCode: string | null
+}
+
+/** Tolerant gate for the regional LAYOUT + landing: requires an RM login but
+ *  allows a pending (un-approved, no-company) RM through so they can see the
+ *  pending screen and reach Settings. Does not redirect on missing company. */
+export async function requireRegionalUser(): Promise<RegionalUser> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/auth/login')
+  const { data: profile } = await supabase
+    .from('user_profiles').select('role, company_id, full_name, requested_region_code').eq('id', user.id).single()
+  if (profile?.role !== 'regional_manager') redirect('/auth/login')
+  const { data: links } = await supabase.from('regional_users').select('region_id').eq('user_id', user.id)
+  return {
+    userId: user.id, role: profile.role, companyId: profile.company_id ?? null,
+    regionIds: (links ?? []).map(l => l.region_id), fullName: profile.full_name ?? null,
+    requestedRegionCode: profile.requested_region_code ?? null,
+  }
 }
 
 /** Gate a v3 executive page + return their company scope. */

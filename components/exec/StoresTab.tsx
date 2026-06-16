@@ -1,14 +1,17 @@
 'use client'
 
 import { useState } from 'react'
-import { Store, Building2, ShieldCheck, AlertTriangle, ClipboardList, ReceiptText, Banknote, Truck, Lock, Repeat, Gavel, CheckCircle2, Trophy } from 'lucide-react'
+import { Store, Building2, ShieldCheck, AlertTriangle, ClipboardList, ReceiptText, Banknote, Truck, Lock, Repeat, Gavel, CheckCircle2, Trophy, TrendingUp } from 'lucide-react'
 import type { EstateDashboardData, StoreCard } from '@/lib/health/data'
 import { statusForScore, STATUS_LABELS } from '@/lib/health/constants'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, formatDate } from '@/lib/utils'
 import {
-  Card, SectionCard, KpiRow, Pill, Donut, BreakdownList, DistributionBar, RecommendedAction, STATUS_TEXT, type Kpi,
+  Card, SectionCard, KpiRow, Pill, Donut, BreakdownList, DistributionBar, RecommendedAction, TrendArrow, STATUS_TEXT, type Kpi,
 } from '@/components/exec/ui'
 import { Drawer, DrawerHeader, PrimaryButton } from '@/components/exec/Drawer'
+import { TabHeader, DateChip, FilterMenu, ExportButton, exportCsv, STATUS_FILTER_OPTIONS } from '@/components/exec/TabControls'
+
+const FLAT = { dir: 'flat' as const, pct: 0 }
 
 const fmtK = (n: number) => n ? (n >= 1000 ? `R ${(n / 1000).toFixed(0)}K` : formatCurrency(n)) : 'R 0,00'
 
@@ -16,8 +19,10 @@ export function StoresTab({ data }: { data: EstateDashboardData }) {
   const stores = data.stores
   const [selId, setSelId] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
+  const [status, setStatus] = useState('all')
   const selected = stores.find(s => s.storeId === selId) ?? null
   const openRow = (id: string) => { setSelId(id); setOpen(true) }
+  const trendOf = (id: string) => data.storeTrends[id] ?? FLAT
 
   const counts = { controlled: 0, attention: 0, at_risk: 0, critical: 0 }
   for (const s of stores) counts[s.finalStatus]++
@@ -40,16 +45,28 @@ export function StoresTab({ data }: { data: EstateDashboardData }) {
   ]
 
   const ranked = [...stores].sort((a, b) => a.finalHealthScore - b.finalHealthScore)
+  const shown = status === 'all' ? ranked : ranked.filter(s => s.finalStatus === status)
   const attention = ranked.filter(s => s.finalStatus !== 'controlled')
   const best = [...stores].sort((a, b) => b.finalHealthScore - a.finalHealthScore)[0]
   const lowestOpen = [...stores].sort((a, b) => a.openTickets - b.openTickets)[0]
+  const mostImproved = [...stores]
+    .map(s => ({ s, up: trendOf(s.storeId).dir === 'up' ? trendOf(s.storeId).pct : 0 }))
+    .sort((a, b) => b.up - a.up)[0]
+
+  const onExport = () => exportCsv('store-ranking.csv',
+    ['Store', 'Region', 'Health', 'Trend', 'Status', 'Open', 'Overdue', 'Approvals', 'Exposure', 'Main Driver'],
+    shown.map(s => {
+      const t = trendOf(s.storeId)
+      return [s.storeName, s.regionName, s.finalHealthScore, t.dir === 'flat' ? '—' : `${t.dir === 'up' ? '+' : '-'}${t.pct}%`, s.finalStatus, s.openTickets, s.overdueTickets, s.pendingDecisions, s.costExposure, s.mainIssue]
+    }))
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold text-white flex items-center gap-2"><Store className="text-[#C6A35D]" size={22} /> Store Performance</h1>
-        <p className="text-sm text-slate-400 mt-0.5">Individual store health, exceptions and executive attention areas.</p>
-      </div>
+      <TabHeader icon={<Store size={18} className="text-[#C6A35D]" />} title="Store Performance" subtitle="Individual store health, exceptions and executive attention areas.">
+        <DateChip date={formatDate(data.generatedAt)} />
+        <FilterMenu value={status} onChange={setStatus} options={STATUS_FILTER_OPTIONS} />
+        <ExportButton onExport={onExport} />
+      </TabHeader>
 
       {/* Hero */}
       <Card className="p-6">
@@ -73,28 +90,30 @@ export function StoresTab({ data }: { data: EstateDashboardData }) {
 
       <KpiRow kpis={kpis} />
 
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-5 items-start">
+      <div className="space-y-5">
         <div className="space-y-5 min-w-0">
           <SectionCard title="Store Ranking — highest attention first">
             <div className="overflow-x-auto -mx-1">
               <table className="w-full text-sm min-w-[820px]">
                 <thead><tr className="text-left text-[11px] text-slate-500 border-b border-white/5">
-                  <th className="py-2 px-2">#</th><th className="px-2">Store</th><th className="px-2">Region</th><th className="px-2">Health</th><th className="px-2">Status</th>
+                  <th className="py-2 px-2">#</th><th className="px-2">Store</th><th className="px-2">Region</th><th className="px-2">Health</th><th className="px-2">Trend</th><th className="px-2">Status</th>
                   <th className="px-2">Open</th><th className="px-2">Overdue</th><th className="px-2">Approvals</th><th className="px-2">Exposure</th><th className="px-2">Main Driver</th><th className="px-2"></th>
                 </tr></thead>
                 <tbody>
-                  {ranked.map((s, i) => (
+                  {shown.map((s, i) => (
                     <tr key={s.storeId} onClick={() => openRow(s.storeId)} className={`border-b border-white/5 cursor-pointer hover:bg-white/[0.03] ${selId === s.storeId ? 'bg-white/[0.04]' : ''}`}>
                       <td className="py-2.5 px-2 text-slate-500">{i + 1}</td><td className="px-2 text-white">{s.storeName}</td>
                       <td className="px-2 text-slate-400">{s.regionName}</td>
-                      <td className={`px-2 font-semibold ${STATUS_TEXT[s.finalStatus]}`}>{s.finalHealthScore}%</td><td className="px-2"><Pill status={s.finalStatus} /></td>
+                      <td className={`px-2 font-semibold ${STATUS_TEXT[s.finalStatus]}`}>{s.finalHealthScore}%</td>
+                      <td className="px-2">{(() => { const t = trendOf(s.storeId); return <TrendArrow t={{ dir: t.dir, label: `${t.pct}%`, good: t.dir === 'up' }} /> })()}</td>
+                      <td className="px-2"><Pill status={s.finalStatus} /></td>
                       <td className="px-2 text-slate-300">{s.openTickets}</td><td className="px-2 text-red-400">{s.overdueTickets}</td>
                       <td className="px-2 text-slate-300">{s.pendingDecisions}</td><td className="px-2 text-slate-300 whitespace-nowrap">{fmtK(s.costExposure)}</td>
                       <td className="px-2 text-xs text-slate-400 max-w-[200px] truncate">{s.mainIssue}</td>
                       <td className="px-2"><span className={`text-[11px] px-2 py-1 rounded-lg ring-1 ${s.finalStatus === 'controlled' ? 'text-slate-300 ring-white/10' : 'text-[#C6A35D] ring-[#C6A35D]/40'}`}>{s.finalStatus === 'controlled' ? 'Monitor' : 'Review'}</span></td>
                     </tr>
                   ))}
-                  {!stores.length && <tr><td colSpan={11} className="py-6 text-center text-slate-500">No active stores.</td></tr>}
+                  {!shown.length && <tr><td colSpan={12} className="py-6 text-center text-slate-500">No stores match this filter.</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -112,13 +131,10 @@ export function StoresTab({ data }: { data: EstateDashboardData }) {
             </SectionCard>
             <SectionCard title="Performing Well" icon={<CheckCircle2 size={15} className="text-emerald-400" />}>
               <Perf icon={<Trophy size={15} className="text-[#C6A35D]" />} label="Best Performing Store" value={best ? `${best.storeName} (${best.finalHealthScore}%)` : '—'} />
+              <Perf icon={<TrendingUp size={15} className="text-emerald-400" />} label="Most Improved" value={mostImproved && mostImproved.up > 0 ? `${mostImproved.s.storeName} (+${mostImproved.up}%)` : '—'} />
               <Perf icon={<ClipboardList size={15} className="text-emerald-400" />} label="Lowest Open Work" value={lowestOpen ? `${lowestOpen.storeName} (${lowestOpen.openTickets} open)` : '—'} />
             </SectionCard>
           </div>
-        </div>
-
-        <div className="hidden xl:block sticky top-20">
-          <Card className="p-5">{selected ? <StoreDetail s={selected} /> : <p className="text-sm text-slate-500">Select a store.</p>}</Card>
         </div>
       </div>
 

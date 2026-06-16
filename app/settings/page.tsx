@@ -16,6 +16,7 @@ interface ProfileForm {
   company_name: string
   sub_store: string
   branch_code: string
+  requested_region_code: string
 }
 
 const ROLE_LABELS: Record<string, string> = {
@@ -48,6 +49,7 @@ const { register, handleSubmit, reset, formState: { errors } } = useForm<Profile
             company_name: profile.company_name ?? '',
             sub_store:    profile.sub_store    ?? '',
             branch_code:  profile.branch_code  ?? '',
+            requested_region_code: profile.requested_region_code ?? '',
           })
           setEmail(profile.email ?? '')
           setRole(profile.role   ?? '')
@@ -88,6 +90,7 @@ const { register, handleSubmit, reset, formState: { errors } } = useForm<Profile
   }
 
   const isStoreManager = role === 'store_manager' || role === 'client'
+  const isRegionalManager = role === 'regional_manager'
   const sectionLabel   = isStoreManager ? 'Store Information' : 'Profile Information'
 
   return (
@@ -142,6 +145,17 @@ const { register, handleSubmit, reset, formState: { errors } } = useForm<Profile
             error={errors.company_name?.message}
             {...register('company_name')}
           />
+
+          {/* Regional-manager region code (used by the executive to link them) */}
+          {isRegionalManager && (
+            <Input
+              id="requested_region_code"
+              label="Region Code"
+              placeholder="e.g. GP — given by your executive"
+              error={errors.requested_region_code?.message}
+              {...register('requested_region_code')}
+            />
+          )}
 
           {/* Store-manager-only fields */}
           {isStoreManager && (

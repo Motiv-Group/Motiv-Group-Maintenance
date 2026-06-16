@@ -4,9 +4,14 @@ import { useState } from 'react'
 import { Gavel, AlertTriangle, ShieldAlert, Banknote, Users, FileWarning, Lightbulb, Gem, Coins } from 'lucide-react'
 import type { EstateDashboardData } from '@/lib/health/data'
 import type { DecisionItem } from '@/lib/health/decisions'
-import { formatCurrency } from '@/lib/utils'
-import { Card, SectionCard, KpiRow, BreakdownList, QuickRow, RecommendedAction, Donut, type Kpi } from '@/components/exec/ui'
+import { formatDate } from '@/lib/utils'
+import { SectionCard, KpiRow, BreakdownList, QuickRow, RecommendedAction, Donut, type Kpi } from '@/components/exec/ui'
 import { Drawer, DrawerHeader, PrimaryButton } from '@/components/exec/Drawer'
+import { TabHeader, DateChip, FilterMenu, ExportButton, exportCsv, type FilterOption } from '@/components/exec/TabControls'
+
+const BAND_FILTER: FilterOption[] = [
+  { value: 'all', label: 'All priorities' }, { value: 'High', label: 'High' }, { value: 'Medium', label: 'Medium' }, { value: 'Low', label: 'Low' },
+]
 
 const fmtM = (n: number) => n >= 1_000_000 ? `R ${(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `R ${(n / 1000).toFixed(0)}K` : `R ${n}`
 const BAND_PILL: Record<DecisionItem['band'], string> = {
@@ -18,10 +23,12 @@ const bandStatus = (b: DecisionItem['band']) => b === 'High' ? 'at_risk' : b ===
 
 export function DecisionsTab({ data }: { data: EstateDashboardData }) {
   const decisions = data.decisions
-  const [sel, setSel] = useState<number | null>(null)
+  const [sel, setSel] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
-  const selected = sel != null ? decisions[sel] : null
-  const openRow = (i: number) => { setSel(i); setOpen(true) }
+  const [band, setBand] = useState('all')
+  const shown = band === 'all' ? decisions : decisions.filter(d => d.band === band)
+  const selected = sel != null ? decisions.find(d => d.title === sel) ?? null : null
+  const openRow = (title: string) => { setSel(title); setOpen(true) }
 
   const real = decisions.filter(d => d.category !== 'Monitor' || d.title !== 'No executive decisions outstanding')
   const exposure = decisions.reduce((a, d) => a + (d.exposureValue ?? 0), 0)
@@ -43,16 +50,21 @@ export function DecisionsTab({ data }: { data: EstateDashboardData }) {
 
   const statusOf = (d: DecisionItem) => d.category === 'Monitor' ? 'Monitor' : (d.urgency === 'high' && d.deadlineDays <= 1) ? 'Overdue' : 'Pending'
 
+  const onExport = () => exportCsv('decision-queue.csv',
+    ['Priority', 'Type', 'Decision Item', 'Business Impact', 'Exposure', 'Owner', 'Due (days)', 'Status'],
+    shown.map(d => [d.band, d.category, d.title, d.businessImpact, d.exposureValue ?? 0, d.owner, d.deadlineDays, statusOf(d)]))
+
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold text-white flex items-center gap-2"><Gavel className="text-[#C6A35D]" size={22} /> Decisions</h1>
-        <p className="text-sm text-slate-400 mt-0.5">Strategic actions, escalations and business decisions requiring executive input.</p>
-      </div>
+      <TabHeader icon={<Gavel size={18} className="text-[#C6A35D]" />} title="Decisions" subtitle="Strategic actions, escalations and business decisions requiring executive input.">
+        <DateChip date={formatDate(data.generatedAt)} />
+        <FilterMenu value={band} onChange={setBand} options={BAND_FILTER} label="Priority" />
+        <ExportButton onExport={onExport} />
+      </TabHeader>
 
       <KpiRow kpis={kpis} />
 
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-5 items-start">
+      <div className="space-y-5">
         <div className="space-y-5 min-w-0">
           <SectionCard title="Decision Queue — highest priority first">
             <div className="overflow-x-auto -mx-1">
@@ -62,8 +74,8 @@ export function DecisionsTab({ data }: { data: EstateDashboardData }) {
                   <th className="px-2">Business Impact</th><th className="px-2">Exposure</th><th className="px-2">Owner</th><th className="px-2">Due</th><th className="px-2">Status</th><th className="px-2"></th>
                 </tr></thead>
                 <tbody>
-                  {decisions.map((d, i) => (
-                    <tr key={i} onClick={() => openRow(i)} className={`border-b border-white/5 cursor-pointer hover:bg-white/[0.03] ${sel === i ? 'bg-white/[0.04]' : ''}`}>
+                  {shown.map((d, i) => (
+                    <tr key={d.title} onClick={() => openRow(d.title)} className={`border-b border-white/5 cursor-pointer hover:bg-white/[0.03] ${sel === d.title ? 'bg-white/[0.04]' : ''}`}>
                       <td className="py-2.5 px-2 text-slate-500">{i + 1}</td>
                       <td className="px-2"><span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${BAND_PILL[d.band]}`}>{d.band}</span></td>
                       <td className="px-2 text-slate-300 whitespace-nowrap">{d.category}</td>
@@ -76,6 +88,7 @@ export function DecisionsTab({ data }: { data: EstateDashboardData }) {
                       <td className="px-2"><span className="text-[11px] px-2 py-1 rounded-lg ring-1 text-[#C6A35D] ring-[#C6A35D]/40">Review</span></td>
                     </tr>
                   ))}
+                  {!shown.length && <tr><td colSpan={10} className="py-6 text-center text-slate-500">No decisions match this filter.</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -103,8 +116,6 @@ export function DecisionsTab({ data }: { data: EstateDashboardData }) {
             </SectionCard>
           </div>
         </div>
-
-        <div className="hidden xl:block sticky top-20"><Card className="p-5">{selected ? <DecisionDetail d={selected} data={data} /> : <p className="text-sm text-slate-500">Select a decision.</p>}</Card></div>
       </div>
 
       <Drawer open={open} onClose={() => setOpen(false)}>{selected && <DecisionDetail d={selected} data={data} onClose={() => setOpen(false)} />}</Drawer>
