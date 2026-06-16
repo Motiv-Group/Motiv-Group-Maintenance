@@ -72,10 +72,12 @@ function regionSignals(tickets: HealthTicket[], rules: SlaRuleResolver, now: Dat
 export interface StoreCard extends StoreHealthResult { storeName: string; regionName: string }
 export interface TrendDelta { dir: 'up' | 'down' | 'flat'; pct: number }
 export interface EstateTrends { openWork: TrendDelta; slaPressure: TrendDelta; cost: TrendDelta; supplierBreaches: TrendDelta }
+export interface ExposureBucket { label: string; value: number }
 export interface EstateDashboardData {
   trends: EstateTrends
   estate: EstateHealthResult
-  regions: { rank: number; region: RegionalHealthResult; regionName: string }[]
+  totalRegions: number
+  regions: { rank: number; region: RegionalHealthResult; regionName: string; trend: TrendDelta }[]
   stores: StoreCard[]
   topRiskStores: StoreCard[]
   attentionStores: StoreCard[]
@@ -84,6 +86,8 @@ export interface EstateDashboardData {
   repeatDefects: (RepeatDefect & { storeName: string; regionName: string })[]
   decisions: DecisionItem[]
   pendingDecisionValue: number
+  highValueApprovals: { count: number; value: number }
+  exposureBreakdown: ExposureBucket[]
   generatedAt: string
 }
 
@@ -145,9 +149,14 @@ export async function assembleEstateDashboard(companyId: string, now: Date = new
     decisionsPending, supplierSlaBreaches, internalSlaBreaches,
   })
 
+  // per-region trend vs yesterday's snapshot (flat when no snapshot exists yet)
+  const regionPrev = await loadRegionPrevHealth(db, companyId, now)
   const ranking = [...regionResults]
     .sort((a, b) => (rank(b) - rank(a)) || (a.finalPortfolioHealth - b.finalPortfolioHealth))
-    .map((region, i) => ({ rank: i + 1, region, regionName: regionName.get(region.regionId) ?? 'Region' }))
+    .map((region, i) => ({
+      rank: i + 1, region, regionName: regionName.get(region.regionId) ?? 'Region',
+      trend: delta(region.finalPortfolioHealth, regionPrev.get(region.regionId)),
+    }))
 
   const topRiskStores = [...cards].sort((a, b) => storeRisk(b) - storeRisk(a)).slice(0, 10)
   const attentionStores = cards.filter(c => c.finalStatus === 'attention').sort((a, b) => a.finalHealthScore - b.finalHealthScore)
@@ -172,6 +181,20 @@ export async function assembleEstateDashboard(companyId: string, now: Date = new
     .map(t => ({ ticketId: t.id, storeName: storeName.get(t.store_id) ?? 'Store', value: t.quote_value ?? 0, daysWaiting: computeTicketSla(t, rules(t.priority), now).daysWithBlocker ?? 0 }))
     .filter(a => a.value >= HIGH_VALUE).sort((a, b) => b.value - a.value)
 
+  const highValueApprovals = {
+    count: highValueDecisions.length,
+    value: highValueDecisions.reduce((s, a) => s + a.value, 0),
+  }
+
+  // real exposure buckets from active commercial work (top 3 non-zero)
+  const sumBy = (pred: (t: HealthTicket) => boolean) =>
+    active.filter(pred).reduce((s, t) => s + (t.quote_value ?? 0), 0)
+  const exposureBreakdown: ExposureBucket[] = [
+    { label: 'Supplier SLA breaches', value: sumBy(t => computeTicketSla(t, rules(t.priority), now).supplierBreached) },
+    { label: 'Repeat-defect rework', value: sumBy(t => !!t.repeat_defect_flag) },
+    { label: 'Emergency / P1 work', value: sumBy(t => t.priority === 'P1') },
+  ].filter(b => b.value > 0).sort((a, b) => b.value - a.value)
+
   const decisions = getExecutiveDecisionItems({
     topRiskStores: topRiskStores.map(s => ({ store: s, name: s.storeName })),
     regions: regionResults.map(r => ({ region: r, name: regionName.get(r.regionId) ?? 'Region' })),
@@ -186,7 +209,11 @@ export async function assembleEstateDashboard(companyId: string, now: Date = new
     supplierBreaches: estate.supplierSlaBreaches,
   }, now)
 
-  return { trends, estate, regions: ranking, stores: cards, topRiskStores, attentionStores, controlledStores, suppliers, repeatDefects, decisions, pendingDecisionValue, generatedAt: now.toISOString() }
+  return {
+    trends, estate, totalRegions: (regionsRaw ?? []).length, regions: ranking,
+    stores: cards, topRiskStores, attentionStores, controlledStores, suppliers, repeatDefects,
+    decisions, pendingDecisionValue, highValueApprovals, exposureBreakdown, generatedAt: now.toISOString(),
+  }
 }
 
 function delta(cur: number, prev: number | null | undefined): TrendDelta {
@@ -207,6 +234,16 @@ async function loadEstateTrends(
     cost: delta(cur.cost, p?.cost_exposure),
     supplierBreaches: delta(cur.supplierBreaches, p?.supplier_sla_breaches),
   }
+}
+
+// Map region_id → yesterday's final_portfolio_health (for per-region trend arrows).
+async function loadRegionPrevHealth(db: DB, companyId: string, now: Date): Promise<Map<string, number>> {
+  const yesterday = new Date(now.getTime() - DAY).toISOString().slice(0, 10)
+  const { data } = await db.from('regional_health_scores')
+    .select('region_id, final_portfolio_health').eq('company_id', companyId).eq('snapshot_date', yesterday)
+  const m = new Map<string, number>()
+  for (const r of (data ?? []) as any[]) if (r.region_id != null && r.final_portfolio_health != null) m.set(r.region_id, Number(r.final_portfolio_health))
+  return m
 }
 
 // ============================================================

@@ -87,6 +87,65 @@ export function Donut({ value, status, size = 120, label }: { value: number; sta
   )
 }
 
+type Counts = { controlled: number; attention: number; at_risk: number; critical: number }
+
+/** Multi-segment store distribution ring with a total in the centre. */
+export function StoreDistributionDonut({ counts, size = 150 }: { counts: Counts; size?: number }) {
+  const segs = [
+    { color: '#10b981', n: counts.controlled },
+    { color: GOLD, n: counts.attention },
+    { color: '#f87171', n: counts.at_risk },
+    { color: '#991b1b', n: counts.critical },
+  ]
+  const total = segs.reduce((s, x) => s + x.n, 0) || 1
+  const r = size / 2 - 12, c = 2 * Math.PI * r, cx = size / 2
+  let offset = 0
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
+        <circle cx={cx} cy={cx} r={r} fill="none" strokeWidth="12" className="stroke-white/5" />
+        {segs.map((s, i) => {
+          if (s.n <= 0) return null
+          const len = (s.n / total) * c
+          const el = (
+            <circle key={i} cx={cx} cy={cx} r={r} fill="none" strokeWidth="12" strokeLinecap="butt"
+              stroke={s.color} strokeDasharray={`${len} ${c - len}`} strokeDashoffset={-offset} />
+          )
+          offset += len
+          return el
+        })}
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-2xl font-bold text-white tabular-nums">{total}</span>
+        <span className="text-[10px] uppercase tracking-wide text-slate-500">Total Stores</span>
+      </div>
+    </div>
+  )
+}
+
+/** Legend row: swatch · label · count · percentage. */
+export function DistributionLegend({ counts }: { counts: Counts }) {
+  const total = counts.controlled + counts.attention + counts.at_risk + counts.critical || 1
+  const rows: { color: string; label: string; n: number }[] = [
+    { color: 'bg-emerald-500', label: 'Green (Controlled)', n: counts.controlled },
+    { color: 'bg-[#C6A35D]', label: 'Amber (Attention)', n: counts.attention },
+    { color: 'bg-red-400', label: 'Red (At Risk)', n: counts.at_risk },
+    { color: 'bg-red-800', label: 'Critical', n: counts.critical },
+  ]
+  return (
+    <div className="space-y-2">
+      {rows.map((r, i) => (
+        <div key={i} className="flex items-center gap-2 text-xs">
+          <i className={`w-2.5 h-2.5 rounded-full ${r.color}`} />
+          <span className="text-slate-300 flex-1 truncate">{r.label}</span>
+          <span className="text-white font-semibold tabular-nums">{r.n}</span>
+          <span className="text-slate-500 tabular-nums w-9 text-right">{Math.round((r.n / total) * 100)}%</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 /** Breakdown line: label · bar · "x / max". */
 export function BreakdownList({ rows }: { rows: { label: string; value: number; max: number }[] }) {
   return (
