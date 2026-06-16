@@ -6,25 +6,17 @@ import { MotivLogo } from '@/components/ui/MotivLogo'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
-type NavRole = 'client' | 'supplier' | 'regional'
+type NavRole = 'client' | 'supplier' | 'regional' | 'executive'
 
 const BASE: Record<NavRole, string> = {
-  supplier: '/supplier',
-  regional: '/regional',
-  client:   '/client',
+  supplier:  '/supplier',
+  regional:  '/regional',
+  client:    '/client',
+  executive: '/executive',
 }
 
 export function Navbar({ role }: { role: NavRole }) {
   const [unread, setUnread] = useState(0)
-
-  async function handleLogout() {
-    const supabase = createClient()
-    try { await supabase.auth.signOut() } catch {}
-    // Hard navigation — bypasses any pending App Router transition (e.g. a
-    // realtime-triggered refresh after a write) that could otherwise swallow a
-    // client-side router.push and make logout appear unresponsive.
-    window.location.assign('/auth/login')
-  }
 
   useEffect(() => {
     const supabase = createClient()
@@ -80,9 +72,13 @@ export function Navbar({ role }: { role: NavRole }) {
             <Settings size={18} />
           </Link>
 
-          <button onClick={handleLogout} className={iconBtn} title="Log out">
-            <LogOut size={18} />
-          </button>
+          {/* Native form POST → server logout route. No client JS / hydration
+              dependency, so the button can never become unresponsive. */}
+          <form action="/auth/logout" method="post" className="contents">
+            <button type="submit" className={iconBtn} title="Log out">
+              <LogOut size={18} />
+            </button>
+          </form>
         </div>
       </div>
     </nav>

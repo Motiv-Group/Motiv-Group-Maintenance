@@ -58,8 +58,10 @@ export async function PATCH(request: Request) {
     company_name,
     sub_store,
   }
-  // Allow role to be set on first signup (store_manager / regional_manager only — never admin)
-  if (role === 'store_manager' || role === 'regional_manager') {
+  // Allow role to be set on first signup. NOTE: executive is self-selectable
+  // here and grants estate-wide read access — open by product decision. Gate
+  // with an invite code if that ever needs locking down.
+  if (role === 'store_manager' || role === 'regional_manager' || role === 'executive') {
     updateData.role = role
   }
   // Normalise branch_code to uppercase; clear when empty

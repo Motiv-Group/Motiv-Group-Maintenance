@@ -49,6 +49,7 @@ export default function LoginPage() {
     let dest = '/client'
     if (role === 'supplier') dest = '/supplier'
     else if (role === 'regional_manager') dest = '/regional'
+    else if (role === 'executive') dest = '/executive'
     router.push(dest)
     router.refresh()
   }

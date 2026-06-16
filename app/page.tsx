@@ -14,5 +14,7 @@ export default async function Home() {
     .single()
 
   if (profile?.role === 'supplier') redirect('/supplier')
+  if (profile?.role === 'regional_manager') redirect('/regional')
+  if (profile?.role === 'executive') redirect('/executive')
   redirect('/client')
 }

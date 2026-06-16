@@ -1,0 +1,6 @@
+{
+  "crons": [
+    { "path": "/api/cron/recompute", "schedule": "0 1 * * *" },
+    { "path": "/api/cron/snapshots", "schedule": "30 0 * * *" }
+  ]
+}

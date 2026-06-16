@@ -20,6 +20,8 @@ export function MotivLogo({ height = 48, className = '' }: MotivLogoProps) {
       height={height}
       className={`object-contain ${className}`}
       priority
+      unoptimized
+      draggable={false}
     />
   )
 }

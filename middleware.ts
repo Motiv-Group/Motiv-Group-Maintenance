@@ -61,6 +61,15 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  // Executive routes
+  if (path.startsWith('/executive')) {
+    if (!user) return NextResponse.redirect(new URL('/auth/login', request.url))
+    const role = await getRole()
+    if (role !== 'executive') {
+      return NextResponse.redirect(new URL('/auth/login', request.url))
+    }
+  }
+
   // Settings — any authenticated user
   if (path.startsWith('/settings')) {
     if (!user) return NextResponse.redirect(new URL('/auth/login', request.url))
@@ -72,6 +81,7 @@ export async function middleware(request: NextRequest) {
     let dest = '/client'
     if (role === 'supplier') dest = '/supplier'
     else if (role === 'regional_manager') dest = '/regional'
+    else if (role === 'executive') dest = '/executive'
     return NextResponse.redirect(new URL(dest, request.url))
   }
 
@@ -83,6 +93,7 @@ export const config = {
     '/client/:path*',
     '/supplier/:path*',
     '/regional/:path*',
+    '/executive/:path*',
     '/settings',
     '/settings/:path*',
     '/auth/:path*',

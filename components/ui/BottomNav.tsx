@@ -5,9 +5,10 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Ticket, Users, BarChart2,
   AlertTriangle, Store, ClipboardCheck, Truck,
+  Globe2, Map as MapIcon, Gavel,
 } from 'lucide-react'
 
-type NavRole = 'client' | 'supplier' | 'regional'
+type NavRole = 'client' | 'supplier' | 'regional' | 'executive'
 
 const NAV_LINKS: Record<NavRole, { href: string; label: string; icon: React.ElementType }[]> = {
   supplier: [
@@ -29,12 +30,20 @@ const NAV_LINKS: Record<NavRole, { href: string; label: string; icon: React.Elem
     { href: '/client',         label: 'Dashboard', icon: LayoutDashboard },
     { href: '/client/tickets', label: 'Tickets',   icon: Ticket          },
   ],
+  executive: [
+    { href: '/executive',           label: 'Estate',    icon: Globe2          },
+    { href: '/executive/regions',   label: 'Regions',   icon: MapIcon         },
+    { href: '/executive/stores',    label: 'Stores',    icon: Store           },
+    { href: '/executive/suppliers', label: 'Suppliers', icon: Truck           },
+    { href: '/executive/decisions', label: 'Decisions', icon: Gavel           },
+  ],
 }
 
 const BASE: Record<NavRole, string> = {
-  supplier: '/supplier',
-  regional: '/regional',
-  client:   '/client',
+  supplier:  '/supplier',
+  regional:  '/regional',
+  client:    '/client',
+  executive: '/executive',
 }
 
 export function BottomNav({ role }: { role: NavRole }) {

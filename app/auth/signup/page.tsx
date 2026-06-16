@@ -8,10 +8,10 @@ import { createClient } from '@/lib/supabase/client'
 import { Input } from '@/components/ui/Input'
 import { PasswordInput } from '@/components/ui/PasswordInput'
 import { Button } from '@/components/ui/Button'
-import { Store, Users } from 'lucide-react'
+import { Users, Briefcase } from 'lucide-react'
 import { MotivLogo } from '@/components/ui/MotivLogo'
 
-type Role = 'store_manager' | 'regional_manager'
+type Role = 'regional_manager' | 'executive'
 
 interface SignupForm {
   full_name:    string
@@ -19,19 +19,17 @@ interface SignupForm {
   phone:        string
   address:      string
   company_name: string
-  sub_store:    string
-  branch_code:  string
   password:     string
   confirm_password: string
 }
 
 export default function SignupPage() {
   const router  = useRouter()
-  const [role,    setRole]    = useState<Role>('store_manager')
+  const [role,    setRole]    = useState<Role>('regional_manager')
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState('')
 
-  const { register, handleSubmit, watch, reset, formState: { errors } } = useForm<SignupForm>()
+  const { register, handleSubmit, watch, formState: { errors } } = useForm<SignupForm>()
 
   function switchRole(r: Role) {
     setRole(r)
@@ -42,9 +40,7 @@ export default function SignupPage() {
     setLoading(true)
     setError('')
 
-    const supabase    = createClient()
-    const branchCode  = values.branch_code?.trim().toUpperCase() ?? ''
-    const isStoreMgr  = role === 'store_manager'
+    const supabase = createClient()
 
     const { data, error: authError } = await supabase.auth.signUp({
       email:    values.email,
@@ -55,8 +51,8 @@ export default function SignupPage() {
           phone:        values.phone,
           address:      values.address,
           company_name: values.company_name,
-          sub_store:    isStoreMgr ? values.sub_store  : null,
-          branch_code:  isStoreMgr ? branchCode        : null,
+          sub_store:    null,
+          branch_code:  null,
           role,
         },
       },
@@ -69,7 +65,7 @@ export default function SignupPage() {
     }
 
     if (data.session && data.user) {
-      const res = await fetch('/api/profile', {
+      await fetch('/api/profile', {
         method:  'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -77,25 +73,15 @@ export default function SignupPage() {
           phone:        values.phone,
           address:      values.address,
           company_name: values.company_name,
-          sub_store:    isStoreMgr ? values.sub_store : null,
-          branch_code:  isStoreMgr ? branchCode       : null,
+          sub_store:    null,
+          branch_code:  null,
           role,
         }),
       })
-      if (!res.ok) {
-        const d = await res.json()
-        if (d.error?.includes('unique') || d.error?.includes('branch_code')) {
-          setError('That branch code is already in use. Please choose a different one.')
-          setLoading(false)
-          return
-        }
-      }
     }
 
-    router.push(role === 'regional_manager' ? '/regional' : '/client')
+    router.push(role === 'executive' ? '/executive' : '/regional')
   }
-
-  const isStoreMgr = role === 'store_manager'
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col items-center justify-center px-4 py-12">
@@ -111,8 +97,8 @@ export default function SignupPage() {
           {/* Role toggle */}
           <div className="grid grid-cols-2 gap-2 mb-6">
             {([
-              { value: 'store_manager',    label: 'Store Manager',    icon: Store, desc: 'Submit & track tickets' },
-              { value: 'regional_manager', label: 'Regional Manager', icon: Users, desc: 'Oversee multiple stores' },
+              { value: 'regional_manager', label: 'Regional Manager', icon: Users,     desc: 'Oversee multiple stores' },
+              { value: 'executive',        label: 'Executive',        icon: Briefcase, desc: 'Estate-wide dashboards' },
             ] as const).map(opt => (
               <button
                 key={opt.value}
@@ -124,10 +110,7 @@ export default function SignupPage() {
                     : 'border-gray-200 dark:border-gray-700 hover:border-[#C6A35D]/60'
                 }`}
               >
-                <opt.icon
-                  size={20}
-                  className="text-[#C6A35D]"
-                />
+                <opt.icon size={20} className="text-[#C6A35D]" />
                 <span className={`text-sm font-medium ${role === opt.value ? 'text-[#C6A35D]' : 'text-gray-700 dark:text-gray-300'}`}>
                   {opt.label}
                 </span>
@@ -167,34 +150,6 @@ export default function SignupPage() {
               error={errors.company_name?.message}
               {...register('company_name', { required: 'Company name is required' })}
             />
-
-            {isStoreMgr && (
-              <>
-                <Input
-                  id="sub_store"
-                  label="Branch / Sub-Store"
-                  placeholder="e.g. Cape Town Branch"
-                  error={errors.sub_store?.message}
-                  {...register('sub_store', { required: isStoreMgr ? 'Branch name is required' : false })}
-                />
-                <div>
-                  <Input
-                    id="branch_code"
-                    label="Branch Code"
-                    placeholder="e.g. CPT001"
-                    error={errors.branch_code?.message}
-                    {...register('branch_code', {
-                      required: isStoreMgr ? 'Branch code is required' : false,
-                      pattern:  { value: /^[A-Za-z0-9]+$/, message: 'Letters and numbers only' },
-                    })}
-                  />
-                  <p className="mt-1 text-xs text-gray-400">
-                    Unique identifier — your regional manager uses this to link your store.
-                  </p>
-                </div>
-              </>
-            )}
-
             <Input
               id="address"
               label="Address"

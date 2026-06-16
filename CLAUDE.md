@@ -24,13 +24,14 @@ Migrations live in `supabase/migrations/` but are **not** applied via Supabase C
 
 ### Roles & route protection
 
-Four roles drive everything: `client` / `store_manager` (treated identically — see `isStoreManager()` in `lib/types.ts`), `regional_manager`, and `supplier` (the contractor/maintenance-company side; this role was formerly named `admin`). `middleware.ts` is the single gate for route access:
+Five roles drive everything: `client` / `store_manager` (treated identically — see `isStoreManager()` in `lib/types.ts`), `regional_manager`, `supplier` (the contractor/maintenance-company side; this role was formerly named `admin`), and `executive` (estate-wide read-only dashboards; set by an admin, not self-signup). `middleware.ts` is the single gate for route access:
 
 - `/client/*` → `client` or `store_manager`
 - `/regional/*` → `regional_manager`
 - `/supplier/*` → `supplier`
+- `/executive/*` → `executive`
 - `/settings*` → any authenticated user
-- Logged-in users hitting `/auth/login` or `/auth/signup` are redirected to their role's home (`/client`, `/supplier`, or `/regional`)
+- Logged-in users hitting `/auth/login` or `/auth/signup` are redirected to their role's home (`/client`, `/supplier`, `/regional`, or `/executive`)
 
 > Note: the service-role Supabase client is still `createAdminClient()`/`adminClient` — that's infrastructure (RLS bypass), unrelated to the `supplier` role. The DB FK columns `quotes.admin_id` / `completions.admin_id` keep their names too and reference the supplier. The `supplier` role manages a directory of trade companies shown in the UI as **"Sub Suppliers"** (the `suppliers` table) — distinct from the role itself.
 
@@ -67,6 +68,10 @@ also: cancelled (any point)
 Flow across roles: client submits ticket → admins (and the store's `regional_manager`) get notifications → admin sends a `quote` → client accepts/declines → admin progresses status → admin submits a `completion` (COC + proof-of-completion photos) → regional manager reviews/approves (`pending_sign_off → completed`) or raises a `snag`.
 
 Other tables: `suppliers` (the supplier-role-managed trade directory, shown in the UI as "Sub Suppliers"), `ratings` (clients rate suppliers), `push_subscriptions` (web-push endpoints).
+
+### Dashboards v2 (Regional + Executive health engine)
+
+Decision-driven scoring lives in `lib/dashboards/` — **pure functions, no DB**, injected with `now` for testability: `storeHealth.ts` (weighted 6-component score + override rules), `regionalHealth.ts`, `estateHealth.ts`, `sla.ts` (dual supplier/internal SLA + blocker ownership), `ticketHealth.ts`, `supplierPerformance.ts`, `repeatDefects.ts`, `ranking.ts`, `decisions.ts`. Weights/thresholds/penalties are all in `constants.ts` (`ragForScore`, `RAG_COLORS`, etc.). `data.ts` is **server-only** — it loads via `createAdminClient()` and runs the engine to build `assembleRegionalDashboard(rmUserId)` / `assembleEstateDashboard()` payloads, reused by pages, the `/api/dashboards/*` routes and the cron snapshot/recompute jobs (`snapshots.ts`, `recompute.ts`). Dashboards compute **live** from tickets, so they work before any snapshot exists; snapshot tables (`*_health_scores`, `dashboard_snapshots`) are for trend/history and are written by `vercel.json` crons (`/api/cron/*`, auth via `CRON_SECRET` or an executive). Schema: `supabase/migrations/20260616_dashboards_v2.sql` (regions, expanded ticket fields, `sla_rules`, snapshot/audit tables — additive & idempotent). Region = `regions` table; a store links via `profiles.region_id`; ticket `region_id` is trigger-filled from the store. Full reference: `docs/DASHBOARDS_V2.md`.
 
 ### Shared formatting/labels
 
