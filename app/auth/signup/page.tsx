@@ -8,7 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Input } from '@/components/ui/Input'
 import { PasswordInput } from '@/components/ui/PasswordInput'
 import { Button } from '@/components/ui/Button'
-import { Users, Briefcase } from 'lucide-react'
+import { Users, Briefcase, Mail } from 'lucide-react'
 import { MotivLogo } from '@/components/ui/MotivLogo'
 
 type Role = 'regional_manager' | 'executive'
@@ -28,6 +28,7 @@ export default function SignupPage() {
   const [role,    setRole]    = useState<Role>('regional_manager')
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState('')
+  const [sentTo,  setSentTo]  = useState<string | null>(null)
 
   const { register, handleSubmit, watch, formState: { errors } } = useForm<SignupForm>()
 
@@ -64,23 +65,66 @@ export default function SignupPage() {
       return
     }
 
-    if (data.session && data.user) {
-      await fetch('/api/profile', {
-        method:  'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          full_name:    values.full_name,
-          phone:        values.phone,
-          address:      values.address,
-          company_name: values.company_name,
-          sub_store:    null,
-          branch_code:  null,
-          role,
-        }),
-      })
+    // Email confirmation enabled → signUp returns a user but no session. The
+    // account isn't usable (and protected routes will bounce) until the user
+    // clicks the verification link, so show a "check your email" state instead
+    // of redirecting. Profile fields are carried in the signUp metadata above,
+    // so the DB trigger populates user_profiles on confirm.
+    if (!data.session) {
+      setSentTo(values.email)
+      setLoading(false)
+      return
     }
 
+    // No confirmation required → we have a live session. Enforce the profile
+    // fields, then drop the user on their dashboard.
+    await fetch('/api/profile', {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        full_name:    values.full_name,
+        phone:        values.phone,
+        address:      values.address,
+        company_name: values.company_name,
+        sub_store:    null,
+        branch_code:  null,
+        role,
+      }),
+    })
+
     router.push(role === 'executive' ? '/executive' : '/regional')
+  }
+
+  if (sentTo) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col items-center justify-center px-4 py-12">
+        <div className="w-full max-w-md">
+          <div className="flex items-center justify-center mb-8">
+            <MotivLogo height={72} />
+          </div>
+
+          <div className="bg-slate-50 dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 sm:p-8 text-center">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#C6A35D]/10">
+              <Mail size={24} className="text-[#C6A35D]" />
+            </div>
+            <h1 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Check your email</h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+              We&apos;ve sent a verification link to
+            </p>
+            <p className="text-sm font-medium text-gray-900 dark:text-white mb-5 break-all">{sentTo}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+              Click the link in that email to activate your account, then log in. Check your spam folder if it doesn&apos;t arrive within a minute.
+            </p>
+            <Link
+              href="/auth/login"
+              className="inline-block w-full rounded-xl bg-[#C6A35D] px-4 py-3 text-center font-medium text-[#0a0e17] hover:opacity-90 transition-opacity"
+            >
+              Go to login
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
