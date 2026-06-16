@@ -24,7 +24,10 @@ export async function inviteUser(opts: InviteOpts): Promise<{ userId: string; ac
   // Configuration → Redirect URLs, otherwise Supabase ignores it and drops the
   // invited user on the Site URL (logged in, no password set).
   const base = (opts.baseUrl || process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '')
-  const redirectTo = `${base}/auth/reset-password`
+  // Suppliers land on a full onboarding form (company details + password);
+  // RMs just set a password.
+  const path = opts.role === 'supplier' ? '/auth/supplier-onboard' : '/auth/reset-password'
+  const redirectTo = `${base}${path}`
 
   const { data, error } = await admin.auth.admin.generateLink({
     type: 'invite', email: opts.email.trim().toLowerCase(),

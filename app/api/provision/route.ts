@@ -147,8 +147,13 @@ export async function POST(request: Request) {
         const { data: sup, error } = await admin.from('suppliers').insert({ company_id: companyId, company_name: body.companyName, trade: body.trade ?? null }).select('id').single()
         if (error || !sup) return NextResponse.json({ error: error?.message ?? 'Failed' }, { status: 400 })
         if (body.email) {
-          const inv = await inviteUser({ email: body.email, role: 'supplier', companyId, roleLabel: 'Supplier', baseUrl: origin, link: { supplierId: sup.id } })
-          return NextResponse.json({ ok: true, actionLink: inv.actionLink, emailed: inv.emailed })
+          try {
+            const inv = await inviteUser({ email: body.email, role: 'supplier', companyId, roleLabel: 'Supplier', baseUrl: origin, link: { supplierId: sup.id } })
+            return NextResponse.json({ ok: true, actionLink: inv.actionLink, emailed: inv.emailed })
+          } catch (e: any) {
+            await admin.from('suppliers').delete().eq('id', sup.id) // roll back the orphan supplier
+            return NextResponse.json({ error: e?.message ?? 'Invite failed' }, { status: 400 })
+          }
         }
         break
       }
