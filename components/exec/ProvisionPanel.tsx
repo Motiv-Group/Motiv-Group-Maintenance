@@ -21,8 +21,17 @@ export function ProvisionForms({ mode, regions = [], stores = [] }: Props) {
         <Form action="invite_rm" title="Invite regional manager" fields={[{ k: 'email', ph: 'RM email', type: 'email' }]} select={{ k: 'regionId', label: 'Region', opts: regions }} cta={<><UserPlus size={14} /> Invite</>} />
       </>}
       {mode === 'rm-stores' && <>
-        <Form action="add_store" title="Add store" fields={[{ k: 'branch_code', ph: 'Branch code' }, { k: 'name', ph: 'Store name' }]} cta={<><PlusCircle size={14} /> Add</>} />
-        <Form action="invite_store_manager" title="Invite store manager" fields={[{ k: 'email', ph: 'Manager email', type: 'email' }]} select={{ k: 'storeId', label: 'Store', opts: stores }} cta={<><UserPlus size={14} /> Invite</>} />
+        <Form action="add_store" title="Add store only" fields={[{ k: 'branch_code', ph: 'Branch code' }, { k: 'name', ph: 'Store name' }]} cta={<><PlusCircle size={14} /> Add store</>} />
+        <Form action="create_store_manager" title="Create store + manager account"
+          fields={[
+            { k: 'branch_code', ph: 'Branch code' },
+            { k: 'store_name', ph: 'Store / branch name' },
+            { k: 'full_name', ph: 'Manager full name' },
+            { k: 'email', ph: 'Manager email', type: 'email' },
+            { k: 'password', ph: 'Temporary password (min 8)', type: 'password' },
+            { k: 'phone', ph: 'Manager phone (optional)' },
+          ]}
+          cta={<><UserPlus size={14} /> Create account</>} />
       </>}
       {mode === 'suppliers' && (
         <div className="lg:col-span-2"><Form action="add_supplier" title="Add supplier (optionally invite their login)" fields={[{ k: 'companyName', ph: 'Supplier company' }, { k: 'trade', ph: 'Trade (e.g. Electrical)' }, { k: 'email', ph: 'Supplier login email (optional)', type: 'email' }]} cta={<><PlusCircle size={14} /> Add supplier</>} /></div>
@@ -75,7 +84,7 @@ function Form({ action, title, fields, select, cta }: { action: string; title: s
       const res = await fetch('/api/provision', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, ...vals }) })
       const d = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(d.error ?? 'Failed')
-      setMsg({ ok: true, text: d.actionLink ? (d.emailed ? 'Invited — email sent.' : 'Created. Email not configured — copy the link:') : 'Done.', link: d.emailed ? undefined : d.actionLink })
+      setMsg({ ok: true, text: d.message ?? (d.actionLink ? (d.emailed ? 'Invited — email sent.' : 'Created. Email not configured — copy the link:') : 'Done.'), link: d.emailed ? undefined : d.actionLink })
       setVals({}); router.refresh()
     } catch (e: any) { setMsg({ ok: false, text: e.message }) } finally { setBusy(false) }
   }

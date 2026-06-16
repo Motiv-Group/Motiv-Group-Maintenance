@@ -8,6 +8,7 @@ interface InviteOpts {
   role: InviteRole
   companyId: string
   roleLabel: string
+  baseUrl?: string
   link: { regionId?: string; storeId?: string; supplierId?: string }
 }
 
@@ -19,7 +20,11 @@ interface InviteOpts {
  */
 export async function inviteUser(opts: InviteOpts): Promise<{ userId: string; actionLink: string | null; emailed: boolean }> {
   const admin = createAdminClient()
-  const redirectTo = `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/auth/reset-password`
+  // Must be an ABSOLUTE url that is allow-listed in Supabase Auth → URL
+  // Configuration → Redirect URLs, otherwise Supabase ignores it and drops the
+  // invited user on the Site URL (logged in, no password set).
+  const base = (opts.baseUrl || process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '')
+  const redirectTo = `${base}/auth/reset-password`
 
   const { data, error } = await admin.auth.admin.generateLink({
     type: 'invite', email: opts.email.trim().toLowerCase(),
