@@ -1,6 +1,6 @@
 {
   "crons": [
-    { "path": "/api/cron/recompute", "schedule": "0 1 * * *" },
-    { "path": "/api/cron/snapshots", "schedule": "30 0 * * *" }
+    { "path": "/api/cron/snapshots", "schedule": "30 0 * * *" },
+    { "path": "/api/cron/v3-snapshots", "schedule": "45 0 * * *" }
   ]
 }

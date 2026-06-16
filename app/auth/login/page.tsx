@@ -40,7 +40,7 @@ export default function LoginPage() {
     }
 
     const { data: profile } = await supabase
-      .from('profiles')
+      .from('user_profiles')
       .select('role')
       .eq('id', data.user.id)
       .single()
@@ -49,7 +49,7 @@ export default function LoginPage() {
     let dest = '/client'
     if (role === 'supplier') dest = '/supplier'
     else if (role === 'regional_manager') dest = '/regional'
-    else if (role === 'executive') dest = '/executive'
+    else if (role === 'executive' || role === 'system_admin') dest = '/executive'
     router.push(dest)
     router.refresh()
   }

@@ -1,28 +1,15 @@
-import { Navbar } from '@/components/ui/Navbar'
-import { BottomNav } from '@/components/ui/BottomNav'
+import { requireSupplierV3 } from '@/lib/health/guard'
+import { ExecChrome } from '@/components/exec/ExecChrome'
 import { RealtimeRefresh } from '@/components/ui/RealtimeRefresh'
-import { SwipeNav } from '@/components/ui/SwipeNav'
 
-const LINKS = [
-  { href: '/supplier',           label: 'Dashboard' },
-  { href: '/supplier/tickets',   label: 'Tickets'   },
-  { href: '/supplier/regional',  label: 'Clients'   },
-  { href: '/supplier/suppliers', label: 'Sub Suppliers' },
-  { href: '/supplier/stats',     label: 'Stats'     },
-  { href: '/supplier/snag',      label: 'Snag'      },
-]
+export const dynamic = 'force-dynamic'
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default async function SupplierLayout({ children }: { children: React.ReactNode }) {
+  const { fullName } = await requireSupplierV3()
   return (
-    <div className="min-h-screen flex flex-col">
-      <Navbar role="supplier" />
-      <RealtimeRefresh tables={['tickets', 'quotes', 'notifications', 'profiles', 'completions']} />
-      <SwipeNav links={LINKS}>
-        <main className="flex-1 max-w-6xl w-full mx-auto px-4 py-6 pb-24">
-          {children}
-        </main>
-      </SwipeNav>
-      <BottomNav role="supplier" />
-    </div>
+    <ExecChrome userName={fullName} variant="supplier">
+      <RealtimeRefresh tables={['tickets', 'quotes', 'signoffs']} />
+      {children}
+    </ExecChrome>
   )
 }

@@ -2,84 +2,60 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { rateLimit } from '@/lib/rate-limit'
-import { sendPushToUser, sendPushToMany } from '@/lib/push'
+import { sendPushToMany } from '@/lib/push'
+import { computePriority } from '@/lib/health/priority'
 
-// POST /api/tickets — create a new ticket
+// POST /api/tickets — store manager logs a ticket (v3 model).
 export async function POST(request: Request) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-
-  if (!rateLimit(`tickets:${user.id}`, 10, 60_000))
-    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
-
-  // Closed stores cannot submit new tickets.
-  const { data: me } = await supabase.from('profiles').select('closed_at').eq('id', user.id).single()
-  if (me?.closed_at) {
-    return NextResponse.json({
-      error: 'Your store has been closed by your regional manager. You can no longer submit new tickets.',
-    }, { status: 403 })
-  }
+  if (!rateLimit(`tickets:${user.id}`, 10, 60_000)) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
   const body = await request.json()
-  const { title, description, priority, photo_urls } = body
+  const { title, description, category, operational_impact = 'none', photo_urls = [] } = body
+  if (!title || !description) return NextResponse.json({ error: 'Title and description are required' }, { status: 400 })
 
-  const { data: ticket, error } = await supabase
-    .from('tickets')
-    .insert({ client_id: user.id, title, description, priority, photo_urls })
-    .select()
-    .single()
+  const admin = createAdminClient()
+  const { data: profile } = await admin.from('user_profiles').select('company_id').eq('id', user.id).single()
+  const { data: link } = await admin.from('store_users').select('store_id').eq('user_id', user.id).limit(1).single()
+  if (!profile?.company_id || !link?.store_id) return NextResponse.json({ error: 'Your account is not linked to a store yet.' }, { status: 403 })
+  const { data: store } = await admin.from('stores').select('id, region_id, region_code, branch_code, name, closed_at').eq('id', link.store_id).single()
+  if (!store) return NextResponse.json({ error: 'Store not found' }, { status: 404 })
+  if (store.closed_at) return NextResponse.json({ error: 'Your store is closed and cannot submit new tickets.' }, { status: 403 })
 
+  const impact = String(operational_impact)
+  const severity = impact === 'cannot_trade' || impact === 'safety_risk' ? 'critical'
+    : impact === 'trading_affected' ? 'high'
+    : impact === 'customer_visible' || impact === 'staff_inconvenience' ? 'medium' : 'low'
+  const flags = {
+    safety_risk_flag: impact === 'safety_risk',
+    trading_impact_flag: impact === 'trading_affected' || impact === 'cannot_trade',
+    customer_visible_flag: impact === 'customer_visible',
+    staff_impact_flag: impact === 'staff_inconvenience',
+  }
+  const priority = computePriority({ severity, operational_impact: impact, ...flags })
+
+  const { data: ticket, error } = await supabase.from('tickets').insert({
+    company_id: profile.company_id, store_id: store.id, region_id: store.region_id, region_code: store.region_code,
+    branch_code: store.branch_code, created_by: user.id, title, description, category,
+    operational_impact: impact, severity, priority, ...flags, photo_urls, status: 'open',
+  }).select().single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  const adminClient = createAdminClient()
-
-  // Fetch admins and store profile in parallel
-  const [{ data: adminProfiles }, { data: storeProfile }] = await Promise.all([
-    adminClient.from('profiles').select('id').eq('role', 'supplier'),
-    adminClient.from('profiles').select('regional_manager_id, company_name, sub_store').eq('id', user.id).single(),
-  ])
-
-  // Fire all notifications in parallel
-  await Promise.all([
-    adminProfiles?.length
-      ? adminClient.from('notifications').insert(
-          adminProfiles.map(admin => ({
-            user_id: admin.id,
-            type: 'new_ticket',
-            title: 'New Maintenance Ticket',
-            message: `A new ${priority} priority ticket has been submitted: "${title}"`,
-            link: `/supplier/tickets/${ticket.id}`,
-          }))
-        )
-      : Promise.resolve(),
-    storeProfile?.regional_manager_id
-      ? adminClient.from('notifications').insert({
-          user_id: storeProfile.regional_manager_id,
-          type: 'new_ticket',
-          title: 'New Ticket from Your Region',
-          message: `${storeProfile.company_name ?? 'A store'} (${storeProfile.sub_store ?? ''}) submitted a new ${priority} priority ticket: "${title}"`,
-          link: `/regional/tickets/${ticket.id}`,
-        })
-      : Promise.resolve(),
-  ])
-
-  // Fire push notifications — non-blocking
-  if (adminProfiles?.length) {
-    void sendPushToMany(
-      adminProfiles.map((a: any) => a.id),
-      { title: 'New Maintenance Ticket', body: `A new ${priority} ticket: "${title}"`, url: `/supplier/tickets/${ticket.id}` }
-    )
-  }
-  if (storeProfile?.regional_manager_id) {
-    void sendPushToUser(storeProfile.regional_manager_id, {
-      title: 'New Ticket from Your Region',
-      body: `${storeProfile.company_name ?? 'A store'} submitted a new ${priority} ticket: "${title}"`,
-      url: `/regional/tickets/${ticket.id}`,
-    })
+  // notify the region's manager(s)
+  if (store.region_id) {
+    const { data: rms } = await admin.from('regional_users').select('user_id').eq('region_id', store.region_id)
+    const ids = (rms ?? []).map(r => r.user_id)
+    if (ids.length) {
+      await admin.from('notifications').insert(ids.map(id => ({
+        company_id: profile.company_id, user_id: id, type: 'new_ticket', title: 'New Ticket in Your Region',
+        message: `${store.name} logged a ${priority} ticket: "${title}"`, link: `/regional/tickets`,
+      })))
+      void sendPushToMany(ids, { title: 'New Ticket', body: `${store.name}: ${title}`, url: '/regional/tickets' })
+    }
   }
 
-  revalidatePath('/client')
-  revalidatePath('/supplier')
+  revalidatePath('/client'); revalidatePath('/regional')
   return NextResponse.json({ ticket }, { status: 201 })
 }

@@ -1,0 +1,172 @@
+// MOTIV Executive UI kit — dark-navy + gold. Pure presentational (client+server safe).
+import type { ReactNode } from 'react'
+import { ChevronRight } from 'lucide-react'
+import type { HealthStatus } from '@/lib/health/types'
+
+export const GOLD = '#C6A35D'
+
+export const STATUS_PILL: Record<HealthStatus, string> = {
+  controlled: 'bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/30',
+  attention:  'bg-[#C6A35D]/15 text-[#C6A35D] ring-1 ring-[#C6A35D]/30',
+  at_risk:    'bg-red-500/15 text-red-400 ring-1 ring-red-500/30',
+  critical:   'bg-red-700/25 text-red-300 ring-1 ring-red-600/40',
+}
+export const STATUS_TEXT: Record<HealthStatus, string> = {
+  controlled: 'text-emerald-400', attention: 'text-[#C6A35D]', at_risk: 'text-red-400', critical: 'text-red-300',
+}
+export const STATUS_STROKE: Record<HealthStatus, string> = {
+  controlled: '#10b981', attention: GOLD, at_risk: '#f87171', critical: '#dc2626',
+}
+const STATUS_WORD: Record<HealthStatus, string> = {
+  controlled: 'Controlled', attention: 'Attention Required', at_risk: 'At Risk', critical: 'Critical',
+}
+
+export function Pill({ status, label }: { status: HealthStatus; label?: string }) {
+  return <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${STATUS_PILL[status]}`}>{label ?? STATUS_WORD[status]}</span>
+}
+
+export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
+  return <div className={`rounded-2xl bg-[#121826] ring-1 ring-white/5 ${className}`}>{children}</div>
+}
+
+export function SectionCard({ title, icon, action, children }: { title: string; icon?: ReactNode; action?: ReactNode; children: ReactNode }) {
+  return (
+    <Card className="p-5">
+      <div className="flex items-center justify-between gap-2 mb-4">
+        <h2 className="text-sm font-bold text-white flex items-center gap-2">{icon}{title}</h2>
+        {action}
+      </div>
+      {children}
+    </Card>
+  )
+}
+
+export interface Kpi { label: string; value: ReactNode; hint?: ReactNode; icon?: ReactNode; tone?: 'default' | 'gold' | 'good' | 'warn' | 'bad'; trend?: Trend }
+const TONE: Record<NonNullable<Kpi['tone']>, string> = {
+  default: 'text-white', gold: 'text-[#C6A35D]', good: 'text-emerald-400', warn: 'text-[#C6A35D]', bad: 'text-red-400',
+}
+export function KpiCard({ kpi }: { kpi: Kpi }) {
+  return (
+    <Card className="p-4 flex flex-col gap-1.5 min-w-0">
+      <div className="flex items-center justify-between gap-2 text-[11px] text-slate-400">
+        <span className="flex items-center gap-1.5 truncate">{kpi.icon}{kpi.label}</span>
+        {kpi.trend && <TrendArrow t={kpi.trend} />}
+      </div>
+      <div className={`text-2xl font-bold leading-none ${TONE[kpi.tone ?? 'default']}`}>{kpi.value}</div>
+      {kpi.hint && <div className="text-[11px] text-slate-500">{kpi.hint}</div>}
+    </Card>
+  )
+}
+export function KpiRow({ kpis }: { kpis: Kpi[] }) {
+  return <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">{kpis.map((k, i) => <KpiCard key={i} kpi={k} />)}</div>
+}
+
+export type Trend = { dir: 'up' | 'down' | 'flat'; label?: string; good?: boolean }
+export function TrendArrow({ t }: { t: Trend }) {
+  if (t.dir === 'flat') return <span className="text-slate-500 text-[11px]">→ {t.label}</span>
+  const up = t.dir === 'up'
+  const color = t.good === undefined ? (up ? 'text-red-400' : 'text-emerald-400') : (t.good ? 'text-emerald-400' : 'text-red-400')
+  return <span className={`text-[11px] ${color}`}>{up ? '↑' : '↓'} {t.label}</span>
+}
+
+/** Circular score gauge. */
+export function Donut({ value, status, size = 120, label }: { value: number; status: HealthStatus; size?: number; label?: string }) {
+  const r = size / 2 - 10, c = 2 * Math.PI * r, off = c * (1 - value / 100), cx = size / 2
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
+        <circle cx={cx} cy={cx} r={r} fill="none" strokeWidth="10" className="stroke-white/10" />
+        <circle cx={cx} cy={cx} r={r} fill="none" strokeWidth="10" strokeLinecap="round"
+          stroke={STATUS_STROKE[status]} strokeDasharray={c} strokeDashoffset={off} />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-xl font-bold" style={{ color: STATUS_STROKE[status] }}>{value}%</span>
+        {label && <span className="text-[9px] uppercase tracking-wide text-slate-500">{label}</span>}
+      </div>
+    </div>
+  )
+}
+
+/** Breakdown line: label · bar · "x / max". */
+export function BreakdownList({ rows }: { rows: { label: string; value: number; max: number }[] }) {
+  return (
+    <div className="space-y-2">
+      {rows.map((r, i) => {
+        const pct = r.max > 0 ? Math.min(100, (r.value / r.max) * 100) : 0
+        const tone = pct >= 85 ? '#10b981' : pct >= 60 ? GOLD : '#f87171'
+        return (
+          <div key={i} className="flex items-center gap-3 text-xs">
+            <span className="text-slate-400 w-32 shrink-0">{r.label}</span>
+            <span className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden"><span className="block h-full rounded-full" style={{ width: `${pct}%`, background: tone }} /></span>
+            <span className="text-slate-200 w-12 text-right tabular-nums">{round(r.value)} / {r.max}</span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+export function DistributionChips({ counts }: { counts: { controlled: number; attention: number; at_risk: number; critical: number } }) {
+  const total = counts.controlled + counts.attention + counts.at_risk + counts.critical || 1
+  const cells: { k: HealthStatus; label: string; n: number }[] = [
+    { k: 'controlled', label: 'Green', n: counts.controlled },
+    { k: 'attention', label: 'Amber', n: counts.attention },
+    { k: 'at_risk', label: 'Red', n: counts.at_risk },
+    { k: 'critical', label: 'Critical', n: counts.critical },
+  ]
+  return (
+    <div className="grid grid-cols-4 gap-2">
+      {cells.map(c => (
+        <div key={c.k} className={`rounded-lg px-2 py-2 text-center ${STATUS_PILL[c.k]}`}>
+          <div className="text-[10px] opacity-80">{c.label}</div>
+          <div className="text-lg font-bold leading-none">{c.n}</div>
+          <div className="text-[10px] opacity-70">({Math.round((c.n / total) * 100)}%)</div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** Horizontal stacked distribution bar (Stores hero). */
+export function DistributionBar({ counts }: { counts: { controlled: number; attention: number; at_risk: number; critical: number } }) {
+  const total = counts.controlled + counts.attention + counts.at_risk + counts.critical || 1
+  const seg = [
+    { c: 'bg-emerald-500', n: counts.controlled }, { c: 'bg-[#C6A35D]', n: counts.attention },
+    { c: 'bg-red-500', n: counts.at_risk }, { c: 'bg-red-800', n: counts.critical },
+  ]
+  return (
+    <div className="h-3 rounded-full bg-white/10 overflow-hidden flex">
+      {seg.map((s, i) => s.n > 0 && <div key={i} className={`h-full ${s.c}`} style={{ width: `${(s.n / total) * 100}%` }} />)}
+    </div>
+  )
+}
+
+export function QuickRow({ label, value, icon, tone }: { label: string; value: ReactNode; icon?: ReactNode; tone?: 'default' | 'bad' }) {
+  return (
+    <div className="flex items-center justify-between gap-2 py-2 border-b border-white/5 last:border-0">
+      <span className="flex items-center gap-2 text-xs text-slate-300">{icon}{label}</span>
+      <span className={`flex items-center gap-1 text-xs font-semibold ${tone === 'bad' ? 'text-red-400' : 'text-slate-200'}`}>{value}<ChevronRight size={13} className="text-slate-500" /></span>
+    </div>
+  )
+}
+
+export function RecommendedAction({ text }: { text: string }) {
+  return (
+    <div>
+      <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">Recommended Action</div>
+      <p className="text-xs text-slate-300 leading-relaxed">{text}</p>
+    </div>
+  )
+}
+
+export function StatusLegend() {
+  return (
+    <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-400">
+      <span className="flex items-center gap-1.5"><i className="w-2 h-2 rounded-full bg-emerald-500" />Controlled ≥80%</span>
+      <span className="flex items-center gap-1.5"><i className="w-2 h-2 rounded-full bg-[#C6A35D]" />Attention 60–79%</span>
+      <span className="flex items-center gap-1.5"><i className="w-2 h-2 rounded-full bg-red-500" />At Risk &lt;60%</span>
+    </div>
+  )
+}
+
+function round(n: number) { return Math.round(n * 10) / 10 }

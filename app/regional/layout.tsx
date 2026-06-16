@@ -1,27 +1,15 @@
-import { Navbar } from '@/components/ui/Navbar'
-import { BottomNav } from '@/components/ui/BottomNav'
+import { requireRegionalV3 } from '@/lib/health/guard'
+import { ExecChrome } from '@/components/exec/ExecChrome'
 import { RealtimeRefresh } from '@/components/ui/RealtimeRefresh'
-import { SwipeNav } from '@/components/ui/SwipeNav'
 
-const LINKS = [
-  { href: '/regional',         label: 'Dashboard' },
-  { href: '/regional/stores',  label: 'Stores'    },
-  { href: '/regional/tickets', label: 'Tickets'   },
-  { href: '/regional/signoff', label: 'Sign-off'  },
-  { href: '/regional/snag',    label: 'Snag'      },
-]
+export const dynamic = 'force-dynamic'
 
-export default function RegionalLayout({ children }: { children: React.ReactNode }) {
+export default async function RegionalLayout({ children }: { children: React.ReactNode }) {
+  const { fullName } = await requireRegionalV3()
   return (
-    <div className="min-h-screen flex flex-col">
-      <Navbar role="regional" />
-      <RealtimeRefresh tables={['tickets', 'quotes', 'notifications', 'completions']} />
-      <SwipeNav links={LINKS}>
-        <main className="flex-1 max-w-6xl w-full mx-auto px-4 py-6 pb-24">
-          {children}
-        </main>
-      </SwipeNav>
-      <BottomNav role="regional" />
-    </div>
+    <ExecChrome userName={fullName} variant="regional">
+      <RealtimeRefresh tables={['tickets', 'quotes', 'signoffs', 'snags']} />
+      {children}
+    </ExecChrome>
   )
 }

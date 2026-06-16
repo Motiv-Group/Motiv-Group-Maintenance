@@ -8,13 +8,13 @@ export default async function Home() {
   if (!user) redirect('/auth/login')
 
   const { data: profile } = await supabase
-    .from('profiles')
+    .from('user_profiles')
     .select('role')
     .eq('id', user.id)
     .single()
 
   if (profile?.role === 'supplier') redirect('/supplier')
   if (profile?.role === 'regional_manager') redirect('/regional')
-  if (profile?.role === 'executive') redirect('/executive')
+  if (profile?.role === 'executive' || profile?.role === 'system_admin') redirect('/executive')
   redirect('/client')
 }

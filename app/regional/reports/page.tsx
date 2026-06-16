@@ -1,37 +1,47 @@
 export const dynamic = 'force-dynamic'
 
-import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
-import { ReportBuilder } from '@/components/reports/ReportBuilder'
+import { FileBarChart } from 'lucide-react'
+import { requireRegionalV3 } from '@/lib/health/guard'
+import { assembleRegionalDashboard } from '@/lib/health/data'
+import { PrintButton } from '@/components/dashboards/PrintButton'
+import { STATUS_LABELS } from '@/lib/health/constants'
+import { formatCurrency, formatDateTime } from '@/lib/utils'
+
+const fmtK = (n: number) => n >= 1000 ? `R ${(n / 1000).toFixed(0)}K` : formatCurrency(n)
 
 export default async function RegionalReportsPage() {
-  const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/auth/login')
-
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  if (profile?.role !== 'regional_manager') redirect('/auth/login')
-
-  const admin = createAdminClient()
-  const { data: stores } = await admin
-    .from('profiles').select('id, company_name, sub_store')
-    .eq('regional_manager_id', user.id).in('role', ['store_manager', 'client'])
-    .order('company_name')
-
-  const opts = (stores ?? []).map((s: any) => ({
-    id: s.id,
-    label: `${s.company_name ?? '—'}${s.sub_store ? ' — ' + s.sub_store : ''}`,
-  }))
+  const { companyId, regionIds } = await requireRegionalV3()
+  const d = await assembleRegionalDashboard(companyId, regionIds)
+  const p = d.portfolio
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-xl font-bold text-gray-900 dark:text-white">Reports</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-          Generate a multi-store performance report. Pick the stores and period to include.
-        </p>
+      <div className="flex items-center justify-between gap-3 print:hidden">
+        <div><h1 className="text-2xl font-bold text-white flex items-center gap-2"><FileBarChart className="text-[#C6A35D]" size={22} /> Regional Report</h1>
+          <p className="text-sm text-slate-400 mt-0.5">Portfolio summary for your region. Print or save as PDF.</p></div>
+        <PrintButton />
       </div>
-      <ReportBuilder role="regional" stores={opts} />
+      <article className="bg-white text-slate-900 rounded-2xl p-8 space-y-6 print:p-0">
+        <header className="border-b border-slate-200 pb-4">
+          <h2 className="text-2xl font-bold">Regional Portfolio Report</h2>
+          <p className="text-sm text-slate-500">Generated {formatDateTime(d.generatedAt)}</p>
+        </header>
+        <section>
+          <h3 className="font-bold mb-1">Portfolio Health: {p.finalPortfolioHealth}% — {STATUS_LABELS[p.status]}</h3>
+          <p className="text-sm text-slate-600">Average store health {p.averageStoreHealth}% − penalty {p.riskPenalty}. {p.activeStores} stores · {p.counts.controlled} controlled / {p.counts.attention} attention / {p.counts.at_risk} at risk / {p.counts.critical} critical. {p.mainReason}.</p>
+        </section>
+        <section>
+          <h3 className="font-bold mb-2">Stores</h3>
+          <table className="w-full text-xs border-collapse">
+            <thead><tr className="text-left text-slate-500 border-b border-slate-200"><th className="py-1.5 pr-3">Store</th><th className="py-1.5 pr-3">Health</th><th className="py-1.5 pr-3">Status</th><th className="py-1.5 pr-3">Open</th><th className="py-1.5 pr-3">Overdue</th><th className="py-1.5 pr-3">Exposure</th><th className="py-1.5 pr-3">Main Driver</th></tr></thead>
+            <tbody>
+              {d.stores.map(s => (
+                <tr key={s.storeId} className="border-b border-slate-100"><td className="py-1.5 pr-3">{s.storeName}</td><td className="py-1.5 pr-3">{s.finalHealthScore}%</td><td className="py-1.5 pr-3">{STATUS_LABELS[s.finalStatus]}</td><td className="py-1.5 pr-3">{s.openTickets}</td><td className="py-1.5 pr-3">{s.overdueTickets}</td><td className="py-1.5 pr-3">{fmtK(s.costExposure)}</td><td className="py-1.5 pr-3">{s.mainIssue}</td></tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      </article>
     </div>
   )
 }

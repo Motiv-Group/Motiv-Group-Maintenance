@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+// v3 cutover: roles live in user_profiles (company-scoped identity).
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
@@ -13,9 +14,7 @@ export async function middleware(request: NextRequest) {
         setAll(cookiesToSet: { name: string; value: string; options?: Record<string, unknown> }[]) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           supabaseResponse = NextResponse.next({ request })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          )
+          cookiesToSet.forEach(({ name, value, options }) => supabaseResponse.cookies.set(name, value, options))
         },
       },
     }
@@ -24,64 +23,32 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   const path = request.nextUrl.pathname
 
-  async function getRole() {
+  async function getRole(): Promise<string | null> {
     if (!user) return null
-    const { data } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
+    const { data } = await supabase.from('user_profiles').select('role').eq('id', user.id).single()
     return data?.role ?? null
   }
 
-  // Store manager routes
-  if (path.startsWith('/client')) {
+  const gate = async (allowed: string[]) => {
     if (!user) return NextResponse.redirect(new URL('/auth/login', request.url))
     const role = await getRole()
-    if (role !== 'client' && role !== 'store_manager') {
-      return NextResponse.redirect(new URL('/auth/login', request.url))
-    }
+    if (!role || !allowed.includes(role)) return NextResponse.redirect(new URL('/auth/login', request.url))
+    return null
   }
 
-  // Regional manager routes
-  if (path.startsWith('/regional')) {
-    if (!user) return NextResponse.redirect(new URL('/auth/login', request.url))
-    const role = await getRole()
-    if (role !== 'regional_manager') {
-      return NextResponse.redirect(new URL('/auth/login', request.url))
-    }
-  }
+  if (path.startsWith('/client'))    { const r = await gate(['store_manager']); if (r) return r }
+  if (path.startsWith('/regional'))  { const r = await gate(['regional_manager']); if (r) return r }
+  if (path.startsWith('/supplier'))  { const r = await gate(['supplier']); if (r) return r }
+  if (path.startsWith('/executive')) { const r = await gate(['executive', 'system_admin']); if (r) return r }
+  if (path.startsWith('/admin'))     { const r = await gate(['system_admin']); if (r) return r }
+  if (path.startsWith('/settings'))  { if (!user) return NextResponse.redirect(new URL('/auth/login', request.url)) }
 
-  // Admin routes
-  if (path.startsWith('/supplier')) {
-    if (!user) return NextResponse.redirect(new URL('/auth/login', request.url))
-    const role = await getRole()
-    if (role !== 'supplier') {
-      return NextResponse.redirect(new URL('/auth/login', request.url))
-    }
-  }
-
-  // Executive routes
-  if (path.startsWith('/executive')) {
-    if (!user) return NextResponse.redirect(new URL('/auth/login', request.url))
-    const role = await getRole()
-    if (role !== 'executive') {
-      return NextResponse.redirect(new URL('/auth/login', request.url))
-    }
-  }
-
-  // Settings — any authenticated user
-  if (path.startsWith('/settings')) {
-    if (!user) return NextResponse.redirect(new URL('/auth/login', request.url))
-  }
-
-  // Redirect logged-in users away from auth pages
   if (user && (path === '/auth/login' || path === '/auth/signup')) {
     const role = await getRole()
-    let dest = '/client'
-    if (role === 'supplier') dest = '/supplier'
-    else if (role === 'regional_manager') dest = '/regional'
-    else if (role === 'executive') dest = '/executive'
+    const dest = role === 'supplier' ? '/supplier'
+      : role === 'regional_manager' ? '/regional'
+      : role === 'executive' || role === 'system_admin' ? '/executive'
+      : '/client'
     return NextResponse.redirect(new URL(dest, request.url))
   }
 
@@ -89,13 +56,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    '/client/:path*',
-    '/supplier/:path*',
-    '/regional/:path*',
-    '/executive/:path*',
-    '/settings',
-    '/settings/:path*',
-    '/auth/:path*',
-  ],
+  matcher: ['/client/:path*', '/supplier/:path*', '/regional/:path*', '/executive/:path*', '/admin/:path*', '/settings', '/settings/:path*', '/auth/:path*'],
 }

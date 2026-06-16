@@ -1,0 +1,59 @@
+import 'server-only'
+import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
+
+export interface ExecContext { userId: string; companyId: string; fullName: string | null }
+
+export interface SupplierContext { userId: string; companyId: string; supplierIds: string[]; fullName: string | null }
+
+/** Gate a v3 supplier page + return their supplier scope. */
+export async function requireSupplierV3(): Promise<SupplierContext> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/auth/login')
+  const { data: profile } = await supabase.from('user_profiles').select('role, company_id, full_name').eq('id', user.id).single()
+  if (profile?.role !== 'supplier') redirect('/auth/login')
+  if (!profile?.company_id) redirect('/auth/login')
+  const { data: links } = await supabase.from('supplier_users').select('supplier_id').eq('user_id', user.id)
+  return { userId: user.id, companyId: profile.company_id, supplierIds: (links ?? []).map(l => l.supplier_id), fullName: profile.full_name ?? null }
+}
+
+export interface StoreContext { userId: string; companyId: string; storeIds: string[]; fullName: string | null }
+
+/** Gate a v3 store-manager page + return their store scope. */
+export async function requireStoreManagerV3(): Promise<StoreContext> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/auth/login')
+  const { data: profile } = await supabase.from('user_profiles').select('role, company_id, full_name').eq('id', user.id).single()
+  if (profile?.role !== 'store_manager') redirect('/auth/login')
+  if (!profile?.company_id) redirect('/auth/login')
+  const { data: links } = await supabase.from('store_users').select('store_id').eq('user_id', user.id)
+  return { userId: user.id, companyId: profile.company_id, storeIds: (links ?? []).map(l => l.store_id), fullName: profile.full_name ?? null }
+}
+
+export interface RegionalContext { userId: string; companyId: string; regionIds: string[]; fullName: string | null }
+
+/** Gate a v3 regional-manager page + return their region scope. */
+export async function requireRegionalV3(): Promise<RegionalContext> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/auth/login')
+  const { data: profile } = await supabase.from('user_profiles').select('role, company_id, full_name').eq('id', user.id).single()
+  if (profile?.role !== 'regional_manager') redirect('/auth/login')
+  if (!profile?.company_id) redirect('/auth/login')
+  const { data: links } = await supabase.from('regional_users').select('region_id').eq('user_id', user.id)
+  return { userId: user.id, companyId: profile.company_id, regionIds: (links ?? []).map(l => l.region_id), fullName: profile.full_name ?? null }
+}
+
+/** Gate a v3 executive page + return their company scope. */
+export async function requireExecutiveV3(): Promise<ExecContext> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/auth/login')
+  const { data: profile } = await supabase
+    .from('user_profiles').select('role, company_id, full_name').eq('id', user.id).single()
+  if (profile?.role !== 'executive' && profile?.role !== 'system_admin') redirect('/auth/login')
+  if (!profile?.company_id) redirect('/auth/login')
+  return { userId: user.id, companyId: profile.company_id, fullName: profile.full_name ?? null }
+}
