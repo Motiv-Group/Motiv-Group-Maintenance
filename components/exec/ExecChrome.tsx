@@ -82,12 +82,12 @@ export function ExecChrome({
       <main className={`flex-1 ${wrap} w-full mx-auto px-4 py-6 pb-28`}>{children}</main>
 
       <nav className="fixed bottom-0 inset-x-0 z-20 bg-[#0c1120] border-t border-white/5">
-        <div className={`${wrap} mx-auto flex items-stretch h-16 ${variant === 'store' ? 'justify-start px-4' : 'justify-around'}`}>
+        <div className={`${wrap} mx-auto flex items-stretch h-16 ${variant === 'store' ? 'justify-start px-2 gap-1' : 'justify-around'}`}>
           {tabs.map(({ href, label, icon: Icon }) => {
             const active = pathname === href || (href !== home && pathname.startsWith(href))
             return (
               <Link key={href} href={href}
-                className={`flex flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors ${variant === 'store' ? 'px-7' : 'flex-1'} ${active ? 'text-[#C6A35D]' : 'text-slate-500 hover:text-slate-300'}`}>
+                className={`flex flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors ${variant === 'store' ? 'w-24 my-2 rounded-xl hover:bg-white/5' : 'flex-1'} ${active ? 'text-[#C6A35D]' : 'text-slate-500 hover:text-slate-300'}`}>
                 <Icon size={20} strokeWidth={active ? 2.4 : 1.8} />
                 {label}
               </Link>

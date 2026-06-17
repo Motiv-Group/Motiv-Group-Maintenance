@@ -56,7 +56,7 @@ export function EditTicketForm({ ticketId, initial }: Props) {
     return (
       <div className="space-y-2">
         <div className="flex gap-2">
-          <button onClick={() => setEditing(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#C6A35D] text-[#0a0e17] text-sm font-medium"><Pencil size={14} /> Edit ticket</button>
+          <button onClick={() => setEditing(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-500 transition"><Pencil size={14} /> Edit ticket</button>
           <button onClick={() => setConfirmDelete(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-xl ring-1 ring-red-500/40 text-red-400 text-sm hover:bg-red-500/10"><Trash2 size={14} /> Delete</button>
         </div>
         <p className="text-[11px] text-slate-500">You can edit or delete this ticket while it&apos;s still open.</p>
