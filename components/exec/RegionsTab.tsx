@@ -61,7 +61,7 @@ export function RegionsTab({ data }: { data: EstateDashboardData }) {
             <div className="overflow-x-auto -mx-1">
               <table className="w-full text-sm min-w-[860px]">
                 <thead>
-                  <tr className="text-left text-[11px] text-slate-500 border-b border-white/5">
+                  <tr className="text-left text-[11px] text-[var(--text-faint)] border-b border-[var(--border)]">
                     <th className="py-2 px-2">#</th><th className="px-2">Region</th><th className="px-2">Health</th><th className="px-2">Trend</th><th className="px-2">Status</th>
                     <th className="px-2">Stores</th><th className="px-2">Red/Crit</th><th className="px-2">Open</th>
                     <th className="px-2">Sup SLA</th><th className="px-2">Int SLA</th><th className="px-2">Exposure</th><th className="px-2">Main Driver</th><th className="px-2"></th>
@@ -70,27 +70,27 @@ export function RegionsTab({ data }: { data: EstateDashboardData }) {
                 <tbody>
                   {shown.map(({ rank, region, regionName, trend }) => (
                     <tr key={region.regionId} onClick={() => openRow(region.regionId)}
-                      className={`border-b border-white/5 cursor-pointer hover:bg-white/[0.03] ${selId === region.regionId ? 'bg-white/[0.04]' : ''}`}>
-                      <td className="py-2.5 px-2 text-slate-500">{rank}</td>
-                      <td className="px-2 font-medium text-white whitespace-nowrap">{regionName}</td>
+                      className={`border-b border-[var(--border)] cursor-pointer hover:bg-[var(--hover)] ${selId === region.regionId ? 'bg-[var(--hover)]' : ''}`}>
+                      <td className="py-2.5 px-2 text-[var(--text-faint)]">{rank}</td>
+                      <td className="px-2 font-medium text-[var(--text)] whitespace-nowrap">{regionName}</td>
                       <td className={`px-2 font-semibold ${STATUS_TEXT[region.status]}`}>{region.finalPortfolioHealth}%</td>
                       <td className="px-2"><TrendArrow t={{ dir: trend.dir, label: `${trend.pct}%`, good: trend.dir === 'up' }} /></td>
                       <td className="px-2"><Pill status={region.status} /></td>
-                      <td className="px-2 text-slate-300">{region.activeStores}</td>
-                      <td className="px-2 text-slate-300">{region.counts.at_risk} / {region.counts.critical}</td>
-                      <td className="px-2 text-slate-300">{region.openTickets}</td>
-                      <td className="px-2 text-slate-300">{region.supplierSlaBreaches}</td>
-                      <td className="px-2 text-slate-300">{region.internalSlaBreaches}</td>
-                      <td className="px-2 text-slate-300 whitespace-nowrap">{fmtK(region.costExposure)}</td>
-                      <td className="px-2 text-xs text-slate-400 max-w-[200px] truncate">{region.mainReason}</td>
+                      <td className="px-2 text-[var(--text-muted)]">{region.activeStores}</td>
+                      <td className="px-2 text-[var(--text-muted)]">{region.counts.at_risk} / {region.counts.critical}</td>
+                      <td className="px-2 text-[var(--text-muted)]">{region.openTickets}</td>
+                      <td className="px-2 text-[var(--text-muted)]">{region.supplierSlaBreaches}</td>
+                      <td className="px-2 text-[var(--text-muted)]">{region.internalSlaBreaches}</td>
+                      <td className="px-2 text-[var(--text-muted)] whitespace-nowrap">{fmtK(region.costExposure)}</td>
+                      <td className="px-2 text-xs text-[var(--text-muted)] max-w-[200px] truncate">{region.mainReason}</td>
                       <td className="px-2">
-                        <span className={`text-[11px] px-2 py-1 rounded-lg ring-1 ${region.status === 'controlled' ? 'text-slate-300 ring-white/10' : 'text-[#C6A35D] ring-[#C6A35D]/40'}`}>
+                        <span className={`text-[11px] px-2 py-1 rounded-lg ring-1 ${region.status === 'controlled' ? 'text-[var(--text-muted)] ring-white/10' : 'text-[#C6A35D] ring-[#C6A35D]/40'}`}>
                           {region.status === 'controlled' ? 'Monitor' : 'Review'}
                         </span>
                       </td>
                     </tr>
                   ))}
-                  {shown.length === 0 && <tr><td colSpan={13} className="py-6 text-center text-slate-500">No regions match this filter.</td></tr>}
+                  {shown.length === 0 && <tr><td colSpan={13} className="py-6 text-center text-[var(--text-faint)]">No regions match this filter.</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -100,12 +100,12 @@ export function RegionsTab({ data }: { data: EstateDashboardData }) {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             <SectionCard title="Regions Requiring Attention" icon={<AlertTriangle size={15} className="text-[#C6A35D]" />}>
               {regions.filter(r => r.region.status !== 'controlled').slice(0, 5).map(({ region, regionName }) => (
-                <div key={region.regionId} className="flex items-center justify-between gap-2 py-2 border-b border-white/5 last:border-0">
-                  <div className="min-w-0"><Pill status={region.status} label={regionName} /><p className="text-xs text-slate-400 mt-1 truncate">{region.mainReason}</p></div>
+                <div key={region.regionId} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0">
+                  <div className="min-w-0"><Pill status={region.status} label={regionName} /><p className="text-xs text-[var(--text-muted)] mt-1 truncate">{region.mainReason}</p></div>
                   <span className={`text-sm font-semibold ${STATUS_TEXT[region.status]}`}>{region.finalPortfolioHealth}%</span>
                 </div>
               ))}
-              {regions.every(r => r.region.status === 'controlled') && <p className="text-sm text-slate-500">All regions controlled.</p>}
+              {regions.every(r => r.region.status === 'controlled') && <p className="text-sm text-[var(--text-faint)]">All regions controlled.</p>}
             </SectionCard>
 
             <SectionCard title="Performing Well" icon={<CheckCircle2 size={15} className="text-emerald-400" />}>
@@ -127,9 +127,9 @@ export function RegionsTab({ data }: { data: EstateDashboardData }) {
 
 function PerfRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
-    <div className="flex items-center gap-3 py-2 border-b border-white/5 last:border-0">
+    <div className="flex items-center gap-3 py-2 border-b border-[var(--border)] last:border-0">
       <span className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">{icon}</span>
-      <div className="min-w-0"><div className="text-[11px] text-slate-500">{label}</div><div className="text-sm text-white truncate">{value}</div></div>
+      <div className="min-w-0"><div className="text-[11px] text-[var(--text-faint)]">{label}</div><div className="text-sm text-[var(--text)] truncate">{value}</div></div>
     </div>
   )
 }
@@ -144,15 +144,15 @@ function RegionDetail({ data, region, name, onClose }: { data: EstateDashboardDa
   return (
     <div className="space-y-4">
       <DrawerHeader onClose={onClose}
-        title={<div className="flex items-center gap-2 flex-wrap"><h3 className="text-lg font-bold text-white">{name}</h3><Pill status={region.status} /></div>} />
+        title={<div className="flex items-center gap-2 flex-wrap"><h3 className="text-lg font-bold text-[var(--text)]">{name}</h3><Pill status={region.status} /></div>} />
       <div>
         <div className={`text-3xl font-bold ${STATUS_TEXT[region.status]}`}>{region.finalPortfolioHealth}%</div>
-        <p className="text-xs text-slate-400 mt-1">{region.activeStores} Stores · {region.counts.at_risk} Red · {region.counts.critical} Critical</p>
-        <p className="text-xs text-slate-400 mt-1">Main driver: {region.mainReason}</p>
+        <p className="text-xs text-[var(--text-muted)] mt-1">{region.activeStores} Stores · {region.counts.at_risk} Red · {region.counts.critical} Critical</p>
+        <p className="text-xs text-[var(--text-muted)] mt-1">Main driver: {region.mainReason}</p>
       </div>
 
       <div>
-        <div className="text-xs font-semibold text-slate-300 mb-3">Health Breakdown</div>
+        <div className="text-xs font-semibold text-[var(--text-muted)] mb-3">Health Breakdown</div>
         <div className="flex items-center gap-4">
           <Donut value={region.finalPortfolioHealth} status={region.status} size={104} />
           <div className="flex-1">
@@ -169,16 +169,16 @@ function RegionDetail({ data, region, name, onClose }: { data: EstateDashboardDa
       </div>
 
       <div>
-        <div className="text-xs font-semibold text-slate-300 mb-2">Store Health Distribution</div>
+        <div className="text-xs font-semibold text-[var(--text-muted)] mb-2">Store Health Distribution</div>
         <DistributionChips counts={region.counts} />
       </div>
 
       {top5.length > 0 && (
         <div>
-          <div className="text-xs font-semibold text-slate-300 mb-1">Top {top5.length} Stores Needing Attention</div>
+          <div className="text-xs font-semibold text-[var(--text-muted)] mb-1">Top {top5.length} Stores Needing Attention</div>
           {top5.map((s, i) => (
-            <div key={s.storeId} className="flex items-center justify-between py-1.5 border-b border-white/5 last:border-0 text-xs">
-              <span className="text-slate-300 truncate">{i + 1}. {s.storeName}</span>
+            <div key={s.storeId} className="flex items-center justify-between py-1.5 border-b border-[var(--border)] last:border-0 text-xs">
+              <span className="text-[var(--text-muted)] truncate">{i + 1}. {s.storeName}</span>
               <span className={STATUS_TEXT[s.finalStatus]}>{s.finalHealthScore}%</span>
             </div>
           ))}

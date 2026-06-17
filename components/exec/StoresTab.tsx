@@ -73,12 +73,12 @@ export function StoresTab({ data }: { data: EstateDashboardData }) {
         <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-6 items-center">
           <div className="flex items-center gap-4">
             <Donut value={avg} status={avgStatus} size={120} />
-            <div><Pill status={avgStatus} label={STATUS_LABELS[avgStatus]} /><p className="text-sm text-slate-300 mt-2 max-w-xs">Average store health {avg}%. {counts.attention} store(s) need follow-up; {counts.controlled} controlled.</p></div>
+            <div><Pill status={avgStatus} label={STATUS_LABELS[avgStatus]} /><p className="text-sm text-[var(--text-muted)] mt-2 max-w-xs">Average store health {avg}%. {counts.attention} store(s) need follow-up; {counts.controlled} controlled.</p></div>
           </div>
           <div className="space-y-2">
-            <div className="text-xs text-slate-400">Health Distribution</div>
+            <div className="text-xs text-[var(--text-muted)]">Health Distribution</div>
             <DistributionBar counts={counts} />
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-400 pt-1">
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-[var(--text-muted)] pt-1">
               <span className="text-emerald-400">Controlled {counts.controlled} ({pct(counts.controlled, stores.length)}%)</span>
               <span className="text-[#C6A35D]">Attention {counts.attention} ({pct(counts.attention, stores.length)}%)</span>
               <span className="text-red-400">At Risk {counts.at_risk} ({pct(counts.at_risk, stores.length)}%)</span>
@@ -95,25 +95,25 @@ export function StoresTab({ data }: { data: EstateDashboardData }) {
           <SectionCard title="Store Ranking — highest attention first">
             <div className="overflow-x-auto -mx-1">
               <table className="w-full text-sm min-w-[820px]">
-                <thead><tr className="text-left text-[11px] text-slate-500 border-b border-white/5">
+                <thead><tr className="text-left text-[11px] text-[var(--text-faint)] border-b border-[var(--border)]">
                   <th className="py-2 px-2">#</th><th className="px-2">Store</th><th className="px-2">Region</th><th className="px-2">Health</th><th className="px-2">Trend</th><th className="px-2">Status</th>
                   <th className="px-2">Open</th><th className="px-2">Overdue</th><th className="px-2">Approvals</th><th className="px-2">Exposure</th><th className="px-2">Main Driver</th><th className="px-2"></th>
                 </tr></thead>
                 <tbody>
                   {shown.map((s, i) => (
-                    <tr key={s.storeId} onClick={() => openRow(s.storeId)} className={`border-b border-white/5 cursor-pointer hover:bg-white/[0.03] ${selId === s.storeId ? 'bg-white/[0.04]' : ''}`}>
-                      <td className="py-2.5 px-2 text-slate-500">{i + 1}</td><td className="px-2 text-white">{s.storeName}</td>
-                      <td className="px-2 text-slate-400">{s.regionName}</td>
+                    <tr key={s.storeId} onClick={() => openRow(s.storeId)} className={`border-b border-[var(--border)] cursor-pointer hover:bg-[var(--hover)] ${selId === s.storeId ? 'bg-[var(--hover)]' : ''}`}>
+                      <td className="py-2.5 px-2 text-[var(--text-faint)]">{i + 1}</td><td className="px-2 text-[var(--text)]">{s.storeName}</td>
+                      <td className="px-2 text-[var(--text-muted)]">{s.regionName}</td>
                       <td className={`px-2 font-semibold ${STATUS_TEXT[s.finalStatus]}`}>{s.finalHealthScore}%</td>
                       <td className="px-2">{(() => { const t = trendOf(s.storeId); return <TrendArrow t={{ dir: t.dir, label: `${t.pct}%`, good: t.dir === 'up' }} /> })()}</td>
                       <td className="px-2"><Pill status={s.finalStatus} /></td>
-                      <td className="px-2 text-slate-300">{s.openTickets}</td><td className="px-2 text-red-400">{s.overdueTickets}</td>
-                      <td className="px-2 text-slate-300">{s.pendingDecisions}</td><td className="px-2 text-slate-300 whitespace-nowrap">{fmtK(s.costExposure)}</td>
-                      <td className="px-2 text-xs text-slate-400 max-w-[200px] truncate">{s.mainIssue}</td>
-                      <td className="px-2"><span className={`text-[11px] px-2 py-1 rounded-lg ring-1 ${s.finalStatus === 'controlled' ? 'text-slate-300 ring-white/10' : 'text-[#C6A35D] ring-[#C6A35D]/40'}`}>{s.finalStatus === 'controlled' ? 'Monitor' : 'Review'}</span></td>
+                      <td className="px-2 text-[var(--text-muted)]">{s.openTickets}</td><td className="px-2 text-red-400">{s.overdueTickets}</td>
+                      <td className="px-2 text-[var(--text-muted)]">{s.pendingDecisions}</td><td className="px-2 text-[var(--text-muted)] whitespace-nowrap">{fmtK(s.costExposure)}</td>
+                      <td className="px-2 text-xs text-[var(--text-muted)] max-w-[200px] truncate">{s.mainIssue}</td>
+                      <td className="px-2"><span className={`text-[11px] px-2 py-1 rounded-lg ring-1 ${s.finalStatus === 'controlled' ? 'text-[var(--text-muted)] ring-white/10' : 'text-[#C6A35D] ring-[#C6A35D]/40'}`}>{s.finalStatus === 'controlled' ? 'Monitor' : 'Review'}</span></td>
                     </tr>
                   ))}
-                  {!shown.length && <tr><td colSpan={12} className="py-6 text-center text-slate-500">No stores match this filter.</td></tr>}
+                  {!shown.length && <tr><td colSpan={12} className="py-6 text-center text-[var(--text-faint)]">No stores match this filter.</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -122,12 +122,12 @@ export function StoresTab({ data }: { data: EstateDashboardData }) {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             <SectionCard title="Stores Requiring Attention" icon={<AlertTriangle size={15} className="text-[#C6A35D]" />}>
               {attention.slice(0, 5).map(s => (
-                <div key={s.storeId} className="flex items-center justify-between gap-2 py-2 border-b border-white/5 last:border-0">
-                  <div className="min-w-0"><p className="text-sm text-white truncate">{s.storeName}</p><p className="text-[11px] text-slate-500 truncate">{s.mainIssue}</p></div>
+                <div key={s.storeId} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0">
+                  <div className="min-w-0"><p className="text-sm text-[var(--text)] truncate">{s.storeName}</p><p className="text-[11px] text-[var(--text-faint)] truncate">{s.mainIssue}</p></div>
                   <span className={`text-sm font-semibold ${STATUS_TEXT[s.finalStatus]}`}>{s.finalHealthScore}%</span>
                 </div>
               ))}
-              {!attention.length && <p className="text-sm text-slate-500">All stores controlled.</p>}
+              {!attention.length && <p className="text-sm text-[var(--text-faint)]">All stores controlled.</p>}
             </SectionCard>
             <SectionCard title="Performing Well" icon={<CheckCircle2 size={15} className="text-emerald-400" />}>
               <Perf icon={<Trophy size={15} className="text-[#C6A35D]" />} label="Best Performing Store" value={best ? `${best.storeName} (${best.finalHealthScore}%)` : '—'} />
@@ -144,20 +144,20 @@ export function StoresTab({ data }: { data: EstateDashboardData }) {
 }
 
 function Perf({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
-  return <div className="flex items-center gap-3 py-2 border-b border-white/5 last:border-0"><span className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">{icon}</span><div className="min-w-0"><div className="text-[11px] text-slate-500">{label}</div><div className="text-sm text-white truncate">{value}</div></div></div>
+  return <div className="flex items-center gap-3 py-2 border-b border-[var(--border)] last:border-0"><span className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">{icon}</span><div className="min-w-0"><div className="text-[11px] text-[var(--text-faint)]">{label}</div><div className="text-sm text-[var(--text)] truncate">{value}</div></div></div>
 }
 
 function Snap({ label, value, bad }: { label: string; value: React.ReactNode; bad?: boolean }) {
-  return <div className="rounded-lg bg-white/5 px-3 py-2"><div className="text-[10px] text-slate-500">{label}</div><div className={`text-sm font-semibold ${bad ? 'text-red-400' : 'text-white'}`}>{value}</div></div>
+  return <div className="rounded-lg bg-white/5 px-3 py-2"><div className="text-[10px] text-[var(--text-faint)]">{label}</div><div className={`text-sm font-semibold ${bad ? 'text-red-400' : 'text-[var(--text)]'}`}>{value}</div></div>
 }
 
 function StoreDetail({ s, onClose }: { s: StoreCard; onClose?: () => void }) {
   return (
     <div className="space-y-4">
-      <DrawerHeader onClose={onClose} title={<div className="flex items-center gap-2 flex-wrap"><h3 className="text-lg font-bold text-white">{s.storeName}</h3><Pill status={s.finalStatus} /></div>} />
-      <div><div className={`text-3xl font-bold ${STATUS_TEXT[s.finalStatus]}`}>{s.finalHealthScore}%</div><p className="text-xs text-slate-400 mt-1">Region: {s.regionName} · Open work: {s.openTickets} · Pending approvals: {s.pendingDecisions}</p></div>
+      <DrawerHeader onClose={onClose} title={<div className="flex items-center gap-2 flex-wrap"><h3 className="text-lg font-bold text-[var(--text)]">{s.storeName}</h3><Pill status={s.finalStatus} /></div>} />
+      <div><div className={`text-3xl font-bold ${STATUS_TEXT[s.finalStatus]}`}>{s.finalHealthScore}%</div><p className="text-xs text-[var(--text-muted)] mt-1">Region: {s.regionName} · Open work: {s.openTickets} · Pending approvals: {s.pendingDecisions}</p></div>
       <div>
-        <div className="text-xs font-semibold text-slate-300 mb-3">Health Breakdown</div>
+        <div className="text-xs font-semibold text-[var(--text-muted)] mb-3">Health Breakdown</div>
         <div className="flex items-center gap-4">
           <Donut value={s.finalHealthScore} status={s.finalStatus} size={104} />
           <div className="flex-1"><BreakdownList rows={[
@@ -171,7 +171,7 @@ function StoreDetail({ s, onClose }: { s: StoreCard; onClose?: () => void }) {
         </div>
       </div>
       <div>
-        <div className="text-xs font-semibold text-slate-300 mb-2">Store Snapshot</div>
+        <div className="text-xs font-semibold text-[var(--text-muted)] mb-2">Store Snapshot</div>
         <div className="grid grid-cols-3 gap-2">
           <Snap label="Open tickets" value={s.openTickets} />
           <Snap label="Overdue" value={s.overdueTickets} bad={s.overdueTickets > 0} />
@@ -181,9 +181,9 @@ function StoreDetail({ s, onClose }: { s: StoreCard; onClose?: () => void }) {
           <Snap label="Internal SLA breaches" value={s.internalBreaches} bad={s.internalBreaches > 0} />
         </div>
       </div>
-      <div><div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">Executive Attention</div><p className="text-xs text-slate-300">{s.mainIssue}.</p></div>
+      <div><div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Executive Attention</div><p className="text-xs text-[var(--text-muted)]">{s.mainIssue}.</p></div>
       <RecommendedAction text={s.finalStatus === 'controlled' ? 'No action needed — store controlled.' : 'Review and clear the flagged blocker to restore full store health.'} />
-      <div className="flex items-center justify-between text-xs text-slate-400"><span>Owner: Approver / Executive</span><span>Priority: {s.finalStatus === 'controlled' ? 'Routine' : 'High'}</span></div>
+      <div className="flex items-center justify-between text-xs text-[var(--text-muted)]"><span>Owner: Approver / Executive</span><span>Priority: {s.finalStatus === 'controlled' ? 'Routine' : 'High'}</span></div>
       <PrimaryButton tone="gold">View Store Details</PrimaryButton>
     </div>
   )

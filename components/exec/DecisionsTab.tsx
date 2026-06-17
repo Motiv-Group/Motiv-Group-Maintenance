@@ -17,7 +17,7 @@ const fmtM = (n: number) => n >= 1_000_000 ? `R ${(n / 1_000_000).toFixed(1)}M` 
 const BAND_PILL: Record<DecisionItem['band'], string> = {
   High: 'bg-red-500/15 text-red-400 ring-1 ring-red-500/30',
   Medium: 'bg-[#C6A35D]/15 text-[#C6A35D] ring-1 ring-[#C6A35D]/30',
-  Low: 'bg-white/5 text-slate-300 ring-1 ring-white/10',
+  Low: 'bg-white/5 text-[var(--text-muted)] ring-1 ring-white/10',
 }
 const bandStatus = (b: DecisionItem['band']) => b === 'High' ? 'at_risk' : b === 'Medium' ? 'attention' : 'controlled'
 
@@ -69,26 +69,26 @@ export function DecisionsTab({ data }: { data: EstateDashboardData }) {
           <SectionCard title="Decision Queue — highest priority first">
             <div className="overflow-x-auto -mx-1">
               <table className="w-full text-sm min-w-[860px]">
-                <thead><tr className="text-left text-[11px] text-slate-500 border-b border-white/5">
+                <thead><tr className="text-left text-[11px] text-[var(--text-faint)] border-b border-[var(--border)]">
                   <th className="py-2 px-2">#</th><th className="px-2">Priority</th><th className="px-2">Type</th><th className="px-2">Decision Item</th>
                   <th className="px-2">Business Impact</th><th className="px-2">Exposure</th><th className="px-2">Owner</th><th className="px-2">Due</th><th className="px-2">Status</th><th className="px-2"></th>
                 </tr></thead>
                 <tbody>
                   {shown.map((d, i) => (
-                    <tr key={d.title} onClick={() => openRow(d.title)} className={`border-b border-white/5 cursor-pointer hover:bg-white/[0.03] ${sel === d.title ? 'bg-white/[0.04]' : ''}`}>
-                      <td className="py-2.5 px-2 text-slate-500">{i + 1}</td>
+                    <tr key={d.title} onClick={() => openRow(d.title)} className={`border-b border-[var(--border)] cursor-pointer hover:bg-[var(--hover)] ${sel === d.title ? 'bg-[var(--hover)]' : ''}`}>
+                      <td className="py-2.5 px-2 text-[var(--text-faint)]">{i + 1}</td>
                       <td className="px-2"><span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${BAND_PILL[d.band]}`}>{d.band}</span></td>
-                      <td className="px-2 text-slate-300 whitespace-nowrap">{d.category}</td>
-                      <td className="px-2 text-white max-w-[220px] truncate">{d.title}</td>
-                      <td className="px-2 text-slate-400 text-xs">{d.businessImpact}</td>
-                      <td className="px-2 text-slate-300 whitespace-nowrap">{d.exposureValue ? fmtM(d.exposureValue) : 'R 0'}</td>
-                      <td className="px-2 text-slate-400 text-xs whitespace-nowrap">{d.owner}</td>
-                      <td className="px-2 text-slate-400 text-xs">{d.deadlineDays}d</td>
-                      <td className="px-2"><span className={`text-[11px] ${statusOf(d) === 'Overdue' ? 'text-red-400' : statusOf(d) === 'Monitor' ? 'text-slate-400' : 'text-[#C6A35D]'}`}>{statusOf(d)}</span></td>
+                      <td className="px-2 text-[var(--text-muted)] whitespace-nowrap">{d.category}</td>
+                      <td className="px-2 text-[var(--text)] max-w-[220px] truncate">{d.title}</td>
+                      <td className="px-2 text-[var(--text-muted)] text-xs">{d.businessImpact}</td>
+                      <td className="px-2 text-[var(--text-muted)] whitespace-nowrap">{d.exposureValue ? fmtM(d.exposureValue) : 'R 0'}</td>
+                      <td className="px-2 text-[var(--text-muted)] text-xs whitespace-nowrap">{d.owner}</td>
+                      <td className="px-2 text-[var(--text-muted)] text-xs">{d.deadlineDays}d</td>
+                      <td className="px-2"><span className={`text-[11px] ${statusOf(d) === 'Overdue' ? 'text-red-400' : statusOf(d) === 'Monitor' ? 'text-[var(--text-muted)]' : 'text-[#C6A35D]'}`}>{statusOf(d)}</span></td>
                       <td className="px-2"><span className="text-[11px] px-2 py-1 rounded-lg ring-1 text-[#C6A35D] ring-[#C6A35D]/40">Review</span></td>
                     </tr>
                   ))}
-                  {!shown.length && <tr><td colSpan={10} className="py-6 text-center text-slate-500">No decisions match this filter.</td></tr>}
+                  {!shown.length && <tr><td colSpan={10} className="py-6 text-center text-[var(--text-faint)]">No decisions match this filter.</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -97,21 +97,21 @@ export function DecisionsTab({ data }: { data: EstateDashboardData }) {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             <SectionCard title="Immediate Attention" icon={<AlertTriangle size={15} className="text-red-400" />}>
               {decisions.filter(d => d.urgency === 'high').slice(0, 4).map((d, i) => (
-                <div key={i} className="py-2 border-b border-white/5 last:border-0">
-                  <p className="text-sm text-white">{d.title}</p>
-                  <p className="text-[11px] text-slate-500">{d.recommendedAction} · {d.owner} · {d.deadlineDays}d</p>
+                <div key={i} className="py-2 border-b border-[var(--border)] last:border-0">
+                  <p className="text-sm text-[var(--text)]">{d.title}</p>
+                  <p className="text-[11px] text-[var(--text-faint)]">{d.recommendedAction} · {d.owner} · {d.deadlineDays}d</p>
                 </div>
               ))}
-              {!decisions.some(d => d.urgency === 'high') && <p className="text-sm text-slate-500">Nothing urgent.</p>}
+              {!decisions.some(d => d.urgency === 'high') && <p className="text-sm text-[var(--text-faint)]">Nothing urgent.</p>}
             </SectionCard>
             <SectionCard title="Strategic Opportunities" icon={<Lightbulb size={15} className="text-[#C6A35D]" />}>
               <Opp text="Preventive maintenance can reduce repeat defects." show={decisions.some(d => d.category === 'Change Strategy')} />
               <Opp text="Contract review may improve supplier SLA." show={decisions.some(d => d.category === 'Review Contract' || d.category === 'Escalate Supplier')} />
               <Opp text="Budget reallocation can stabilise critical repairs." show={decisions.some(d => d.category === 'Reallocate Budget')} />
               <Opp text="Asset renewal likely to reduce reactive callouts." show={decisions.some(d => d.category === 'Approve Investment')} />
-              <div className="grid grid-cols-2 gap-3 pt-3 mt-1 border-t border-white/5 text-center">
-                <div><div className="flex items-center justify-center gap-1 text-[#C6A35D]"><Gem size={14} /><span className="text-lg font-bold">{highValue}</span></div><div className="text-[11px] text-slate-500">High-Value Items</div></div>
-                <div><div className="flex items-center justify-center gap-1 text-emerald-400"><Coins size={14} /><span className="text-lg font-bold">{fmtM(savings)}</span></div><div className="text-[11px] text-slate-500">Potential Savings</div></div>
+              <div className="grid grid-cols-2 gap-3 pt-3 mt-1 border-t border-[var(--border)] text-center">
+                <div><div className="flex items-center justify-center gap-1 text-[#C6A35D]"><Gem size={14} /><span className="text-lg font-bold">{highValue}</span></div><div className="text-[11px] text-[var(--text-faint)]">High-Value Items</div></div>
+                <div><div className="flex items-center justify-center gap-1 text-emerald-400"><Coins size={14} /><span className="text-lg font-bold">{fmtM(savings)}</span></div><div className="text-[11px] text-[var(--text-faint)]">Potential Savings</div></div>
               </div>
             </SectionCard>
           </div>
@@ -125,7 +125,7 @@ export function DecisionsTab({ data }: { data: EstateDashboardData }) {
 
 function Opp({ text, show }: { text: string; show: boolean }) {
   if (!show) return null
-  return <div className="flex items-start gap-2 py-1.5 text-xs text-slate-300"><Lightbulb size={13} className="text-[#C6A35D] mt-0.5 shrink-0" />{text}</div>
+  return <div className="flex items-start gap-2 py-1.5 text-xs text-[var(--text-muted)]"><Lightbulb size={13} className="text-[#C6A35D] mt-0.5 shrink-0" />{text}</div>
 }
 
 function DecisionDetail({ d, data, onClose }: { d: DecisionItem; data: EstateDashboardData; onClose?: () => void }) {
@@ -140,11 +140,11 @@ function DecisionDetail({ d, data, onClose }: { d: DecisionItem; data: EstateDas
   }
   return (
     <div className="space-y-4">
-      <DrawerHeader onClose={onClose} title={<div className="flex items-center gap-2 flex-wrap"><h3 className="text-lg font-bold text-white">{d.title}</h3><span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-red-500/15 text-red-400">Action Required</span></div>} />
+      <DrawerHeader onClose={onClose} title={<div className="flex items-center gap-2 flex-wrap"><h3 className="text-lg font-bold text-[var(--text)]">{d.title}</h3><span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-red-500/15 text-red-400">Action Required</span></div>} />
       {d.exposureValue ? <div className="text-3xl font-bold text-red-400">{fmtM(d.exposureValue)}</div> : null}
-      <p className="text-xs text-slate-400">{d.context}. Main driver: {d.mainDriver}.</p>
+      <p className="text-xs text-[var(--text-muted)]">{d.context}. Main driver: {d.mainDriver}.</p>
       <div>
-        <div className="text-xs font-semibold text-slate-300 mb-3">Decision Summary</div>
+        <div className="text-xs font-semibold text-[var(--text-muted)] mb-3">Decision Summary</div>
         <div className="flex items-center gap-4">
           <Donut value={avg} status={bandStatus(d.band)} size={104} label={d.band} />
           <div className="flex-1"><BreakdownList rows={[
@@ -159,7 +159,7 @@ function DecisionDetail({ d, data, onClose }: { d: DecisionItem; data: EstateDas
       </div>
       {d.affectedStores.length > 0 && (
         <div>
-          <div className="text-xs font-semibold text-slate-300 mb-2">Affected Stores</div>
+          <div className="text-xs font-semibold text-[var(--text-muted)] mb-2">Affected Stores</div>
           <div className="grid grid-cols-3 gap-2 text-center text-xs">
             <div className="rounded-lg bg-red-500/15 text-red-400 py-2"><div className="text-lg font-bold">{counts.critical}</div>Critical</div>
             <div className="rounded-lg bg-[#C6A35D]/15 text-[#C6A35D] py-2"><div className="text-lg font-bold">{counts.attention}</div>Attention</div>

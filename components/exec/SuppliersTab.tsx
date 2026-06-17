@@ -77,28 +77,28 @@ export function SuppliersTab({ data }: { data: EstateDashboardData }) {
           <SectionCard title="Supplier Performance Ranking — highest risk first">
             <div className="overflow-x-auto -mx-1">
               <table className="w-full text-sm min-w-[900px]">
-                <thead><tr className="text-left text-[11px] text-slate-500 border-b border-white/5">
+                <thead><tr className="text-left text-[11px] text-[var(--text-faint)] border-b border-[var(--border)]">
                   <th className="py-2 px-2">#</th><th className="px-2">Supplier</th><th className="px-2">SLA%</th><th className="px-2">Trend</th><th className="px-2">Status</th>
                   <th className="px-2">Open</th><th className="px-2">Overdue</th><th className="px-2">Resp (hrs)</th><th className="px-2">Compl (days)</th>
                   <th className="px-2">First-fix</th><th className="px-2">Repeat</th><th className="px-2">Exposure</th><th className="px-2">Escal.</th><th className="px-2"></th>
                 </tr></thead>
                 <tbody>
                   {shown.map((s, i) => (
-                    <tr key={s.id} onClick={() => openRow(s.id)} className={`border-b border-white/5 cursor-pointer hover:bg-white/[0.03] ${selId === s.id ? 'bg-white/[0.04]' : ''}`}>
-                      <td className="py-2.5 px-2 text-slate-500">{i + 1}</td><td className="px-2 text-white">{s.name}</td>
+                    <tr key={s.id} onClick={() => openRow(s.id)} className={`border-b border-[var(--border)] cursor-pointer hover:bg-[var(--hover)] ${selId === s.id ? 'bg-[var(--hover)]' : ''}`}>
+                      <td className="py-2.5 px-2 text-[var(--text-faint)]">{i + 1}</td><td className="px-2 text-[var(--text)]">{s.name}</td>
                       <td className={`px-2 font-semibold ${STATUS_TEXT[s.perf.band]}`}>{s.perf.performanceScore}%</td>
                       <td className="px-2"><TrendArrow t={{ dir: s.trend.dir, label: `${s.trend.pct}%`, good: s.trend.dir === 'up' }} /></td>
                       <td className="px-2"><Pill status={s.perf.band} /></td>
-                      <td className="px-2 text-slate-300">{s.open}</td><td className="px-2 text-red-400">{s.overdue}</td>
-                      <td className="px-2 text-slate-300">{s.perf.avgResponseMins == null ? '—' : (s.perf.avgResponseMins / 60).toFixed(1)}</td>
-                      <td className="px-2 text-slate-300">{s.perf.avgResolutionMins == null ? '—' : (s.perf.avgResolutionMins / 1440).toFixed(1)}</td>
-                      <td className="px-2 text-slate-300">{Math.round(s.perf.firstTimeFixRate * 100)}%</td>
-                      <td className="px-2 text-slate-300">{s.perf.assignedTickets ? Math.round(s.perf.repeatDefectInvolvement / s.perf.assignedTickets * 100) : 0}%</td>
-                      <td className="px-2 text-slate-300 whitespace-nowrap">{fmtK(s.costExposure)}</td><td className="px-2 text-slate-300">{s.perf.escalationCount}</td>
-                      <td className="px-2"><span className={`text-[11px] px-2 py-1 rounded-lg ring-1 ${s.perf.band === 'controlled' ? 'text-slate-300 ring-white/10' : 'text-[#C6A35D] ring-[#C6A35D]/40'}`}>{s.perf.band === 'controlled' ? 'Monitor' : 'Review'}</span></td>
+                      <td className="px-2 text-[var(--text-muted)]">{s.open}</td><td className="px-2 text-red-400">{s.overdue}</td>
+                      <td className="px-2 text-[var(--text-muted)]">{s.perf.avgResponseMins == null ? '—' : (s.perf.avgResponseMins / 60).toFixed(1)}</td>
+                      <td className="px-2 text-[var(--text-muted)]">{s.perf.avgResolutionMins == null ? '—' : (s.perf.avgResolutionMins / 1440).toFixed(1)}</td>
+                      <td className="px-2 text-[var(--text-muted)]">{Math.round(s.perf.firstTimeFixRate * 100)}%</td>
+                      <td className="px-2 text-[var(--text-muted)]">{s.perf.assignedTickets ? Math.round(s.perf.repeatDefectInvolvement / s.perf.assignedTickets * 100) : 0}%</td>
+                      <td className="px-2 text-[var(--text-muted)] whitespace-nowrap">{fmtK(s.costExposure)}</td><td className="px-2 text-[var(--text-muted)]">{s.perf.escalationCount}</td>
+                      <td className="px-2"><span className={`text-[11px] px-2 py-1 rounded-lg ring-1 ${s.perf.band === 'controlled' ? 'text-[var(--text-muted)] ring-white/10' : 'text-[#C6A35D] ring-[#C6A35D]/40'}`}>{s.perf.band === 'controlled' ? 'Monitor' : 'Review'}</span></td>
                     </tr>
                   ))}
-                  {!shown.length && <tr><td colSpan={14} className="py-6 text-center text-slate-500">No suppliers match this filter.</td></tr>}
+                  {!shown.length && <tr><td colSpan={14} className="py-6 text-center text-[var(--text-faint)]">No suppliers match this filter.</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -119,11 +119,11 @@ export function SuppliersTab({ data }: { data: EstateDashboardData }) {
             <SectionCard title="Top Suppliers by Cost Exposure">
               {topCost.map((s, i) => (
                 <div key={s.id} className="py-1.5">
-                  <div className="flex justify-between text-xs mb-1"><span className="text-slate-300">{i + 1}. {s.name}</span><span className="text-slate-400">{fmtK(s.costExposure)}</span></div>
+                  <div className="flex justify-between text-xs mb-1"><span className="text-[var(--text-muted)]">{i + 1}. {s.name}</span><span className="text-[var(--text-muted)]">{fmtK(s.costExposure)}</span></div>
                   <div className="h-2 rounded-full bg-white/10 overflow-hidden"><div className="h-full bg-[#C6A35D]" style={{ width: `${(s.costExposure / maxCost) * 100}%` }} /></div>
                 </div>
               ))}
-              {!topCost.length && <p className="text-sm text-slate-500">No exposure.</p>}
+              {!topCost.length && <p className="text-sm text-[var(--text-faint)]">No exposure.</p>}
             </SectionCard>
           </div>
 
@@ -131,18 +131,18 @@ export function SuppliersTab({ data }: { data: EstateDashboardData }) {
             {data.escalations.length > 0 ? (
               <div className="overflow-x-auto -mx-1">
                 <table className="w-full text-sm min-w-[640px]">
-                  <thead><tr className="text-left text-[11px] text-slate-500 border-b border-white/5">
+                  <thead><tr className="text-left text-[11px] text-[var(--text-faint)] border-b border-[var(--border)]">
                     <th className="py-2 px-2">Supplier</th><th className="px-2">Issue</th><th className="px-2">Escalated On</th><th className="px-2">By</th><th className="px-2">Status</th><th className="px-2">Action Required</th>
                   </tr></thead>
                   <tbody>
                     {data.escalations.slice(0, 6).map(e => (
-                      <tr key={e.id} className="border-b border-white/5">
-                        <td className="py-2 px-2 text-white whitespace-nowrap">{e.supplierName}</td>
-                        <td className="px-2 text-slate-300 max-w-[200px] truncate">{e.issue}</td>
-                        <td className="px-2 text-slate-400 whitespace-nowrap">{formatDate(e.escalatedAt)}</td>
-                        <td className="px-2 text-slate-400 whitespace-nowrap">{e.escalatedBy ?? '—'}</td>
+                      <tr key={e.id} className="border-b border-[var(--border)]">
+                        <td className="py-2 px-2 text-[var(--text)] whitespace-nowrap">{e.supplierName}</td>
+                        <td className="px-2 text-[var(--text-muted)] max-w-[200px] truncate">{e.issue}</td>
+                        <td className="px-2 text-[var(--text-muted)] whitespace-nowrap">{formatDate(e.escalatedAt)}</td>
+                        <td className="px-2 text-[var(--text-muted)] whitespace-nowrap">{e.escalatedBy ?? '—'}</td>
                         <td className="px-2"><span className={`text-[11px] px-2 py-0.5 rounded-full ${e.status === 'resolved' ? 'bg-emerald-500/15 text-emerald-400' : e.status === 'in_progress' ? 'bg-[#C6A35D]/15 text-[#C6A35D]' : 'bg-red-500/15 text-red-400'}`}>{e.status.replace('_', ' ')}</span></td>
-                        <td className="px-2 text-slate-400 max-w-[200px] truncate">{e.actionRequired ?? '—'}</td>
+                        <td className="px-2 text-[var(--text-muted)] max-w-[200px] truncate">{e.actionRequired ?? '—'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -150,12 +150,12 @@ export function SuppliersTab({ data }: { data: EstateDashboardData }) {
               </div>
             ) : escalated.length > 0 ? (
               escalated.slice(0, 5).map(s => (
-                <div key={s.id} className="flex items-center justify-between gap-2 py-2 border-b border-white/5 last:border-0">
-                  <div className="min-w-0"><p className="text-sm text-white truncate">{s.name}</p><p className="text-[11px] text-slate-500">{s.perf.slaBreaches} SLA breaches · {s.overdue} overdue</p></div>
+                <div key={s.id} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0">
+                  <div className="min-w-0"><p className="text-sm text-[var(--text)] truncate">{s.name}</p><p className="text-[11px] text-[var(--text-faint)]">{s.perf.slaBreaches} SLA breaches · {s.overdue} overdue</p></div>
                   <Pill status={s.perf.band} />
                 </div>
               ))
-            ) : <p className="text-sm text-slate-500">No escalations logged.</p>}
+            ) : <p className="text-sm text-[var(--text-faint)]">No escalations logged.</p>}
           </SectionCard>
         </div>
       </div>
@@ -167,7 +167,7 @@ export function SuppliersTab({ data }: { data: EstateDashboardData }) {
 
 /** Minimal SVG line sparkline for the SLA-trend series (flat message until snapshots exist). */
 function Sparkline({ series }: { series: { label: string; value: number }[] }) {
-  if (series.length < 2) return <p className="text-sm text-slate-500 py-6 text-center">Trend builds once daily snapshots run.</p>
+  if (series.length < 2) return <p className="text-sm text-[var(--text-faint)] py-6 text-center">Trend builds once daily snapshots run.</p>
   const w = 240, h = 90, pad = 8
   const xs = series.map((_, i) => pad + (i * (w - pad * 2)) / (series.length - 1))
   const ys = series.map(p => h - pad - (Math.max(0, Math.min(100, p.value)) / 100) * (h - pad * 2))
@@ -179,7 +179,7 @@ function Sparkline({ series }: { series: { label: string; value: number }[] }) {
         <path d={path} fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         {xs.map((x, i) => <circle key={i} cx={x} cy={ys[i]} r="2.5" fill="#10b981" />)}
       </svg>
-      <div className="flex justify-between text-[10px] text-slate-500 mt-1">
+      <div className="flex justify-between text-[10px] text-[var(--text-faint)] mt-1">
         <span>{series[0].label}</span><span className="text-emerald-400 font-semibold">{last}%</span><span>{series[series.length - 1].label}</span>
       </div>
     </div>
@@ -189,7 +189,7 @@ function Sparkline({ series }: { series: { label: string; value: number }[] }) {
 function Bucket({ color, label, n, total }: { color: string; label: string; n: number; total: number }) {
   return (
     <div className="flex items-center gap-3">
-      <span className={`w-2.5 h-2.5 rounded-full ${color}`} /><span className="text-slate-300 w-20">{label}</span>
+      <span className={`w-2.5 h-2.5 rounded-full ${color}`} /><span className="text-[var(--text-muted)] w-20">{label}</span>
       <span className="flex-1 h-2 rounded-full bg-white/10 overflow-hidden"><span className={`block h-full ${color}`} style={{ width: `${total ? (n / total) * 100 : 0}%` }} /></span>
       <span className="text-slate-200 w-8 text-right">{n}</span>
     </div>
@@ -200,14 +200,14 @@ function SupplierDetail({ s, onClose }: { s: Supplier; onClose?: () => void }) {
   const a = axes(s)
   return (
     <div className="space-y-4">
-      <DrawerHeader onClose={onClose} title={<div className="flex items-center gap-2 flex-wrap"><h3 className="text-lg font-bold text-white">{s.name}</h3><Pill status={s.perf.band} /></div>} />
+      <DrawerHeader onClose={onClose} title={<div className="flex items-center gap-2 flex-wrap"><h3 className="text-lg font-bold text-[var(--text)]">{s.name}</h3><Pill status={s.perf.band} /></div>} />
       <div className="grid grid-cols-3 gap-2 text-center">
-        <div className="rounded-lg bg-white/5 px-2 py-2"><div className="text-[10px] text-slate-500">Open</div><div className="text-sm font-semibold text-white">{s.open}</div></div>
-        <div className="rounded-lg bg-white/5 px-2 py-2"><div className="text-[10px] text-slate-500">Overdue</div><div className="text-sm font-semibold text-red-400">{s.overdue}</div></div>
-        <div className="rounded-lg bg-white/5 px-2 py-2"><div className="text-[10px] text-slate-500">Cost</div><div className="text-sm font-semibold text-white">{fmtK(s.costExposure)}</div></div>
+        <div className="rounded-lg bg-white/5 px-2 py-2"><div className="text-[10px] text-[var(--text-faint)]">Open</div><div className="text-sm font-semibold text-[var(--text)]">{s.open}</div></div>
+        <div className="rounded-lg bg-white/5 px-2 py-2"><div className="text-[10px] text-[var(--text-faint)]">Overdue</div><div className="text-sm font-semibold text-red-400">{s.overdue}</div></div>
+        <div className="rounded-lg bg-white/5 px-2 py-2"><div className="text-[10px] text-[var(--text-faint)]">Cost</div><div className="text-sm font-semibold text-[var(--text)]">{fmtK(s.costExposure)}</div></div>
       </div>
       <div>
-        <div className="text-xs font-semibold text-slate-300 mb-3">SLA Breakdown</div>
+        <div className="text-xs font-semibold text-[var(--text-muted)] mb-3">SLA Breakdown</div>
         <div className="flex items-center gap-4">
           <Donut value={s.perf.performanceScore} status={s.perf.band} size={104} label="SLA" />
           <div className="flex-1"><BreakdownList rows={[

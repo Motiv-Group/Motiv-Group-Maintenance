@@ -45,8 +45,8 @@ export function PendingRegionalManagers() {
         {rows.map(r => (
           <div key={r.id} className="flex items-center justify-between gap-3 py-2 border-b border-white/5 last:border-0">
             <div className="min-w-0">
-              <p className="text-sm text-white truncate">{r.fullName || r.email}</p>
-              <p className="text-[11px] text-slate-500 truncate flex items-center gap-1">
+              <p className="text-sm text-[var(--text)] truncate">{r.fullName || r.email}</p>
+              <p className="text-[11px] text-[var(--text-faint)] truncate flex items-center gap-1">
                 <Clock size={11} /> {r.email} · code <span className="text-[#C6A35D]">{r.code}</span> → {r.regionName}
               </p>
             </div>
@@ -56,14 +56,14 @@ export function PendingRegionalManagers() {
                 <Check size={13} /> Approve
               </button>
               <button disabled={busy === r.id} onClick={() => act(r.id, 'reject_rm')}
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg ring-1 ring-white/10 text-slate-300 text-xs hover:bg-white/5 disabled:opacity-50">
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-xs hover:bg-white/5 disabled:opacity-50">
                 <X size={13} /> Reject
               </button>
             </div>
           </div>
         ))}
       </div>
-      {err && <p className="text-xs text-red-400 mt-2">{err}</p>}
+      {err && <p className="text-xs text-red-500 mt-2">{err}</p>}
     </SectionCard>
   )
 }

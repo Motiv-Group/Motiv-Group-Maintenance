@@ -23,7 +23,7 @@ const quality = (s: number) => (s >= 90 ? 'Excellent' : s >= 80 ? 'Good' : s >= 
 const BAND: Record<'High' | 'Medium' | 'Low', string> = {
   High: 'bg-red-500/15 text-red-400 ring-1 ring-red-500/30',
   Medium: 'bg-[#C6A35D]/15 text-[#C6A35D] ring-1 ring-[#C6A35D]/30',
-  Low: 'bg-slate-500/15 text-slate-400 ring-1 ring-slate-500/30',
+  Low: 'bg-slate-500/15 text-[var(--text-muted)] ring-1 ring-slate-500/30',
 }
 
 export default async function ExecutiveEstatePage() {
@@ -66,19 +66,19 @@ export default async function ExecutiveEstatePage() {
           <Donut value={e.finalEstateHealth} status={e.status} size={140} label="Estate" />
           <div className="flex-1 min-w-0 w-full space-y-3 text-center lg:text-left">
             <div className="flex items-center justify-center lg:justify-start gap-2 flex-wrap">
-              <h2 className="text-lg font-bold text-white">Estate Health</h2>
+              <h2 className="text-lg font-bold text-[var(--text)]">Estate Health</h2>
               <Pill status={e.status} label={`${quality(e.finalEstateHealth)} / ${STATUS_LABELS[e.status]}`} />
             </div>
-            <p className="text-sm text-slate-300">
+            <p className="text-sm text-[var(--text-muted)]">
               Weighted estate health {e.weightedRegionalHealth}% − risk penalty {e.riskPenalty}% ={' '}
               <strong className={STATUS_TEXT[e.status]}>{e.finalEstateHealth}%</strong>. Main driver: <strong>{e.mainRiskDriver}</strong>.
             </p>
             <DistributionBar counts={e.counts} />
             <div className="flex flex-wrap justify-center lg:justify-start gap-x-5 gap-y-1 text-[11px]">
-              <span className="flex items-center gap-1.5 text-slate-400"><i className="w-2 h-2 rounded-full bg-emerald-500" />Controlled: {e.counts.controlled} ({pct(e.counts.controlled, total)}%)</span>
-              <span className="flex items-center gap-1.5 text-slate-400"><i className="w-2 h-2 rounded-full bg-[#C6A35D]" />Attention: {e.counts.attention} ({pct(e.counts.attention, total)}%)</span>
-              <span className="flex items-center gap-1.5 text-slate-400"><i className="w-2 h-2 rounded-full bg-red-400" />At Risk: {e.counts.at_risk} ({pct(e.counts.at_risk, total)}%)</span>
-              <span className="flex items-center gap-1.5 text-slate-400"><i className="w-2 h-2 rounded-full bg-red-800" />Critical: {e.counts.critical} ({pct(e.counts.critical, total)}%)</span>
+              <span className="flex items-center gap-1.5 text-[var(--text-muted)]"><i className="w-2 h-2 rounded-full bg-emerald-500" />Controlled: {e.counts.controlled} ({pct(e.counts.controlled, total)}%)</span>
+              <span className="flex items-center gap-1.5 text-[var(--text-muted)]"><i className="w-2 h-2 rounded-full bg-[#C6A35D]" />Attention: {e.counts.attention} ({pct(e.counts.attention, total)}%)</span>
+              <span className="flex items-center gap-1.5 text-[var(--text-muted)]"><i className="w-2 h-2 rounded-full bg-red-400" />At Risk: {e.counts.at_risk} ({pct(e.counts.at_risk, total)}%)</span>
+              <span className="flex items-center gap-1.5 text-[var(--text-muted)]"><i className="w-2 h-2 rounded-full bg-red-800" />Critical: {e.counts.critical} ({pct(e.counts.critical, total)}%)</span>
             </div>
           </div>
         </div>
@@ -100,7 +100,7 @@ export default async function ExecutiveEstatePage() {
             <div className="overflow-x-auto -mx-1">
               <table className="w-full text-sm min-w-[640px]">
                 <thead>
-                  <tr className="text-left text-[11px] text-slate-500 border-b border-white/5">
+                  <tr className="text-left text-[11px] text-[var(--text-faint)] border-b border-[var(--border)]">
                     <th className="py-2 px-2">#</th><th className="px-2">Region</th><th className="px-2">Health</th><th className="px-2">Trend</th>
                     <th className="px-2">Status</th><th className="px-2">Stores</th><th className="px-2">Red/Crit</th><th className="px-2">Open</th>
                     <th className="px-2">Cost</th><th className="px-2">Executive Note</th>
@@ -108,20 +108,20 @@ export default async function ExecutiveEstatePage() {
                 </thead>
                 <tbody>
                   {data.regions.slice(0, 8).map(({ rank, region, regionName, trend }) => (
-                    <tr key={region.regionId} className="border-b border-white/5">
-                      <td className="py-2 px-2 text-slate-500">{rank}</td>
-                      <td className="px-2 text-white whitespace-nowrap">{regionName}</td>
+                    <tr key={region.regionId} className="border-b border-[var(--border)]">
+                      <td className="py-2 px-2 text-[var(--text-faint)]">{rank}</td>
+                      <td className="px-2 text-[var(--text)] whitespace-nowrap">{regionName}</td>
                       <td className={`px-2 font-semibold ${STATUS_TEXT[region.status]}`}>{region.finalPortfolioHealth}%</td>
                       <td className="px-2"><TrendArrow t={{ dir: trend.dir, label: `${trend.pct}%`, good: trend.dir === 'up' }} /></td>
                       <td className="px-2"><Pill status={region.status} /></td>
-                      <td className="px-2 text-slate-300">{region.activeStores}</td>
-                      <td className="px-2 text-slate-300 tabular-nums">{region.counts.at_risk}/{region.counts.critical}</td>
-                      <td className="px-2 text-slate-300">{region.openTickets}</td>
-                      <td className="px-2 text-slate-300 whitespace-nowrap">{fmtK(region.costExposure)}</td>
-                      <td className="px-2 text-slate-400 text-xs max-w-[180px] truncate">{region.mainReason}</td>
+                      <td className="px-2 text-[var(--text-muted)]">{region.activeStores}</td>
+                      <td className="px-2 text-[var(--text-muted)] tabular-nums">{region.counts.at_risk}/{region.counts.critical}</td>
+                      <td className="px-2 text-[var(--text-muted)]">{region.openTickets}</td>
+                      <td className="px-2 text-[var(--text-muted)] whitespace-nowrap">{fmtK(region.costExposure)}</td>
+                      <td className="px-2 text-[var(--text-muted)] text-xs max-w-[180px] truncate">{region.mainReason}</td>
                     </tr>
                   ))}
-                  {data.regions.length === 0 && <tr><td colSpan={10} className="py-4 px-2 text-slate-500 text-center text-xs">No regions yet</td></tr>}
+                  {data.regions.length === 0 && <tr><td colSpan={10} className="py-4 px-2 text-[var(--text-faint)] text-center text-xs">No regions yet</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -147,24 +147,24 @@ export default async function ExecutiveEstatePage() {
             <div className="overflow-x-auto -mx-1">
               <table className="w-full text-sm min-w-[420px]">
                 <thead>
-                  <tr className="text-left text-[11px] text-slate-500 border-b border-white/5">
+                  <tr className="text-left text-[11px] text-[var(--text-faint)] border-b border-[var(--border)]">
                     <th className="py-2 px-2">#</th><th className="px-2">Store</th><th className="px-2">Health</th>
                     <th className="px-2">Main Risk</th><th className="px-2">Open</th><th className="px-2">Ovd</th><th className="px-2">Exposure</th>
                   </tr>
                 </thead>
                 <tbody>
                   {data.topRiskStores.slice(0, 6).map((s, i) => (
-                    <tr key={s.storeId} className="border-b border-white/5">
-                      <td className="py-2 px-2 text-slate-500">{i + 1}</td>
-                      <td className="px-2 text-white max-w-[140px] truncate">{s.storeName}<div className="text-[10px] text-slate-500 truncate">{s.regionName}</div></td>
+                    <tr key={s.storeId} className="border-b border-[var(--border)]">
+                      <td className="py-2 px-2 text-[var(--text-faint)]">{i + 1}</td>
+                      <td className="px-2 text-[var(--text)] max-w-[140px] truncate">{s.storeName}<div className="text-[10px] text-[var(--text-faint)] truncate">{s.regionName}</div></td>
                       <td className={`px-2 font-semibold ${STATUS_TEXT[s.finalStatus]}`}>{s.finalHealthScore}%</td>
-                      <td className="px-2 text-slate-400 text-xs max-w-[150px] truncate">{s.mainIssue}</td>
-                      <td className="px-2 text-slate-300">{s.openTickets}</td>
-                      <td className="px-2 text-slate-300">{s.overdueTickets}</td>
-                      <td className="px-2 text-slate-300 whitespace-nowrap">{fmtK(s.costExposure)}</td>
+                      <td className="px-2 text-[var(--text-muted)] text-xs max-w-[150px] truncate">{s.mainIssue}</td>
+                      <td className="px-2 text-[var(--text-muted)]">{s.openTickets}</td>
+                      <td className="px-2 text-[var(--text-muted)]">{s.overdueTickets}</td>
+                      <td className="px-2 text-[var(--text-muted)] whitespace-nowrap">{fmtK(s.costExposure)}</td>
                     </tr>
                   ))}
-                  {data.topRiskStores.length === 0 && <tr><td colSpan={7} className="py-4 px-2 text-slate-500 text-center text-xs">No stores yet</td></tr>}
+                  {data.topRiskStores.length === 0 && <tr><td colSpan={7} className="py-4 px-2 text-[var(--text-faint)] text-center text-xs">No stores yet</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -182,11 +182,11 @@ export default async function ExecutiveEstatePage() {
               <div className="space-y-1.5">
                 {bestSuppliers.map(s => (
                   <div key={s.id} className="flex items-center justify-between text-xs">
-                    <span className="text-slate-300 truncate">{s.name}</span>
+                    <span className="text-[var(--text-muted)] truncate">{s.name}</span>
                     <span className="text-emerald-400 font-semibold tabular-nums">{s.perf.performanceScore}%</span>
                   </div>
                 ))}
-                {bestSuppliers.length === 0 && <p className="text-xs text-slate-500">No suppliers yet</p>}
+                {bestSuppliers.length === 0 && <p className="text-xs text-[var(--text-faint)]">No suppliers yet</p>}
               </div>
             </div>
             <div>
@@ -194,11 +194,11 @@ export default async function ExecutiveEstatePage() {
               <div className="space-y-1.5">
                 {underSuppliers.map(s => (
                   <div key={s.id} className="flex items-center justify-between text-xs">
-                    <span className="text-slate-300 truncate">{s.name}</span>
+                    <span className="text-[var(--text-muted)] truncate">{s.name}</span>
                     <span className="text-red-400 font-semibold tabular-nums">{s.perf.performanceScore}%</span>
                   </div>
                 ))}
-                {underSuppliers.length === 0 && <p className="text-xs text-slate-500">None below threshold</p>}
+                {underSuppliers.length === 0 && <p className="text-xs text-[var(--text-faint)]">None below threshold</p>}
               </div>
             </div>
           </div>
@@ -216,18 +216,18 @@ export default async function ExecutiveEstatePage() {
           action={<Link href="/executive/decisions" className="text-xs text-[#C6A35D] hover:underline">View all</Link>}>
           <div className="space-y-2">
             {actionableDecisions.slice(0, 5).map((d, i) => (
-              <div key={i} className="flex items-start justify-between gap-2 py-1.5 border-b border-white/5 last:border-0">
+              <div key={i} className="flex items-start justify-between gap-2 py-1.5 border-b border-[var(--border)] last:border-0">
                 <div className="min-w-0">
                   <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${BAND[d.band]}`}>{d.band}</span>
-                  <p className="text-xs text-white mt-1 truncate">{d.title}</p>
+                  <p className="text-xs text-[var(--text)] mt-1 truncate">{d.title}</p>
                 </div>
                 <div className="text-right shrink-0">
                   {d.exposureValue ? <p className="text-xs text-slate-200 whitespace-nowrap">{fmtK(d.exposureValue)}</p> : null}
-                  <p className="text-[10px] text-slate-500 whitespace-nowrap">Due in {d.deadlineDays}d</p>
+                  <p className="text-[10px] text-[var(--text-faint)] whitespace-nowrap">Due in {d.deadlineDays}d</p>
                 </div>
               </div>
             ))}
-            {actionableDecisions.length === 0 && <p className="text-xs text-slate-500">No executive decisions outstanding</p>}
+            {actionableDecisions.length === 0 && <p className="text-xs text-[var(--text-faint)]">No executive decisions outstanding</p>}
           </div>
         </SectionCard>
 
@@ -239,15 +239,15 @@ export default async function ExecutiveEstatePage() {
               <KpiCard kpi={{ label: 'High Value Approvals', value: fmtK(data.highValueApprovals.value), hint: `${data.highValueApprovals.count} items` }} />
             </div>
             <div>
-              <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-2">Top Exposure Areas</div>
+              <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-2">Top Exposure Areas</div>
               <div className="space-y-1.5">
                 {data.exposureBreakdown.map((b, i) => (
                   <div key={i} className="flex items-center justify-between text-xs">
-                    <span className="text-slate-300 truncate">{i + 1}. {b.label}</span>
+                    <span className="text-[var(--text-muted)] truncate">{i + 1}. {b.label}</span>
                     <span className="text-slate-200 font-semibold whitespace-nowrap">{fmtK(b.value)}</span>
                   </div>
                 ))}
-                {data.exposureBreakdown.length === 0 && <p className="text-xs text-slate-500">No commercial exposure</p>}
+                {data.exposureBreakdown.length === 0 && <p className="text-xs text-[var(--text-faint)]">No commercial exposure</p>}
               </div>
             </div>
           </div>

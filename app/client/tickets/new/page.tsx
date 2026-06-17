@@ -26,10 +26,11 @@ export default function LogTicketPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const input = 'w-full px-3 py-2.5 rounded-xl bg-[#121826] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#C6A35D]/50'
+  const input = 'w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--border)] text-[var(--text)] placeholder-[var(--text-faint)] focus:outline-none focus:ring-2 focus:ring-[#C6A35D]/50'
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
+    if (files.length < 2) { setError('Please add at least 2 photos of the issue.'); return }
     setLoading(true); setError('')
     try {
       const supabase = createClient()
@@ -51,26 +52,26 @@ export default function LogTicketPage() {
 
   return (
     <div className="max-w-xl mx-auto space-y-5">
-      <div><h1 className="text-2xl font-bold text-white flex items-center gap-2"><PlusCircle className="text-[#C6A35D]" size={22} /> Log a Ticket</h1>
-        <p className="text-sm text-slate-400 mt-0.5">Describe the maintenance issue at your store.</p></div>
+      <div><h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><PlusCircle className="text-emerald-500" size={22} /> Log a Ticket</h1>
+        <p className="text-sm text-[var(--text-muted)] mt-0.5">Describe the maintenance issue at your store.</p></div>
 
       <form onSubmit={submit} className="space-y-4">
         <Field label="Title"><input className={input} value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Aircon not cooling" required /></Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Category"><select className={input} value={category} onChange={e => setCategory(e.target.value)}>{CATEGORIES.map(c => <option key={c} value={c} className="bg-[#121826]">{c}</option>)}</select></Field>
-          <Field label="Operational Impact"><select className={input} value={impact} onChange={e => setImpact(e.target.value)}>{IMPACTS.map(i => <option key={i.v} value={i.v} className="bg-[#121826]">{i.label}</option>)}</select></Field>
+          <Field label="Category"><select className={input} value={category} onChange={e => setCategory(e.target.value)}>{CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select></Field>
+          <Field label="Operational Impact"><select className={input} value={impact} onChange={e => setImpact(e.target.value)}>{IMPACTS.map(i => <option key={i.v} value={i.v}>{i.label}</option>)}</select></Field>
         </div>
         <Field label="Description"><textarea className={`${input} min-h-[110px]`} value={description} onChange={e => setDescription(e.target.value)} placeholder="What's wrong, where, since when…" required /></Field>
 
-        <Field label="Photos (optional)">
-          <label className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-[#121826] border border-dashed border-white/15 text-slate-400 cursor-pointer hover:border-[#C6A35D]/50">
+        <Field label={`Photos (min 2) — ${files.length} added`}>
+          <label className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-[var(--input-bg)] border border-dashed border-[var(--border)] text-[var(--text-muted)] cursor-pointer hover:border-[#C6A35D]/50">
             <Upload size={16} /> Add photos
             <input type="file" accept="image/*" multiple className="hidden" onChange={e => setFiles([...files, ...Array.from(e.target.files ?? [])])} />
           </label>
           {files.length > 0 && (
             <div className="flex flex-wrap gap-2 mt-2">
               {files.map((f, i) => (
-                <span key={i} className="flex items-center gap-1 text-[11px] bg-white/5 text-slate-300 rounded-lg px-2 py-1">
+                <span key={i} className="flex items-center gap-1 text-[11px] bg-[var(--hover)] text-[var(--text-muted)] rounded-lg px-2 py-1">
                   {f.name.slice(0, 18)}<button type="button" onClick={() => setFiles(files.filter((_, j) => j !== i))}><X size={12} /></button>
                 </span>
               ))}
@@ -78,13 +79,13 @@ export default function LogTicketPage() {
           )}
         </Field>
 
-        {error && <div className="text-sm text-red-400 bg-red-500/10 rounded-lg px-3 py-2">{error}</div>}
-        <button type="submit" disabled={loading} className="w-full py-3 rounded-xl bg-[#C6A35D] text-[#0a0e17] font-semibold disabled:opacity-60">{loading ? 'Logging…' : 'Submit Ticket'}</button>
+        {error && <div className="text-sm text-red-500 bg-red-500/10 rounded-lg px-3 py-2">{error}</div>}
+        <button type="submit" disabled={loading} className="w-full py-3 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-500 transition disabled:opacity-60">{loading ? 'Logging…' : 'Submit Ticket'}</button>
       </form>
     </div>
   )
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div><label className="block text-xs text-slate-400 mb-1">{label}</label>{children}</div>
+  return <div><label className="block text-xs text-[var(--text-muted)] mb-1">{label}</label>{children}</div>
 }

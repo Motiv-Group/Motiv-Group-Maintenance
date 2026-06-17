@@ -12,7 +12,7 @@ export function TabHeader({ icon, title, subtitle, children }: { icon: ReactNode
         <span className="grid place-items-center w-9 h-9 rounded-xl bg-[#C6A35D]/15 ring-1 ring-[#C6A35D]/30">{icon}</span>
         <div>
           <h1 className="text-xl font-bold text-white leading-tight">{title}</h1>
-          <p className="text-xs text-slate-400">{subtitle}</p>
+          <p className="text-xs text-[var(--text-muted)]">{subtitle}</p>
         </div>
       </div>
       {children && <div className="flex items-center gap-2 flex-wrap">{children}</div>}
@@ -20,10 +20,10 @@ export function TabHeader({ icon, title, subtitle, children }: { icon: ReactNode
   )
 }
 
-const chip = 'flex items-center gap-2 text-xs text-slate-300 bg-[#121826] ring-1 ring-white/5 rounded-xl px-3 py-2'
+const chip = 'flex items-center gap-2 text-xs text-[var(--text-muted)] bg-[var(--surface)] ring-1 ring-[var(--border)] rounded-xl px-3 py-2'
 
 export function DateChip({ date }: { date: string }) {
-  return <span className={chip}><Calendar size={14} className="text-slate-400" />{date}</span>
+  return <span className={chip}><Calendar size={14} className="text-[var(--text-muted)]" />{date}</span>
 }
 
 export interface FilterOption { value: string; label: string }
@@ -41,17 +41,17 @@ export function FilterMenu({ value, onChange, options, label = 'Filters' }: { va
   return (
     <div className="relative" ref={ref}>
       <button onClick={() => setOpen(o => !o)} className={`${chip} hover:ring-[#C6A35D]/40 transition`}>
-        <Filter size={14} className="text-slate-400" />
+        <Filter size={14} className="text-[var(--text-muted)]" />
         {active && active.value !== 'all' ? active.label : label}
-        <ChevronDown size={13} className={`text-slate-500 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown size={13} className={`text-[var(--text-faint)] transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div className="absolute right-0 mt-1 w-48 rounded-xl bg-[#121826] ring-1 ring-white/10 shadow-xl z-20 p-1">
+        <div className="absolute right-0 mt-1 w-48 rounded-xl bg-[var(--surface)] ring-1 ring-[var(--border)] shadow-xl z-20 p-1">
           {options.map(o => (
             <button
               key={o.value}
               onClick={() => { onChange(o.value); setOpen(false) }}
-              className="w-full text-left px-3 py-2 text-xs rounded-lg hover:bg-white/5 flex items-center justify-between text-slate-300 hover:text-white transition"
+              className="w-full text-left px-3 py-2 text-xs rounded-lg hover:bg-[var(--hover)] flex items-center justify-between text-[var(--text-muted)] hover:text-white transition"
             >
               {o.label}
               {o.value === value && <Check size={13} className="text-[#C6A35D]" />}
@@ -66,7 +66,7 @@ export function FilterMenu({ value, onChange, options, label = 'Filters' }: { va
 export function ExportButton({ onExport }: { onExport: () => void }) {
   return (
     <button onClick={onExport} className={`${chip} hover:ring-[#C6A35D]/40 transition`}>
-      <Download size={14} className="text-slate-400" /> Export
+      <Download size={14} className="text-[var(--text-muted)]" /> Export
     </button>
   )
 }

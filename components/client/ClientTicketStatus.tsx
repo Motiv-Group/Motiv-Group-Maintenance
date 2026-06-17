@@ -41,8 +41,8 @@ export function ClientTicketStatus({ status }: { status: string }) {
         ? <span className="relative shrink-0 w-6 h-6"><Loader2 size={24} className="text-[#C6A35D] animate-spin" /></span>
         : <Icon size={22} className={`${color} shrink-0`} />}
       <div>
-        <p className="text-sm font-semibold text-white">{m.msg}</p>
-        <p className="text-xs text-slate-400">{m.sub}</p>
+        <p className="text-sm font-semibold text-[var(--text)]">{m.msg}</p>
+        <p className="text-xs text-[var(--text-muted)]">{m.sub}</p>
       </div>
     </div>
   )

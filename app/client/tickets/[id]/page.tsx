@@ -23,7 +23,7 @@ export default async function StoreTicketDetailPage({ params }: { params: { id: 
 
   return (
     <div className="space-y-5">
-      <Link href="/client/tickets" className="inline-flex items-center gap-1 text-sm text-slate-400 hover:text-white"><ArrowLeft size={15} /> Back to tickets</Link>
+      <Link href="/client/tickets" className="inline-flex items-center gap-1 text-sm text-[var(--text-muted)] hover:text-[var(--text)]"><ArrowLeft size={15} /> Back to tickets</Link>
 
       {/* Progress — its own block, dots */}
       <Card className="p-5"><ClientTicketProgress status={t.status} /></Card>
@@ -31,12 +31,12 @@ export default async function StoreTicketDetailPage({ params }: { params: { id: 
       {/* Ticket detail */}
       <Card className="p-5 space-y-3">
         <div>
-          <h1 className="text-lg font-bold text-white">{t.title}</h1>
-          <p className="text-sm text-slate-400">{t.category ?? 'General'} · logged {formatDateTime(t.created_at)}</p>
+          <h1 className="text-lg font-bold text-[var(--text)]">{t.title}</h1>
+          <p className="text-sm text-[var(--text-muted)]">{t.category ?? 'General'} · logged {formatDateTime(t.created_at)}</p>
         </div>
         <div>
-          <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">Description</div>
-          <p className="text-sm text-slate-300 whitespace-pre-line">{t.description}</p>
+          <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Description</div>
+          <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{t.description}</p>
         </div>
         {Array.isArray(t.photo_urls) && t.photo_urls.length > 0 && (
           <div className="flex flex-wrap gap-2">{t.photo_urls.map((u: string, i: number) => <a key={i} href={u} target="_blank" className="text-xs text-[#C6A35D] underline">Photo {i + 1}</a>)}</div>
@@ -55,10 +55,10 @@ export default async function StoreTicketDetailPage({ params }: { params: { id: 
       </Card>
 
       <Card className="p-5">
-        <h2 className="text-sm font-bold text-white mb-3">Activity</h2>
+        <h2 className="text-sm font-bold text-[var(--text)] mb-3">Activity</h2>
         {(updates ?? []).length ? (updates ?? []).map((u: any, i: number) => (
-          <div key={i} className="py-2 border-b border-white/5 last:border-0"><p className="text-sm text-slate-200">{u.body}</p><p className="text-[11px] text-slate-500">{formatDateTime(u.created_at)}</p></div>
-        )) : <p className="text-sm text-slate-500">No updates yet.</p>}
+          <div key={i} className="py-2 border-b border-white/5 last:border-0"><p className="text-sm text-[var(--text)]">{u.body}</p><p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(u.created_at)}</p></div>
+        )) : <p className="text-sm text-[var(--text-faint)]">No updates yet.</p>}
       </Card>
     </div>
   )

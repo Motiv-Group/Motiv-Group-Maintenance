@@ -1,4 +1,6 @@
-// MOTIV Executive UI kit — dark-navy + gold. Pure presentational (client+server safe).
+// MOTIV dashboard UI kit. Theme-aware via CSS vars (see globals.css): surfaces
+// use --surface/--border/--text/--text-muted/--text-faint so light + dark both
+// work. Status accents use a darker hue in light mode for readability.
 import type { ReactNode } from 'react'
 import { ChevronRight } from 'lucide-react'
 import type { HealthStatus } from '@/lib/health/types'
@@ -6,13 +8,14 @@ import type { HealthStatus } from '@/lib/health/types'
 export const GOLD = '#C6A35D'
 
 export const STATUS_PILL: Record<HealthStatus, string> = {
-  controlled: 'bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/30',
-  attention:  'bg-[#C6A35D]/15 text-[#C6A35D] ring-1 ring-[#C6A35D]/30',
-  at_risk:    'bg-red-500/15 text-red-400 ring-1 ring-red-500/30',
-  critical:   'bg-red-700/25 text-red-300 ring-1 ring-red-600/40',
+  controlled: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-500/30',
+  attention:  'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D] ring-1 ring-[#C6A35D]/30',
+  at_risk:    'bg-red-500/15 text-red-700 dark:text-red-400 ring-1 ring-red-500/30',
+  critical:   'bg-red-700/20 text-red-800 dark:text-red-300 ring-1 ring-red-600/40',
 }
 export const STATUS_TEXT: Record<HealthStatus, string> = {
-  controlled: 'text-emerald-400', attention: 'text-[#C6A35D]', at_risk: 'text-red-400', critical: 'text-red-300',
+  controlled: 'text-emerald-600 dark:text-emerald-400', attention: 'text-amber-600 dark:text-[#C6A35D]',
+  at_risk: 'text-red-600 dark:text-red-400', critical: 'text-red-700 dark:text-red-300',
 }
 export const STATUS_STROKE: Record<HealthStatus, string> = {
   controlled: '#10b981', attention: GOLD, at_risk: '#f87171', critical: '#dc2626',
@@ -26,14 +29,14 @@ export function Pill({ status, label }: { status: HealthStatus; label?: string }
 }
 
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <div className={`rounded-2xl bg-[#121826] ring-1 ring-white/5 ${className}`}>{children}</div>
+  return <div className={`rounded-2xl bg-[var(--surface)] ring-1 ring-[var(--border)] ${className}`}>{children}</div>
 }
 
 export function SectionCard({ title, icon, action, children }: { title: string; icon?: ReactNode; action?: ReactNode; children: ReactNode }) {
   return (
     <Card className="p-5">
       <div className="flex items-center justify-between gap-2 mb-4">
-        <h2 className="text-sm font-bold text-white flex items-center gap-2">{icon}{title}</h2>
+        <h2 className="text-sm font-bold text-[var(--text)] flex items-center gap-2">{icon}{title}</h2>
         {action}
       </div>
       {children}
@@ -43,17 +46,18 @@ export function SectionCard({ title, icon, action, children }: { title: string; 
 
 export interface Kpi { label: string; value: ReactNode; hint?: ReactNode; icon?: ReactNode; tone?: 'default' | 'gold' | 'good' | 'warn' | 'bad'; trend?: Trend }
 const TONE: Record<NonNullable<Kpi['tone']>, string> = {
-  default: 'text-white', gold: 'text-[#C6A35D]', good: 'text-emerald-400', warn: 'text-[#C6A35D]', bad: 'text-red-400',
+  default: 'text-[var(--text)]', gold: 'text-amber-600 dark:text-[#C6A35D]', good: 'text-emerald-600 dark:text-emerald-400',
+  warn: 'text-amber-600 dark:text-[#C6A35D]', bad: 'text-red-600 dark:text-red-400',
 }
 export function KpiCard({ kpi }: { kpi: Kpi }) {
   return (
     <Card className="p-4 flex flex-col gap-1.5 min-w-0">
-      <div className="flex items-center justify-between gap-2 text-[11px] text-slate-400">
+      <div className="flex items-center justify-between gap-2 text-[11px] text-[var(--text-muted)]">
         <span className="flex items-center gap-1.5 truncate">{kpi.icon}{kpi.label}</span>
         {kpi.trend && <TrendArrow t={kpi.trend} />}
       </div>
       <div className={`text-2xl font-bold leading-none ${TONE[kpi.tone ?? 'default']}`}>{kpi.value}</div>
-      {kpi.hint && <div className="text-[11px] text-slate-500">{kpi.hint}</div>}
+      {kpi.hint && <div className="text-[11px] text-[var(--text-faint)]">{kpi.hint}</div>}
     </Card>
   )
 }
@@ -63,9 +67,10 @@ export function KpiRow({ kpis }: { kpis: Kpi[] }) {
 
 export type Trend = { dir: 'up' | 'down' | 'flat'; label?: string; good?: boolean }
 export function TrendArrow({ t }: { t: Trend }) {
-  if (t.dir === 'flat') return <span className="text-slate-500 text-[11px]">→ {t.label}</span>
+  if (t.dir === 'flat') return <span className="text-[var(--text-faint)] text-[11px]">→ {t.label}</span>
   const up = t.dir === 'up'
-  const color = t.good === undefined ? (up ? 'text-red-400' : 'text-emerald-400') : (t.good ? 'text-emerald-400' : 'text-red-400')
+  const bad = 'text-red-600 dark:text-red-400', good = 'text-emerald-600 dark:text-emerald-400'
+  const color = t.good === undefined ? (up ? bad : good) : (t.good ? good : bad)
   return <span className={`text-[11px] ${color}`}>{up ? '↑' : '↓'} {t.label}</span>
 }
 
@@ -75,13 +80,13 @@ export function Donut({ value, status, size = 120, label }: { value: number; sta
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
-        <circle cx={cx} cy={cx} r={r} fill="none" strokeWidth="10" className="stroke-white/10" />
+        <circle cx={cx} cy={cx} r={r} fill="none" strokeWidth="10" className="stroke-slate-200 dark:stroke-white/10" />
         <circle cx={cx} cy={cx} r={r} fill="none" strokeWidth="10" strokeLinecap="round"
           stroke={STATUS_STROKE[status]} strokeDasharray={c} strokeDashoffset={off} />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span className="text-xl font-bold" style={{ color: STATUS_STROKE[status] }}>{value}%</span>
-        {label && <span className="text-[9px] uppercase tracking-wide text-slate-500">{label}</span>}
+        {label && <span className="text-[9px] uppercase tracking-wide text-[var(--text-faint)]">{label}</span>}
       </div>
     </div>
   )
@@ -103,7 +108,7 @@ export function StoreDistributionDonut({ counts, size = 150 }: { counts: Counts;
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
-        <circle cx={cx} cy={cx} r={r} fill="none" strokeWidth="12" className="stroke-white/5" />
+        <circle cx={cx} cy={cx} r={r} fill="none" strokeWidth="12" className="stroke-slate-200 dark:stroke-white/5" />
         {segs.map((s, i) => {
           if (s.n <= 0) return null
           const len = (s.n / total) * c
@@ -116,8 +121,8 @@ export function StoreDistributionDonut({ counts, size = 150 }: { counts: Counts;
         })}
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-2xl font-bold text-white tabular-nums">{total}</span>
-        <span className="text-[10px] uppercase tracking-wide text-slate-500">Total Stores</span>
+        <span className="text-2xl font-bold text-[var(--text)] tabular-nums">{total}</span>
+        <span className="text-[10px] uppercase tracking-wide text-[var(--text-faint)]">Total Stores</span>
       </div>
     </div>
   )
@@ -137,9 +142,9 @@ export function DistributionLegend({ counts }: { counts: Counts }) {
       {rows.map((r, i) => (
         <div key={i} className="flex items-center gap-2 text-xs">
           <i className={`w-2.5 h-2.5 rounded-full ${r.color}`} />
-          <span className="text-slate-300 flex-1 truncate">{r.label}</span>
-          <span className="text-white font-semibold tabular-nums">{r.n}</span>
-          <span className="text-slate-500 tabular-nums w-9 text-right">{Math.round((r.n / total) * 100)}%</span>
+          <span className="text-[var(--text-muted)] flex-1 truncate">{r.label}</span>
+          <span className="text-[var(--text)] font-semibold tabular-nums">{r.n}</span>
+          <span className="text-[var(--text-faint)] tabular-nums w-9 text-right">{Math.round((r.n / total) * 100)}%</span>
         </div>
       ))}
     </div>
@@ -155,9 +160,9 @@ export function BreakdownList({ rows }: { rows: { label: string; value: number; 
         const tone = pct >= 85 ? '#10b981' : pct >= 60 ? GOLD : '#f87171'
         return (
           <div key={i} className="flex items-center gap-3 text-xs">
-            <span className="text-slate-400 w-32 shrink-0">{r.label}</span>
-            <span className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden"><span className="block h-full rounded-full" style={{ width: `${pct}%`, background: tone }} /></span>
-            <span className="text-slate-200 w-12 text-right tabular-nums">{round(r.value)} / {r.max}</span>
+            <span className="text-[var(--text-muted)] w-32 shrink-0">{r.label}</span>
+            <span className="flex-1 h-1.5 rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden"><span className="block h-full rounded-full" style={{ width: `${pct}%`, background: tone }} /></span>
+            <span className="text-[var(--text)] w-12 text-right tabular-nums">{round(r.value)} / {r.max}</span>
           </div>
         )
       })}
@@ -194,7 +199,7 @@ export function DistributionBar({ counts }: { counts: { controlled: number; atte
     { c: 'bg-red-500', n: counts.at_risk }, { c: 'bg-red-800', n: counts.critical },
   ]
   return (
-    <div className="h-3 rounded-full bg-white/10 overflow-hidden flex">
+    <div className="h-3 rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden flex">
       {seg.map((s, i) => s.n > 0 && <div key={i} className={`h-full ${s.c}`} style={{ width: `${(s.n / total) * 100}%` }} />)}
     </div>
   )
@@ -202,9 +207,9 @@ export function DistributionBar({ counts }: { counts: { controlled: number; atte
 
 export function QuickRow({ label, value, icon, tone }: { label: string; value: ReactNode; icon?: ReactNode; tone?: 'default' | 'bad' }) {
   return (
-    <div className="flex items-center justify-between gap-2 py-2 border-b border-white/5 last:border-0">
-      <span className="flex items-center gap-2 text-xs text-slate-300">{icon}{label}</span>
-      <span className={`flex items-center gap-1 text-xs font-semibold ${tone === 'bad' ? 'text-red-400' : 'text-slate-200'}`}>{value}<ChevronRight size={13} className="text-slate-500" /></span>
+    <div className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0">
+      <span className="flex items-center gap-2 text-xs text-[var(--text-muted)]">{icon}{label}</span>
+      <span className={`flex items-center gap-1 text-xs font-semibold ${tone === 'bad' ? 'text-red-600 dark:text-red-400' : 'text-[var(--text)]'}`}>{value}<ChevronRight size={13} className="text-[var(--text-faint)]" /></span>
     </div>
   )
 }
@@ -212,15 +217,15 @@ export function QuickRow({ label, value, icon, tone }: { label: string; value: R
 export function RecommendedAction({ text }: { text: string }) {
   return (
     <div>
-      <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">Recommended Action</div>
-      <p className="text-xs text-slate-300 leading-relaxed">{text}</p>
+      <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Recommended Action</div>
+      <p className="text-xs text-[var(--text-muted)] leading-relaxed">{text}</p>
     </div>
   )
 }
 
 export function StatusLegend() {
   return (
-    <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-400">
+    <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-[var(--text-muted)]">
       <span className="flex items-center gap-1.5"><i className="w-2 h-2 rounded-full bg-emerald-500" />Controlled ≥80%</span>
       <span className="flex items-center gap-1.5"><i className="w-2 h-2 rounded-full bg-[#C6A35D]" />Attention 60–79%</span>
       <span className="flex items-center gap-1.5"><i className="w-2 h-2 rounded-full bg-red-500" />At Risk &lt;60%</span>

@@ -16,6 +16,34 @@
   body {
     @apply bg-gray-100 text-gray-900 dark:bg-gray-950 dark:text-white;
   }
+
+  /* ── Dashboard surface palette (single source of truth for light + dark).
+     The v3 command-centre UI references these vars instead of hard-coded
+     navy hex, so the theme toggle works everywhere and stays readable. ── */
+  :root {
+    --app-bg:     #eef2f7;
+    --surface:    #ffffff;
+    --surface-2:  #f8fafc;
+    --nav-bg:     #ffffff;
+    --border:     rgba(15, 23, 42, 0.10);
+    --hover:      rgba(15, 23, 42, 0.045);
+    --input-bg:   #f1f5f9;
+    --text:       #0f172a;
+    --text-muted: #475569;
+    --text-faint: #64748b;
+  }
+  html.dark {
+    --app-bg:     #0a0e17;
+    --surface:    #121826;
+    --surface-2:  #0e1422;
+    --nav-bg:     #0c1120;
+    --border:     rgba(255, 255, 255, 0.07);
+    --hover:      rgba(255, 255, 255, 0.05);
+    --input-bg:   rgba(0, 0, 0, 0.22);
+    --text:       #f8fafc;
+    --text-muted: #94a3b8;
+    --text-faint: #64748b;
+  }
 }
 
 @layer utilities {

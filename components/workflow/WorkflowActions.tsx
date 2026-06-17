@@ -24,7 +24,7 @@ function tone(action: string): string {
     return 'bg-[#C6A35D] text-[#0a0e17] hover:brightness-95'
   if (/^(reject|reject_quote|reject_variation)/.test(action))
     return 'bg-red-600 text-white hover:bg-red-500'
-  return 'ring-1 ring-white/15 text-slate-200 hover:bg-white/10'
+  return 'ring-1 ring-[var(--border)] text-[var(--text)] hover:bg-white/10'
 }
 
 interface Props {
@@ -75,7 +75,7 @@ export function WorkflowActions({ ticketId, status, role, suppliers = [] }: Prop
     fire(active, vals)
   }
 
-  const input = 'w-full px-3 py-2 rounded-lg bg-black/20 ring-1 ring-white/10 text-white text-sm placeholder-slate-500'
+  const input = 'w-full px-3 py-2 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)]'
 
   return (
     <div className="space-y-3">
@@ -89,8 +89,8 @@ export function WorkflowActions({ ticketId, status, role, suppliers = [] }: Prop
       </div>
 
       {active && (fields.length > 0 || needsSupplier) && (
-        <form onSubmit={submitForm} className="space-y-2 rounded-xl bg-black/20 ring-1 ring-white/10 p-3">
-          <div className="text-xs text-slate-400">{active.label}</div>
+        <form onSubmit={submitForm} className="space-y-2 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] p-3">
+          <div className="text-xs text-[var(--text-muted)]">{active.label}</div>
           {needsSupplier && (
             <select className={input} value={vals.supplierId ?? ''} onChange={e => setVals({ ...vals, supplierId: e.target.value })}>
               <option value="">— Choose supplier —</option>
@@ -103,12 +103,12 @@ export function WorkflowActions({ ticketId, status, role, suppliers = [] }: Prop
           ))}
           <div className="flex gap-2">
             <button type="submit" disabled={busy} className="px-3 py-2 rounded-lg bg-[#C6A35D] text-[#0a0e17] text-sm font-medium disabled:opacity-50">{busy ? '…' : 'Confirm'}</button>
-            <button type="button" onClick={() => { setActive(null); setError('') }} className="px-3 py-2 rounded-lg ring-1 ring-white/15 text-slate-300 text-sm">Cancel</button>
+            <button type="button" onClick={() => { setActive(null); setError('') }} className="px-3 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm">Cancel</button>
           </div>
         </form>
       )}
 
-      {error && <p className="text-xs text-red-400">{error}</p>}
+      {error && <p className="text-xs text-red-500">{error}</p>}
     </div>
   )
 }

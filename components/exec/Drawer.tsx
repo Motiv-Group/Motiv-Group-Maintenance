@@ -13,7 +13,7 @@ export function Drawer({ open, onClose, children }: { open: boolean; onClose: ()
         aria-hidden
       />
       <aside
-        className={`fixed right-0 top-0 bottom-0 z-50 w-full sm:w-[420px] bg-[#0e1422] ring-1 ring-white/10 overflow-y-auto transition-transform duration-300 ease-out ${open ? 'translate-x-0' : 'translate-x-full'}`}
+        className={`fixed right-0 top-0 bottom-0 z-50 w-full sm:w-[420px] bg-[var(--surface-2)] ring-1 ring-[var(--border)] overflow-y-auto transition-transform duration-300 ease-out ${open ? 'translate-x-0' : 'translate-x-full'}`}
         role="dialog"
         aria-modal="true"
       >
@@ -29,7 +29,7 @@ export function DrawerHeader({ title, onClose, children }: { title: ReactNode; o
       <div className="min-w-0">{title}</div>
       <div className="flex items-center gap-2">
         {children}
-        {onClose && <button onClick={onClose} className="text-slate-500 hover:text-white"><X size={18} /></button>}
+        {onClose && <button onClick={onClose} className="text-[var(--text-faint)] hover:text-white"><X size={18} /></button>}
       </div>
     </div>
   )

@@ -45,11 +45,11 @@ export function ProvisionPanel({ mode, regions = [], stores = [] }: Props) {
   const [open, setOpen] = useState(false)
   return (
     <Card className="p-0 overflow-hidden">
-      <button onClick={() => setOpen(o => !o)} className="w-full flex items-center justify-between px-5 py-3 text-sm font-semibold text-white">
+      <button onClick={() => setOpen(o => !o)} className="w-full flex items-center justify-between px-5 py-3 text-sm font-semibold text-[var(--text)]">
         <span className="flex items-center gap-2"><UserPlus size={15} className="text-[#C6A35D]" /> {title(mode)}</span>
-        <ChevronDown size={16} className={`text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown size={16} className={`text-[var(--text-muted)] transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
-      {open && <div className="px-5 pb-5 border-t border-white/5 pt-4"><ProvisionForms mode={mode} regions={regions} stores={stores} /></div>}
+      {open && <div className="px-5 pb-5 border-t border-[var(--border)] pt-4"><ProvisionForms mode={mode} regions={regions} stores={stores} /></div>}
     </Card>
   )
 }
@@ -63,7 +63,7 @@ export function ProvisionButton({ mode, regions = [], stores = [], label }: Prop
         <UserPlus size={14} /> {label ?? title(mode)}
       </button>
       <Drawer open={open} onClose={() => setOpen(false)}>
-        <DrawerHeader onClose={() => setOpen(false)} title={<h3 className="text-lg font-bold text-white">{title(mode)}</h3>} />
+        <DrawerHeader onClose={() => setOpen(false)} title={<h3 className="text-lg font-bold text-[var(--text)]">{title(mode)}</h3>} />
         <ProvisionForms mode={mode} regions={regions} stores={stores} />
       </Drawer>
     </>
@@ -76,7 +76,7 @@ function Form({ action, title, fields, select, cta }: { action: string; title: s
   const [vals, setVals] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<{ ok: boolean; text: string; link?: string } | null>(null)
-  const input = 'w-full px-3 py-2 rounded-lg bg-[#121826] border border-white/10 text-white text-sm placeholder-slate-500'
+  const input = 'w-full px-3 py-2 rounded-lg bg-[var(--input-bg)] border border-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)]'
 
   async function submit(e: React.FormEvent) {
     e.preventDefault(); setBusy(true); setMsg(null)
@@ -91,12 +91,12 @@ function Form({ action, title, fields, select, cta }: { action: string; title: s
 
   return (
     <form onSubmit={submit} className="space-y-2">
-      <div className="text-xs text-slate-400">{title}</div>
+      <div className="text-xs text-[var(--text-muted)]">{title}</div>
       {fields.map(f => <input key={f.k} className={input} type={f.type ?? 'text'} placeholder={f.ph} value={vals[f.k] ?? ''} onChange={e => setVals({ ...vals, [f.k]: e.target.value })} />)}
       {select && (
         <select className={input} value={vals[select.k] ?? ''} onChange={e => setVals({ ...vals, [select.k]: e.target.value })}>
-          <option value="" className="bg-[#121826]">— {select.label} —</option>
-          {select.opts.map(o => <option key={o.id} value={o.id} className="bg-[#121826]">{o.name}</option>)}
+          <option value="" className="bg-[var(--input-bg)]">— {select.label} —</option>
+          {select.opts.map(o => <option key={o.id} value={o.id} className="bg-[var(--input-bg)]">{o.name}</option>)}
         </select>
       )}
       <button disabled={busy} className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-[#C6A35D] text-[#0a0e17] text-sm font-medium disabled:opacity-50">{busy ? '…' : cta}</button>
