@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useForm } from 'react-hook-form'
@@ -19,8 +19,30 @@ export default function LoginPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [forwarding, setForwarding] = useState(false)
 
   const { register, handleSubmit, formState: { errors } } = useForm<LoginForm>()
+
+  // Supabase invite/recovery links land here (their generateLink ignores
+  // redirect_to and uses the Site URL). The token arrives in the URL hash and
+  // detectSessionInUrl establishes a session — so detect it and forward the
+  // user to the right place: suppliers complete onboarding, everyone else sets
+  // a password.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const hash = window.location.hash
+    if (!/access_token=|type=(invite|recovery)/.test(hash)) return
+    setForwarding(true)
+    const type = new URLSearchParams(hash.replace(/^#/, '')).get('type')
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data }) => {
+      const user = data.user
+      if (!user) { setForwarding(false); return }
+      const role = (user.user_metadata as { role?: string } | null)?.role
+      if (type === 'invite' && role === 'supplier') router.replace('/auth/supplier-onboard')
+      else router.replace('/auth/reset-password') // RM invite / password recovery
+    }).catch(() => setForwarding(false))
+  }, [router])
 
   async function onSubmit(values: LoginForm) {
     setLoading(true)
@@ -55,6 +77,15 @@ export default function LoginPage() {
   }
 
   // Always dark — force the dark class on this page's wrapper regardless of theme
+  if (forwarding) {
+    return (
+      <div className="dark min-h-screen bg-gray-950 flex flex-col items-center justify-center gap-4">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#C6A35D]" />
+        <p className="text-sm text-gray-400">Completing your invite…</p>
+      </div>
+    )
+  }
+
   return (
     <div className="dark">
       <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center px-4">
