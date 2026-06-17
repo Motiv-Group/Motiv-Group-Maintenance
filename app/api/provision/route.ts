@@ -4,7 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { rateLimit } from '@/lib/rate-limit'
 import { inviteUser } from '@/lib/invite'
 import { normalisePhone } from '@/lib/csv'
-import { sendEmail, storeInviteEmail } from '@/lib/email'
+import { sendEmail, storeInviteEmail, supplierInviteEmail } from '@/lib/email'
+import { randomBytes } from 'crypto'
 
 // POST /api/provision — delegated provisioning.
 //  Exec: add_region, invite_rm, add_supplier
@@ -144,16 +145,22 @@ export async function POST(request: Request) {
       case 'add_supplier': {
         if (!isExec && !isRM) return forbid()
         if (!body.companyName) return NextResponse.json({ error: 'Supplier name required' }, { status: 400 })
-        const { data: sup, error } = await admin.from('suppliers').insert({ company_id: companyId, company_name: body.companyName, trade: body.trade ?? null }).select('id').single()
+        const supEmail = body.email ? String(body.email).trim().toLowerCase() : null
+        const { data: sup, error } = await admin.from('suppliers').insert({ company_id: companyId, company_name: body.companyName, trade: body.trade ?? null, email: supEmail }).select('id').single()
         if (error || !sup) return NextResponse.json({ error: error?.message ?? 'Failed' }, { status: 400 })
-        if (body.email) {
-          try {
-            const inv = await inviteUser({ email: body.email, role: 'supplier', companyId, roleLabel: 'Supplier', baseUrl: origin, link: { supplierId: sup.id } })
-            return NextResponse.json({ ok: true, actionLink: inv.actionLink, emailed: inv.emailed })
-          } catch (e: any) {
+        if (supEmail) {
+          // Custom reusable invite token (no Supabase OTP). Valid until onboarding completes.
+          const token = randomBytes(24).toString('hex')
+          const { error: invErr } = await admin.from('supplier_invites').insert({ company_id: companyId, supplier_id: sup.id, email: supEmail, token })
+          if (invErr) {
             await admin.from('suppliers').delete().eq('id', sup.id) // roll back the orphan supplier
-            return NextResponse.json({ error: e?.message ?? 'Invite failed' }, { status: 400 })
+            return NextResponse.json({ error: invErr.message }, { status: 400 })
           }
+          const link = `${origin.replace(/\/$/, '')}/auth/supplier-onboard?token=${token}`
+          const { subject, html, text } = supplierInviteEmail({ link, companyName: body.companyName })
+          const emailed = await sendEmail({ to: supEmail, subject, html, text })
+          revalidatePath('/executive/suppliers'); revalidatePath('/regional/suppliers')
+          return NextResponse.json({ ok: true, emailed, actionLink: emailed ? undefined : link, message: emailed ? 'Supplier added — invite link emailed.' : 'Supplier added. Email not sent — copy this link:' })
         }
         break
       }

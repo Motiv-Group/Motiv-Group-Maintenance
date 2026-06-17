@@ -83,3 +83,33 @@ export function storeInviteEmail({
 
   return { subject, html, text }
 }
+
+/** Build the supplier invite email — a reusable onboarding link (custom token). */
+export function supplierInviteEmail({ link, companyName }: { link: string; companyName: string }): { subject: string; html: string; text: string } {
+  const subject = `You've been invited to MOTIV as a supplier`
+  const text = [
+    `Hi,`,
+    ``,
+    `${companyName} has been added to MOTIV as a supplier.`,
+    `Open the link below to set up your account — choose your password and confirm your company details:`,
+    ``,
+    link,
+    ``,
+    `This link stays valid until you complete sign-up.`,
+    ``,
+    `— Motiv`,
+  ].join('\n')
+
+  const html = `
+  <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:480px;margin:0 auto;color:#0f172a">
+    <h2 style="color:#1e293b;margin:0 0 12px">Welcome to MOTIV</h2>
+    <p style="margin:0 0 16px"><strong>${companyName}</strong> has been added as a supplier. Set up your account — choose a password and confirm your company details.</p>
+    <p style="margin:0 0 20px">
+      <a href="${link}" style="display:inline-block;background:#C6A35D;color:#0a0e17;text-decoration:none;padding:12px 20px;border-radius:10px;font-weight:600">Set up my account</a>
+    </p>
+    <p style="margin:0 0 8px;color:#64748b;font-size:12px">If the button doesn't work, paste this link:<br>${link}</p>
+    <p style="margin:0;color:#64748b;font-size:12px">This link stays valid until you finish signing up.</p>
+  </div>`
+
+  return { subject, html, text }
+}

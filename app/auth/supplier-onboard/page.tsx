@@ -24,48 +24,45 @@ interface OnboardForm {
 
 export default function SupplierOnboardPage() {
   const router = useRouter()
-  const { register, handleSubmit, watch, formState: { errors } } = useForm<OnboardForm>()
+  const { register, handleSubmit, watch, reset, formState: { errors } } = useForm<OnboardForm>()
+  const [token, setToken]     = useState<string | null>(null)
   const [checking, setChecking] = useState(true)
-  const [email, setEmail]       = useState<string | null>(null)
-  const [loading, setLoading]   = useState(false)
-  const [error, setError]       = useState('')
+  const [email, setEmail]     = useState<string | null>(null)
+  const [invalid, setInvalid] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError]     = useState('')
 
-  // The invite link establishes a session (detectSessionInUrl). Read it.
+  // Validate the custom invite token (from ?token=) on load.
   useEffect(() => {
-    const supabase = createClient()
-    supabase.auth.getUser().then(({ data }) => {
-      setEmail(data.user?.email ?? null)
-      setChecking(false)
-    })
-  }, [])
+    const t = new URLSearchParams(window.location.search).get('token')
+    setToken(t)
+    if (!t) { setInvalid('No invite token in the link.'); setChecking(false); return }
+    fetch(`/api/supplier/onboard?token=${encodeURIComponent(t)}`)
+      .then(async r => {
+        const d = await r.json().catch(() => ({}))
+        if (!r.ok) { setInvalid(d.error || 'This invite link is invalid.'); return }
+        setEmail(d.email)
+        reset({ company_name: d.companyName ?? '', trade: d.trade ?? '', contact_name: '', phone: '', address: '', vat_number: '', password: '', confirm_password: '' })
+      })
+      .finally(() => setChecking(false))
+  }, [reset])
 
   async function onSubmit(values: OnboardForm) {
+    if (!token) return
     setLoading(true)
     setError('')
-    const supabase = createClient()
 
-    // 1) set the supplier's own password
-    const { error: pwErr } = await supabase.auth.updateUser({ password: values.password })
-    if (pwErr) {
-      setError(/session|missing|expired|invalid|jwt/i.test(pwErr.message)
-        ? 'Your invite link has expired or is invalid. Ask your contact to re-send it.'
-        : pwErr.message)
-      setLoading(false)
-      return
-    }
-
-    // 2) save company + contact details (keeps them linked to the RM/exec company)
     const res = await fetch('/api/supplier/onboard', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(values),
+      body: JSON.stringify({ token, ...values }),
     })
-    if (!res.ok) {
-      const d = await res.json().catch(() => ({}))
-      setError(d.error || 'Could not save your details.')
-      setLoading(false)
-      return
-    }
+    const d = await res.json().catch(() => ({}))
+    if (!res.ok) { setError(d.error || 'Could not create your account.'); setLoading(false); return }
 
+    // Sign them straight in with the password they just chose.
+    const supabase = createClient()
+    const { error: signInErr } = await supabase.auth.signInWithPassword({ email: d.email, password: values.password })
+    if (signInErr) { router.push('/auth/login'); return } // account exists — let them log in
     router.push('/supplier')
     router.refresh()
   }
@@ -78,15 +75,15 @@ export default function SupplierOnboardPage() {
     )
   }
 
-  if (!email) {
+  if (invalid) {
     return (
       <div className="dark min-h-screen bg-gray-950 flex flex-col items-center justify-center px-4">
         <div className="w-full max-w-sm text-center">
           <div className="flex justify-center mb-8"><MotivLogo height={80} /></div>
           <div className="bg-gray-900 rounded-2xl border border-gray-700 p-8 space-y-3">
-            <h1 className="text-xl font-semibold text-white">Invite link invalid or expired</h1>
-            <p className="text-sm text-gray-400">Please ask your regional manager or executive to send you a new supplier invite.</p>
-            <Link href="/auth/login" className="text-[#C6A35D] hover:underline text-sm">Back to login</Link>
+            <h1 className="text-xl font-semibold text-white">Invite link problem</h1>
+            <p className="text-sm text-gray-400">{invalid}</p>
+            <Link href="/auth/login" className="text-[#C6A35D] hover:underline text-sm">Go to login</Link>
           </div>
         </div>
       </div>
@@ -103,12 +100,12 @@ export default function SupplierOnboardPage() {
               <Truck size={18} className="text-[#C6A35D]" />
               <h1 className="text-xl font-semibold text-white">Set up your supplier account</h1>
             </div>
-            <p className="text-sm text-gray-400 mb-5">You&apos;ve been invited to MOTIV. Complete your company details and choose a password.</p>
+            <p className="text-sm text-gray-400 mb-5">Complete your company details and choose a password.</p>
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1">Email</label>
-                <input value={email} readOnly className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-gray-400 text-sm cursor-not-allowed" />
+                <input value={email ?? ''} readOnly className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-gray-400 text-sm cursor-not-allowed" />
               </div>
               <Input id="company_name" label="Company Name" placeholder="Colorworx" error={errors.company_name?.message} {...register('company_name', { required: 'Company name is required' })} />
               <Input id="contact_name" label="Your Name" placeholder="Jacques Dippenaar" error={errors.contact_name?.message} {...register('contact_name', { required: 'Your name is required' })} />
