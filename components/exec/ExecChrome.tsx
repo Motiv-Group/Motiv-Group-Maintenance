@@ -24,8 +24,8 @@ const REGIONAL_TABS: ChromeTab[] = [
   { href: '/regional/snag',     label: 'Snags',     icon: AlertTriangle },
 ]
 const STORE_TABS: ChromeTab[] = [
-  { href: '/client',         label: 'Dashboard',  icon: LayoutDashboard },
-  { href: '/client/tickets', label: 'My Tickets', icon: Ticket },
+  { href: '/client',         label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/client/tickets', label: 'Tickets',   icon: Ticket },
 ]
 const SUPPLIER_TABS: ChromeTab[] = [
   { href: '/supplier',         label: 'Home',        icon: LayoutDashboard },
@@ -82,12 +82,12 @@ export function ExecChrome({
       <main className={`flex-1 ${wrap} w-full mx-auto px-4 py-6 pb-28`}>{children}</main>
 
       <nav className="fixed bottom-0 inset-x-0 z-20 bg-[#0c1120] border-t border-white/5">
-        <div className={`${wrap} mx-auto flex items-stretch justify-around h-16`}>
+        <div className={`${wrap} mx-auto flex items-stretch h-16 ${variant === 'store' ? 'justify-start px-4' : 'justify-around'}`}>
           {tabs.map(({ href, label, icon: Icon }) => {
             const active = pathname === href || (href !== home && pathname.startsWith(href))
             return (
               <Link key={href} href={href}
-                className={`flex flex-col items-center justify-center flex-1 gap-1 text-[11px] font-medium transition-colors ${active ? 'text-[#C6A35D]' : 'text-slate-500 hover:text-slate-300'}`}>
+                className={`flex flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors ${variant === 'store' ? 'px-7' : 'flex-1'} ${active ? 'text-[#C6A35D]' : 'text-slate-500 hover:text-slate-300'}`}>
                 <Icon size={20} strokeWidth={active ? 2.4 : 1.8} />
                 {label}
               </Link>
