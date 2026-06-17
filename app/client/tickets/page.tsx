@@ -5,7 +5,7 @@ import { PlusCircle, Ticket } from 'lucide-react'
 import { requireStoreManagerV3 } from '@/lib/health/guard'
 import { assembleStoreManagerDashboard } from '@/lib/health/data'
 import { Card } from '@/components/exec/ui'
-import { formatDate } from '@/lib/utils'
+import { formatDateTime } from '@/lib/utils'
 
 const TONE: Record<string, string> = { open: 'bg-blue-500/15 text-blue-400', in_progress: 'bg-[#C6A35D]/15 text-[#C6A35D]', completed: 'bg-emerald-500/15 text-emerald-400' }
 const WORD: Record<string, string> = { open: 'Open', in_progress: 'In Progress', completed: 'Completed' }
@@ -24,13 +24,13 @@ export default async function StoreTicketsPage() {
 
       <Card className="p-2">
         {d.tickets.map(t => (
-          <div key={t.id} className="flex items-center justify-between gap-2 px-3 py-3 border-b border-white/5 last:border-0">
+          <Link key={t.id} href={`/client/tickets/${t.id}`} className="flex items-center justify-between gap-2 px-3 py-3 border-b border-white/5 last:border-0 hover:bg-white/[0.03] transition">
             <div className="min-w-0">
               <p className="text-sm text-white truncate">{t.title}</p>
-              <p className="text-[11px] text-slate-500">{t.category ?? 'General'} · {formatDate(t.createdAt)}{t.supplierAssigned ? ' · Supplier assigned' : ''}</p>
+              <p className="text-[11px] text-slate-500">{t.category ?? 'General'} · {formatDateTime(t.createdAt)}{t.supplierAssigned ? ' · Supplier assigned' : ''}</p>
             </div>
             <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${TONE[t.status]}`}>{WORD[t.status]}</span>
-          </div>
+          </Link>
         ))}
         {!d.tickets.length && <p className="text-sm text-slate-500 text-center py-8">No tickets yet.</p>}
       </Card>
