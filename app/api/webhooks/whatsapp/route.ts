@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
-import { sendPushToMany, sendPushToUser } from '@/lib/push';
+import { sendPushToMany } from '@/lib/push';
 import type { Priority } from '@/lib/types';
 import https from 'https';
 
@@ -155,6 +155,18 @@ function sanitiseExtracted(raw: Partial<ExtractedTicket>, fallbackDescription?: 
   };
 }
 
+// AI urgency word → v3 ticket priority (P1–P4) + severity.
+type V3Priority = 'P1' | 'P2' | 'P3' | 'P4';
+function mapPriority(word: Priority): { priority: V3Priority; severity: 'low' | 'medium' | 'high' | 'critical' } {
+  switch (word) {
+    case 'urgent': return { priority: 'P1', severity: 'critical' };
+    case 'high':   return { priority: 'P2', severity: 'high' };
+    case 'low':    return { priority: 'P4', severity: 'low' };
+    default:       return { priority: 'P3', severity: 'medium' };
+  }
+}
+const P_EMOJI: Record<V3Priority, string> = { P1: '🔴', P2: '🟠', P3: '🟡', P4: '🟢' };
+
 /** Send a WhatsApp text reply */
 async function sendWhatsAppReply(to: string, text: string): Promise<void> {
   await fetch(`https://graph.facebook.com/v21.0/${WA_PHONE_ID}/messages`, {
@@ -217,55 +229,23 @@ async function appendSessionPhoto(
   return (data as string[]) ?? [];
 }
 
-/** Fan out notifications + push + revalidate after ticket created */
-async function notifyAndRevalidate(
-  ticketId: string,
-  title: string,
-  priority: Priority,
-  senderProfile: { id: string; company_name: string | null; sub_store: string | null; regional_manager_id: string | null }
+/** Notify the store's regional manager(s) + revalidate (v3). Mirrors /api/tickets. */
+async function notifyRegion(
+  adminClient: ReturnType<typeof createAdminClient>,
+  o: { ticketId: string; title: string; priority: string; companyId: string; regionId: string | null; storeName: string }
 ): Promise<void> {
-  const adminClient = createAdminClient();
-  const { data: adminProfiles } = await adminClient.from('profiles').select('id').eq('role', 'supplier');
-
-  await Promise.all([
-    adminProfiles?.length
-      ? adminClient.from('notifications').insert(
-          adminProfiles.map((admin: { id: string }) => ({
-            user_id: admin.id,
-            type:    'new_ticket',
-            title:   'New Maintenance Ticket',
-            message: `A new ${priority} priority ticket has been submitted: "${title}"`,
-            link:    `/supplier/tickets/${ticketId}`,
-          }))
-        )
-      : Promise.resolve(),
-    senderProfile.regional_manager_id
-      ? adminClient.from('notifications').insert({
-          user_id: senderProfile.regional_manager_id,
-          type:    'new_ticket',
-          title:   'New Ticket from Your Region',
-          message: `${senderProfile.company_name ?? 'A store'} (${senderProfile.sub_store ?? ''}) submitted a new ${priority} priority ticket: "${title}"`,
-          link:    `/regional/tickets/${ticketId}`,
-        })
-      : Promise.resolve(),
-  ]);
-
-  if (adminProfiles?.length) {
-    void sendPushToMany(
-      adminProfiles.map((a: { id: string }) => a.id),
-      { title: 'New Maintenance Ticket', body: `A new ${priority} ticket: "${title}"`, url: `/supplier/tickets/${ticketId}` }
-    );
+  if (o.regionId) {
+    const { data: rms } = await adminClient.from('regional_users').select('user_id').eq('region_id', o.regionId);
+    const ids = (rms ?? []).map((r: { user_id: string }) => r.user_id);
+    if (ids.length) {
+      await adminClient.from('notifications').insert(ids.map(id => ({
+        company_id: o.companyId, user_id: id, type: 'new_ticket', title: 'New Ticket in Your Region',
+        message: `${o.storeName} logged a ${o.priority} ticket via WhatsApp: "${o.title}"`, link: '/regional/tickets',
+      })));
+      void sendPushToMany(ids, { title: 'New Ticket', body: `${o.storeName}: ${o.title}`, url: '/regional/tickets' });
+    }
   }
-  if (senderProfile.regional_manager_id) {
-    void sendPushToUser(senderProfile.regional_manager_id, {
-      title: 'New Ticket from Your Region',
-      body:  `${senderProfile.company_name ?? 'A store'} submitted a new ${priority} ticket: "${title}"`,
-      url:   `/regional/tickets/${ticketId}`,
-    });
-  }
-
   revalidatePath('/client');
-  revalidatePath('/supplier');
   revalidatePath('/regional');
 }
 
@@ -389,22 +369,26 @@ async function handleNewTicket(
 
   const { title, description, priority } = extracted;
 
-  // Look up sender profile
-  const { data: senderProfile, error: profileError } = await adminClient
-    .from('profiles')
-    .select('id, full_name, company_name, sub_store, regional_manager_id, role')
+  // Look up sender (v3): user_profiles by phone → must be a store manager linked to a store.
+  const { data: senderProfile } = await adminClient
+    .from('user_profiles')
+    .select('id, role, company_id')
     .eq('phone', normalisedPhone)
-    .single();
+    .maybeSingle();
 
-  console.log(`[WhatsApp] Profile lookup — phone: "${normalisedPhone}", found: ${senderProfile?.full_name ?? 'none'}, error: ${profileError?.message ?? 'none'}`);
+  console.log(`[WhatsApp] Profile lookup — phone: "${normalisedPhone}", role: ${senderProfile?.role ?? 'none'}`);
 
   if (!senderProfile) {
     await sendWhatsAppReply(from, '⚠️ Your number is not registered in Motiv. Please contact your administrator.');
     return;
   }
-
-  if (senderProfile.role !== 'client' && senderProfile.role !== 'store_manager') {
-    await sendWhatsAppReply(from, '⚠️ Only store managers and clients can submit tickets via WhatsApp.');
+  if (senderProfile.role !== 'store_manager' && senderProfile.role !== 'client') {
+    await sendWhatsAppReply(from, '⚠️ Only store managers can submit tickets via WhatsApp.');
+    return;
+  }
+  const { data: storeLink } = await adminClient.from('store_users').select('store_id').eq('user_id', senderProfile.id).limit(1).maybeSingle();
+  if (!storeLink?.store_id) {
+    await sendWhatsAppReply(from, '⚠️ Your account is not linked to a store yet. Please contact your regional manager.');
     return;
   }
 
@@ -545,29 +529,44 @@ async function finaliseSession(
   // Mark session complete first to prevent double-submit
   await adminClient.from('whatsapp_sessions').update({ status: 'complete' }).eq('id', session.id);
 
-  // Fetch sender profile
+  // Resolve sender → store (v3)
   const { data: senderProfile } = await adminClient
-    .from('profiles')
-    .select('id, company_name, sub_store, regional_manager_id')
-    .eq('phone', normalisedPhone)
-    .single();
-
-  if (!senderProfile) {
+    .from('user_profiles').select('id, company_id').eq('phone', normalisedPhone).maybeSingle();
+  const { data: storeLink } = senderProfile
+    ? await adminClient.from('store_users').select('store_id').eq('user_id', senderProfile.id).limit(1).maybeSingle()
+    : { data: null };
+  if (!senderProfile?.company_id || !storeLink?.store_id) {
+    await sendWhatsAppReply(from, '❌ Error finalising ticket — your account is not linked to a store. Please contact your administrator.');
+    return;
+  }
+  const { data: store } = await adminClient
+    .from('stores').select('id, region_id, region_code, branch_code, name').eq('id', storeLink.store_id).single();
+  if (!store) {
     await sendWhatsAppReply(from, '❌ Error finalising ticket. Please contact your administrator.');
     return;
   }
 
-  // Create ticket now with all photos
+  const { priority, severity } = mapPriority(session.priority as Priority);
+
+  // Create the v3 ticket with all photos
   const { data: ticket, error: ticketError } = await adminClient
     .from('tickets')
     .insert({
-      client_id:   senderProfile.id,
+      company_id:  senderProfile.company_id,
+      store_id:    store.id,
+      region_id:   store.region_id,
+      region_code: store.region_code,
+      branch_code: store.branch_code,
+      created_by:  senderProfile.id,
       title:       session.title,
       description: session.description,
-      priority:    session.priority,
+      priority,
+      severity,
+      operational_impact: 'none',
+      status:      'open',
       photo_urls:  photoUrls,
     })
-    .select()
+    .select('id')
     .single();
 
   if (ticketError || !ticket) {
@@ -578,15 +577,16 @@ async function finaliseSession(
 
   console.log(`[WhatsApp] Ticket created: ${ticket.id} with ${photoUrls.length} photos`);
 
-  await notifyAndRevalidate(ticket.id, session.title, session.priority as Priority, senderProfile);
-
-  const priorityEmoji: Record<Priority, string> = { low: '🟢', medium: '🟡', high: '🟠', urgent: '🔴' };
+  await notifyRegion(adminClient, {
+    ticketId: ticket.id, title: session.title, priority, companyId: senderProfile.company_id,
+    regionId: store.region_id, storeName: store.name,
+  });
 
   await sendWhatsAppReply(
     from,
     `✅ *Ticket submitted successfully!*\n\n` +
     `*Title:* ${session.title}\n` +
-    `*Priority:* ${priorityEmoji[session.priority as Priority]} ${session.priority.charAt(0).toUpperCase() + session.priority.slice(1)}\n` +
+    `*Priority:* ${P_EMOJI[priority]} ${priority}\n` +
     `*Photos:* ${photoUrls.length}\n\n` +
     `Your ticket has been logged and the team has been notified. 🔧`
   );
