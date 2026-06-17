@@ -6,7 +6,7 @@ import { requireStoreManagerV3 } from '@/lib/health/guard'
 import { assembleStoreManagerDashboard } from '@/lib/health/data'
 import { STATUS_LABELS } from '@/lib/health/constants'
 import { Card, Donut, Pill } from '@/components/exec/ui'
-import { formatDateTime } from '@/lib/utils'
+import { formatDate, formatDateTime } from '@/lib/utils'
 
 const STATUS_TONE: Record<string, string> = { open: 'text-blue-400', in_progress: 'text-[#C6A35D]', completed: 'text-emerald-400' }
 const STATUS_WORD: Record<string, string> = { open: 'Open', in_progress: 'In Progress', completed: 'Completed' }
@@ -21,11 +21,14 @@ export default async function StoreOverviewPage() {
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-white">{greeting}, {fullName?.split(' ')[0] ?? 'there'} 👋</h1>
-          <p className="text-sm text-slate-400 mt-0.5">{d.storeName}</p>
+          <p className="text-sm text-slate-400 mt-0.5">{[d.company, d.branch, d.branchCode].filter(Boolean).join(' · ')}</p>
         </div>
-        <Link href="/client/tickets/new" className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-500 transition shrink-0">
-          <PlusCircle size={16} /> Log a Ticket
-        </Link>
+        <div className="flex flex-col items-end gap-1 shrink-0">
+          <Link href="/client/tickets/new" className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-500 transition">
+            <PlusCircle size={16} /> Log a Ticket
+          </Link>
+          <span className="text-[11px] text-slate-500">{formatDate(d.generatedAt)}</span>
+        </div>
       </div>
 
       {d.health && (

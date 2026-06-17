@@ -412,6 +412,9 @@ function clientVisible(status: string): ClientStatus | null {
 export interface StoreManagerTicket { id: string; title: string; category: string | null; status: ClientStatus; createdAt: string; supplierAssigned: boolean }
 export interface StoreManagerData {
   storeName: string
+  company: string
+  branch: string
+  branchCode: string
   health: StoreHealthResult | null
   open: number; inProgress: number; completed: number
   tickets: StoreManagerTicket[]
@@ -420,11 +423,12 @@ export interface StoreManagerData {
 
 export async function assembleStoreManagerDashboard(companyId: string, storeIds: string[], now: Date = new Date()): Promise<StoreManagerData> {
   const db = createAdminClient()
-  if (!storeIds.length) return { storeName: 'Store', health: null, open: 0, inProgress: 0, completed: 0, tickets: [], generatedAt: now.toISOString() }
+  if (!storeIds.length) return { storeName: 'Store', company: '', branch: '', branchCode: '', health: null, open: 0, inProgress: 0, completed: 0, tickets: [], generatedAt: now.toISOString() }
   const rules = await loadSlaResolver(db, companyId)
-  const [{ data: storesRaw }, { data: ticketsRaw }] = await Promise.all([
-    db.from('stores').select('id, name, sub_store, region_id').in('id', storeIds),
+  const [{ data: storesRaw }, { data: ticketsRaw }, { data: companyRow }] = await Promise.all([
+    db.from('stores').select('id, name, sub_store, branch_code, region_id').in('id', storeIds),
     db.from('tickets').select(TICKET_COLS).eq('company_id', companyId).in('store_id', storeIds),
+    db.from('companies').select('name').eq('id', companyId).maybeSingle(),
   ])
   const stores = (storesRaw ?? []) as any[]
   const tickets = ((ticketsRaw ?? []) as any[]).map(asTicket)
@@ -442,6 +446,9 @@ export async function assembleStoreManagerDashboard(companyId: string, storeIds:
   visible.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
   return {
     storeName: stores.map(s => [s.name, s.sub_store].filter(Boolean).join(' — '))[0] ?? 'Store',
+    company: (companyRow as any)?.name ?? '',
+    branch: primary?.sub_store || primary?.name || 'Store',
+    branchCode: primary?.branch_code ?? '',
     health, open, inProgress, completed, tickets: visible, generatedAt: now.toISOString(),
   }
 }
