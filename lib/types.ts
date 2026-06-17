@@ -1,6 +1,15 @@
 export type Priority = 'low' | 'medium' | 'high' | 'urgent'
 export type Severity = 'low' | 'medium' | 'high' | 'critical'
-export type TicketStatus = 'open' | 'quoted' | 'accepted' | 'in_progress' | 'completed' | 'cancelled' | 'declined' | 'pending_sign_off' | 'snag' | 'snag_in_progress' | 'variation_pending' | 'variation_accepted'
+export type TicketStatus =
+  // canonical lifecycle (see lib/workflow.ts)
+  | 'open' | 'info_requested' | 'assigned' | 'assessment'
+  | 'quote_requested' | 'quoted' | 'quote_revision' | 'accepted'
+  | 'scheduled' | 'in_progress' | 'variation_review'
+  | 'submitted_for_signoff' | 'evidence_requested'
+  | 'snag' | 'snag_assigned' | 'snag_resolved'
+  | 'approved_closeout' | 'completed' | 'cancelled' | 'declined'
+  // legacy v2 values still referenced by some UI
+  | 'pending_sign_off' | 'snag_in_progress' | 'variation_pending' | 'variation_accepted'
 export type QuoteStatus = 'pending' | 'accepted' | 'declined'
 export type QuoteType = 'quote' | 'variation'
 export type UserRole = 'client' | 'store_manager' | 'regional_manager' | 'supplier' | 'executive'

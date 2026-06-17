@@ -6,7 +6,9 @@ import { ArrowLeft } from 'lucide-react'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireSupplierV3 } from '@/lib/health/guard'
 import { Card } from '@/components/exec/ui'
-import { SupplierTicketActions } from '@/components/exec/SupplierTicketActions'
+import { WorkflowActions } from '@/components/workflow/WorkflowActions'
+import { StatusPipeline } from '@/components/workflow/StatusPipeline'
+import { SupplierAttachments } from '@/components/workflow/SupplierAttachments'
 import { formatDateTime } from '@/lib/utils'
 
 export default async function SupplierTicketDetailPage({ params }: { params: { id: string } }) {
@@ -24,20 +26,27 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
     <div className="space-y-5 max-w-2xl mx-auto">
       <Link href="/supplier/tickets" className="inline-flex items-center gap-1 text-sm text-slate-400 hover:text-white"><ArrowLeft size={15} /> Back to tickets</Link>
 
-      <Card className="p-5 space-y-3">
-        <div className="flex items-start justify-between gap-2">
-          <div><h1 className="text-lg font-bold text-white">{t.title}</h1><p className="text-sm text-slate-400">{storeName} · {t.priority} · {t.category ?? 'General'}</p></div>
-          <span className="text-[11px] px-2 py-0.5 rounded-full bg-white/5 text-slate-300 capitalize">{String(t.status).replace(/_/g, ' ')}</span>
+      <Card className="p-5 space-y-4">
+        <div>
+          <h1 className="text-lg font-bold text-white">{t.title}</h1>
+          <p className="text-sm text-slate-400">{storeName} · {t.priority} · {t.category ?? 'General'}</p>
         </div>
+        <StatusPipeline status={t.status} />
         <p className="text-sm text-slate-300">{t.description}</p>
+        {t.scheduled_at && <p className="text-xs text-slate-400">Scheduled: {formatDateTime(t.scheduled_at)}</p>}
         {Array.isArray(t.photo_urls) && t.photo_urls.length > 0 && (
           <div className="flex flex-wrap gap-2">{t.photo_urls.map((u: string, i: number) => <a key={i} href={u} target="_blank" className="text-xs text-[#C6A35D] underline">Photo {i + 1}</a>)}</div>
         )}
       </Card>
 
       <Card className="p-5">
-        <h2 className="text-sm font-bold text-white mb-3">Actions</h2>
-        <SupplierTicketActions ticketId={t.id} status={t.status} acknowledged={!!t.first_response_at} before={!!t.before_photo_uploaded} after={!!t.after_photo_uploaded} coc={!!t.completion_certificate_uploaded} quoteSubmitted={!!t.quote_submitted_at} />
+        <h2 className="text-sm font-bold text-white mb-3">Next step</h2>
+        <WorkflowActions ticketId={t.id} status={t.status} role="supplier" />
+      </Card>
+
+      <Card className="p-5">
+        <h2 className="text-sm font-bold text-white mb-3">Updates & evidence</h2>
+        <SupplierAttachments ticketId={t.id} before={!!t.before_photo_uploaded} after={!!t.after_photo_uploaded} coc={!!t.completion_certificate_uploaded} />
       </Card>
 
       <Card className="p-5">
