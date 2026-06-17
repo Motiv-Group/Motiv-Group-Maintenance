@@ -17,7 +17,7 @@ export default async function StoreOverviewPage() {
   const greeting = (() => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening' })()
 
   return (
-    <div className="space-y-5 max-w-2xl">
+    <div className="space-y-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-white">{greeting}, {fullName?.split(' ')[0] ?? 'there'} 👋</h1>

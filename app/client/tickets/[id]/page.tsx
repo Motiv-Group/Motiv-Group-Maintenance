@@ -8,6 +8,7 @@ import { requireStoreManagerV3 } from '@/lib/health/guard'
 import { Card } from '@/components/exec/ui'
 import { WorkflowActions } from '@/components/workflow/WorkflowActions'
 import { StatusPipeline } from '@/components/workflow/StatusPipeline'
+import { EditTicketForm } from '@/components/client/EditTicketForm'
 import { formatCurrency, formatDateTime } from '@/lib/utils'
 
 export default async function StoreTicketDetailPage({ params }: { params: { id: string } }) {
@@ -22,7 +23,7 @@ export default async function StoreTicketDetailPage({ params }: { params: { id: 
   ])
 
   return (
-    <div className="space-y-5 max-w-2xl">
+    <div className="space-y-5">
       <Link href="/client/tickets" className="inline-flex items-center gap-1 text-sm text-slate-400 hover:text-white"><ArrowLeft size={15} /> Back to my tickets</Link>
 
       <Card className="p-5 space-y-4">
@@ -38,6 +39,13 @@ export default async function StoreTicketDetailPage({ params }: { params: { id: 
           <div className="flex flex-wrap gap-2">{t.photo_urls.map((u: string, i: number) => <a key={i} href={u} target="_blank" className="text-xs text-[#C6A35D] underline">Photo {i + 1}</a>)}</div>
         )}
       </Card>
+
+      {t.status === 'open' && (
+        <Card className="p-5">
+          <h2 className="text-sm font-bold text-white mb-3">Edit</h2>
+          <EditTicketForm ticketId={t.id} initial={{ title: t.title, category: t.category ?? 'General', impact: t.operational_impact ?? 'none', description: t.description }} />
+        </Card>
+      )}
 
       <Card className="p-5">
         <h2 className="text-sm font-bold text-white mb-3">Your actions</h2>

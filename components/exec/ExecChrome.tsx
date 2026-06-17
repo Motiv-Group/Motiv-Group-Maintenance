@@ -49,11 +49,14 @@ export function ExecChrome({
   const home = tabs[0]?.href ?? base
   const initial = (userName ?? roleLabel).trim().charAt(0).toUpperCase()
   const iconBtn = 'p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors'
+  // Store manager uses a narrow centred column — constrain header + main + nav
+  // to the same width so the logo lines up with the content cards.
+  const wrap = variant === 'store' ? 'max-w-3xl' : 'max-w-[1500px]'
 
   return (
     <div className="min-h-screen bg-[#0a0e17] text-slate-100 flex flex-col">
       <header className="sticky top-0 z-20 bg-[#0a0e17]/90 backdrop-blur border-b border-white/5">
-        <div className="max-w-[1500px] mx-auto px-4 h-14 flex items-center justify-between">
+        <div className={`${wrap} mx-auto px-4 h-14 flex items-center justify-between`}>
           <Link href={home}><MotivLogo height={30} /></Link>
           <div className="flex items-center gap-1">
             {reports && <Link href={`${base}/reports`} className={iconBtn} title="Reports"><FileBarChart size={18} /></Link>}
@@ -76,10 +79,10 @@ export function ExecChrome({
         </div>
       </header>
 
-      <main className="flex-1 max-w-[1500px] w-full mx-auto px-4 py-6 pb-28">{children}</main>
+      <main className={`flex-1 ${wrap} w-full mx-auto px-4 py-6 pb-28`}>{children}</main>
 
       <nav className="fixed bottom-0 inset-x-0 z-20 bg-[#0c1120] border-t border-white/5">
-        <div className="max-w-[1500px] mx-auto flex items-stretch justify-around h-16">
+        <div className={`${wrap} mx-auto flex items-stretch justify-around h-16`}>
           {tabs.map(({ href, label, icon: Icon }) => {
             const active = pathname === href || (href !== home && pathname.startsWith(href))
             return (

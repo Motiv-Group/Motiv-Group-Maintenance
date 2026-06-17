@@ -16,11 +16,11 @@ const TONE: Record<string, string> = {
 }
 const WORD: Record<string, string> = { open: 'Open', in_progress: 'In Progress', completed: 'Completed' }
 
-const PILLS: { key: Filter; label: string; active: string }[] = [
-  { key: 'all',         label: 'All',         active: 'bg-white text-[#0a0e17] border-white' },
-  { key: 'open',        label: 'Open',        active: 'bg-blue-500 text-white border-blue-500' },
-  { key: 'in_progress', label: 'In Progress', active: 'bg-[#C6A35D] text-[#0a0e17] border-[#C6A35D]' },
-  { key: 'completed',   label: 'Completed',   active: 'bg-emerald-500 text-white border-emerald-500' },
+const PILLS: { key: Filter; label: string; active: string; inactive: string }[] = [
+  { key: 'all',         label: 'All',         active: 'bg-white text-[#0a0e17] border-white',                inactive: 'text-slate-300 border-white/15 hover:border-white/30' },
+  { key: 'open',        label: 'Open',        active: 'bg-blue-500 text-white border-blue-500',              inactive: 'text-blue-400 border-blue-500/40 hover:border-blue-400' },
+  { key: 'in_progress', label: 'In Progress', active: 'bg-[#C6A35D] text-[#0a0e17] border-[#C6A35D]',        inactive: 'text-[#C6A35D] border-[#C6A35D]/40 hover:border-[#C6A35D]' },
+  { key: 'completed',   label: 'Completed',   active: 'bg-emerald-500 text-white border-emerald-500',        inactive: 'text-emerald-400 border-emerald-500/40 hover:border-emerald-400' },
 ]
 
 export function StoreTicketsList({ tickets, storeName }: { tickets: StoreManagerTicket[]; storeName: string }) {
@@ -44,7 +44,7 @@ export function StoreTicketsList({ tickets, storeName }: { tickets: StoreManager
   const pct = (n: number) => Math.round((n / total) * 100)
 
   return (
-    <div className="space-y-5 max-w-2xl">
+    <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white flex items-center gap-2"><Ticket className="text-[#C6A35D]" size={22} /> My Tickets</h1>
@@ -74,14 +74,14 @@ export function StoreTicketsList({ tickets, storeName }: { tickets: StoreManager
           className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-[#121826] ring-1 ring-white/10 text-white text-sm placeholder-slate-500 focus:ring-[#C6A35D]/40 outline-none" />
       </div>
 
-      {/* Filter pills */}
-      <div className="flex flex-wrap gap-2">
+      {/* Filter pills — 3-col grid on phone, inline on larger screens */}
+      <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
         {PILLS.map(p => {
           const n = p.key === 'all' ? tickets.length : (counts as any)[p.key]
           const on = filter === p.key
           return (
             <button key={p.key} onClick={() => setFilter(p.key)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium border transition ${on ? p.active : 'text-slate-300 border-white/15 hover:border-white/30'}`}>
+              className={`px-3 py-1.5 rounded-full text-xs font-medium border transition text-center ${on ? p.active : p.inactive}`}>
               {p.label} <span className="opacity-70">{n}</span>
             </button>
           )
