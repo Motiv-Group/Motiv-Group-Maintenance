@@ -22,7 +22,7 @@ export default async function StoreTicketDetailPage({ params }: { params: { id: 
   ])
 
   return (
-    <div className="space-y-5 max-w-2xl mx-auto">
+    <div className="space-y-5 max-w-2xl">
       <Link href="/client/tickets" className="inline-flex items-center gap-1 text-sm text-slate-400 hover:text-white"><ArrowLeft size={15} /> Back to my tickets</Link>
 
       <Card className="p-5 space-y-4">
