@@ -1,6 +1,6 @@
 // Plain-language status for the store manager — no quote/COC/sign-off jargon.
 // Shows a spinner while the job is being handled, a tick when done.
-import { Loader2, CheckCircle2, Clock, XCircle } from 'lucide-react'
+import { Loader2, CheckCircle2, XCircle } from 'lucide-react'
 
 type Mode = 'wait' | 'spin' | 'done' | 'closed'
 interface Meta { msg: string; sub: string; mode: Mode }
@@ -30,11 +30,16 @@ const MAP: Record<string, Meta> = {
 
 export function ClientTicketStatus({ status }: { status: string }) {
   const m = MAP[status] ?? { msg: 'In progress', sub: 'Being handled.', mode: 'spin' as Mode }
-  const Icon = m.mode === 'spin' ? Loader2 : m.mode === 'done' ? CheckCircle2 : m.mode === 'closed' ? XCircle : Clock
-  const color = m.mode === 'done' ? 'text-emerald-400' : m.mode === 'closed' ? 'text-slate-500' : 'text-[#C6A35D]'
+  const done = status === 'completed'
+  const closed = status === 'cancelled' || status === 'declined'
+  const active = !done && !closed   // everything in-flight spins, incl. "awaiting review"
+  const Icon = done ? CheckCircle2 : closed ? XCircle : Loader2
+  const color = done ? 'text-emerald-400' : closed ? 'text-slate-500' : 'text-[#C6A35D]'
   return (
     <div className="flex items-center gap-3">
-      <Icon size={22} className={`${color} ${m.mode === 'spin' ? 'animate-spin' : ''} shrink-0`} />
+      {active
+        ? <span className="relative shrink-0 w-6 h-6"><Loader2 size={24} className="text-[#C6A35D] animate-spin" /></span>
+        : <Icon size={22} className={`${color} shrink-0`} />}
       <div>
         <p className="text-sm font-semibold text-white">{m.msg}</p>
         <p className="text-xs text-slate-400">{m.sub}</p>

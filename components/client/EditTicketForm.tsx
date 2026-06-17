@@ -55,11 +55,10 @@ export function EditTicketForm({ ticketId, initial }: Props) {
   if (!editing) {
     return (
       <div className="space-y-2">
-        <div className="flex gap-2">
-          <button onClick={() => setEditing(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-500 transition"><Pencil size={14} /> Edit ticket</button>
-          <button onClick={() => setConfirmDelete(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-xl ring-1 ring-red-500/40 text-red-400 text-sm hover:bg-red-500/10"><Trash2 size={14} /> Delete</button>
+        <div className="flex gap-3">
+          <button onClick={() => setEditing(true)} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-500 transition"><Pencil size={15} /> Edit ticket</button>
+          <button onClick={() => setConfirmDelete(true)} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl ring-1 ring-red-500/40 text-red-400 text-sm font-semibold hover:bg-red-500/10 transition"><Trash2 size={15} /> Delete</button>
         </div>
-        <p className="text-[11px] text-slate-500">You can edit or delete this ticket while it&apos;s still open.</p>
         {error && <p className="text-xs text-red-400">{error}</p>}
         {confirmDelete && (
           <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setConfirmDelete(false)}>
@@ -78,7 +77,7 @@ export function EditTicketForm({ ticketId, initial }: Props) {
   }
 
   return (
-    <form onSubmit={save} className="space-y-3">
+    <form onSubmit={save} className="space-y-3 rounded-2xl bg-[#121826] ring-1 ring-white/10 p-5">
       <div className="flex items-center justify-between"><span className="text-sm font-semibold text-white">Edit ticket</span><button type="button" onClick={() => setEditing(false)} className="text-slate-500 hover:text-white"><X size={16} /></button></div>
       <input className={input} value={title} onChange={e => setTitle(e.target.value)} placeholder="Title" required />
       <div className="grid grid-cols-2 gap-2">

@@ -43,11 +43,9 @@ export default async function StoreTicketDetailPage({ params }: { params: { id: 
         )}
       </Card>
 
-      {/* Edit / delete — only while open, directly under the detail */}
+      {/* Edit / delete — only while open, out of the card, spanning the block width */}
       {isOpen && (
-        <Card className="p-5">
-          <EditTicketForm ticketId={t.id} initial={{ title: t.title, category: t.category ?? 'General', impact: t.operational_impact ?? 'none', description: t.description }} />
-        </Card>
+        <EditTicketForm ticketId={t.id} initial={{ title: t.title, category: t.category ?? 'General', impact: t.operational_impact ?? 'none', description: t.description }} />
       )}
 
       {/* Plain-language status (no quote/sign-off jargon) + the only SM action: resubmit */}
