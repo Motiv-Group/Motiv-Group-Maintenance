@@ -11,7 +11,7 @@ export function TabHeader({ icon, title, subtitle, children }: { icon: ReactNode
       <div className="flex items-center gap-2.5">
         <span className="grid place-items-center w-9 h-9 rounded-xl bg-[#C6A35D]/15 ring-1 ring-[#C6A35D]/30">{icon}</span>
         <div>
-          <h1 className="text-xl font-bold text-white leading-tight">{title}</h1>
+          <h1 className="text-xl font-bold text-[var(--text)] leading-tight">{title}</h1>
           <p className="text-xs text-[var(--text-muted)]">{subtitle}</p>
         </div>
       </div>
@@ -51,7 +51,7 @@ export function FilterMenu({ value, onChange, options, label = 'Filters' }: { va
             <button
               key={o.value}
               onClick={() => { onChange(o.value); setOpen(false) }}
-              className="w-full text-left px-3 py-2 text-xs rounded-lg hover:bg-[var(--hover)] flex items-center justify-between text-[var(--text-muted)] hover:text-white transition"
+              className="w-full text-left px-3 py-2 text-xs rounded-lg hover:bg-[var(--hover)] flex items-center justify-between text-[var(--text-muted)] hover:text-[var(--text)] transition"
             >
               {o.label}
               {o.value === value && <Check size={13} className="text-[#C6A35D]" />}

@@ -35,7 +35,7 @@ export function StatusPipeline({ status }: { status: string }) {
           return (
             <div key={g.key} className="flex-1">
               <div className={`h-1.5 rounded-full ${active ? (cancelled ? 'bg-gray-500' : 'bg-[#C6A35D]') : done ? 'bg-[#C6A35D]/50' : 'bg-white/10'}`} />
-              <div className={`text-[10px] mt-1 text-center ${active ? 'text-[#C6A35D]' : 'text-slate-500'}`}>{g.label}</div>
+              <div className={`text-[10px] mt-1 text-center ${active ? 'text-[#C6A35D]' : 'text-[var(--text-faint)]'}`}>{g.label}</div>
             </div>
           )
         })}

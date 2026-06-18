@@ -42,12 +42,12 @@ export function RegionalOverview({ data, name }: { data: RegionalDashboardData; 
       </div>
 
       <SectionCard title="Recommended Focus Today" icon={<ListTodo size={15} className="text-[#C6A35D]" />}>
-        {focus.length ? <ul className="space-y-2">{focus.map((f, i) => <li key={i} className="flex items-start gap-2 text-sm text-slate-200">{f.icon}<span>{f.text}</span></li>)}</ul>
+        {focus.length ? <ul className="space-y-2">{focus.map((f, i) => <li key={i} className="flex items-start gap-2 text-sm text-[var(--text)]">{f.icon}<span>{f.text}</span></li>)}</ul>
           : <p className="text-sm text-[var(--text-faint)]">Nothing urgent — portfolio under control.</p>}
       </SectionCard>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <SectionCard title="Stores Requiring Attention" icon={<AlertTriangle size={15} className="text-[#C6A35D]" />} action={<Link href="/regional/stores" className="text-xs text-[#C6A35D] hover:underline">All</Link>}>
+        <SectionCard title="Stores Requiring Attention" icon={<AlertTriangle size={15} className="text-amber-600 dark:text-amber-500" />} action={<Link href="/regional/stores" className="text-xs text-[#C6A35D] hover:underline">All</Link>}>
           {data.attentionStores.slice(0, 8).map(s => (
             <div key={s.storeId} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0">
               <div className="min-w-0"><p className="text-sm text-[var(--text)] truncate">{s.storeName}</p><p className="text-[11px] text-[var(--text-faint)] truncate">{s.mainIssue}</p></div>
@@ -67,7 +67,7 @@ export function RegionalOverview({ data, name }: { data: RegionalDashboardData; 
         </SectionCard>
       </div>
 
-      <SectionCard title="Tickets Needing Action" icon={<ClipboardList size={15} className="text-[#C6A35D]" />} action={<Link href="/regional/tickets" className="text-xs text-[#C6A35D] hover:underline">All tickets</Link>}>
+      <SectionCard title="Tickets Needing Action" icon={<ClipboardList size={15} className="text-blue-600 dark:text-blue-400" />} action={<Link href="/regional/tickets" className="text-xs text-[#C6A35D] hover:underline">All tickets</Link>}>
         {data.ticketActions.slice(0, 6).map(t => (
           <div key={t.id} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0">
             <div className="min-w-0"><p className="text-sm text-[var(--text)] truncate">{t.storeName} · <span className="text-[var(--text-muted)]">{t.priority}</span></p><p className="text-[11px] text-[var(--text-faint)] truncate">{t.nextAction}</p></div>

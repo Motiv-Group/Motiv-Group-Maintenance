@@ -95,7 +95,7 @@ export default async function StoreTicketDetailPage({ params }: { params: { id: 
       <Card className="p-5">
         <h2 className="text-sm font-bold text-[var(--text)] mb-3">Activity</h2>
         {(updates ?? []).length ? (updates ?? []).map((u: any, i: number) => (
-          <div key={i} className="py-2 border-b border-white/5 last:border-0"><p className="text-sm text-[var(--text)]">{u.body}</p><p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(u.created_at)}</p></div>
+          <div key={i} className="py-2 border-b border-[var(--border)] last:border-0"><p className="text-sm text-[var(--text)]">{u.body}</p><p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(u.created_at)}</p></div>
         )) : <p className="text-sm text-[var(--text-faint)]">No updates yet.</p>}
       </Card>
     </div>

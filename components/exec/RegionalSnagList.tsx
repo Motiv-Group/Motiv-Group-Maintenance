@@ -21,15 +21,15 @@ export function RegionalSnagList({ rows }: { rows: SnagRow[] }) {
     } catch (e: any) { setErr(e.message) } finally { setBusy(null) }
   }
 
-  if (!rows.length) return <Card className="p-8 text-center"><p className="text-sm text-slate-500">No open snags.</p></Card>
+  if (!rows.length) return <Card className="p-8 text-center"><p className="text-sm text-[var(--text-faint)]">No open snags.</p></Card>
   return (
     <div className="space-y-3">
       {err && <div className="text-sm text-red-400 bg-red-500/10 rounded-lg px-3 py-2">{err}</div>}
       {rows.map(r => (
         <Card key={r.id} className="p-4 flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-sm text-white truncate">{r.description}</p>
-            <p className="text-[11px] text-slate-500">{r.storeName} · {r.ticketTitle} · <span className="capitalize">{r.severity}</span></p>
+            <p className="text-sm text-[var(--text)] truncate">{r.description}</p>
+            <p className="text-[11px] text-[var(--text-faint)]">{r.storeName} · {r.ticketTitle} · <span className="capitalize">{r.severity}</span></p>
           </div>
           <button onClick={() => resolve(r)} disabled={busy === r.id} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 text-white text-sm font-medium disabled:opacity-50 shrink-0"><Check size={15} /> Resolve</button>
         </Card>

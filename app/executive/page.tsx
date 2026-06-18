@@ -222,7 +222,7 @@ export default async function ExecutiveEstatePage() {
                   <p className="text-xs text-[var(--text)] mt-1 truncate">{d.title}</p>
                 </div>
                 <div className="text-right shrink-0">
-                  {d.exposureValue ? <p className="text-xs text-slate-200 whitespace-nowrap">{fmtK(d.exposureValue)}</p> : null}
+                  {d.exposureValue ? <p className="text-xs text-[var(--text)] whitespace-nowrap">{fmtK(d.exposureValue)}</p> : null}
                   <p className="text-[10px] text-[var(--text-faint)] whitespace-nowrap">Due in {d.deadlineDays}d</p>
                 </div>
               </div>
@@ -244,7 +244,7 @@ export default async function ExecutiveEstatePage() {
                 {data.exposureBreakdown.map((b, i) => (
                   <div key={i} className="flex items-center justify-between text-xs">
                     <span className="text-[var(--text-muted)] truncate">{i + 1}. {b.label}</span>
-                    <span className="text-slate-200 font-semibold whitespace-nowrap">{fmtK(b.value)}</span>
+                    <span className="text-[var(--text)] font-semibold whitespace-nowrap">{fmtK(b.value)}</span>
                   </div>
                 ))}
                 {data.exposureBreakdown.length === 0 && <p className="text-xs text-[var(--text-faint)]">No commercial exposure</p>}

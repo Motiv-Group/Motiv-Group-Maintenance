@@ -27,7 +27,7 @@ export function RecentTicketsCard({ tickets }: { tickets: StoreManagerTicket[] }
     <Card className="p-5">
       <div className="flex items-center justify-between gap-2 mb-3">
         <button onClick={() => setOpen(o => !o)} aria-expanded={open}
-          className="flex items-center gap-2 min-w-0 -m-1 p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition">
+          className="flex items-center gap-2 min-w-0 -m-1 p-1 rounded-lg hover:bg-black/5 dark:hover:bg-[var(--hover)] transition">
           <ChevronDown size={16} className={`shrink-0 text-[var(--text-muted)] transition-transform ${open ? 'rotate-180' : ''}`} />
           <span className="text-sm font-bold text-[var(--text)]">Recent Tickets</span>
           <span className="text-[11px] font-medium text-[var(--text-muted)] bg-black/5 dark:bg-white/10 rounded-full px-2 py-0.5 whitespace-nowrap">Last 7 days · {recent.length}</span>

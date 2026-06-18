@@ -34,7 +34,7 @@ export function ClientTicketStatus({ status }: { status: string }) {
   const closed = status === 'cancelled' || status === 'declined'
   const active = !done && !closed   // everything in-flight spins, incl. "awaiting review"
   const Icon = done ? CheckCircle2 : closed ? XCircle : Loader2
-  const color = done ? 'text-emerald-400' : closed ? 'text-slate-500' : 'text-[#C6A35D]'
+  const color = done ? 'text-emerald-400' : closed ? 'text-[var(--text-faint)]' : 'text-[#C6A35D]'
   return (
     <div className="flex items-center gap-3">
       {active

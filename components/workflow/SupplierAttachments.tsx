@@ -48,7 +48,7 @@ export function SupplierAttachments({ ticketId, before, after, coc }: Props) {
       </div>
 
       <div>
-        <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1.5">Evidence</div>
+        <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Evidence</div>
         <div className="grid grid-cols-3 gap-2">
           <EvidenceBtn label="Before" done={before} busy={busy === 'before_photo'} onPick={f => upload(f, 'ticket-photos', 'before_photo')} />
           <EvidenceBtn label="After" done={after} busy={busy === 'after_photo'} onPick={f => upload(f, 'ticket-photos', 'after_photo')} />
@@ -61,7 +61,7 @@ export function SupplierAttachments({ ticketId, before, after, coc }: Props) {
 
 function EvidenceBtn({ label, done, busy, onPick }: { label: string; done: boolean; busy: boolean; onPick: (f: File) => void }) {
   return (
-    <label className={`flex flex-col items-center gap-1 px-2 py-3 rounded-xl border cursor-pointer text-xs ${done ? 'border-emerald-500/40 text-emerald-400' : 'border-white/10 text-slate-300'}`}>
+    <label className={`flex flex-col items-center gap-1 px-2 py-3 rounded-xl border cursor-pointer text-xs ${done ? 'border-emerald-500/40 text-emerald-400' : 'border-[var(--border)] text-[var(--text)]'}`}>
       <Upload size={15} />{busy ? '…' : done ? `${label} ✓` : label}
       <input type="file" accept="image/*,application/pdf" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) onPick(f) }} />
     </label>

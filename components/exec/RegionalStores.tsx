@@ -38,8 +38,8 @@ export function RegionalStores({ stores }: { stores: StoreCard[] }) {
                   <tr key={s.storeId} onClick={() => { setSelId(s.storeId); setOpen(true) }} className={`border-b border-[var(--border)] cursor-pointer hover:bg-[var(--hover)] ${selId === s.storeId ? 'bg-[var(--hover)]' : ''}`}>
                     <td className="py-2.5 px-2 text-[var(--text-faint)]">{i + 1}</td><td className="px-2 text-[var(--text)]">{s.storeName}</td>
                     <td className={`px-2 font-semibold ${STATUS_TEXT[s.finalStatus]}`}>{s.finalHealthScore}%</td><td className="px-2"><Pill status={s.finalStatus} /></td>
-                    <td className="px-2 text-slate-300">{s.openTickets}</td><td className="px-2 text-red-400">{s.overdueTickets}</td>
-                    <td className="px-2 text-slate-300">{s.pendingDecisions}</td><td className="px-2 text-slate-300 whitespace-nowrap">{fmtK(s.costExposure)}</td>
+                    <td className="px-2 text-[var(--text)]">{s.openTickets}</td><td className="px-2 text-red-400">{s.overdueTickets}</td>
+                    <td className="px-2 text-[var(--text)]">{s.pendingDecisions}</td><td className="px-2 text-[var(--text)] whitespace-nowrap">{fmtK(s.costExposure)}</td>
                     <td className="px-2 text-xs text-[var(--text-muted)] max-w-[200px] truncate">{s.mainIssue}</td>
                   </tr>
                 ))}
@@ -94,7 +94,7 @@ function Detail({ s, onClose }: { s: StoreCard; onClose?: () => void }) {
           { label: 'Commercial Impact', value: s.breakdown.commercialBlocker, max: 10 }, { label: 'Data Quality', value: s.breakdown.dataQuality, max: 10 },
         ]} /></div>
       </div>
-      <div><div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Recommended Action</div><p className="text-xs text-slate-300">{s.finalStatus === 'controlled' ? 'Store controlled — maintain.' : `Resolve: ${s.mainIssue}.`}</p></div>
+      <div><div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Recommended Action</div><p className="text-xs text-[var(--text)]">{s.finalStatus === 'controlled' ? 'Store controlled — maintain.' : `Resolve: ${s.mainIssue}.`}</p></div>
       <PrimaryButton tone="gold">View Store Tickets</PrimaryButton>
     </div>
   )

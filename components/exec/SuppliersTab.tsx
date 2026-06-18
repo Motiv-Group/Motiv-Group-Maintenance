@@ -191,7 +191,7 @@ function Bucket({ color, label, n, total }: { color: string; label: string; n: n
     <div className="flex items-center gap-3">
       <span className={`w-2.5 h-2.5 rounded-full ${color}`} /><span className="text-[var(--text-muted)] w-20">{label}</span>
       <span className="flex-1 h-2 rounded-full bg-white/10 overflow-hidden"><span className={`block h-full ${color}`} style={{ width: `${total ? (n / total) * 100 : 0}%` }} /></span>
-      <span className="text-slate-200 w-8 text-right">{n}</span>
+      <span className="text-[var(--text)] w-8 text-right">{n}</span>
     </div>
   )
 }

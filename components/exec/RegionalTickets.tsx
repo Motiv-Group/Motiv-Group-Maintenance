@@ -27,7 +27,7 @@ export function RegionalTickets({ actions }: { actions: RegionalDashboardData['t
 
   return (
     <div className="space-y-5">
-      <div><h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><Ticket className="text-[#C6A35D]" size={22} /> Tickets</h1>
+      <div><h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><Ticket className="text-blue-600 dark:text-blue-400" size={22} /> Tickets</h1>
         <p className="text-sm text-[var(--text-muted)] mt-0.5">Open tickets needing action — lowest health first.</p></div>
       <SectionCard title={`Ticket Action List (${actions.length})`}>
         <ResponsiveTable columns={cols} rows={actions} getKey={t => t.id} minWidth={760} empty="No open tickets needing action." />

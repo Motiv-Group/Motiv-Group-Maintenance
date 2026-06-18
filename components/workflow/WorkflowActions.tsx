@@ -24,7 +24,7 @@ function tone(action: string): string {
     return 'bg-[#C6A35D] text-[#0a0e17] hover:brightness-95'
   if (/^(reject|reject_quote|reject_variation)/.test(action))
     return 'bg-red-600 text-white hover:bg-red-500'
-  return 'ring-1 ring-[var(--border)] text-[var(--text)] hover:bg-white/10'
+  return 'ring-1 ring-[var(--border)] text-[var(--text)] hover:bg-[var(--hover)]'
 }
 
 interface Props {

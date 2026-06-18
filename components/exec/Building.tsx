@@ -6,8 +6,8 @@ export function Building({ tab }: { tab: string }) {
       <div className="w-14 h-14 rounded-2xl bg-[#C6A35D]/15 flex items-center justify-center mb-4">
         <Hammer className="text-[#C6A35D]" size={24} />
       </div>
-      <h1 className="text-xl font-bold text-white">{tab}</h1>
-      <p className="text-sm text-slate-400 mt-1 max-w-sm">This executive tab is being built in the next Phase 2 step. The <span className="text-[#C6A35D]">Regions</span> tab is live now.</p>
+      <h1 className="text-xl font-bold text-[var(--text)]">{tab}</h1>
+      <p className="text-sm text-[var(--text-muted)] mt-1 max-w-sm">This executive tab is being built in the next Phase 2 step. The <span className="text-[#C6A35D]">Regions</span> tab is live now.</p>
     </div>
   )
 }

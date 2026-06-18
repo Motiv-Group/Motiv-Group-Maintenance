@@ -18,8 +18,8 @@ export default async function ExecutiveReportsPage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-3 print:hidden">
         <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2"><FileBarChart className="text-[#C6A35D]" size={22} /> Executive Report</h1>
-          <p className="text-sm text-slate-400 mt-0.5">Exception-based estate summary. Print or save as PDF.</p>
+          <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><FileBarChart className="text-slate-600 dark:text-slate-400" size={22} /> Executive Report</h1>
+          <p className="text-sm text-[var(--text-muted)] mt-0.5">Exception-based estate summary. Print or save as PDF.</p>
         </div>
         <PrintButton />
       </div>
@@ -27,7 +27,7 @@ export default async function ExecutiveReportsPage() {
       <article className="bg-white text-slate-900 rounded-2xl p-8 space-y-6 print:p-0">
         <header className="border-b border-slate-200 pb-4">
           <h2 className="text-2xl font-bold">Estate Maintenance Report</h2>
-          <p className="text-sm text-slate-500">Generated {formatDateTime(d.generatedAt)}</p>
+          <p className="text-sm text-[var(--text-faint)]">Generated {formatDateTime(d.generatedAt)}</p>
         </header>
 
         <section>
@@ -66,11 +66,11 @@ function ReportTable({ title, head, rows }: { title: string; head: string[]; row
       <h3 className="font-bold mb-2">{title}</h3>
       <div className="overflow-x-auto">
         <table className="w-full text-xs border-collapse">
-          <thead><tr className="text-left text-slate-500 border-b border-slate-200">{head.map(h => <th key={h} className="py-1.5 pr-3 font-semibold">{h}</th>)}</tr></thead>
+          <thead><tr className="text-left text-[var(--text-faint)] border-b border-slate-200">{head.map(h => <th key={h} className="py-1.5 pr-3 font-semibold">{h}</th>)}</tr></thead>
           <tbody>
             {rows.length ? rows.map((r, i) => (
               <tr key={i} className="border-b border-slate-100 align-top">{r.map((c, j) => <td key={j} className="py-1.5 pr-3">{c}</td>)}</tr>
-            )) : <tr><td colSpan={head.length} className="py-3 text-slate-400">Nothing to report.</td></tr>}
+            )) : <tr><td colSpan={head.length} className="py-3 text-[var(--text-muted)]">Nothing to report.</td></tr>}
           </tbody>
         </table>
       </div>

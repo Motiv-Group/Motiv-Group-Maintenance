@@ -29,7 +29,7 @@ export function DrawerHeader({ title, onClose, children }: { title: ReactNode; o
       <div className="min-w-0">{title}</div>
       <div className="flex items-center gap-2">
         {children}
-        {onClose && <button onClick={onClose} className="text-[var(--text-faint)] hover:text-white"><X size={18} /></button>}
+        {onClose && <button onClick={onClose} className="text-[var(--text-faint)] hover:text-[var(--text)]"><X size={18} /></button>}
       </div>
     </div>
   )

@@ -2,12 +2,14 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { PlusCircle, Upload, X } from 'lucide-react'
+import { PlusCircle, ImagePlus, Camera, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { Card } from '@/components/exec/ui'
 import { OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
 
 const CATEGORIES = ['Electrical', 'Plumbing', 'HVAC', 'Refrigeration', 'Gas', 'Structural', 'General', 'Cleaning', 'Other']
 const IMPACTS = Object.entries(OPERATIONAL_IMPACT_LABELS).map(([v, label]) => ({ v, label }))
+const MAX_PHOTOS = 5
 
 export default function LogTicketPage() {
   const router = useRouter()
@@ -24,7 +26,14 @@ export default function LogTicketPage() {
   const previews = useMemo(() => files.map(f => URL.createObjectURL(f)), [files])
   useEffect(() => () => { previews.forEach(u => URL.revokeObjectURL(u)) }, [previews])
 
-  const input = 'w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--border)] text-[var(--text)] placeholder-[var(--text-faint)] focus:outline-none focus:ring-2 focus:ring-[#C6A35D]/50'
+  const remaining = Math.max(0, MAX_PHOTOS - files.length)
+  function addFiles(incoming: File[]) {
+    const imgs = incoming.filter(f => f.type.startsWith('image/'))
+    setFiles(prev => [...prev, ...imgs].slice(0, MAX_PHOTOS))
+  }
+
+  // Raised slate field on the card, green focus accent — matches the design.
+  const input = 'w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-[var(--text)] placeholder-[var(--text-faint)] focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500/60'
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -54,50 +63,68 @@ export default function LogTicketPage() {
       <div><h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><PlusCircle className="text-emerald-500" size={22} /> Log a Ticket</h1>
         <p className="text-sm text-[var(--text-muted)] mt-0.5">Describe the maintenance issue at your store. All fields are required.</p></div>
 
-      <form onSubmit={submit} className="space-y-4">
-        <Field label="Title"><input className={input} value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Aircon not cooling" required /></Field>
+      <Card className="p-5 sm:p-6">
+        <form onSubmit={submit} className="space-y-4">
+          <Field label="Title" required><input className={input} value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Aircon not cooling" required /></Field>
 
-        <Field label="Category">
-          <select className={input} value={category} onChange={e => setCategory(e.target.value)} required>
-            <option value="" disabled>Select a category…</option>
-            {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-        </Field>
+          <Field label="Category" required>
+            <select className={input} value={category} onChange={e => setCategory(e.target.value)} required>
+              <option value="" disabled>Select a category…</option>
+              {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </Field>
 
-        {/* Full-width so the longest impact labels (e.g. "Store cannot trade") fit on phones. */}
-        <Field label="Operational Impact">
-          <select className={input} value={impact} onChange={e => setImpact(e.target.value)} required>
-            <option value="" disabled>Select operational impact…</option>
-            {IMPACTS.map(i => <option key={i.v} value={i.v}>{i.label}</option>)}
-          </select>
-        </Field>
+          {/* Full-width so the longest impact labels (e.g. "Store cannot trade") fit on phones. */}
+          <Field label="Operational Impact" required>
+            <select className={input} value={impact} onChange={e => setImpact(e.target.value)} required>
+              <option value="" disabled>Select operational impact…</option>
+              {IMPACTS.map(i => <option key={i.v} value={i.v}>{i.label}</option>)}
+            </select>
+          </Field>
 
-        <Field label="Description"><textarea className={`${input} min-h-[110px]`} value={description} onChange={e => setDescription(e.target.value)} placeholder="What's wrong, where, since when…" required /></Field>
+          <Field label="Description" required><textarea className={`${input} min-h-[110px]`} value={description} onChange={e => setDescription(e.target.value)} placeholder="What's wrong, where, since when…" required /></Field>
 
-        <Field label={`Photos (min 2) — ${files.length} added`}>
-          <label className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-[var(--input-bg)] border border-dashed border-[var(--border)] text-[var(--text-muted)] cursor-pointer hover:border-[#C6A35D]/50">
-            <Upload size={16} /> Add photos
-            <input type="file" accept="image/*" multiple className="hidden" onChange={e => setFiles([...files, ...Array.from(e.target.files ?? [])])} />
-          </label>
-          {files.length > 0 && (
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mt-2">
-              {files.map((f, i) => (
-                <div key={i} className="relative">
-                  <button type="button" onClick={() => setPreview(previews[i])} className="block w-full aspect-square rounded-lg overflow-hidden ring-1 ring-[var(--border)] focus:outline-none focus:ring-2 focus:ring-[#C6A35D]/50" title={`View ${f.name}`}>
-                    <img src={previews[i]} alt={f.name} className="w-full h-full object-cover" />
-                  </button>
-                  <button type="button" onClick={() => setFiles(files.filter((_, j) => j !== i))} className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center shadow" title="Remove">
-                    <X size={11} />
-                  </button>
+          <Field label="Photos" required hint="(minimum 2, up to 5)">
+            <div
+              onDragOver={e => e.preventDefault()}
+              onDrop={e => { e.preventDefault(); addFiles(Array.from(e.dataTransfer.files)) }}
+              className="rounded-xl border border-dashed border-slate-300 dark:border-slate-600 p-3"
+            >
+              <div className="grid grid-cols-2 gap-3">
+                {/* Browse — pick existing images */}
+                <label className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-[var(--text)] text-sm font-medium transition ${remaining ? 'cursor-pointer hover:border-emerald-500/60' : 'opacity-50 cursor-not-allowed'}`}>
+                  <ImagePlus size={16} /> Browse
+                  <input type="file" accept="image/*" multiple disabled={!remaining} className="hidden" onChange={e => { addFiles(Array.from(e.target.files ?? [])); e.target.value = '' }} />
+                </label>
+                {/* Take Photo — opens the device camera on phones (capture) */}
+                <label className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-[var(--text)] text-sm font-medium transition ${remaining ? 'cursor-pointer hover:border-emerald-500/60' : 'opacity-50 cursor-not-allowed'}`}>
+                  <Camera size={16} /> Take Photo
+                  <input type="file" accept="image/*" capture="environment" disabled={!remaining} className="hidden" onChange={e => { addFiles(Array.from(e.target.files ?? [])); e.target.value = '' }} />
+                </label>
+              </div>
+              <p className="text-center text-[11px] text-[var(--text-faint)] mt-2.5">{remaining} of {MAX_PHOTOS} slots remaining · drag &amp; drop also works</p>
+
+              {files.length > 0 && (
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mt-3">
+                  {files.map((f, i) => (
+                    <div key={i} className="relative">
+                      <button type="button" onClick={() => setPreview(previews[i])} className="block w-full aspect-square rounded-lg overflow-hidden ring-1 ring-slate-300 dark:ring-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/60" title={`View ${f.name}`}>
+                        <img src={previews[i]} alt={f.name} className="w-full h-full object-cover" />
+                      </button>
+                      <button type="button" onClick={() => setFiles(files.filter((_, j) => j !== i))} className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center shadow" title="Remove">
+                        <X size={11} />
+                      </button>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
-          )}
-        </Field>
+          </Field>
 
-        {error && <div className="text-sm text-red-500 bg-red-500/10 rounded-lg px-3 py-2">{error}</div>}
-        <button type="submit" disabled={loading} className="w-full py-3 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-500 transition disabled:opacity-60">{loading ? 'Logging…' : 'Submit Ticket'}</button>
-      </form>
+          {error && <div className="text-sm text-red-500 bg-red-500/10 rounded-lg px-3 py-2">{error}</div>}
+          <button type="submit" disabled={loading} className="w-full py-3 rounded-xl bg-brand-700 hover:bg-brand-600 text-white font-semibold border border-brand-600 transition disabled:opacity-60">{loading ? 'Logging…' : 'Submit Ticket'}</button>
+        </form>
+      </Card>
 
       {/* Tap-to-view lightbox */}
       {preview && (
@@ -110,6 +137,14 @@ export default function LogTicketPage() {
   )
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div><label className="block text-xs text-[var(--text-muted)] mb-1">{label}</label>{children}</div>
+function Field({ label, required, hint, children }: { label: string; required?: boolean; hint?: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="block text-xs font-medium text-[var(--text-muted)] mb-1.5">
+        {label}{required && <span className="text-red-500"> *</span>}
+        {hint && <span className="text-[var(--text-faint)] font-normal"> {hint}</span>}
+      </label>
+      {children}
+    </div>
+  )
 }

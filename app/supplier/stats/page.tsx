@@ -19,8 +19,8 @@ export default async function SupplierPerformancePage() {
   }
   return (
     <div className="space-y-5">
-      <div><h1 className="text-2xl font-bold text-white flex items-center gap-2"><BarChart2 className="text-[#C6A35D]" size={22} /> Performance</h1>
-        <p className="text-sm text-slate-400 mt-0.5">Your SLA delivery and quality. Only your own data.</p></div>
+      <div><h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><BarChart2 className="text-slate-600 dark:text-slate-400" size={22} /> Performance</h1>
+        <p className="text-sm text-[var(--text-muted)] mt-0.5">Your SLA delivery and quality. Only your own data.</p></div>
       <Card className="p-6">
         <div className="flex flex-col sm:flex-row items-center gap-6">
           <Donut value={perf.performanceScore} status={perf.band} size={140} label="SLA" />
@@ -43,7 +43,7 @@ export default async function SupplierPerformancePage() {
           { l: 'First-Time Fix', v: `${Math.round(perf.firstTimeFixRate * 100)}%` }, { l: 'Evidence Rate', v: `${Math.round(perf.evidenceCompletionRate * 100)}%` },
           { l: 'Avg Response', v: perf.avgResponseMins == null ? '—' : `${(perf.avgResponseMins / 60).toFixed(1)}h` },
           { l: 'Escalations', v: perf.escalationCount },
-        ].map(x => <Card key={x.l} className="p-4 text-center"><div className="text-2xl font-bold text-white">{x.v}</div><div className="text-[11px] text-slate-400">{x.l}</div></Card>)}
+        ].map(x => <Card key={x.l} className="p-4 text-center"><div className="text-2xl font-bold text-[var(--text)]">{x.v}</div><div className="text-[11px] text-[var(--text-muted)]">{x.l}</div></Card>)}
       </div>
     </div>
   )

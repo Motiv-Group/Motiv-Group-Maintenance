@@ -32,8 +32,8 @@ export default async function RegionalSignoffPage() {
 
   return (
     <div className="space-y-5 max-w-2xl mx-auto">
-      <div><h1 className="text-2xl font-bold text-white flex items-center gap-2"><ClipboardCheck className="text-[#C6A35D]" size={22} /> Sign-off</h1>
-        <p className="text-sm text-slate-400 mt-0.5">Review supplier-submitted jobs. Accept to complete, or reject for more evidence.</p></div>
+      <div><h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><ClipboardCheck className="text-emerald-600 dark:text-emerald-400" size={22} /> Sign-off</h1>
+        <p className="text-sm text-[var(--text-muted)] mt-0.5">Review supplier-submitted jobs. Accept to complete, or reject for more evidence.</p></div>
       <RegionalSignoffReview rows={rows} />
     </div>
   )
