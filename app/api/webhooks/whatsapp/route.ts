@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { sendPushToMany } from '@/lib/push';
+import { OPERATIONAL_IMPACT_LABELS } from '@/lib/utils';
 import type { Priority } from '@/lib/types';
 import https from 'https';
 
@@ -37,10 +38,22 @@ interface WaPayload {
   }>;
 }
 
+// Must mirror the web "Log a Ticket" form options exactly.
+const CATEGORIES = ['Electrical', 'Plumbing', 'HVAC', 'Refrigeration', 'Gas', 'Structural', 'General', 'Cleaning', 'Other'] as const;
+const IMPACTS = ['none', 'cosmetic', 'customer_visible', 'staff_inconvenience', 'trading_affected', 'safety_risk', 'cannot_trade'] as const;
+type Category = typeof CATEGORIES[number];
+type OpImpact = typeof IMPACTS[number];
+
+// Below this the AI is treated as unsure → warn the manager + flag for RM review.
+const CONFIDENCE_THRESHOLD = 0.6;
+
 interface ExtractedTicket {
   title: string;
   description: string;
   priority: Priority;
+  category: Category;
+  operational_impact: OpImpact;
+  confidence: number;
 }
 
 interface WaSession {
@@ -48,6 +61,9 @@ interface WaSession {
   title: string;
   description: string;
   priority: string;
+  category: string;
+  operational_impact: string;
+  confidence?: number | null;
   photo_urls: string[];
 }
 
@@ -92,14 +108,29 @@ async function downloadMedia(mediaId: string): Promise<{ arrayBuffer: ArrayBuffe
   return { arrayBuffer, mimeType: mime_type };
 }
 
-const TICKET_EXTRACTION_PROMPT = `You are a maintenance ticket assistant for a South African retail maintenance platform.
-Extract structured fields and return ONLY a valid JSON object with these exact keys:
-- "title": short one-line summary of the issue (max 80 chars)
-- "description": detailed description of the issue
-- "priority": one of "low", "medium", "high", "urgent"
+// Biases Whisper toward a South African accent + the Afrikaans/English code-
+// switching common in SA retail, so the transcript spelling is accurate.
+// (Whisper uses this as vocabulary/style context, not an instruction.)
+const WHISPER_PROMPT =
+  'South African English, often mixed with Afrikaans, describing a retail store maintenance problem. ' +
+  'Common terms: aircon, geyser, load shedding, koelkas, vrieskas, lekkasie, krag, stukkend, deur, ligte, plafon, drein, toilet, pyp, muur, dak.';
 
-Priority guide: urgent = safety hazard or no service, high = major disruption, medium = moderate issue, low = minor/cosmetic.
-Input may be South African English or Afrikaans — handle both.`;
+const TICKET_EXTRACTION_PROMPT = `You are a maintenance ticket assistant for a South African retail maintenance platform.
+The input is a store manager describing a maintenance problem, in South African English, Afrikaans, or a mix of both (code-switching). It may contain transcription errors from a voice note.
+
+Return ONLY a valid JSON object with these EXACT keys:
+- "title": a short, professional one-line summary in ENGLISH (max 80 chars). No slang, no Afrikaans.
+- "description": a clear, professional description in ENGLISH — what is broken, where, and any impact mentioned. Translate any Afrikaans to English and write full sentences. Do NOT invent details that were not said.
+- "category": the single most appropriate value, EXACTLY one of: Electrical, Plumbing, HVAC, Refrigeration, Gas, Structural, General, Cleaning, Other.
+- "operational_impact": the single most appropriate value, EXACTLY one of: none, cosmetic, customer_visible, staff_inconvenience, trading_affected, safety_risk, cannot_trade.
+- "priority": one of low, medium, high, urgent.
+- "confidence": a number from 0 to 1 — how confident you are that the category, impact and details are correct. Use a LOW value when the input was vague, very short, off-topic, or hard to transcribe; a HIGH value only when the issue is clearly described.
+
+Category guide: HVAC = aircon/heating/ventilation; Refrigeration = fridges/freezers/cold rooms; Gas = gas lines/burners; Structural = walls/roof/ceiling/doors/floors; Plumbing = water/leaks/drains/toilets; Cleaning = spills/hygiene; General = anything not clearly another category; Other only if truly none fit.
+Operational impact guide: cannot_trade = store cannot operate; safety_risk = danger to people; trading_affected = trading/sales disrupted; customer_visible = customers can see it; staff_inconvenience = affects staff only; cosmetic = minor/appearance; none = no operational impact.
+Priority guide: urgent = safety_risk or cannot_trade; high = trading_affected; medium = customer_visible or staff_inconvenience; low = cosmetic or none.
+
+Rules: Always output English. If uncertain, pick the safest reasonable option and prefer "General" / "none" over a wild guess. Never leave a field blank.`;
 
 /** Transcribe audio using Groq Whisper, then extract ticket fields */
 async function transcribeAndExtract(arrayBuffer: ArrayBuffer, mimeType: string): Promise<ExtractedTicket> {
@@ -108,7 +139,10 @@ async function transcribeAndExtract(arrayBuffer: ArrayBuffer, mimeType: string):
   form.append('file', new Blob([arrayBuffer], { type: mimeType }), `audio.${ext}`);
   form.append('model', 'whisper-large-v3');
   form.append('response_format', 'text');
-  // No language hint — Whisper auto-detects SA English/Afrikaans mix
+  form.append('temperature', '0');
+  // Vocabulary/accent bias for SA English + Afrikaans code-switching. Language
+  // stays auto-detected so the Afrikaans mix is captured, then the LLM translates.
+  form.append('prompt', WHISPER_PROMPT);
 
   const res = await fetch(`${GROQ_BASE}/audio/transcriptions`, {
     method: 'POST',
@@ -131,6 +165,7 @@ async function extractTicketFields(text: string): Promise<ExtractedTicket> {
     body: JSON.stringify({
       model: 'llama-3.3-70b-versatile',
       response_format: { type: 'json_object' },
+      temperature: 0,
       messages: [
         { role: 'system', content: TICKET_EXTRACTION_PROMPT },
         { role: 'user', content: text },
@@ -148,21 +183,32 @@ async function extractTicketFields(text: string): Promise<ExtractedTicket> {
 
 function sanitiseExtracted(raw: Partial<ExtractedTicket>, fallbackDescription?: string): ExtractedTicket {
   const validPriorities: Priority[] = ['low', 'medium', 'high', 'urgent'];
+  // Constrain free-text model output to our exact enums; fall back safely so a
+  // bad/missing value never blocks ticket creation.
+  const category: Category = (CATEGORIES as readonly string[]).includes(raw.category as string) ? (raw.category as Category) : 'General';
+  const operational_impact: OpImpact = (IMPACTS as readonly string[]).includes(raw.operational_impact as string) ? (raw.operational_impact as OpImpact) : 'none';
+  const confidence = typeof raw.confidence === 'number' && raw.confidence >= 0 && raw.confidence <= 1 ? raw.confidence : 0.5;
   return {
-    title:       raw.title ?? 'Maintenance request',
+    title:       (raw.title ?? 'Maintenance request').toString().slice(0, 80),
     description: raw.description ?? fallbackDescription ?? 'No description provided',
     priority:    validPriorities.includes(raw.priority as Priority) ? (raw.priority as Priority) : 'medium',
+    category,
+    operational_impact,
+    confidence,
   };
 }
 
-// AI urgency word → v3 ticket priority (P1–P4) + severity.
+// Operational impact → v3 ticket priority (P1–P4) + severity. Mirrors the
+// health engine's derivation so WhatsApp tickets rank like web-form tickets.
 type V3Priority = 'P1' | 'P2' | 'P3' | 'P4';
-function mapPriority(word: Priority): { priority: V3Priority; severity: 'low' | 'medium' | 'high' | 'critical' } {
-  switch (word) {
-    case 'urgent': return { priority: 'P1', severity: 'critical' };
-    case 'high':   return { priority: 'P2', severity: 'high' };
-    case 'low':    return { priority: 'P4', severity: 'low' };
-    default:       return { priority: 'P3', severity: 'medium' };
+function impactToPriority(impact: OpImpact): { priority: V3Priority; severity: 'low' | 'medium' | 'high' | 'critical' } {
+  switch (impact) {
+    case 'cannot_trade':
+    case 'safety_risk':       return { priority: 'P1', severity: 'critical' };
+    case 'trading_affected':  return { priority: 'P2', severity: 'high' };
+    case 'customer_visible':
+    case 'staff_inconvenience': return { priority: 'P3', severity: 'medium' };
+    default:                  return { priority: 'P4', severity: 'low' }; // cosmetic / none
   }
 }
 const P_EMOJI: Record<V3Priority, string> = { P1: '🔴', P2: '🟠', P3: '🟡', P4: '🟢' };
@@ -194,6 +240,73 @@ async function sendWhatsAppButton(to: string, bodyText: string, buttonLabel: str
       },
     }),
   });
+}
+
+/** Send a WhatsApp interactive message with up to 3 reply buttons. */
+async function sendWhatsAppButtons(to: string, bodyText: string, buttons: { id: string; title: string }[]): Promise<void> {
+  await fetch(`https://graph.facebook.com/v21.0/${WA_PHONE_ID}/messages`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${WA_TOKEN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      messaging_product: 'whatsapp',
+      to,
+      type: 'interactive',
+      interactive: {
+        type: 'button',
+        body: { text: bodyText },
+        action: { buttons: buttons.slice(0, 3).map(b => ({ type: 'reply', reply: { id: b.id, title: b.title } })) },
+      },
+    }),
+  });
+}
+
+const PRIORITY_EMOJI: Record<Priority, string> = { low: '🟢', medium: '🟡', high: '🟠', urgent: '🔴' };
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+interface DraftView { title: string; category: string; operational_impact: string; priority: string; confidence?: number | null }
+
+/** Show the AI draft + Confirm / Edit buttons so the manager can catch mistakes. */
+async function sendDraft(from: string, d: DraftView): Promise<void> {
+  const pr = d.priority as Priority;
+  const lowConfidence = d.confidence != null && d.confidence < CONFIDENCE_THRESHOLD;
+  const body =
+    (lowConfidence ? `⚠️ *I wasn't fully sure about this one — please double-check the details below.*\n\n` : ``) +
+    `📝 *Please check your ticket:*\n\n` +
+    `*Title:* ${d.title}\n` +
+    `*Category:* ${d.category}\n` +
+    `*Impact:* ${OPERATIONAL_IMPACT_LABELS[d.operational_impact] ?? d.operational_impact}\n` +
+    `*Priority:* ${PRIORITY_EMOJI[pr] ?? ''} ${cap(d.priority)}`;
+  await sendWhatsAppButtons(from, body, [
+    { id: 'confirm_ticket', title: '✅ Looks good' },
+    { id: 'edit_ticket',    title: '✏️ Edit' },
+  ]);
+}
+
+async function sendEditInstructions(from: string): Promise<void> {
+  await sendWhatsAppReply(
+    from,
+    `✏️ *Edit a detail* — reply with the field and new value:\n\n` +
+    `• \`title: <new title>\`\n` +
+    `• \`category: <e.g. Plumbing>\`\n` +
+    `• \`impact: <e.g. cannot trade>\`\n` +
+    `• \`priority: <low | medium | high | urgent>\`\n\n` +
+    `Or just send a new voice note / message to redo the whole ticket.`
+  );
+}
+
+/** Extract a draft from a VN or text message (sends a "processing" ack). */
+async function extractFromMessage(from: string, message: WaMessage): Promise<ExtractedTicket | null> {
+  if (message.type === 'audio') {
+    const mediaId = message.audio?.id;
+    if (!mediaId) return null;
+    await sendWhatsAppReply(from, '🎙️ Voice note received! Processing your request, please hold on...');
+    const { arrayBuffer, mimeType } = await downloadMedia(mediaId);
+    return transcribeAndExtract(arrayBuffer, mimeType);
+  }
+  const transcript = (message.text?.body ?? '').trim();
+  if (!transcript) return null;
+  await sendWhatsAppReply(from, '💬 Message received! Processing your request, please hold on...');
+  return extractTicketFields(transcript);
 }
 
 /** Upload image buffer to Supabase Storage, return public URL */
@@ -232,15 +345,16 @@ async function appendSessionPhoto(
 /** Notify the store's regional manager(s) + revalidate (v3). Mirrors /api/tickets. */
 async function notifyRegion(
   adminClient: ReturnType<typeof createAdminClient>,
-  o: { ticketId: string; title: string; priority: string; companyId: string; regionId: string | null; storeName: string }
+  o: { ticketId: string; title: string; priority: string; companyId: string; regionId: string | null; storeName: string; needsReview?: boolean }
 ): Promise<void> {
   if (o.regionId) {
     const { data: rms } = await adminClient.from('regional_users').select('user_id').eq('region_id', o.regionId);
     const ids = (rms ?? []).map((r: { user_id: string }) => r.user_id);
     if (ids.length) {
+      const reviewHint = o.needsReview ? ' ⚠️ Low AI confidence — please review.' : '';
       await adminClient.from('notifications').insert(ids.map(id => ({
         company_id: o.companyId, user_id: id, type: 'new_ticket', title: 'New Ticket in Your Region',
-        message: `${o.storeName} logged a ${o.priority} ticket via WhatsApp: "${o.title}"`, link: '/regional/tickets',
+        message: `${o.storeName} logged a ${o.priority} ticket via WhatsApp: "${o.title}"${reviewHint}`, link: '/regional/tickets',
       })));
       void sendPushToMany(ids, { title: 'New Ticket', body: `${o.storeName}: ${o.title}`, url: '/regional/tickets' });
     }
@@ -296,41 +410,54 @@ async function handleWebhook(payload: WaPayload) {
     }
 
     if (message.type === 'interactive') {
-      if (message.interactive?.button_reply?.id === 'submit_ticket') {
-        await handleSubmitButton(from, normalisedPhone, adminClient);
+      const id = message.interactive?.button_reply?.id;
+      if (id === 'submit_ticket') { await handleSubmitButton(from, normalisedPhone, adminClient); return; }
+      if (id === 'confirm_ticket' || id === 'edit_ticket') {
+        const { data: session } = await adminClient
+          .from('whatsapp_sessions')
+          .select('id, title, description, priority, category, operational_impact, confidence, photo_urls')
+          .eq('phone', normalisedPhone).eq('status', 'awaiting_confirm')
+          .order('created_at', { ascending: false }).limit(1).maybeSingle() as { data: WaSession | null };
+        if (!session) { await sendWhatsAppReply(from, '⚠️ Nothing to confirm. Send a voice note or message to start a ticket.'); return; }
+        if (id === 'confirm_ticket') await confirmDraft(from, session.id, adminClient);
+        else await sendEditInstructions(from);
       }
       return;
     }
 
     if (message.type === 'audio' || message.type === 'text') {
-      // Text "done" while session active = submit
+      // Latest in-flight session (drafting or collecting photos) for this phone.
+      const { data: active } = await adminClient
+        .from('whatsapp_sessions')
+        .select('id, title, description, priority, category, operational_impact, confidence, photo_urls, status')
+        .eq('phone', normalisedPhone)
+        .in('status', ['awaiting_confirm', 'awaiting_photos'])
+        .order('created_at', { ascending: false }).limit(1).maybeSingle() as { data: (WaSession & { status: string }) | null };
+
       if (message.type === 'text') {
-        const body = (message.text?.body ?? '').trim().toLowerCase();
-        if (body === 'done') {
-          await handleSubmitButton(from, normalisedPhone, adminClient);
+        const body  = (message.text?.body ?? '').trim();
+        const lower = body.toLowerCase();
+
+        if (active?.status === 'awaiting_photos') {
+          if (lower === 'done') { await handleSubmitButton(from, normalisedPhone, adminClient); return; }
+          await sendWhatsAppReply(from, `📸 Please send your photos (${active.photo_urls.length}/${MAX_PHOTOS} received), or reply *done* to submit.`);
           return;
         }
-
-        // Active session = remind to send photos
-        const { data: activeSession } = await adminClient
-          .from('whatsapp_sessions')
-          .select('id, photo_urls')
-          .eq('phone', normalisedPhone)
-          .eq('status', 'awaiting_photos')
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single();
-
-        if (activeSession) {
-          const count = (activeSession.photo_urls as string[]).length;
-          await sendWhatsAppReply(
-            from,
-            `📸 Please send your photos (${count}/${MAX_PHOTOS} received).`
-          );
+        if (active?.status === 'awaiting_confirm') {
+          await handleConfirmText(from, active, body, adminClient);
           return;
         }
+        await handleNewTicket(from, normalisedPhone, message, adminClient);
+        return;
       }
 
+      // Audio: a new VN while a draft/photo session is open = redo the draft.
+      if (active?.status === 'awaiting_confirm' || active?.status === 'awaiting_photos') {
+        const extracted = await extractFromMessage(from, message);
+        if (!extracted) return;
+        await applyDraftUpdate(from, active.id, extracted, adminClient);
+        return;
+      }
       await handleNewTicket(from, normalisedPhone, message, adminClient);
       return;
     }
@@ -348,26 +475,11 @@ async function handleNewTicket(
   message: WaMessage,
   adminClient: ReturnType<typeof createAdminClient>
 ) {
-  let extracted: ExtractedTicket;
+  const extracted = await extractFromMessage(from, message);
+  if (!extracted) return;
+  console.log(`[WhatsApp] Extracted:`, extracted);
 
-  if (message.type === 'audio') {
-    const mediaId = message.audio?.id;
-    if (!mediaId) return;
-
-    console.log(`[WhatsApp] Voice note received from ${from}, media: ${mediaId}`);
-    await sendWhatsAppReply(from, '🎙️ Voice note received! Processing your request, please hold on...');
-
-    const { arrayBuffer, mimeType } = await downloadMedia(mediaId);
-    extracted = await transcribeAndExtract(arrayBuffer, mimeType);
-    console.log(`[WhatsApp] Extracted:`, extracted);
-  } else {
-    const transcript = (message.text?.body ?? '').trim();
-    if (!transcript) return;
-    await sendWhatsAppReply(from, '💬 Message received! Processing your request, please hold on...');
-    extracted = await extractTicketFields(transcript);
-  }
-
-  const { title, description, priority } = extracted;
+  const { title, description, priority, category, operational_impact } = extracted;
 
   // Look up sender (v3): user_profiles by phone → must be a store manager linked to a store.
   const { data: senderProfile } = await adminClient
@@ -401,8 +513,11 @@ async function handleNewTicket(
       title,
       description: `${description}\n\n_Submitted via ${source}_`,
       priority,
+      category,
+      operational_impact,
+      confidence:  extracted.confidence,
       photo_urls:  [],
-      status:      'awaiting_photos',
+      status:      'awaiting_confirm',
     })
     .select('id')
     .single();
@@ -413,15 +528,84 @@ async function handleNewTicket(
     return;
   }
 
-  const priorityEmoji: Record<Priority, string> = { low: '🟢', medium: '🟡', high: '🟠', urgent: '🔴' };
+  await sendDraft(from, extracted);
+}
 
-  await sendWhatsAppReply(
-    from,
-    `✅ *Got it!*\n\n` +
-    `*Title:* ${title}\n` +
-    `*Priority:* ${priorityEmoji[priority]} ${priority.charAt(0).toUpperCase() + priority.slice(1)}\n\n` +
-    `📸 Please send at least *${MIN_PHOTOS} photos* of the issue (max ${MAX_PHOTOS}).`
-  );
+// ─── Confirm / edit the AI draft before photos ───────────────────────────────
+
+/** Confirm tapped → move to photo collection. */
+async function confirmDraft(from: string, sessionId: string, adminClient: ReturnType<typeof createAdminClient>): Promise<void> {
+  await adminClient.from('whatsapp_sessions').update({ status: 'awaiting_photos' }).eq('id', sessionId);
+  await sendWhatsAppReply(from, `📸 Great — now send at least *${MIN_PHOTOS} photos* of the issue (max ${MAX_PHOTOS}).`);
+}
+
+/** Replace the session draft from a fresh extraction and re-show it for confirmation. */
+async function applyDraftUpdate(from: string, sessionId: string, extracted: ExtractedTicket, adminClient: ReturnType<typeof createAdminClient>): Promise<void> {
+  await adminClient.from('whatsapp_sessions').update({
+    title:              extracted.title,
+    description:        `${extracted.description}\n\n_Submitted via WhatsApp_`,
+    priority:           extracted.priority,
+    category:           extracted.category,
+    operational_impact: extracted.operational_impact,
+    confidence:         extracted.confidence,
+    status:             'awaiting_confirm',
+  }).eq('id', sessionId);
+  await sendDraft(from, extracted);
+}
+
+const CONFIRM_WORDS = new Set(['yes', 'y', 'ok', 'okay', 'looks good', 'correct', 'confirm', 'done', 'good', '👍']);
+const CANCEL_WORDS  = new Set(['cancel', 'stop', 'no']);
+const FIELD_RE = /^(title|description|category|impact|operational impact|priority)\s*[:=]\s*([\s\S]+)$/i;
+
+/** Handle a text reply while a draft awaits confirmation: confirm, cancel, edit one field, or redo. */
+async function handleConfirmText(from: string, session: WaSession, body: string, adminClient: ReturnType<typeof createAdminClient>): Promise<void> {
+  const lower = body.trim().toLowerCase();
+
+  if (CONFIRM_WORDS.has(lower)) { await confirmDraft(from, session.id, adminClient); return; }
+  if (CANCEL_WORDS.has(lower)) {
+    await adminClient.from('whatsapp_sessions').update({ status: 'cancelled' }).eq('id', session.id);
+    await sendWhatsAppReply(from, '❌ Cancelled. Send a new voice note or message to start again.');
+    return;
+  }
+
+  const m = body.match(FIELD_RE);
+  if (m) {
+    const field = m[1].toLowerCase();
+    const value = m[2].trim();
+    const update: Record<string, string> = {};
+    const view: DraftView = { title: session.title, category: session.category, operational_impact: session.operational_impact, priority: session.priority, confidence: session.confidence };
+
+    if (field === 'title') { update.title = value.slice(0, 80); view.title = update.title; }
+    else if (field === 'description') { update.description = `${value}\n\n_Submitted via WhatsApp_`; }
+    else if (field === 'category') {
+      const v = value.toLowerCase();
+      const match = CATEGORIES.find(c => c.toLowerCase() === v) ?? CATEGORIES.find(c => c.toLowerCase().startsWith(v));
+      if (!match) { await sendWhatsAppReply(from, `⚠️ Unknown category. Options: ${CATEGORIES.join(', ')}`); return; }
+      update.category = match; view.category = match;
+    }
+    else if (field === 'impact' || field === 'operational impact') {
+      const norm = value.toLowerCase().replace(/\s+/g, '_');
+      const match = (IMPACTS as readonly string[]).includes(norm)
+        ? (norm as OpImpact)
+        : (IMPACTS.find(i => OPERATIONAL_IMPACT_LABELS[i].toLowerCase() === value.toLowerCase())
+          ?? IMPACTS.find(i => OPERATIONAL_IMPACT_LABELS[i].toLowerCase().includes(value.toLowerCase())));
+      if (!match) { await sendWhatsAppReply(from, `⚠️ Unknown impact. Options: ${IMPACTS.map(i => OPERATIONAL_IMPACT_LABELS[i]).join(', ')}`); return; }
+      update.operational_impact = match; view.operational_impact = match;
+    }
+    else if (field === 'priority') {
+      const v = value.toLowerCase();
+      if (!['low', 'medium', 'high', 'urgent'].includes(v)) { await sendWhatsAppReply(from, '⚠️ Priority must be low, medium, high or urgent.'); return; }
+      update.priority = v; view.priority = v;
+    }
+    await adminClient.from('whatsapp_sessions').update(update).eq('id', session.id);
+    await sendDraft(from, view);
+    return;
+  }
+
+  // Free text → redo the whole draft from it.
+  await sendWhatsAppReply(from, '💬 Updating your ticket…');
+  const extracted = await extractTicketFields(body);
+  await applyDraftUpdate(from, session.id, extracted, adminClient);
 }
 
 // ─── Handler: incoming photo(s) ──────────────────────────────────────────────
@@ -433,7 +617,7 @@ async function handleIncomingPhoto(
 ) {
   const { data: session } = await adminClient
     .from('whatsapp_sessions')
-    .select('id, title, description, priority, photo_urls')
+    .select('id, title, description, priority, category, operational_impact, confidence, photo_urls')
     .eq('phone', normalisedPhone)
     .eq('status', 'awaiting_photos')
     .order('created_at', { ascending: false })
@@ -441,7 +625,13 @@ async function handleIncomingPhoto(
     .single() as { data: WaSession | null };
 
   if (!session) {
-    await sendWhatsAppReply(from, '⚠️ No active ticket found. Please send a voice note or text to create a ticket first.');
+    const { data: draft } = await adminClient
+      .from('whatsapp_sessions').select('id')
+      .eq('phone', normalisedPhone).eq('status', 'awaiting_confirm')
+      .order('created_at', { ascending: false }).limit(1).maybeSingle();
+    await sendWhatsAppReply(from, draft
+      ? '⚠️ Please confirm the ticket details first (tap *✅ Looks good*) before sending photos.'
+      : '⚠️ No active ticket found. Please send a voice note or text to create a ticket first.');
     return;
   }
 
@@ -493,7 +683,7 @@ async function handleSubmitButton(
 ) {
   const { data: session } = await adminClient
     .from('whatsapp_sessions')
-    .select('id, title, description, priority, photo_urls')
+    .select('id, title, description, priority, category, operational_impact, confidence, photo_urls')
     .eq('phone', normalisedPhone)
     .eq('status', 'awaiting_photos')
     .order('created_at', { ascending: false })
@@ -546,7 +736,8 @@ async function finaliseSession(
     return;
   }
 
-  const { priority, severity } = mapPriority(session.priority as Priority);
+  const { priority, severity } = impactToPriority(session.operational_impact as OpImpact);
+  const needsReview = (session.confidence ?? 1) < CONFIDENCE_THRESHOLD;
 
   // Create the v3 ticket with all photos
   const { data: ticket, error: ticketError } = await adminClient
@@ -560,9 +751,11 @@ async function finaliseSession(
       created_by:  senderProfile.id,
       title:       session.title,
       description: session.description,
+      category:    session.category,
       priority,
       severity,
-      operational_impact: 'none',
+      operational_impact: session.operational_impact,
+      needs_review: needsReview,
       status:      'open',
       photo_urls:  photoUrls,
     })
@@ -579,7 +772,7 @@ async function finaliseSession(
 
   await notifyRegion(adminClient, {
     ticketId: ticket.id, title: session.title, priority, companyId: senderProfile.company_id,
-    regionId: store.region_id, storeName: store.name,
+    regionId: store.region_id, storeName: store.name, needsReview,
   });
 
   await sendWhatsAppReply(
