@@ -23,7 +23,7 @@ interface WaMessage {
   audio?:       { id: string };
   text?:        { body: string };
   image?:       { id: string; mime_type: string };
-  interactive?: { button_reply: { id: string; title: string } };
+  interactive?: { type?: string; button_reply?: { id: string; title: string }; list_reply?: { id: string; title: string } };
 }
 
 interface WaPayload {
@@ -64,6 +64,7 @@ interface WaSession {
   category: string;
   operational_impact: string;
   confidence?: number | null;
+  pending_field?: string | null;
   photo_urls: string[];
 }
 
@@ -286,16 +287,36 @@ async function sendDraft(from: string, d: DraftView): Promise<void> {
   ]);
 }
 
-async function sendEditInstructions(from: string): Promise<void> {
-  await sendWhatsAppReply(
-    from,
-    `✏️ *Edit a detail* — reply with the field and new value:\n\n` +
-    `• \`title: <new title>\`\n` +
-    `• \`category: <e.g. Plumbing>\`\n` +
-    `• \`impact: <e.g. cannot trade>\`\n` +
-    `• \`priority: <low | medium | high | urgent>\`\n\n` +
-    `Or just send a new voice note / message to redo the whole ticket.`
-  );
+/** Interactive list message (tappable menu) — single section, up to 10 rows. */
+async function sendWhatsAppList(to: string, bodyText: string, buttonLabel: string, rows: { id: string; title: string; description?: string }[]): Promise<void> {
+  await fetch(`https://graph.facebook.com/v21.0/${WA_PHONE_ID}/messages`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${WA_TOKEN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      messaging_product: 'whatsapp',
+      to,
+      type: 'interactive',
+      interactive: {
+        type: 'list',
+        body: { text: bodyText },
+        action: {
+          button: buttonLabel.slice(0, 20),
+          sections: [{ rows: rows.slice(0, 10).map(r => ({ id: r.id, title: r.title.slice(0, 24), ...(r.description ? { description: r.description.slice(0, 72) } : {}) })) }],
+        },
+      },
+    }),
+  });
+}
+
+/** Tap-to-edit: pick which field to change. */
+async function sendFieldPicker(from: string): Promise<void> {
+  await sendWhatsAppList(from, 'Which detail would you like to change?', 'Choose a field', [
+    { id: 'edit_field:category',    title: 'Category' },
+    { id: 'edit_field:impact',      title: 'Operational Impact' },
+    { id: 'edit_field:priority',    title: 'Priority' },
+    { id: 'edit_field:title',       title: 'Title' },
+    { id: 'edit_field:description', title: 'Description' },
+  ]);
 }
 
 /** Extract a draft from a VN or text message (sends a "processing" ack). */
@@ -414,18 +435,24 @@ async function handleWebhook(payload: WaPayload) {
     }
 
     if (message.type === 'interactive') {
-      const id = message.interactive?.button_reply?.id;
+      const reply = message.interactive?.button_reply ?? message.interactive?.list_reply;
+      const id = reply?.id ?? '';
+
       if (id === 'submit_ticket') { await handleSubmitButton(from, normalisedPhone, adminClient); return; }
-      if (id === 'confirm_ticket' || id === 'edit_ticket') {
-        const { data: session } = await adminClient
-          .from('whatsapp_sessions')
-          .select('id, title, description, priority, category, operational_impact, confidence, photo_urls')
-          .eq('phone', normalisedPhone).eq('status', 'awaiting_confirm')
-          .order('created_at', { ascending: false }).limit(1).maybeSingle() as { data: WaSession | null };
+      if (id === 'confirm_ticket') {
+        const session = await fetchConfirmSession(normalisedPhone, adminClient);
         if (!session) { await sendWhatsAppReply(from, '⚠️ Nothing to confirm. Send a voice note or message to start a ticket.'); return; }
-        if (id === 'confirm_ticket') await confirmDraft(from, session.id, adminClient);
-        else await sendEditInstructions(from);
+        await confirmDraft(from, session.id, adminClient);
+        return;
       }
+      if (id === 'edit_ticket') {
+        const session = await fetchConfirmSession(normalisedPhone, adminClient);
+        if (!session) { await sendWhatsAppReply(from, '⚠️ Nothing to edit. Send a voice note or message to start a ticket.'); return; }
+        await sendFieldPicker(from);
+        return;
+      }
+      if (id.startsWith('edit_field:')) { await handleEditFieldChoice(from, normalisedPhone, id.slice('edit_field:'.length), adminClient); return; }
+      if (id.startsWith('set:'))        { await handleSetField(from, normalisedPhone, id, adminClient); return; }
       return;
     }
 
@@ -433,7 +460,7 @@ async function handleWebhook(payload: WaPayload) {
       // Latest in-flight session (drafting or collecting photos) for this phone.
       const { data: active } = await adminClient
         .from('whatsapp_sessions')
-        .select('id, title, description, priority, category, operational_impact, confidence, photo_urls, status')
+        .select('id, title, description, priority, category, operational_impact, confidence, pending_field, photo_urls, status')
         .eq('phone', normalisedPhone)
         .in('status', ['awaiting_confirm', 'awaiting_photos'])
         .order('created_at', { ascending: false }).limit(1).maybeSingle() as { data: (WaSession & { status: string }) | null };
@@ -572,6 +599,12 @@ async function handleConfirmText(from: string, session: WaSession, body: string,
     return;
   }
 
+  // Tap-to-edit Title/Description: capture this whole message as that field.
+  if (session.pending_field === 'title' || session.pending_field === 'description') {
+    await applyFieldAndRedraw(from, session, session.pending_field, body, adminClient);
+    return;
+  }
+
   const m = body.match(FIELD_RE);
   if (m) {
     const field = m[1].toLowerCase();
@@ -610,6 +643,61 @@ async function handleConfirmText(from: string, session: WaSession, body: string,
   await sendWhatsAppReply(from, '💬 Updating your ticket…');
   const extracted = await extractTicketFields(body);
   await applyDraftUpdate(from, session.id, extracted, adminClient);
+}
+
+/** Latest draft (awaiting_confirm) for this phone. */
+async function fetchConfirmSession(phone: string, adminClient: ReturnType<typeof createAdminClient>): Promise<WaSession | null> {
+  const { data } = await adminClient
+    .from('whatsapp_sessions')
+    .select('id, title, description, priority, category, operational_impact, confidence, pending_field, photo_urls')
+    .eq('phone', phone).eq('status', 'awaiting_confirm')
+    .order('created_at', { ascending: false }).limit(1).maybeSingle();
+  return (data as WaSession | null) ?? null;
+}
+
+/** User picked which field to edit from the list. */
+async function handleEditFieldChoice(from: string, phone: string, field: string, adminClient: ReturnType<typeof createAdminClient>): Promise<void> {
+  if (field === 'category') {
+    await sendWhatsAppList(from, 'Pick the correct category:', 'Categories', CATEGORIES.map(c => ({ id: `set:category:${c}`, title: c })));
+    return;
+  }
+  if (field === 'impact') {
+    await sendWhatsAppList(from, 'Pick the operational impact:', 'Impact options', IMPACTS.map(i => ({ id: `set:impact:${i}`, title: OPERATIONAL_IMPACT_LABELS[i] })));
+    return;
+  }
+  if (field === 'priority') {
+    await sendWhatsAppList(from, 'Pick the priority:', 'Priorities', (['low', 'medium', 'high', 'urgent'] as Priority[]).map(p => ({ id: `set:priority:${p}`, title: `${PRIORITY_EMOJI[p]} ${cap(p)}` })));
+    return;
+  }
+  // title / description → capture the next text message
+  const session = await fetchConfirmSession(phone, adminClient);
+  if (!session) { await sendWhatsAppReply(from, '⚠️ Nothing to edit. Send a voice note or message to start a ticket.'); return; }
+  await adminClient.from('whatsapp_sessions').update({ pending_field: field }).eq('id', session.id);
+  await sendWhatsAppReply(from, `✏️ Send the new *${field}* as a message.`);
+}
+
+/** User tapped a value row: set:<field>:<value>. */
+async function handleSetField(from: string, phone: string, id: string, adminClient: ReturnType<typeof createAdminClient>): Promise<void> {
+  const [, field, ...rest] = id.split(':');
+  const value = rest.join(':');
+  const session = await fetchConfirmSession(phone, adminClient);
+  if (!session) { await sendWhatsAppReply(from, '⚠️ Nothing to edit. Send a voice note or message to start a ticket.'); return; }
+  await applyFieldAndRedraw(from, session, field, value, adminClient);
+}
+
+/** Apply one field edit, clear any pending state, and re-show the draft. */
+async function applyFieldAndRedraw(from: string, session: WaSession, field: string, value: string, adminClient: ReturnType<typeof createAdminClient>): Promise<void> {
+  const update: Record<string, string | null> = { pending_field: null };
+  const view: DraftView = { title: session.title, description: cleanDescription(session.description), category: session.category, operational_impact: session.operational_impact, priority: session.priority, confidence: session.confidence };
+  switch (field) {
+    case 'title':       update.title = value.slice(0, 80); view.title = update.title; break;
+    case 'description': update.description = `${value}\n\n_Submitted via WhatsApp_`; view.description = value; break;
+    case 'category':    update.category = value; view.category = value; break;
+    case 'impact':      update.operational_impact = value; view.operational_impact = value; break;
+    case 'priority':    update.priority = value; view.priority = value; break;
+  }
+  await adminClient.from('whatsapp_sessions').update(update).eq('id', session.id);
+  await sendDraft(from, view);
 }
 
 // ─── Handler: incoming photo(s) ──────────────────────────────────────────────
