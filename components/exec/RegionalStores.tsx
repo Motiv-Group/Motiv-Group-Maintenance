@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { Store, Plus } from 'lucide-react'
 import type { StoreCard } from '@/lib/health/data'
 import { formatCurrency } from '@/lib/utils'
-import { Card, SectionCard, Pill, Donut, BreakdownList, STATUS_TEXT } from '@/components/exec/ui'
+import { SectionCard, Pill, Donut, BreakdownList, STATUS_TEXT } from '@/components/exec/ui'
 import { Drawer, DrawerHeader, PrimaryButton } from '@/components/exec/Drawer'
 
 const fmtK = (n: number) => n ? (n >= 1000 ? `R ${(n / 1000).toFixed(0)}K` : formatCurrency(n)) : 'R 0'
@@ -25,8 +25,7 @@ export function RegionalStores({ stores }: { stores: StoreCard[] }) {
         </Link>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-5 items-start">
-        <SectionCard title="Store Ranking — highest attention first">
+      <SectionCard title="Store Ranking — highest attention first">
           {/* Desktop / tablet — full table */}
           <div className="hidden md:block overflow-x-auto -mx-1">
             <table className="w-full text-sm min-w-[760px]">
@@ -75,9 +74,7 @@ export function RegionalStores({ stores }: { stores: StoreCard[] }) {
             ))}
             {!stores.length && <li className="py-6 text-center text-[var(--text-faint)] text-sm">No stores in your region.</li>}
           </ul>
-        </SectionCard>
-        <div className="hidden xl:block sticky top-20"><Card className="p-5">{selected ? <Detail s={selected} /> : <p className="text-sm text-[var(--text-faint)]">Select a store.</p>}</Card></div>
-      </div>
+      </SectionCard>
 
       <Drawer open={open} onClose={() => setOpen(false)}>{selected && <Detail s={selected} onClose={() => setOpen(false)} />}</Drawer>
     </div>

@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'Motiv',
   webDir: 'out',
   server: {
-    url: 'https://maintenance-app-mv3k.vercel.app',
+    url: 'https://motivgroup.co.za',
     cleartext: false,
   },
   android: {

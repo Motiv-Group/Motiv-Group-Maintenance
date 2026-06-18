@@ -34,7 +34,7 @@
   }
   html.dark {
     --app-bg:     #0a0e17;
-    --surface:    #121826;
+    --surface:    #1e293b;
     --surface-2:  #0e1422;
     --nav-bg:     #0c1120;
     --border:     rgba(255, 255, 255, 0.07);
@@ -49,6 +49,18 @@
 @layer utilities {
   .safe-top    { padding-top: env(safe-area-inset-top); }
   .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+}
+
+/* ── Native <select> dark-mode popup fix ──
+   Option popups composite their background from the control's
+   background-color. The dark --input-bg is translucent (rgba black), so the
+   popup renders light grey with our light text on top = unreadable. Force an
+   opaque, readable background on selects + their options in dark mode.
+   Unlayered so it overrides the Tailwind `bg-[var(--input-bg)]` utility. */
+html.dark select,
+html.dark select option {
+  background-color: #161d2e;
+  color: #f8fafc;
 }
 
 /* ── Report (print) layout ── */

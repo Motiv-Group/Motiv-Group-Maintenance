@@ -6,11 +6,21 @@
  */
 export function normalisePhone(raw: string | null | undefined): string | null {
   if (!raw) return null
-  const digits = raw.replace(/\D/g, '')
+  let digits = raw.replace(/\D/g, '')
   if (!digits) return null
+  if (digits.startsWith('0027')) digits = digits.slice(2) // 0027… → 27…
+
+  // Strip the SA country code then the national trunk 0, so all of
+  // "0761936165", "270761936165" and "+270761936165" collapse to the same
+  // 9-digit subscriber number.
+  let local = digits
+  if (local.startsWith('27')) local = local.slice(2)
+  if (local.startsWith('0'))  local = local.slice(1)
+  if (local.length === 9) return `+27${local}`
+
+  // Fallbacks for anything that isn't a standard SA mobile.
   if (digits.startsWith('0') && digits.length === 10) return `+27${digits.slice(1)}`
   if (digits.startsWith('27') && digits.length === 11) return `+${digits}`
-  if (raw.trim().startsWith('+')) return `+${digits}`
   return `+${digits}`
 }
 

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { UserPlus, CheckCircle } from 'lucide-react'
 import { Card } from '@/components/exec/ui'
+import { normalisePhone } from '@/lib/csv'
 
 /** RM-only: create a store + its store-manager login in one step.
  *  Posts the `create_store_manager` action to /api/provision. */
@@ -14,6 +15,8 @@ export function AddStoreManagerForm() {
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) => setVals(v => ({ ...v, [k]: e.target.value }))
+  // Reformat the phone to +27 E.164 when the field loses focus.
+  const formatPhone = () => { const n = normalisePhone(vals.phone); if (n) setVals(v => ({ ...v, phone: n })) }
   const input = 'w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--border)] text-[var(--text)] placeholder-[var(--text-faint)] focus:outline-none focus:ring-2 focus:ring-[#C6A35D]/50'
 
   async function submit(e: React.FormEvent) {
@@ -44,7 +47,7 @@ export function AddStoreManagerForm() {
           <Field label="Branch code"><input className={`${input} uppercase font-mono`} value={vals.branch_code ?? ''} onChange={e => setVals(v => ({ ...v, branch_code: e.target.value.toUpperCase() }))} placeholder="e.g. CPT001" required /></Field>
           <Field label="Store / branch name"><input className={input} value={vals.store_name ?? ''} onChange={set('store_name')} placeholder="e.g. Canal Walk" required /></Field>
         </div>
-        <Field label="Manager phone (optional)"><input className={input} value={vals.phone ?? ''} onChange={set('phone')} placeholder="+27 ..." /></Field>
+        <Field label="Manager phone"><input className={input} type="tel" value={vals.phone ?? ''} onChange={set('phone')} onBlur={formatPhone} placeholder="e.g. 0761936165" required /></Field>
 
         <button disabled={busy} className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-500 transition disabled:opacity-60">
           <UserPlus size={16} /> {busy ? 'Creating…' : 'Create store manager account'}

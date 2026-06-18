@@ -3,21 +3,22 @@
 import Link from 'next/link'
 import { Building2, ClipboardList, ShieldAlert, Truck, Lock, ClipboardCheck, AlertTriangle, ListTodo, Sparkles, Calendar } from 'lucide-react'
 import type { RegionalDashboardData } from '@/lib/health/data'
-import { SectionCard, KpiRow, Pill, STATUS_TEXT, type Kpi } from '@/components/exec/ui'
+import { SectionCard, KpiCard, Pill, STATUS_TEXT, type Kpi } from '@/components/exec/ui'
 import { formatDate } from '@/lib/utils'
 
 export function RegionalOverview({ data, name }: { data: RegionalDashboardData; name: string | null }) {
   const p = data.portfolio
   const greeting = (() => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening' })()
 
+  // Every KPI carries a hint so all cards share the same height → uniform size.
   const kpis: Kpi[] = [
     { label: 'Active Stores', value: p.activeStores, hint: `avg ${p.averageStoreHealth}%`, icon: <Building2 size={13} /> },
-    { label: 'Stores Need Attention', value: data.attentionStores.length, icon: <ShieldAlert size={13} />, tone: data.attentionStores.length ? 'warn' : 'good' },
+    { label: 'Stores Need Attention', value: data.attentionStores.length, hint: 'need action', icon: <ShieldAlert size={13} />, tone: data.attentionStores.length ? 'warn' : 'good' },
     { label: 'Open Tickets', value: p.openTickets, hint: `${p.overdueTickets} overdue`, icon: <ClipboardList size={13} /> },
-    { label: 'Pending Signoffs', value: data.signoffsPending, icon: <ClipboardCheck size={13} />, tone: data.signoffsPending ? 'warn' : 'good' },
-    { label: 'Open Snags', value: data.snagsOpen, icon: <AlertTriangle size={13} />, tone: data.snagsOpen ? 'warn' : 'good' },
-    { label: 'Internal Breaches', value: p.internalSlaBreaches, icon: <Lock size={13} />, tone: p.internalSlaBreaches ? 'warn' : 'good' },
-    { label: 'Supplier Breaches', value: p.supplierSlaBreaches, icon: <Truck size={13} />, tone: p.supplierSlaBreaches ? 'warn' : 'good' },
+    { label: 'Pending Signoffs', value: data.signoffsPending, hint: 'awaiting you', icon: <ClipboardCheck size={13} />, tone: data.signoffsPending ? 'warn' : 'good' },
+    { label: 'Open Snags', value: data.snagsOpen, hint: 'to resolve', icon: <AlertTriangle size={13} />, tone: data.snagsOpen ? 'warn' : 'good' },
+    { label: 'Internal Breaches', value: p.internalSlaBreaches, hint: 'internal SLA', icon: <Lock size={13} />, tone: p.internalSlaBreaches ? 'warn' : 'good' },
+    { label: 'Supplier Breaches', value: p.supplierSlaBreaches, hint: 'supplier SLA', icon: <Truck size={13} />, tone: p.supplierSlaBreaches ? 'warn' : 'good' },
   ]
 
   const focus = buildFocus(data)
@@ -36,7 +37,9 @@ export function RegionalOverview({ data, name }: { data: RegionalDashboardData; 
         </span>
       </div>
 
-      <KpiRow kpis={kpis} />
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+        {kpis.map((k, i) => <KpiCard key={i} kpi={k} />)}
+      </div>
 
       <SectionCard title="Recommended Focus Today" icon={<ListTodo size={15} className="text-[#C6A35D]" />}>
         {focus.length ? <ul className="space-y-2">{focus.map((f, i) => <li key={i} className="flex items-start gap-2 text-sm text-slate-200">{f.icon}<span>{f.text}</span></li>)}</ul>

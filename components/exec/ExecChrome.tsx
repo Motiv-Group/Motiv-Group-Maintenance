@@ -52,15 +52,14 @@ export function ExecChrome({
   // Nav bars are always deep navy (brand-600) in both light and dark mode,
   // matching the Settings Navbar — so icons/labels use light tones on navy.
   const iconBtn = 'p-2 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 transition-colors'
-  // Store manager uses a narrow centred column — constrain header + main + nav
-  // to the same width so the logo lines up with the content cards.
-  const wrap = variant === 'store' ? 'max-w-3xl' : 'max-w-[1500px]'
+  // All roles share the same content width so the chrome is consistent.
+  const wrap = 'max-w-[1500px]'
 
   return (
     <div className="min-h-screen bg-[var(--app-bg)] text-[var(--text)] flex flex-col">
       <header className="sticky top-0 z-20 bg-brand-600 border-b border-brand-700">
-        <div className={`${wrap} mx-auto px-4 h-14 flex items-center justify-between`}>
-          <Link href={home}><MotivLogo height={30} /></Link>
+        <div className={`${wrap} mx-auto px-4 h-16 flex items-center justify-between`}>
+          <Link href={home}><MotivLogo height={36} /></Link>
           <div className="flex items-center gap-1">
             {reports && <Link href={`${base}/reports`} className={iconBtn} title="Reports"><FileBarChart size={18} /></Link>}
             <Link href={`${base}/notifications`} className={`relative ${iconBtn}`} title="Notifications">
@@ -84,17 +83,17 @@ export function ExecChrome({
 
       {/* Swipe left/right on mobile moves between this section's tabs. */}
       <SwipeNav links={tabs}>
-        <main className={`flex-1 ${wrap} w-full mx-auto px-4 py-6 pb-28`}>{children}</main>
+        <main className={`flex-1 ${wrap} w-full mx-auto px-4 py-6 pb-32`}>{children}</main>
       </SwipeNav>
 
       <nav className="fixed bottom-0 inset-x-0 z-20 bg-brand-600 border-t border-brand-700">
-        <div className={`${wrap} mx-auto flex items-stretch h-16 justify-around`}>
+        <div className={`${wrap} mx-auto flex items-stretch h-20 justify-around`}>
           {tabs.map(({ href, label, icon: Icon }) => {
             const active = pathname === href || (href !== home && pathname.startsWith(href))
             return (
               <Link key={href} href={href}
                 className={`flex flex-col items-center justify-center gap-1 flex-1 text-[11px] font-medium transition-colors ${active ? 'text-[#C6A35D]' : 'text-gray-400 hover:text-gray-200'}`}>
-                <Icon size={20} strokeWidth={active ? 2.4 : 1.8} />
+                <Icon size={22} strokeWidth={active ? 2.4 : 1.8} />
                 {label}
               </Link>
             )
