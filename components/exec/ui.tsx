@@ -29,7 +29,7 @@ export function Pill({ status, label }: { status: HealthStatus; label?: string }
 }
 
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <div className={`rounded-2xl bg-[var(--surface)] ring-1 ring-[var(--border)] ${className}`}>{children}</div>
+  return <div className={`rounded-2xl bg-[var(--surface)] ring-1 ring-black/10 dark:ring-white/10 shadow-sm dark:shadow-md dark:shadow-black/20 ${className}`}>{children}</div>
 }
 
 export function SectionCard({ title, icon, action, children }: { title: string; icon?: ReactNode; action?: ReactNode; children: ReactNode }) {

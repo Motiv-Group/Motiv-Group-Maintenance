@@ -122,7 +122,7 @@ export default function LogTicketPage() {
           </Field>
 
           {error && <div className="text-sm text-red-500 bg-red-500/10 rounded-lg px-3 py-2">{error}</div>}
-          <button type="submit" disabled={loading} className="w-full py-3 rounded-xl bg-brand-700 hover:bg-brand-600 text-white font-semibold border border-brand-600 transition disabled:opacity-60">{loading ? 'Logging…' : 'Submit Ticket'}</button>
+          <button type="submit" disabled={loading} className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition disabled:opacity-60">{loading ? 'Logging…' : 'Submit Ticket'}</button>
         </form>
       </Card>
 

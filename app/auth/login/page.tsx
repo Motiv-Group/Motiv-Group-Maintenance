@@ -89,15 +89,15 @@ export default function LoginPage() {
   return (
     <div className="dark">
       <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center px-4">
-        <div className="w-full max-w-sm">
+        <div className="w-full max-w-sm sm:max-w-md">
 
           {/* Logo — larger and centred */}
           <div className="flex items-center justify-center mb-10">
-            <MotivLogo height={100} />
+            <MotivLogo height={120} />
           </div>
 
-          <div className="bg-gray-900 rounded-2xl shadow-xl border border-gray-700 p-6 sm:p-8">
-            <h1 className="text-xl font-semibold text-white mb-1">Welcome back</h1>
+          <div className="bg-gray-900 rounded-2xl shadow-xl border border-gray-700 p-6 sm:p-10">
+            <h1 className="text-xl sm:text-2xl font-semibold text-white mb-1">Welcome back</h1>
             <p className="text-sm text-gray-400 mb-6">Log in to your account.</p>
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
