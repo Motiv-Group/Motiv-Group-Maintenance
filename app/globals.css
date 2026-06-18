@@ -63,6 +63,25 @@ html.dark select option {
   color: #f8fafc;
 }
 
+/* ── First-load splash overlay ──
+   SSR-rendered so it paints before hydration; fades out on its own via a CSS
+   animation (no JS dependency). pointer-events:none so it never traps clicks. */
+#motiv-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  background: #0a0e17 url('/splash/motiv-splash.png') center / contain no-repeat;
+  pointer-events: none;
+  animation: motivSplashOut 2.1s ease-in forwards;
+}
+@keyframes motivSplashOut {
+  0%, 58% { opacity: 1; }
+  100%    { opacity: 0; visibility: hidden; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #motiv-splash { animation-duration: 1s; }
+}
+
 /* ── Report (print) layout ── */
 .report-cover {
   text-align: center;

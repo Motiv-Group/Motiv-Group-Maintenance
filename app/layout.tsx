@@ -33,6 +33,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="min-h-screen antialiased">
+        {/* First-load splash — paints instantly (SSR), fades out via CSS. */}
+        <div id="motiv-splash" aria-hidden="true" />
         <ThemeProvider>
           <ServiceWorkerSetup />
           {children}
