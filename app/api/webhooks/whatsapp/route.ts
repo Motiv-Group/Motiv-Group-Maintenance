@@ -263,7 +263,10 @@ async function sendWhatsAppButtons(to: string, bodyText: string, buttons: { id: 
 const PRIORITY_EMOJI: Record<Priority, string> = { low: '🟢', medium: '🟡', high: '🟠', urgent: '🔴' };
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-interface DraftView { title: string; category: string; operational_impact: string; priority: string; confidence?: number | null }
+interface DraftView { title: string; description: string; category: string; operational_impact: string; priority: string; confidence?: number | null }
+
+/** Strip the trailing "_Submitted via …_" note from a stored description. */
+const cleanDescription = (s: string) => s.replace(/\n\n_Submitted via[\s\S]*$/, '').trim();
 
 /** Show the AI draft + Confirm / Edit buttons so the manager can catch mistakes. */
 async function sendDraft(from: string, d: DraftView): Promise<void> {
@@ -273,6 +276,7 @@ async function sendDraft(from: string, d: DraftView): Promise<void> {
     (lowConfidence ? `⚠️ *I wasn't fully sure about this one — please double-check the details below.*\n\n` : ``) +
     `📝 *Please check your ticket:*\n\n` +
     `*Title:* ${d.title}\n` +
+    `*Description:* ${d.description}\n` +
     `*Category:* ${d.category}\n` +
     `*Impact:* ${OPERATIONAL_IMPACT_LABELS[d.operational_impact] ?? d.operational_impact}\n` +
     `*Priority:* ${PRIORITY_EMOJI[pr] ?? ''} ${cap(d.priority)}`;
@@ -573,10 +577,10 @@ async function handleConfirmText(from: string, session: WaSession, body: string,
     const field = m[1].toLowerCase();
     const value = m[2].trim();
     const update: Record<string, string> = {};
-    const view: DraftView = { title: session.title, category: session.category, operational_impact: session.operational_impact, priority: session.priority, confidence: session.confidence };
+    const view: DraftView = { title: session.title, description: cleanDescription(session.description), category: session.category, operational_impact: session.operational_impact, priority: session.priority, confidence: session.confidence };
 
     if (field === 'title') { update.title = value.slice(0, 80); view.title = update.title; }
-    else if (field === 'description') { update.description = `${value}\n\n_Submitted via WhatsApp_`; }
+    else if (field === 'description') { update.description = `${value}\n\n_Submitted via WhatsApp_`; view.description = value; }
     else if (field === 'category') {
       const v = value.toLowerCase();
       const match = CATEGORIES.find(c => c.toLowerCase() === v) ?? CATEGORIES.find(c => c.toLowerCase().startsWith(v));

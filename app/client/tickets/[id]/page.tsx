@@ -70,11 +70,9 @@ export default async function StoreTicketDetailPage({ params }: { params: { id: 
         {Array.isArray(t.photo_urls) && t.photo_urls.length > 0 && (
           <div>
             <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Photos</div>
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
               {t.photo_urls.map((u: string, i: number) => (
-                <a key={i} href={u} target="_blank" rel="noopener noreferrer" className="block aspect-square rounded-lg overflow-hidden ring-1 ring-[var(--border)] hover:ring-[#C6A35D]/50 transition">
-                  <img src={u} alt={`Photo ${i + 1}`} className="w-full h-full object-cover" />
-                </a>
+                <a key={i} href={u} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C6A35D] underline hover:text-amber-500">Photo {i + 1}</a>
               ))}
             </div>
           </div>

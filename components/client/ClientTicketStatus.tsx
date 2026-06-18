@@ -35,10 +35,13 @@ export function ClientTicketStatus({ status }: { status: string }) {
   const active = !done && !closed   // everything in-flight spins, incl. "awaiting review"
   const Icon = done ? CheckCircle2 : closed ? XCircle : Loader2
   const color = done ? 'text-emerald-400' : closed ? 'text-[var(--text-faint)]' : 'text-[#C6A35D]'
+  // Logged / awaiting-review states spin blue (matches the "open" tone);
+  // active work stays gold.
+  const spinColor = m.mode === 'wait' ? 'text-blue-500' : 'text-[#C6A35D]'
   return (
     <div className="flex items-center gap-3">
       {active
-        ? <span className="relative shrink-0 w-6 h-6"><Loader2 size={24} className="text-[#C6A35D] animate-spin" /></span>
+        ? <span className="relative shrink-0 w-6 h-6"><Loader2 size={24} className={`${spinColor} animate-spin`} /></span>
         : <Icon size={22} className={`${color} shrink-0`} />}
       <div>
         <p className="text-sm font-semibold text-[var(--text)]">{m.msg}</p>
