@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { PlusCircle, Search, Ticket } from 'lucide-react'
 import type { StoreManagerTicket } from '@/lib/health/data'
 import { Card } from '@/components/exec/ui'
-import { formatDateTime } from '@/lib/utils'
+import { formatDate, formatDateTime, OPERATIONAL_IMPACT_LABELS, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
 
 type Filter = 'all' | 'open' | 'in_progress' | 'completed'
 
@@ -23,7 +23,7 @@ const PILLS: { key: Filter; label: string; active: string; inactive: string }[] 
   { key: 'completed',   label: 'Completed',   active: 'bg-emerald-500 text-white border-emerald-500',        inactive: 'text-emerald-600 dark:text-emerald-400 border-emerald-500/40 hover:border-emerald-400' },
 ]
 
-export function StoreTicketsList({ tickets, storeName }: { tickets: StoreManagerTicket[]; storeName: string }) {
+export function StoreTicketsList({ tickets }: { tickets: StoreManagerTicket[] }) {
   const [filter, setFilter] = useState<Filter>('all')
   const [q, setQ] = useState('')
 
@@ -34,12 +34,33 @@ export function StoreTicketsList({ tickets, storeName }: { tickets: StoreManager
   }, [tickets])
   const total = tickets.length || 1
 
+  // Build one lowercase haystack per ticket covering every field a manager
+  // might type: title, description, category, status (friendly + raw),
+  // priority (label + P1–P4 alias), operational impact, and the date.
+  const haystacks = useMemo(() => tickets.map(t => ({
+    t,
+    hay: [
+      t.title,
+      t.description ?? '',
+      t.category ?? 'General',
+      WORD[t.status] ?? '', t.status,
+      t.priority, PRIORITY_LEVEL_LABELS[t.priority] ?? '',
+      t.operationalImpact ? (OPERATIONAL_IMPACT_LABELS[t.operationalImpact] ?? t.operationalImpact) : '',
+      t.operationalImpact ?? '',
+      formatDate(t.createdAt), formatDateTime(t.createdAt),
+      t.supplierAssigned ? 'supplier assigned' : '',
+    ].join(' · ').toLowerCase(),
+  })), [tickets])
+
+  // Multi-token AND search: split on spaces and "+", every token must match.
   const shown = useMemo(() => {
-    const needle = q.trim().toLowerCase()
-    return tickets.filter(t =>
-      (filter === 'all' || t.status === filter) &&
-      (!needle || t.title.toLowerCase().includes(needle) || (t.category ?? '').toLowerCase().includes(needle)))
-  }, [tickets, filter, q])
+    const tokens = q.toLowerCase().split(/[\s+]+/).map(s => s.trim()).filter(Boolean)
+    return haystacks
+      .filter(({ t, hay }) =>
+        (filter === 'all' || t.status === filter) &&
+        (tokens.length === 0 || tokens.every(tok => hay.includes(tok))))
+      .map(x => x.t)
+  }, [haystacks, filter, q])
 
   const pct = (n: number) => Math.round((n / total) * 100)
 
@@ -47,8 +68,7 @@ export function StoreTicketsList({ tickets, storeName }: { tickets: StoreManager
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><Ticket className="text-[#C6A35D]" size={22} /> My Tickets</h1>
-          <p className="text-sm text-[var(--text-muted)] mt-0.5">{tickets.length} ticket(s) · {storeName}</p>
+          <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><Ticket className="text-blue-600 dark:text-blue-400" size={22} /> Tickets</h1>
         </div>
         <Link href="/client/tickets/new" className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-500 transition shrink-0"><PlusCircle size={16} /> Log a Ticket</Link>
       </div>
@@ -60,7 +80,7 @@ export function StoreTicketsList({ tickets, storeName }: { tickets: StoreManager
           {counts.in_progress > 0 && <div className="h-full bg-[#C6A35D]" style={{ width: `${pct(counts.in_progress)}%` }} />}
           {counts.completed > 0 && <div className="h-full bg-emerald-500" style={{ width: `${pct(counts.completed)}%` }} />}
         </div>
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px]">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] sm:flex sm:flex-wrap">
           <span className="flex items-center gap-1.5 text-[var(--text-muted)]"><i className="w-2 h-2 rounded-full bg-blue-500" />Open {counts.open} ({pct(counts.open)}%)</span>
           <span className="flex items-center gap-1.5 text-[var(--text-muted)]"><i className="w-2 h-2 rounded-full bg-[#C6A35D]" />In Progress {counts.in_progress} ({pct(counts.in_progress)}%)</span>
           <span className="flex items-center gap-1.5 text-[var(--text-muted)]"><i className="w-2 h-2 rounded-full bg-emerald-500" />Completed {counts.completed} ({pct(counts.completed)}%)</span>
@@ -70,7 +90,7 @@ export function StoreTicketsList({ tickets, storeName }: { tickets: StoreManager
       {/* Search */}
       <div className="relative">
         <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
-        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search tickets…"
+        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search title, status, priority, date… (e.g. General + open)"
           className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)] focus:ring-[#C6A35D]/40 outline-none" />
       </div>
 

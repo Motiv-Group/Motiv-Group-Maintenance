@@ -1,12 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { Store } from 'lucide-react'
+import Link from 'next/link'
+import { Store, Plus } from 'lucide-react'
 import type { StoreCard } from '@/lib/health/data'
 import { formatCurrency } from '@/lib/utils'
 import { Card, SectionCard, Pill, Donut, BreakdownList, STATUS_TEXT } from '@/components/exec/ui'
 import { Drawer, DrawerHeader, PrimaryButton } from '@/components/exec/Drawer'
-import { ProvisionPanel } from '@/components/exec/ProvisionPanel'
 
 const fmtK = (n: number) => n ? (n >= 1000 ? `R ${(n / 1000).toFixed(0)}K` : formatCurrency(n)) : 'R 0'
 
@@ -18,14 +18,17 @@ export function RegionalStores({ stores }: { stores: StoreCard[] }) {
 
   return (
     <div className="space-y-5">
-      <div><h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><Store className="text-[#C6A35D]" size={22} /> Stores</h1>
-        <p className="text-sm text-[var(--text-muted)] mt-0.5">Stores in your region — health, blockers and required action.</p></div>
-
-      <ProvisionPanel mode="rm-stores" stores={stores.map(s => ({ id: s.storeId, name: s.storeName }))} />
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><Store className="text-indigo-600 dark:text-indigo-400" size={22} /> Stores</h1>
+        <Link href="/regional/stores/add" className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-500 transition shrink-0">
+          <Plus size={16} /> Add Stores
+        </Link>
+      </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-5 items-start">
         <SectionCard title="Store Ranking — highest attention first">
-          <div className="overflow-x-auto -mx-1">
+          {/* Desktop / tablet — full table */}
+          <div className="hidden md:block overflow-x-auto -mx-1">
             <table className="w-full text-sm min-w-[760px]">
               <thead><tr className="text-left text-[11px] text-[var(--text-faint)] border-b border-[var(--border)]">
                 <th className="py-2 px-2">#</th><th className="px-2">Store</th><th className="px-2">Health</th><th className="px-2">Status</th>
@@ -45,6 +48,33 @@ export function RegionalStores({ stores }: { stores: StoreCard[] }) {
               </tbody>
             </table>
           </div>
+
+          {/* Phone — stacked cards, tap to open detail (no horizontal scroll) */}
+          <ul className="md:hidden space-y-2">
+            {ranked.map((s, i) => (
+              <li key={s.storeId}>
+                <button onClick={() => { setSelId(s.storeId); setOpen(true) }} className="w-full text-left rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3 hover:bg-[var(--hover)] transition">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-[var(--text)] truncate"><span className="text-[var(--text-faint)]">#{i + 1}</span> {s.storeName}</p>
+                      <p className="text-[11px] text-[var(--text-faint)] truncate mt-0.5">{s.mainIssue}</p>
+                    </div>
+                    <span className="flex flex-col items-end gap-1 shrink-0">
+                      <span className={`text-sm font-semibold ${STATUS_TEXT[s.finalStatus]}`}>{s.finalHealthScore}%</span>
+                      <Pill status={s.finalStatus} />
+                    </span>
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-[var(--text-muted)]">
+                    <span>Open: <span className="text-[var(--text)]">{s.openTickets}</span></span>
+                    <span>Overdue: <span className="text-red-500">{s.overdueTickets}</span></span>
+                    <span>Approvals: <span className="text-[var(--text)]">{s.pendingDecisions}</span></span>
+                    <span>Exposure: <span className="text-[var(--text)]">{fmtK(s.costExposure)}</span></span>
+                  </div>
+                </button>
+              </li>
+            ))}
+            {!stores.length && <li className="py-6 text-center text-[var(--text-faint)] text-sm">No stores in your region.</li>}
+          </ul>
         </SectionCard>
         <div className="hidden xl:block sticky top-20"><Card className="p-5">{selected ? <Detail s={selected} /> : <p className="text-sm text-[var(--text-faint)]">Select a store.</p>}</Card></div>
       </div>

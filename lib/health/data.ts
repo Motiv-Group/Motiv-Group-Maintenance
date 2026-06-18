@@ -409,7 +409,7 @@ function clientVisible(status: string): ClientStatus | null {
   if (status === 'open') return 'open'
   return 'in_progress'
 }
-export interface StoreManagerTicket { id: string; title: string; category: string | null; status: ClientStatus; createdAt: string; supplierAssigned: boolean }
+export interface StoreManagerTicket { id: string; title: string; description: string | null; category: string | null; status: ClientStatus; priority: Priority; operationalImpact: string | null; createdAt: string; supplierAssigned: boolean }
 export interface StoreManagerData {
   storeName: string
   company: string
@@ -441,7 +441,7 @@ export async function assembleStoreManagerDashboard(companyId: string, storeIds:
     const v = clientVisible(t.status)
     if (!v) continue
     if (v === 'open') open++; else if (v === 'in_progress') inProgress++; else completed++
-    visible.push({ id: t.id, title: t.title ?? 'Untitled', category: t.category ?? null, status: v, createdAt: t.created_at, supplierAssigned: !!t.supplier_id })
+    visible.push({ id: t.id, title: t.title ?? 'Untitled', description: (t as any).description ?? null, category: t.category ?? null, status: v, priority: t.priority, operationalImpact: t.operational_impact ?? null, createdAt: t.created_at, supplierAssigned: !!t.supplier_id })
   }
   visible.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
   return {

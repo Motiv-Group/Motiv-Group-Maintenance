@@ -7,5 +7,5 @@ import { StoreTicketsList } from '@/components/client/StoreTicketsList'
 export default async function StoreTicketsPage() {
   const { companyId, storeIds } = await requireStoreManagerV3()
   const d = await assembleStoreManagerDashboard(companyId, storeIds)
-  return <StoreTicketsList tickets={d.tickets} storeName={d.storeName} />
+  return <StoreTicketsList tickets={d.tickets} />
 }

@@ -84,6 +84,26 @@ export const QUOTE_STATUS_LABELS: Record<QuoteStatus, string> = {
   declined: 'Declined',
 }
 
+// Operational impact — single source of truth for the labels shown on the
+// log-ticket form, the ticket detail view and the store-manager search.
+export const OPERATIONAL_IMPACT_LABELS: Record<string, string> = {
+  none:                'No operational impact',
+  cosmetic:            'Cosmetic / minor',
+  customer_visible:    'Customer-visible',
+  staff_inconvenience: 'Staff inconvenience',
+  trading_affected:    'Trading affected',
+  safety_risk:         'Safety risk',
+  cannot_trade:        'Store cannot trade',
+}
+
+// Priority level labels — handles both the health engine's P1–P4 codes and the
+// classic low/medium/high/urgent values, so search and detail views can render
+// either representation. P1 = most urgent.
+export const PRIORITY_LEVEL_LABELS: Record<string, string> = {
+  P1: 'Critical', P2: 'High', P3: 'Medium', P4: 'Low',
+  urgent: 'Urgent', high: 'High', medium: 'Medium', low: 'Low',
+}
+
 // Filter-pill colours per status — active (filled) + inactive (tinted outline),
 // matching STATUS_COLORS hues so a filter reads like the status it selects.
 // Reused by the ticket filter bars across regional / supplier / client pages.

@@ -1,24 +1,23 @@
 'use client'
 
 import Link from 'next/link'
-import { LayoutDashboard, Building2, ClipboardList, ShieldAlert, Truck, Lock, ClipboardCheck, AlertTriangle, ListTodo, CheckCircle2, Sparkles } from 'lucide-react'
+import { Building2, ClipboardList, ShieldAlert, Truck, Lock, ClipboardCheck, AlertTriangle, ListTodo, Sparkles, Calendar } from 'lucide-react'
 import type { RegionalDashboardData } from '@/lib/health/data'
-import { STATUS_LABELS } from '@/lib/health/constants'
-import { Card, SectionCard, KpiRow, Donut, Pill, DistributionChips, STATUS_TEXT, type Kpi } from '@/components/exec/ui'
+import { SectionCard, KpiRow, Pill, STATUS_TEXT, type Kpi } from '@/components/exec/ui'
+import { formatDate } from '@/lib/utils'
 
 export function RegionalOverview({ data, name }: { data: RegionalDashboardData; name: string | null }) {
   const p = data.portfolio
   const greeting = (() => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening' })()
 
   const kpis: Kpi[] = [
-    { label: 'Portfolio Health', value: `${p.finalPortfolioHealth}%`, hint: STATUS_LABELS[p.status], icon: <LayoutDashboard size={13} />, tone: p.status === 'controlled' ? 'good' : p.status === 'attention' ? 'warn' : 'bad' },
     { label: 'Active Stores', value: p.activeStores, hint: `avg ${p.averageStoreHealth}%`, icon: <Building2 size={13} /> },
+    { label: 'Stores Need Attention', value: data.attentionStores.length, icon: <ShieldAlert size={13} />, tone: data.attentionStores.length ? 'warn' : 'good' },
     { label: 'Open Tickets', value: p.openTickets, hint: `${p.overdueTickets} overdue`, icon: <ClipboardList size={13} /> },
-    { label: 'Supplier Breaches', value: p.supplierSlaBreaches, icon: <Truck size={13} />, tone: p.supplierSlaBreaches ? 'warn' : 'good' },
-    { label: 'Internal Breaches', value: p.internalSlaBreaches, icon: <Lock size={13} />, tone: p.internalSlaBreaches ? 'warn' : 'good' },
     { label: 'Pending Signoffs', value: data.signoffsPending, icon: <ClipboardCheck size={13} />, tone: data.signoffsPending ? 'warn' : 'good' },
     { label: 'Open Snags', value: data.snagsOpen, icon: <AlertTriangle size={13} />, tone: data.snagsOpen ? 'warn' : 'good' },
-    { label: 'Stores Need Attention', value: data.attentionStores.length, icon: <ShieldAlert size={13} />, tone: data.attentionStores.length ? 'warn' : 'good' },
+    { label: 'Internal Breaches', value: p.internalSlaBreaches, icon: <Lock size={13} />, tone: p.internalSlaBreaches ? 'warn' : 'good' },
+    { label: 'Supplier Breaches', value: p.supplierSlaBreaches, icon: <Truck size={13} />, tone: p.supplierSlaBreaches ? 'warn' : 'good' },
   ]
 
   const focus = buildFocus(data)
@@ -26,22 +25,16 @@ export function RegionalOverview({ data, name }: { data: RegionalDashboardData; 
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold text-[var(--text)]">{greeting}, {name?.split(' ')[0] ?? 'Manager'} 👋</h1>
-        <p className="text-sm text-[var(--text-muted)] mt-0.5">Regional portfolio overview · {new Date().toLocaleDateString('en-ZA', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
-      </div>
-
-      <Card className="p-6">
-        <div className="flex flex-col sm:flex-row items-center gap-6">
-          <Donut value={p.finalPortfolioHealth} status={p.status} size={140} label="Portfolio" />
-          <div className="flex-1 min-w-0 space-y-3 text-center sm:text-left">
-            <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap"><h2 className="text-lg font-bold text-[var(--text)]">Portfolio Health</h2><Pill status={p.status} label={STATUS_LABELS[p.status]} /></div>
-            <p className="text-sm text-[var(--text-muted)]">Average store health {p.averageStoreHealth}% − penalty {p.riskPenalty} = <strong className={STATUS_TEXT[p.status]}>{p.finalPortfolioHealth}%</strong>. {p.mainReason}.</p>
-            {p.appliedPenalties.length > 0 && <div className="flex flex-wrap gap-1.5 justify-center sm:justify-start">{p.appliedPenalties.map((x, i) => <span key={i} className="text-[11px] px-2 py-0.5 rounded-full bg-red-500/15 text-red-300">{x}</span>)}</div>}
-            <DistributionChips counts={p.counts} />
-          </div>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-[var(--text)]">{greeting}, {name?.split(' ')[0] ?? 'Manager'} 👋</h1>
+          <p className="text-sm text-[var(--text-muted)] mt-0.5">Regional portfolio overview</p>
         </div>
-      </Card>
+        <span className="flex items-center gap-2 text-xs text-[var(--text-muted)] bg-[var(--surface)] ring-1 ring-[var(--border)] rounded-xl px-3 py-2 self-start sm:self-auto">
+          <Calendar size={14} className="text-[var(--text-muted)]" />
+          {formatDate(data.generatedAt)}
+        </span>
+      </div>
 
       <KpiRow kpis={kpis} />
 
