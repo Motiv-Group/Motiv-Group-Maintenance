@@ -70,7 +70,7 @@ html.dark select option {
   position: fixed;
   inset: 0;
   z-index: 2147483647;
-  background: #0a0e17 url('/splash/motiv-splash.png') center / contain no-repeat;
+  background: #0a0e17 url('/splash/cape-town.jpg') center / contain no-repeat;
   pointer-events: none;
   animation: motivSplashOut 2.1s ease-in forwards;
 }
