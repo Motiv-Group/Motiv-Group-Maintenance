@@ -24,3 +24,6 @@ npm-debug.log*
 android/keystore.properties
 *.keystore
 *.jks
+
+# TypeScript incremental build cache
+*.tsbuildinfo
