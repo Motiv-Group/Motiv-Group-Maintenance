@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { rateLimit } from '@/lib/rate-limit'
 import { sendPushToMany } from '@/lib/push'
 import { resolveTransition, statusLabel, type WorkflowRole } from '@/lib/workflow'
+import { loadSlaResolver } from '@/lib/health/data'
+import type { SlaTargets } from '@/lib/health/types'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -35,9 +37,16 @@ export async function POST(request: Request, { params }: { params: { id: string 
   if (!tr) return NextResponse.json({ error: `You can't ${action} a ticket that is "${statusLabel(ticket.status)}".` }, { status: 400 })
 
   const now = new Date().toISOString()
+  const addMins = (m: number) => new Date(new Date(now).getTime() + m * 60_000).toISOString()
   const updates: Record<string, unknown> = { status: tr.to, updated_at: now }
-  const internalRoles = role === 'supplier' ? { last_supplier_update_at: now } : { last_internal_update_at: now }
-  Object.assign(updates, internalRoles)
+  // Stamp freshness against the acting side (drives the health Data-Quality + stale checks).
+  const freshness = role === 'supplier' ? { last_supplier_update_at: now }
+    : role === 'store_manager' ? { last_store_update_at: now }
+    : { last_internal_update_at: now }
+  Object.assign(updates, freshness)
+  // SLA targets for due-date / blocker timestamps (first-class signals for the health engine).
+  const slaRules = await loadSlaResolver(admin, ticket.company_id)
+  const tgt: SlaTargets = slaRules(ticket.priority as 'P1' | 'P2' | 'P3' | 'P4')
 
   try {
     switch (action) {
@@ -52,8 +61,11 @@ export async function POST(request: Request, { params }: { params: { id: string 
         if (body.supplierId) updates.supplier_id = body.supplierId
         break
       case 'request_quote':
-        updates.quote_required = true; updates.quote_requested_at = now
+        updates.quote_required = true; updates.quote_requested_at = now; updates.quote_due_at = addMins(tgt.quote_due_mins)
         if (body.supplierId) updates.supplier_id = body.supplierId
+        break
+      case 'request_evidence':
+        updates.evidence_required = true
         break
       case 'submit_quote': {
         const amount = Number(body.amount)
@@ -96,6 +108,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
         const invoice = (ev ?? []).find(e => e.kind === 'invoice')?.url ?? null
         await admin.from('signoffs').insert({ company_id: ticket.company_id, ticket_id: ticketId, supplier_id: ticket.supplier_id, before_urls: before, after_urls: after, coc_url: coc, invoice_url: invoice, status: 'submitted', notes: body.notes ?? null })
         updates.submitted_for_signoff_at = now; updates.signoff_status = 'submitted'
+        updates.evidence_required = true
+        updates.before_photo_uploaded = before.length > 0; updates.after_photo_uploaded = after.length > 0
+        updates.completion_certificate_uploaded = !!coc; updates.invoice_uploaded = !!invoice
         break
       }
       case 'approve':
@@ -104,6 +119,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       case 'raise_snag':
         await admin.from('snags').insert({ company_id: ticket.company_id, ticket_id: ticketId, store_id: ticket.store_id, supplier_id: ticket.supplier_id, description: body.description ?? null, severity: body.severity ?? null, required_correction: body.required_correction ?? null, status: 'open' })
         await admin.from('signoffs').update({ status: 'rejected', reject_reason: body.description ?? 'Snag raised', reviewed_by: user.id, reviewed_at: now }).eq('ticket_id', ticketId).in('status', ['submitted', 'awaiting_regional', 'awaiting_store'])
+        updates.evidence_required = true
         break
       case 'assign_snag':
         updates.assigned_user_id = body.supplierId ?? ticket.supplier_id
@@ -122,6 +138,10 @@ export async function POST(request: Request, { params }: { params: { id: string 
     return NextResponse.json({ error: e?.message ?? 'Action failed' }, { status: 400 })
   }
 
+  // Blocker / pause / owner columns derived from the destination status, so the
+  // stored signals stay in lock-step with the health engine's own derivation.
+  Object.assign(updates, lifecycleFields(tr.to, now, tgt))
+
   const { error: upErr } = await admin.from('tickets').update(updates).eq('id', ticketId)
   if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 })
 
@@ -134,6 +154,25 @@ export async function POST(request: Request, { params }: { params: { id: string 
     revalidatePath('/regional/reports'); revalidatePath('/executive/reports'); revalidatePath('/executive/stores'); revalidatePath('/regional/stores')
   }
   return NextResponse.json({ ok: true, status: tr.to })
+}
+
+// Map a destination status → the explicit blocker/pause columns the health
+// engine reads. Mirrors lib/health/sla.ts status buckets. Idempotent: each
+// transition (re)sets blocker_started_at = now for the new blocker state.
+function lifecycleFields(to: string, now: string, tgt: SlaTargets): Record<string, unknown> {
+  const addMins = (m: number) => new Date(new Date(now).getTime() + m * 60_000).toISOString()
+  const supplier = { current_blocker: 'supplier_action', blocker_owner_type: 'supplier', blocker_started_at: now, sla_paused: false, internal_action_due_at: null }
+  const internalDecision = { current_blocker: 'quote_approval', blocker_owner_type: 'regional_manager', blocker_started_at: now, sla_paused: true, pause_reason: 'awaiting_decision', pause_started_at: now, internal_action_due_at: addMins(tgt.internal_decision_mins) }
+  const signoff = { current_blocker: 'completion_signoff', blocker_owner_type: 'regional_manager', blocker_started_at: now, sla_paused: true, pause_reason: 'awaiting_signoff', pause_started_at: now, internal_action_due_at: addMins(tgt.internal_decision_mins) }
+  const cleared = { current_blocker: null, blocker_owner_type: null, blocker_started_at: null, sla_paused: false, pause_ended_at: now, internal_action_due_at: null }
+  switch (to) {
+    case 'quoted': case 'variation_review': return internalDecision
+    case 'submitted_for_signoff': case 'approved_closeout': return signoff
+    case 'completed': case 'cancelled': case 'declined': return cleared
+    case 'open': return { current_blocker: null, blocker_owner_type: null, blocker_started_at: null, sla_paused: false, internal_action_due_at: null }
+    case 'info_requested': return { current_blocker: null, blocker_owner_type: 'store', sla_paused: false, internal_action_due_at: null }
+    default: return supplier
+  }
 }
 
 async function hasAccess(admin: Admin, role: WorkflowRole, userId: string, ticket: any): Promise<boolean> {

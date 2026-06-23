@@ -40,6 +40,7 @@ export async function POST(request: Request) {
     company_id: profile.company_id, store_id: store.id, region_id: store.region_id, region_code: store.region_code,
     branch_code: store.branch_code, created_by: user.id, title, description, category,
     operational_impact: impact, severity, priority, ...flags, photo_urls, status: 'open',
+    last_store_update_at: new Date().toISOString(),
   }).select().single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 

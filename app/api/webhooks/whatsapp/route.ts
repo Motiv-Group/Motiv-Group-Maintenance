@@ -850,6 +850,7 @@ async function finaliseSession(
       needs_review: needsReview,
       status:      'open',
       photo_urls:  photoUrls,
+      last_store_update_at: new Date().toISOString(),
     })
     .select('id')
     .single();
