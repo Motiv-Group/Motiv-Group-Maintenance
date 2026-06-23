@@ -5,6 +5,7 @@ import {
   STORE_WEIGHTS, OP_IMPACT_DEDUCTION, THRESHOLDS, statusForScore, STATUS_RANK, bandCeiling,
 } from './constants'
 import { computeTicketSla } from './sla'
+import { deriveDueDates } from './priority'
 
 const DAY = 24 * 3600_000
 
@@ -82,28 +83,40 @@ export function calculateStoreHealth(
   const repeatDefect = criticalRepeat ? 0 : groups === 0 ? 15 : groups === 1 ? 10 : groups === 2 ? 6 : 2
 
   // ── §7.5 Commercial Blocker (10) — worst applicable ──
+  // The ">7d blocked → 0" band applies only to genuine commercial/internal
+  // blockers (quote approval, sign-off, store access) — not normal supplier
+  // execution (that's the SLA component) nor un-triaged intake.
   let commercialBlocker = 10, pendingDecisions = 0, costExposure = 0
   for (const { t, sla } of enriched) {
     costExposure += t.quote_value ?? 0
     const decisionPending = t.quote_decision_required && (t.quote_decision_status ?? 'pending') === 'pending'
     if (decisionPending) pendingDecisions++
+    const quoteDue = deriveDueDates(t, rules(t.priority)).quoteDue
+    const quoteOverdue = !t.quote_submitted_at && !!quoteDue && now.getTime() > new Date(quoteDue).getTime()
+    const longBlock = (sla.currentBlocker === 'quote_approval' || sla.currentBlocker === 'completion_signoff' || sla.currentBlocker === 'store_access')
+      && (sla.daysWithBlocker ?? 0) > THRESHOLDS.blockerMaxDays
     let band = 10
-    if ((sla.daysWithBlocker ?? 0) > THRESHOLDS.blockerMaxDays) band = 0
+    if (longBlock) band = 0
     else if (decisionPending && (t.quote_value ?? 0) >= THRESHOLDS.highValueQuote) band = 3
-    else if (t.quote_due_at && !t.quote_submitted_at && now.getTime() > new Date(t.quote_due_at).getTime()) band = 5
+    else if (quoteOverdue) band = 5
     else if (decisionPending) band = 5
     else if (t.quote_requested_at && !t.quote_submitted_at) band = 8
     commercialBlocker = Math.min(commercialBlocker, band)
   }
 
   // ── §7.6 Data Quality (10) — worst applicable ──
+  // Only judge OWNED tickets (a supplier assigned, or past intake). Un-triaged
+  // tickets aren't a data-quality problem — their delay is the SLA/triage clock.
   let missingUpdate = 0, staleOver7d = false, missingEvidence = false
   for (const t of active) {
+    const owned = !!t.supplier_id || !(t.status === 'open' || t.status === 'info_requested')
+    if (!owned) continue
     const last = mostRecent(t.last_supplier_update_at, t.last_internal_update_at, t.last_store_update_at, t.updated_at)
     if (last && now.getTime() - new Date(last).getTime() > THRESHOLDS.staleUpdateDays * DAY) staleOver7d = true
     const ageDays = (now.getTime() - new Date(t.created_at).getTime()) / DAY
     if (ageDays > 2 && !t.last_supplier_update_at && !t.last_internal_update_at) missingUpdate++
-    if (t.evidence_required && !(t.before_photo_uploaded || t.after_photo_uploaded || t.completion_certificate_uploaded)) missingEvidence = true
+    const evidenceExpected = t.evidence_required || t.status === 'submitted_for_signoff' || t.status === 'approved_closeout'
+    if (evidenceExpected && !(t.before_photo_uploaded || t.after_photo_uploaded || t.completion_certificate_uploaded)) missingEvidence = true
   }
   const dataQuality =
     staleOver7d ? 0 :
@@ -175,7 +188,7 @@ function resolveOverride(
       if (last && now.getTime() - new Date(last).getTime() > THRESHOLDS.criticalStaleHours * 3600_000)
         return { status: 'at_risk', reason: `No update on a critical ticket for over ${THRESHOLDS.criticalStaleHours}h` }
     }
-    if (t.priority === 'P1' && t.evidence_required && !t.completion_certificate_uploaded && t.status === 'submitted_for_signoff')
+    if (t.priority === 'P1' && (t.status === 'submitted_for_signoff' || t.status === 'approved_closeout') && !t.completion_certificate_uploaded)
       return { status: 'attention', reason: 'Completion evidence missing on a critical job' }
   }
   return { status: null, reason: null }
