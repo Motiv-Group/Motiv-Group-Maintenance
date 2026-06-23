@@ -1,17 +1,21 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { runEstateSnapshots } from '@/lib/health/snapshots'
+import { runRepeatDefectRecompute } from '@/lib/health/recompute'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
-// GET /api/cron/v3-snapshots — daily v3 health snapshots (all companies).
+// GET /api/cron/v3-snapshots — daily v3 health maintenance (all companies):
+// recompute repeat-defect flags, then snapshot health for trend history.
+// (Bundled into one daily job so it fits the Vercel Hobby 2-cron / daily limit.)
 // Auth: Vercel cron secret OR a signed-in executive / system_admin.
 export async function GET(request: Request) {
   if (!(await authorize(request))) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   try {
+    const repeat = await runRepeatDefectRecompute()
     const summary = await runEstateSnapshots()
-    return NextResponse.json({ ok: true, summary })
+    return NextResponse.json({ ok: true, repeat, summary })
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message ?? 'Snapshot failed' }, { status: 500 })
   }
