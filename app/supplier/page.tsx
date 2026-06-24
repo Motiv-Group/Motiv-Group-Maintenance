@@ -23,12 +23,12 @@ export default async function SupplierOverviewPage() {
   const perf = d.perf
 
   const kpis: Kpi[] = [
-    { label: 'Open Work', value: k.open, icon: <ClipboardList size={13} /> },
-    { label: 'Overdue', value: k.overdue, icon: <AlertTriangle size={13} />, tone: k.overdue ? 'bad' : 'good' },
-    { label: 'Due Today', value: k.dueToday, icon: <Clock size={13} />, tone: k.dueToday ? 'warn' : 'good' },
-    { label: 'Pending Quotes', value: k.pendingQuotes, icon: <ReceiptText size={13} />, tone: k.pendingQuotes ? 'warn' : 'good' },
-    { label: 'Awaiting Sign-off', value: k.awaitingSignoff, icon: <ClipboardCheck size={13} /> },
-    { label: 'Evidence Missing', value: k.evidenceMissing, icon: <Camera size={13} />, tone: k.evidenceMissing ? 'warn' : 'good' },
+    { label: 'Open Work', value: k.open, icon: <ClipboardList size={13} />, href: '/supplier/tickets' },
+    { label: 'Overdue', value: k.overdue, icon: <AlertTriangle size={13} />, tone: k.overdue ? 'bad' : 'good', href: '/supplier/tickets' },
+    { label: 'Due Today', value: k.dueToday, icon: <Clock size={13} />, tone: k.dueToday ? 'warn' : 'good', href: '/supplier/tickets' },
+    { label: 'Pending Quotes', value: k.pendingQuotes, icon: <ReceiptText size={13} />, tone: k.pendingQuotes ? 'warn' : 'good', href: '/supplier/quotes' },
+    { label: 'Awaiting Sign-off', value: k.awaitingSignoff, icon: <ClipboardCheck size={13} />, href: '/supplier/signoff' },
+    { label: 'Evidence Missing', value: k.evidenceMissing, icon: <Camera size={13} />, tone: k.evidenceMissing ? 'warn' : 'good', href: '/supplier/tickets' },
   ]
 
   const needsAction = d.tickets.filter(t => t.slaLabel === 'Breached' || t.slaLabel === 'At risk' || !t.acknowledged).slice(0, 6)

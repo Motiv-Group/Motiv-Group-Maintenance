@@ -24,8 +24,8 @@ const PILLS: { key: Filter; label: string; active: string; inactive: string }[] 
   { key: 'completed',   label: 'Completed',   active: 'bg-emerald-500 text-white border-emerald-500',        inactive: 'text-emerald-600 dark:text-emerald-400 border-emerald-500/40 hover:border-emerald-400' },
 ]
 
-export function StoreTicketsList({ tickets }: { tickets: StoreManagerTicket[] }) {
-  const [filter, setFilter] = useState<Filter>('all')
+export function StoreTicketsList({ tickets, initialFilter = 'all' }: { tickets: StoreManagerTicket[]; initialFilter?: Filter }) {
+  const [filter, setFilter] = useState<Filter>(initialFilter)
   const [q, setQ] = useState('')
 
   const counts = useMemo(() => {

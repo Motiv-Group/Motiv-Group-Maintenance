@@ -17,10 +17,10 @@ export default async function StoreOverviewPage() {
 
   // Store managers only ever see ticket status — never money or quotes.
   const kpis: Kpi[] = [
-    { label: 'Open', value: d.open, icon: <ClipboardList size={13} /> },
-    { label: 'In Progress', value: d.inProgress, icon: <Wrench size={13} /> },
-    { label: 'Completed', value: d.completed, icon: <CheckCircle2 size={13} />, tone: 'good' },
-    { label: 'Overdue', value: h?.overdueTickets ?? 0, icon: <AlertTriangle size={13} />, tone: (h?.overdueTickets ?? 0) ? 'bad' : 'good' },
+    { label: 'Open', value: d.open, icon: <ClipboardList size={13} />, href: '/client/tickets?status=open' },
+    { label: 'In Progress', value: d.inProgress, icon: <Wrench size={13} />, href: '/client/tickets?status=in_progress' },
+    { label: 'Completed', value: d.completed, icon: <CheckCircle2 size={13} />, tone: 'good', href: '/client/tickets?status=completed' },
+    { label: 'Overdue', value: h?.overdueTickets ?? 0, icon: <AlertTriangle size={13} />, tone: (h?.overdueTickets ?? 0) ? 'bad' : 'good', href: '/client/tickets' },
   ]
 
   // Status-only prompts — no info-request / quote / money items.
