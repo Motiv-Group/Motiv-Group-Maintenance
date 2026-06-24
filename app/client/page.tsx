@@ -1,13 +1,12 @@
 export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
-import { PlusCircle, Calendar, ClipboardList, Wrench, CheckCircle2, AlertTriangle, ListTodo, ShieldAlert } from 'lucide-react'
+import { PlusCircle, Calendar, ClipboardList, Wrench, CheckCircle2, AlertTriangle, ListTodo, Sparkles } from 'lucide-react'
 import { requireStoreManagerV3 } from '@/lib/health/guard'
 import { assembleStoreManagerDashboard } from '@/lib/health/data'
 import { STATUS_LABELS } from '@/lib/health/constants'
-import { Card, Donut, Pill, KpiCard, BreakdownList, SectionCard, type Kpi } from '@/components/exec/ui'
+import { Card, Donut, Pill, KpiCard, SectionCard, type Kpi } from '@/components/exec/ui'
 import { RecentTicketsCard } from '@/components/client/RecentTicketsCard'
-import { BriefingCard } from '@/components/briefing/BriefingCard'
 import { getDailyBriefing } from '@/lib/briefing/generate'
 import { storeFacts } from '@/lib/briefing/facts'
 import { formatDate } from '@/lib/utils'
@@ -28,9 +27,8 @@ export default async function StoreOverviewPage() {
     { label: 'Overdue', value: h?.overdueTickets ?? 0, icon: <AlertTriangle size={13} />, tone: (h?.overdueTickets ?? 0) ? 'bad' : 'good', href: '/client/tickets' },
   ]
 
-  // Status-only prompts — no info-request / quote / money items.
+  // Status-only prompts — no safety / info-request / quote / money items.
   const actions: { icon: React.ReactNode; text: string }[] = []
-  if ((h?.safetyOpen ?? 0) > 0) actions.push({ icon: <ShieldAlert size={15} className="text-red-500 mt-0.5 shrink-0" />, text: `${h!.safetyOpen} safety-risk ticket${h!.safetyOpen > 1 ? 's' : ''} open — these are prioritised.` })
   if ((h?.overdueTickets ?? 0) > 0) actions.push({ icon: <AlertTriangle size={15} className="text-amber-500 mt-0.5 shrink-0" />, text: `${h!.overdueTickets} ticket${h!.overdueTickets > 1 ? 's' : ''} past target — the team is following up.` })
 
   return (
@@ -54,10 +52,7 @@ export default async function StoreOverviewPage() {
         </div>
       </div>
 
-      {/* AI morning briefing */}
-      <BriefingCard briefing={briefing} scope="store" scopeId={briefingScopeId} />
-
-      {/* Health hero + breakdown */}
+      {/* Store health + AI summary */}
       {h && (
         <Card className="p-6">
           <div className="flex flex-col sm:flex-row items-center gap-6">
@@ -67,15 +62,14 @@ export default async function StoreOverviewPage() {
                 <h2 className="text-lg font-bold text-[var(--text)]">Store Health</h2>
                 <Pill status={h.finalStatus} label={STATUS_LABELS[h.finalStatus]} />
               </div>
-              <p className="text-sm text-[var(--text-muted)]">{h.mainIssue}.</p>
-              <BreakdownList rows={[
-                { label: 'Operational Risk', value: h.breakdown.operationalRisk, max: 30 },
-                { label: 'SLA Performance', value: h.breakdown.sla, max: 20 },
-                { label: 'Ticket Load', value: h.breakdown.ticketLoad, max: 15 },
-                { label: 'Repeat Defects', value: h.breakdown.repeatDefect, max: 15 },
-                { label: 'Commercial Impact', value: h.breakdown.commercialBlocker, max: 10 },
-                { label: 'Data Quality', value: h.breakdown.dataQuality, max: 10 },
-              ]} />
+              {briefing?.body && (
+                <div className="flex items-start gap-2 justify-center sm:justify-start text-left">
+                  <span className="shrink-0 mt-0.5 inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wide text-[#C6A35D] bg-[#C6A35D]/10 rounded-full px-1.5 py-0.5">
+                    <Sparkles size={10} /> AI
+                  </span>
+                  <p className="text-sm text-[var(--text-muted)] leading-relaxed">{briefing.body}</p>
+                </div>
+              )}
             </div>
           </div>
         </Card>

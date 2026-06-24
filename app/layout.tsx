@@ -33,15 +33,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="min-h-screen antialiased">
-        {/* First-load splash — paints instantly (SSR), fades out via CSS.
-            The inline script rotates the city image so it differs each open
-            (portrait set on phones, the landscape image on wide screens). */}
-        <div id="motiv-splash" aria-hidden="true" />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(function(){var el=document.getElementById('motiv-splash');if(!el)return;var cap=window.Capacitor;if(cap&&(cap.isNativePlatform?cap.isNativePlatform():(cap.platform&&cap.platform!=='web'))){el.style.display='none';return;}var P=['/splash/cape-town.jpg','/splash/durban.jpg','/splash/johannesburg.jpg','/splash/johannesburg-2.jpg'];var L='/splash/horisontal.jpg';var pick;if(window.innerWidth>window.innerHeight&&window.innerWidth>=900){pick=L;}else{var last=null;try{last=localStorage.getItem('msplash');}catch(e){}var pool=P.filter(function(p){return p!==last;});if(!pool.length)pool=P;pick=pool[Math.floor(Math.random()*pool.length)];try{localStorage.setItem('msplash',pick);}catch(e){}}el.style.backgroundImage="url('"+pick+"')";})();`,
-          }}
-        />
+        {/* Web splash removed for now (native Android splash unaffected). */}
         <ThemeProvider>
           <ServiceWorkerSetup />
           {children}

@@ -48,16 +48,14 @@ export default async function StoreTicketDetailPage({ params }: { params: { id: 
 
       {/* Ticket detail — all info, structured */}
       <Card className="p-5 space-y-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            {t.job_ref && <p className="text-[11px] font-mono font-semibold tracking-wide text-[var(--text-faint)] mb-0.5">{t.job_ref}</p>}
-            <h1 className="text-lg font-bold text-[var(--text)]">{t.title}</h1>
-          </div>
-          <div className="flex items-center gap-1.5 shrink-0">
+        <div className="space-y-2 min-w-0">
+          {t.job_ref && <p className="text-[11px] font-mono font-semibold tracking-wide text-[var(--text-faint)]">{t.job_ref}</p>}
+          <h1 className="text-lg font-bold text-[var(--text)]">{t.title}</h1>
+          <div className="grid grid-cols-2 gap-1.5 w-fit justify-items-start">
             <PriorityBadge priority={t.priority} />
             {(() => {
               const cv = clientVisibleStatus(t.status as TicketStatus)
-              return cv ? <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full ${CV_TONE[cv]}`}>{CV_WORD[cv]}</span> : null
+              return cv ? <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full text-center ${CV_TONE[cv]}`}>{CV_WORD[cv]}</span> : null
             })()}
           </div>
         </div>
