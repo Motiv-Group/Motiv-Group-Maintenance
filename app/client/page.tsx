@@ -7,12 +7,16 @@ import { assembleStoreManagerDashboard } from '@/lib/health/data'
 import { STATUS_LABELS } from '@/lib/health/constants'
 import { Card, Donut, Pill, KpiCard, BreakdownList, SectionCard, type Kpi } from '@/components/exec/ui'
 import { RecentTicketsCard } from '@/components/client/RecentTicketsCard'
+import { BriefingCard } from '@/components/briefing/BriefingCard'
+import { getDailyBriefing } from '@/lib/briefing/generate'
+import { storeFacts } from '@/lib/briefing/facts'
 import { formatDate } from '@/lib/utils'
 
 export default async function StoreOverviewPage() {
   const { companyId, storeIds, fullName } = await requireStoreManagerV3()
   const d = await assembleStoreManagerDashboard(companyId, storeIds)
   const h = d.health
+  const briefing = await getDailyBriefing({ companyId, scope: 'store', scopeId: storeIds.slice().sort().join(','), role: 'store_manager', facts: storeFacts(d) })
   const greeting = (() => { const x = new Date().getHours(); return x < 12 ? 'Good morning' : x < 17 ? 'Good afternoon' : 'Good evening' })()
 
   // Store managers only ever see ticket status — never money or quotes.
@@ -48,6 +52,9 @@ export default async function StoreOverviewPage() {
           </span>
         </div>
       </div>
+
+      {/* AI morning briefing */}
+      <BriefingCard briefing={briefing} />
 
       {/* Health hero + breakdown */}
       {h && (

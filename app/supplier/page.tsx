@@ -5,6 +5,9 @@ import { Truck, ClipboardList, Clock, ReceiptText, ClipboardCheck, Camera, Alert
 import { requireSupplierV3 } from '@/lib/health/guard'
 import { assembleSupplierDashboard } from '@/lib/health/data'
 import { Card, SectionCard, KpiRow, Donut, Pill, BreakdownList, type Kpi } from '@/components/exec/ui'
+import { BriefingCard } from '@/components/briefing/BriefingCard'
+import { getDailyBriefing } from '@/lib/briefing/generate'
+import { supplierFacts } from '@/lib/briefing/facts'
 import { formatCurrency, formatDate } from '@/lib/utils'
 
 const clamp = (n: number) => Math.max(0, Math.min(20, Math.round(n)))
@@ -21,6 +24,7 @@ export default async function SupplierOverviewPage() {
   const d = await assembleSupplierDashboard(companyId, supplierIds)
   const k = d.kpis
   const perf = d.perf
+  const briefing = await getDailyBriefing({ companyId, scope: 'supplier', scopeId: supplierIds.slice().sort().join(','), role: 'supplier', facts: supplierFacts(d) })
 
   const kpis: Kpi[] = [
     { label: 'Open Work', value: k.open, icon: <ClipboardList size={13} />, href: '/supplier/tickets' },
@@ -39,6 +43,8 @@ export default async function SupplierOverviewPage() {
     <div className="space-y-5">
       <div><h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><Truck className="text-teal-600 dark:text-teal-400" size={22} /> {fullName ?? 'Supplier'}</h1>
         <p className="text-sm text-[var(--text-muted)] mt-0.5">Your assigned work, quotes, sign-offs and performance.</p></div>
+
+      <BriefingCard briefing={briefing} />
 
       <KpiRow kpis={kpis} />
 

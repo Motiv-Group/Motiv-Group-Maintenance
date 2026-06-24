@@ -6,6 +6,8 @@ import { requireRegionalUser } from '@/lib/health/guard'
 import { assembleRegionalDashboard } from '@/lib/health/data'
 import { RegionalOverview } from '@/components/exec/RegionalOverview'
 import { Card } from '@/components/exec/ui'
+import { getDailyBriefing } from '@/lib/briefing/generate'
+import { regionFacts } from '@/lib/briefing/facts'
 
 export default async function RegionalOverviewPage() {
   const { companyId, regionIds, fullName, requestedRegionCode } = await requireRegionalUser()
@@ -34,5 +36,6 @@ export default async function RegionalOverviewPage() {
   }
 
   const data = await assembleRegionalDashboard(companyId, regionIds)
-  return <RegionalOverview data={data} name={fullName} />
+  const briefing = await getDailyBriefing({ companyId, scope: 'region', scopeId: regionIds.slice().sort().join(','), role: 'regional_manager', facts: regionFacts(data) })
+  return <RegionalOverview data={data} name={fullName} briefing={briefing} />
 }

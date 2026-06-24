@@ -12,6 +12,9 @@ import {
   Card, SectionCard, KpiCard, Donut, Pill, DistributionBar, StoreDistributionDonut,
   DistributionLegend, TrendArrow, STATUS_TEXT, type Kpi, type Trend,
 } from '@/components/exec/ui'
+import { BriefingCard } from '@/components/briefing/BriefingCard'
+import { getDailyBriefing } from '@/lib/briefing/generate'
+import { estateFacts } from '@/lib/briefing/facts'
 import { STATUS_LABELS } from '@/lib/health/constants'
 import { formatCurrency, formatDate } from '@/lib/utils'
 
@@ -31,6 +34,7 @@ export default async function ExecutiveEstatePage() {
   const data = await assembleEstateDashboard(companyId)
   const e = data.estate
   const total = e.totalActiveStores
+  const briefing = await getDailyBriefing({ companyId, scope: 'estate', scopeId: companyId, role: 'executive', facts: estateFacts(data) })
 
   const supplierBreachSuppliers = data.suppliers.filter(s => s.overdue > 0).length
   const regionAlerts = data.regions.filter(r => r.region.status !== 'controlled').length
@@ -59,6 +63,9 @@ export default async function ExecutiveEstatePage() {
   return (
     <div className="space-y-5">
       <EstateHeader dateLabel={formatDate(data.generatedAt)} regions={data.regions.map(r => ({ id: r.region.regionId, name: r.regionName }))} />
+
+      {/* AI morning briefing */}
+      <BriefingCard briefing={briefing} />
 
       {/* Estate Health hero */}
       <Card className="p-6">

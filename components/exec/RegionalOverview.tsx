@@ -4,11 +4,13 @@ import Link from 'next/link'
 import { Building2, ClipboardList, ShieldAlert, Truck, Lock, ClipboardCheck, AlertTriangle, ListTodo, Sparkles, Calendar, Banknote, CheckCircle2, AlertCircle } from 'lucide-react'
 import type { RegionalDashboardData } from '@/lib/health/data'
 import { SectionCard, KpiCard, Pill, DistributionBar, STATUS_TEXT, type Kpi } from '@/components/exec/ui'
+import { BriefingCard } from '@/components/briefing/BriefingCard'
+import type { Briefing } from '@/lib/briefing/facts'
 import { formatDate, formatCurrency } from '@/lib/utils'
 
 const fmtK = (n: number) => (n >= 1000 ? `R ${(n / 1000).toFixed(0)}K` : formatCurrency(n))
 
-export function RegionalOverview({ data, name }: { data: RegionalDashboardData; name: string | null }) {
+export function RegionalOverview({ data, name, briefing }: { data: RegionalDashboardData; name: string | null; briefing?: Briefing }) {
   const p = data.portfolio
   const greeting = (() => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening' })()
 
@@ -41,6 +43,8 @@ export function RegionalOverview({ data, name }: { data: RegionalDashboardData; 
           {formatDate(data.generatedAt)}
         </span>
       </div>
+
+      {briefing && <BriefingCard briefing={briefing} />}
 
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 gap-3">
         {kpis.map((k, i) => <KpiCard key={i} kpi={k} />)}
