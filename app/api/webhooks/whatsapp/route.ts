@@ -56,6 +56,7 @@ interface ExtractedTicket {
   category: Category;
   operational_impact: OpImpact;
   confidence: number;
+  is_issue: boolean;
 }
 
 interface WaSession {
@@ -128,6 +129,7 @@ Return ONLY a valid JSON object with these EXACT keys:
 - "operational_impact": the single most appropriate value, EXACTLY one of: none, cosmetic, customer_visible, staff_inconvenience, trading_affected, safety_risk, cannot_trade.
 - "priority": one of low, medium, high, urgent.
 - "confidence": a number from 0 to 1 — how confident you are that the category, impact and details are correct. Use a LOW value when the input was vague, very short, off-topic, or hard to transcribe; a HIGH value only when the issue is clearly described.
+- "is_issue": true ONLY if the message describes (or clearly is) a maintenance/facilities problem to log (something broken, leaking, not working, unsafe, etc.). Set false for greetings, small talk, thanks, questions, commands like "menu"/"help"/"briefing", or anything that is NOT a maintenance problem.
 
 Category guide: HVAC = aircon/heating/ventilation; Refrigeration = fridges/freezers/cold rooms; Gas = gas lines/burners; Structural = walls/roof/ceiling/doors/floors; Plumbing = water/leaks/drains/toilets; Cleaning = spills/hygiene; General = anything not clearly another category; Other only if truly none fit.
 Operational impact guide: cannot_trade = store cannot operate; safety_risk = danger to people; trading_affected = trading/sales disrupted; customer_visible = customers can see it; staff_inconvenience = affects staff only; cosmetic = minor/appearance; none = no operational impact.
@@ -191,6 +193,8 @@ function sanitiseExtracted(raw: Partial<ExtractedTicket>, fallbackDescription?: 
   const category: Category = (CATEGORIES as readonly string[]).includes(raw.category as string) ? (raw.category as Category) : 'General';
   const operational_impact: OpImpact = (IMPACTS as readonly string[]).includes(raw.operational_impact as string) ? (raw.operational_impact as OpImpact) : 'none';
   const confidence = typeof raw.confidence === 'number' && raw.confidence >= 0 && raw.confidence <= 1 ? raw.confidence : 0.5;
+  // Default true so a missing flag never silently drops a real ticket.
+  const is_issue = typeof raw.is_issue === 'boolean' ? raw.is_issue : true;
   return {
     title:       (raw.title ?? 'Maintenance request').toString().slice(0, 80),
     description: raw.description ?? fallbackDescription ?? 'No description provided',
@@ -198,6 +202,7 @@ function sanitiseExtracted(raw: Partial<ExtractedTicket>, fallbackDescription?: 
     category,
     operational_impact,
     confidence,
+    is_issue,
   };
 }
 
@@ -420,7 +425,7 @@ const GREETING_RE = /^(hi+|hey+|hallo|hello|halo|howzit|yo+|sup|good\s*(morning|
 function isGreeting(s: string): boolean { return GREETING_RE.test(s.trim()); }
 
 /** Send the role-aware main menu: SMs get Log-a-ticket + Briefing; others get Briefing. */
-async function sendMainMenu(from: string, normalisedPhone: string, adminClient: ReturnType<typeof createAdminClient>): Promise<void> {
+async function sendMainMenu(from: string, normalisedPhone: string, adminClient: ReturnType<typeof createAdminClient>, bodyText?: string): Promise<void> {
   const { data: profile } = await adminClient.from('user_profiles').select('role, full_name').eq('phone', normalisedPhone).maybeSingle();
   if (!profile) {
     await sendWhatsAppReply(from, '👋 Welcome to Motiv. Your number is not registered yet — please contact your administrator.');
@@ -431,7 +436,7 @@ async function sendMainMenu(from: string, normalisedPhone: string, adminClient: 
   const buttons = isSM
     ? [{ id: 'menu_log_ticket', title: 'Log a ticket' }, { id: 'menu_briefing', title: 'Daily briefing' }]
     : [{ id: 'menu_briefing', title: 'Daily briefing' }];
-  await sendWhatsAppButtons(from, `👋 Hi ${name || 'there'}! What would you like to do?`, buttons);
+  await sendWhatsAppButtons(from, bodyText ?? `👋 Hi ${name || 'there'}! What would you like to do?`, buttons);
 }
 
 /** Build the sender's daily briefing and send it as a WhatsApp message. */
@@ -561,6 +566,13 @@ async function handleNewTicket(
   const extracted = await extractFromMessage(from, message);
   if (!extracted) return;
   console.log(`[WhatsApp] Extracted:`, extracted);
+
+  // Not a maintenance issue (greeting, small talk, question, etc.) → show the
+  // menu instead of drafting a ticket from it.
+  if (!extracted.is_issue) {
+    await sendMainMenu(from, normalisedPhone, adminClient, "That doesn't look like a maintenance issue 🙂 What would you like to do?");
+    return;
+  }
 
   const { title, description, priority, category, operational_impact } = extracted;
 
