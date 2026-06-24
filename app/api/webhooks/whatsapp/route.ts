@@ -337,7 +337,8 @@ async function extractFromMessage(from: string, message: WaMessage): Promise<Ext
   }
   const transcript = (message.text?.body ?? '').trim();
   if (!transcript) return null;
-  await sendWhatsAppReply(from, '💬 Message received! Processing your request, please hold on...');
+  // No "processing a ticket" ack for text — we don't yet know if it's a ticket.
+  // The is_issue check then routes to either the menu or the draft (≈1-2s).
   return extractTicketFields(transcript);
 }
 
