@@ -472,6 +472,11 @@ async function handleWebhook(payload: WaPayload) {
     const normalisedPhone = normalisePhone(from);
     const adminClient     = createAdminClient();
 
+    // Stamp the 24h WhatsApp window: this user has just messaged us, so
+    // business-initiated sends (e.g. the dashboard "Send to WhatsApp" button)
+    // are allowed for the next 24h. Best-effort — ignore errors.
+    await adminClient.from('user_profiles').update({ last_wa_inbound_at: new Date().toISOString() }).eq('phone', normalisedPhone);
+
     if (message.type === 'image') {
       await handleIncomingPhoto(from, normalisedPhone, message, adminClient);
       return;

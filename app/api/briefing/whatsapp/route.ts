@@ -19,12 +19,22 @@ export async function POST(request: Request) {
   if (typeof text !== 'string' || !text.trim()) return NextResponse.json({ error: 'No briefing text.' }, { status: 400 })
 
   const admin = createAdminClient()
-  const { data: profile } = await admin.from('user_profiles').select('phone').eq('id', user.id).single()
+  const { data: profile } = await admin.from('user_profiles').select('phone, last_wa_inbound_at').eq('id', user.id).single()
   const phone = (profile?.phone ?? '').trim()
   if (!phone) return NextResponse.json({ error: 'No phone number on your profile — add one in Settings.' }, { status: 400 })
 
+  // Never initiate outside the 24h window — protects the business number from
+  // being flagged/banned. The user must have messaged the Motiv WhatsApp first.
+  const last = profile?.last_wa_inbound_at ? new Date(profile.last_wa_inbound_at).getTime() : 0
+  if (Date.now() - last > 24 * 60 * 60 * 1000) {
+    return NextResponse.json({
+      error: "Send 'hi' to the Motiv WhatsApp number first, then try again — we can only message you within 24h of your message.",
+      needsOptIn: true,
+    }, { status: 409 })
+  }
+
   const ok = await sendWhatsAppText(phone, text.slice(0, 1000))
-  if (!ok) return NextResponse.json({ error: "Couldn't send — WhatsApp only delivers if you messaged the Motiv number in the last 24h." }, { status: 502 })
+  if (!ok) return NextResponse.json({ error: "Couldn't send — please message the Motiv WhatsApp number, then try again." }, { status: 502 })
 
   return NextResponse.json({ ok: true })
 }
