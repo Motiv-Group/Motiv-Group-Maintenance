@@ -118,9 +118,9 @@ export function StoreTicketsList({ tickets, initialFilter = 'all' }: { tickets: 
               <p className="text-sm text-[var(--text)] truncate">{t.title}</p>
               <p className="text-[11px] text-[var(--text-faint)]">{t.category ?? 'General'} · {formatDateTime(t.createdAt)}{t.supplierAssigned ? ' · Supplier assigned' : ''}</p>
             </div>
-            <div className="grid grid-cols-2 gap-1.5 w-fit shrink-0 justify-items-end">
-              <PriorityBadge priority={t.priority} />
-              <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full text-center ${TONE[t.status]}`}>{WORD[t.status]}</span>
+            <div className="grid grid-cols-[4.5rem_6rem] gap-1.5 shrink-0">
+              <PriorityBadge priority={t.priority} className="w-full text-center" />
+              <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${TONE[t.status]}`}>{WORD[t.status]}</span>
             </div>
           </Link>
         ))}
