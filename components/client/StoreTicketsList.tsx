@@ -112,15 +112,15 @@ export function StoreTicketsList({ tickets, initialFilter = 'all' }: { tickets: 
 
       <Card className="p-2">
         {shown.map(t => (
-          <Link key={t.id} href={`/client/tickets/${t.id}`} className="block px-3 py-3 border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition">
+          <Link key={t.id} href={`/client/tickets/${t.id}`} className="flex items-center justify-between gap-2 px-3 py-3 border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition">
             <div className="min-w-0">
               {t.jobRef && <p className="text-[10px] font-mono text-[var(--text-faint)]">{t.jobRef}</p>}
               <p className="text-sm text-[var(--text)] truncate">{t.title}</p>
               <p className="text-[11px] text-[var(--text-faint)]">{t.category ?? 'General'} · {formatDateTime(t.createdAt)}{t.supplierAssigned ? ' · Supplier assigned' : ''}</p>
-              <div className="grid grid-cols-2 gap-1.5 w-fit justify-items-start mt-1.5">
-                <PriorityBadge priority={t.priority} />
-                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full text-center ${TONE[t.status]}`}>{WORD[t.status]}</span>
-              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5 w-fit shrink-0 justify-items-end">
+              <PriorityBadge priority={t.priority} />
+              <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full text-center ${TONE[t.status]}`}>{WORD[t.status]}</span>
             </div>
           </Link>
         ))}

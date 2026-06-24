@@ -37,14 +37,14 @@ export function RecentTicketsCard({ tickets }: { tickets: StoreManagerTicket[] }
       </div>
 
       {open && (recent.length ? recent.map(t => (
-        <Link key={t.id} href={`/client/tickets/${t.id}`} className="block py-2 -mx-2 px-2 rounded-lg border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition">
+        <Link key={t.id} href={`/client/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2 -mx-2 px-2 rounded-lg border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition">
           <div className="min-w-0">
             <p className="text-sm text-[var(--text)] truncate">{t.title}</p>
             <p className="text-[11px] text-[var(--text-faint)]">{t.jobRef ? `${t.jobRef} · ` : ''}{t.category ?? 'General'} · {formatDateTime(t.createdAt)}</p>
-            <div className="grid grid-cols-2 gap-1.5 w-fit justify-items-start mt-1.5">
-              <PriorityBadge priority={t.priority} />
-              <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full text-center ${STATUS_TONE[t.status]}`}>{STATUS_WORD[t.status]}</span>
-            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-1.5 w-fit shrink-0 justify-items-end">
+            <PriorityBadge priority={t.priority} />
+            <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full text-center ${STATUS_TONE[t.status]}`}>{STATUS_WORD[t.status]}</span>
           </div>
         </Link>
       )) : <p className="text-sm text-[var(--text-faint)]">No tickets in the last 7 days.</p>)}
