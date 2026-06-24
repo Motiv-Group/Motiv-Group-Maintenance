@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache';
 import { sendPushToMany } from '@/lib/push';
 import { OPERATIONAL_IMPACT_LABELS } from '@/lib/utils';
 import type { Priority } from '@/lib/types';
+import { getBriefingForUser } from '@/lib/briefing/generate';
+import { briefingToText } from '@/lib/briefing/facts';
 import https from 'https';
 
 // ─── ENV ────────────────────────────────────────────────────────────────────
@@ -411,6 +413,47 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ status: 'ok' });
 }
 
+// ─── Greeting / main menu ────────────────────────────────────────────────────
+// A casual greeting (or "menu"/"help") shows a role-aware action menu instead of
+// being treated as a ticket. Substantive text still flows straight to intake.
+const GREETING_RE = /^(hi+|hey+|hallo|hello|halo|howzit|yo+|sup|good\s*(morning|afternoon|evening|day)|goeie\s*(more|môre|middag|naand|dag)|menu|help|start|hi motiv|hello motiv)\b[\s!.,?]*$/i;
+function isGreeting(s: string): boolean { return GREETING_RE.test(s.trim()); }
+
+/** Send the role-aware main menu: SMs get Log-a-ticket + Briefing; others get Briefing. */
+async function sendMainMenu(from: string, normalisedPhone: string, adminClient: ReturnType<typeof createAdminClient>): Promise<void> {
+  const { data: profile } = await adminClient.from('user_profiles').select('role, full_name').eq('phone', normalisedPhone).maybeSingle();
+  if (!profile) {
+    await sendWhatsAppReply(from, '👋 Welcome to Motiv. Your number is not registered yet — please contact your administrator.');
+    return;
+  }
+  const name = (profile.full_name ?? '').split(' ')[0];
+  const isSM = profile.role === 'store_manager' || profile.role === 'client';
+  const buttons = isSM
+    ? [{ id: 'menu_log_ticket', title: 'Log a ticket' }, { id: 'menu_briefing', title: 'Daily briefing' }]
+    : [{ id: 'menu_briefing', title: 'Daily briefing' }];
+  await sendWhatsAppButtons(from, `👋 Hi ${name || 'there'}! What would you like to do?`, buttons);
+}
+
+/** Build the sender's daily briefing and send it as a WhatsApp message. */
+async function sendBriefingViaWhatsApp(from: string, normalisedPhone: string, adminClient: ReturnType<typeof createAdminClient>): Promise<void> {
+  const { data: profile } = await adminClient.from('user_profiles').select('id, role, company_id').eq('phone', normalisedPhone).maybeSingle();
+  if (!profile?.company_id) {
+    await sendWhatsAppReply(from, '⚠️ Your number is not registered in Motiv. Please contact your administrator.');
+    return;
+  }
+  try {
+    const briefing = await getBriefingForUser({ userId: profile.id, role: profile.role, companyId: profile.company_id });
+    if (!briefing) {
+      await sendWhatsAppReply(from, "I couldn't build your briefing yet — your account may not be linked to a store/region. Please check the app.");
+      return;
+    }
+    await sendWhatsAppReply(from, briefingToText(briefing));
+  } catch (err) {
+    console.error('[WhatsApp] briefing send error:', err);
+    await sendWhatsAppReply(from, '⚠️ Could not generate your briefing right now. Please try again shortly.');
+  }
+}
+
 async function handleWebhook(payload: WaPayload) {
   try {
     console.log('[WhatsApp] Raw payload:', JSON.stringify(payload, null, 2));
@@ -438,6 +481,8 @@ async function handleWebhook(payload: WaPayload) {
       const reply = message.interactive?.button_reply ?? message.interactive?.list_reply;
       const id = reply?.id ?? '';
 
+      if (id === 'menu_log_ticket') { await sendWhatsAppReply(from, '📝 Send a voice note or describe the maintenance issue, and I’ll log it for you.'); return; }
+      if (id === 'menu_briefing')   { await sendBriefingViaWhatsApp(from, normalisedPhone, adminClient); return; }
       if (id === 'submit_ticket') { await handleSubmitButton(from, normalisedPhone, adminClient); return; }
       if (id === 'confirm_ticket') {
         const session = await fetchConfirmSession(normalisedPhone, adminClient);
@@ -478,6 +523,8 @@ async function handleWebhook(payload: WaPayload) {
           await handleConfirmText(from, active, body, adminClient);
           return;
         }
+        // Greeting / "menu" / "help" → role-aware menu instead of a ticket draft.
+        if (isGreeting(body)) { await sendMainMenu(from, normalisedPhone, adminClient); return; }
         await handleNewTicket(from, normalisedPhone, message, adminClient);
         return;
       }

@@ -5,7 +5,13 @@
 // briefing so the dashboard never blocks or breaks.
 import 'server-only'
 import { createAdminClient } from '@/lib/supabase/server'
-import { fallbackBriefing, type Briefing, type BriefingFacts, type BriefingRole, type BriefingScope } from './facts'
+import {
+  assembleStoreManagerDashboard, assembleRegionalDashboard, assembleSupplierDashboard, assembleEstateDashboard,
+} from '@/lib/health/data'
+import {
+  fallbackBriefing, storeFacts, regionFacts, supplierFacts, estateFacts,
+  type Briefing, type BriefingFacts, type BriefingRole, type BriefingScope,
+} from './facts'
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
@@ -102,4 +108,41 @@ export async function getDailyBriefing({ companyId, scope, scopeId, role, facts,
   } catch {
     return fallbackBriefing(role, facts, now) // DB unavailable → still show something
   }
+}
+
+/**
+ * Resolve + build a user's briefing from their role/scope (shares the same daily
+ * cache as the dashboards). Used by the WhatsApp menu. Returns null if the user
+ * isn't linked to any scope yet.
+ */
+export async function getBriefingForUser(opts: { userId: string; role: string; companyId: string; now?: Date }): Promise<Briefing | null> {
+  const { userId, role, companyId, now } = opts
+  const db = createAdminClient()
+
+  if (role === 'store_manager' || role === 'client') {
+    const { data } = await db.from('store_users').select('store_id').eq('user_id', userId)
+    const storeIds = (data ?? []).map(l => l.store_id)
+    if (!storeIds.length) return null
+    const d = await assembleStoreManagerDashboard(companyId, storeIds)
+    return getDailyBriefing({ companyId, scope: 'store', scopeId: storeIds.slice().sort().join(','), role: 'store_manager', facts: storeFacts(d), now })
+  }
+  if (role === 'regional_manager') {
+    const { data } = await db.from('regional_users').select('region_id').eq('user_id', userId)
+    const regionIds = (data ?? []).map(l => l.region_id)
+    if (!regionIds.length) return null
+    const d = await assembleRegionalDashboard(companyId, regionIds)
+    return getDailyBriefing({ companyId, scope: 'region', scopeId: regionIds.slice().sort().join(','), role: 'regional_manager', facts: regionFacts(d), now })
+  }
+  if (role === 'supplier') {
+    const { data } = await db.from('supplier_users').select('supplier_id').eq('user_id', userId)
+    const supplierIds = (data ?? []).map(l => l.supplier_id)
+    if (!supplierIds.length) return null
+    const d = await assembleSupplierDashboard(companyId, supplierIds)
+    return getDailyBriefing({ companyId, scope: 'supplier', scopeId: supplierIds.slice().sort().join(','), role: 'supplier', facts: supplierFacts(d), now })
+  }
+  if (role === 'executive' || role === 'system_admin') {
+    const d = await assembleEstateDashboard(companyId)
+    return getDailyBriefing({ companyId, scope: 'estate', scopeId: companyId, role: 'executive', facts: estateFacts(d), now })
+  }
+  return null
 }

@@ -12,6 +12,11 @@ export interface Briefing { headline: string | null; body: string; source: 'ai' 
 
 const r = (n: number) => `R${Math.round(n).toLocaleString('en-ZA')}`
 
+/** Render a briefing as a WhatsApp message (bold headline + body + sign-off). */
+export function briefingToText(b: Briefing): string {
+  return `${b.headline ? `*${b.headline}*\n\n` : ''}${b.body}\n\n— Motiv briefing`
+}
+
 // ── facts builders ──────────────────────────────────────────────
 // Store managers must never see money/quotes — those keys are omitted here.
 export function storeFacts(d: StoreManagerData): BriefingFacts {
