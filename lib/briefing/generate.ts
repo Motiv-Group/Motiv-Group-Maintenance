@@ -68,12 +68,17 @@ async function callGroq(role: BriefingRole, facts: BriefingFacts): Promise<{ hea
   }
 }
 
+// facts may be passed eagerly (dashboards already assembled their data) or as a
+// thunk that's only invoked on a cache MISS (lets the morning push skip the
+// expensive dashboard assemble for every already-cached scope).
+type FactsInput = BriefingFacts | (() => BriefingFacts | Promise<BriefingFacts>)
+
 interface Args {
   companyId: string
   scope: BriefingScope
   scopeId: string
   role: BriefingRole
-  facts: BriefingFacts
+  facts: FactsInput
   now?: Date
 }
 
@@ -84,29 +89,33 @@ interface Args {
 export async function getDailyBriefing({ companyId, scope, scopeId, role, facts, now = new Date() }: Args): Promise<Briefing> {
   const date = now.toISOString().slice(0, 10)
   const id = scopeId || companyId
+  const resolveFacts = async (): Promise<BriefingFacts> => (typeof facts === 'function' ? await facts() : facts)
   try {
     const db = createAdminClient()
     const { data: existing, error: selErr } = await db.from('daily_briefings')
       .select('headline, body, source')
       .eq('company_id', companyId).eq('scope', scope).eq('scope_id', id).eq('briefing_date', date)
       .maybeSingle()
-    // Table not migrated yet (or transient read error) → show fallback without
-    // hammering the LLM on every load. Caching resumes once the table exists.
-    if (selErr) return fallbackBriefing(role, facts, now)
+    // Cache hit → return without resolving facts (skips the dashboard assemble).
     if (existing) return { headline: existing.headline ?? null, body: existing.body, source: (existing.source as Briefing['source']) ?? 'ai' }
 
-    const ai = await callGroq(role, facts)
-    const briefing: Briefing = ai ? { headline: ai.headline || null, body: ai.body, source: 'ai' } : fallbackBriefing(role, facts, now)
+    const resolved = await resolveFacts()
+    // Table not migrated yet (or transient read error) → fallback, don't cache.
+    if (selErr) return fallbackBriefing(role, resolved, now)
+
+    const ai = await callGroq(role, resolved)
+    const briefing: Briefing = ai ? { headline: ai.headline || null, body: ai.body, source: 'ai' } : fallbackBriefing(role, resolved, now)
 
     // Cache for the rest of the day; ignore conflicts from a concurrent first load.
     await db.from('daily_briefings').upsert({
       company_id: companyId, scope, scope_id: id, briefing_date: date, role,
-      headline: briefing.headline, body: briefing.body, source: briefing.source, facts: facts as any,
+      headline: briefing.headline, body: briefing.body, source: briefing.source, facts: resolved as any,
     }, { onConflict: 'company_id,scope,scope_id,briefing_date', ignoreDuplicates: true })
 
     return briefing
   } catch {
-    return fallbackBriefing(role, facts, now) // DB unavailable → still show something
+    try { return fallbackBriefing(role, await resolveFacts(), now) } // DB unavailable → still show something
+    catch { return { headline: null, body: 'Your briefing is unavailable right now.', source: 'fallback' } }
   }
 }
 
@@ -119,30 +128,28 @@ export async function getBriefingForUser(opts: { userId: string; role: string; c
   const { userId, role, companyId, now } = opts
   const db = createAdminClient()
 
+  // facts are passed as thunks so the (expensive) dashboard assemble only runs
+  // on a cache miss — important for the morning push that loops over every user.
   if (role === 'store_manager' || role === 'client') {
     const { data } = await db.from('store_users').select('store_id').eq('user_id', userId)
     const storeIds = (data ?? []).map(l => l.store_id)
     if (!storeIds.length) return null
-    const d = await assembleStoreManagerDashboard(companyId, storeIds)
-    return getDailyBriefing({ companyId, scope: 'store', scopeId: storeIds.slice().sort().join(','), role: 'store_manager', facts: storeFacts(d), now })
+    return getDailyBriefing({ companyId, scope: 'store', scopeId: storeIds.slice().sort().join(','), role: 'store_manager', facts: async () => storeFacts(await assembleStoreManagerDashboard(companyId, storeIds)), now })
   }
   if (role === 'regional_manager') {
     const { data } = await db.from('regional_users').select('region_id').eq('user_id', userId)
     const regionIds = (data ?? []).map(l => l.region_id)
     if (!regionIds.length) return null
-    const d = await assembleRegionalDashboard(companyId, regionIds)
-    return getDailyBriefing({ companyId, scope: 'region', scopeId: regionIds.slice().sort().join(','), role: 'regional_manager', facts: regionFacts(d), now })
+    return getDailyBriefing({ companyId, scope: 'region', scopeId: regionIds.slice().sort().join(','), role: 'regional_manager', facts: async () => regionFacts(await assembleRegionalDashboard(companyId, regionIds)), now })
   }
   if (role === 'supplier') {
     const { data } = await db.from('supplier_users').select('supplier_id').eq('user_id', userId)
     const supplierIds = (data ?? []).map(l => l.supplier_id)
     if (!supplierIds.length) return null
-    const d = await assembleSupplierDashboard(companyId, supplierIds)
-    return getDailyBriefing({ companyId, scope: 'supplier', scopeId: supplierIds.slice().sort().join(','), role: 'supplier', facts: supplierFacts(d), now })
+    return getDailyBriefing({ companyId, scope: 'supplier', scopeId: supplierIds.slice().sort().join(','), role: 'supplier', facts: async () => supplierFacts(await assembleSupplierDashboard(companyId, supplierIds)), now })
   }
   if (role === 'executive' || role === 'system_admin') {
-    const d = await assembleEstateDashboard(companyId)
-    return getDailyBriefing({ companyId, scope: 'estate', scopeId: companyId, role: 'executive', facts: estateFacts(d), now })
+    return getDailyBriefing({ companyId, scope: 'estate', scopeId: companyId, role: 'executive', facts: async () => estateFacts(await assembleEstateDashboard(companyId)), now })
   }
   return null
 }

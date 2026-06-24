@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { runEstateSnapshots } from '@/lib/health/snapshots'
 import { runRepeatDefectRecompute } from '@/lib/health/recompute'
+import { runMorningBriefingPush } from '@/lib/briefing/push'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -15,7 +16,12 @@ export async function GET(request: Request) {
   try {
     const repeat = await runRepeatDefectRecompute()
     const summary = await runEstateSnapshots()
-    return NextResponse.json({ ok: true, repeat, summary })
+    // Morning briefing push (folded in to fit the Hobby 2-cron limit). Runs at
+    // ~07:00 SAST via this cron's schedule. Isolated so it can't fail the snapshot.
+    let briefings: { users: number; sent: number; skipped: number } | { error: string } | null = null
+    try { briefings = await runMorningBriefingPush() }
+    catch (e: any) { briefings = { error: e?.message ?? 'briefing push failed' } }
+    return NextResponse.json({ ok: true, repeat, summary, briefings })
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message ?? 'Snapshot failed' }, { status: 500 })
   }
