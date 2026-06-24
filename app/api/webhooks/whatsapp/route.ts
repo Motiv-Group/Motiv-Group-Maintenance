@@ -221,51 +221,49 @@ function impactToPriority(impact: OpImpact): { priority: V3Priority; severity: '
 }
 const P_EMOJI: Record<V3Priority, string> = { P1: '🔴', P2: '🟠', P3: '🟡', P4: '🟢' };
 
+/** POST a message payload to the WhatsApp Cloud API. Logs Meta's error body on
+ *  failure (these were previously swallowed, so rejected interactive messages
+ *  looked like "nothing happened"). Returns true on a 2xx. */
+async function waPost(payload: object, label: string): Promise<boolean> {
+  try {
+    const res = await fetch(`https://graph.facebook.com/v21.0/${WA_PHONE_ID}/messages`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${WA_TOKEN}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      console.error(`[WhatsApp] ${label} failed ${res.status}:`, await res.text().catch(() => ''));
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error(`[WhatsApp] ${label} error:`, err);
+    return false;
+  }
+}
+
 /** Send a WhatsApp text reply */
-async function sendWhatsAppReply(to: string, text: string): Promise<void> {
-  await fetch(`https://graph.facebook.com/v21.0/${WA_PHONE_ID}/messages`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${WA_TOKEN}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'text', text: { body: text } }),
-  });
+async function sendWhatsAppReply(to: string, text: string): Promise<boolean> {
+  return waPost({ messaging_product: 'whatsapp', to, type: 'text', text: { body: text } }, 'text');
 }
 
 /** Send a WhatsApp interactive button message */
-async function sendWhatsAppButton(to: string, bodyText: string, buttonLabel: string, buttonId: string): Promise<void> {
-  await fetch(`https://graph.facebook.com/v21.0/${WA_PHONE_ID}/messages`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${WA_TOKEN}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      messaging_product: 'whatsapp',
-      to,
-      type: 'interactive',
-      interactive: {
-        type: 'button',
-        body: { text: bodyText },
-        action: {
-          buttons: [{ type: 'reply', reply: { id: buttonId, title: buttonLabel } }],
-        },
-      },
-    }),
-  });
+async function sendWhatsAppButton(to: string, bodyText: string, buttonLabel: string, buttonId: string): Promise<boolean> {
+  return waPost({
+    messaging_product: 'whatsapp', to, type: 'interactive',
+    interactive: { type: 'button', body: { text: bodyText }, action: { buttons: [{ type: 'reply', reply: { id: buttonId, title: buttonLabel } }] } },
+  }, 'button');
 }
 
 /** Send a WhatsApp interactive message with up to 3 reply buttons. */
-async function sendWhatsAppButtons(to: string, bodyText: string, buttons: { id: string; title: string }[]): Promise<void> {
-  await fetch(`https://graph.facebook.com/v21.0/${WA_PHONE_ID}/messages`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${WA_TOKEN}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      messaging_product: 'whatsapp',
-      to,
-      type: 'interactive',
-      interactive: {
-        type: 'button',
-        body: { text: bodyText },
-        action: { buttons: buttons.slice(0, 3).map(b => ({ type: 'reply', reply: { id: b.id, title: b.title } })) },
-      },
-    }),
-  });
+async function sendWhatsAppButtons(to: string, bodyText: string, buttons: { id: string; title: string }[]): Promise<boolean> {
+  return waPost({
+    messaging_product: 'whatsapp', to, type: 'interactive',
+    interactive: {
+      type: 'button', body: { text: bodyText },
+      action: { buttons: buttons.slice(0, 3).map(b => ({ type: 'reply', reply: { id: b.id, title: b.title } })) },
+    },
+  }, 'buttons');
 }
 
 const PRIORITY_EMOJI: Record<Priority, string> = { low: '🟢', medium: '🟡', high: '🟠', urgent: '🔴' };
@@ -295,24 +293,17 @@ async function sendDraft(from: string, d: DraftView): Promise<void> {
 }
 
 /** Interactive list message (tappable menu) — single section, up to 10 rows. */
-async function sendWhatsAppList(to: string, bodyText: string, buttonLabel: string, rows: { id: string; title: string; description?: string }[]): Promise<void> {
-  await fetch(`https://graph.facebook.com/v21.0/${WA_PHONE_ID}/messages`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${WA_TOKEN}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      messaging_product: 'whatsapp',
-      to,
-      type: 'interactive',
-      interactive: {
-        type: 'list',
-        body: { text: bodyText },
-        action: {
-          button: buttonLabel.slice(0, 20),
-          sections: [{ rows: rows.slice(0, 10).map(r => ({ id: r.id, title: r.title.slice(0, 24), ...(r.description ? { description: r.description.slice(0, 72) } : {}) })) }],
-        },
+async function sendWhatsAppList(to: string, bodyText: string, buttonLabel: string, rows: { id: string; title: string; description?: string }[]): Promise<boolean> {
+  return waPost({
+    messaging_product: 'whatsapp', to, type: 'interactive',
+    interactive: {
+      type: 'list', body: { text: bodyText },
+      action: {
+        button: buttonLabel.slice(0, 20),
+        sections: [{ rows: rows.slice(0, 10).map(r => ({ id: r.id, title: r.title.slice(0, 24), ...(r.description ? { description: r.description.slice(0, 72) } : {}) })) }],
       },
-    }),
-  });
+    },
+  }, 'list');
 }
 
 /** Tap-to-edit: pick which field to change. */
@@ -437,7 +428,16 @@ async function sendMainMenu(from: string, normalisedPhone: string, adminClient: 
   const buttons = isSM
     ? [{ id: 'menu_log_ticket', title: 'Log a ticket' }, { id: 'menu_briefing', title: 'Daily briefing' }]
     : [{ id: 'menu_briefing', title: 'Daily briefing' }];
-  await sendWhatsAppButtons(from, bodyText ?? `👋 Hi ${name || 'there'}! What would you like to do?`, buttons);
+  const body = bodyText ?? `👋 Hi ${name || 'there'}! What would you like to do?`;
+  const ok = await sendWhatsAppButtons(from, body, buttons);
+  // Fallback if interactive buttons are rejected (keeps the menu usable): a plain
+  // text prompt with keyword replies, handled in the text dispatcher.
+  if (!ok) {
+    const options = isSM
+      ? 'Reply *ticket* to log a maintenance issue, or *briefing* for your daily briefing.'
+      : 'Reply *briefing* for your daily briefing.';
+    await sendWhatsAppReply(from, `${body}\n\n${options}`);
+  }
 }
 
 /** Build the sender's daily briefing and send it as a WhatsApp message. */
@@ -532,6 +532,15 @@ async function handleWebhook(payload: WaPayload) {
         }
         if (active?.status === 'awaiting_confirm') {
           await handleConfirmText(from, active, body, adminClient);
+          return;
+        }
+        // Keyword shortcuts (also power the text fallback when buttons fail).
+        if (lower === 'ticket' || lower === 'log ticket' || lower === 'log a ticket') {
+          await sendWhatsAppReply(from, '📝 Send a voice note or describe the maintenance issue, and I’ll log it for you.');
+          return;
+        }
+        if (lower === 'briefing' || lower === 'daily briefing' || lower === 'debrief') {
+          await sendBriefingViaWhatsApp(from, normalisedPhone, adminClient);
           return;
         }
         // Greeting / "menu" / "help" → role-aware menu instead of a ticket draft.
