@@ -40,7 +40,11 @@ export interface Profile {
 
 export interface Ticket {
   id: string
-  job_number?: number | null
+  job_number?: number | null   // legacy global sequence (JOB-00042)
+  store_job_number?: number | null
+  store_job_year?: number | null
+  job_ref?: string | null      // per-store reference, e.g. WBP-2026-0007
+  branch_code?: string | null
   client_id: string            // the store profile (store_id)
   region_id?: string | null
   supplier_id?: string | null  // sub-supplier (trade directory) assigned

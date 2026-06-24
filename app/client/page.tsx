@@ -1,13 +1,13 @@
 export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
-import { PlusCircle, Calendar, ClipboardList, Wrench, CheckCircle2, AlertTriangle, Inbox, Banknote, ListTodo, ShieldAlert } from 'lucide-react'
+import { PlusCircle, Calendar, ClipboardList, Wrench, CheckCircle2, AlertTriangle, ListTodo, ShieldAlert } from 'lucide-react'
 import { requireStoreManagerV3 } from '@/lib/health/guard'
 import { assembleStoreManagerDashboard } from '@/lib/health/data'
 import { STATUS_LABELS } from '@/lib/health/constants'
 import { Card, Donut, Pill, KpiCard, BreakdownList, SectionCard, type Kpi } from '@/components/exec/ui'
 import { RecentTicketsCard } from '@/components/client/RecentTicketsCard'
-import { formatDate, formatCurrency } from '@/lib/utils'
+import { formatDate } from '@/lib/utils'
 
 export default async function StoreOverviewPage() {
   const { companyId, storeIds, fullName } = await requireStoreManagerV3()
@@ -15,20 +15,18 @@ export default async function StoreOverviewPage() {
   const h = d.health
   const greeting = (() => { const x = new Date().getHours(); return x < 12 ? 'Good morning' : x < 17 ? 'Good afternoon' : 'Good evening' })()
 
+  // Store managers only ever see ticket status — never money or quotes.
   const kpis: Kpi[] = [
     { label: 'Open', value: d.open, icon: <ClipboardList size={13} /> },
     { label: 'In Progress', value: d.inProgress, icon: <Wrench size={13} /> },
     { label: 'Completed', value: d.completed, icon: <CheckCircle2 size={13} />, tone: 'good' },
     { label: 'Overdue', value: h?.overdueTickets ?? 0, icon: <AlertTriangle size={13} />, tone: (h?.overdueTickets ?? 0) ? 'bad' : 'good' },
-    { label: 'Awaiting your input', value: d.awaitingInput, icon: <Inbox size={13} />, tone: d.awaitingInput ? 'warn' : 'good' },
-    { label: 'Cost exposure', value: formatCurrency(h?.costExposure ?? 0), icon: <Banknote size={13} /> },
   ]
 
+  // Status-only prompts — no info-request / quote / money items.
   const actions: { icon: React.ReactNode; text: string }[] = []
-  if (d.awaitingInput > 0) actions.push({ icon: <Inbox size={15} className="text-amber-500 mt-0.5 shrink-0" />, text: `Respond to ${d.awaitingInput} information request${d.awaitingInput > 1 ? 's' : ''} so the work can continue.` })
   if ((h?.safetyOpen ?? 0) > 0) actions.push({ icon: <ShieldAlert size={15} className="text-red-500 mt-0.5 shrink-0" />, text: `${h!.safetyOpen} safety-risk ticket${h!.safetyOpen > 1 ? 's' : ''} open — these are prioritised.` })
   if ((h?.overdueTickets ?? 0) > 0) actions.push({ icon: <AlertTriangle size={15} className="text-amber-500 mt-0.5 shrink-0" />, text: `${h!.overdueTickets} ticket${h!.overdueTickets > 1 ? 's' : ''} past target — the team is following up.` })
-  if ((h?.pendingDecisions ?? 0) > 0) actions.push({ icon: <ListTodo size={15} className="text-[#C6A35D] mt-0.5 shrink-0" />, text: `${h!.pendingDecisions} quote${h!.pendingDecisions > 1 ? 's' : ''} awaiting approval.` })
 
   return (
     <div className="space-y-5">
@@ -76,7 +74,7 @@ export default async function StoreOverviewPage() {
       )}
 
       {/* KPI grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {kpis.map((k, i) => <KpiCard key={i} kpi={k} />)}
       </div>
 

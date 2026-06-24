@@ -34,6 +34,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
 
       <Card className="p-5 space-y-4">
         <div>
+          {t.job_ref && <p className="text-[11px] font-mono font-semibold tracking-wide text-[var(--text-faint)] mb-0.5">{t.job_ref}</p>}
           <h1 className="text-lg font-bold text-[var(--text)]">{t.title}</h1>
           <p className="text-sm text-[var(--text-muted)]">{storeName} · {t.priority} · {t.category ?? 'General'}</p>
         </div>

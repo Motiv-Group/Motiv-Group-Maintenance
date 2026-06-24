@@ -15,6 +15,7 @@ const STALE_MS = 7 * 24 * 60 * 60 * 1000
 export interface RecentTicket {
   id: string
   job_number?: number | null
+  job_ref?: string | null
   title: string
   status: string
   priority: string
@@ -41,7 +42,7 @@ export function TicketContent({ ticket, variant }: { ticket: RecentTicket; varia
     ? ticket.profiles?.sub_store
     : ticket.store?.sub_store
 
-  const jobId = formatJobId(ticket.job_number)
+  const jobId = ticket.job_ref ?? formatJobId(ticket.job_number)
   const isStaleOpen = ticket.status === 'open' && Date.now() - new Date(ticket.created_at).getTime() > STALE_MS
 
   return (

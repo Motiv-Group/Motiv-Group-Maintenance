@@ -17,6 +17,8 @@ import { calculateSupplierPerformance, type SupplierPerformance } from './suppli
 import { detectRepeatDefects, type RepeatDefect } from './repeatDefects'
 import { getExecutiveDecisionItems, type DecisionItem } from './decisions'
 import { computeTicketSla, supplierBreachOlderThan, internalBreachOlderThan } from './sla'
+import { clientVisibleStatus } from '@/lib/utils'
+import type { TicketStatus } from '@/lib/types'
 
 type DB = ReturnType<typeof createAdminClient>
 const DAY = 24 * 3600_000
@@ -403,13 +405,14 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
 // STORE MANAGER DASHBOARD (simplified, own store only)
 // ============================================================
 export type ClientStatus = 'open' | 'in_progress' | 'completed'
-function clientVisible(status: string): ClientStatus | null {
-  if (status === 'cancelled' || status === 'declined') return null
-  if (status === 'completed') return 'completed'
-  if (status === 'open') return 'open'
-  return 'in_progress'
-}
-export interface StoreManagerTicket { id: string; title: string; description: string | null; category: string | null; status: ClientStatus; priority: Priority; operationalImpact: string | null; createdAt: string; supplierAssigned: boolean }
+// Single source of truth for the SM/client Open → In Progress → Completed
+// collapse lives in lib/utils (clientVisibleStatus). Re-use it here so the
+// dashboard counts and the ticket-detail badge can never disagree (previously
+// this mapped everything-not-open → in_progress, which is why an assigned/quoted
+// ticket read "Open" on the detail page but "In Progress" on the dashboard).
+const clientVisible = (status: string): ClientStatus | null =>
+  clientVisibleStatus(status as TicketStatus)
+export interface StoreManagerTicket { id: string; title: string; description: string | null; category: string | null; status: ClientStatus; priority: Priority; operationalImpact: string | null; createdAt: string; supplierAssigned: boolean; jobRef: string | null }
 export interface StoreManagerData {
   storeName: string
   company: string
@@ -443,7 +446,7 @@ export async function assembleStoreManagerDashboard(companyId: string, storeIds:
     const v = clientVisible(t.status)
     if (!v) continue
     if (v === 'open') open++; else if (v === 'in_progress') inProgress++; else completed++
-    visible.push({ id: t.id, title: t.title ?? 'Untitled', description: (t as any).description ?? null, category: t.category ?? null, status: v, priority: t.priority, operationalImpact: t.operational_impact ?? null, createdAt: t.created_at, supplierAssigned: !!t.supplier_id })
+    visible.push({ id: t.id, title: t.title ?? 'Untitled', description: (t as any).description ?? null, category: t.category ?? null, status: v, priority: t.priority, operationalImpact: t.operational_impact ?? null, createdAt: t.created_at, supplierAssigned: !!t.supplier_id, jobRef: (t as any).job_ref ?? null })
   }
   visible.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
   return {

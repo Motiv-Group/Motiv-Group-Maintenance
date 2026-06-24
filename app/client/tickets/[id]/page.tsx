@@ -10,7 +10,8 @@ import { WorkflowActions } from '@/components/workflow/WorkflowActions'
 import { ClientTicketProgress } from '@/components/client/ClientTicketProgress'
 import { ClientTicketStatus } from '@/components/client/ClientTicketStatus'
 import { EditTicketForm } from '@/components/client/EditTicketForm'
-import { formatDateTime, clientVisibleStatus, OPERATIONAL_IMPACT_LABELS, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
+import { PriorityBadge } from '@/components/ui/PriorityBadge'
+import { formatDateTime, clientVisibleStatus, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
 import type { TicketStatus } from '@/lib/types'
 
 const CV_TONE: Record<string, string> = {
@@ -48,17 +49,22 @@ export default async function StoreTicketDetailPage({ params }: { params: { id: 
       {/* Ticket detail — all info, structured */}
       <Card className="p-5 space-y-4">
         <div className="flex items-start justify-between gap-3">
-          <h1 className="text-lg font-bold text-[var(--text)] min-w-0">{t.title}</h1>
-          {(() => {
-            const cv = clientVisibleStatus(t.status as TicketStatus)
-            return cv ? <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full shrink-0 ${CV_TONE[cv]}`}>{CV_WORD[cv]}</span> : null
-          })()}
+          <div className="min-w-0">
+            {t.job_ref && <p className="text-[11px] font-mono font-semibold tracking-wide text-[var(--text-faint)] mb-0.5">{t.job_ref}</p>}
+            <h1 className="text-lg font-bold text-[var(--text)]">{t.title}</h1>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <PriorityBadge priority={t.priority} />
+            {(() => {
+              const cv = clientVisibleStatus(t.status as TicketStatus)
+              return cv ? <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full ${CV_TONE[cv]}`}>{CV_WORD[cv]}</span> : null
+            })()}
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-x-4 gap-y-3">
           <DetailItem label="Category" value={t.category ?? 'General'} />
           <DetailItem label="Operational Impact" value={OPERATIONAL_IMPACT_LABELS[t.operational_impact ?? 'none'] ?? 'No operational impact'} />
-          <DetailItem label="Priority" value={PRIORITY_LEVEL_LABELS[t.priority] ?? '—'} />
           <DetailItem label="Logged" value={formatDateTime(t.created_at)} />
         </div>
 
@@ -84,11 +90,11 @@ export default async function StoreTicketDetailPage({ params }: { params: { id: 
         <EditTicketForm ticketId={t.id} initial={{ title: t.title, category: t.category ?? 'General', impact: t.operational_impact ?? 'none', description: t.description }} />
       )}
 
-      {/* Plain-language status (no quote/sign-off jargon) + the only SM action: resubmit */}
-      <Card className="p-5 space-y-3">
-        <ClientTicketStatus status={t.status} />
-        <WorkflowActions ticketId={t.id} status={t.status} role="store_manager" />
-      </Card>
+      {/* Plain-language status (no quote/sign-off jargon) — its own accented card */}
+      <ClientTicketStatus status={t.status} />
+
+      {/* The only SM action (resubmit on info-requested); renders nothing otherwise */}
+      <WorkflowActions ticketId={t.id} status={t.status} role="store_manager" />
 
       <Card className="p-5">
         <h2 className="text-sm font-bold text-[var(--text)] mb-3">Activity</h2>

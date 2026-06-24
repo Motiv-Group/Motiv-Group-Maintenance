@@ -29,8 +29,8 @@ function TicketRow({ ticket, storeName }: { ticket: Ticket; storeName?: string }
       <div className="bg-slate-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 hover:border-brand-400 dark:hover:border-gray-400 transition-colors">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            {formatJobId((ticket as any).job_number) && (
-              <p className="text-[10px] font-mono text-gray-400 dark:text-gray-500 mb-0.5">{formatJobId((ticket as any).job_number)}</p>
+            {((ticket as any).job_ref ?? formatJobId((ticket as any).job_number)) && (
+              <p className="text-[10px] font-mono text-gray-400 dark:text-gray-500 mb-0.5">{(ticket as any).job_ref ?? formatJobId((ticket as any).job_number)}</p>
             )}
             <p className="font-medium text-sm text-gray-900 dark:text-white truncate">{ticket.title}</p>
             {storeName && (

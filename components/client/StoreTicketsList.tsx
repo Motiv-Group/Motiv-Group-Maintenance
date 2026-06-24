@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { PlusCircle, Search, Ticket } from 'lucide-react'
 import type { StoreManagerTicket } from '@/lib/health/data'
 import { Card } from '@/components/exec/ui'
+import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { formatDate, formatDateTime, OPERATIONAL_IMPACT_LABELS, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
 
 type Filter = 'all' | 'open' | 'in_progress' | 'completed'
@@ -47,6 +48,7 @@ export function StoreTicketsList({ tickets }: { tickets: StoreManagerTicket[] })
       t.priority, PRIORITY_LEVEL_LABELS[t.priority] ?? '',
       t.operationalImpact ? (OPERATIONAL_IMPACT_LABELS[t.operationalImpact] ?? t.operationalImpact) : '',
       t.operationalImpact ?? '',
+      t.jobRef ?? '',
       formatDate(t.createdAt), formatDateTime(t.createdAt),
       t.supplierAssigned ? 'supplier assigned' : '',
     ].join(' · ').toLowerCase(),
@@ -112,10 +114,14 @@ export function StoreTicketsList({ tickets }: { tickets: StoreManagerTicket[] })
         {shown.map(t => (
           <Link key={t.id} href={`/client/tickets/${t.id}`} className="flex items-center justify-between gap-2 px-3 py-3 border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition">
             <div className="min-w-0">
+              {t.jobRef && <p className="text-[10px] font-mono text-[var(--text-faint)]">{t.jobRef}</p>}
               <p className="text-sm text-[var(--text)] truncate">{t.title}</p>
               <p className="text-[11px] text-[var(--text-faint)]">{t.category ?? 'General'} · {formatDateTime(t.createdAt)}{t.supplierAssigned ? ' · Supplier assigned' : ''}</p>
             </div>
-            <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${TONE[t.status]}`}>{WORD[t.status]}</span>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <PriorityBadge priority={t.priority} />
+              <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${TONE[t.status]}`}>{WORD[t.status]}</span>
+            </div>
           </Link>
         ))}
         {!shown.length && <p className="text-sm text-[var(--text-faint)] text-center py-8">{tickets.length ? 'No tickets match.' : 'No tickets yet.'}</p>}

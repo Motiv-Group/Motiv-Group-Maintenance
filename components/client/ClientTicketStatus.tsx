@@ -6,7 +6,7 @@ type Mode = 'wait' | 'spin' | 'done' | 'closed'
 interface Meta { msg: string; sub: string; mode: Mode }
 
 const MAP: Record<string, Meta> = {
-  open:              { msg: 'Logged — awaiting review',     sub: "We've received your request.",            mode: 'wait' },
+  open:              { msg: 'Being processed',              sub: 'Your ticket has been received and is being processed. You will be notified once work begins.', mode: 'wait' },
   info_requested:    { msg: 'We need a bit more info',      sub: 'Please update and resubmit below.',         mode: 'wait' },
   assigned:          { msg: 'Assigned to a team',           sub: 'Getting this organised for you.',           mode: 'spin' },
   assessment:        { msg: 'Being assessed',               sub: 'A technician is reviewing the issue.',      mode: 'spin' },
@@ -32,20 +32,22 @@ export function ClientTicketStatus({ status }: { status: string }) {
   const m = MAP[status] ?? { msg: 'In progress', sub: 'Being handled.', mode: 'spin' as Mode }
   const done = status === 'completed'
   const closed = status === 'cancelled' || status === 'declined'
-  const active = !done && !closed   // everything in-flight spins, incl. "awaiting review"
+  const active = !done && !closed   // everything in-flight spins, incl. "being processed"
+  const isWait = m.mode === 'wait'  // logged / awaiting-review → blue tone
   const Icon = done ? CheckCircle2 : closed ? XCircle : Loader2
-  const color = done ? 'text-emerald-400' : closed ? 'text-[var(--text-faint)]' : 'text-[#C6A35D]'
-  // Logged / awaiting-review states spin blue (matches the "open" tone);
-  // active work stays gold.
-  const spinColor = m.mode === 'wait' ? 'text-blue-500' : 'text-[#C6A35D]'
+  // Self-contained card: blue accent while being processed, gold while work is
+  // underway, emerald when complete, faint when closed.
+  const ring = done ? 'ring-emerald-500/40' : closed ? 'ring-[var(--border)]' : isWait ? 'ring-blue-500/40' : 'ring-[#C6A35D]/40'
+  const iconColor = done ? 'text-emerald-400' : closed ? 'text-[var(--text-faint)]' : isWait ? 'text-blue-500' : 'text-[#C6A35D]'
+  const subColor = active && isWait ? 'text-blue-600/90 dark:text-blue-300/80' : 'text-[var(--text-muted)]'
   return (
-    <div className="flex items-center gap-3">
+    <div className={`rounded-2xl bg-[var(--surface)] ring-1 ${ring} p-5 flex items-center gap-4`}>
       {active
-        ? <span className="relative shrink-0 w-6 h-6"><Loader2 size={24} className={`${spinColor} animate-spin`} /></span>
-        : <Icon size={22} className={`${color} shrink-0`} />}
-      <div>
-        <p className="text-sm font-semibold text-[var(--text)]">{m.msg}</p>
-        <p className="text-xs text-[var(--text-muted)]">{m.sub}</p>
+        ? <Loader2 size={26} className={`${iconColor} animate-spin shrink-0`} />
+        : <Icon size={26} className={`${iconColor} shrink-0`} />}
+      <div className="min-w-0">
+        <p className="text-base font-bold text-[var(--text)]">{m.msg}</p>
+        <p className={`text-sm mt-0.5 ${subColor}`}>{m.sub}</p>
       </div>
     </div>
   )
