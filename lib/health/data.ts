@@ -417,13 +417,14 @@ export interface StoreManagerData {
   branchCode: string
   health: StoreHealthResult | null
   open: number; inProgress: number; completed: number
+  awaitingInput: number
   tickets: StoreManagerTicket[]
   generatedAt: string
 }
 
 export async function assembleStoreManagerDashboard(companyId: string, storeIds: string[], now: Date = new Date()): Promise<StoreManagerData> {
   const db = createAdminClient()
-  if (!storeIds.length) return { storeName: 'Store', company: '', branch: '', branchCode: '', health: null, open: 0, inProgress: 0, completed: 0, tickets: [], generatedAt: now.toISOString() }
+  if (!storeIds.length) return { storeName: 'Store', company: '', branch: '', branchCode: '', health: null, open: 0, inProgress: 0, completed: 0, awaitingInput: 0, tickets: [], generatedAt: now.toISOString() }
   const rules = await loadSlaResolver(db, companyId)
   const [{ data: storesRaw }, { data: ticketsRaw }, { data: companyRow }] = await Promise.all([
     db.from('stores').select('id, name, sub_store, branch_code, region_id').in('id', storeIds),
@@ -435,9 +436,10 @@ export async function assembleStoreManagerDashboard(companyId: string, storeIds:
   const primary = stores[0]
   const health = primary ? calculateStoreHealth({ id: primary.id, region_id: primary.region_id }, tickets.filter(t => t.store_id === primary.id), rules, now) : null
 
-  let open = 0, inProgress = 0, completed = 0
+  let open = 0, inProgress = 0, completed = 0, awaitingInput = 0
   const visible: StoreManagerTicket[] = []
   for (const t of tickets) {
+    if (t.status === 'info_requested') awaitingInput++
     const v = clientVisible(t.status)
     if (!v) continue
     if (v === 'open') open++; else if (v === 'in_progress') inProgress++; else completed++
@@ -449,7 +451,7 @@ export async function assembleStoreManagerDashboard(companyId: string, storeIds:
     company: (companyRow as any)?.name ?? '',
     branch: primary?.sub_store || primary?.name || 'Store',
     branchCode: primary?.branch_code ?? '',
-    health, open, inProgress, completed, tickets: visible, generatedAt: now.toISOString(),
+    health, open, inProgress, completed, awaitingInput, tickets: visible, generatedAt: now.toISOString(),
   }
 }
 
