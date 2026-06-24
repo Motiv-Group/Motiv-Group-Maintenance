@@ -10,7 +10,7 @@ import { formatDate, formatCurrency } from '@/lib/utils'
 
 const fmtK = (n: number) => (n >= 1000 ? `R ${(n / 1000).toFixed(0)}K` : formatCurrency(n))
 
-export function RegionalOverview({ data, name, briefing }: { data: RegionalDashboardData; name: string | null; briefing?: Briefing }) {
+export function RegionalOverview({ data, name, briefing, briefingScopeId }: { data: RegionalDashboardData; name: string | null; briefing?: Briefing; briefingScopeId?: string }) {
   const p = data.portfolio
   const greeting = (() => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening' })()
 
@@ -44,7 +44,7 @@ export function RegionalOverview({ data, name, briefing }: { data: RegionalDashb
         </span>
       </div>
 
-      {briefing && <BriefingCard briefing={briefing} />}
+      {briefing && <BriefingCard briefing={briefing} scope="region" scopeId={briefingScopeId ?? ''} />}
 
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 gap-3">
         {kpis.map((k, i) => <KpiCard key={i} kpi={k} />)}

@@ -65,7 +65,7 @@ export default async function ExecutiveEstatePage() {
       <EstateHeader dateLabel={formatDate(data.generatedAt)} regions={data.regions.map(r => ({ id: r.region.regionId, name: r.regionName }))} />
 
       {/* AI morning briefing */}
-      <BriefingCard briefing={briefing} />
+      <BriefingCard briefing={briefing} scope="estate" scopeId={companyId} />
 
       {/* Estate Health hero */}
       <Card className="p-6">

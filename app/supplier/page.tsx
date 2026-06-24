@@ -24,7 +24,8 @@ export default async function SupplierOverviewPage() {
   const d = await assembleSupplierDashboard(companyId, supplierIds)
   const k = d.kpis
   const perf = d.perf
-  const briefing = await getDailyBriefing({ companyId, scope: 'supplier', scopeId: supplierIds.slice().sort().join(','), role: 'supplier', facts: supplierFacts(d) })
+  const briefingScopeId = supplierIds.slice().sort().join(',')
+  const briefing = await getDailyBriefing({ companyId, scope: 'supplier', scopeId: briefingScopeId, role: 'supplier', facts: supplierFacts(d) })
 
   const kpis: Kpi[] = [
     { label: 'Open Work', value: k.open, icon: <ClipboardList size={13} />, href: '/supplier/tickets' },
@@ -44,7 +45,7 @@ export default async function SupplierOverviewPage() {
       <div><h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><Truck className="text-teal-600 dark:text-teal-400" size={22} /> {fullName ?? 'Supplier'}</h1>
         <p className="text-sm text-[var(--text-muted)] mt-0.5">Your assigned work, quotes, sign-offs and performance.</p></div>
 
-      <BriefingCard briefing={briefing} />
+      <BriefingCard briefing={briefing} scope="supplier" scopeId={briefingScopeId} />
 
       <KpiRow kpis={kpis} />
 
