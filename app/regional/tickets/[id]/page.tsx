@@ -10,16 +10,7 @@ import { WorkflowActions } from '@/components/workflow/WorkflowActions'
 import { RmPipeline } from '@/components/regional/RmPipeline'
 import { AssignSuppliersCard, SupplierStatusList, QuoteReviewCard, CancelTicketCard } from '@/components/regional/RmTicketActions'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
-import { formatCurrency, formatDateTime, clientVisibleStatus, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
-import type { TicketStatus } from '@/lib/types'
-
-const CV_TONE: Record<string, string> = {
-  open: 'bg-blue-500/15 text-blue-700 dark:text-blue-400',
-  in_progress: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D]',
-  completed: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
-  cancelled: 'bg-gray-500/15 text-gray-600 dark:text-gray-400',
-}
-const CV_WORD: Record<string, string> = { open: 'Open', in_progress: 'In Progress', completed: 'Completed', cancelled: 'Cancelled' }
+import { formatCurrency, formatDateTime, rmStatusMeta, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
 
 function DetailItem({ label, value }: { label: string; value: string }) {
   return (
@@ -74,14 +65,9 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
             {t.job_ref && <p className="text-[11px] font-mono font-semibold tracking-wide text-[var(--text-faint)] mb-0.5">{t.job_ref}</p>}
             <h1 className="text-lg font-bold text-[var(--text)]">{t.title}</h1>
           </div>
-          <div className="grid grid-cols-[4.5rem_6rem] gap-1.5 shrink-0 justify-items-end">
+          <div className="grid grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end">
             <PriorityBadge priority={t.priority} className="w-full text-center" />
-            {t.status === 'info_requested'
-              ? <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center bg-amber-500/15 text-amber-700 dark:text-amber-400">Info requested</span>
-              : (() => {
-                  const cv = clientVisibleStatus(t.status as TicketStatus)
-                  return cv ? <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${CV_TONE[cv]}`}>{CV_WORD[cv]}</span> : null
-                })()}
+            {(() => { const sm = rmStatusMeta(t.status); return <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${sm.cls}`}>{sm.label}</span> })()}
           </div>
         </div>
 

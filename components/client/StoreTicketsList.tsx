@@ -23,7 +23,7 @@ const PILLS: { key: Filter; label: string; active: string; inactive: string }[] 
   { key: 'open',        label: 'Open',        active: 'bg-blue-500 text-white border-blue-500',              inactive: 'text-blue-600 dark:text-blue-400 border-blue-500/40 hover:border-blue-400' },
   { key: 'in_progress', label: 'In Progress', active: 'bg-[#C6A35D] text-[#0a0e17] border-[#C6A35D]',        inactive: 'text-amber-600 dark:text-[#C6A35D] border-[#C6A35D]/40 hover:border-[#C6A35D]' },
   { key: 'completed',   label: 'Completed',   active: 'bg-emerald-500 text-white border-emerald-500',        inactive: 'text-emerald-600 dark:text-emerald-400 border-emerald-500/40 hover:border-emerald-400' },
-  { key: 'cancelled',   label: 'Cancelled',   active: 'bg-gray-500 text-white border-gray-500',              inactive: 'text-gray-600 dark:text-gray-400 border-gray-400/40 hover:border-gray-400' },
+  { key: 'cancelled',   label: 'Cancelled',   active: 'bg-red-500 text-white border-red-500',                inactive: 'text-red-600 dark:text-red-400 border-red-500/40 hover:border-red-400' },
 ]
 
 export function StoreTicketsList({ tickets, initialFilter = 'all' }: { tickets: StoreManagerTicket[]; initialFilter?: Filter }) {
@@ -67,6 +67,9 @@ export function StoreTicketsList({ tickets, initialFilter = 'all' }: { tickets: 
   }, [haystacks, filter, q])
 
   const pct = (n: number) => Math.round((n / total) * 100)
+  // Distribution bar excludes cancelled (shown as its own red filter, not in the bar).
+  const barTotal = counts.open + counts.in_progress + counts.completed || 1
+  const barPct = (n: number) => Math.round((n / barTotal) * 100)
 
   return (
     <div className="space-y-5">
@@ -80,16 +83,15 @@ export function StoreTicketsList({ tickets, initialFilter = 'all' }: { tickets: 
       {/* Distribution bar */}
       <Card className="p-4 space-y-2">
         <div className="h-3 rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden flex">
-          {counts.open > 0 && <div className="h-full bg-blue-500" style={{ width: `${pct(counts.open)}%` }} />}
-          {counts.in_progress > 0 && <div className="h-full bg-[#C6A35D]" style={{ width: `${pct(counts.in_progress)}%` }} />}
-          {counts.completed > 0 && <div className="h-full bg-emerald-500" style={{ width: `${pct(counts.completed)}%` }} />}
-          {counts.cancelled > 0 && <div className="h-full bg-gray-500" style={{ width: `${pct(counts.cancelled)}%` }} />}
+          {counts.open > 0 && <div className="h-full bg-blue-500" style={{ width: `${barPct(counts.open)}%` }} />}
+          {counts.in_progress > 0 && <div className="h-full bg-[#C6A35D]" style={{ width: `${barPct(counts.in_progress)}%` }} />}
+          {counts.completed > 0 && <div className="h-full bg-emerald-500" style={{ width: `${barPct(counts.completed)}%` }} />}
         </div>
         <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] sm:flex sm:flex-wrap">
-          <span className="flex items-center gap-1.5 text-[var(--text-muted)]"><i className="w-2 h-2 rounded-full bg-blue-500" />Open {counts.open} ({pct(counts.open)}%)</span>
-          <span className="flex items-center gap-1.5 text-[var(--text-muted)]"><i className="w-2 h-2 rounded-full bg-[#C6A35D]" />In Progress {counts.in_progress} ({pct(counts.in_progress)}%)</span>
-          <span className="flex items-center gap-1.5 text-[var(--text-muted)]"><i className="w-2 h-2 rounded-full bg-emerald-500" />Completed {counts.completed} ({pct(counts.completed)}%)</span>
-          <span className="flex items-center gap-1.5 text-[var(--text-muted)]"><i className="w-2 h-2 rounded-full bg-gray-500" />Cancelled {counts.cancelled} ({pct(counts.cancelled)}%)</span>
+          <span className="flex items-center gap-1.5 text-[var(--text-muted)]"><i className="w-2 h-2 rounded-full bg-blue-500" />Open {counts.open} ({barPct(counts.open)}%)</span>
+          <span className="flex items-center gap-1.5 text-[var(--text-muted)]"><i className="w-2 h-2 rounded-full bg-[#C6A35D]" />In Progress {counts.in_progress} ({barPct(counts.in_progress)}%)</span>
+          <span className="flex items-center gap-1.5 text-[var(--text-muted)]"><i className="w-2 h-2 rounded-full bg-emerald-500" />Completed {counts.completed} ({barPct(counts.completed)}%)</span>
+          {counts.cancelled > 0 && <span className="flex items-center gap-1.5 text-[var(--text-muted)]"><i className="w-2 h-2 rounded-full bg-red-500" />Cancelled {counts.cancelled}</span>}
         </div>
       </Card>
 

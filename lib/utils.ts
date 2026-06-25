@@ -156,6 +156,53 @@ export function clientVisibleStatus(status: TicketStatus): ClientVisibleStatus |
   return 'open'
 }
 
+/** Store display label that avoids "Mall — Mall" when name === sub_store. */
+export function storeLabel(name?: string | null, subStore?: string | null): string {
+  const n = (name ?? '').trim()
+  const s = (subStore ?? '').trim()
+  if (s && s !== n) return `${n} — ${s}`
+  return n || s || 'Store'
+}
+
+/**
+ * Condensed-but-accurate ticket status for RM views (recent card, tickets tab,
+ * ticket page). Unlike clientVisibleStatus (3-state, for the SM), this reflects
+ * the commercial/execution phase so the overview updates as the ticket moves.
+ */
+export function rmStatusMeta(status: string): { label: string; cls: string } {
+  const cyan   = 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-400'
+  const violet = 'bg-violet-500/15 text-violet-700 dark:text-violet-400'
+  const gold   = 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D]'
+  const orange = 'bg-orange-500/15 text-orange-700 dark:text-orange-400'
+  const M: Record<string, { label: string; cls: string }> = {
+    open:                  { label: 'Open',              cls: 'bg-blue-500/15 text-blue-700 dark:text-blue-400' },
+    info_requested:        { label: 'Info requested',    cls: 'bg-amber-500/15 text-amber-700 dark:text-amber-400' },
+    assigned:              { label: 'Quote requested',   cls: cyan },
+    quote_requested:       { label: 'Quote requested',   cls: cyan },
+    assessment:            { label: 'Assessment',        cls: cyan },
+    quoted:                { label: 'Quoted',            cls: violet },
+    quote_revision:        { label: 'Quoted',            cls: violet },
+    accepted:              { label: 'Approved',          cls: 'bg-teal-500/15 text-teal-700 dark:text-teal-400' },
+    scheduled:             { label: 'In progress',       cls: gold },
+    in_progress:           { label: 'In progress',       cls: gold },
+    variation_review:      { label: 'In progress',       cls: gold },
+    submitted_for_signoff: { label: 'Awaiting sign-off', cls: orange },
+    evidence_requested:    { label: 'Awaiting sign-off', cls: orange },
+    snag:                  { label: 'Snag',              cls: 'bg-red-500/15 text-red-700 dark:text-red-400' },
+    snag_assigned:         { label: 'Snag',              cls: 'bg-red-500/15 text-red-700 dark:text-red-400' },
+    snag_resolved:         { label: 'Awaiting sign-off', cls: orange },
+    approved_closeout:     { label: 'Awaiting sign-off', cls: orange },
+    completed:             { label: 'Completed',         cls: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' },
+    cancelled:             { label: 'Cancelled',         cls: 'bg-red-500/15 text-red-700 dark:text-red-400' },
+    declined:              { label: 'Declined',          cls: 'bg-gray-500/15 text-gray-600 dark:text-gray-400' },
+    // legacy
+    pending_sign_off:      { label: 'Awaiting sign-off', cls: orange },
+    snag_in_progress:      { label: 'Snag',              cls: 'bg-red-500/15 text-red-700 dark:text-red-400' },
+    variation_accepted:    { label: 'In progress',       cls: gold },
+  }
+  return M[status] ?? { label: status, cls: 'bg-gray-500/15 text-gray-600 dark:text-gray-400' }
+}
+
 /** Human-readable ticket reference, e.g. JOB-00042. */
 export function formatJobId(jobNumber: number | null | undefined): string | null {
   if (jobNumber == null) return null

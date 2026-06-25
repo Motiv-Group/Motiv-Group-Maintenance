@@ -17,7 +17,7 @@ import { calculateSupplierPerformance, type SupplierPerformance } from './suppli
 import { detectRepeatDefects, type RepeatDefect } from './repeatDefects'
 import { getExecutiveDecisionItems, type DecisionItem } from './decisions'
 import { computeTicketSla, supplierBreachOlderThan, internalBreachOlderThan } from './sla'
-import { clientVisibleStatus } from '@/lib/utils'
+import { clientVisibleStatus, storeLabel } from '@/lib/utils'
 import type { TicketStatus } from '@/lib/types'
 
 type DB = ReturnType<typeof createAdminClient>
@@ -330,6 +330,7 @@ export interface RegionalTicketAction {
 export interface RegionalTicketRow {
   id: string; title: string; storeName: string; branchCode: string | null
   status: string; priority: Priority; jobRef: string | null; createdAt: string
+  quoteRequestedAt: string | null
 }
 export interface RegionalDashboardData {
   portfolio: RegionalHealthResult
@@ -361,18 +362,19 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
   const regionName = new Map((regionsRaw ?? []).map((r: any) => [r.id, r.name]))
   const stores = (storesRaw ?? []) as any[]
   const storeIds = stores.map(s => s.id)
-  const storeName = new Map(stores.map(s => [s.id, [s.name, s.sub_store].filter(Boolean).join(' — ')]))
+  const storeName = new Map(stores.map(s => [s.id, storeLabel(s.name, s.sub_store)]))
   const storeBranch = new Map(stores.map(s => [s.id, s.branch_code ?? null]))
   const tickets = ((ticketsRaw ?? []) as any[]).map(asTicket)
   const supplierName = new Map((suppliersRaw ?? []).map((s: any) => [s.id, s.company_name]))
 
-  // SM-style ticket rows (most-recent first) for the recent card + tickets tab.
+  // Ticket rows (most-recent first) for the recent card + tickets tab.
   const ticketRows: RegionalTicketRow[] = [...tickets]
     .sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at))
     .map(t => ({
       id: t.id, title: t.title ?? 'Untitled',
       storeName: storeName.get(t.store_id) ?? 'Store', branchCode: storeBranch.get(t.store_id) ?? null,
       status: t.status, priority: t.priority, jobRef: (t as any).job_ref ?? null, createdAt: t.created_at,
+      quoteRequestedAt: (t as any).quote_requested_at ?? null,
     }))
 
   const byStore = new Map<string, HealthTicket[]>()

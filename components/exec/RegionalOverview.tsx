@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { Building2, ClipboardList, ShieldAlert, Truck, Lock, ClipboardCheck, AlertTriangle, ListTodo, Sparkles, Calendar, Banknote, CheckCircle2, AlertCircle } from 'lucide-react'
 import type { RegionalDashboardData } from '@/lib/health/data'
 import { SectionCard, KpiCard, Pill, Donut, Card, DistributionBar, STATUS_TEXT, type Kpi } from '@/components/exec/ui'
-import { BriefingCard } from '@/components/briefing/BriefingCard'
 import { RegionalRecentTickets } from '@/components/regional/RegionalRecentTickets'
 import { STATUS_LABELS } from '@/lib/health/constants'
 import type { Briefing } from '@/lib/briefing/facts'
@@ -12,7 +11,7 @@ import { formatDate, formatCurrency } from '@/lib/utils'
 
 const fmtK = (n: number) => (n >= 1000 ? `R ${(n / 1000).toFixed(0)}K` : formatCurrency(n))
 
-export function RegionalOverview({ data, name, briefing, briefingScopeId }: { data: RegionalDashboardData; name: string | null; briefing?: Briefing; briefingScopeId?: string }) {
+export function RegionalOverview({ data, name, briefing }: { data: RegionalDashboardData; name: string | null; briefing?: Briefing }) {
   const p = data.portfolio
   const greeting = (() => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening' })()
 
@@ -46,9 +45,7 @@ export function RegionalOverview({ data, name, briefing, briefingScopeId }: { da
         </span>
       </div>
 
-      {briefing && <BriefingCard briefing={briefing} scope="region" scopeId={briefingScopeId ?? ''} />}
-
-      {/* Overall regional health — donut hero (mirrors the SM store-health block) */}
+      {/* Overall regional health — donut hero with the AI portfolio summary inside */}
       <Card className="p-6">
         <div className="flex flex-col sm:flex-row items-center gap-6">
           <Donut value={p.finalPortfolioHealth} status={p.status} size={140} label="Region" />
@@ -57,8 +54,12 @@ export function RegionalOverview({ data, name, briefing, briefingScopeId }: { da
               <h2 className="text-lg font-bold text-[var(--text)]">Regional Health</h2>
               <Pill status={p.status} label={STATUS_LABELS[p.status]} />
             </div>
-            {p.mainReason && <p className="text-sm text-[var(--text-muted)]">{p.mainReason}</p>}
-            <p className="text-sm text-[var(--text-muted)]">{p.activeStores} stores · avg {p.averageStoreHealth}% · {p.openTickets} open ticket{p.openTickets === 1 ? '' : 's'}</p>
+            {briefing?.body && (
+              <div className="flex items-start gap-2 justify-center sm:justify-start text-left">
+                <span className="shrink-0 mt-0.5 inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wide text-[#C6A35D] bg-[#C6A35D]/10 rounded-full px-1.5 py-0.5"><Sparkles size={10} /> AI</span>
+                <p className="text-sm text-[var(--text-muted)] leading-relaxed">{briefing.body}</p>
+              </div>
+            )}
           </div>
         </div>
       </Card>

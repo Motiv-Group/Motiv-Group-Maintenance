@@ -38,5 +38,5 @@ export default async function RegionalOverviewPage() {
   const data = await assembleRegionalDashboard(companyId, regionIds)
   const briefingScopeId = regionIds.slice().sort().join(',')
   const briefing = await getDailyBriefing({ companyId, scope: 'region', scopeId: briefingScopeId, role: 'regional_manager', facts: regionFacts(data) })
-  return <RegionalOverview data={data} name={fullName} briefing={briefing} briefingScopeId={briefingScopeId} />
+  return <RegionalOverview data={data} name={fullName} briefing={briefing} />
 }

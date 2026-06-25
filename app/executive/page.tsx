@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic'
 import Link from 'next/link'
 import {
   Building2, AlertTriangle, ClipboardList, Truck, ShieldAlert, FileText, Banknote,
-  Repeat, Globe2, Gavel, ArrowRight, CheckCircle2, AlertCircle, BarChart3,
+  Repeat, Globe2, Gavel, ArrowRight, CheckCircle2, AlertCircle, BarChart3, Sparkles,
 } from 'lucide-react'
 import { requireExecutiveV3 } from '@/lib/health/guard'
 import { assembleEstateDashboard, type TrendDelta } from '@/lib/health/data'
@@ -12,7 +12,6 @@ import {
   Card, SectionCard, KpiCard, Donut, Pill, DistributionBar, StoreDistributionDonut,
   DistributionLegend, TrendArrow, STATUS_TEXT, type Kpi, type Trend,
 } from '@/components/exec/ui'
-import { BriefingCard } from '@/components/briefing/BriefingCard'
 import { getDailyBriefing } from '@/lib/briefing/generate'
 import { estateFacts } from '@/lib/briefing/facts'
 import { STATUS_LABELS } from '@/lib/health/constants'
@@ -64,9 +63,6 @@ export default async function ExecutiveEstatePage() {
     <div className="space-y-5">
       <EstateHeader dateLabel={formatDate(data.generatedAt)} regions={data.regions.map(r => ({ id: r.region.regionId, name: r.regionName }))} />
 
-      {/* AI morning briefing */}
-      <BriefingCard briefing={briefing} scope="estate" scopeId={companyId} />
-
       {/* Estate Health hero */}
       <Card className="p-6">
         <div className="flex flex-col lg:flex-row items-center gap-6">
@@ -76,10 +72,12 @@ export default async function ExecutiveEstatePage() {
               <h2 className="text-lg font-bold text-[var(--text)]">Estate Health</h2>
               <Pill status={e.status} label={`${quality(e.finalEstateHealth)} / ${STATUS_LABELS[e.status]}`} />
             </div>
-            <p className="text-sm text-[var(--text-muted)]">
-              Weighted estate health {e.weightedRegionalHealth}% − risk penalty {e.riskPenalty}% ={' '}
-              <strong className={STATUS_TEXT[e.status]}>{e.finalEstateHealth}%</strong>. Main driver: <strong>{e.mainRiskDriver}</strong>.
-            </p>
+            {briefing?.body && (
+              <div className="flex items-start gap-2 justify-center lg:justify-start text-left">
+                <span className="shrink-0 mt-0.5 inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wide text-[#C6A35D] bg-[#C6A35D]/10 rounded-full px-1.5 py-0.5"><Sparkles size={10} /> AI</span>
+                <p className="text-sm text-[var(--text-muted)] leading-relaxed">{briefing.body}</p>
+              </div>
+            )}
             <DistributionBar counts={e.counts} />
             <div className="flex flex-wrap justify-center lg:justify-start gap-x-5 gap-y-1 text-[11px]">
               <span className="flex items-center gap-1.5 text-[var(--text-muted)]"><i className="w-2 h-2 rounded-full bg-emerald-500" />Controlled: {e.counts.controlled} ({pct(e.counts.controlled, total)}%)</span>
