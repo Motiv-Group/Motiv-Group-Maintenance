@@ -55,7 +55,13 @@ export function parseZar(raw: string): number | null {
 
 // ─── label-based amount lookup ───────────────────────────────────────────────
 // A money token: optional R / ZAR, then digits with , . or space separators.
-const MONEY = String.raw`R?\s?(?:ZAR)?\s?(-?\d[\d .,]*\d|\d)`
+// The trailing (?![\d., ]*%) stops us reading a percentage as an amount — it
+// rejects any figure that is followed (across more digits/separators) by a "%",
+// e.g. both "15" and the single-digit "1" in "VAT @ 15%".
+const MONEY = String.raw`R?\s?(?:ZAR)?\s?(-?\d[\d .,]*\d|\d)(?![\d., ]*%)`
+// Gap between a label and its amount: skip non-digit chars, and also skip whole
+// "15%" rate tokens so we land on the real money figure that follows.
+const GAP = String.raw`(?:[^\d\n]|\d{1,3}\s*%){0,40}?`
 
 const EXCL_LABELS = [
   'total\\s+excl(?:uding)?\\.?\\s*(?:vat)?',
@@ -86,7 +92,7 @@ const INCL_LABELS = [
 /** Find the money value that appears immediately after any of the given labels. */
 function findAmountAfter(text: string, labels: string[]): number | null {
   for (const lbl of labels) {
-    const re = new RegExp(lbl + String.raw`[^\d\n]{0,40}?` + MONEY, 'i')
+    const re = new RegExp(lbl + GAP + MONEY, 'i')
     const m = text.match(re)
     if (m) {
       const v = parseZar(m[1])
