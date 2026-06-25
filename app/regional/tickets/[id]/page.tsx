@@ -76,10 +76,12 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
           </div>
           <div className="grid grid-cols-[4.5rem_6rem] gap-1.5 shrink-0 justify-items-end">
             <PriorityBadge priority={t.priority} className="w-full text-center" />
-            {(() => {
-              const cv = clientVisibleStatus(t.status as TicketStatus)
-              return cv ? <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${CV_TONE[cv]}`}>{CV_WORD[cv]}</span> : null
-            })()}
+            {t.status === 'info_requested'
+              ? <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center bg-amber-500/15 text-amber-700 dark:text-amber-400">Info requested</span>
+              : (() => {
+                  const cv = clientVisibleStatus(t.status as TicketStatus)
+                  return cv ? <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${CV_TONE[cv]}`}>{CV_WORD[cv]}</span> : null
+                })()}
           </div>
         </div>
 
