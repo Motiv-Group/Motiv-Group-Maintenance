@@ -142,23 +142,26 @@ export function RmEditTicketForm({ ticketId, initial }: { ticketId: string; init
     } catch (e: any) { setErr(e.message); setBusy(false) }
   }
 
-  if (!open) return <button onClick={() => setOpen(true)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#C6A35D] hover:underline"><Pencil size={13} /> Edit ticket</button>
-
   return (
-    <div className="rounded-xl ring-1 ring-[var(--border)] p-4 space-y-2">
-      <input className={input} value={title} onChange={e => setTitle(e.target.value)} placeholder="Title" />
-      <div className="grid grid-cols-2 gap-2">
-        <select className={input} value={category} onChange={e => setCategory(e.target.value)}>{CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select>
-        <select className={input} value={priority} onChange={e => setPriority(e.target.value)}>{PRIORITIES.map(p => <option key={p.v} value={p.v}>{p.label}</option>)}</select>
-      </div>
-      <select className={input} value={impact} onChange={e => setImpact(e.target.value)}>{IMPACTS.map(i => <option key={i.v} value={i.v}>{i.label}</option>)}</select>
-      <textarea className={`${input} min-h-[90px]`} value={description} onChange={e => setDescription(e.target.value)} placeholder="Description" />
-      {err && <p className="text-xs text-red-500">{err}</p>}
-      <div className="flex gap-2">
-        <button disabled={busy} onClick={save} className="px-3 py-2 rounded-lg bg-[#C6A35D] text-[#0a0e17] text-sm font-semibold disabled:opacity-50">{busy ? 'Saving…' : 'Save'}</button>
-        <button onClick={() => setOpen(false)} className="px-3 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm">Cancel</button>
-      </div>
-    </div>
+    <>
+      <button onClick={() => setOpen(true)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#C6A35D] hover:underline"><Pencil size={13} /> Edit ticket</button>
+      {open && (
+        <Modal title="Edit ticket" onClose={() => setOpen(false)}>
+          <input className={input} value={title} onChange={e => setTitle(e.target.value)} placeholder="Title" />
+          <div className="grid grid-cols-2 gap-2">
+            <select className={input} value={category} onChange={e => setCategory(e.target.value)}>{CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select>
+            <select className={input} value={priority} onChange={e => setPriority(e.target.value)}>{PRIORITIES.map(p => <option key={p.v} value={p.v}>{p.label}</option>)}</select>
+          </div>
+          <select className={input} value={impact} onChange={e => setImpact(e.target.value)}>{IMPACTS.map(i => <option key={i.v} value={i.v}>{i.label}</option>)}</select>
+          <textarea className={`${input} min-h-[90px]`} value={description} onChange={e => setDescription(e.target.value)} placeholder="Description" />
+          {err && <p className="text-xs text-red-500">{err}</p>}
+          <div className="flex gap-2">
+            <button disabled={busy} onClick={save} className="flex-1 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Saving…' : 'Save'}</button>
+            <button onClick={() => setOpen(false)} className="flex-1 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold">Cancel</button>
+          </div>
+        </Modal>
+      )}
+    </>
   )
 }
 
@@ -266,7 +269,7 @@ export function CancelTicketCard({ ticketId }: { ticketId: string }) {
   const input = 'w-full px-3 py-2 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm'
   return (
     <>
-      <button onClick={() => setOpen(true)} className="px-3 py-2 rounded-xl ring-1 ring-red-500/40 text-red-600 dark:text-red-400 text-sm font-semibold hover:bg-red-500/10 transition">Cancel ticket</button>
+      <button onClick={() => setOpen(true)} className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition">Cancel ticket</button>
       {open && (
         <Modal title="Cancel this ticket?" onClose={() => setOpen(false)}>
           <p className="text-sm text-[var(--text-muted)]">Choose a reason — the store manager will be notified.</p>

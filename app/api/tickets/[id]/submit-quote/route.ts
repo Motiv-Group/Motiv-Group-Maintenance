@@ -34,7 +34,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const now = new Date().toISOString()
   const { data: quote, error: qErr } = await admin.from('quotes').insert({
     company_id: ticket.company_id, ticket_id: ticket.id, supplier_id: invite.supplier_id, submitted_by: user.id,
-    amount, amount_incl_vat: body.amount_incl_vat ?? null, file_url: body.file_url ?? null, status: 'pending', description: body.description ?? null,
+    amount, amount_incl_vat: body.amount_incl_vat ?? null, file_url: body.file_url ?? null, status: 'pending',
+    description: body.description ?? null, valid_until: body.valid_until ?? null,
   }).select('id').single()
   if (qErr) return NextResponse.json({ error: qErr.message }, { status: 500 })
 

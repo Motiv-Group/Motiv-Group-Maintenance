@@ -6,7 +6,7 @@ import { requireSupplierV3 } from '@/lib/health/guard'
 import { assembleSupplierDashboard } from '@/lib/health/data'
 import { SectionCard } from '@/components/exec/ui'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
-import { rmStatusMeta } from '@/lib/utils'
+import { rmStatusMeta, formatDate } from '@/lib/utils'
 
 export default async function SupplierTicketsPage() {
   const { companyId, supplierIds } = await requireSupplierV3()
@@ -26,9 +26,9 @@ export default async function SupplierTicketsPage() {
             <Link key={t.id} href={`/supplier/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2.5 -mx-2 px-2 rounded-lg border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition">
               <div className="min-w-0">
                 <p className="text-sm text-[var(--text)] truncate">{t.title}</p>
-                <p className="text-[11px] text-[var(--text-faint)] truncate">{t.storeName} · {t.ageDays}d · {sla}{t.evidenceRequired ? ` · evidence ${[t.beforeUploaded, t.afterUploaded, t.cocUploaded].filter(Boolean).length}/3` : ''}</p>
+                <p className="text-[11px] text-[var(--text-faint)] truncate">{t.storeName}{t.branchCode ? ` · ${t.branchCode}` : ''} · Received {formatDate(t.createdAt)} · {sla}{t.evidenceRequired ? ` · evidence ${[t.beforeUploaded, t.afterUploaded, t.cocUploaded].filter(Boolean).length}/3` : ''}</p>
               </div>
-              <div className="grid grid-cols-[4.5rem_7rem] gap-1.5 shrink-0">
+              <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
                 <PriorityBadge priority={t.priority} className="w-full text-center" />
                 <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${sm.cls}`}>{sm.label}</span>
               </div>

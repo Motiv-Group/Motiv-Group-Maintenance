@@ -28,18 +28,20 @@ const MAP: Record<string, Meta> = {
   declined:          { msg: 'Declined',                     sub: 'This request was declined.',                mode: 'closed' },
 }
 
-export function ClientTicketStatus({ status }: { status: string }) {
+export function ClientTicketStatus({ status, cancellationReason }: { status: string; cancellationReason?: string | null }) {
   const m = MAP[status] ?? { msg: 'In progress', sub: 'Being handled.', mode: 'spin' as Mode }
   const done = status === 'completed'
-  const closed = status === 'cancelled' || status === 'declined'
+  const cancelled = status === 'cancelled'
+  const closed = cancelled || status === 'declined'
   const active = !done && !closed   // everything in-flight spins, incl. "being processed"
   const isWait = m.mode === 'wait'  // logged / awaiting-review → blue tone
   const Icon = done ? CheckCircle2 : closed ? XCircle : Loader2
-  // Self-contained card: blue accent while being processed, gold while work is
-  // underway, emerald when complete, faint when closed.
-  const ring = done ? 'ring-emerald-500/40' : closed ? 'ring-[var(--border)]' : isWait ? 'ring-blue-500/40' : 'ring-[#C6A35D]/40'
-  const iconColor = done ? 'text-emerald-400' : closed ? 'text-[var(--text-faint)]' : isWait ? 'text-blue-500' : 'text-[#C6A35D]'
+  // Self-contained card: blue while being processed, gold while underway,
+  // emerald when complete, red when cancelled, faint when declined.
+  const ring = done ? 'ring-emerald-500/40' : cancelled ? 'ring-red-500/40' : closed ? 'ring-[var(--border)]' : isWait ? 'ring-blue-500/40' : 'ring-[#C6A35D]/40'
+  const iconColor = done ? 'text-emerald-400' : cancelled ? 'text-red-500' : closed ? 'text-[var(--text-faint)]' : isWait ? 'text-blue-500' : 'text-[#C6A35D]'
   const subColor = active && isWait ? 'text-blue-600/90 dark:text-blue-300/80' : 'text-[var(--text-muted)]'
+  const sub = cancelled && cancellationReason ? cancellationReason : m.sub
   return (
     <div className={`rounded-2xl bg-[var(--surface)] ring-1 ${ring} p-5 flex items-center gap-4`}>
       {active
@@ -47,7 +49,7 @@ export function ClientTicketStatus({ status }: { status: string }) {
         : <Icon size={26} className={`${iconColor} shrink-0`} />}
       <div className="min-w-0">
         <p className="text-base font-bold text-[var(--text)]">{m.msg}</p>
-        <p className={`text-sm mt-0.5 ${subColor}`}>{m.sub}</p>
+        <p className={`text-sm mt-0.5 ${subColor}`}>{sub}</p>
       </div>
     </div>
   )

@@ -1,55 +1,57 @@
-// RM ticket progress — 8-stage pipeline mapped from the underlying engine
-// statuses, with a snag/variation branch chip. Pure/server-safe (no hooks).
-import type { TicketStatus } from '@/lib/types'
+// RM ticket progress — SM-style stepper (dots + connectors + labels), out of the
+// description block. Stage labels + colours match the ticket status badge
+// (rmStatusMeta), so the bar and the badge always agree. Pure/server-safe.
 
 const STAGES = [
-  'Open', 'Supplier assigned', 'Quoted', 'Awaiting approval',
-  'Approved', 'In progress', 'Awaiting sign-off', 'Completed',
+  { label: 'Open',              dot: 'bg-blue-500',    ring: 'ring-blue-500/30',    text: 'text-blue-600 dark:text-blue-400' },
+  { label: 'Quote requested',   dot: 'bg-cyan-500',    ring: 'ring-cyan-500/30',    text: 'text-cyan-600 dark:text-cyan-400' },
+  { label: 'Quoted',            dot: 'bg-violet-500',  ring: 'ring-violet-500/30',  text: 'text-violet-600 dark:text-violet-400' },
+  { label: 'Approved',          dot: 'bg-teal-500',    ring: 'ring-teal-500/30',    text: 'text-teal-600 dark:text-teal-400' },
+  { label: 'In progress',       dot: 'bg-[#C6A35D]',   ring: 'ring-[#C6A35D]/30',   text: 'text-amber-600 dark:text-[#C6A35D]' },
+  { label: 'Awaiting sign-off', dot: 'bg-orange-500',  ring: 'ring-orange-500/30',  text: 'text-orange-600 dark:text-orange-400' },
+  { label: 'Completed',         dot: 'bg-emerald-500', ring: 'ring-emerald-500/30', text: 'text-emerald-600 dark:text-emerald-400' },
 ] as const
 
-// Map an engine status to the furthest stage index reached.
-const STAGE_IDX: Record<string, number> = {
+const IDX: Record<string, number> = {
   open: 0, info_requested: 0,
-  assigned: 1, assessment: 1, quote_requested: 1,
-  quoted: 3, quote_revision: 3,            // quote received → awaiting RM approval
-  accepted: 4,
-  scheduled: 5, in_progress: 5, variation_review: 5,
-  submitted_for_signoff: 6, evidence_requested: 6,
-  snag: 6, snag_assigned: 6, snag_resolved: 6, approved_closeout: 6,
-  completed: 7, pending_sign_off: 6, snag_in_progress: 6, variation_accepted: 5,
+  assigned: 1, quote_requested: 1, assessment: 1,
+  quoted: 2, quote_revision: 2,
+  accepted: 3,
+  scheduled: 4, in_progress: 4, variation_review: 4, variation_accepted: 4,
+  submitted_for_signoff: 5, evidence_requested: 5, snag: 5, snag_assigned: 5, snag_resolved: 5, approved_closeout: 5, pending_sign_off: 5, snag_in_progress: 5,
+  completed: 6,
 }
-
 const BRANCH: Record<string, string> = {
   snag: 'Snag', snag_assigned: 'Snag', snag_resolved: 'Snag', snag_in_progress: 'Snag',
   variation_review: 'Variation', variation_accepted: 'Variation',
 }
 
 export function RmPipeline({ status }: { status: string }) {
-  const closed = status === 'cancelled' || status === 'declined'
-  if (closed) {
-    return <p className="text-sm font-semibold text-[var(--text-muted)]">This ticket is {status === 'declined' ? 'declined' : 'cancelled'}.</p>
+  if (status === 'cancelled' || status === 'declined') {
+    return <p className="text-sm font-semibold text-red-600 dark:text-red-400">This ticket is {status === 'declined' ? 'declined' : 'cancelled'}.</p>
   }
-  const idx = STAGE_IDX[status as TicketStatus] ?? 0
+  const idx = IDX[status] ?? 0
   const branch = BRANCH[status]
+  const cur = STAGES[idx]
 
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
-        <span className="text-sm font-semibold text-[var(--text)]">{STAGES[idx]}</span>
+        <span className={`w-2.5 h-2.5 rounded-full ${cur.dot}`} />
+        <span className={`text-sm font-semibold ${cur.text}`}>{cur.label}</span>
         {branch && <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400 bg-amber-500/15 rounded-full px-2 py-0.5">{branch}</span>}
       </div>
-      <div className="flex items-start gap-1 overflow-x-auto -mx-1 px-1">
-        {STAGES.map((label, i) => {
+      <div className="flex items-start">
+        {STAGES.map((s, i) => {
           const reached = i <= idx
-          const active = i === idx
+          const isLast = i === STAGES.length - 1
           return (
-            <div key={label} className="flex flex-col items-center gap-1 min-w-[64px] flex-1">
-              <div className="flex items-center w-full">
-                <div className={`h-1.5 flex-1 rounded-full ${i === 0 ? 'opacity-0' : i <= idx ? 'bg-[#C6A35D]' : 'bg-white/10'}`} />
-                <div className={`w-3 h-3 rounded-full shrink-0 ${reached ? 'bg-[#C6A35D]' : 'bg-white/10'} ${active ? 'ring-4 ring-[#C6A35D]/30' : ''}`} />
-                <div className={`h-1.5 flex-1 rounded-full ${i === STAGES.length - 1 ? 'opacity-0' : i < idx ? 'bg-[#C6A35D]' : 'bg-white/10'}`} />
+            <div key={s.label} className={isLast ? 'flex items-start' : 'flex items-start flex-1'}>
+              <div className="flex flex-col items-center gap-1 w-12 sm:w-16">
+                <div className={`w-3.5 h-3.5 rounded-full transition ${reached ? s.dot : 'bg-white/10'} ${i === idx ? `ring-4 ${s.ring}` : ''}`} />
+                <span className={`text-[9px] text-center leading-tight ${i === idx ? `${s.text} font-semibold` : reached ? 'text-[var(--text-muted)]' : 'text-[var(--text-faint)]'}`}>{s.label}</span>
               </div>
-              <span className={`text-[9px] text-center leading-tight ${active ? 'text-[#C6A35D] font-semibold' : reached ? 'text-[var(--text-muted)]' : 'text-[var(--text-faint)]'}`}>{label}</span>
+              {!isLast && <div className={`flex-1 h-0.5 mt-[7px] rounded ${i < idx ? s.dot : 'bg-white/10'}`} />}
             </div>
           )
         })}

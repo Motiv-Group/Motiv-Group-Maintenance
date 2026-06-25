@@ -9,7 +9,7 @@ import { Card } from '@/components/exec/ui'
 import { WorkflowActions } from '@/components/workflow/WorkflowActions'
 import { StatusPipeline } from '@/components/workflow/StatusPipeline'
 import { SupplierAttachments } from '@/components/workflow/SupplierAttachments'
-import { SupplierQuoteCard } from '@/components/supplier/SupplierQuoteCard'
+import { SendQuoteForm } from '@/components/admin/SendQuoteForm'
 import { ScheduleJobCard, SubmitCompletionCard } from '@/components/supplier/SupplierJobActions'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { formatDateTime, rmStatusMeta, storeLabel } from '@/lib/utils'
@@ -42,7 +42,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
             <h1 className="text-lg font-bold text-[var(--text)]">{t.title}</h1>
             <p className="text-[11px] text-[var(--text-faint)] mt-0.5">{storeName} · {t.category ?? 'General'}</p>
           </div>
-          <div className="grid grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end">
+          <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end">
             <PriorityBadge priority={t.priority} className="w-full text-center" />
             {(() => { const sm = rmStatusMeta(t.status); return <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${sm.cls}`}>{sm.label}</span> })()}
           </div>
@@ -57,7 +57,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
 
       <Card className="p-5 space-y-3">
         <h2 className="text-sm font-bold text-[var(--text)]">Next step</h2>
-        {canQuote && <SupplierQuoteCard ticketId={t.id} alreadyQuoted={invite?.status === 'quoted'} />}
+        {canQuote && <SendQuoteForm ticketId={t.id} competitive />}
         {t.status === 'accepted' && <ScheduleJobCard ticketId={t.id} priority={t.priority} createdAt={t.created_at} />}
         {['in_progress', 'snag_resolved', 'evidence_requested'].includes(t.status) && <SubmitCompletionCard ticketId={t.id} />}
         <WorkflowActions ticketId={t.id} status={t.status} role="supplier" exclude={['schedule', 'submit_completion']} />

@@ -481,8 +481,8 @@ export async function assembleStoreManagerDashboard(companyId: string, storeIds:
 // SUPPLIER DASHBOARD (own assigned tickets only)
 // ============================================================
 export interface SupplierTicketRow {
-  id: string; storeName: string; title: string; priority: Priority; status: string
-  ageDays: number; slaLabel: string; nextActionDueAt: string | null
+  id: string; storeName: string; branchCode: string | null; title: string; priority: Priority; status: string
+  ageDays: number; createdAt: string; slaLabel: string; nextActionDueAt: string | null
   acknowledged: boolean; evidenceRequired: boolean; beforeUploaded: boolean; afterUploaded: boolean; cocUploaded: boolean
 }
 export interface SupplierDashboardData {
@@ -511,8 +511,9 @@ export async function assembleSupplierDashboard(companyId: string, supplierIds: 
   const { data: invitedTickets } = extraIds.length ? await db.from('tickets').select(TICKET_COLS).in('id', extraIds) : { data: [] as any[] }
   const tickets = [...owned, ...((invitedTickets ?? []) as any[])].map(asTicket)
   const storeIds = Array.from(new Set(tickets.map(t => t.store_id)))
-  const { data: storesRaw } = storeIds.length ? await db.from('stores').select('id, name, sub_store').in('id', storeIds) : { data: [] as any[] }
-  const storeName = new Map((storesRaw ?? []).map((s: any) => [s.id, [s.name, s.sub_store].filter(Boolean).join(' — ')]))
+  const { data: storesRaw } = storeIds.length ? await db.from('stores').select('id, name, sub_store, branch_code').in('id', storeIds) : { data: [] as any[] }
+  const storeName = new Map((storesRaw ?? []).map((s: any) => [s.id, storeLabel(s.name, s.sub_store)]))
+  const storeBranch = new Map((storesRaw ?? []).map((s: any) => [s.id, s.branch_code ?? null]))
   const titleOf = new Map(tickets.map(t => [t.id, t.title ?? 'Ticket']))
 
   const [{ data: quotesRaw }, { data: signoffsRaw }] = await Promise.all([
@@ -535,8 +536,8 @@ export async function assembleSupplierDashboard(companyId: string, supplierIds: 
       if (t.evidence_required && !(t.before_photo_uploaded && t.after_photo_uploaded && t.completion_certificate_uploaded)) evidenceMissing++
       const lbl = sla.supplierBreached ? 'Breached' : sla.supplierStatus === 'paused' ? 'Paused (internal)' : sla.atRisk ? 'At risk' : sla.supplierStatus === 'not_started' ? 'Not started' : 'Running'
       rows.push({
-        id: t.id, storeName: storeName.get(t.store_id) ?? 'Store', title: t.title ?? 'Ticket', priority: t.priority, status: t.status,
-        ageDays: Math.floor((now.getTime() - new Date(t.created_at).getTime()) / DAY), slaLabel: lbl, nextActionDueAt: sla.nextActionDueAt,
+        id: t.id, storeName: storeName.get(t.store_id) ?? 'Store', branchCode: storeBranch.get(t.store_id) ?? null, title: t.title ?? 'Ticket', priority: t.priority, status: t.status,
+        ageDays: Math.floor((now.getTime() - new Date(t.created_at).getTime()) / DAY), createdAt: t.created_at, slaLabel: lbl, nextActionDueAt: sla.nextActionDueAt,
         acknowledged: !!t.first_response_at, evidenceRequired: !!t.evidence_required,
         beforeUploaded: !!t.before_photo_uploaded, afterUploaded: !!t.after_photo_uploaded, cocUploaded: !!t.completion_certificate_uploaded,
       })

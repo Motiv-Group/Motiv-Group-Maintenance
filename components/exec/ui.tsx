@@ -45,19 +45,26 @@ export function SectionCard({ title, icon, action, children }: { title: string; 
   )
 }
 
-export interface Kpi { label: string; value: ReactNode; hint?: ReactNode; icon?: ReactNode; tone?: 'default' | 'gold' | 'good' | 'warn' | 'bad'; trend?: Trend; href?: string }
+export interface Kpi { label: string; value: ReactNode; hint?: ReactNode; icon?: ReactNode; tone?: 'default' | 'info' | 'gold' | 'good' | 'warn' | 'bad' | 'neutral'; trend?: Trend; href?: string }
+// Tone colours the icon + label so each metric reads at a glance; the number
+// stays white for contrast.
 const TONE: Record<NonNullable<Kpi['tone']>, string> = {
-  default: 'text-[var(--text)]', gold: 'text-amber-600 dark:text-[#C6A35D]', good: 'text-emerald-600 dark:text-emerald-400',
-  warn: 'text-amber-600 dark:text-[#C6A35D]', bad: 'text-red-600 dark:text-red-400',
+  default: 'text-[var(--text-muted)]',
+  info:    'text-blue-600 dark:text-blue-400',
+  gold:    'text-amber-600 dark:text-[#C6A35D]',
+  good:    'text-emerald-600 dark:text-emerald-400',
+  warn:    'text-amber-600 dark:text-amber-500',
+  bad:     'text-red-600 dark:text-red-400',
+  neutral: 'text-[var(--text-muted)]',
 }
 export function KpiCard({ kpi }: { kpi: Kpi }) {
   const body = (
     <Card className={`p-4 flex flex-col gap-1.5 min-w-0${kpi.href ? ' h-full transition hover:ring-[#C6A35D]/50 hover:-translate-y-0.5 cursor-pointer' : ''}`}>
-      <div className="flex items-center justify-between gap-2 text-[11px] text-[var(--text-muted)]">
+      <div className={`flex items-center justify-between gap-2 text-[11px] font-semibold ${TONE[kpi.tone ?? 'default']}`}>
         <span className="flex items-center gap-1.5 truncate">{kpi.icon}{kpi.label}</span>
-        {kpi.trend ? <TrendArrow t={kpi.trend} /> : kpi.href ? <ChevronRight size={13} className="text-[var(--text-faint)] shrink-0" /> : null}
+        {kpi.trend && <TrendArrow t={kpi.trend} />}
       </div>
-      <div className={`text-2xl font-bold leading-none ${TONE[kpi.tone ?? 'default']}`}>{kpi.value}</div>
+      <div className="text-2xl font-bold leading-none text-[var(--text)]">{kpi.value}</div>
       {kpi.hint && <div className="text-[11px] text-[var(--text-faint)]">{kpi.hint}</div>}
     </Card>
   )

@@ -29,11 +29,11 @@ export default async function SupplierOverviewPage() {
   const briefing = await getDailyBriefing({ companyId, scope: 'supplier', scopeId: briefingScopeId, role: 'supplier', facts: supplierFacts(d) })
 
   const kpis: Kpi[] = [
-    { label: 'Open Work', value: k.open, icon: <ClipboardList size={13} />, href: '/supplier/tickets' },
+    { label: 'Open Work', value: k.open, icon: <ClipboardList size={13} />, tone: 'info', href: '/supplier/tickets' },
     { label: 'Overdue', value: k.overdue, icon: <AlertTriangle size={13} />, tone: k.overdue ? 'bad' : 'good', href: '/supplier/tickets' },
     { label: 'Due Today', value: k.dueToday, icon: <Clock size={13} />, tone: k.dueToday ? 'warn' : 'good', href: '/supplier/tickets' },
-    { label: 'Pending Quotes', value: k.pendingQuotes, icon: <ReceiptText size={13} />, tone: k.pendingQuotes ? 'warn' : 'good', href: '/supplier/quotes' },
-    { label: 'Awaiting Sign-off', value: k.awaitingSignoff, icon: <ClipboardCheck size={13} />, href: '/supplier/signoff' },
+    { label: 'Pending Quotes', value: k.pendingQuotes, icon: <ReceiptText size={13} />, tone: 'gold', href: '/supplier/quotes' },
+    { label: 'Awaiting Sign-off', value: k.awaitingSignoff, icon: <ClipboardCheck size={13} />, tone: 'info', href: '/supplier/signoff' },
     { label: 'Evidence Missing', value: k.evidenceMissing, icon: <Camera size={13} />, tone: k.evidenceMissing ? 'warn' : 'good', href: '/supplier/tickets' },
   ]
 
@@ -100,7 +100,7 @@ export default async function SupplierOverviewPage() {
           return (
             <Link key={t.id} href={`/supplier/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] -mx-2 px-2 rounded">
               <div className="min-w-0"><p className="text-sm text-[var(--text)] truncate">{t.title}</p><p className="text-[11px] text-[var(--text-faint)] truncate">{t.storeName} · {t.ageDays}d</p></div>
-              <div className="grid grid-cols-[4.5rem_7rem] gap-1.5 shrink-0">
+              <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
                 <PriorityBadge priority={t.priority} className="w-full text-center" />
                 <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${sm.cls}`}>{sm.label}</span>
               </div>

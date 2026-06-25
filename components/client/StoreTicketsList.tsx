@@ -124,7 +124,7 @@ export function StoreTicketsList({ tickets, initialFilter = 'all' }: { tickets: 
               <p className="text-sm text-[var(--text)] truncate">{t.title}</p>
               <p className="text-[11px] text-[var(--text-faint)]">{t.category ?? 'General'} · {formatDateTime(t.createdAt)}{t.supplierAssigned ? ' · Supplier assigned' : ''}</p>
             </div>
-            <div className="grid grid-cols-[4.5rem_6rem] gap-1.5 shrink-0">
+            <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_6rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
               <PriorityBadge priority={t.priority} className="w-full text-center" />
               <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${TONE[t.status]}`}>{WORD[t.status]}</span>
             </div>

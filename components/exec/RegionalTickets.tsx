@@ -38,8 +38,9 @@ function TicketRow({ t }: { t: RegionalTicketRow }) {
         {t.jobRef && <p className="text-[10px] font-mono text-[var(--text-faint)]">{t.jobRef}</p>}
         <p className="text-sm text-[var(--text)] truncate">{t.title}</p>
         <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(t.createdAt)}{t.breached ? ' · ⚠ breached' : ''}</p>
+        {t.quoteRequestedAt && <p className="text-[11px] text-[var(--text-faint)]">Quote requested · {formatDateTime(t.quoteRequestedAt)}</p>}
       </div>
-      <div className="grid grid-cols-[4.5rem_7rem] gap-1.5 shrink-0">
+      <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
         <PriorityBadge priority={t.priority} className="w-full text-center" />
         <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${sm.cls}`}>{sm.label}</span>
       </div>

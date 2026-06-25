@@ -67,9 +67,12 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
             {t.job_ref && <p className="text-[11px] font-mono font-semibold tracking-wide text-[var(--text-faint)] mb-0.5">{t.job_ref}</p>}
             <h1 className="text-lg font-bold text-[var(--text)]">{t.title}</h1>
           </div>
-          <div className="grid grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end">
-            <PriorityBadge priority={t.priority} className="w-full text-center" />
-            {(() => { const sm = rmStatusMeta(t.status); return <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${sm.cls}`}>{sm.label}</span> })()}
+          <div className="flex flex-col items-end gap-2 shrink-0">
+            <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 justify-items-end">
+              <PriorityBadge priority={t.priority} className="w-full text-center" />
+              {(() => { const sm = rmStatusMeta(t.status); return <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${sm.cls}`}>{sm.label}</span> })()}
+            </div>
+            {canEdit && <RmEditTicketForm ticketId={t.id} initial={{ title: t.title, category: t.category ?? 'General', impact: t.operational_impact ?? 'none', priority: t.priority, description: t.description }} />}
           </div>
         </div>
 
@@ -98,7 +101,6 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
 
         {t.info_request_reason && <p className="text-xs text-amber-600 dark:text-amber-400">Info requested: {t.info_request_reason}</p>}
         {t.scheduled_at && <p className="text-xs text-[var(--text-muted)]">Scheduled: {formatDateTime(t.scheduled_at)}</p>}
-        {canEdit && <div className="pt-1"><RmEditTicketForm ticketId={t.id} initial={{ title: t.title, category: t.category ?? 'General', impact: t.operational_impact ?? 'none', priority: t.priority, description: t.description }} /></div>}
       </Card>
 
       {pendingSignoff && (
@@ -115,11 +117,12 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
       <Card className="p-5 space-y-4">
         <h2 className="text-sm font-bold text-[var(--text)]">Actions</h2>
 
-        {/* Primary actions — equal-size, side by side (until a supplier is assigned) */}
-        {canAssign && (
+        {/* Primary actions — equal-size, side by side: Assign (green) · Request info (amber) · Cancel (red) */}
+        {!isTerminal && (
           <div className="flex gap-2">
-            <AssignSuppliersButton ticketId={t.id} suppliers={supplierList} />
-            <RequestInfoButton ticketId={t.id} />
+            {canAssign && <AssignSuppliersButton ticketId={t.id} suppliers={supplierList} />}
+            {canAssign && <RequestInfoButton ticketId={t.id} />}
+            <CancelTicketCard ticketId={t.id} />
           </div>
         )}
 
@@ -129,9 +132,6 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
           suppliers={supplierList}
           exclude={['validate', 'reject', 'request_info', 'request_quote', 'require_assessment', 'approve_quote', 'reject_quote', 'request_revision', 'proceed_no_quote']}
         />
-
-        {/* Cancel with reason */}
-        {!isTerminal && <CancelTicketCard ticketId={t.id} />}
       </Card>
 
       {/* Quotes & Variation Orders — suppliers requested, quotes to review, VOs */}

@@ -41,7 +41,7 @@ export function RegionalRecentTickets({ tickets }: { tickets: RegionalTicketRow[
               <p className="text-[11px] text-[var(--text-faint)] truncate">{t.storeName}{t.branchCode ? ` · ${t.branchCode}` : ''} · {formatDateTime(t.createdAt)}</p>
               {t.quoteRequestedAt && <p className="text-[11px] text-[var(--text-faint)] truncate">Quote requested · {formatDateTime(t.quoteRequestedAt)}</p>}
             </div>
-            <div className="grid grid-cols-[4.5rem_7rem] gap-1.5 shrink-0">
+            <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
               <PriorityBadge priority={t.priority} className="w-full text-center" />
               <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${sm.cls}`}>{sm.label}</span>
             </div>

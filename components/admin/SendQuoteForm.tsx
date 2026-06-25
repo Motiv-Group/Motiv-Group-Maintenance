@@ -104,10 +104,14 @@ export function SendQuoteForm({
   ticketId,
   variant = 'quote',
   existingQuote = null,
+  competitive = false,
 }: {
   ticketId: string
   variant?: 'quote' | 'variation'
   existingQuote?: ExistingQuote | null
+  /** Competitive model: post the quote against the invited supplier via the
+   *  ticket submit-quote route (updates ticket_suppliers + status). */
+  competitive?: boolean
 }) {
   const isVariation = variant === 'variation'
   const isEdit      = !!existingQuote
@@ -265,7 +269,8 @@ export function SendQuoteForm({
       }
     }
 
-    const res = await fetch(isEdit ? `/api/quotes/${existingQuote!.id}` : '/api/quotes', {
+    const url = isEdit ? `/api/quotes/${existingQuote!.id}` : competitive ? `/api/tickets/${ticketId}/submit-quote` : '/api/quotes'
+    const res = await fetch(url, {
       method: isEdit ? 'PATCH' : 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

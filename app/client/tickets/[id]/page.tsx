@@ -55,7 +55,7 @@ export default async function StoreTicketDetailPage({ params }: { params: { id: 
             {t.job_ref && <p className="text-[11px] font-mono font-semibold tracking-wide text-[var(--text-faint)] mb-0.5">{t.job_ref}</p>}
             <h1 className="text-lg font-bold text-[var(--text)]">{t.title}</h1>
           </div>
-          <div className="grid grid-cols-2 gap-1.5 w-fit shrink-0 justify-items-end">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 w-fit shrink-0 justify-items-end">
             <PriorityBadge priority={t.priority} />
             {(() => {
               const cv = clientVisibleStatus(t.status as TicketStatus)
@@ -95,21 +95,13 @@ export default async function StoreTicketDetailPage({ params }: { params: { id: 
         </div>
       )}
 
-      {/* Cancelled — show the reason from the RM */}
-      {t.status === 'cancelled' && (
-        <div className="rounded-2xl bg-gray-500/10 ring-1 ring-gray-500/40 p-5 space-y-1">
-          <p className="text-sm font-bold text-[var(--text)]">Ticket cancelled</p>
-          <p className="text-sm text-[var(--text-muted)]">{t.cancellation_reason || 'This ticket was cancelled.'}</p>
-        </div>
-      )}
-
       {/* Edit / delete — while open or info-requested, out of the card, spanning the block width */}
       {canEdit && (
         <EditTicketForm ticketId={t.id} initial={{ title: t.title, category: t.category ?? 'General', impact: t.operational_impact ?? 'none', description: t.description }} />
       )}
 
       {/* Plain-language status (no quote/sign-off jargon) — its own accented card */}
-      <ClientTicketStatus status={t.status} />
+      <ClientTicketStatus status={t.status} cancellationReason={t.cancellation_reason} />
 
       {/* The only SM action (resubmit on info-requested); renders nothing otherwise */}
       <WorkflowActions ticketId={t.id} status={t.status} role="store_manager" />

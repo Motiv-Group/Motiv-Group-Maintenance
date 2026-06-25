@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
-import { PlusCircle, Calendar, ClipboardList, Wrench, CheckCircle2, AlertTriangle, ListTodo, Sparkles, XCircle } from 'lucide-react'
+import { PlusCircle, Calendar, ClipboardList, Wrench, CheckCircle2, AlertTriangle, ListTodo, Sparkles } from 'lucide-react'
 import { requireStoreManagerV3 } from '@/lib/health/guard'
 import { assembleStoreManagerDashboard } from '@/lib/health/data'
 import { STATUS_LABELS } from '@/lib/health/constants'
@@ -21,10 +21,9 @@ export default async function StoreOverviewPage() {
 
   // Store managers only ever see ticket status — never money or quotes.
   const kpis: Kpi[] = [
-    { label: 'Open', value: d.open, icon: <ClipboardList size={13} />, href: '/client/tickets?status=open' },
-    { label: 'In Progress', value: d.inProgress, icon: <Wrench size={13} />, href: '/client/tickets?status=in_progress' },
+    { label: 'Open', value: d.open, icon: <ClipboardList size={13} />, tone: 'info', href: '/client/tickets?status=open' },
+    { label: 'In Progress', value: d.inProgress, icon: <Wrench size={13} />, tone: 'gold', href: '/client/tickets?status=in_progress' },
     { label: 'Completed', value: d.completed, icon: <CheckCircle2 size={13} />, tone: 'good', href: '/client/tickets?status=completed' },
-    { label: 'Cancelled', value: d.cancelled, icon: <XCircle size={13} />, href: '/client/tickets?status=cancelled' },
     { label: 'Overdue', value: h?.overdueTickets ?? 0, icon: <AlertTriangle size={13} />, tone: (h?.overdueTickets ?? 0) ? 'bad' : 'good', href: '/client/tickets' },
   ]
 
@@ -77,7 +76,7 @@ export default async function StoreOverviewPage() {
       )}
 
       {/* KPI grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {kpis.map((k, i) => <KpiCard key={i} kpi={k} />)}
       </div>
 
