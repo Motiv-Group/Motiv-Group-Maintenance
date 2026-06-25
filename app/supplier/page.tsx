@@ -1,13 +1,12 @@
 export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
-import { Truck, ClipboardList, Clock, ReceiptText, ClipboardCheck, Camera, AlertTriangle, BarChart2, Gauge } from 'lucide-react'
+import { Truck, ClipboardList, Clock, ReceiptText, ClipboardCheck, Camera, AlertTriangle, BarChart2, Gauge, Star } from 'lucide-react'
 import { requireSupplierV3 } from '@/lib/health/guard'
 import { assembleSupplierDashboard } from '@/lib/health/data'
 import { Card, SectionCard, KpiRow, Donut, Pill, BreakdownList, type Kpi } from '@/components/exec/ui'
 import { BriefingCard } from '@/components/briefing/BriefingCard'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
-import { Stars } from '@/components/ui/Stars'
 import { getDailyBriefing } from '@/lib/briefing/generate'
 import { supplierFacts } from '@/lib/briefing/facts'
 import { formatCurrency, formatDate, rmStatusMeta } from '@/lib/utils'
@@ -47,8 +46,16 @@ export default async function SupplierOverviewPage() {
       <div>
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><Truck className="text-teal-600 dark:text-teal-400" size={22} /> {fullName ?? 'Supplier'}</h1>
-          <Link href="/supplier/reviews" className="inline-flex items-center gap-1.5 shrink-0 rounded-full bg-[var(--surface-2)] ring-1 ring-[var(--border)] px-3 py-1.5 hover:bg-[var(--hover)] transition" title="View your reviews">
-            {d.rating.count ? <Stars value={d.rating.avg} count={d.rating.count} size={14} /> : <span className="text-xs text-[var(--text-muted)]">No reviews yet</span>}
+          <Link href="/supplier/reviews" className="inline-flex items-center gap-2 shrink-0 rounded-full bg-[var(--surface-2)] ring-1 ring-[#C6A35D]/40 px-4 py-1.5 hover:bg-[var(--hover)] transition" title="View your reviews">
+            {d.rating.count ? (
+              <>
+                <Star size={17} className="fill-amber-400 text-amber-400 shrink-0" />
+                <span className="text-sm font-bold text-[var(--text)]">{d.rating.avg.toFixed(1)} / 5</span>
+                <span className="text-xs text-amber-600 dark:text-amber-400/80">({d.rating.count} review{d.rating.count !== 1 ? 's' : ''})</span>
+              </>
+            ) : (
+              <span className="text-xs text-[var(--text-muted)]">No reviews yet</span>
+            )}
           </Link>
         </div>
         <p className="text-sm text-[var(--text-muted)] mt-0.5">Your assigned work, quotes, sign-offs and performance.</p></div>
