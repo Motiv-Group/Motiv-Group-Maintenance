@@ -383,7 +383,15 @@ export function SendQuoteForm({
               )}
               <button
                 type="button"
-                onClick={() => { if (filePreview) URL.revokeObjectURL(filePreview); setFilePreview(null); setFile(null); setAutofilled(false); setNeedAmount(false); setValidNA(false); setParseError(false) }}
+                // Removing the quote clears the whole form so the next file
+                // populates fresh (parse only fills still-empty fields).
+                onClick={() => {
+                  if (filePreview) URL.revokeObjectURL(filePreview)
+                  setFilePreview(null); setFile(null)
+                  setAutofilled(false); setNeedAmount(false); setParseError(false)
+                  setValidNA(false)
+                  reset({ amount: undefined as any, amount_incl_vat: '', description: '', valid_until: '' })
+                }}
                 className="p-1 text-gray-400 hover:text-red-500 rounded transition-colors"
               >
                 <X size={16} />

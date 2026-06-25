@@ -10,6 +10,7 @@ import { WorkflowActions } from '@/components/workflow/WorkflowActions'
 import { RmPipeline } from '@/components/regional/RmPipeline'
 import { SupplierAttachments } from '@/components/workflow/SupplierAttachments'
 import { SendQuoteForm } from '@/components/admin/SendQuoteForm'
+import { QuoteSummary, type QuoteSummaryStatus } from '@/components/workflow/QuoteSummary'
 import { ScheduleJobCard, RaiseVariationCard } from '@/components/supplier/SupplierJobActions'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { formatDateTime, rmStatusMeta, storeLabel, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
@@ -28,17 +29,28 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   const admin = createAdminClient()
   const { data: t } = await admin.from('tickets').select('*').eq('id', params.id).single()
   if (!t || t.company_id !== companyId) redirect('/supplier/tickets')
-  const [{ data: store }, { data: updates }, { data: invite }] = await Promise.all([
+  const [{ data: store }, { data: updates }, { data: invite }, { data: myQuotes }] = await Promise.all([
     admin.from('stores').select('name, sub_store').eq('id', t.store_id).single(),
     admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('ticket_suppliers').select('status').eq('ticket_id', t.id).in('supplier_id', supplierIds).maybeSingle(),
+    admin.from('quotes').select('id, amount, amount_incl_vat, description, file_url, status, valid_until, created_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).order('created_at', { ascending: false }),
   ])
   // Access: the awarded supplier OR a supplier invited to quote (competitive model).
   const awarded = !!t.supplier_id && supplierIds.includes(t.supplier_id)
   if (!awarded && !invite) redirect('/supplier/tickets')
   const storeName = storeLabel(store?.name, store?.sub_store)
-  // Invited to quote and not yet awarded/declined → can quote.
-  const canQuote = (invite?.status === 'invited' || invite?.status === 'quoted')
+
+  // Their latest submitted quote (if any) for this ticket.
+  const latestQuote = ((myQuotes ?? []) as any[])[0] ?? null
+  // Can (re)submit a quote only when invited and not yet quoted, or when a
+  // revision was requested. Once submitted, the quote is shown read-only.
+  const revisionRequested = t.status === 'quote_revision'
+  const canSubmitQuote = (invite?.status === 'invited' && !latestQuote) || revisionRequested
+  // Status badge for the read-only quote card.
+  const quoteCardStatus: QuoteSummaryStatus =
+    awarded || latestQuote?.status === 'accepted' ? 'accepted'
+    : latestQuote?.status === 'declined' ? 'declined'
+    : 'pending'
 
   return (
     <div className="space-y-5">
@@ -86,7 +98,14 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
 
       <Card className="p-5 space-y-3">
         <h2 className="text-sm font-bold text-[var(--text)]">Next step</h2>
-        {canQuote && <SendQuoteForm ticketId={t.id} competitive />}
+        {canSubmitQuote && <SendQuoteForm ticketId={t.id} competitive />}
+        {!canSubmitQuote && latestQuote && (
+          <QuoteSummary
+            title="Your submitted quote"
+            status={quoteCardStatus}
+            quote={{ id: latestQuote.id, amount: latestQuote.amount, amountInclVat: latestQuote.amount_incl_vat ?? null, description: latestQuote.description ?? null, fileUrl: latestQuote.file_url ?? null, validUntil: latestQuote.valid_until ?? null, createdAt: latestQuote.created_at }}
+          />
+        )}
         {t.status === 'accepted' && <ScheduleJobCard ticketId={t.id} priority={t.priority} createdAt={t.created_at} />}
         {['in_progress', 'snag_resolved', 'evidence_requested'].includes(t.status) && (
           <Link href={`/supplier/tickets/${t.id}/complete`} className="block w-full text-center py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition">Submit COC &amp; POC</Link>

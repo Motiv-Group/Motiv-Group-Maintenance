@@ -1,15 +1,15 @@
-import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
+export const dynamic = 'force-dynamic'
+
+import { createAdminClient } from '@/lib/supabase/server'
+import { requireSupplierV3 } from '@/lib/health/guard'
 import { BackButton } from '@/components/ui/BackButton'
 import { Star } from 'lucide-react'
 import { formatDateTime } from '@/lib/utils'
 
-export const dynamic = 'force-dynamic'
-
 function StarRow({ score }: { score: number }) {
   return (
     <span className="flex items-center gap-0.5">
-      {[1,2,3,4,5].map(i => (
+      {[1, 2, 3, 4, 5].map(i => (
         <Star
           key={i}
           size={13}
@@ -20,22 +20,17 @@ function StarRow({ score }: { score: number }) {
   )
 }
 
-export default async function AdminReviewsPage() {
-  const supabase = createClient()
-  const adminDb  = createAdminClient()
+export default async function SupplierReviewsPage() {
+  const { supplierIds } = await requireSupplierV3()
+  const adminDb = createAdminClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/auth/login')
-
-  const [{ data: profile }, { data: ratings }] = await Promise.all([
-    adminDb.from('profiles').select('role, full_name').eq('id', user.id).single(),
-    adminDb
-      .from('ratings')
-      .select('id, score, comment, created_at, ticket_id, tickets(title)')
-      .eq('contractor_id', user.id)
-      .order('created_at', { ascending: false }),
-  ])
-  if (profile?.role !== 'supplier') redirect('/auth/login')
+  const { data: ratings } = supplierIds.length
+    ? await adminDb
+        .from('ratings')
+        .select('id, score, comment, created_at, ticket_id, tickets(title)')
+        .in('supplier_id', supplierIds)
+        .order('created_at', { ascending: false })
+    : { data: [] as any[] }
 
   const reviews = (ratings ?? []) as any[]
   const avgRating = reviews.length > 0

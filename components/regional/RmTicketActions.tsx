@@ -4,7 +4,7 @@
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Search, Pencil } from 'lucide-react'
-import { StarInput } from '@/components/ui/Stars'
+import { StarInput, Stars } from '@/components/ui/Stars'
 import { formatCurrency, formatDateTime } from '@/lib/utils'
 
 async function post(url: string, body: unknown): Promise<void> {
@@ -24,7 +24,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 }
 
 // ── Assign suppliers (button → modal with search + multi-select) ─
-export function AssignSuppliersButton({ ticketId, suppliers }: { ticketId: string; suppliers: { id: string; name: string }[] }) {
+export function AssignSuppliersButton({ ticketId, suppliers }: { ticketId: string; suppliers: { id: string; name: string; avgRating?: number; ratingCount?: number }[] }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState('')
@@ -63,7 +63,12 @@ export function AssignSuppliersButton({ ticketId, suppliers }: { ticketId: strin
             {shown.map(s => (
               <label key={s.id} className={`flex items-center gap-2 text-sm px-2 py-2 rounded-lg cursor-pointer ${sel.has(s.id) ? 'bg-[#C6A35D]/10' : 'hover:bg-[var(--hover)]'}`}>
                 <input type="checkbox" checked={sel.has(s.id)} onChange={() => toggle(s.id)} className="accent-[#C6A35D] w-4 h-4" />
-                <span className="truncate text-[var(--text)]">{s.name}</span>
+                <span className="truncate text-[var(--text)] flex-1 min-w-0">{s.name}</span>
+                {s.ratingCount ? (
+                  <span className="shrink-0"><Stars value={s.avgRating ?? 0} count={s.ratingCount} size={12} /></span>
+                ) : (
+                  <span className="shrink-0 text-[11px] text-[var(--text-faint)]">No ratings</span>
+                )}
               </label>
             ))}
             {!shown.length && <p className="text-sm text-[var(--text-faint)] px-2 py-2">No matching suppliers.</p>}

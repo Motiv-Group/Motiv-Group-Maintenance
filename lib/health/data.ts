@@ -71,7 +71,8 @@ function regionSignals(tickets: HealthTicket[], rules: SlaRuleResolver, now: Dat
   }
 }
 
-export interface StoreCard extends StoreHealthResult { storeName: string; regionName: string }
+export interface StoreManagerContact { name: string | null; email: string | null; phone: string | null }
+export interface StoreCard extends StoreHealthResult { storeName: string; regionName: string; sm?: StoreManagerContact | null }
 export interface TrendDelta { dir: 'up' | 'down' | 'flat'; pct: number }
 export interface EstateTrends { openWork: TrendDelta; slaPressure: TrendDelta; cost: TrendDelta; supplierBreaches: TrendDelta }
 export interface ExposureBucket { label: string; value: number }
@@ -393,9 +394,24 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
   const byStore = new Map<string, HealthTicket[]>()
   for (const t of tickets) { const a = byStore.get(t.store_id) ?? []; a.push(t); byStore.set(t.store_id, a) }
 
+  // SM contact per store — derived from the most recent store_manager who logged a
+  // ticket there (no canonical store→manager link exists in the schema).
+  const creatorIds = Array.from(new Set(tickets.map(t => (t as any).created_by).filter(Boolean)))
+  const { data: profRows } = creatorIds.length
+    ? await db.from('user_profiles').select('id, full_name, email, phone, role').in('id', creatorIds)
+    : { data: [] as any[] }
+  const smProfile = new Map<string, StoreManagerContact>()
+  for (const p of (profRows ?? []) as any[]) if (p.role === 'store_manager') smProfile.set(p.id, { name: p.full_name ?? null, email: p.email ?? null, phone: p.phone ?? null })
+  const storeSm = new Map<string, StoreManagerContact>()
+  for (const t of [...tickets].sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at))) {
+    if (storeSm.has(t.store_id)) continue
+    const sm = smProfile.get((t as any).created_by)
+    if (sm) storeSm.set(t.store_id, sm)
+  }
+
   const cards: StoreCard[] = stores.map(s => {
     const res = calculateStoreHealth({ id: s.id, region_id: s.region_id }, byStore.get(s.id) ?? [], rules, now)
-    return { ...res, storeName: storeName.get(s.id) ?? 'Store', regionName: regionName.get(s.region_id) ?? '—' }
+    return { ...res, storeName: storeName.get(s.id) ?? 'Store', regionName: regionName.get(s.region_id) ?? '—', sm: storeSm.get(s.id) ?? null }
   })
   const portfolio = calculateRegionalPortfolioHealth('portfolio', cards, regionSignals(tickets, rules, now))
 
@@ -511,13 +527,14 @@ export interface SupplierDashboardData {
   tickets: SupplierTicketRow[]
   quotes: { id: string; ticketTitle: string; amount: number; status: string; createdAt: string }[]
   signoffs: { id: string; ticketTitle: string; status: string; createdAt: string }[]
+  rating: { avg: number; count: number }
   generatedAt: string
 }
 
 export async function assembleSupplierDashboard(companyId: string, supplierIds: string[], now: Date = new Date()): Promise<SupplierDashboardData> {
   const db = createAdminClient()
   const emptyPerf = calculateSupplierPerformance('none', [], (p) => FALLBACK_SLA[p], now)
-  if (!supplierIds.length) return { perf: emptyPerf, kpis: { open: 0, overdue: 0, dueToday: 0, pendingQuotes: 0, awaitingSignoff: 0, evidenceMissing: 0 }, tickets: [], quotes: [], signoffs: [], generatedAt: now.toISOString() }
+  if (!supplierIds.length) return { perf: emptyPerf, kpis: { open: 0, overdue: 0, dueToday: 0, pendingQuotes: 0, awaitingSignoff: 0, evidenceMissing: 0 }, tickets: [], quotes: [], signoffs: [], rating: { avg: 0, count: 0 }, generatedAt: now.toISOString() }
   const rules = await loadSlaResolver(db, companyId)
 
   // Own tickets (awarded) + tickets where invited to quote (competitive model).
@@ -536,10 +553,13 @@ export async function assembleSupplierDashboard(companyId: string, supplierIds: 
   const storeBranch = new Map((storesRaw ?? []).map((s: any) => [s.id, s.branch_code ?? null]))
   const titleOf = new Map(tickets.map(t => [t.id, t.title ?? 'Ticket']))
 
-  const [{ data: quotesRaw }, { data: signoffsRaw }] = await Promise.all([
+  const [{ data: quotesRaw }, { data: signoffsRaw }, { data: ratingRows }] = await Promise.all([
     db.from('quotes').select('id, ticket_id, amount, status, created_at').in('supplier_id', supplierIds).order('created_at', { ascending: false }),
     db.from('signoffs').select('id, ticket_id, status, created_at').in('supplier_id', supplierIds).order('created_at', { ascending: false }),
+    db.from('ratings').select('score').in('supplier_id', supplierIds),
   ])
+  const ratingScores = ((ratingRows ?? []) as any[]).map(r => Number(r.score)).filter(n => Number.isFinite(n))
+  const rating = { avg: ratingScores.length ? ratingScores.reduce((s, n) => s + n, 0) / ratingScores.length : 0, count: ratingScores.length }
 
   const todayEnd = new Date(now); todayEnd.setHours(23, 59, 59, 999)
   let open = 0, overdue = 0, dueToday = 0, pendingQuotes = 0, awaitingSignoff = 0, evidenceMissing = 0
@@ -571,6 +591,7 @@ export async function assembleSupplierDashboard(companyId: string, supplierIds: 
     tickets: rows,
     quotes: (quotesRaw ?? []).map((q: any) => ({ id: q.id, ticketTitle: titleOf.get(q.ticket_id) ?? 'Ticket', amount: q.amount, status: q.status, createdAt: q.created_at })),
     signoffs: (signoffsRaw ?? []).map((s: any) => ({ id: s.id, ticketTitle: titleOf.get(s.ticket_id) ?? 'Ticket', status: s.status, createdAt: s.created_at })),
+    rating,
     generatedAt: now.toISOString(),
   }
 }

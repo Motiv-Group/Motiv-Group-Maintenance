@@ -3,7 +3,7 @@
 // RM Tickets tab — search, full status filters + distribution bar, collapsible
 // store groups, and a slide-out store panel. Each row shows the latest quote
 // milestone (requested → received → accepted) coloured to the status.
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Ticket, Search, ChevronDown, BarChart3, X, PlusCircle } from 'lucide-react'
 import type { RegionalTicketRow } from '@/lib/health/data'
@@ -69,6 +69,12 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
   const [filter, setFilter] = useState<'all' | Bucket>('all')
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [panelStore, setPanelStore] = useState<string | null>(null)
+
+  // Open a store's panel directly when linked from the Stores tab (?store=Name).
+  useEffect(() => {
+    const s = new URLSearchParams(window.location.search).get('store')
+    if (s) setPanelStore(s)
+  }, [])
 
   const counts = useMemo(() => {
     const c: Record<Bucket, number> = { open: 0, quote_requested: 0, quoted: 0, approved: 0, in_progress: 0, awaiting_signoff: 0, completed: 0, cancelled: 0 }

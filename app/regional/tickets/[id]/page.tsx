@@ -27,7 +27,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   const { data: t } = await admin.from('tickets').select('*').eq('id', params.id).single()
   if (!t || !t.region_id || !regionIds.includes(t.region_id)) redirect('/regional/tickets')
 
-  const [{ data: store }, { data: quotes }, { data: updates }, { data: signoffs }, { data: suppliers }, { data: variations }, { data: snags }, { data: invites }] = await Promise.all([
+  const [{ data: store }, { data: quotes }, { data: updates }, { data: signoffs }, { data: suppliers }, { data: variations }, { data: snags }, { data: invites }, { data: ratingRows }] = await Promise.all([
     admin.from('stores').select('name, sub_store').eq('id', t.store_id).single(),
     admin.from('quotes').select('id, supplier_id, amount, amount_incl_vat, description, file_url, status, valid_until, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
@@ -36,11 +36,21 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
     admin.from('ticket_variations').select('description, amount, status, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('snags').select('description, status, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('ticket_suppliers').select('supplier_id, status, invited_at, suppliers(company_name)').eq('ticket_id', t.id),
+    admin.from('ratings').select('supplier_id, score').eq('company_id', companyId),
   ])
   const storeName = store ? storeLabel(store.name, store.sub_store) : 'Store'
   const pendingSignoff = (signoffs ?? [])[0] ?? null
 
-  const supplierList = (suppliers ?? []).map((s: any) => ({ id: s.id, name: s.company_name }))
+  // Avg star rating per supplier, so the RM sees each contractor's record when assigning.
+  const ratingAgg = new Map<string, { sum: number; n: number }>()
+  for (const r of (ratingRows ?? []) as any[]) {
+    if (!r.supplier_id) continue
+    const a = ratingAgg.get(r.supplier_id) ?? { sum: 0, n: 0 }; a.sum += Number(r.score); a.n++; ratingAgg.set(r.supplier_id, a)
+  }
+  const supplierList = (suppliers ?? []).map((s: any) => {
+    const ra = ratingAgg.get(s.id)
+    return { id: s.id, name: s.company_name, avgRating: ra ? ra.sum / ra.n : 0, ratingCount: ra ? ra.n : 0 }
+  })
   const nameById = new Map<string, string>(supplierList.map(s => [s.id, s.name]))
   for (const inv of (invites ?? []) as any[]) if (inv.suppliers?.company_name) nameById.set(inv.supplier_id, inv.suppliers.company_name)
   const supplierRows = ((invites ?? []) as any[]).map(inv => ({ name: inv.suppliers?.company_name ?? nameById.get(inv.supplier_id) ?? 'Supplier', status: inv.status as string, invitedAt: inv.invited_at ?? null }))

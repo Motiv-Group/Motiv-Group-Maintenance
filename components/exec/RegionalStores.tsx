@@ -2,11 +2,11 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Store, Plus } from 'lucide-react'
+import { Store, Plus, User, Mail, Phone, Ticket } from 'lucide-react'
 import type { StoreCard } from '@/lib/health/data'
 import { formatCurrency } from '@/lib/utils'
 import { SectionCard, Pill, Donut, BreakdownList, STATUS_TEXT } from '@/components/exec/ui'
-import { Drawer, DrawerHeader, PrimaryButton } from '@/components/exec/Drawer'
+import { Drawer, DrawerHeader } from '@/components/exec/Drawer'
 
 const fmtK = (n: number) => n ? (n >= 1000 ? `R ${(n / 1000).toFixed(0)}K` : formatCurrency(n)) : 'R 0'
 
@@ -86,6 +86,36 @@ function Detail({ s, onClose }: { s: StoreCard; onClose?: () => void }) {
     <div className="space-y-4">
       <DrawerHeader onClose={onClose} title={<div className="flex items-center gap-2 flex-wrap"><h3 className="text-lg font-bold text-[var(--text)]">{s.storeName}</h3><Pill status={s.finalStatus} /></div>} />
       <div><div className={`text-3xl font-bold ${STATUS_TEXT[s.finalStatus]}`}>{s.finalHealthScore}%</div><p className="text-xs text-[var(--text-muted)] mt-1">Open {s.openTickets} · Overdue {s.overdueTickets} · Pending approvals {s.pendingDecisions}</p></div>
+
+      {/* Store manager contact */}
+      <div className="rounded-xl ring-1 ring-[var(--border)] bg-[var(--surface-2)] p-3 space-y-2">
+        <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Store Manager</div>
+        {s.sm ? (
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2 text-sm text-[var(--text)]"><User size={14} className="text-[var(--text-faint)] shrink-0" />{s.sm.name ?? 'Unnamed'}</div>
+            {s.sm.email && <a href={`mailto:${s.sm.email}`} className="flex items-center gap-2 text-sm text-[var(--text)] hover:text-[#C6A35D]"><Mail size={14} className="text-[var(--text-faint)] shrink-0" /><span className="truncate">{s.sm.email}</span></a>}
+            {s.sm.phone && <a href={`tel:${s.sm.phone}`} className="flex items-center gap-2 text-sm text-[var(--text)] hover:text-[#C6A35D]"><Phone size={14} className="text-[var(--text-faint)] shrink-0" />{s.sm.phone}</a>}
+          </div>
+        ) : (
+          <p className="text-sm text-[var(--text-faint)]">No store manager on record.</p>
+        )}
+      </div>
+
+      {/* Summary grid */}
+      <div className="grid grid-cols-2 gap-2">
+        {[
+          { label: 'Open', value: String(s.openTickets) },
+          { label: 'Overdue', value: String(s.overdueTickets) },
+          { label: 'Pending approvals', value: String(s.pendingDecisions) },
+          { label: 'Cost exposure', value: formatCurrency(s.costExposure) },
+        ].map(c => (
+          <div key={c.label} className="rounded-lg ring-1 ring-[var(--border)] p-2.5">
+            <div className="text-[10px] uppercase tracking-wide text-[var(--text-faint)]">{c.label}</div>
+            <div className="text-sm font-semibold text-[var(--text)] mt-0.5">{c.value}</div>
+          </div>
+        ))}
+      </div>
+
       <div className="flex items-center gap-4">
         <Donut value={s.finalHealthScore} status={s.finalStatus} size={104} />
         <div className="flex-1"><BreakdownList rows={[
@@ -95,7 +125,9 @@ function Detail({ s, onClose }: { s: StoreCard; onClose?: () => void }) {
         ]} /></div>
       </div>
       <div><div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Recommended Action</div><p className="text-xs text-[var(--text)]">{s.finalStatus === 'controlled' ? 'Store controlled — maintain.' : `Resolve: ${s.mainIssue}.`}</p></div>
-      <PrimaryButton tone="gold">View Store Tickets</PrimaryButton>
+      <Link href={`/regional/tickets?store=${encodeURIComponent(s.storeName)}`} className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl bg-[#C6A35D] hover:bg-[#b8954f] text-[#0a0e17] text-sm font-semibold transition">
+        <Ticket size={15} /> View Store Tickets
+      </Link>
     </div>
   )
 }

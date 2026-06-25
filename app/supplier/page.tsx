@@ -7,6 +7,7 @@ import { assembleSupplierDashboard } from '@/lib/health/data'
 import { Card, SectionCard, KpiRow, Donut, Pill, BreakdownList, type Kpi } from '@/components/exec/ui'
 import { BriefingCard } from '@/components/briefing/BriefingCard'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
+import { Stars } from '@/components/ui/Stars'
 import { getDailyBriefing } from '@/lib/briefing/generate'
 import { supplierFacts } from '@/lib/briefing/facts'
 import { formatCurrency, formatDate, rmStatusMeta } from '@/lib/utils'
@@ -43,7 +44,13 @@ export default async function SupplierOverviewPage() {
 
   return (
     <div className="space-y-5">
-      <div><h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><Truck className="text-teal-600 dark:text-teal-400" size={22} /> {fullName ?? 'Supplier'}</h1>
+      <div>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><Truck className="text-teal-600 dark:text-teal-400" size={22} /> {fullName ?? 'Supplier'}</h1>
+          <Link href="/supplier/reviews" className="inline-flex items-center gap-1.5 shrink-0 rounded-full bg-[var(--surface-2)] ring-1 ring-[var(--border)] px-3 py-1.5 hover:bg-[var(--hover)] transition" title="View your reviews">
+            {d.rating.count ? <Stars value={d.rating.avg} count={d.rating.count} size={14} /> : <span className="text-xs text-[var(--text-muted)]">No reviews yet</span>}
+          </Link>
+        </div>
         <p className="text-sm text-[var(--text-muted)] mt-0.5">Your assigned work, quotes, sign-offs and performance.</p></div>
 
       <BriefingCard briefing={briefing} scope="supplier" scopeId={briefingScopeId} />
