@@ -330,7 +330,7 @@ export interface RegionalTicketAction {
 export interface RegionalTicketRow {
   id: string; title: string; storeName: string; branchCode: string | null
   status: string; priority: Priority; jobRef: string | null; createdAt: string
-  quoteRequestedAt: string | null
+  quoteRequestedAt: string | null; breached: boolean
 }
 export interface RegionalDashboardData {
   portfolio: RegionalHealthResult
@@ -375,6 +375,7 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
       storeName: storeName.get(t.store_id) ?? 'Store', branchCode: storeBranch.get(t.store_id) ?? null,
       status: t.status, priority: t.priority, jobRef: (t as any).job_ref ?? null, createdAt: t.created_at,
       quoteRequestedAt: (t as any).quote_requested_at ?? null,
+      breached: isActive(t.status) ? (() => { const s = computeTicketSla(t, rules(t.priority), now); return s.supplierBreached || s.internalBreached })() : false,
     }))
 
   const byStore = new Map<string, HealthTicket[]>()
