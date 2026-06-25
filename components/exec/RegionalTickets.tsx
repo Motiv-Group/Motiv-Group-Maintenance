@@ -4,7 +4,7 @@
 // collapsible store groups, and a slide-out store panel (chart + key counts).
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Ticket, Search, ChevronDown, BarChart3, X } from 'lucide-react'
+import { Ticket, Search, ChevronDown, BarChart3, X, PlusCircle } from 'lucide-react'
 import type { RegionalTicketRow } from '@/lib/health/data'
 import { Card } from '@/components/exec/ui'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
@@ -82,9 +82,12 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><Ticket className="text-blue-600 dark:text-blue-400" size={22} /> Tickets</h1>
-        <p className="text-sm text-[var(--text-muted)] mt-0.5">Grouped by store. Tap a store name for an overview.</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><Ticket className="text-blue-600 dark:text-blue-400" size={22} /> Tickets</h1>
+          <p className="text-sm text-[var(--text-muted)] mt-0.5">Grouped by store. Tap a store for an overview.</p>
+        </div>
+        <Link href="/regional/tickets/new" className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-500 transition shrink-0"><PlusCircle size={16} /> Log a Ticket</Link>
       </div>
 
       {/* Distribution bar (excludes cancelled) */}

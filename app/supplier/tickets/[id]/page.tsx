@@ -10,7 +10,7 @@ import { WorkflowActions } from '@/components/workflow/WorkflowActions'
 import { StatusPipeline } from '@/components/workflow/StatusPipeline'
 import { SupplierAttachments } from '@/components/workflow/SupplierAttachments'
 import { SendQuoteForm } from '@/components/admin/SendQuoteForm'
-import { ScheduleJobCard, SubmitCompletionCard } from '@/components/supplier/SupplierJobActions'
+import { ScheduleJobCard } from '@/components/supplier/SupplierJobActions'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { formatDateTime, rmStatusMeta, storeLabel } from '@/lib/utils'
 
@@ -59,7 +59,9 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
         <h2 className="text-sm font-bold text-[var(--text)]">Next step</h2>
         {canQuote && <SendQuoteForm ticketId={t.id} competitive />}
         {t.status === 'accepted' && <ScheduleJobCard ticketId={t.id} priority={t.priority} createdAt={t.created_at} />}
-        {['in_progress', 'snag_resolved', 'evidence_requested'].includes(t.status) && <SubmitCompletionCard ticketId={t.id} />}
+        {['in_progress', 'snag_resolved', 'evidence_requested'].includes(t.status) && (
+          <Link href={`/supplier/tickets/${t.id}/complete`} className="block w-full text-center py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition">Submit COC &amp; POC</Link>
+        )}
         <WorkflowActions ticketId={t.id} status={t.status} role="supplier" exclude={['schedule', 'submit_completion']} />
       </Card>
 

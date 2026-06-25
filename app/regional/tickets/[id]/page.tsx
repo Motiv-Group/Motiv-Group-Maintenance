@@ -130,7 +130,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         <WorkflowActions
           ticketId={t.id} status={t.status} role="regional_manager"
           suppliers={supplierList}
-          exclude={['validate', 'reject', 'request_info', 'request_quote', 'require_assessment', 'approve_quote', 'reject_quote', 'request_revision', 'proceed_no_quote']}
+          exclude={['validate', 'reject', 'request_info', 'request_quote', 'require_assessment', 'approve_quote', 'reject_quote', 'request_revision', 'proceed_no_quote', 'schedule']}
         />
       </Card>
 
