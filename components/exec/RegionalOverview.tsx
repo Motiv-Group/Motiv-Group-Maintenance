@@ -1,10 +1,11 @@
 'use client'
 
 import Link from 'next/link'
-import { Building2, ClipboardList, ShieldAlert, Truck, Lock, ClipboardCheck, AlertTriangle, ListTodo, Sparkles, Calendar, Banknote, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Building2, ClipboardList, ShieldAlert, Truck, Lock, ClipboardCheck, AlertTriangle, ListTodo, Sparkles, Calendar, Banknote } from 'lucide-react'
 import type { RegionalDashboardData } from '@/lib/health/data'
 import { SectionCard, KpiCard, Pill, Donut, Card, DistributionBar, STATUS_TEXT, type Kpi } from '@/components/exec/ui'
 import { RegionalRecentTickets } from '@/components/regional/RegionalRecentTickets'
+import { Stars } from '@/components/ui/Stars'
 import { STATUS_LABELS } from '@/lib/health/constants'
 import type { Briefing } from '@/lib/briefing/facts'
 import { formatDate, formatCurrency } from '@/lib/utils'
@@ -29,8 +30,6 @@ export function RegionalOverview({ data, name, briefing }: { data: RegionalDashb
 
   const focus = buildFocus(data)
   const healthy = [...data.stores].filter(s => s.finalStatus === 'controlled').sort((a, b) => b.finalHealthScore - a.finalHealthScore)
-  const underSuppliers = data.suppliers.filter(s => s.perf.band !== 'controlled').slice(0, 4)
-  const bestSupplier = [...data.suppliers].sort((a, b) => b.perf.performanceScore - a.perf.performanceScore)[0]
 
   return (
     <div className="space-y-5">
@@ -80,17 +79,14 @@ export function RegionalOverview({ data, name, briefing }: { data: RegionalDashb
         </SectionCard>
 
         <SectionCard title="Supplier Performance" icon={<Truck size={15} className="text-teal-600 dark:text-teal-400" />} action={<Link href="/regional/suppliers" className="text-xs text-[#C6A35D] hover:underline">All</Link>}>
-          {bestSupplier && (
-            <div className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)]">
-              <span className="flex items-center gap-1.5 text-sm text-[var(--text)] min-w-0"><CheckCircle2 size={14} className="text-emerald-500 shrink-0" /><span className="truncate">{bestSupplier.name}</span></span>
-              <span className={`text-sm font-semibold shrink-0 ${STATUS_TEXT[bestSupplier.perf.band]}`}>{bestSupplier.perf.performanceScore}%</span>
-            </div>
-          )}
-          {underSuppliers.map(s => (
-            <div key={s.id} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0">
-              <span className="flex items-center gap-1.5 text-sm text-[var(--text)] min-w-0"><AlertCircle size={14} className="text-red-400 shrink-0" /><span className="truncate">{s.name}</span><span className="text-[11px] text-[var(--text-faint)] shrink-0">{s.overdue} overdue</span></span>
+          {data.suppliers.map(s => (
+            <Link key={s.id} href={`/regional/supplier-reviews/${s.id}`} className="flex items-center justify-between gap-2 py-2 -mx-2 px-2 rounded-lg border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition">
+              <div className="min-w-0">
+                <p className="text-sm text-[var(--text)] truncate">{s.name}</p>
+                <Stars value={s.avgRating} count={s.ratingCount} />
+              </div>
               <span className={`text-sm font-semibold shrink-0 ${STATUS_TEXT[s.perf.band]}`}>{s.perf.performanceScore}%</span>
-            </div>
+            </Link>
           ))}
           {!data.suppliers.length && <p className="text-sm text-[var(--text-faint)]">No suppliers active in your region yet.</p>}
         </SectionCard>

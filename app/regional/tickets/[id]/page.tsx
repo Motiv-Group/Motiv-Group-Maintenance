@@ -8,7 +8,7 @@ import { requireRegionalV3 } from '@/lib/health/guard'
 import { Card } from '@/components/exec/ui'
 import { WorkflowActions } from '@/components/workflow/WorkflowActions'
 import { RmPipeline } from '@/components/regional/RmPipeline'
-import { AssignSuppliersButton, RequestInfoButton, RmEditTicketForm, SupplierStatusList, QuoteReviewCard, CancelTicketCard } from '@/components/regional/RmTicketActions'
+import { AssignSuppliersButton, RequestInfoButton, RmEditTicketForm, SupplierStatusList, QuoteReviewCard, CancelTicketCard, ApproveSignoffCard } from '@/components/regional/RmTicketActions'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { formatCurrency, formatDateTime, rmStatusMeta, storeLabel, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
 
@@ -128,11 +128,14 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
           </div>
         )}
 
-        {/* Remaining lifecycle actions (schedule, sign-off, snag, variation, close) */}
+        {/* Accept sign-off with a required supplier rating */}
+        {t.status === 'submitted_for_signoff' && <ApproveSignoffCard ticketId={t.id} />}
+
+        {/* Remaining lifecycle actions (request evidence, snag, variation, close) */}
         <WorkflowActions
           ticketId={t.id} status={t.status} role="regional_manager"
           suppliers={supplierList}
-          exclude={['validate', 'reject', 'request_info', 'request_quote', 'require_assessment', 'approve_quote', 'reject_quote', 'request_revision', 'proceed_no_quote', 'schedule']}
+          exclude={['validate', 'reject', 'request_info', 'request_quote', 'require_assessment', 'approve_quote', 'reject_quote', 'request_revision', 'proceed_no_quote', 'schedule', 'approve']}
         />
       </Card>
 

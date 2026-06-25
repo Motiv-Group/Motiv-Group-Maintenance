@@ -338,7 +338,7 @@ export interface RegionalDashboardData {
   attentionStores: StoreCard[]
   ticketActions: RegionalTicketAction[]
   tickets: RegionalTicketRow[]
-  suppliers: { id: string; name: string; perf: SupplierPerformance; open: number; overdue: number; costExposure: number }[]
+  suppliers: { id: string; name: string; perf: SupplierPerformance; open: number; overdue: number; costExposure: number; avgRating: number; ratingCount: number }[]
   signoffsPending: number
   snagsOpen: number
   generatedAt: string
@@ -412,10 +412,18 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
 
   const bySupplier = new Map<string, HealthTicket[]>()
   for (const t of tickets) if (t.supplier_id) { const a = bySupplier.get(t.supplier_id) ?? []; a.push(t); bySupplier.set(t.supplier_id, a) }
+  // Avg star rating per supplier (company-wide).
+  const { data: ratingRows } = await db.from('ratings').select('supplier_id, score').eq('company_id', companyId)
+  const ratingAgg = new Map<string, { sum: number; n: number }>()
+  for (const r of (ratingRows ?? []) as any[]) {
+    if (!r.supplier_id || r.score == null) continue
+    const a = ratingAgg.get(r.supplier_id) ?? { sum: 0, n: 0 }; a.sum += Number(r.score); a.n++; ratingAgg.set(r.supplier_id, a)
+  }
   const suppliers = [...bySupplier.entries()].map(([id, ts]) => {
     const act = ts.filter(t => isActive(t.status))
     const overdue = act.filter(t => { const s = computeTicketSla(t, rules(t.priority), now); return s.supplierBreached || s.internalBreached }).length
-    return { id, name: supplierName.get(id) ?? 'Supplier', perf: calculateSupplierPerformance(id, ts, rules, now), open: act.length, overdue, costExposure: act.reduce((s, t) => s + (t.quote_value ?? 0), 0) }
+    const ra = ratingAgg.get(id)
+    return { id, name: supplierName.get(id) ?? 'Supplier', perf: calculateSupplierPerformance(id, ts, rules, now), open: act.length, overdue, costExposure: act.reduce((s, t) => s + (t.quote_value ?? 0), 0), avgRating: ra ? ra.sum / ra.n : 0, ratingCount: ra ? ra.n : 0 }
   }).sort((a, b) => a.perf.performanceScore - b.perf.performanceScore)
 
   let signoffsPending = 0, snagsOpen = 0

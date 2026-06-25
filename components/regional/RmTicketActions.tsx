@@ -4,6 +4,7 @@
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Search, Pencil } from 'lucide-react'
+import { StarInput } from '@/components/ui/Stars'
 import { formatCurrency, formatDateTime } from '@/lib/utils'
 
 async function post(url: string, body: unknown): Promise<void> {
@@ -254,6 +255,35 @@ export function QuoteReviewCard({ ticketId, quotes }: { ticketId: string; quotes
         </div>
       ))}
       {err && <p className="text-xs text-red-500">{err}</p>}
+    </div>
+  )
+}
+
+// ── Approve sign-off (rate the supplier first) ──────────────────
+export function ApproveSignoffCard({ ticketId }: { ticketId: string }) {
+  const router = useRouter()
+  const [score, setScore] = useState(0)
+  const [comment, setComment] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+
+  async function approve() {
+    if (!score) { setErr('Please give the supplier a star rating before accepting.'); return }
+    setBusy(true); setErr('')
+    try {
+      await post(`/api/ratings`, { ticketId, score, comment })
+      await post(`/api/tickets/${ticketId}/transition`, { action: 'approve' })
+      router.refresh()
+    } catch (e: any) { setErr(e.message); setBusy(false) }
+  }
+
+  return (
+    <div className="rounded-xl ring-1 ring-[var(--border)] p-4 space-y-3">
+      <p className="text-sm font-semibold text-[var(--text)]">Rate the supplier, then accept the COC &amp; POC</p>
+      <StarInput value={score} onChange={setScore} />
+      <textarea className="w-full px-3 py-2 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm min-h-[60px]" placeholder="Comment on the supplier's work (optional)" value={comment} onChange={e => setComment(e.target.value)} />
+      {err && <p className="text-xs text-red-500">{err}</p>}
+      <button onClick={approve} disabled={busy} className="w-full py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Submitting…' : 'Approve & accept COC/POC'}</button>
     </div>
   )
 }

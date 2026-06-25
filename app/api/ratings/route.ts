@@ -1,0 +1,36 @@
+import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { NextResponse } from 'next/server'
+import { rateLimit } from '@/lib/rate-limit'
+
+// POST /api/ratings — RM rates the awarded supplier for a ticket (1–5 + comment).
+// Used as a required step when accepting the COC/POC sign-off.
+export async function POST(request: Request) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+  if (!rateLimit(`rating:${user.id}`, 30, 60_000)) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+
+  const body = await request.json().catch(() => ({}))
+  const score = Number(body.score)
+  if (!Number.isInteger(score) || score < 1 || score > 5) return NextResponse.json({ error: 'Give a score from 1 to 5.' }, { status: 400 })
+  if (typeof body.ticketId !== 'string') return NextResponse.json({ error: 'Bad request' }, { status: 400 })
+
+  const admin = createAdminClient()
+  const { data: prof } = await admin.from('user_profiles').select('role, company_id').eq('id', user.id).single()
+  if (!prof?.company_id || (prof.role !== 'regional_manager' && prof.role !== 'executive')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  const { data: ticket } = await admin.from('tickets').select('id, company_id, region_id, supplier_id').eq('id', body.ticketId).single()
+  if (!ticket || ticket.company_id !== prof.company_id) return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
+  if (!ticket.supplier_id) return NextResponse.json({ error: 'No supplier assigned to rate.' }, { status: 400 })
+  if (prof.role === 'regional_manager') {
+    const { data: links } = await admin.from('regional_users').select('region_id').eq('user_id', user.id)
+    if (!ticket.region_id || !(links ?? []).some(l => l.region_id === ticket.region_id)) return NextResponse.json({ error: 'Not your ticket' }, { status: 403 })
+  }
+
+  const { error } = await admin.from('ratings').insert({
+    company_id: ticket.company_id, ticket_id: ticket.id, supplier_id: ticket.supplier_id,
+    rated_by: user.id, score, comment: typeof body.comment === 'string' && body.comment.trim() ? body.comment.trim() : null,
+  })
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ ok: true })
+}
