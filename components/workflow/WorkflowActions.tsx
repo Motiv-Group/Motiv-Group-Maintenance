@@ -18,6 +18,8 @@ const FIELDS: Record<string, FieldDef[]> = {
 }
 // Actions where a supplier must be chosen/assigned.
 const NEEDS_SUPPLIER = new Set(['validate', 'request_quote', 'require_assessment', 'assign_snag'])
+// Actions that get an explicit "Are you sure?" confirmation before firing.
+const CONFIRM_ACTIONS = new Set(['raise_snag', 'submit_variation'])
 
 function tone(action: string): string {
   if (/^(approve|close_out|proceed|approve_quote|approve_variation|start_work|schedule)/.test(action))
@@ -44,16 +46,23 @@ export function WorkflowActions({ ticketId, status, role, suppliers = [], exclud
   const [vals, setVals] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [confirm, setConfirm] = useState<{ t: Transition; payload: Record<string, unknown> } | null>(null)
 
   if (actions.length === 0) return null
 
   const fields = active ? (FIELDS[active.action] ?? []) : []
   const needsSupplier = active ? NEEDS_SUPPLIER.has(active.action) : false
 
+  // Actions that get an explicit "Are you sure?" step before firing.
+  function maybeFire(t: Transition, payload: Record<string, unknown>) {
+    if (CONFIRM_ACTIONS.has(t.action)) { setActive(null); setConfirm({ t, payload }) }
+    else fire(t, payload)
+  }
+
   function start(t: Transition) {
     setError('')
     if ((FIELDS[t.action] ?? []).length || NEEDS_SUPPLIER.has(t.action)) { setActive(t); setVals({}) }
-    else fire(t, {})
+    else maybeFire(t, {})
   }
 
   async function fire(t: Transition, payload: Record<string, unknown>) {
@@ -74,7 +83,7 @@ export function WorkflowActions({ ticketId, status, role, suppliers = [], exclud
     if (!active) return
     for (const f of fields) if (f.required && !vals[f.k]?.trim()) { setError(`${f.label} is required`); return }
     if (needsSupplier && !vals.supplierId) { setError('Choose a supplier'); return }
-    fire(active, vals)
+    maybeFire(active, vals)
   }
 
   const input = 'w-full px-3 py-2 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)]'
@@ -108,6 +117,16 @@ export function WorkflowActions({ ticketId, status, role, suppliers = [], exclud
             <button type="button" onClick={() => { setActive(null); setError('') }} className="px-3 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm">Cancel</button>
           </div>
         </form>
+      )}
+
+      {confirm && (
+        <div className="rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] p-3 space-y-2">
+          <p className="text-sm text-[var(--text)]">Are you sure you want to <span className="font-semibold">{confirm.t.label.toLowerCase()}</span>?</p>
+          <div className="flex gap-2">
+            <button onClick={() => { const c = confirm; setConfirm(null); fire(c.t, c.payload) }} disabled={busy} className="px-3 py-2 rounded-lg bg-[#C6A35D] text-[#0a0e17] text-sm font-semibold disabled:opacity-50">{busy ? '…' : 'Yes, continue'}</button>
+            <button onClick={() => setConfirm(null)} className="px-3 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm">Cancel</button>
+          </div>
+        </div>
       )}
 
       {error && <p className="text-xs text-red-500">{error}</p>}

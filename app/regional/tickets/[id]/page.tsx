@@ -44,21 +44,23 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   const nameById = new Map<string, string>(supplierList.map(s => [s.id, s.name]))
   for (const inv of (invites ?? []) as any[]) if (inv.suppliers?.company_name) nameById.set(inv.supplier_id, inv.suppliers.company_name)
   const supplierRows = ((invites ?? []) as any[]).map(inv => ({ name: inv.suppliers?.company_name ?? nameById.get(inv.supplier_id) ?? 'Supplier', status: inv.status as string, invitedAt: inv.invited_at ?? null }))
-  const reviewQuotes = ((quotes ?? []) as any[]).filter(q => q.status === 'pending').map(q => ({
+  const mapQuote = (q: any) => ({
     id: q.id, supplierName: nameById.get(q.supplier_id) ?? 'Supplier', amount: q.amount,
     amountInclVat: q.amount_incl_vat ?? null, description: q.description ?? null, fileUrl: q.file_url ?? null, createdAt: q.created_at,
-  }))
+  })
+  const reviewQuotes = ((quotes ?? []) as any[]).filter(q => q.status === 'pending').map(mapQuote)
+  const acceptedQuotes = ((quotes ?? []) as any[]).filter(q => q.status === 'accepted').map(mapQuote)
   const isTerminal = ['completed', 'cancelled', 'declined'].includes(t.status)
   const canAssign = ['open', 'info_requested'].includes(t.status)
   const canEdit = ['open', 'info_requested'].includes(t.status)
-  const hasQuoteBlock = supplierRows.length > 0 || reviewQuotes.length > 0 || (variations ?? []).length > 0
+  const hasQuoteBlock = supplierRows.length > 0 || reviewQuotes.length > 0 || acceptedQuotes.length > 0 || (variations ?? []).length > 0
 
   return (
     <div className="space-y-5 max-w-2xl mx-auto">
       <Link href="/regional/tickets" className="inline-flex items-center gap-1 text-sm text-[var(--text-muted)] hover:text-[var(--text)]"><ArrowLeft size={15} /> Back to tickets</Link>
 
-      {/* Progress — its own block, outside the description (like the SM view) */}
-      <Card className="p-5"><RmPipeline status={t.status} /></Card>
+      {/* Progress — bare, no card around it */}
+      <div className="px-1 pt-1"><RmPipeline status={t.status} /></div>
 
       {/* Ticket detail — structured, mirrors the SM layout */}
       <Card className="p-5 space-y-4">
@@ -148,6 +150,22 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
             <div className="space-y-2">
               <h3 className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Quotes for review</h3>
               <QuoteReviewCard ticketId={t.id} quotes={reviewQuotes} />
+            </div>
+          )}
+          {acceptedQuotes.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Accepted quote</h3>
+              {acceptedQuotes.map(q => (
+                <div key={q.id} className="rounded-xl ring-1 ring-emerald-500/40 bg-emerald-500/5 p-4 space-y-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)] min-w-0"><span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400 bg-emerald-500/15 rounded-full px-1.5 py-0.5">Accepted</span><span className="truncate">{q.supplierName}</span></span>
+                    <span className="text-base font-bold text-[var(--text)] shrink-0">{formatCurrency(q.amount)}</span>
+                  </div>
+                  <p className="text-[11px] text-[var(--text-faint)]">Submitted {formatDateTime(q.createdAt)}{q.amountInclVat ? ` · incl VAT ${formatCurrency(q.amountInclVat)}` : ''}</p>
+                  {q.description && <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{q.description}</p>}
+                  {q.fileUrl && <a href={q.fileUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C6A35D] underline">View attachment</a>}
+                </div>
+              ))}
             </div>
           )}
           {(variations ?? []).length > 0 && (

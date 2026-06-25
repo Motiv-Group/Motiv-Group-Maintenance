@@ -1,16 +1,24 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 
 export const dynamic = 'force-dynamic'
 
 // POST /auth/logout — server-side sign-out + redirect.
-// Driven by a native <form> in the Navbar so logout never depends on client
-// hydration or a client-side router transition (both of which previously made
-// the logout button appear unresponsive). signOut clears the auth cookies on
-// the response; we always redirect even if signOut fails.
+// Driven by a native <form> in the chrome so logout never depends on client
+// hydration. We sign out AND explicitly expire every Supabase auth cookie on the
+// redirect response — a token refresh (e.g. after submitting a quote) can leave a
+// cookie that signOut's own clear misses, which previously made logout "stick".
 export async function POST(request: Request) {
   const supabase = createClient()
   try { await supabase.auth.signOut() } catch {}
+
   // 303 → browser re-issues the request to /auth/login as a GET
-  return NextResponse.redirect(new URL('/auth/login', request.url), { status: 303 })
+  const res = NextResponse.redirect(new URL('/auth/login', request.url), { status: 303 })
+  try {
+    for (const c of cookies().getAll()) {
+      if (c.name.startsWith('sb-')) res.cookies.set(c.name, '', { maxAge: 0, path: '/' })
+    }
+  } catch {}
+  return res
 }

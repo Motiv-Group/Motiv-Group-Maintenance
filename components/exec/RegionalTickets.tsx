@@ -1,7 +1,8 @@
 'use client'
 
-// RM Tickets tab — SM-style controls (search, filters, distribution bar),
-// collapsible store groups, and a slide-out store panel (chart + key counts).
+// RM Tickets tab — search, full status filters + distribution bar, collapsible
+// store groups, and a slide-out store panel. Each row shows the latest quote
+// milestone (requested → received → accepted) coloured to the status.
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Ticket, Search, ChevronDown, BarChart3, X, PlusCircle } from 'lucide-react'
@@ -10,35 +11,50 @@ import { Card } from '@/components/exec/ui'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { rmStatusMeta, formatDateTime } from '@/lib/utils'
 
-type Bucket = 'open' | 'quoting' | 'in_progress' | 'completed' | 'cancelled'
+type Bucket = 'open' | 'quote_requested' | 'quoted' | 'approved' | 'in_progress' | 'awaiting_signoff' | 'completed' | 'cancelled'
 function bucketOf(s: string): Bucket {
   if (s === 'open' || s === 'info_requested') return 'open'
-  if (['assigned', 'quote_requested', 'assessment', 'quoted', 'quote_revision'].includes(s)) return 'quoting'
+  if (['assigned', 'quote_requested', 'assessment'].includes(s)) return 'quote_requested'
+  if (['quoted', 'quote_revision'].includes(s)) return 'quoted'
+  if (s === 'accepted') return 'approved'
+  if (['scheduled', 'in_progress', 'variation_review', 'variation_accepted'].includes(s)) return 'in_progress'
+  if (['submitted_for_signoff', 'evidence_requested', 'snag', 'snag_assigned', 'snag_resolved', 'approved_closeout', 'pending_sign_off', 'snag_in_progress'].includes(s)) return 'awaiting_signoff'
   if (s === 'completed') return 'completed'
-  if (s === 'cancelled' || s === 'declined') return 'cancelled'
-  return 'in_progress'
+  return 'cancelled'
 }
-const BUCKET_LABEL: Record<Bucket, string> = { open: 'Open', quoting: 'Quoting', in_progress: 'In Progress', completed: 'Completed', cancelled: 'Cancelled' }
-const BUCKET_BAR: Record<Bucket, string> = { open: 'bg-blue-500', quoting: 'bg-violet-500', in_progress: 'bg-[#C6A35D]', completed: 'bg-emerald-500', cancelled: 'bg-red-500' }
+const BUCKET_LABEL: Record<Bucket, string> = { open: 'Open', quote_requested: 'Quote requested', quoted: 'Quoted', approved: 'Approved', in_progress: 'In progress', awaiting_signoff: 'Sign-off', completed: 'Completed', cancelled: 'Cancelled' }
+const BUCKET_BAR: Record<Bucket, string> = { open: 'bg-blue-500', quote_requested: 'bg-cyan-500', quoted: 'bg-violet-500', approved: 'bg-teal-500', in_progress: 'bg-[#C6A35D]', awaiting_signoff: 'bg-orange-500', completed: 'bg-emerald-500', cancelled: 'bg-red-500' }
+const BAR_ORDER: Bucket[] = ['open', 'quote_requested', 'quoted', 'approved', 'in_progress', 'awaiting_signoff', 'completed']
 
 const PILLS: { key: 'all' | Bucket; label: string; active: string; inactive: string }[] = [
   { key: 'all', label: 'All', active: 'bg-slate-800 text-white border-slate-800 dark:bg-white dark:text-[#0a0e17] dark:border-white', inactive: 'text-[var(--text-muted)] border-[var(--border)] hover:border-slate-400' },
   { key: 'open', label: 'Open', active: 'bg-blue-500 text-white border-blue-500', inactive: 'text-blue-600 dark:text-blue-400 border-blue-500/40 hover:border-blue-400' },
-  { key: 'quoting', label: 'Quoting', active: 'bg-violet-500 text-white border-violet-500', inactive: 'text-violet-600 dark:text-violet-400 border-violet-500/40 hover:border-violet-400' },
-  { key: 'in_progress', label: 'In Progress', active: 'bg-[#C6A35D] text-[#0a0e17] border-[#C6A35D]', inactive: 'text-amber-600 dark:text-[#C6A35D] border-[#C6A35D]/40 hover:border-[#C6A35D]' },
+  { key: 'quote_requested', label: 'Quote req.', active: 'bg-cyan-500 text-white border-cyan-500', inactive: 'text-cyan-600 dark:text-cyan-400 border-cyan-500/40 hover:border-cyan-400' },
+  { key: 'quoted', label: 'Quoted', active: 'bg-violet-500 text-white border-violet-500', inactive: 'text-violet-600 dark:text-violet-400 border-violet-500/40 hover:border-violet-400' },
+  { key: 'approved', label: 'Approved', active: 'bg-teal-500 text-white border-teal-500', inactive: 'text-teal-600 dark:text-teal-400 border-teal-500/40 hover:border-teal-400' },
+  { key: 'in_progress', label: 'In progress', active: 'bg-[#C6A35D] text-[#0a0e17] border-[#C6A35D]', inactive: 'text-amber-600 dark:text-[#C6A35D] border-[#C6A35D]/40 hover:border-[#C6A35D]' },
+  { key: 'awaiting_signoff', label: 'Sign-off', active: 'bg-orange-500 text-white border-orange-500', inactive: 'text-orange-600 dark:text-orange-400 border-orange-500/40 hover:border-orange-400' },
   { key: 'completed', label: 'Completed', active: 'bg-emerald-500 text-white border-emerald-500', inactive: 'text-emerald-600 dark:text-emerald-400 border-emerald-500/40 hover:border-emerald-400' },
   { key: 'cancelled', label: 'Cancelled', active: 'bg-red-500 text-white border-red-500', inactive: 'text-red-600 dark:text-red-400 border-red-500/40 hover:border-red-400' },
 ]
 
+function milestone(t: RegionalTicketRow): { label: string; at: string } | null {
+  if (t.quoteAcceptedAt) return { label: 'Quote accepted', at: t.quoteAcceptedAt }
+  if (t.quoteReceivedAt) return { label: 'Quote received', at: t.quoteReceivedAt }
+  if (t.quoteRequestedAt) return { label: 'Quote requested', at: t.quoteRequestedAt }
+  return null
+}
+
 function TicketRow({ t }: { t: RegionalTicketRow }) {
   const sm = rmStatusMeta(t.status)
+  const m = milestone(t)
   return (
     <Link href={`/regional/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2.5 -mx-2 px-2 rounded-lg border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition">
       <div className="min-w-0">
         {t.jobRef && <p className="text-[10px] font-mono text-[var(--text-faint)]">{t.jobRef}</p>}
         <p className="text-sm text-[var(--text)] truncate">{t.title}</p>
         <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(t.createdAt)}{t.breached ? ' · ⚠ breached' : ''}</p>
-        {t.quoteRequestedAt && <p className="text-[11px] text-[var(--text-faint)]">Quote requested · {formatDateTime(t.quoteRequestedAt)}</p>}
+        {m && <p className={`text-[11px] font-medium ${sm.text}`}>{m.label} · {formatDateTime(m.at)}</p>}
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
         <PriorityBadge priority={t.priority} className="w-full text-center" />
@@ -55,11 +71,11 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
   const [panelStore, setPanelStore] = useState<string | null>(null)
 
   const counts = useMemo(() => {
-    const c: Record<Bucket, number> = { open: 0, quoting: 0, in_progress: 0, completed: 0, cancelled: 0 }
+    const c: Record<Bucket, number> = { open: 0, quote_requested: 0, quoted: 0, approved: 0, in_progress: 0, awaiting_signoff: 0, completed: 0, cancelled: 0 }
     for (const t of tickets) c[bucketOf(t.status)]++
     return c
   }, [tickets])
-  const barTotal = counts.open + counts.quoting + counts.in_progress + counts.completed || 1
+  const barTotal = BAR_ORDER.reduce((s, b) => s + counts[b], 0) || 1
 
   const shown = useMemo(() => {
     const terms = q.toLowerCase().split(/\s+/).filter(Boolean)
@@ -93,14 +109,10 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
       {/* Distribution bar (excludes cancelled) */}
       <Card className="p-4 space-y-2">
         <div className="h-3 rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden flex">
-          {(['open', 'quoting', 'in_progress', 'completed'] as Bucket[]).map(b => counts[b] > 0 && (
-            <div key={b} className={`h-full ${BUCKET_BAR[b]}`} style={{ width: `${Math.round((counts[b] / barTotal) * 100)}%` }} />
-          ))}
+          {BAR_ORDER.map(b => counts[b] > 0 && <div key={b} className={`h-full ${BUCKET_BAR[b]}`} style={{ width: `${Math.round((counts[b] / barTotal) * 100)}%` }} />)}
         </div>
         <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] sm:flex sm:flex-wrap">
-          {(['open', 'quoting', 'in_progress', 'completed'] as Bucket[]).map(b => (
-            <span key={b} className="flex items-center gap-1.5 text-[var(--text-muted)]"><i className={`w-2 h-2 rounded-full ${BUCKET_BAR[b]}`} />{BUCKET_LABEL[b]} {counts[b]}</span>
-          ))}
+          {BAR_ORDER.map(b => <span key={b} className="flex items-center gap-1.5 text-[var(--text-muted)]"><i className={`w-2 h-2 rounded-full ${BUCKET_BAR[b]}`} />{BUCKET_LABEL[b]} {counts[b]}</span>)}
           {counts.cancelled > 0 && <span className="flex items-center gap-1.5 text-[var(--text-muted)]"><i className="w-2 h-2 rounded-full bg-red-500" />Cancelled {counts.cancelled}</span>}
         </div>
       </Card>
@@ -125,7 +137,7 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
         })}
       </div>
 
-      {/* Store groups (collapsible; tap name for the side panel) */}
+      {/* Store groups */}
       {groups.map(([store, g]) => {
         const isCollapsed = collapsed.has(store)
         return (
@@ -150,10 +162,10 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
 }
 
 function StorePanel({ store, rows, onClose }: { store: string; rows: RegionalTicketRow[]; onClose: () => void }) {
-  const c: Record<Bucket, number> = { open: 0, quoting: 0, in_progress: 0, completed: 0, cancelled: 0 }
+  const c: Record<Bucket, number> = { open: 0, quote_requested: 0, quoted: 0, approved: 0, in_progress: 0, awaiting_signoff: 0, completed: 0, cancelled: 0 }
   for (const t of rows) c[bucketOf(t.status)]++
   const total = rows.length
-  const barTotal = c.open + c.quoting + c.in_progress + c.completed || 1
+  const barTotal = BAR_ORDER.reduce((s, b) => s + c[b], 0) || 1
   const breached = rows.filter(t => t.breached).length
   const active = rows.filter(t => { const b = bucketOf(t.status); return b !== 'completed' && b !== 'cancelled' })
   const oldest = active.length ? Math.max(...active.map(t => Math.floor((Date.now() - new Date(t.createdAt).getTime()) / 86_400_000))) : 0
@@ -174,13 +186,12 @@ function StorePanel({ store, rows, onClose }: { store: string; rows: RegionalTic
           <button onClick={onClose} className="shrink-0 -m-1 p-1.5 rounded-lg text-[var(--text-faint)] hover:text-[var(--text)] hover:bg-[var(--hover)]"><X size={18} /></button>
         </div>
 
-        {/* status breakdown chart */}
         <div className="space-y-2">
           <div className="h-3 rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden flex">
-            {(['open', 'quoting', 'in_progress', 'completed'] as Bucket[]).map(b => c[b] > 0 && <div key={b} className={`h-full ${BUCKET_BAR[b]}`} style={{ width: `${Math.round((c[b] / barTotal) * 100)}%` }} />)}
+            {BAR_ORDER.map(b => c[b] > 0 && <div key={b} className={`h-full ${BUCKET_BAR[b]}`} style={{ width: `${Math.round((c[b] / barTotal) * 100)}%` }} />)}
           </div>
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px]">
-            {(['open', 'quoting', 'in_progress', 'completed', 'cancelled'] as Bucket[]).map(b => c[b] > 0 && (
+            {([...BAR_ORDER, 'cancelled'] as Bucket[]).map(b => c[b] > 0 && (
               <span key={b} className="flex items-center gap-1.5 text-[var(--text-muted)]"><i className={`w-2 h-2 rounded-full ${BUCKET_BAR[b]}`} />{BUCKET_LABEL[b]} {c[b]}</span>
             ))}
           </div>
@@ -189,8 +200,8 @@ function StorePanel({ store, rows, onClose }: { store: string; rows: RegionalTic
         <div className="grid grid-cols-2 gap-2">
           <Stat label="Total" value={total} />
           <Stat label="Breached" value={breached} tone={breached ? 'text-red-600 dark:text-red-400' : 'text-[var(--text)]'} />
-          <Stat label="Open / Quoting" value={c.open + c.quoting} />
-          <Stat label="In progress" value={c.in_progress} />
+          <Stat label="Open / Quoting" value={c.open + c.quote_requested + c.quoted} />
+          <Stat label="In progress" value={c.approved + c.in_progress + c.awaiting_signoff} />
           <Stat label="Completed" value={c.completed} />
           <Stat label="Oldest open" value={`${oldest}d`} tone={oldest >= 7 ? 'text-amber-600 dark:text-amber-400' : 'text-[var(--text)]'} />
         </div>

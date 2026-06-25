@@ -7,12 +7,21 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { requireSupplierV3 } from '@/lib/health/guard'
 import { Card } from '@/components/exec/ui'
 import { WorkflowActions } from '@/components/workflow/WorkflowActions'
-import { StatusPipeline } from '@/components/workflow/StatusPipeline'
+import { RmPipeline } from '@/components/regional/RmPipeline'
 import { SupplierAttachments } from '@/components/workflow/SupplierAttachments'
 import { SendQuoteForm } from '@/components/admin/SendQuoteForm'
 import { ScheduleJobCard } from '@/components/supplier/SupplierJobActions'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
-import { formatDateTime, rmStatusMeta, storeLabel } from '@/lib/utils'
+import { formatDateTime, rmStatusMeta, storeLabel, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
+
+function DetailItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">{label}</div>
+      <div className="text-sm text-[var(--text)] mt-0.5">{value}</div>
+    </div>
+  )
+}
 
 export default async function SupplierTicketDetailPage({ params }: { params: { id: string } }) {
   const { companyId, supplierIds } = await requireSupplierV3()
@@ -35,24 +44,44 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
     <div className="space-y-5 max-w-2xl mx-auto">
       <Link href="/supplier/tickets" className="inline-flex items-center gap-1 text-sm text-[var(--text-muted)] hover:text-[var(--text)]"><ArrowLeft size={15} /> Back to tickets</Link>
 
+      {/* Progress — bare, no card around it (same as RM) */}
+      <div className="px-1 pt-1"><RmPipeline status={t.status} /></div>
+
+      {/* Ticket detail — same layout as the SM view */}
       <Card className="p-5 space-y-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             {t.job_ref && <p className="text-[11px] font-mono font-semibold tracking-wide text-[var(--text-faint)] mb-0.5">{t.job_ref}</p>}
             <h1 className="text-lg font-bold text-[var(--text)]">{t.title}</h1>
-            <p className="text-[11px] text-[var(--text-faint)] mt-0.5">{storeName} · {t.category ?? 'General'}</p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end">
             <PriorityBadge priority={t.priority} className="w-full text-center" />
             {(() => { const sm = rmStatusMeta(t.status); return <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${sm.cls}`}>{sm.label}</span> })()}
           </div>
         </div>
-        <StatusPipeline status={t.status} />
-        <p className="text-sm text-[var(--text)]">{t.description}</p>
-        {t.scheduled_at && <p className="text-xs text-[var(--text-muted)]">Scheduled: {formatDateTime(t.scheduled_at)}</p>}
+
+        <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+          <DetailItem label="Store" value={storeName} />
+          <DetailItem label="Category" value={t.category ?? 'General'} />
+          <DetailItem label="Operational Impact" value={OPERATIONAL_IMPACT_LABELS[t.operational_impact ?? 'none'] ?? 'No operational impact'} />
+          <DetailItem label="Logged" value={formatDateTime(t.created_at)} />
+        </div>
+
+        <div>
+          <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Description</div>
+          <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{t.description}</p>
+        </div>
+
         {Array.isArray(t.photo_urls) && t.photo_urls.length > 0 && (
-          <div className="flex flex-wrap gap-2">{t.photo_urls.map((u: string, i: number) => <a key={i} href={u} target="_blank" className="text-xs text-[#C6A35D] underline">Photo {i + 1}</a>)}</div>
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Photos</div>
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
+              {t.photo_urls.map((u: string, i: number) => <a key={i} href={u} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C6A35D] underline hover:text-amber-500">Photo {i + 1}</a>)}
+            </div>
+          </div>
         )}
+
+        {t.scheduled_at && <p className="text-xs text-[var(--text-muted)]">Scheduled: {formatDateTime(t.scheduled_at)}</p>}
       </Card>
 
       <Card className="p-5 space-y-3">
@@ -62,7 +91,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
         {['in_progress', 'snag_resolved', 'evidence_requested'].includes(t.status) && (
           <Link href={`/supplier/tickets/${t.id}/complete`} className="block w-full text-center py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition">Submit COC &amp; POC</Link>
         )}
-        <WorkflowActions ticketId={t.id} status={t.status} role="supplier" exclude={['schedule', 'submit_completion']} />
+        <WorkflowActions ticketId={t.id} status={t.status} role="supplier" exclude={['schedule', 'submit_completion', 'require_assessment', 'request_quote']} />
       </Card>
 
       <Card className="p-5">

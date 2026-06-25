@@ -330,7 +330,7 @@ export interface RegionalTicketAction {
 export interface RegionalTicketRow {
   id: string; title: string; storeName: string; branchCode: string | null
   status: string; priority: Priority; jobRef: string | null; createdAt: string
-  quoteRequestedAt: string | null; breached: boolean
+  quoteRequestedAt: string | null; quoteReceivedAt: string | null; quoteAcceptedAt: string | null; breached: boolean
 }
 export interface RegionalDashboardData {
   portfolio: RegionalHealthResult
@@ -367,6 +367,16 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
   const tickets = ((ticketsRaw ?? []) as any[]).map(asTicket)
   const supplierName = new Map((suppliersRaw ?? []).map((s: any) => [s.id, s.company_name]))
 
+  // Quote milestones per ticket: first quote received + when one was accepted.
+  const ticketIds = tickets.map(t => t.id)
+  const { data: quoteRows } = ticketIds.length ? await db.from('quotes').select('ticket_id, status, created_at').in('ticket_id', ticketIds) : { data: [] as any[] }
+  const firstQuoteAt = new Map<string, string>(); const acceptedQuoteAt = new Map<string, string>()
+  for (const q of (quoteRows ?? []) as any[]) {
+    const cur = firstQuoteAt.get(q.ticket_id)
+    if (!cur || new Date(q.created_at) < new Date(cur)) firstQuoteAt.set(q.ticket_id, q.created_at)
+    if (q.status === 'accepted') acceptedQuoteAt.set(q.ticket_id, q.created_at)
+  }
+
   // Ticket rows (most-recent first) for the recent card + tickets tab.
   const ticketRows: RegionalTicketRow[] = [...tickets]
     .sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at))
@@ -375,6 +385,8 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
       storeName: storeName.get(t.store_id) ?? 'Store', branchCode: storeBranch.get(t.store_id) ?? null,
       status: t.status, priority: t.priority, jobRef: (t as any).job_ref ?? null, createdAt: t.created_at,
       quoteRequestedAt: (t as any).quote_requested_at ?? null,
+      quoteReceivedAt: firstQuoteAt.get(t.id) ?? null,
+      quoteAcceptedAt: acceptedQuoteAt.get(t.id) ?? (t.status === 'accepted' ? (t as any).quote_decided_at ?? null : null),
       breached: isActive(t.status) ? (() => { const s = computeTicketSla(t, rules(t.priority), now); return s.supplierBreached || s.internalBreached })() : false,
     }))
 

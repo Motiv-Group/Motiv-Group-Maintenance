@@ -169,38 +169,39 @@ export function storeLabel(name?: string | null, subStore?: string | null): stri
  * ticket page). Unlike clientVisibleStatus (3-state, for the SM), this reflects
  * the commercial/execution phase so the overview updates as the ticket moves.
  */
-export function rmStatusMeta(status: string): { label: string; cls: string } {
-  const cyan   = 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-400'
-  const violet = 'bg-violet-500/15 text-violet-700 dark:text-violet-400'
-  const gold   = 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D]'
-  const orange = 'bg-orange-500/15 text-orange-700 dark:text-orange-400'
-  const M: Record<string, { label: string; cls: string }> = {
-    open:                  { label: 'Open',              cls: 'bg-blue-500/15 text-blue-700 dark:text-blue-400' },
-    info_requested:        { label: 'Info requested',    cls: 'bg-amber-500/15 text-amber-700 dark:text-amber-400' },
-    assigned:              { label: 'Quote requested',   cls: cyan },
-    quote_requested:       { label: 'Quote requested',   cls: cyan },
-    assessment:            { label: 'Assessment',        cls: cyan },
-    quoted:                { label: 'Quoted',            cls: violet },
-    quote_revision:        { label: 'Quoted',            cls: violet },
-    accepted:              { label: 'Approved',          cls: 'bg-teal-500/15 text-teal-700 dark:text-teal-400' },
-    scheduled:             { label: 'In progress',       cls: gold },
-    in_progress:           { label: 'In progress',       cls: gold },
-    variation_review:      { label: 'In progress',       cls: gold },
-    submitted_for_signoff: { label: 'Awaiting sign-off', cls: orange },
-    evidence_requested:    { label: 'Awaiting sign-off', cls: orange },
-    snag:                  { label: 'Snag',              cls: 'bg-red-500/15 text-red-700 dark:text-red-400' },
-    snag_assigned:         { label: 'Snag',              cls: 'bg-red-500/15 text-red-700 dark:text-red-400' },
-    snag_resolved:         { label: 'Awaiting sign-off', cls: orange },
-    approved_closeout:     { label: 'Awaiting sign-off', cls: orange },
-    completed:             { label: 'Completed',         cls: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' },
-    cancelled:             { label: 'Cancelled',         cls: 'bg-red-500/15 text-red-700 dark:text-red-400' },
-    declined:              { label: 'Declined',          cls: 'bg-gray-500/15 text-gray-600 dark:text-gray-400' },
+export function rmStatusMeta(status: string): { label: string; cls: string; text: string } {
+  const cyanT = 'text-cyan-700 dark:text-cyan-400', violetT = 'text-violet-700 dark:text-violet-400'
+  const goldT = 'text-amber-700 dark:text-[#C6A35D]', orangeT = 'text-orange-700 dark:text-orange-400'
+  const blueT = 'text-blue-700 dark:text-blue-400', tealT = 'text-teal-700 dark:text-teal-400'
+  const redT = 'text-red-700 dark:text-red-400', greenT = 'text-emerald-700 dark:text-emerald-400', grayT = 'text-gray-600 dark:text-gray-400'
+  const cyan = `bg-cyan-500/15 ${cyanT}`, violet = `bg-violet-500/15 ${violetT}`, gold = `bg-[#C6A35D]/15 ${goldT}`, orange = `bg-orange-500/15 ${orangeT}`
+  const M: Record<string, { label: string; cls: string; text: string }> = {
+    open:                  { label: 'Open',              cls: `bg-blue-500/15 ${blueT}`, text: blueT },
+    info_requested:        { label: 'Info requested',    cls: 'bg-amber-500/15 text-amber-700 dark:text-amber-400', text: 'text-amber-700 dark:text-amber-400' },
+    assigned:              { label: 'Quote requested',   cls: cyan, text: cyanT },
+    quote_requested:       { label: 'Quote requested',   cls: cyan, text: cyanT },
+    assessment:            { label: 'Assessment',        cls: cyan, text: cyanT },
+    quoted:                { label: 'Quoted',            cls: violet, text: violetT },
+    quote_revision:        { label: 'Quoted',            cls: violet, text: violetT },
+    accepted:              { label: 'Approved',          cls: `bg-teal-500/15 ${tealT}`, text: tealT },
+    scheduled:             { label: 'In progress',       cls: gold, text: goldT },
+    in_progress:           { label: 'In progress',       cls: gold, text: goldT },
+    variation_review:      { label: 'In progress',       cls: gold, text: goldT },
+    submitted_for_signoff: { label: 'Awaiting sign-off', cls: orange, text: orangeT },
+    evidence_requested:    { label: 'Awaiting sign-off', cls: orange, text: orangeT },
+    snag:                  { label: 'Snag',              cls: `bg-red-500/15 ${redT}`, text: redT },
+    snag_assigned:         { label: 'Snag',              cls: `bg-red-500/15 ${redT}`, text: redT },
+    snag_resolved:         { label: 'Awaiting sign-off', cls: orange, text: orangeT },
+    approved_closeout:     { label: 'Awaiting sign-off', cls: orange, text: orangeT },
+    completed:             { label: 'Completed',         cls: `bg-emerald-500/15 ${greenT}`, text: greenT },
+    cancelled:             { label: 'Cancelled',         cls: `bg-red-500/15 ${redT}`, text: redT },
+    declined:              { label: 'Declined',          cls: `bg-gray-500/15 ${grayT}`, text: grayT },
     // legacy
-    pending_sign_off:      { label: 'Awaiting sign-off', cls: orange },
-    snag_in_progress:      { label: 'Snag',              cls: 'bg-red-500/15 text-red-700 dark:text-red-400' },
-    variation_accepted:    { label: 'In progress',       cls: gold },
+    pending_sign_off:      { label: 'Awaiting sign-off', cls: orange, text: orangeT },
+    snag_in_progress:      { label: 'Snag',              cls: `bg-red-500/15 ${redT}`, text: redT },
+    variation_accepted:    { label: 'In progress',       cls: gold, text: goldT },
   }
-  return M[status] ?? { label: status, cls: 'bg-gray-500/15 text-gray-600 dark:text-gray-400' }
+  return M[status] ?? { label: status, cls: `bg-gray-500/15 ${grayT}`, text: grayT }
 }
 
 /** Human-readable ticket reference, e.g. JOB-00042. */

@@ -124,6 +124,7 @@ export function SendQuoteForm({
   const [existingFileUrl, setExistingFileUrl] = useState<string | null>(existingQuote?.file_url ?? null)
   const [uploading,  setUploading]  = useState(false)
   const [parsing,     setParsing]     = useState(false)
+  const [confirmVals, setConfirmVals] = useState<QuoteForm | null>(null)   // competitive: confirm before sending
   const [autofilled,  setAutofilled]  = useState(false)
   const [parseError,  setParseError]  = useState<'scanned' | 'generic' | false>(false)
   const [needAmount,  setNeedAmount]  = useState(false)   // parsed ok but amount couldn't be read confidently
@@ -254,6 +255,13 @@ export function SendQuoteForm({
       setError('Please attach the quote document (PDF, Excel, image or Word) before submitting.')
       return
     }
+    // Competitive supplier quote → confirm before sending.
+    if (competitive && !confirmVals) { setConfirmVals(values); setError(''); return }
+    await doSubmit(values)
+  }
+
+  async function doSubmit(values: QuoteForm) {
+    setConfirmVals(null)
     setLoading(true)
     setError('')
 
@@ -305,6 +313,7 @@ export function SendQuoteForm({
 
   function handleClose() {
     setOpen(false)
+    setConfirmVals(null)
     if (filePreview) URL.revokeObjectURL(filePreview)
     setFilePreview(null)
     setFile(null)
@@ -542,6 +551,16 @@ export function SendQuoteForm({
         {error && (
           <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm rounded-lg px-4 py-3">
             {error}
+          </div>
+        )}
+
+        {confirmVals && (
+          <div className="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 p-3 space-y-2">
+            <p className="text-sm text-amber-800 dark:text-amber-200">Send this quote to the manager? Please double-check the amount and details first.</p>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => doSubmit(confirmVals)} disabled={loading} className="px-3 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-semibold disabled:opacity-50">{loading ? 'Sending…' : 'Yes, send quote'}</button>
+              <button type="button" onClick={() => setConfirmVals(null)} className="px-3 py-2 rounded-lg ring-1 ring-gray-300 dark:ring-gray-600 text-gray-600 dark:text-gray-300 text-sm">Back</button>
+            </div>
           </div>
         )}
 

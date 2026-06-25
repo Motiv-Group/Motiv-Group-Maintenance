@@ -202,6 +202,7 @@ export function QuoteReviewCard({ ticketId, quotes }: { ticketId: string; quotes
   const router = useRouter()
   const [busy, setBusy] = useState<string | null>(null)
   const [declineFor, setDeclineFor] = useState<string | null>(null)
+  const [approveFor, setApproveFor] = useState<string | null>(null)
   const [reason, setReason] = useState(DECLINE_REASONS[0])
   const [other, setOther] = useState('')
   const [err, setErr] = useState('')
@@ -236,9 +237,17 @@ export function QuoteReviewCard({ ticketId, quotes }: { ticketId: string; quotes
                 <button onClick={() => setDeclineFor(null)} className="px-3 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm">Back</button>
               </div>
             </div>
+          ) : approveFor === q.id ? (
+            <div className="space-y-2 pt-1">
+              <p className="text-sm text-[var(--text)]">Approve and award <span className="font-semibold">{q.supplierName}</span>? Other quotes for this ticket will be declined.</p>
+              <div className="flex gap-2">
+                <button onClick={() => decide(q.id, 'approve')} disabled={busy === q.id} className="px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold disabled:opacity-50">{busy === q.id ? '…' : 'Yes, approve'}</button>
+                <button onClick={() => setApproveFor(null)} className="px-3 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm">Cancel</button>
+              </div>
+            </div>
           ) : (
             <div className="flex gap-2 pt-1">
-              <button onClick={() => decide(q.id, 'approve')} disabled={busy === q.id} className="px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold disabled:opacity-50">{busy === q.id ? '…' : 'Approve'}</button>
+              <button onClick={() => setApproveFor(q.id)} className="px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold">Approve</button>
               <button onClick={() => { setDeclineFor(q.id); setReason(DECLINE_REASONS[0]); setOther('') }} className="px-3 py-2 rounded-lg ring-1 ring-red-500/40 text-red-600 dark:text-red-400 text-sm font-semibold">Decline</button>
             </div>
           )}
