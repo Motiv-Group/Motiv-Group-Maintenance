@@ -63,6 +63,9 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   const acceptedQuotes = ((quotes ?? []) as any[]).filter(q => q.status === 'accepted').map(mapQuote)
   const isTerminal = ['completed', 'cancelled', 'declined'].includes(t.status)
   const canAssign = ['open', 'info_requested'].includes(t.status)
+  // Cancelling is only allowed up to (and including) quote review — once a quote
+  // is accepted (status 'accepted' or later), the job is committed.
+  const canCancel = ['open', 'info_requested', 'assigned', 'assessment', 'quote_requested', 'quoted', 'quote_revision'].includes(t.status)
   const canEdit = ['open', 'info_requested'].includes(t.status)
   const hasQuoteBlock = supplierRows.length > 0 || reviewQuotes.length > 0 || acceptedQuotes.length > 0 || (variations ?? []).length > 0
 
@@ -131,11 +134,11 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         <h2 className="text-sm font-bold text-[var(--text)]">Actions</h2>
 
         {/* Primary actions — equal-size, side by side: Assign (green) · Request info (amber) · Cancel (red) */}
-        {!isTerminal && (
+        {!isTerminal && (canAssign || canCancel) && (
           <div className="flex gap-2">
             {canAssign && <AssignSuppliersButton ticketId={t.id} suppliers={supplierList} />}
             {canAssign && <RequestInfoButton ticketId={t.id} />}
-            <CancelTicketCard ticketId={t.id} />
+            {canCancel && <CancelTicketCard ticketId={t.id} />}
           </div>
         )}
 
