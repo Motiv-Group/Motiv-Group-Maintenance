@@ -10,16 +10,26 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
   const admin = createAdminClient()
-  const { data: ticket } = await admin.from('tickets').select('created_by, store_id, status').eq('id', params.id).single()
+  const { data: prof } = await admin.from('user_profiles').select('role').eq('id', user.id).single()
+  const role = prof?.role
+  const { data: ticket } = await admin.from('tickets').select('created_by, store_id, region_id, status').eq('id', params.id).single()
   if (!ticket) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  // Owner = the creator, or any manager linked to the ticket's store.
-  let owns = ticket.created_by === user.id
-  if (!owns) {
-    const { data: link } = await admin.from('store_users').select('store_id').eq('user_id', user.id).eq('store_id', ticket.store_id).maybeSingle()
-    owns = !!link
+  // Access: SM owner (creator or store-linked), the ticket's RM, or an executive.
+  let allowed = role === 'executive' || role === 'system_admin'
+  if (!allowed && role === 'regional_manager') {
+    const { data: rl } = await admin.from('regional_users').select('region_id').eq('user_id', user.id)
+    allowed = !!ticket.region_id && (rl ?? []).some(l => l.region_id === ticket.region_id)
   }
-  if (!owns) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!allowed) {
+    let owns = ticket.created_by === user.id
+    if (!owns) {
+      const { data: link } = await admin.from('store_users').select('store_id').eq('user_id', user.id).eq('store_id', ticket.store_id).maybeSingle()
+      owns = !!link
+    }
+    allowed = owns
+  }
+  if (!allowed) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   if (ticket.status !== 'open' && ticket.status !== 'info_requested') return NextResponse.json({ error: 'This ticket can no longer be edited' }, { status: 400 })
 
   const body = await request.json()
@@ -36,7 +46,11 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     customer_visible_flag: impact === 'customer_visible',
     staff_impact_flag: impact === 'staff_inconvenience',
   }
-  const priority = computePriority({ severity, operational_impact: impact, ...flags })
+  // Managers can set priority directly (manual override); SM/owner keeps it derived from impact.
+  const isManager = role === 'regional_manager' || role === 'executive' || role === 'system_admin'
+  const priority = (isManager && ['P1', 'P2', 'P3', 'P4'].includes(String(body.priority)))
+    ? String(body.priority)
+    : computePriority({ severity, operational_impact: impact, ...flags })
 
   const update: Record<string, unknown> = { title, description, category, operational_impact: impact, severity, priority, ...flags, updated_at: new Date().toISOString() }
   if (Array.isArray(photo_urls)) update.photo_urls = photo_urls
@@ -45,6 +59,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   revalidatePath('/client'); revalidatePath('/client/tickets'); revalidatePath(`/client/tickets/${params.id}`)
+  revalidatePath('/regional'); revalidatePath('/regional/tickets'); revalidatePath(`/regional/tickets/${params.id}`)
   return NextResponse.json({ ticket: data })
 }
 
