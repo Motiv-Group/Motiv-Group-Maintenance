@@ -85,9 +85,17 @@ export async function POST(request: Request, { params }: { params: { id: string 
         updates.quote_decision_status = 'rejected'; updates.quote_decided_at = now
         await admin.from('quotes').update({ status: 'declined' }).eq('ticket_id', ticketId).eq('status', 'pending')
         break
-      case 'schedule':
-        updates.scheduled_at = body.scheduledAt ?? now
+      case 'schedule': {
+        const when = body.scheduledAt ? new Date(body.scheduledAt) : new Date(now)
+        if (isNaN(when.getTime())) return NextResponse.json({ error: 'Invalid date' }, { status: 400 })
+        const H = ({ P1: 8, P2: 24, P3: 72, P4: 168 } as Record<string, number>)[ticket.priority] ?? 72
+        let max = new Date(new Date(ticket.created_at).getTime() + H * 3600_000)
+        if (max.getTime() <= Date.now()) max = new Date(Date.now() + H * 3600_000)
+        if (when.getTime() < Date.now() - 5 * 60_000) return NextResponse.json({ error: 'Cannot schedule in the past.' }, { status: 400 })
+        if (when.getTime() > max.getTime() + 3600_000) return NextResponse.json({ error: 'Scheduled date is beyond the allowed window for this priority.' }, { status: 400 })
+        updates.scheduled_at = when.toISOString()
         break
+      }
       case 'start_work':
         updates.first_response_at = ticket.first_response_at ?? now; updates.attended_at = ticket.attended_at ?? now
         break

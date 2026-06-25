@@ -29,7 +29,7 @@ const STORE_TABS: ChromeTab[] = [
   { href: '/client/tickets', label: 'Tickets',   icon: Ticket },
 ]
 const SUPPLIER_TABS: ChromeTab[] = [
-  { href: '/supplier',         label: 'Home',        icon: LayoutDashboard },
+  { href: '/supplier',         label: 'Dashboard',   icon: LayoutDashboard },
   { href: '/supplier/tickets', label: 'Tickets',     icon: Ticket },
   { href: '/supplier/quotes',  label: 'Quotes',      icon: ReceiptText },
   { href: '/supplier/signoff', label: 'Sign-off',    icon: ClipboardCheck },

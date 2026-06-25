@@ -105,11 +105,11 @@ export const TRANSITIONS: Record<TicketStatus, Transition[]> = {
     { action: 'schedule', label: 'Schedule job', to: 'scheduled', roles: ['supplier', 'regional_manager'] },
   ],
   scheduled: [
-    { action: 'start_work', label: 'Start work', to: 'in_progress', roles: ['supplier'] },
+    { action: 'start_work', label: 'In Progress', to: 'in_progress', roles: ['supplier'] },
   ],
   in_progress: [
-    { action: 'submit_variation',   label: 'Submit variation',  to: 'variation_review',      roles: ['supplier'] },
-    { action: 'submit_completion',  label: 'Submit completion', to: 'submitted_for_signoff', roles: ['supplier'] },
+    { action: 'submit_variation',   label: 'Submit variation',   to: 'variation_review',      roles: ['supplier'] },
+    { action: 'submit_completion',  label: 'Submit COC & POC',   to: 'submitted_for_signoff', roles: ['supplier'] },
   ],
   variation_review: [
     { action: 'approve_variation', label: 'Approve variation', to: 'in_progress', roles: ['regional_manager', 'executive'] },

@@ -10,6 +10,7 @@ import { WorkflowActions } from '@/components/workflow/WorkflowActions'
 import { StatusPipeline } from '@/components/workflow/StatusPipeline'
 import { SupplierAttachments } from '@/components/workflow/SupplierAttachments'
 import { SupplierQuoteCard } from '@/components/supplier/SupplierQuoteCard'
+import { ScheduleJobCard, SubmitCompletionCard } from '@/components/supplier/SupplierJobActions'
 import { formatDateTime } from '@/lib/utils'
 
 export default async function SupplierTicketDetailPage({ params }: { params: { id: string } }) {
@@ -47,12 +48,14 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
       <Card className="p-5 space-y-3">
         <h2 className="text-sm font-bold text-[var(--text)]">Next step</h2>
         {canQuote && <SupplierQuoteCard ticketId={t.id} alreadyQuoted={invite?.status === 'quoted'} />}
-        <WorkflowActions ticketId={t.id} status={t.status} role="supplier" />
+        {t.status === 'accepted' && <ScheduleJobCard ticketId={t.id} priority={t.priority} createdAt={t.created_at} />}
+        {['in_progress', 'snag_resolved', 'evidence_requested'].includes(t.status) && <SubmitCompletionCard ticketId={t.id} />}
+        <WorkflowActions ticketId={t.id} status={t.status} role="supplier" exclude={['schedule', 'submit_completion']} />
       </Card>
 
       <Card className="p-5">
-        <h2 className="text-sm font-bold text-[var(--text)] mb-3">Updates & evidence</h2>
-        <SupplierAttachments ticketId={t.id} before={!!t.before_photo_uploaded} after={!!t.after_photo_uploaded} coc={!!t.completion_certificate_uploaded} />
+        <h2 className="text-sm font-bold text-[var(--text)] mb-3">Post an update</h2>
+        <SupplierAttachments ticketId={t.id} />
       </Card>
 
       <Card className="p-5">
