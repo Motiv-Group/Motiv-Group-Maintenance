@@ -326,11 +326,17 @@ export interface RegionalTicketAction {
   id: string; storeName: string; priority: Priority; ageDays: number
   slaLabel: string; currentBlocker: string | null; nextAction: string; nextActionDueAt: string | null; healthScore: number
 }
+// Simple ticket row for the RM recent-tickets card + tickets tab (SM-style).
+export interface RegionalTicketRow {
+  id: string; title: string; storeName: string; branchCode: string | null
+  status: string; priority: Priority; jobRef: string | null; createdAt: string
+}
 export interface RegionalDashboardData {
   portfolio: RegionalHealthResult
   stores: StoreCard[]
   attentionStores: StoreCard[]
   ticketActions: RegionalTicketAction[]
+  tickets: RegionalTicketRow[]
   suppliers: { id: string; name: string; perf: SupplierPerformance; open: number; overdue: number; costExposure: number }[]
   signoffsPending: number
   snagsOpen: number
@@ -342,13 +348,13 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
   const rules = await loadSlaResolver(db, companyId)
   const empty = (): RegionalDashboardData => ({
     portfolio: calculateRegionalPortfolioHealth('portfolio', [], { criticalTicketOverdue: false, supplierBreachOver3dCount: 0, internalBreachOver3dCount: 0, repeatAcrossStores: false, highValueBlocker: false, missingCriticalUpdates: false, openTickets: 0, overdueTickets: 0, costExposure: 0 }),
-    stores: [], attentionStores: [], ticketActions: [], suppliers: [], signoffsPending: 0, snagsOpen: 0, generatedAt: now.toISOString(),
+    stores: [], attentionStores: [], ticketActions: [], tickets: [], suppliers: [], signoffsPending: 0, snagsOpen: 0, generatedAt: now.toISOString(),
   })
   if (!regionIds.length) return empty()
 
   const [{ data: regionsRaw }, { data: storesRaw }, { data: ticketsRaw }, { data: suppliersRaw }] = await Promise.all([
     db.from('regions').select('id, name').in('id', regionIds),
-    db.from('stores').select('id, name, sub_store, region_id').eq('company_id', companyId).in('region_id', regionIds).eq('active', true).is('closed_at', null),
+    db.from('stores').select('id, name, sub_store, branch_code, region_id').eq('company_id', companyId).in('region_id', regionIds).eq('active', true).is('closed_at', null),
     db.from('tickets').select(TICKET_COLS).eq('company_id', companyId).in('region_id', regionIds),
     db.from('suppliers').select('id, company_name').eq('company_id', companyId),
   ])
@@ -356,8 +362,18 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
   const stores = (storesRaw ?? []) as any[]
   const storeIds = stores.map(s => s.id)
   const storeName = new Map(stores.map(s => [s.id, [s.name, s.sub_store].filter(Boolean).join(' — ')]))
+  const storeBranch = new Map(stores.map(s => [s.id, s.branch_code ?? null]))
   const tickets = ((ticketsRaw ?? []) as any[]).map(asTicket)
   const supplierName = new Map((suppliersRaw ?? []).map((s: any) => [s.id, s.company_name]))
+
+  // SM-style ticket rows (most-recent first) for the recent card + tickets tab.
+  const ticketRows: RegionalTicketRow[] = [...tickets]
+    .sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at))
+    .map(t => ({
+      id: t.id, title: t.title ?? 'Untitled',
+      storeName: storeName.get(t.store_id) ?? 'Store', branchCode: storeBranch.get(t.store_id) ?? null,
+      status: t.status, priority: t.priority, jobRef: (t as any).job_ref ?? null, createdAt: t.created_at,
+    }))
 
   const byStore = new Map<string, HealthTicket[]>()
   for (const t of tickets) { const a = byStore.get(t.store_id) ?? []; a.push(t); byStore.set(t.store_id, a) }
@@ -398,13 +414,13 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
   }
 
   const attentionStores = [...cards].filter(c => c.finalStatus !== 'controlled').sort((a, b) => a.finalHealthScore - b.finalHealthScore)
-  return { portfolio, stores: cards, attentionStores, ticketActions, suppliers, signoffsPending, snagsOpen, generatedAt: now.toISOString() }
+  return { portfolio, stores: cards, attentionStores, ticketActions, tickets: ticketRows, suppliers, signoffsPending, snagsOpen, generatedAt: now.toISOString() }
 }
 
 // ============================================================
 // STORE MANAGER DASHBOARD (simplified, own store only)
 // ============================================================
-export type ClientStatus = 'open' | 'in_progress' | 'completed'
+export type ClientStatus = 'open' | 'in_progress' | 'completed' | 'cancelled'
 // Single source of truth for the SM/client Open → In Progress → Completed
 // collapse lives in lib/utils (clientVisibleStatus). Re-use it here so the
 // dashboard counts and the ticket-detail badge can never disagree (previously
@@ -419,7 +435,7 @@ export interface StoreManagerData {
   branch: string
   branchCode: string
   health: StoreHealthResult | null
-  open: number; inProgress: number; completed: number
+  open: number; inProgress: number; completed: number; cancelled: number
   awaitingInput: number
   tickets: StoreManagerTicket[]
   generatedAt: string
@@ -427,7 +443,7 @@ export interface StoreManagerData {
 
 export async function assembleStoreManagerDashboard(companyId: string, storeIds: string[], now: Date = new Date()): Promise<StoreManagerData> {
   const db = createAdminClient()
-  if (!storeIds.length) return { storeName: 'Store', company: '', branch: '', branchCode: '', health: null, open: 0, inProgress: 0, completed: 0, awaitingInput: 0, tickets: [], generatedAt: now.toISOString() }
+  if (!storeIds.length) return { storeName: 'Store', company: '', branch: '', branchCode: '', health: null, open: 0, inProgress: 0, completed: 0, cancelled: 0, awaitingInput: 0, tickets: [], generatedAt: now.toISOString() }
   const rules = await loadSlaResolver(db, companyId)
   const [{ data: storesRaw }, { data: ticketsRaw }, { data: companyRow }] = await Promise.all([
     db.from('stores').select('id, name, sub_store, branch_code, region_id').in('id', storeIds),
@@ -439,13 +455,13 @@ export async function assembleStoreManagerDashboard(companyId: string, storeIds:
   const primary = stores[0]
   const health = primary ? calculateStoreHealth({ id: primary.id, region_id: primary.region_id }, tickets.filter(t => t.store_id === primary.id), rules, now) : null
 
-  let open = 0, inProgress = 0, completed = 0, awaitingInput = 0
+  let open = 0, inProgress = 0, completed = 0, cancelled = 0, awaitingInput = 0
   const visible: StoreManagerTicket[] = []
   for (const t of tickets) {
     if (t.status === 'info_requested') awaitingInput++
     const v = clientVisible(t.status)
     if (!v) continue
-    if (v === 'open') open++; else if (v === 'in_progress') inProgress++; else completed++
+    if (v === 'open') open++; else if (v === 'in_progress') inProgress++; else if (v === 'cancelled') cancelled++; else completed++
     visible.push({ id: t.id, title: t.title ?? 'Untitled', description: (t as any).description ?? null, category: t.category ?? null, status: v, priority: t.priority, operationalImpact: t.operational_impact ?? null, createdAt: t.created_at, supplierAssigned: !!t.supplier_id, jobRef: (t as any).job_ref ?? null })
   }
   visible.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
@@ -454,7 +470,7 @@ export async function assembleStoreManagerDashboard(companyId: string, storeIds:
     company: (companyRow as any)?.name ?? '',
     branch: primary?.sub_store || primary?.name || 'Store',
     branchCode: primary?.branch_code ?? '',
-    health, open, inProgress, completed, awaitingInput, tickets: visible, generatedAt: now.toISOString(),
+    health, open, inProgress, completed, cancelled, awaitingInput, tickets: visible, generatedAt: now.toISOString(),
   }
 }
 

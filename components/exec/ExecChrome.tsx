@@ -17,7 +17,7 @@ const EXEC_TABS: ChromeTab[] = [
   { href: '/executive/decisions', label: 'Decisions', icon: Gavel },
 ]
 const REGIONAL_TABS: ChromeTab[] = [
-  { href: '/regional',          label: 'Overview',  icon: LayoutDashboard },
+  { href: '/regional',          label: 'Dashboard', icon: LayoutDashboard },
   { href: '/regional/stores',   label: 'Stores',    icon: Store },
   { href: '/regional/tickets',  label: 'Tickets',   icon: Ticket },
   { href: '/regional/suppliers', label: 'Suppliers', icon: Truck },

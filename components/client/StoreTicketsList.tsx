@@ -8,20 +8,22 @@ import { Card } from '@/components/exec/ui'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { formatDate, formatDateTime, OPERATIONAL_IMPACT_LABELS, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
 
-type Filter = 'all' | 'open' | 'in_progress' | 'completed'
+type Filter = 'all' | 'open' | 'in_progress' | 'completed' | 'cancelled'
 
 const TONE: Record<string, string> = {
   open: 'bg-blue-500/15 text-blue-700 dark:text-blue-400',
   in_progress: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D]',
   completed: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
+  cancelled: 'bg-gray-500/15 text-gray-600 dark:text-gray-400',
 }
-const WORD: Record<string, string> = { open: 'Open', in_progress: 'In Progress', completed: 'Completed' }
+const WORD: Record<string, string> = { open: 'Open', in_progress: 'In Progress', completed: 'Completed', cancelled: 'Cancelled' }
 
 const PILLS: { key: Filter; label: string; active: string; inactive: string }[] = [
   { key: 'all',         label: 'All',         active: 'bg-slate-800 text-white border-slate-800 dark:bg-white dark:text-[#0a0e17] dark:border-white', inactive: 'text-[var(--text-muted)] border-[var(--border)] hover:border-slate-400' },
   { key: 'open',        label: 'Open',        active: 'bg-blue-500 text-white border-blue-500',              inactive: 'text-blue-600 dark:text-blue-400 border-blue-500/40 hover:border-blue-400' },
   { key: 'in_progress', label: 'In Progress', active: 'bg-[#C6A35D] text-[#0a0e17] border-[#C6A35D]',        inactive: 'text-amber-600 dark:text-[#C6A35D] border-[#C6A35D]/40 hover:border-[#C6A35D]' },
   { key: 'completed',   label: 'Completed',   active: 'bg-emerald-500 text-white border-emerald-500',        inactive: 'text-emerald-600 dark:text-emerald-400 border-emerald-500/40 hover:border-emerald-400' },
+  { key: 'cancelled',   label: 'Cancelled',   active: 'bg-gray-500 text-white border-gray-500',              inactive: 'text-gray-600 dark:text-gray-400 border-gray-400/40 hover:border-gray-400' },
 ]
 
 export function StoreTicketsList({ tickets, initialFilter = 'all' }: { tickets: StoreManagerTicket[]; initialFilter?: Filter }) {
@@ -29,7 +31,7 @@ export function StoreTicketsList({ tickets, initialFilter = 'all' }: { tickets: 
   const [q, setQ] = useState('')
 
   const counts = useMemo(() => {
-    const c = { open: 0, in_progress: 0, completed: 0 }
+    const c = { open: 0, in_progress: 0, completed: 0, cancelled: 0 }
     for (const t of tickets) if (t.status in c) (c as any)[t.status]++
     return c
   }, [tickets])
@@ -81,11 +83,13 @@ export function StoreTicketsList({ tickets, initialFilter = 'all' }: { tickets: 
           {counts.open > 0 && <div className="h-full bg-blue-500" style={{ width: `${pct(counts.open)}%` }} />}
           {counts.in_progress > 0 && <div className="h-full bg-[#C6A35D]" style={{ width: `${pct(counts.in_progress)}%` }} />}
           {counts.completed > 0 && <div className="h-full bg-emerald-500" style={{ width: `${pct(counts.completed)}%` }} />}
+          {counts.cancelled > 0 && <div className="h-full bg-gray-500" style={{ width: `${pct(counts.cancelled)}%` }} />}
         </div>
         <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] sm:flex sm:flex-wrap">
           <span className="flex items-center gap-1.5 text-[var(--text-muted)]"><i className="w-2 h-2 rounded-full bg-blue-500" />Open {counts.open} ({pct(counts.open)}%)</span>
           <span className="flex items-center gap-1.5 text-[var(--text-muted)]"><i className="w-2 h-2 rounded-full bg-[#C6A35D]" />In Progress {counts.in_progress} ({pct(counts.in_progress)}%)</span>
           <span className="flex items-center gap-1.5 text-[var(--text-muted)]"><i className="w-2 h-2 rounded-full bg-emerald-500" />Completed {counts.completed} ({pct(counts.completed)}%)</span>
+          <span className="flex items-center gap-1.5 text-[var(--text-muted)]"><i className="w-2 h-2 rounded-full bg-gray-500" />Cancelled {counts.cancelled} ({pct(counts.cancelled)}%)</span>
         </div>
       </Card>
 

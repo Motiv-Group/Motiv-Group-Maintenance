@@ -135,14 +135,14 @@ export const STATUS_PILL: Record<TicketStatus, { active: string; inactive: strin
   snag_in_progress: { active: 'bg-pink-500 text-white border-pink-500',  inactive: 'text-pink-700 dark:text-pink-400 border-pink-200 dark:border-pink-900/40 hover:border-pink-400' },
 }
 
-export type ClientVisibleStatus = 'open' | 'in_progress' | 'completed'
+export type ClientVisibleStatus = 'open' | 'in_progress' | 'completed' | 'cancelled'
 
 /**
  * Collapse the full ticket lifecycle into what a store manager / client is
- * allowed to see: Open → In Progress → Completed. Every supplier/RM-side
- * intermediate state (quoted, accepted, variation_pending, pending_sign_off,
- * snag, snag_in_progress, declined) reads as 'open' so the ticket never
- * disappears from their view. Cancelled tickets return null (hidden).
+ * allowed to see: Open → In Progress → Completed (+ Cancelled). Every
+ * supplier/RM-side intermediate state (quoted, accepted, variation_pending,
+ * pending_sign_off, snag, snag_in_progress, declined) reads as 'open' so the
+ * ticket never disappears from their view. Cancelled is shown explicitly.
  */
 const CLIENT_IN_PROGRESS = new Set<TicketStatus>([
   'scheduled', 'in_progress', 'variation_review', 'variation_accepted',
@@ -150,7 +150,7 @@ const CLIENT_IN_PROGRESS = new Set<TicketStatus>([
   'approved_closeout', 'pending_sign_off', 'snag_in_progress',
 ])
 export function clientVisibleStatus(status: TicketStatus): ClientVisibleStatus | null {
-  if (status === 'cancelled')  return null
+  if (status === 'cancelled')  return 'cancelled'
   if (status === 'completed')  return 'completed'
   if (CLIENT_IN_PROGRESS.has(status)) return 'in_progress'
   return 'open'

@@ -18,8 +18,9 @@ const CV_TONE: Record<string, string> = {
   open: 'bg-blue-500/15 text-blue-700 dark:text-blue-400',
   in_progress: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D]',
   completed: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
+  cancelled: 'bg-gray-500/15 text-gray-600 dark:text-gray-400',
 }
-const CV_WORD: Record<string, string> = { open: 'Open', in_progress: 'In Progress', completed: 'Completed' }
+const CV_WORD: Record<string, string> = { open: 'Open', in_progress: 'In Progress', completed: 'Completed', cancelled: 'Cancelled' }
 
 function DetailItem({ label, value }: { label: string; value: string }) {
   return (
@@ -37,7 +38,8 @@ export default async function StoreTicketDetailPage({ params }: { params: { id: 
   if (!t || !storeIds.includes(t.store_id)) redirect('/client/tickets')
 
   const { data: updates } = await admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false })
-  const isOpen = t.status === 'open'
+  // SM may edit/resubmit while open OR when more info has been requested.
+  const canEdit = t.status === 'open' || t.status === 'info_requested'
 
   return (
     <div className="space-y-5">
@@ -85,8 +87,24 @@ export default async function StoreTicketDetailPage({ params }: { params: { id: 
         )}
       </Card>
 
-      {/* Edit / delete — only while open, out of the card, spanning the block width */}
-      {isOpen && (
+      {/* More info requested by the RM — show the message + let the SM edit/resubmit */}
+      {t.status === 'info_requested' && (
+        <div className="rounded-2xl bg-amber-500/10 ring-1 ring-amber-500/40 p-5 space-y-1">
+          <p className="text-sm font-bold text-amber-700 dark:text-amber-400">More information requested</p>
+          <p className="text-sm text-[var(--text-muted)]">{t.info_request_reason || 'Please update the details below and resubmit so we can proceed.'}</p>
+        </div>
+      )}
+
+      {/* Cancelled — show the reason from the RM */}
+      {t.status === 'cancelled' && (
+        <div className="rounded-2xl bg-gray-500/10 ring-1 ring-gray-500/40 p-5 space-y-1">
+          <p className="text-sm font-bold text-[var(--text)]">Ticket cancelled</p>
+          <p className="text-sm text-[var(--text-muted)]">{t.cancellation_reason || 'This ticket was cancelled.'}</p>
+        </div>
+      )}
+
+      {/* Edit / delete — while open or info-requested, out of the card, spanning the block width */}
+      {canEdit && (
         <EditTicketForm ticketId={t.id} initial={{ title: t.title, category: t.category ?? 'General', impact: t.operational_impact ?? 'none', description: t.description }} />
       )}
 

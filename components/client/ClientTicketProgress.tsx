@@ -12,8 +12,8 @@ const STEPS = [
 
 export function ClientTicketProgress({ status }: { status: string }) {
   const cv = clientVisibleStatus(status as TicketStatus)
-  if (cv === null) {
-    return <p className="text-center text-sm text-[var(--text-faint)]">This ticket is closed ({status === 'declined' ? 'declined' : 'cancelled'}).</p>
+  if (cv === null || cv === 'cancelled') {
+    return <p className="text-center text-sm text-[var(--text-faint)]">This ticket was cancelled.</p>
   }
   const idx = cv === 'completed' ? 2 : cv === 'in_progress' ? 1 : 0
 

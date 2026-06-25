@@ -20,7 +20,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     owns = !!link
   }
   if (!owns) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  if (ticket.status !== 'open') return NextResponse.json({ error: 'Only open tickets can be edited' }, { status: 400 })
+  if (ticket.status !== 'open' && ticket.status !== 'info_requested') return NextResponse.json({ error: 'This ticket can no longer be edited' }, { status: 400 })
 
   const body = await request.json()
   const { title, description, category, operational_impact, photo_urls } = body

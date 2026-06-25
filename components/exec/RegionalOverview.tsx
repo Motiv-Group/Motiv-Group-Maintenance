@@ -3,8 +3,10 @@
 import Link from 'next/link'
 import { Building2, ClipboardList, ShieldAlert, Truck, Lock, ClipboardCheck, AlertTriangle, ListTodo, Sparkles, Calendar, Banknote, CheckCircle2, AlertCircle } from 'lucide-react'
 import type { RegionalDashboardData } from '@/lib/health/data'
-import { SectionCard, KpiCard, Pill, DistributionBar, STATUS_TEXT, type Kpi } from '@/components/exec/ui'
+import { SectionCard, KpiCard, Pill, Donut, Card, DistributionBar, STATUS_TEXT, type Kpi } from '@/components/exec/ui'
 import { BriefingCard } from '@/components/briefing/BriefingCard'
+import { RegionalRecentTickets } from '@/components/regional/RegionalRecentTickets'
+import { STATUS_LABELS } from '@/lib/health/constants'
 import type { Briefing } from '@/lib/briefing/facts'
 import { formatDate, formatCurrency } from '@/lib/utils'
 
@@ -45,6 +47,21 @@ export function RegionalOverview({ data, name, briefing, briefingScopeId }: { da
       </div>
 
       {briefing && <BriefingCard briefing={briefing} scope="region" scopeId={briefingScopeId ?? ''} />}
+
+      {/* Overall regional health — donut hero (mirrors the SM store-health block) */}
+      <Card className="p-6">
+        <div className="flex flex-col sm:flex-row items-center gap-6">
+          <Donut value={p.finalPortfolioHealth} status={p.status} size={140} label="Region" />
+          <div className="flex-1 min-w-0 w-full space-y-3 text-center sm:text-left">
+            <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
+              <h2 className="text-lg font-bold text-[var(--text)]">Regional Health</h2>
+              <Pill status={p.status} label={STATUS_LABELS[p.status]} />
+            </div>
+            {p.mainReason && <p className="text-sm text-[var(--text-muted)]">{p.mainReason}</p>}
+            <p className="text-sm text-[var(--text-muted)]">{p.activeStores} stores · avg {p.averageStoreHealth}% · {p.openTickets} open ticket{p.openTickets === 1 ? '' : 's'}</p>
+          </div>
+        </div>
+      </Card>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 gap-3">
         {kpis.map((k, i) => <KpiCard key={i} kpi={k} />)}
@@ -104,15 +121,7 @@ export function RegionalOverview({ data, name, briefing, briefingScopeId }: { da
         </SectionCard>
       </div>
 
-      <SectionCard title="Tickets Needing Action" icon={<ClipboardList size={15} className="text-blue-600 dark:text-blue-400" />} action={<Link href="/regional/tickets" className="text-xs text-[#C6A35D] hover:underline">All tickets</Link>}>
-        {data.ticketActions.slice(0, 6).map(t => (
-          <div key={t.id} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0">
-            <div className="min-w-0"><p className="text-sm text-[var(--text)] truncate">{t.storeName} · <span className="text-[var(--text-muted)]">{t.priority}</span></p><p className="text-[11px] text-[var(--text-faint)] truncate">{t.nextAction}</p></div>
-            <span className="text-[11px] text-[var(--text-muted)] shrink-0">{t.slaLabel} · {t.ageDays}d</span>
-          </div>
-        ))}
-        {!data.ticketActions.length && <p className="text-sm text-[var(--text-faint)]">No open tickets needing action.</p>}
-      </SectionCard>
+      <RegionalRecentTickets tickets={data.tickets} />
     </div>
   )
 }

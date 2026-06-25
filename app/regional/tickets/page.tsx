@@ -7,5 +7,5 @@ import { RegionalTickets } from '@/components/exec/RegionalTickets'
 export default async function RegionalTicketsPage() {
   const { companyId, regionIds } = await requireRegionalV3()
   const data = await assembleRegionalDashboard(companyId, regionIds)
-  return <RegionalTickets actions={data.ticketActions} />
+  return <RegionalTickets tickets={data.tickets} />
 }

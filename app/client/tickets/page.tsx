@@ -4,7 +4,7 @@ import { requireStoreManagerV3 } from '@/lib/health/guard'
 import { assembleStoreManagerDashboard } from '@/lib/health/data'
 import { StoreTicketsList } from '@/components/client/StoreTicketsList'
 
-const FILTERS = ['open', 'in_progress', 'completed'] as const
+const FILTERS = ['open', 'in_progress', 'completed', 'cancelled'] as const
 
 export default async function StoreTicketsPage({ searchParams }: { searchParams?: { status?: string } }) {
   const { companyId, storeIds } = await requireStoreManagerV3()
