@@ -17,10 +17,7 @@ export default async function SupplierCompletePage({ params }: { params: { id: s
   return (
     <div className="space-y-5">
       <Link href={`/supplier/tickets/${t.id}`} className="inline-flex items-center gap-1 text-sm text-[var(--text-muted)] hover:text-[var(--text)]"><ArrowLeft size={15} /> Back to ticket</Link>
-      <div>
-        <h1 className="text-2xl font-bold text-[var(--text)]">Submit COC &amp; POC</h1>
-        <p className="text-sm text-[var(--text-muted)] mt-0.5">{t.job_ref ? `${t.job_ref} · ` : ''}{t.title}</p>
-      </div>
+      <p className="text-sm text-[var(--text-muted)]">{t.job_ref ? `${t.job_ref} · ` : ''}{t.title}</p>
       <SubmitCompletionForm ticketId={t.id} />
     </div>
   )
