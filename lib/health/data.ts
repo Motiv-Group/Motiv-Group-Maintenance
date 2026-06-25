@@ -386,7 +386,7 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
       status: t.status, priority: t.priority, jobRef: (t as any).job_ref ?? null, createdAt: t.created_at,
       quoteRequestedAt: (t as any).quote_requested_at ?? null,
       quoteReceivedAt: firstQuoteAt.get(t.id) ?? null,
-      quoteAcceptedAt: acceptedQuoteAt.get(t.id) ?? (t.status === 'accepted' ? (t as any).quote_decided_at ?? null : null),
+      quoteAcceptedAt: ((t as any).quote_decision_status === 'approved' ? (t as any).quote_decided_at : null) ?? acceptedQuoteAt.get(t.id) ?? null,
       breached: isActive(t.status) ? (() => { const s = computeTicketSla(t, rules(t.priority), now); return s.supplierBreached || s.internalBreached })() : false,
     }))
 

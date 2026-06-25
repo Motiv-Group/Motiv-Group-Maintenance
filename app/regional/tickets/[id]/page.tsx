@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, FileText } from 'lucide-react'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireRegionalV3 } from '@/lib/health/guard'
 import { Card } from '@/components/exec/ui'
@@ -10,7 +10,7 @@ import { WorkflowActions } from '@/components/workflow/WorkflowActions'
 import { RmPipeline } from '@/components/regional/RmPipeline'
 import { AssignSuppliersButton, RequestInfoButton, RmEditTicketForm, SupplierStatusList, QuoteReviewCard, CancelTicketCard, ApproveSignoffCard } from '@/components/regional/RmTicketActions'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
-import { formatCurrency, formatDateTime, rmStatusMeta, storeLabel, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
+import { formatCurrency, formatDateTime, formatDate, rmStatusMeta, storeLabel, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
 
 function DetailItem({ label, value }: { label: string; value: string }) {
   return (
@@ -29,7 +29,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
 
   const [{ data: store }, { data: quotes }, { data: updates }, { data: signoffs }, { data: suppliers }, { data: variations }, { data: snags }, { data: invites }] = await Promise.all([
     admin.from('stores').select('name, sub_store').eq('id', t.store_id).single(),
-    admin.from('quotes').select('id, supplier_id, amount, amount_incl_vat, description, file_url, status, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
+    admin.from('quotes').select('id, supplier_id, amount, amount_incl_vat, description, file_url, status, valid_until, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('signoffs').select('id, status, before_urls, after_urls, coc_url').eq('ticket_id', t.id).in('status', ['submitted', 'awaiting_regional', 'awaiting_store']).order('created_at', { ascending: false }),
     admin.from('suppliers').select('id, company_name').eq('company_id', companyId).eq('active', true).order('company_name'),
@@ -46,7 +46,8 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   const supplierRows = ((invites ?? []) as any[]).map(inv => ({ name: inv.suppliers?.company_name ?? nameById.get(inv.supplier_id) ?? 'Supplier', status: inv.status as string, invitedAt: inv.invited_at ?? null }))
   const mapQuote = (q: any) => ({
     id: q.id, supplierName: nameById.get(q.supplier_id) ?? 'Supplier', amount: q.amount,
-    amountInclVat: q.amount_incl_vat ?? null, description: q.description ?? null, fileUrl: q.file_url ?? null, createdAt: q.created_at,
+    amountInclVat: q.amount_incl_vat ?? null, description: q.description ?? null, fileUrl: q.file_url ?? null,
+    validUntil: q.valid_until ?? null, createdAt: q.created_at,
   })
   const reviewQuotes = ((quotes ?? []) as any[]).filter(q => q.status === 'pending').map(mapQuote)
   const acceptedQuotes = ((quotes ?? []) as any[]).filter(q => q.status === 'accepted').map(mapQuote)
@@ -159,14 +160,26 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
             <div className="space-y-2">
               <h3 className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Accepted quote</h3>
               {acceptedQuotes.map(q => (
-                <div key={q.id} className="rounded-xl ring-1 ring-emerald-500/40 bg-emerald-500/5 p-4 space-y-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)] min-w-0"><span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400 bg-emerald-500/15 rounded-full px-1.5 py-0.5">Accepted</span><span className="truncate">{q.supplierName}</span></span>
-                    <span className="text-base font-bold text-[var(--text)] shrink-0">{formatCurrency(q.amount)}</span>
+                <div key={q.id} className="rounded-xl ring-1 ring-emerald-500/40 bg-emerald-500/5 overflow-hidden">
+                  <div className="flex items-center justify-between gap-2 px-4 py-2.5 bg-emerald-500/10 border-b border-emerald-500/20">
+                    <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)] min-w-0"><CheckCircle2 size={15} className="text-emerald-500 shrink-0" /><span className="truncate">{q.supplierName}</span></span>
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400 bg-emerald-500/15 rounded-full px-2 py-0.5 shrink-0">Accepted</span>
                   </div>
-                  <p className="text-[11px] text-[var(--text-faint)]">Submitted {formatDateTime(q.createdAt)}{q.amountInclVat ? ` · incl VAT ${formatCurrency(q.amountInclVat)}` : ''}</p>
-                  {q.description && <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{q.description}</p>}
-                  {q.fileUrl && <a href={q.fileUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C6A35D] underline">View attachment</a>}
+                  <div className="p-4 space-y-3">
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                      <DetailItem label="Excl. VAT" value={formatCurrency(q.amount)} />
+                      <DetailItem label="Incl. VAT" value={q.amountInclVat ? formatCurrency(q.amountInclVat) : '—'} />
+                      <DetailItem label="Submitted" value={formatDateTime(q.createdAt)} />
+                      <DetailItem label="Valid until" value={q.validUntil ? formatDate(q.validUntil) : 'N/A'} />
+                    </div>
+                    {q.description && (
+                      <div>
+                        <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Description</div>
+                        <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{q.description}</p>
+                      </div>
+                    )}
+                    {q.fileUrl && <a href={q.fileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View attached quote</a>}
+                  </div>
                 </div>
               ))}
             </div>

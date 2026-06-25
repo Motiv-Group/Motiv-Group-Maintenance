@@ -13,6 +13,52 @@ async function transition(ticketId: string, body: Record<string, unknown>) {
   if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Something went wrong')
 }
 
+// Raise a variation order — full-width amber button matching the COC/POC button.
+export function RaiseVariationCard({ ticketId }: { ticketId: string }) {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+  const [desc, setDesc] = useState('')
+  const [amount, setAmount] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const input = 'w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)]'
+
+  async function submit() {
+    setBusy(true); setErr('')
+    try { await transition(ticketId, { action: 'submit_variation', description: desc.trim(), amount: amount ? Number(amount) : undefined }); router.refresh() }
+    catch (e: any) { setErr(e.message); setBusy(false) }
+  }
+
+  if (!open) {
+    return <button onClick={() => setOpen(true)} className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-[#0a0e17] text-sm font-semibold transition">Raise Variation</button>
+  }
+
+  return (
+    <div className="rounded-xl ring-1 ring-[var(--border)] p-4 space-y-2">
+      <p className="text-sm font-semibold text-[var(--text)]">Raise a variation order</p>
+      <p className="text-xs text-[var(--text-muted)]">Extra materials or work needed to finish — sent to the manager for approval before work continues.</p>
+      <textarea className={`${input} min-h-[80px]`} placeholder="What changed / extra scope needed" value={desc} onChange={e => setDesc(e.target.value)} />
+      <input className={input} type="number" inputMode="decimal" placeholder="Extra cost (R) — optional" value={amount} onChange={e => setAmount(e.target.value)} />
+      {err && <p className="text-xs text-red-500">{err}</p>}
+      {confirming ? (
+        <div className="space-y-2">
+          <p className="text-sm text-[var(--text)]">Submit this variation order to the manager?</p>
+          <div className="flex gap-2">
+            <button onClick={submit} disabled={busy} className="flex-1 py-2 rounded-lg bg-amber-500 text-[#0a0e17] text-sm font-semibold disabled:opacity-50">{busy ? 'Submitting…' : 'Yes, submit'}</button>
+            <button onClick={() => setConfirming(false)} className="flex-1 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm">Back</button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex gap-2">
+          <button onClick={() => { if (!desc.trim()) { setErr('Describe the extra scope.'); return } setErr(''); setConfirming(true) }} className="flex-1 py-2 rounded-lg bg-amber-500 text-[#0a0e17] text-sm font-semibold">Raise Variation</button>
+          <button onClick={() => setOpen(false)} className="flex-1 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm">Cancel</button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function ScheduleJobCard({ ticketId, priority, createdAt }: { ticketId: string; priority: string; createdAt: string }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)

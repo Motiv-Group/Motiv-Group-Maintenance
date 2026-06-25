@@ -29,7 +29,7 @@ const BAR_ORDER: Bucket[] = ['open', 'quote_requested', 'quoted', 'approved', 'i
 const PILLS: { key: 'all' | Bucket; label: string; active: string; inactive: string }[] = [
   { key: 'all', label: 'All', active: 'bg-slate-800 text-white border-slate-800 dark:bg-white dark:text-[#0a0e17] dark:border-white', inactive: 'text-[var(--text-muted)] border-[var(--border)] hover:border-slate-400' },
   { key: 'open', label: 'Open', active: 'bg-blue-500 text-white border-blue-500', inactive: 'text-blue-600 dark:text-blue-400 border-blue-500/40 hover:border-blue-400' },
-  { key: 'quote_requested', label: 'Quote req.', active: 'bg-cyan-500 text-white border-cyan-500', inactive: 'text-cyan-600 dark:text-cyan-400 border-cyan-500/40 hover:border-cyan-400' },
+  { key: 'quote_requested', label: 'Quote requested', active: 'bg-cyan-500 text-white border-cyan-500', inactive: 'text-cyan-600 dark:text-cyan-400 border-cyan-500/40 hover:border-cyan-400' },
   { key: 'quoted', label: 'Quoted', active: 'bg-violet-500 text-white border-violet-500', inactive: 'text-violet-600 dark:text-violet-400 border-violet-500/40 hover:border-violet-400' },
   { key: 'approved', label: 'Approved', active: 'bg-teal-500 text-white border-teal-500', inactive: 'text-teal-600 dark:text-teal-400 border-teal-500/40 hover:border-teal-400' },
   { key: 'in_progress', label: 'In progress', active: 'bg-[#C6A35D] text-[#0a0e17] border-[#C6A35D]', inactive: 'text-amber-600 dark:text-[#C6A35D] border-[#C6A35D]/40 hover:border-[#C6A35D]' },

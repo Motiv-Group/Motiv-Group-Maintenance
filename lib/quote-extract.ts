@@ -80,6 +80,7 @@ const INCL_LABELS = [
   'total\\s+due',
   'amount\\s+due',
   'balance\\s+due',
+  '\\btotal\\b',   // generic "Total R…" fallback (does NOT match "Subtotal")
 ]
 
 /** Find the money value that appears immediately after any of the given labels. */

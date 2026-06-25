@@ -10,7 +10,7 @@ import { WorkflowActions } from '@/components/workflow/WorkflowActions'
 import { RmPipeline } from '@/components/regional/RmPipeline'
 import { SupplierAttachments } from '@/components/workflow/SupplierAttachments'
 import { SendQuoteForm } from '@/components/admin/SendQuoteForm'
-import { ScheduleJobCard } from '@/components/supplier/SupplierJobActions'
+import { ScheduleJobCard, RaiseVariationCard } from '@/components/supplier/SupplierJobActions'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { formatDateTime, rmStatusMeta, storeLabel, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
 
@@ -91,7 +91,8 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
         {['in_progress', 'snag_resolved', 'evidence_requested'].includes(t.status) && (
           <Link href={`/supplier/tickets/${t.id}/complete`} className="block w-full text-center py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition">Submit COC &amp; POC</Link>
         )}
-        <WorkflowActions ticketId={t.id} status={t.status} role="supplier" exclude={['schedule', 'submit_completion', 'require_assessment', 'request_quote']} />
+        {t.status === 'in_progress' && <RaiseVariationCard ticketId={t.id} />}
+        <WorkflowActions ticketId={t.id} status={t.status} role="supplier" exclude={['schedule', 'submit_completion', 'require_assessment', 'request_quote', 'submit_variation']} />
       </Card>
 
       <Card className="p-5">

@@ -21,26 +21,14 @@ const IDX: Record<string, number> = {
   submitted_for_signoff: 5, evidence_requested: 5, snag: 5, snag_assigned: 5, snag_resolved: 5, approved_closeout: 5, pending_sign_off: 5, snag_in_progress: 5,
   completed: 6,
 }
-const BRANCH: Record<string, string> = {
-  snag: 'Snag', snag_assigned: 'Snag', snag_resolved: 'Snag', snag_in_progress: 'Snag',
-  variation_review: 'Variation', variation_accepted: 'Variation',
-}
-
 export function RmPipeline({ status }: { status: string }) {
   if (status === 'cancelled' || status === 'declined') {
     return <p className="text-sm font-semibold text-red-600 dark:text-red-400">This ticket is {status === 'declined' ? 'declined' : 'cancelled'}.</p>
   }
   const idx = IDX[status] ?? 0
-  const branch = BRANCH[status]
-  const cur = STAGES[idx]
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <span className={`w-2.5 h-2.5 rounded-full ${cur.dot}`} />
-        <span className={`text-sm font-semibold ${cur.text}`}>{cur.label}</span>
-        {branch && <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400 bg-amber-500/15 rounded-full px-2 py-0.5">{branch}</span>}
-      </div>
+    <div>
       <div className="flex items-start">
         {STAGES.map((s, i) => {
           const reached = i <= idx

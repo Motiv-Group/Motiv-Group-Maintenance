@@ -108,7 +108,7 @@ export const TRANSITIONS: Record<TicketStatus, Transition[]> = {
     { action: 'start_work', label: 'In Progress', to: 'in_progress', roles: ['supplier'] },
   ],
   in_progress: [
-    { action: 'submit_variation',   label: 'Submit variation',   to: 'variation_review',      roles: ['supplier'] },
+    { action: 'submit_variation',   label: 'Raise Variation',    to: 'variation_review',      roles: ['supplier'] },
     { action: 'submit_completion',  label: 'Submit COC & POC',   to: 'submitted_for_signoff', roles: ['supplier'] },
   ],
   variation_review: [
