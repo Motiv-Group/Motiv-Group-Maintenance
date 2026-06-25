@@ -9,6 +9,7 @@ import { Card } from '@/components/exec/ui'
 import { WorkflowActions } from '@/components/workflow/WorkflowActions'
 import { StatusPipeline } from '@/components/workflow/StatusPipeline'
 import { SupplierAttachments } from '@/components/workflow/SupplierAttachments'
+import { SupplierQuoteCard } from '@/components/supplier/SupplierQuoteCard'
 import { formatDateTime } from '@/lib/utils'
 
 export default async function SupplierTicketDetailPage({ params }: { params: { id: string } }) {
@@ -16,11 +17,14 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   const admin = createAdminClient()
   const { data: t } = await admin.from('tickets').select('*').eq('id', params.id).single()
   if (!t || !t.supplier_id || !supplierIds.includes(t.supplier_id)) redirect('/supplier/tickets')
-  const [{ data: store }, { data: updates }] = await Promise.all([
+  const [{ data: store }, { data: updates }, { data: invite }] = await Promise.all([
     admin.from('stores').select('name, sub_store').eq('id', t.store_id).single(),
     admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
+    admin.from('ticket_suppliers').select('status').eq('ticket_id', t.id).in('supplier_id', supplierIds).maybeSingle(),
   ])
   const storeName = store ? [store.name, store.sub_store].filter(Boolean).join(' — ') : 'Store'
+  // Invited to quote (competitive model) and not yet awarded/declined → can quote.
+  const canQuote = (invite?.status === 'invited' || invite?.status === 'quoted')
 
   return (
     <div className="space-y-5 max-w-2xl mx-auto">
@@ -40,8 +44,9 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
         )}
       </Card>
 
-      <Card className="p-5">
-        <h2 className="text-sm font-bold text-[var(--text)] mb-3">Next step</h2>
+      <Card className="p-5 space-y-3">
+        <h2 className="text-sm font-bold text-[var(--text)]">Next step</h2>
+        {canQuote && <SupplierQuoteCard ticketId={t.id} alreadyQuoted={invite?.status === 'quoted'} />}
         <WorkflowActions ticketId={t.id} status={t.status} role="supplier" />
       </Card>
 

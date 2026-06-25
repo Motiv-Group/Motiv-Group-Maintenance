@@ -56,6 +56,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
       case 'request_info':
         updates.info_request_reason = body.reason ?? null
         break
+      case 'reject':
+        updates.cancellation_reason = body.reason ?? null
+        break
       case 'require_assessment':
         updates.assessment_required = true
         if (body.supplierId) updates.supplier_id = body.supplierId
@@ -179,7 +182,11 @@ async function hasAccess(admin: Admin, role: WorkflowRole, userId: string, ticke
   if (role === 'executive' || role === 'system_admin') return true
   if (role === 'supplier') {
     const { data } = await admin.from('supplier_users').select('supplier_id').eq('user_id', userId)
-    return !!ticket.supplier_id && (data ?? []).some(l => l.supplier_id === ticket.supplier_id)
+    const mine = (data ?? []).map(l => l.supplier_id)
+    if (ticket.supplier_id && mine.includes(ticket.supplier_id)) return true
+    // Also allow suppliers invited to quote (competitive model) before award.
+    const { data: inv } = await admin.from('ticket_suppliers').select('id').eq('ticket_id', ticket.id).in('supplier_id', mine.length ? mine : ['00000000-0000-0000-0000-000000000000']).maybeSingle()
+    return !!inv
   }
   if (role === 'regional_manager') {
     const { data } = await admin.from('regional_users').select('region_id').eq('user_id', userId)
@@ -196,7 +203,7 @@ async function hasAccess(admin: Admin, role: WorkflowRole, userId: string, ticke
 async function notify(admin: Admin, action: string, ticket: any, actorName: string | null) {
   const toSupplier = ['validate', 'request_quote', 'require_assessment', 'approve_quote', 'request_evidence', 'raise_snag', 'assign_snag', 'reject_variation']
   const toRegion   = ['submit_quote', 'submit_completion', 'submit_variation', 'resolve_snag']
-  const toStore    = ['request_info', 'close_out']
+  const toStore    = ['request_info', 'close_out', 'reject']
   const title = `Ticket: ${ticket.title ?? 'Untitled'}`
 
   if (toSupplier.includes(action) && ticket.supplier_id) {

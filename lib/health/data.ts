@@ -497,8 +497,16 @@ export async function assembleSupplierDashboard(companyId: string, supplierIds: 
   if (!supplierIds.length) return { perf: emptyPerf, kpis: { open: 0, overdue: 0, dueToday: 0, pendingQuotes: 0, awaitingSignoff: 0, evidenceMissing: 0 }, tickets: [], quotes: [], signoffs: [], generatedAt: now.toISOString() }
   const rules = await loadSlaResolver(db, companyId)
 
-  const { data: ticketsRaw } = await db.from('tickets').select(TICKET_COLS).eq('company_id', companyId).in('supplier_id', supplierIds)
-  const tickets = ((ticketsRaw ?? []) as any[]).map(asTicket)
+  // Own tickets (awarded) + tickets where invited to quote (competitive model).
+  const [{ data: bySupplier }, { data: invRows }] = await Promise.all([
+    db.from('tickets').select(TICKET_COLS).eq('company_id', companyId).in('supplier_id', supplierIds),
+    db.from('ticket_suppliers').select('ticket_id').in('supplier_id', supplierIds).in('status', ['invited', 'quoted', 'awarded']),
+  ])
+  const owned = (bySupplier ?? []) as any[]
+  const ownedIds = new Set(owned.map(t => t.id))
+  const extraIds = Array.from(new Set((invRows ?? []).map(r => r.ticket_id))).filter(id => !ownedIds.has(id))
+  const { data: invitedTickets } = extraIds.length ? await db.from('tickets').select(TICKET_COLS).in('id', extraIds) : { data: [] as any[] }
+  const tickets = [...owned, ...((invitedTickets ?? []) as any[])].map(asTicket)
   const storeIds = Array.from(new Set(tickets.map(t => t.store_id)))
   const { data: storesRaw } = storeIds.length ? await db.from('stores').select('id, name, sub_store').in('id', storeIds) : { data: [] as any[] }
   const storeName = new Map((storesRaw ?? []).map((s: any) => [s.id, [s.name, s.sub_store].filter(Boolean).join(' — ')]))

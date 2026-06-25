@@ -33,11 +33,13 @@ interface Props {
   role: WorkflowRole
   /** Suppliers to choose from for assignment actions. */
   suppliers?: { id: string; name: string }[]
+  /** Action verbs to hide here (handled by dedicated UI elsewhere). */
+  exclude?: string[]
 }
 
-export function WorkflowActions({ ticketId, status, role, suppliers = [] }: Props) {
+export function WorkflowActions({ ticketId, status, role, suppliers = [], exclude = [] }: Props) {
   const router = useRouter()
-  const actions = transitionsFor(status, role)
+  const actions = transitionsFor(status, role).filter(t => !exclude.includes(t.action))
   const [active, setActive] = useState<Transition | null>(null)
   const [vals, setVals] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
