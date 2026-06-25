@@ -42,10 +42,14 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
 
   // Their latest submitted quote (if any) for this ticket.
   const latestQuote = ((myQuotes ?? []) as any[])[0] ?? null
-  // Can (re)submit a quote only when invited and not yet quoted, or when a
-  // revision was requested. Once submitted, the quote is shown read-only.
+  // A quote can be (re)submitted while the ticket is in a quote-requesting state
+  // (covers both the competitive 'assigned' invite and the legacy 'quote_requested'
+  // path) and the invitation isn't closed. Once submitted the ticket moves to
+  // 'quoted' and the quote is shown read-only — re-submission only on a revision.
   const revisionRequested = t.status === 'quote_revision'
-  const canSubmitQuote = (invite?.status === 'invited' && !latestQuote) || revisionRequested
+  const quoteableStatus = ['assigned', 'assessment', 'quote_requested', 'quote_revision'].includes(t.status)
+  const inviteOpen = !invite || !['declined', 'closed', 'awarded'].includes(invite.status)
+  const canSubmitQuote = quoteableStatus && inviteOpen && (!latestQuote || revisionRequested)
   // Status badge for the read-only quote card.
   const quoteCardStatus: QuoteSummaryStatus =
     awarded || latestQuote?.status === 'accepted' ? 'accepted'
