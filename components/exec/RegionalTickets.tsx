@@ -120,7 +120,7 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
       {/* Search */}
       <div className="relative">
         <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
-        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search title, store, status, job ID…"
+        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search tickets…"
           className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)] outline-none focus:ring-[#C6A35D]/40" />
       </div>
 

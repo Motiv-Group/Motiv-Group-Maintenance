@@ -56,7 +56,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   const hasQuoteBlock = supplierRows.length > 0 || reviewQuotes.length > 0 || acceptedQuotes.length > 0 || (variations ?? []).length > 0
 
   return (
-    <div className="space-y-5 max-w-2xl mx-auto">
+    <div className="space-y-5">
       <Link href="/regional/tickets" className="inline-flex items-center gap-1 text-sm text-[var(--text-muted)] hover:text-[var(--text)]"><ArrowLeft size={15} /> Back to tickets</Link>
 
       {/* Progress — bare, no card around it */}

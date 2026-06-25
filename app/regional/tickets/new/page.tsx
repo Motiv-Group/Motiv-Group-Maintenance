@@ -19,7 +19,7 @@ export default async function RegionalNewTicketPage() {
   const suppliers = ((suppliersRaw ?? []) as any[]).map(s => ({ id: s.id, name: s.company_name }))
 
   return (
-    <div className="space-y-5 max-w-2xl mx-auto">
+    <div className="space-y-5">
       <Link href="/regional/tickets" className="inline-flex items-center gap-1 text-sm text-[var(--text-muted)] hover:text-[var(--text)]"><ArrowLeft size={15} /> Back to tickets</Link>
       <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><PlusCircle className="text-emerald-600 dark:text-emerald-400" size={22} /> Log a Ticket</h1>
       <Card className="p-5">

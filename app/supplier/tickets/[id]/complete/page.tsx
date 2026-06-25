@@ -15,7 +15,7 @@ export default async function SupplierCompletePage({ params }: { params: { id: s
   if (!['in_progress', 'snag_resolved', 'evidence_requested'].includes(t.status)) redirect(`/supplier/tickets/${t.id}`)
 
   return (
-    <div className="space-y-5 max-w-2xl mx-auto">
+    <div className="space-y-5">
       <Link href={`/supplier/tickets/${t.id}`} className="inline-flex items-center gap-1 text-sm text-[var(--text-muted)] hover:text-[var(--text)]"><ArrowLeft size={15} /> Back to ticket</Link>
       <div>
         <h1 className="text-2xl font-bold text-[var(--text)]">Submit COC &amp; POC</h1>

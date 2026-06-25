@@ -40,7 +40,7 @@ export function SchedulePicker({ priority, createdAt, onConfirm, onCancel, busy 
   const hourDisabled = (h: number) => {
     if (!day) return true
     const dt = new Date(day); dt.setHours(h, 0, 0, 0)
-    return dt < now || dt > max
+    return dt < now // the day is already capped to the window; only block past times
   }
 
   // Calendar cells for the current month view (leading blanks for alignment).

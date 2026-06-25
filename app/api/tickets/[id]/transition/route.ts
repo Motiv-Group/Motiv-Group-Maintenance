@@ -91,8 +91,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
         const H = ({ P1: 8, P2: 24, P3: 72, P4: 168 } as Record<string, number>)[ticket.priority] ?? 72
         let max = new Date(new Date(ticket.created_at).getTime() + H * 3600_000)
         if (max.getTime() <= Date.now()) max = new Date(Date.now() + H * 3600_000)
+        const maxEnd = new Date(max); maxEnd.setHours(23, 59, 59, 999) // day-granular window
         if (when.getTime() < Date.now() - 5 * 60_000) return NextResponse.json({ error: 'Cannot schedule in the past.' }, { status: 400 })
-        if (when.getTime() > max.getTime() + 3600_000) return NextResponse.json({ error: 'Scheduled date is beyond the allowed window for this priority.' }, { status: 400 })
+        if (when.getTime() > maxEnd.getTime()) return NextResponse.json({ error: 'Scheduled date is beyond the allowed window for this priority.' }, { status: 400 })
         updates.scheduled_at = when.toISOString()
         break
       }
