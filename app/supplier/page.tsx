@@ -6,9 +6,10 @@ import { requireSupplierV3 } from '@/lib/health/guard'
 import { assembleSupplierDashboard } from '@/lib/health/data'
 import { Card, SectionCard, KpiRow, Donut, Pill, BreakdownList, type Kpi } from '@/components/exec/ui'
 import { BriefingCard } from '@/components/briefing/BriefingCard'
+import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { getDailyBriefing } from '@/lib/briefing/generate'
 import { supplierFacts } from '@/lib/briefing/facts'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatCurrency, formatDate, rmStatusMeta } from '@/lib/utils'
 
 const clamp = (n: number) => Math.max(0, Math.min(20, Math.round(n)))
 const slaTone = (l: string) =>
@@ -94,12 +95,18 @@ export default async function SupplierOverviewPage() {
 
       {/* Assigned tickets */}
       <SectionCard title={`Assigned Tickets (${d.tickets.length})`} icon={<ClipboardList size={15} className="text-blue-600 dark:text-blue-400" />} action={<Link href="/supplier/tickets" className="text-xs text-[#C6A35D] hover:underline">All</Link>}>
-        {d.tickets.slice(0, 8).map(t => (
-          <Link key={t.id} href={`/supplier/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] -mx-2 px-2 rounded">
-            <div className="min-w-0"><p className="text-sm text-[var(--text)] truncate">{t.title}</p><p className="text-[11px] text-[var(--text-faint)] truncate">{t.storeName} · {t.priority} · {t.ageDays}d</p></div>
-            <span className={`text-[11px] shrink-0 ${slaTone(t.acknowledged ? t.slaLabel : 'Not started')}`}>{t.acknowledged ? t.slaLabel : 'New'}</span>
-          </Link>
-        ))}
+        {d.tickets.slice(0, 8).map(t => {
+          const sm = rmStatusMeta(t.status)
+          return (
+            <Link key={t.id} href={`/supplier/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] -mx-2 px-2 rounded">
+              <div className="min-w-0"><p className="text-sm text-[var(--text)] truncate">{t.title}</p><p className="text-[11px] text-[var(--text-faint)] truncate">{t.storeName} · {t.ageDays}d</p></div>
+              <div className="grid grid-cols-[4.5rem_7rem] gap-1.5 shrink-0">
+                <PriorityBadge priority={t.priority} className="w-full text-center" />
+                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${sm.cls}`}>{sm.label}</span>
+              </div>
+            </Link>
+          )
+        })}
         {!d.tickets.length && <p className="text-sm text-[var(--text-faint)]">No open work assigned.</p>}
       </SectionCard>
 

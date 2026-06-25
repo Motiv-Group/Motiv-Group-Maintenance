@@ -11,20 +11,24 @@ import { StatusPipeline } from '@/components/workflow/StatusPipeline'
 import { SupplierAttachments } from '@/components/workflow/SupplierAttachments'
 import { SupplierQuoteCard } from '@/components/supplier/SupplierQuoteCard'
 import { ScheduleJobCard, SubmitCompletionCard } from '@/components/supplier/SupplierJobActions'
-import { formatDateTime } from '@/lib/utils'
+import { PriorityBadge } from '@/components/ui/PriorityBadge'
+import { formatDateTime, rmStatusMeta, storeLabel } from '@/lib/utils'
 
 export default async function SupplierTicketDetailPage({ params }: { params: { id: string } }) {
-  const { supplierIds } = await requireSupplierV3()
+  const { companyId, supplierIds } = await requireSupplierV3()
   const admin = createAdminClient()
   const { data: t } = await admin.from('tickets').select('*').eq('id', params.id).single()
-  if (!t || !t.supplier_id || !supplierIds.includes(t.supplier_id)) redirect('/supplier/tickets')
+  if (!t || t.company_id !== companyId) redirect('/supplier/tickets')
   const [{ data: store }, { data: updates }, { data: invite }] = await Promise.all([
     admin.from('stores').select('name, sub_store').eq('id', t.store_id).single(),
     admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('ticket_suppliers').select('status').eq('ticket_id', t.id).in('supplier_id', supplierIds).maybeSingle(),
   ])
-  const storeName = store ? [store.name, store.sub_store].filter(Boolean).join(' — ') : 'Store'
-  // Invited to quote (competitive model) and not yet awarded/declined → can quote.
+  // Access: the awarded supplier OR a supplier invited to quote (competitive model).
+  const awarded = !!t.supplier_id && supplierIds.includes(t.supplier_id)
+  if (!awarded && !invite) redirect('/supplier/tickets')
+  const storeName = storeLabel(store?.name, store?.sub_store)
+  // Invited to quote and not yet awarded/declined → can quote.
   const canQuote = (invite?.status === 'invited' || invite?.status === 'quoted')
 
   return (
@@ -32,10 +36,16 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
       <Link href="/supplier/tickets" className="inline-flex items-center gap-1 text-sm text-[var(--text-muted)] hover:text-[var(--text)]"><ArrowLeft size={15} /> Back to tickets</Link>
 
       <Card className="p-5 space-y-4">
-        <div>
-          {t.job_ref && <p className="text-[11px] font-mono font-semibold tracking-wide text-[var(--text-faint)] mb-0.5">{t.job_ref}</p>}
-          <h1 className="text-lg font-bold text-[var(--text)]">{t.title}</h1>
-          <p className="text-sm text-[var(--text-muted)]">{storeName} · {t.priority} · {t.category ?? 'General'}</p>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            {t.job_ref && <p className="text-[11px] font-mono font-semibold tracking-wide text-[var(--text-faint)] mb-0.5">{t.job_ref}</p>}
+            <h1 className="text-lg font-bold text-[var(--text)]">{t.title}</h1>
+            <p className="text-[11px] text-[var(--text-faint)] mt-0.5">{storeName} · {t.category ?? 'General'}</p>
+          </div>
+          <div className="grid grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end">
+            <PriorityBadge priority={t.priority} className="w-full text-center" />
+            {(() => { const sm = rmStatusMeta(t.status); return <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${sm.cls}`}>{sm.label}</span> })()}
+          </div>
         </div>
         <StatusPipeline status={t.status} />
         <p className="text-sm text-[var(--text)]">{t.description}</p>
