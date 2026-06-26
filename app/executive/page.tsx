@@ -9,7 +9,7 @@ import { requireExecutiveV3 } from '@/lib/health/guard'
 import { assembleEstateDashboard, type TrendDelta } from '@/lib/health/data'
 import { EstateHeader } from '@/components/exec/EstateHeader'
 import {
-  Card, SectionCard, KpiCard, Donut, Pill, DistributionBar, StoreDistributionDonut,
+  Card, SectionCard, KpiCard, Donut, Pill, StoreDistributionDonut,
   DistributionLegend, TrendArrow, STATUS_TEXT, type Kpi, type Trend,
 } from '@/components/exec/ui'
 import { getDailyBriefing } from '@/lib/briefing/generate'
@@ -48,7 +48,7 @@ export default async function ExecutiveEstatePage() {
 
   const kpis: Kpi[] = [
     { label: 'Stores', value: total, hint: `${data.totalRegions} regions`, icon: <Building2 size={13} />, tone: 'info', href: '/executive/stores' },
-    { label: 'Attention Stores', value: e.counts.attention, hint: `${pct(e.counts.attention, total)}% of estate`, icon: <AlertTriangle size={13} />, tone: e.counts.attention ? 'warn' : 'good', href: '/executive/stores' },
+    { label: 'Attention Stores', value: e.counts.attention, hint: `${pct(e.counts.attention, total)}% of estate`, icon: <AlertTriangle size={13} />, tone: e.counts.attention ? 'bad' : 'good', href: '/executive/stores' },
     { label: 'Open Work', value: e.openTickets, hint: 'vs last week', icon: <ClipboardList size={13} />, tone: 'info', trend: tr(data.trends.openWork), href: '/executive/stores' },
     { label: 'Supplier Breaches', value: e.supplierSlaBreaches, hint: `${supplierBreachSuppliers} supplier${supplierBreachSuppliers === 1 ? '' : 's'}`, icon: <Truck size={13} />, tone: e.supplierSlaBreaches ? 'bad' : 'good', trend: tr(data.trends.supplierBreaches), href: '/executive/suppliers' },
     { label: 'Internal Breaches', value: e.internalSlaBreaches, hint: 'Across functions', icon: <ShieldAlert size={13} />, tone: e.internalSlaBreaches ? 'bad' : 'good', href: '/executive/decisions' },
@@ -78,12 +78,20 @@ export default async function ExecutiveEstatePage() {
                 <p className="text-sm text-[var(--text-muted)] leading-relaxed">{briefing.body}</p>
               </div>
             )}
-            <DistributionBar counts={e.counts} />
-            <div className="flex flex-wrap justify-center lg:justify-start gap-x-5 gap-y-1 text-[11px]">
-              <span className="flex items-center gap-1.5 text-[var(--text-muted)]"><i className="w-2 h-2 rounded-full bg-emerald-500" />Controlled: {e.counts.controlled} ({pct(e.counts.controlled, total)}%)</span>
-              <span className="flex items-center gap-1.5 text-[var(--text-muted)]"><i className="w-2 h-2 rounded-full bg-[#C6A35D]" />Attention: {e.counts.attention} ({pct(e.counts.attention, total)}%)</span>
-              <span className="flex items-center gap-1.5 text-[var(--text-muted)]"><i className="w-2 h-2 rounded-full bg-red-400" />At Risk: {e.counts.at_risk} ({pct(e.counts.at_risk, total)}%)</span>
-              <span className="flex items-center gap-1.5 text-[var(--text-muted)]"><i className="w-2 h-2 rounded-full bg-red-800" />Critical: {e.counts.critical} ({pct(e.counts.critical, total)}%)</span>
+            {/* Health bands across the estate (all stores in the exec's regions) */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {[
+                { label: 'Controlled', value: e.counts.controlled, cls: 'bg-emerald-500/10 ring-emerald-500/30 text-emerald-600 dark:text-emerald-400' },
+                { label: 'Attention',  value: e.counts.attention,  cls: 'bg-[#C6A35D]/10 ring-[#C6A35D]/30 text-amber-600 dark:text-[#C6A35D]' },
+                { label: 'At Risk',    value: e.counts.at_risk,    cls: 'bg-red-500/10 ring-red-500/30 text-red-600 dark:text-red-400' },
+                { label: 'Critical',   value: e.counts.critical,   cls: 'bg-red-900/15 ring-red-800/40 text-red-700 dark:text-red-300' },
+              ].map(b => (
+                <div key={b.label} className={`rounded-xl ring-1 p-3 ${b.cls}`}>
+                  <div className="text-2xl font-bold leading-none">{b.value}</div>
+                  <div className="text-[11px] font-semibold mt-1">{b.label}</div>
+                  <div className="text-[10px] opacity-70">{pct(b.value, total)}% of estate</div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
