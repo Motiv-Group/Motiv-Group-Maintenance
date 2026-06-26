@@ -44,8 +44,8 @@ const VARIANTS = {
 } as const
 
 export function ExecChrome({
-  children, userName, variant = 'exec',
-}: { children: ReactNode; userName: string | null; variant?: keyof typeof VARIANTS }) {
+  children, userName, variant = 'exec', unreadCount = 0,
+}: { children: ReactNode; userName: string | null; variant?: keyof typeof VARIANTS; unreadCount?: number }) {
   const { tabs, roleLabel, base, reports } = VARIANTS[variant]
   const pathname = usePathname()
   const home = tabs[0]?.href ?? base
@@ -65,7 +65,9 @@ export function ExecChrome({
             {reports && <Link href={`${base}/reports`} className={iconBtn} title="Reports"><FileBarChart size={18} /></Link>}
             <Link href={`${base}/notifications`} className={`relative ${iconBtn}`} title="Notifications">
               <Bell size={18} />
-              <span className="absolute top-1 right-1 w-3.5 h-3.5 bg-red-500 text-white text-[9px] rounded-full flex items-center justify-center">3</span>
+              {unreadCount > 0 && (
+                <span className="absolute top-0.5 right-0.5 min-w-[16px] h-4 px-1 bg-red-500 text-white text-[9px] font-semibold rounded-full flex items-center justify-center">{unreadCount > 9 ? '9+' : unreadCount}</span>
+              )}
             </Link>
             <Link href="/settings" className={iconBtn} title="Settings"><Settings size={17} /></Link>
             <form action="/auth/logout" method="post" className="contents">

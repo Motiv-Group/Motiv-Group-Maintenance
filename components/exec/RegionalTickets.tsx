@@ -93,11 +93,16 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
     })
   }, [tickets, q, filter])
 
+  // Under the "All" filter, completed tickets move to a collapsed Archive section.
+  const liveShown = useMemo(() => filter === 'all' ? shown.filter(t => bucketOf(t.status) !== 'completed') : shown, [shown, filter])
+  const archived = useMemo(() => filter === 'all' ? shown.filter(t => bucketOf(t.status) === 'completed') : [], [shown, filter])
+  const [archiveOpen, setArchiveOpen] = useState(false)
+
   const groups = useMemo(() => {
     const m = new Map<string, { branchCode: string | null; rows: RegionalTicketRow[] }>()
-    for (const t of shown) { const g = m.get(t.storeName) ?? { branchCode: t.branchCode, rows: [] }; g.rows.push(t); m.set(t.storeName, g) }
+    for (const t of liveShown) { const g = m.get(t.storeName) ?? { branchCode: t.branchCode, rows: [] }; g.rows.push(t); m.set(t.storeName, g) }
     return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]))
-  }, [shown])
+  }, [liveShown])
 
   const toggle = (s: string) => setCollapsed(c => { const n = new Set(c); n.has(s) ? n.delete(s) : n.add(s); return n })
   const panelRows = useMemo(() => panelStore ? tickets.filter(t => t.storeName === panelStore) : [], [tickets, panelStore])
@@ -160,7 +165,37 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
           </Card>
         )
       })}
-      {!groups.length && <Card className="p-5"><p className="text-sm text-[var(--text-faint)] text-center">No tickets match.</p></Card>}
+      {!groups.length && !archived.length && <Card className="p-5"><p className="text-sm text-[var(--text-faint)] text-center">No tickets match.</p></Card>}
+
+      {/* Archive — completed tickets, only under the All filter */}
+      {archived.length > 0 && (
+        <Card className="p-3">
+          <button onClick={() => setArchiveOpen(o => !o)} aria-expanded={archiveOpen} className="w-full flex items-center gap-2 -m-1 p-1 rounded-lg hover:bg-[var(--hover)] transition">
+            <ChevronDown size={16} className={`shrink-0 text-[var(--text-muted)] transition-transform ${archiveOpen ? '' : '-rotate-90'}`} />
+            <span className="text-sm font-bold text-[var(--text)]">Archive · Completed</span>
+            <span className="text-[11px] font-medium text-[var(--text-muted)] bg-black/5 dark:bg-white/10 rounded-full px-2 py-0.5">{archived.length}</span>
+          </button>
+          {archiveOpen && (
+            <div className="px-1">
+              {archived.map(t => {
+                const sm = rmStatusMeta(t.status)
+                return (
+                  <Link key={t.id} href={`/regional/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2.5 -mx-2 px-2 rounded-lg border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition">
+                    <div className="min-w-0">
+                      <p className="text-sm text-[var(--text)] truncate">{t.title}</p>
+                      <p className="text-[11px] text-[var(--text-faint)] truncate">{t.storeName} · {formatDateTime(t.createdAt)}</p>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
+                      <PriorityBadge priority={t.priority} className="w-full text-center" />
+                      <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${sm.cls}`}>{sm.label}</span>
+                    </div>
+                  </Link>
+                )
+              })}
+            </div>
+          )}
+        </Card>
+      )}
 
       {panelStore && <StorePanel store={panelStore} rows={panelRows} onClose={() => setPanelStore(null)} />}
     </div>

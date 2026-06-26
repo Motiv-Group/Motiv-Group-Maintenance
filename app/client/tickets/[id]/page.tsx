@@ -11,7 +11,7 @@ import { ClientTicketProgress } from '@/components/client/ClientTicketProgress'
 import { ClientTicketStatus } from '@/components/client/ClientTicketStatus'
 import { EditTicketForm } from '@/components/client/EditTicketForm'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
-import { formatDateTime, clientVisibleStatus, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
+import { formatDateTime, clientVisibleStatus } from '@/lib/utils'
 import type { TicketStatus } from '@/lib/types'
 
 const CV_TONE: Record<string, string> = {
@@ -66,7 +66,6 @@ export default async function StoreTicketDetailPage({ params }: { params: { id: 
 
         <div className="grid grid-cols-2 gap-x-4 gap-y-3">
           <DetailItem label="Category" value={t.category ?? 'General'} />
-          <DetailItem label="Operational Impact" value={OPERATIONAL_IMPACT_LABELS[t.operational_impact ?? 'none'] ?? 'No operational impact'} />
           <DetailItem label="Logged" value={formatDateTime(t.created_at)} />
         </div>
 

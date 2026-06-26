@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { PlusCircle, Search, Ticket } from 'lucide-react'
+import { PlusCircle, Search, Ticket, ChevronDown } from 'lucide-react'
 import type { StoreManagerTicket } from '@/lib/health/data'
 import { Card } from '@/components/exec/ui'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
@@ -26,6 +26,38 @@ const PILLS: { key: Filter; label: string; active: string; inactive: string }[] 
   { key: 'cancelled',   label: 'Cancelled',   active: 'bg-red-500 text-white border-red-500',                inactive: 'text-red-600 dark:text-red-400 border-red-500/40 hover:border-red-400' },
 ]
 
+function Row({ t }: { t: StoreManagerTicket }) {
+  return (
+    <Link href={`/client/tickets/${t.id}`} className="flex items-center justify-between gap-2 px-3 py-3 border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition">
+      <div className="min-w-0">
+        {t.jobRef && <p className="text-[10px] font-mono text-[var(--text-faint)]">{t.jobRef}</p>}
+        <p className="text-sm text-[var(--text)] truncate">{t.title}</p>
+        <p className="text-[11px] text-[var(--text-faint)]">{t.category ?? 'General'} · {formatDateTime(t.createdAt)}{t.supplierAssigned ? ' · Supplier assigned' : ''}</p>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_6rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
+        <PriorityBadge priority={t.priority} className="w-full text-center" />
+        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${TONE[t.status]}`}>{WORD[t.status]}</span>
+      </div>
+    </Link>
+  )
+}
+
+/** Collapsible status group used in the "All" view. */
+function Group({ title, tickets, defaultOpen = true }: { title: string; tickets: StoreManagerTicket[]; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen)
+  if (!tickets.length) return null
+  return (
+    <Card className="p-2">
+      <button onClick={() => setOpen(o => !o)} aria-expanded={open} className="w-full flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-[var(--hover)] transition">
+        <ChevronDown size={16} className={`shrink-0 text-[var(--text-muted)] transition-transform ${open ? '' : '-rotate-90'}`} />
+        <span className="text-sm font-bold text-[var(--text)]">{title}</span>
+        <span className="text-[11px] font-medium text-[var(--text-muted)] bg-black/5 dark:bg-white/10 rounded-full px-2 py-0.5">{tickets.length}</span>
+      </button>
+      {open && <div>{tickets.map(t => <Row key={t.id} t={t} />)}</div>}
+    </Card>
+  )
+}
+
 export function StoreTicketsList({ tickets, initialFilter = 'all' }: { tickets: StoreManagerTicket[]; initialFilter?: Filter }) {
   const [filter, setFilter] = useState<Filter>(initialFilter)
   const [q, setQ] = useState('')
@@ -35,11 +67,8 @@ export function StoreTicketsList({ tickets, initialFilter = 'all' }: { tickets: 
     for (const t of tickets) if (t.status in c) (c as any)[t.status]++
     return c
   }, [tickets])
-  const total = tickets.length || 1
 
-  // Build one lowercase haystack per ticket covering every field a manager
-  // might type: title, description, category, status (friendly + raw),
-  // priority (label + P1–P4 alias), operational impact, and the date.
+  // Lowercase haystack per ticket covering every searchable field.
   const haystacks = useMemo(() => tickets.map(t => ({
     t,
     hay: [
@@ -56,7 +85,7 @@ export function StoreTicketsList({ tickets, initialFilter = 'all' }: { tickets: 
     ].join(' · ').toLowerCase(),
   })), [tickets])
 
-  // Multi-token AND search: split on spaces and "+", every token must match.
+  // Multi-token AND search: every token must match.
   const shown = useMemo(() => {
     const tokens = q.toLowerCase().split(/[\s+]+/).map(s => s.trim()).filter(Boolean)
     return haystacks
@@ -66,8 +95,14 @@ export function StoreTicketsList({ tickets, initialFilter = 'all' }: { tickets: 
       .map(x => x.t)
   }, [haystacks, filter, q])
 
-  const pct = (n: number) => Math.round((n / total) * 100)
-  // Distribution bar excludes cancelled (shown as its own red filter, not in the bar).
+  // Split the (search-filtered) "all" set into status groups.
+  const grouped = useMemo(() => {
+    const g: Record<string, StoreManagerTicket[]> = { open: [], in_progress: [], completed: [], cancelled: [] }
+    for (const t of shown) (g[t.status] ?? (g[t.status] = [])).push(t)
+    return g
+  }, [shown])
+
+  // Distribution bar excludes cancelled + completed (live work only).
   const barTotal = counts.open + counts.in_progress + counts.completed || 1
   const barPct = (n: number) => Math.round((n / barTotal) * 100)
 
@@ -87,11 +122,10 @@ export function StoreTicketsList({ tickets, initialFilter = 'all' }: { tickets: 
           {counts.in_progress > 0 && <div className="h-full bg-[#C6A35D]" style={{ width: `${barPct(counts.in_progress)}%` }} />}
           {counts.completed > 0 && <div className="h-full bg-emerald-500" style={{ width: `${barPct(counts.completed)}%` }} />}
         </div>
-        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] sm:flex sm:flex-wrap">
+        <div className="grid grid-cols-3 gap-x-4 gap-y-1 text-[11px] sm:flex sm:flex-wrap">
           <span className="flex items-center gap-1.5 text-[var(--text-muted)]"><i className="w-2 h-2 rounded-full bg-blue-500" />Open {counts.open} ({barPct(counts.open)}%)</span>
           <span className="flex items-center gap-1.5 text-[var(--text-muted)]"><i className="w-2 h-2 rounded-full bg-[#C6A35D]" />In Progress {counts.in_progress} ({barPct(counts.in_progress)}%)</span>
           <span className="flex items-center gap-1.5 text-[var(--text-muted)]"><i className="w-2 h-2 rounded-full bg-emerald-500" />Completed {counts.completed} ({barPct(counts.completed)}%)</span>
-          {counts.cancelled > 0 && <span className="flex items-center gap-1.5 text-[var(--text-muted)]"><i className="w-2 h-2 rounded-full bg-red-500" />Cancelled {counts.cancelled}</span>}
         </div>
       </Card>
 
@@ -102,7 +136,7 @@ export function StoreTicketsList({ tickets, initialFilter = 'all' }: { tickets: 
           className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)] focus:ring-[#C6A35D]/40 outline-none" />
       </div>
 
-      {/* Filter pills — 3-col grid on phone, inline on larger screens */}
+      {/* Filter pills */}
       <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
         {PILLS.map(p => {
           const n = p.key === 'all' ? tickets.length : (counts as any)[p.key]
@@ -116,22 +150,24 @@ export function StoreTicketsList({ tickets, initialFilter = 'all' }: { tickets: 
         })}
       </div>
 
-      <Card className="p-2">
-        {shown.map(t => (
-          <Link key={t.id} href={`/client/tickets/${t.id}`} className="flex items-center justify-between gap-2 px-3 py-3 border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition">
-            <div className="min-w-0">
-              {t.jobRef && <p className="text-[10px] font-mono text-[var(--text-faint)]">{t.jobRef}</p>}
-              <p className="text-sm text-[var(--text)] truncate">{t.title}</p>
-              <p className="text-[11px] text-[var(--text-faint)]">{t.category ?? 'General'} · {formatDateTime(t.createdAt)}{t.supplierAssigned ? ' · Supplier assigned' : ''}</p>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_6rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
-              <PriorityBadge priority={t.priority} className="w-full text-center" />
-              <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${TONE[t.status]}`}>{WORD[t.status]}</span>
-            </div>
-          </Link>
-        ))}
-        {!shown.length && <p className="text-sm text-[var(--text-faint)] text-center py-8">{tickets.length ? 'No tickets match.' : 'No tickets yet.'}</p>}
-      </Card>
+      {/* All → collapsible status groups, Completed under Archive. Specific filter → flat list. */}
+      {filter === 'all' ? (
+        shown.length ? (
+          <div className="space-y-3">
+            <Group title="Open" tickets={grouped.open} />
+            <Group title="In Progress" tickets={grouped.in_progress} />
+            <Group title="Cancelled" tickets={grouped.cancelled} defaultOpen={false} />
+            <Group title="Archive · Completed" tickets={grouped.completed} defaultOpen={false} />
+          </div>
+        ) : (
+          <Card className="p-2"><p className="text-sm text-[var(--text-faint)] text-center py-8">{tickets.length ? 'No tickets match.' : 'No tickets yet.'}</p></Card>
+        )
+      ) : (
+        <Card className="p-2">
+          {shown.map(t => <Row key={t.id} t={t} />)}
+          {!shown.length && <p className="text-sm text-[var(--text-faint)] text-center py-8">{tickets.length ? 'No tickets match.' : 'No tickets yet.'}</p>}
+        </Card>
+      )}
     </div>
   )
 }

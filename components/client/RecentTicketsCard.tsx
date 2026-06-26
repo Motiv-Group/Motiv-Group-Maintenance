@@ -22,7 +22,8 @@ export function RecentTicketsCard({ tickets }: { tickets: StoreManagerTicket[] }
   const [open, setOpen] = useState(true)
   const recent = useMemo(() => {
     const cutoff = Date.now() - WEEK_MS
-    return tickets.filter(t => new Date(t.createdAt).getTime() >= cutoff)
+    // Completed tickets live in the Tickets-tab archive, not the dashboard overview.
+    return tickets.filter(t => t.status !== 'completed' && new Date(t.createdAt).getTime() >= cutoff)
   }, [tickets])
 
   return (

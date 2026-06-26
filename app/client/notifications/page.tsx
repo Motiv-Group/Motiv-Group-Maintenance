@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { BellOff, Search, X } from 'lucide-react'
 import { formatDateTime } from '@/lib/utils'
 import { MarkAllReadButton } from '@/components/ui/MarkAllReadButton'
+import { BackButton } from '@/components/ui/BackButton'
 import type { Notification } from '@/lib/types'
 
 const TYPE_LABELS: Record<string, string> = {
@@ -52,10 +53,13 @@ export default function ClientNotificationsPage() {
 
   return (
     <div className="max-w-lg mx-auto space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white">Notifications</h1>
-          {unreadCount > 0 && <p className="text-xs text-gray-400 mt-0.5">{unreadCount} unread</p>}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <BackButton />
+          <div>
+            <h1 className="text-xl font-bold text-gray-900 dark:text-white">Notifications</h1>
+            {unreadCount > 0 && <p className="text-xs text-gray-400 mt-0.5">{unreadCount} unread</p>}
+          </div>
         </div>
         <MarkAllReadButton />
       </div>

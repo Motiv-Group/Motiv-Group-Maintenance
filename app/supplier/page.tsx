@@ -64,7 +64,7 @@ export default async function SupplierOverviewPage() {
 
   const needsAction = d.tickets.filter(t => t.active && (t.slaLabel === 'Breached' || t.slaLabel === 'At risk' || !t.acknowledged)).slice(0, 6)
   const evidenceTodo = d.tickets.filter(t => t.active && t.evidenceRequired && !(t.beforeUploaded && t.afterUploaded && t.cocUploaded)).slice(0, 6)
-  const recentTickets = [...d.tickets].sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)).slice(0, 8)
+  const recentTickets = [...d.tickets].filter(t => t.status !== 'completed').sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)).slice(0, 8)
   const missingBits = (t: SupplierTicketRow) => [!t.beforeUploaded && 'before', !t.afterUploaded && 'after', !t.cocUploaded && 'COC'].filter(Boolean).join(', ')
 
   return (
