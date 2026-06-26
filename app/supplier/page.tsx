@@ -6,6 +6,7 @@ import { requireSupplierV3 } from '@/lib/health/guard'
 import { assembleSupplierDashboard, type SupplierTicketRow } from '@/lib/health/data'
 import { Card, SectionCard, KpiRow, Donut, Pill, type Kpi } from '@/components/exec/ui'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
+import { BriefingRefresh } from '@/components/briefing/BriefingRefresh'
 import { getDailyBriefing } from '@/lib/briefing/generate'
 import { supplierFacts } from '@/lib/briefing/facts'
 import { formatCurrency, formatDateTime, rmStatusMeta } from '@/lib/utils'
@@ -89,6 +90,7 @@ export default async function SupplierOverviewPage() {
             <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
               <h2 className="text-lg font-bold text-[var(--text)]">SLA Health</h2>
               <Pill status={perf.band} />
+              <span className="ml-auto"><BriefingRefresh scope="supplier" scopeId={briefingScopeId} /></span>
             </div>
             {briefing?.body && (
               <div className="flex items-start gap-2 justify-center sm:justify-start text-left">

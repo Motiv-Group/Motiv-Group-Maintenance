@@ -5,6 +5,7 @@ import { Building2, ClipboardList, ShieldAlert, Truck, Lock, ClipboardCheck, Ale
 import type { RegionalDashboardData } from '@/lib/health/data'
 import { SectionCard, KpiCard, Pill, Donut, Card, DistributionBar, STATUS_TEXT, type Kpi } from '@/components/exec/ui'
 import { RegionalRecentTickets } from '@/components/regional/RegionalRecentTickets'
+import { BriefingRefresh } from '@/components/briefing/BriefingRefresh'
 import { Stars } from '@/components/ui/Stars'
 import { STATUS_LABELS } from '@/lib/health/constants'
 import type { Briefing } from '@/lib/briefing/facts'
@@ -12,7 +13,7 @@ import { formatDate, formatCurrency } from '@/lib/utils'
 
 const fmtK = (n: number) => (n >= 1000 ? `R ${(n / 1000).toFixed(0)}K` : formatCurrency(n))
 
-export function RegionalOverview({ data, name, briefing }: { data: RegionalDashboardData; name: string | null; briefing?: Briefing }) {
+export function RegionalOverview({ data, name, briefing, briefingScopeId }: { data: RegionalDashboardData; name: string | null; briefing?: Briefing; briefingScopeId?: string }) {
   const p = data.portfolio
   const greeting = (() => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening' })()
 
@@ -52,6 +53,7 @@ export function RegionalOverview({ data, name, briefing }: { data: RegionalDashb
             <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
               <h2 className="text-lg font-bold text-[var(--text)]">Regional Health</h2>
               <Pill status={p.status} label={STATUS_LABELS[p.status]} />
+              {briefingScopeId && <span className="ml-auto"><BriefingRefresh scope="region" scopeId={briefingScopeId} /></span>}
             </div>
             {briefing?.body && (
               <div className="flex items-start gap-2 justify-center sm:justify-start text-left">

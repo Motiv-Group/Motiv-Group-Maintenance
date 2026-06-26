@@ -13,6 +13,7 @@ import {
   RagBlocks, TrendArrow, STATUS_TEXT, type Kpi, type Trend,
 } from '@/components/exec/ui'
 import { getDailyBriefing } from '@/lib/briefing/generate'
+import { BriefingRefresh } from '@/components/briefing/BriefingRefresh'
 import { estateFacts } from '@/lib/briefing/facts'
 import { STATUS_LABELS } from '@/lib/health/constants'
 import { formatCurrency, formatDate } from '@/lib/utils'
@@ -71,6 +72,7 @@ export default async function ExecutiveEstatePage() {
             <div className="flex items-center justify-center lg:justify-start gap-2 flex-wrap">
               <h2 className="text-lg font-bold text-[var(--text)]">Estate Health</h2>
               <Pill status={e.status} label={`${quality(e.finalEstateHealth)} / ${STATUS_LABELS[e.status]}`} />
+              <span className="ml-auto"><BriefingRefresh scope="estate" scopeId={companyId} /></span>
             </div>
             {briefing?.body && (
               <div className="flex items-start gap-2 justify-center lg:justify-start text-left">

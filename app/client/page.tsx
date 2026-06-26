@@ -7,6 +7,7 @@ import { assembleStoreManagerDashboard } from '@/lib/health/data'
 import { STATUS_LABELS } from '@/lib/health/constants'
 import { Card, Donut, Pill, KpiCard, SectionCard, type Kpi } from '@/components/exec/ui'
 import { RecentTicketsCard } from '@/components/client/RecentTicketsCard'
+import { BriefingRefresh } from '@/components/briefing/BriefingRefresh'
 import { getDailyBriefing } from '@/lib/briefing/generate'
 import { storeFacts } from '@/lib/briefing/facts'
 import { formatDate } from '@/lib/utils'
@@ -62,6 +63,7 @@ export default async function StoreOverviewPage() {
               <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
                 <h2 className="text-lg font-bold text-[var(--text)]">Store Health</h2>
                 <Pill status={h.finalStatus} label={STATUS_LABELS[h.finalStatus]} />
+                <span className="ml-auto"><BriefingRefresh scope="store" scopeId={briefingScopeId} /></span>
               </div>
               {briefing?.body && (
                 <div className="flex items-start gap-2 justify-center sm:justify-start text-left">

@@ -104,6 +104,7 @@ export function SupplierTickets({ tickets, quotes }: { tickets: SupplierTicketRo
   const liveShown = useMemo(() => (filter === 'all' ? shown.filter(t => !t.breached && bucketOf(t.status) !== 'completed') : shown).slice().sort(byDateThenUrgency), [shown, filter])
   const archived = useMemo(() => (filter === 'all' ? shown.filter(t => bucketOf(t.status) === 'completed') : []).slice().sort(byDateThenUrgency), [shown, filter])
   const [archiveOpen, setArchiveOpen] = useState(false)
+  const [breachedOpen, setBreachedOpen] = useState(true)
 
   const groups = useMemo(() => {
     const m = new Map<string, { branchCode: string | null; rows: SupplierTicketRow[] }>()
@@ -153,14 +154,15 @@ export function SupplierTickets({ tickets, quotes }: { tickets: SupplierTicketRo
         })}
       </div>
 
-      {/* SLA breached — pinned at the top under the All filter */}
+      {/* SLA breached — pinned at the top under the All filter, collapsible */}
       {filter === 'all' && breachedRows.length > 0 && (
         <Card className="p-3 ring-1 ring-red-500/40">
-          <div className="flex items-center gap-2 mb-1 px-1">
+          <button onClick={() => setBreachedOpen(o => !o)} aria-expanded={breachedOpen} className="w-full flex items-center gap-2 -m-1 p-1 rounded-lg hover:bg-[var(--hover)] transition">
+            <ChevronDown size={16} className={`shrink-0 text-red-500 transition-transform ${breachedOpen ? '' : '-rotate-90'}`} />
             <span className="text-sm font-bold text-red-600 dark:text-red-400">SLA Breached</span>
             <span className="text-[11px] font-medium text-red-700 dark:text-red-400 bg-red-500/15 rounded-full px-2 py-0.5">{breachedRows.length}</span>
-          </div>
-          <div className="px-1">{breachedRows.map(t => <TicketRow key={t.id} t={t} />)}</div>
+          </button>
+          {breachedOpen && <div className="px-1 mt-1">{breachedRows.map(t => <TicketRow key={t.id} t={t} />)}</div>}
         </Card>
       )}
 
