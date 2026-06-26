@@ -38,15 +38,15 @@ export default async function SupplierQuotesPage() {
             <ChevronUp size={16} className="text-[var(--text-faint)] shrink-0 hidden group-open:block" />
           </summary>
           <div className="border-t border-[var(--border)] overflow-x-auto">
-            <table className="w-full text-sm min-w-[560px]">
-              <thead><tr className="text-left text-[11px] text-[var(--text-faint)] border-b border-[var(--border)]"><th className="py-2 px-3">Quote</th><th className="px-3">Amount</th><th className="px-3">Status</th><th className="px-3">Submitted</th></tr></thead>
+            <table className="w-full text-sm min-w-[620px]">
+              <thead><tr className="text-left text-[11px] text-[var(--text-faint)] border-b border-[var(--border)]"><th className="py-2 px-3">Quote</th><th className="px-3 text-right">Amount</th><th className="px-3">VAT</th><th className="px-3">Status</th><th className="px-3">Submitted</th></tr></thead>
               <tbody>
                 {quotes.map(q => (
                   <tr key={q.id} className="border-b border-[var(--border)] last:border-0">
-                    <td className="py-2.5 px-3 text-[var(--text)] max-w-[260px] truncate">{q.ticketTitle}</td>
+                    <td className="py-2.5 px-3 text-[var(--text)] max-w-[240px] truncate">{q.ticketTitle}</td>
+                    <td className="px-3 text-right tabular-nums whitespace-nowrap text-[var(--text)]">{formatCurrency(q.amountInclVat ?? q.amount)}</td>
                     <td className="px-3">
-                      <span className="text-[var(--text)]">{formatCurrency(q.amountInclVat ?? q.amount)}</span>
-                      <span className={`ml-1.5 text-[10px] font-semibold uppercase rounded-full px-1.5 py-0.5 ${q.amountInclVat ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' : 'bg-[var(--surface-2)] text-[var(--text-muted)]'}`}>{q.amountInclVat ? 'incl VAT' : 'excl VAT'}</span>
+                      <span className={`inline-block text-[10px] font-semibold uppercase rounded-full px-1.5 py-0.5 ${q.amountInclVat ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' : 'bg-[var(--surface-2)] text-[var(--text-muted)]'}`}>{q.amountInclVat ? 'incl VAT' : 'excl VAT'}</span>
                     </td>
                     <td className={`px-3 capitalize ${TONE[q.status] ?? 'text-[var(--text)]'}`}>{q.status.replace('_', ' ')}</td>
                     <td className="px-3 text-[var(--text-muted)] text-xs whitespace-nowrap">{formatDateTime(q.createdAt)}</td>

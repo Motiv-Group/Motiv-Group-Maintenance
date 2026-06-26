@@ -1,14 +1,14 @@
 export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
-import { Truck, ClipboardList, Clock, ReceiptText, ClipboardCheck, Camera, AlertTriangle, Star, Sparkles } from 'lucide-react'
+import { Truck, ClipboardList, Clock, ReceiptText, ClipboardCheck, Camera, AlertTriangle, Star, Sparkles, ChevronDown, ChevronUp } from 'lucide-react'
 import { requireSupplierV3 } from '@/lib/health/guard'
 import { assembleSupplierDashboard, type SupplierTicketRow } from '@/lib/health/data'
 import { Card, SectionCard, KpiRow, Donut, Pill, type Kpi } from '@/components/exec/ui'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { getDailyBriefing } from '@/lib/briefing/generate'
 import { supplierFacts } from '@/lib/briefing/facts'
-import { formatCurrency, formatDate, rmStatusMeta } from '@/lib/utils'
+import { formatCurrency, formatDateTime, rmStatusMeta } from '@/lib/utils'
 
 const slaTone = (l: string) =>
   l === 'Breached' ? 'text-red-600 dark:text-red-400'
@@ -35,7 +35,7 @@ function TicketRow({ t }: { t: SupplierTicketRow }) {
       <div className="min-w-0">
         <p className="text-sm font-medium text-[var(--text)] truncate">{t.storeName}</p>
         <p className="text-[11px] text-[var(--text-muted)] truncate">{t.title}</p>
-        {m && <p className={`text-[11px] ${sm.text}`}>{m.label} · {formatDate(m.at)}</p>}
+        {m && <p className={`text-[11px] ${sm.text}`}>{m.label} · {formatDateTime(m.at)}</p>}
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
         <PriorityBadge priority={t.priority} className="w-full text-center" />
@@ -124,7 +124,7 @@ export default async function SupplierOverviewPage() {
         <SectionCard title="Recent Quotes" icon={<ReceiptText size={15} className="text-amber-600 dark:text-amber-500" />} action={<Link href="/supplier/quotes" className="text-xs text-[#C6A35D] hover:underline">All</Link>}>
           {d.quotes.slice(0, 5).map(q => (
             <div key={q.id} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0">
-              <div className="min-w-0"><p className="text-sm font-medium text-[var(--text)] truncate">{q.storeName}</p><p className="text-[11px] text-[var(--text-muted)] truncate">{q.ticketTitle}</p><p className="text-[11px] text-[var(--text-faint)]">{formatDate(q.createdAt)}</p></div>
+              <div className="min-w-0"><p className="text-sm font-medium text-[var(--text)] truncate">{q.storeName}</p><p className="text-[11px] text-[var(--text-muted)] truncate">{q.ticketTitle}</p><p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(q.createdAt)}</p></div>
               <span className="flex flex-col items-end shrink-0"><span className="text-sm text-[var(--text)]">{formatCurrency(q.amountInclVat ?? q.amount)}</span><span className="text-[10px] text-[var(--text-faint)]">{q.amountInclVat ? 'incl VAT' : 'excl VAT'}</span><span className={`text-[11px] capitalize ${QUOTE_TONE[q.status] ?? 'text-[var(--text-muted)]'}`}>{q.status}</span></span>
             </div>
           ))}
@@ -146,7 +146,7 @@ export default async function SupplierOverviewPage() {
         <SectionCard title="Pending Sign-off" icon={<ClipboardCheck size={15} className="text-emerald-600 dark:text-emerald-400" />} action={<Link href="/supplier/signoff" className="text-xs text-[#C6A35D] hover:underline">All</Link>}>
           {d.signoffs.slice(0, 5).map(s => (
             <div key={s.id} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0">
-              <div className="min-w-0"><p className="text-sm text-[var(--text)] truncate">{s.ticketTitle}</p><p className="text-[11px] text-[var(--text-faint)]">{formatDate(s.createdAt)}</p></div>
+              <div className="min-w-0"><p className="text-sm text-[var(--text)] truncate">{s.ticketTitle}</p><p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(s.createdAt)}</p></div>
               <span className="text-[11px] text-[var(--text-muted)] capitalize shrink-0">{s.status.replace(/_/g, ' ')}</span>
             </div>
           ))}
@@ -154,11 +154,22 @@ export default async function SupplierOverviewPage() {
         </SectionCard>
       </div>
 
-      {/* Recent tickets — moved to the bottom */}
-      <SectionCard title="Recent Tickets" icon={<ClipboardList size={15} className="text-blue-600 dark:text-blue-400" />} action={<Link href="/supplier/tickets" className="text-xs text-[#C6A35D] hover:underline">All</Link>}>
-        {recentTickets.map(t => <TicketRow key={t.id} t={t} />)}
-        {!recentTickets.length && <p className="text-sm text-[var(--text-faint)]">No tickets yet.</p>}
-      </SectionCard>
+      {/* Recent tickets — moved to the bottom, collapsible */}
+      <Card className="p-5">
+        <details open className="group">
+          <summary className="flex items-center justify-between gap-2 cursor-pointer list-none">
+            <h2 className="text-sm font-bold text-[var(--text)] flex items-center gap-2"><ClipboardList size={15} className="text-blue-600 dark:text-blue-400" /> Recent Tickets</h2>
+            <span className="flex items-center gap-1.5 text-[var(--text-faint)]">
+              <ChevronDown size={16} className="group-open:hidden" /><ChevronUp size={16} className="hidden group-open:block" />
+            </span>
+          </summary>
+          <div className="mt-4">
+            {recentTickets.map(t => <TicketRow key={t.id} t={t} />)}
+            {!recentTickets.length && <p className="text-sm text-[var(--text-faint)]">No tickets yet.</p>}
+            {recentTickets.length > 0 && <Link href="/supplier/tickets" className="mt-3 inline-block text-xs text-[#C6A35D] hover:underline">View all tickets →</Link>}
+          </div>
+        </details>
+      </Card>
     </div>
   )
 }
