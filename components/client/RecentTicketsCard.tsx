@@ -41,8 +41,9 @@ export function RecentTicketsCard({ tickets }: { tickets: StoreManagerTicket[] }
       {open && (recent.length ? recent.map(t => (
         <Link key={t.id} href={`/client/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2 -mx-2 px-2 rounded-lg border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition">
           <div className="min-w-0">
+            {t.jobRef && <p className="text-[10px] font-mono text-[var(--text-faint)]">{t.jobRef}</p>}
             <p className="text-sm text-[var(--text)] truncate">{t.title}</p>
-            <p className="text-[11px] text-[var(--text-faint)]">{t.jobRef ? `${t.jobRef} · ` : ''}{t.category ?? 'General'} · {formatDateTime(t.createdAt)}</p>
+            <p className="text-[11px] text-[var(--text-faint)]">{t.category ?? 'General'} · {formatDateTime(t.createdAt)}</p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_6rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
             <PriorityBadge priority={t.priority} className="w-full text-center" />
