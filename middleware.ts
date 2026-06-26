@@ -47,7 +47,8 @@ export async function middleware(request: NextRequest) {
     const role = await getRole()
     const dest = role === 'supplier' ? '/supplier'
       : role === 'regional_manager' ? '/regional'
-      : role === 'executive' || role === 'system_admin' ? '/executive'
+      : role === 'system_admin' ? '/admin'
+      : role === 'executive' ? '/executive'
       : '/client'
     return NextResponse.redirect(new URL(dest, request.url))
   }
