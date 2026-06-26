@@ -73,15 +73,9 @@ export default async function SupplierOverviewPage() {
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><Truck className="text-teal-600 dark:text-teal-400" size={22} /> {fullName ?? 'Supplier'}</h1>
           <Link href="/supplier/reviews" className="inline-flex items-center gap-2 shrink-0 rounded-full bg-[var(--surface-2)] ring-1 ring-[#C6A35D]/40 px-4 py-1.5 hover:bg-[var(--hover)] transition" title="View your reviews">
-            {d.rating.count ? (
-              <>
-                <Star size={17} className="fill-amber-400 text-amber-400 shrink-0" />
-                <span className="text-sm font-bold text-[var(--text)]">{d.rating.avg.toFixed(1)} / 5</span>
-                <span className="text-xs text-amber-600 dark:text-amber-400/80">({d.rating.count} review{d.rating.count !== 1 ? 's' : ''})</span>
-              </>
-            ) : (
-              <span className="text-xs text-[var(--text-muted)]">No reviews yet</span>
-            )}
+            <Star size={17} className="fill-amber-400 text-amber-400 shrink-0" />
+            <span className="text-sm font-bold text-[var(--text)]">{d.rating.avg.toFixed(1)} / 5</span>
+            <span className="text-xs text-amber-600 dark:text-amber-400/80">{d.rating.count ? `(${d.rating.count} review${d.rating.count !== 1 ? 's' : ''})` : '(new)'}</span>
           </Link>
         </div>
         <p className="text-sm text-[var(--text-muted)] mt-0.5">Your assigned work, quotes, sign-offs and performance.</p>

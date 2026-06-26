@@ -67,8 +67,8 @@ export async function POST(request: Request) {
     const { data: su } = await admin.from('supplier_users').select('user_id').in('supplier_id', supplierIds)
     const ids = Array.from(new Set((su ?? []).map(r => r.user_id)))
     if (ids.length) {
-      await admin.from('notifications').insert(ids.map(id => ({ company_id: prof.company_id, user_id: id, type: 'ticket_update', title: `Ticket: ${title}`, message: 'You have been invited to quote.', link: '/supplier/tickets' })))
-      void sendPushToMany(ids, { title: 'New quote request', body: title, url: '/supplier/tickets' })
+      await admin.from('notifications').insert(ids.map(id => ({ company_id: prof.company_id, user_id: id, type: 'ticket_update', title: `Ticket: ${title}`, message: 'You have been invited to quote.', link: `/supplier/tickets/${ticket.id}` })))
+      void sendPushToMany(ids, { title: 'New quote request', body: title, url: `/supplier/tickets/${ticket.id}` })
     }
   }
 
@@ -76,8 +76,8 @@ export async function POST(request: Request) {
   const { data: sm } = await admin.from('store_users').select('user_id').eq('store_id', store.id)
   const smIds = (sm ?? []).map(r => r.user_id)
   if (smIds.length) {
-    await admin.from('notifications').insert(smIds.map(id => ({ company_id: prof.company_id, user_id: id, type: 'new_ticket', title: 'New ticket logged', message: `${prof.full_name ?? 'Your regional manager'} logged: "${title}"`, link: '/client/tickets' })))
-    void sendPushToMany(smIds, { title: 'New ticket', body: title, url: '/client/tickets' })
+    await admin.from('notifications').insert(smIds.map(id => ({ company_id: prof.company_id, user_id: id, type: 'new_ticket', title: 'New ticket logged', message: `${prof.full_name ?? 'Your regional manager'} logged: "${title}"`, link: `/client/tickets/${ticket.id}` })))
+    void sendPushToMany(smIds, { title: 'New ticket', body: title, url: `/client/tickets/${ticket.id}` })
   }
 
   revalidatePath('/regional'); revalidatePath('/regional/tickets'); revalidatePath('/client'); revalidatePath('/supplier')

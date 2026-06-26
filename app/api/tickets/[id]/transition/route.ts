@@ -95,6 +95,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
         if (when.getTime() < Date.now() - 5 * 60_000) return NextResponse.json({ error: 'Cannot schedule in the past.' }, { status: 400 })
         if (when.getTime() > maxEnd.getTime()) return NextResponse.json({ error: 'Scheduled date is beyond the allowed window for this priority.' }, { status: 400 })
         updates.scheduled_at = when.toISOString()
+        // Optional: assign the technician who will attend (supplier's own roster).
+        if (body.technicianId !== undefined) updates.technician_id = body.technicianId || null
         break
       }
       case 'start_work':
@@ -218,15 +220,15 @@ async function notify(admin: Admin, action: string, ticket: any, actorName: stri
   if (toSupplier.includes(action) && ticket.supplier_id) {
     const { data } = await admin.from('supplier_users').select('user_id').eq('supplier_id', ticket.supplier_id)
     const ids = (data ?? []).map(r => r.user_id)
-    await push(admin, ids, ticket.company_id, title, `${actorName ?? 'A manager'} → ${action.replace(/_/g, ' ')}`, '/supplier/tickets')
+    await push(admin, ids, ticket.company_id, title, `${actorName ?? 'A manager'} → ${action.replace(/_/g, ' ')}`, `/supplier/tickets/${ticket.id}`)
   }
   if (toRegion.includes(action) && ticket.region_id) {
     const { data } = await admin.from('regional_users').select('user_id').eq('region_id', ticket.region_id)
     const ids = (data ?? []).map(r => r.user_id)
-    await push(admin, ids, ticket.company_id, title, `Update: ${action.replace(/_/g, ' ')}`, '/regional/tickets')
+    await push(admin, ids, ticket.company_id, title, `Update: ${action.replace(/_/g, ' ')}`, `/regional/tickets/${ticket.id}`)
   }
   if (toStore.includes(action) && ticket.created_by) {
-    await push(admin, [ticket.created_by], ticket.company_id, title, `Update: ${action.replace(/_/g, ' ')}`, '/client')
+    await push(admin, [ticket.created_by], ticket.company_id, title, `Update: ${action.replace(/_/g, ' ')}`, `/client/tickets/${ticket.id}`)
   }
 }
 

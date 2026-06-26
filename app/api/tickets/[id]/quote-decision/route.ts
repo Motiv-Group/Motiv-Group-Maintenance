@@ -43,8 +43,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
     const { data: su } = await admin.from('supplier_users').select('user_id').eq('supplier_id', quote.supplier_id)
     const ids = (su ?? []).map(r => r.user_id)
     if (ids.length) {
-      await admin.from('notifications').insert(ids.map(id => ({ company_id: ticket.company_id, user_id: id, type: 'ticket_update', title: `Ticket: ${ticket.title ?? 'Untitled'}`, message: 'Your quote was declined.', link: '/supplier/tickets' })))
-      void sendPushToMany(ids, { title: 'Quote declined', body: ticket.title ?? '', url: '/supplier/tickets' })
+      await admin.from('notifications').insert(ids.map(id => ({ company_id: ticket.company_id, user_id: id, type: 'ticket_update', title: `Ticket: ${ticket.title ?? 'Untitled'}`, message: 'Your quote was declined.', link: `/supplier/tickets/${ticket.id}` })))
+      void sendPushToMany(ids, { title: 'Quote declined', body: ticket.title ?? '', url: `/supplier/tickets/${ticket.id}` })
     }
     revalidatePath('/regional'); revalidatePath(`/regional/tickets/${ticket.id}`); revalidatePath('/supplier')
     return NextResponse.json({ ok: true })
@@ -66,12 +66,12 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const { data: su } = await admin.from('supplier_users').select('user_id').eq('supplier_id', quote.supplier_id)
   const ids = (su ?? []).map(r => r.user_id)
   if (ids.length) {
-    await admin.from('notifications').insert(ids.map(id => ({ company_id: ticket.company_id, user_id: id, type: 'ticket_update', title: `Ticket: ${ticket.title ?? 'Untitled'}`, message: 'Your quote was approved — you can proceed.', link: '/supplier/tickets' })))
-    void sendPushToMany(ids, { title: 'Quote approved', body: ticket.title ?? '', url: '/supplier/tickets' })
+    await admin.from('notifications').insert(ids.map(id => ({ company_id: ticket.company_id, user_id: id, type: 'ticket_update', title: `Ticket: ${ticket.title ?? 'Untitled'}`, message: 'Your quote was approved — you can proceed.', link: `/supplier/tickets/${ticket.id}` })))
+    void sendPushToMany(ids, { title: 'Quote approved', body: ticket.title ?? '', url: `/supplier/tickets/${ticket.id}` })
   }
   if (ticket.created_by) {
-    await admin.from('notifications').insert([{ company_id: ticket.company_id, user_id: ticket.created_by, type: 'ticket_update', title: `Ticket: ${ticket.title ?? 'Untitled'}`, message: 'Work approved — a supplier has been assigned.', link: '/client' }])
-    void sendPushToMany([ticket.created_by], { title: 'Work approved', body: ticket.title ?? '', url: '/client' })
+    await admin.from('notifications').insert([{ company_id: ticket.company_id, user_id: ticket.created_by, type: 'ticket_update', title: `Ticket: ${ticket.title ?? 'Untitled'}`, message: 'Work approved — a supplier has been assigned.', link: `/client/tickets/${ticket.id}` }])
+    void sendPushToMany([ticket.created_by], { title: 'Work approved', body: ticket.title ?? '', url: `/client/tickets/${ticket.id}` })
   }
 
   revalidatePath('/regional'); revalidatePath(`/regional/tickets/${ticket.id}`); revalidatePath('/supplier'); revalidatePath('/client')

@@ -59,15 +59,16 @@ export function RaiseVariationCard({ ticketId }: { ticketId: string }) {
   )
 }
 
-export function ScheduleJobCard({ ticketId, priority, createdAt }: { ticketId: string; priority: string; createdAt: string }) {
+export function ScheduleJobCard({ ticketId, priority, createdAt, technicians = [] }: { ticketId: string; priority: string; createdAt: string; technicians?: { id: string; name: string }[] }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  const [techId, setTechId] = useState('')
 
   async function confirm(iso: string) {
     setBusy(true); setErr('')
-    try { await transition(ticketId, { action: 'schedule', scheduledAt: iso }); router.refresh() }
+    try { await transition(ticketId, { action: 'schedule', scheduledAt: iso, technicianId: techId || null }); router.refresh() }
     catch (e: any) { setErr(e.message); setBusy(false) }
   }
 
@@ -80,6 +81,18 @@ export function ScheduleJobCard({ ticketId, priority, createdAt }: { ticketId: s
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setOpen(false)}>
           <div className="bg-[var(--surface-2)] ring-1 ring-[var(--border)] rounded-2xl p-5 max-w-sm w-full space-y-3" onClick={e => e.stopPropagation()}>
             <p className="font-semibold text-[var(--text)]">Schedule the job</p>
+            {/* Assign a technician (from your roster) */}
+            <div>
+              <label className="block text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Technician</label>
+              {technicians.length ? (
+                <select value={techId} onChange={e => setTechId(e.target.value)} className="w-full px-3 py-2 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm outline-none focus:ring-[#C6A35D]/40">
+                  <option value="">— Unassigned —</option>
+                  {technicians.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              ) : (
+                <p className="text-xs text-[var(--text-muted)]">No technicians yet — add them under the <span className="text-[#C6A35D]">Technicians</span> tab.</p>
+              )}
+            </div>
             {err && <p className="text-xs text-red-500">{err}</p>}
             <SchedulePicker priority={priority} createdAt={createdAt} busy={busy} onConfirm={confirm} onCancel={() => setOpen(false)} />
           </div>

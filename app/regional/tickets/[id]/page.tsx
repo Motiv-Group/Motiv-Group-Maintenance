@@ -49,7 +49,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   }
   const supplierList = (suppliers ?? []).map((s: any) => {
     const ra = ratingAgg.get(s.id)
-    return { id: s.id, name: s.company_name, avgRating: ra ? ra.sum / ra.n : 0, ratingCount: ra ? ra.n : 0 }
+    return { id: s.id, name: s.company_name, avgRating: ra ? ra.sum / ra.n : 5, ratingCount: ra ? ra.n : 0 }
   })
   const nameById = new Map<string, string>(supplierList.map(s => [s.id, s.name]))
   for (const inv of (invites ?? []) as any[]) if (inv.suppliers?.company_name) nameById.set(inv.supplier_id, inv.suppliers.company_name)

@@ -52,8 +52,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const { data: su } = await admin.from('supplier_users').select('user_id, supplier_id').in('supplier_id', supplierIds)
   const ids = Array.from(new Set((su ?? []).map(r => r.user_id)))
   if (ids.length) {
-    await admin.from('notifications').insert(ids.map(id => ({ company_id: ticket.company_id, user_id: id, type: 'ticket_update', title: `Ticket: ${ticket.title ?? 'Untitled'}`, message: 'You have been invited to quote.', link: '/supplier/tickets' })))
-    void sendPushToMany(ids, { title: 'New quote request', body: ticket.title ?? 'A ticket needs your quote', url: '/supplier/tickets' })
+    await admin.from('notifications').insert(ids.map(id => ({ company_id: ticket.company_id, user_id: id, type: 'ticket_update', title: `Ticket: ${ticket.title ?? 'Untitled'}`, message: 'You have been invited to quote.', link: `/supplier/tickets/${ticket.id}` })))
+    void sendPushToMany(ids, { title: 'New quote request', body: ticket.title ?? 'A ticket needs your quote', url: `/supplier/tickets/${ticket.id}` })
   }
 
   revalidatePath('/regional'); revalidatePath('/regional/tickets'); revalidatePath(`/regional/tickets/${ticket.id}`); revalidatePath('/supplier')

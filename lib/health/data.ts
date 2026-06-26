@@ -439,7 +439,7 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
     const act = ts.filter(t => isActive(t.status))
     const overdue = act.filter(t => { const s = computeTicketSla(t, rules(t.priority), now); return s.supplierBreached || s.internalBreached }).length
     const ra = ratingAgg.get(id)
-    return { id, name: supplierName.get(id) ?? 'Supplier', perf: calculateSupplierPerformance(id, ts, rules, now), open: act.length, overdue, costExposure: act.reduce((s, t) => s + (t.quote_value ?? 0), 0), avgRating: ra ? ra.sum / ra.n : 0, ratingCount: ra ? ra.n : 0 }
+    return { id, name: supplierName.get(id) ?? 'Supplier', perf: calculateSupplierPerformance(id, ts, rules, now), open: act.length, overdue, costExposure: act.reduce((s, t) => s + (t.quote_value ?? 0), 0), avgRating: ra ? ra.sum / ra.n : 5, ratingCount: ra ? ra.n : 0 }
   }).sort((a, b) => a.perf.performanceScore - b.perf.performanceScore)
 
   let signoffsPending = 0, snagsOpen = 0
@@ -537,7 +537,7 @@ export interface SupplierDashboardData {
 export async function assembleSupplierDashboard(companyId: string, supplierIds: string[], now: Date = new Date()): Promise<SupplierDashboardData> {
   const db = createAdminClient()
   const emptyPerf = calculateSupplierPerformance('none', [], (p) => FALLBACK_SLA[p], now)
-  if (!supplierIds.length) return { perf: emptyPerf, kpis: { open: 0, overdue: 0, dueToday: 0, pendingQuotes: 0, awaitingSignoff: 0, evidenceMissing: 0 }, tickets: [], quotes: [], signoffs: [], rating: { avg: 0, count: 0 }, generatedAt: now.toISOString() }
+  if (!supplierIds.length) return { perf: emptyPerf, kpis: { open: 0, overdue: 0, dueToday: 0, pendingQuotes: 0, awaitingSignoff: 0, evidenceMissing: 0 }, tickets: [], quotes: [], signoffs: [], rating: { avg: 5, count: 0 }, generatedAt: now.toISOString() }
   const rules = await loadSlaResolver(db, companyId)
 
   // Own tickets (awarded) + tickets where invited to quote (competitive model).
@@ -564,7 +564,8 @@ export async function assembleSupplierDashboard(companyId: string, supplierIds: 
     db.from('ratings').select('score').in('supplier_id', supplierIds),
   ])
   const ratingScores = ((ratingRows ?? []) as any[]).map(r => Number(r.score)).filter(n => Number.isFinite(n))
-  const rating = { avg: ratingScores.length ? ratingScores.reduce((s, n) => s + n, 0) / ratingScores.length : 0, count: ratingScores.length }
+  // Suppliers start at a full 5★ and degrade as real ratings arrive.
+  const rating = { avg: ratingScores.length ? ratingScores.reduce((s, n) => s + n, 0) / ratingScores.length : 5, count: ratingScores.length }
   // Earliest accepted quote per ticket — fallback for the approval date.
   const acceptedQuoteAt = new Map<string, string>()
   for (const q of (quotesRaw ?? []) as any[]) if (q.status === 'accepted') acceptedQuoteAt.set(q.ticket_id, q.created_at)

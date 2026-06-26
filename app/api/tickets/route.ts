@@ -51,9 +51,9 @@ export async function POST(request: Request) {
     if (ids.length) {
       await admin.from('notifications').insert(ids.map(id => ({
         company_id: profile.company_id, user_id: id, type: 'new_ticket', title: 'New Ticket in Your Region',
-        message: `${store.name} logged a ${priority} ticket: "${title}"`, link: `/regional/tickets`,
+        message: `${store.name} logged a ${priority} ticket: "${title}"`, link: `/regional/tickets/${ticket.id}`,
       })))
-      void sendPushToMany(ids, { title: 'New Ticket', body: `${store.name}: ${title}`, url: '/regional/tickets' })
+      void sendPushToMany(ids, { title: 'New Ticket', body: `${store.name}: ${title}`, url: `/regional/tickets/${ticket.id}` })
     }
   }
 

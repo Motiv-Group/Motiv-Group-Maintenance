@@ -33,9 +33,10 @@ export default async function SupplierReviewsPage() {
     : { data: [] as any[] }
 
   const reviews = (ratings ?? []) as any[]
+  // Suppliers start at a full 5★ and degrade as real reviews arrive.
   const avgRating = reviews.length > 0
     ? reviews.reduce((s, r) => s + r.score, 0) / reviews.length
-    : null
+    : 5
 
   return (
     <div className="space-y-5">
@@ -43,12 +44,10 @@ export default async function SupplierReviewsPage() {
         <BackButton />
         <div>
           <h1 className="text-xl font-bold text-gray-900 dark:text-white">My Reviews</h1>
-          {avgRating !== null && (
-            <p className="text-sm text-amber-600 dark:text-amber-400 mt-0.5 flex items-center gap-1.5">
-              <Star size={14} className="fill-amber-400 text-amber-400" />
-              {avgRating.toFixed(1)} / 5 average across {reviews.length} review{reviews.length !== 1 ? 's' : ''}
-            </p>
-          )}
+          <p className="text-sm text-amber-600 dark:text-amber-400 mt-0.5 flex items-center gap-1.5">
+            <Star size={14} className="fill-amber-400 text-amber-400" />
+            {avgRating.toFixed(1)} / 5 {reviews.length > 0 ? `average across ${reviews.length} review${reviews.length !== 1 ? 's' : ''}` : '— starting rating, no reviews yet'}
+          </p>
         </div>
       </div>
 

@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Globe2, Map as MapIcon, Store, Truck, Gavel, Bell, Settings, LogOut, FileBarChart, LayoutDashboard, Ticket, ClipboardCheck, AlertTriangle, ReceiptText, BarChart2 } from 'lucide-react'
+import { Globe2, Map as MapIcon, Store, Truck, Gavel, Bell, Settings, LogOut, FileBarChart, LayoutDashboard, Ticket, ClipboardCheck, AlertTriangle, ReceiptText, BarChart2, Users } from 'lucide-react'
 import { MotivLogo } from '@/components/ui/MotivLogo'
 import { SwipeNav } from '@/components/ui/SwipeNav'
 
@@ -34,6 +34,7 @@ const SUPPLIER_TABS: ChromeTab[] = [
   { href: '/supplier/quotes',  label: 'Quotes',      icon: ReceiptText },
   { href: '/supplier/signoff', label: 'Sign-off',    icon: ClipboardCheck },
   { href: '/supplier/snag',    label: 'Snags',       icon: AlertTriangle },
+  { href: '/supplier/technicians', label: 'Technicians', icon: Users },
   { href: '/supplier/stats',   label: 'Performance', icon: BarChart2 },
 ]
 const VARIANTS = {

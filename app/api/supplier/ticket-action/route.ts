@@ -65,7 +65,7 @@ export async function POST(request: Request) {
       if (ticket.region_id) {
         const { data: rms } = await admin.from('regional_users').select('user_id').eq('region_id', ticket.region_id)
         const ids = (rms ?? []).map(r => r.user_id)
-        if (ids.length) await admin.from('notifications').insert(ids.map(id => ({ company_id: ticket.company_id, user_id: id, type: 'signoff_request', title: 'Job submitted for sign-off', message: `"${ticket.title}" is ready for your sign-off.`, link: '/regional/signoff' })))
+        if (ids.length) await admin.from('notifications').insert(ids.map(id => ({ company_id: ticket.company_id, user_id: id, type: 'signoff_request', title: 'Job submitted for sign-off', message: `"${ticket.title}" is ready for your sign-off.`, link: `/regional/tickets/${ticketId}` })))
       }
       break
     }

@@ -249,7 +249,7 @@ export default async function ExecutiveEstatePage() {
                 {data.exposureBreakdown.length === 0 && <p className="text-xs text-[var(--text-faint)]">No commercial exposure</p>}
               </div>
             </div>
-            <div className="text-right"><Link href="/executive/insights/cost-exposure" className="text-xs text-[#C6A35D] hover:underline">View cost exposure details</Link></div>
+            <div className="text-center"><Link href="/executive/insights/cost-exposure" className="text-xs text-[#C6A35D] hover:underline">View cost exposure details</Link></div>
           </div>
         </SectionCard>
       </div>

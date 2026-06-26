@@ -10,7 +10,7 @@ export function Stars({ value, count, size = 14, showNumber = true }: { value: n
       {[1, 2, 3, 4, 5].map(i => (
         <Star key={i} size={size} className={i <= full ? 'text-amber-400 fill-amber-400' : 'text-[var(--text-faint)]'} />
       ))}
-      {showNumber && value > 0 && <span className="text-[11px] text-[var(--text-muted)] ml-1">{value.toFixed(1)}{count != null ? ` (${count})` : ''}</span>}
+      {showNumber && value > 0 && <span className="text-[11px] text-[var(--text-muted)] ml-1">{value.toFixed(1)}{count ? ` (${count})` : ''}</span>}
     </span>
   )
 }

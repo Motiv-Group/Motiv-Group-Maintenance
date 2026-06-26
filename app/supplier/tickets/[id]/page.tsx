@@ -29,12 +29,14 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   const admin = createAdminClient()
   const { data: t } = await admin.from('tickets').select('*').eq('id', params.id).single()
   if (!t || t.company_id !== companyId) redirect('/supplier/tickets')
-  const [{ data: store }, { data: updates }, { data: invite }, { data: myQuotes }] = await Promise.all([
+  const [{ data: store }, { data: updates }, { data: invite }, { data: myQuotes }, { data: technicianRows }] = await Promise.all([
     admin.from('stores').select('name, sub_store').eq('id', t.store_id).single(),
     admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('ticket_suppliers').select('status').eq('ticket_id', t.id).in('supplier_id', supplierIds).maybeSingle(),
     admin.from('quotes').select('id, amount, amount_incl_vat, description, file_url, status, valid_until, created_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).order('created_at', { ascending: false }),
+    admin.from('technicians').select('id, name').in('supplier_id', supplierIds).eq('active', true).order('name'),
   ])
+  const technicians = (technicianRows ?? []) as { id: string; name: string }[]
   // Access: the awarded supplier OR a supplier invited to quote (competitive model).
   const awarded = !!t.supplier_id && supplierIds.includes(t.supplier_id)
   if (!awarded && !invite) redirect('/supplier/tickets')
@@ -98,6 +100,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
         )}
 
         {t.scheduled_at && <p className="text-xs text-[var(--text-muted)]">Scheduled: {formatDateTime(t.scheduled_at)}</p>}
+        {t.technician_id && technicians.find(x => x.id === t.technician_id) && <p className="text-xs text-[var(--text-muted)]">Technician: {technicians.find(x => x.id === t.technician_id)!.name}</p>}
       </Card>
 
       <Card className="p-5 space-y-3">
@@ -110,7 +113,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
             quote={{ id: latestQuote.id, amount: latestQuote.amount, amountInclVat: latestQuote.amount_incl_vat ?? null, description: latestQuote.description ?? null, fileUrl: latestQuote.file_url ?? null, validUntil: latestQuote.valid_until ?? null, createdAt: latestQuote.created_at }}
           />
         )}
-        {t.status === 'accepted' && <ScheduleJobCard ticketId={t.id} priority={t.priority} createdAt={t.created_at} />}
+        {t.status === 'accepted' && <ScheduleJobCard ticketId={t.id} priority={t.priority} createdAt={t.created_at} technicians={technicians} />}
         {['in_progress', 'snag_resolved', 'evidence_requested'].includes(t.status) && (
           <Link href={`/supplier/tickets/${t.id}/complete`} className="block w-full text-center py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition">Submit COC &amp; POC</Link>
         )}

@@ -22,15 +22,58 @@ const ROLE_LABEL: Record<BriefingRole, string> = {
   supplier: 'maintenance supplier (contractor)', executive: 'executive (estate-wide)',
 }
 
-const SYSTEM_PROMPT = `You are an operations analyst for Motiv, a maintenance-ticketing platform in South Africa.
-Write a short, punchy MORNING BRIEFING for the given role, using ONLY the JSON facts provided.
-Rules:
-- Plain South African business English. Currency is ZAR, written like R12 500.
-- Lead with what matters most (safety, overdue work, money at risk, falling health), then end with ONE clear recommended next step.
-- Never invent or estimate numbers — use only the facts given. If a fact is 0 or absent, don't mention it.
-- No markdown, no bullet points, no emojis, no greeting padding beyond a brief "Good morning".
-- "body" must be 2 to 4 sentences. "headline" must be at most 6 words.
+const SYSTEM_PROMPT = `You are a senior operations analyst writing the morning briefing for Motiv, a maintenance-ticketing platform in South Africa.
+
+Write a concise, professional briefing for the stated role using ONLY the facts provided. The facts are already formatted with their correct units — copy each value exactly, unit included.
+
+Style:
+- Polished South African business English. Calm, factual and decision-useful — no hype, no filler, no padding.
+- Open with the single most important thing (safety, overdue or at-risk work, money at risk, or falling health), give brief supporting context, then close with ONE clear recommended next step.
+- Keep every number EXACTLY as given, with its unit: percentages keep the % sign (write "62% health", never a bare "62"), money stays in Rand (e.g. R12 500). Never strip or change a unit.
+- Do not invent, estimate or recalculate anything. If a fact is zero or absent, leave it out entirely.
+- Plain sentences only — no markdown, lists, headings or emojis.
+- "body": 2 to 4 sentences. "headline": at most 6 words, specific to today (not a generic title).
+
 Return strict JSON: {"headline": string, "body": string}.`
+
+/** Human-readable label from a camelCase fact key. */
+function labelOf(k: string): string {
+  return k.replace(/([A-Z])/g, ' $1').replace(/^./, c => c.toUpperCase()).trim()
+}
+
+/**
+ * Render the raw facts into a clean, unit-bearing line list so the model never
+ * has to guess units (the source of the "14" vs "14%" bug). Percentages get a
+ * %, money gets R, the rest stay as plain counts.
+ */
+function factsToPrompt(facts: BriefingFacts): string {
+  const money = /value|exposure/i
+  const percent = /score$|rate$|^health$|health$/i
+  const lines: string[] = []
+  for (const [k, v] of Object.entries(facts)) {
+    if (v == null || v === '') continue
+    if (Array.isArray(v)) {
+      if (!v.length) continue
+      const items = v.map((o: any) => {
+        if (o && typeof o === 'object') {
+          const name = o.name ?? ''
+          const health = o.health != null ? ` (${Math.round(Number(o.health))}% health)` : ''
+          const issue = o.issue ? ` — ${o.issue}` : ''
+          return `${name}${health}${issue}`.trim()
+        }
+        return String(o)
+      })
+      lines.push(`${labelOf(k)}: ${items.join('; ')}`)
+    } else if (typeof v === 'number') {
+      if (money.test(k)) lines.push(`${labelOf(k)}: R${Math.round(v).toLocaleString('en-ZA')}`)
+      else if (percent.test(k)) lines.push(`${labelOf(k)}: ${Math.round(v)}%`)
+      else lines.push(`${labelOf(k)}: ${v}`)
+    } else {
+      lines.push(`${labelOf(k)}: ${v}`)
+    }
+  }
+  return lines.join('\n')
+}
 
 async function callGroq(role: BriefingRole, facts: BriefingFacts): Promise<{ headline: string; body: string } | null> {
   if (!GROQ_API_KEY) return null
@@ -48,7 +91,7 @@ async function callGroq(role: BriefingRole, facts: BriefingFacts): Promise<{ hea
         max_tokens: 320,
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: `Role: ${ROLE_LABEL[role]}\nFacts: ${JSON.stringify(facts)}` },
+          { role: 'user', content: `Role: ${ROLE_LABEL[role]}\n\nFacts (use exactly, units included):\n${factsToPrompt(facts)}` },
         ],
       }),
     })

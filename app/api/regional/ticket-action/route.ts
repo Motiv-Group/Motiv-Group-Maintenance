@@ -36,7 +36,7 @@ export async function POST(request: Request) {
   const notifyStore = async (title: string, message: string) => {
     const { data: su } = await admin.from('store_users').select('user_id').eq('store_id', ticket.store_id)
     const ids = (su ?? []).map(r => r.user_id)
-    if (ids.length) await admin.from('notifications').insert(ids.map(id => ({ company_id: ticket.company_id, user_id: id, type: 'ticket', title, message, link: `/client/tickets` })))
+    if (ids.length) await admin.from('notifications').insert(ids.map(id => ({ company_id: ticket.company_id, user_id: id, type: 'ticket', title, message, link: `/client/tickets/${ticketId}` })))
   }
 
   switch (action) {

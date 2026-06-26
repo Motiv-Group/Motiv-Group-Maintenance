@@ -26,8 +26,15 @@ const BUCKET_LABEL: Record<Bucket, string> = { open: 'Open', quote_requested: 'Q
 const BUCKET_BAR: Record<Bucket, string> = { open: 'bg-blue-500', quote_requested: 'bg-cyan-500', quoted: 'bg-violet-500', approved: 'bg-teal-500', in_progress: 'bg-[#C6A35D]', awaiting_signoff: 'bg-orange-500', completed: 'bg-emerald-500', cancelled: 'bg-red-500' }
 const BAR_ORDER: Bucket[] = ['open', 'quote_requested', 'quoted', 'approved', 'in_progress', 'awaiting_signoff', 'completed']
 
-const PILLS: { key: 'all' | Bucket; label: string; active: string; inactive: string }[] = [
+// Urgency rank (handles classic low/medium/high/urgent and engine P1–P4).
+const URGENCY: Record<string, number> = { urgent: 0, P1: 0, high: 1, P2: 1, medium: 2, P3: 2, low: 3, P4: 3 }
+const urgency = (p: string) => URGENCY[p] ?? 5
+const byDateThenUrgency = (a: RegionalTicketRow, b: RegionalTicketRow) =>
+  (+new Date(b.createdAt) - +new Date(a.createdAt)) || (urgency(a.priority) - urgency(b.priority))
+
+const PILLS: { key: 'all' | 'breached' | Bucket; label: string; active: string; inactive: string }[] = [
   { key: 'all', label: 'All', active: 'bg-slate-800 text-white border-slate-800 dark:bg-white dark:text-[#0a0e17] dark:border-white', inactive: 'text-[var(--text-muted)] border-[var(--border)] hover:border-slate-400' },
+  { key: 'breached', label: 'SLA Breached', active: 'bg-red-600 text-white border-red-600', inactive: 'text-red-600 dark:text-red-400 border-red-500/50 hover:border-red-500' },
   { key: 'open', label: 'Open', active: 'bg-blue-500 text-white border-blue-500', inactive: 'text-blue-600 dark:text-blue-400 border-blue-500/40 hover:border-blue-400' },
   { key: 'quote_requested', label: 'Quote requested', active: 'bg-cyan-500 text-white border-cyan-500', inactive: 'text-cyan-600 dark:text-cyan-400 border-cyan-500/40 hover:border-cyan-400' },
   { key: 'quoted', label: 'Quoted', active: 'bg-violet-500 text-white border-violet-500', inactive: 'text-violet-600 dark:text-violet-400 border-violet-500/40 hover:border-violet-400' },
@@ -66,7 +73,7 @@ function TicketRow({ t }: { t: RegionalTicketRow }) {
 
 export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
   const [q, setQ] = useState('')
-  const [filter, setFilter] = useState<'all' | Bucket>('all')
+  const [filter, setFilter] = useState<'all' | 'breached' | Bucket>('all')
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [panelStore, setPanelStore] = useState<string | null>(null)
 
@@ -82,20 +89,24 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
     return c
   }, [tickets])
   const barTotal = BAR_ORDER.reduce((s, b) => s + counts[b], 0) || 1
+  const breachedCount = useMemo(() => tickets.filter(t => t.breached).length, [tickets])
 
   const shown = useMemo(() => {
     const terms = q.toLowerCase().split(/\s+/).filter(Boolean)
     return tickets.filter(t => {
-      if (filter !== 'all' && bucketOf(t.status) !== filter) return false
+      if (filter === 'breached') { if (!t.breached) return false }
+      else if (filter !== 'all' && bucketOf(t.status) !== filter) return false
       if (!terms.length) return true
       const hay = `${t.title} ${t.storeName} ${t.branchCode ?? ''} ${t.jobRef ?? ''} ${rmStatusMeta(t.status).label}`.toLowerCase()
       return terms.every(w => hay.includes(w))
     })
   }, [tickets, q, filter])
 
-  // Under the "All" filter, completed tickets move to a collapsed Archive section.
-  const liveShown = useMemo(() => filter === 'all' ? shown.filter(t => bucketOf(t.status) !== 'completed') : shown, [shown, filter])
-  const archived = useMemo(() => filter === 'all' ? shown.filter(t => bucketOf(t.status) === 'completed') : [], [shown, filter])
+  // Under "All": breached tickets pin to the top, completed drop into the Archive,
+  // and the rest group by store. Everything is ordered newest → most urgent.
+  const breachedRows = useMemo(() => filter === 'all' ? shown.filter(t => t.breached).sort(byDateThenUrgency) : [], [shown, filter])
+  const liveShown = useMemo(() => (filter === 'all' ? shown.filter(t => !t.breached && bucketOf(t.status) !== 'completed') : shown).slice().sort(byDateThenUrgency), [shown, filter])
+  const archived = useMemo(() => (filter === 'all' ? shown.filter(t => bucketOf(t.status) === 'completed') : []).slice().sort(byDateThenUrgency), [shown, filter])
   const [archiveOpen, setArchiveOpen] = useState(false)
 
   const groups = useMemo(() => {
@@ -138,7 +149,7 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
       {/* Filter pills */}
       <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
         {PILLS.map(p => {
-          const n = p.key === 'all' ? tickets.length : counts[p.key]
+          const n = p.key === 'all' ? tickets.length : p.key === 'breached' ? breachedCount : counts[p.key]
           const on = filter === p.key
           return (
             <button key={p.key} onClick={() => setFilter(p.key)} className={`px-3 py-1.5 rounded-full text-xs font-medium border transition text-center ${on ? p.active : p.inactive}`}>
@@ -147,6 +158,17 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
           )
         })}
       </div>
+
+      {/* SLA breached — pinned at the top under the All filter */}
+      {filter === 'all' && breachedRows.length > 0 && (
+        <Card className="p-3 ring-1 ring-red-500/40">
+          <div className="flex items-center gap-2 mb-1 px-1">
+            <span className="text-sm font-bold text-red-600 dark:text-red-400">SLA Breached</span>
+            <span className="text-[11px] font-medium text-red-700 dark:text-red-400 bg-red-500/15 rounded-full px-2 py-0.5">{breachedRows.length}</span>
+          </div>
+          <div className="px-1">{breachedRows.map(t => <TicketRow key={t.id} t={t} />)}</div>
+        </Card>
+      )}
 
       {/* Store groups */}
       {groups.map(([store, g]) => {
@@ -165,7 +187,7 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
           </Card>
         )
       })}
-      {!groups.length && !archived.length && <Card className="p-5"><p className="text-sm text-[var(--text-faint)] text-center">No tickets match.</p></Card>}
+      {!groups.length && !archived.length && !breachedRows.length && <Card className="p-5"><p className="text-sm text-[var(--text-faint)] text-center">No tickets match.</p></Card>}
 
       {/* Archive — completed tickets, only under the All filter */}
       {archived.length > 0 && (

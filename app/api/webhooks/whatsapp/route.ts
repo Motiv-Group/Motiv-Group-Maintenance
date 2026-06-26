@@ -378,9 +378,9 @@ async function notifyRegion(
       const reviewHint = o.needsReview ? ' ⚠️ Low AI confidence — please review.' : '';
       await adminClient.from('notifications').insert(ids.map(id => ({
         company_id: o.companyId, user_id: id, type: 'new_ticket', title: 'New Ticket in Your Region',
-        message: `${o.storeName} logged a ${o.priority} ticket via WhatsApp: "${o.title}"${reviewHint}`, link: '/regional/tickets',
+        message: `${o.storeName} logged a ${o.priority} ticket via WhatsApp: "${o.title}"${reviewHint}`, link: `/regional/tickets/${o.ticketId}`,
       })));
-      void sendPushToMany(ids, { title: 'New Ticket', body: `${o.storeName}: ${o.title}`, url: '/regional/tickets' });
+      void sendPushToMany(ids, { title: 'New Ticket', body: `${o.storeName}: ${o.title}`, url: `/regional/tickets/${o.ticketId}` });
     }
   }
   revalidatePath('/client');

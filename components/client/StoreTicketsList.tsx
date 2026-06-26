@@ -18,6 +18,13 @@ const TONE: Record<string, string> = {
 }
 const WORD: Record<string, string> = { open: 'Open', in_progress: 'In Progress', completed: 'Completed', cancelled: 'Cancelled' }
 
+// Urgency rank (handles classic low/medium/high/urgent and engine P1–P4).
+const URGENCY: Record<string, number> = { urgent: 0, P1: 0, high: 1, P2: 1, medium: 2, P3: 2, low: 3, P4: 3 }
+const urgency = (p: string) => URGENCY[p] ?? 5
+// Newest first, then most urgent.
+const byDateThenUrgency = (a: StoreManagerTicket, b: StoreManagerTicket) =>
+  (+new Date(b.createdAt) - +new Date(a.createdAt)) || (urgency(a.priority) - urgency(b.priority))
+
 const PILLS: { key: Filter; label: string; active: string; inactive: string }[] = [
   { key: 'all',         label: 'All',         active: 'bg-slate-800 text-white border-slate-800 dark:bg-white dark:text-[#0a0e17] dark:border-white', inactive: 'text-[var(--text-muted)] border-[var(--border)] hover:border-slate-400' },
   { key: 'open',        label: 'Open',        active: 'bg-blue-500 text-white border-blue-500',              inactive: 'text-blue-600 dark:text-blue-400 border-blue-500/40 hover:border-blue-400' },
@@ -95,12 +102,11 @@ export function StoreTicketsList({ tickets, initialFilter = 'all' }: { tickets: 
       .map(x => x.t)
   }, [haystacks, filter, q])
 
-  // Split the (search-filtered) "all" set into status groups.
-  const grouped = useMemo(() => {
-    const g: Record<string, StoreManagerTicket[]> = { open: [], in_progress: [], completed: [], cancelled: [] }
-    for (const t of shown) (g[t.status] ?? (g[t.status] = [])).push(t)
-    return g
-  }, [shown])
+  // "All" view: active tickets as a plain list (newest → urgency); completed go
+  // into a collapsible Archive. Only the Archive collapses.
+  const active = useMemo(() => shown.filter(t => t.status !== 'completed').sort(byDateThenUrgency), [shown])
+  const archived = useMemo(() => shown.filter(t => t.status === 'completed').sort(byDateThenUrgency), [shown])
+  const shownSorted = useMemo(() => [...shown].sort(byDateThenUrgency), [shown])
 
   // Distribution bar excludes cancelled + completed (live work only).
   const barTotal = counts.open + counts.in_progress + counts.completed || 1
@@ -154,18 +160,19 @@ export function StoreTicketsList({ tickets, initialFilter = 'all' }: { tickets: 
       {filter === 'all' ? (
         shown.length ? (
           <div className="space-y-3">
-            <Group title="Open" tickets={grouped.open} />
-            <Group title="In Progress" tickets={grouped.in_progress} />
-            <Group title="Cancelled" tickets={grouped.cancelled} defaultOpen={false} />
-            <Group title="Archive · Completed" tickets={grouped.completed} defaultOpen={false} />
+            <Card className="p-2">
+              {active.map(t => <Row key={t.id} t={t} />)}
+              {!active.length && <p className="text-sm text-[var(--text-faint)] text-center py-6">No active tickets — see the archive below.</p>}
+            </Card>
+            <Group title="Archive · Completed" tickets={archived} defaultOpen={false} />
           </div>
         ) : (
           <Card className="p-2"><p className="text-sm text-[var(--text-faint)] text-center py-8">{tickets.length ? 'No tickets match.' : 'No tickets yet.'}</p></Card>
         )
       ) : (
         <Card className="p-2">
-          {shown.map(t => <Row key={t.id} t={t} />)}
-          {!shown.length && <p className="text-sm text-[var(--text-faint)] text-center py-8">{tickets.length ? 'No tickets match.' : 'No tickets yet.'}</p>}
+          {shownSorted.map(t => <Row key={t.id} t={t} />)}
+          {!shownSorted.length && <p className="text-sm text-[var(--text-faint)] text-center py-8">{tickets.length ? 'No tickets match.' : 'No tickets yet.'}</p>}
         </Card>
       )}
     </div>
