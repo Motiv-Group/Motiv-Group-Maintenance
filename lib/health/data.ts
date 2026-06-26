@@ -520,12 +520,15 @@ export interface SupplierTicketRow {
   id: string; storeName: string; branchCode: string | null; title: string; priority: Priority; status: string
   ageDays: number; createdAt: string; slaLabel: string; nextActionDueAt: string | null
   acknowledged: boolean; evidenceRequired: boolean; beforeUploaded: boolean; afterUploaded: boolean; cocUploaded: boolean
+  active: boolean; breached: boolean
+  assignedAt: string | null; quoteRequestedAt: string | null; quoteApprovedAt: string | null
 }
+export interface SupplierQuoteRow { id: string; ticketTitle: string; storeName: string; amount: number; amountInclVat: number | null; status: string; createdAt: string }
 export interface SupplierDashboardData {
   perf: SupplierPerformance
   kpis: { open: number; overdue: number; dueToday: number; pendingQuotes: number; awaitingSignoff: number; evidenceMissing: number }
   tickets: SupplierTicketRow[]
-  quotes: { id: string; ticketTitle: string; amount: number; status: string; createdAt: string }[]
+  quotes: SupplierQuoteRow[]
   signoffs: { id: string; ticketTitle: string; status: string; createdAt: string }[]
   rating: { avg: number; count: number }
   generatedAt: string
@@ -546,7 +549,9 @@ export async function assembleSupplierDashboard(companyId: string, supplierIds: 
   const ownedIds = new Set(owned.map(t => t.id))
   const extraIds = Array.from(new Set((invRows ?? []).map(r => r.ticket_id))).filter(id => !ownedIds.has(id))
   const { data: invitedTickets } = extraIds.length ? await db.from('tickets').select(TICKET_COLS).in('id', extraIds) : { data: [] as any[] }
-  const tickets = [...owned, ...((invitedTickets ?? []) as any[])].map(asTicket)
+  const rawAll = [...owned, ...((invitedTickets ?? []) as any[])]
+  const rawById = new Map(rawAll.map((r: any) => [r.id, r]))
+  const tickets = rawAll.map(asTicket)
   const storeIds = Array.from(new Set(tickets.map(t => t.store_id)))
   const { data: storesRaw } = storeIds.length ? await db.from('stores').select('id, name, sub_store, branch_code').in('id', storeIds) : { data: [] as any[] }
   const storeName = new Map((storesRaw ?? []).map((s: any) => [s.id, storeLabel(s.name, s.sub_store)]))
@@ -554,12 +559,15 @@ export async function assembleSupplierDashboard(companyId: string, supplierIds: 
   const titleOf = new Map(tickets.map(t => [t.id, t.title ?? 'Ticket']))
 
   const [{ data: quotesRaw }, { data: signoffsRaw }, { data: ratingRows }] = await Promise.all([
-    db.from('quotes').select('id, ticket_id, amount, status, created_at').in('supplier_id', supplierIds).order('created_at', { ascending: false }),
+    db.from('quotes').select('id, ticket_id, amount, amount_incl_vat, status, created_at').in('supplier_id', supplierIds).order('created_at', { ascending: false }),
     db.from('signoffs').select('id, ticket_id, status, created_at').in('supplier_id', supplierIds).order('created_at', { ascending: false }),
     db.from('ratings').select('score').in('supplier_id', supplierIds),
   ])
   const ratingScores = ((ratingRows ?? []) as any[]).map(r => Number(r.score)).filter(n => Number.isFinite(n))
   const rating = { avg: ratingScores.length ? ratingScores.reduce((s, n) => s + n, 0) / ratingScores.length : 0, count: ratingScores.length }
+  // Earliest accepted quote per ticket — fallback for the approval date.
+  const acceptedQuoteAt = new Map<string, string>()
+  for (const q of (quotesRaw ?? []) as any[]) if (q.status === 'accepted') acceptedQuoteAt.set(q.ticket_id, q.created_at)
 
   const todayEnd = new Date(now); todayEnd.setHours(23, 59, 59, 999)
   let open = 0, overdue = 0, dueToday = 0, pendingQuotes = 0, awaitingSignoff = 0, evidenceMissing = 0
@@ -567,6 +575,7 @@ export async function assembleSupplierDashboard(companyId: string, supplierIds: 
   for (const t of tickets) {
     const active = isActive(t.status)
     const sla = computeTicketSla(t, rules(t.priority), now)
+    const raw: any = rawById.get(t.id) ?? {}
     if (active) {
       open++
       if (sla.supplierBreached) overdue++
@@ -574,22 +583,30 @@ export async function assembleSupplierDashboard(companyId: string, supplierIds: 
       if (t.status === 'submitted_for_signoff') awaitingSignoff++
       if (t.quote_required && !t.quote_submitted_at) pendingQuotes++
       if (t.evidence_required && !(t.before_photo_uploaded && t.after_photo_uploaded && t.completion_certificate_uploaded)) evidenceMissing++
-      const lbl = sla.supplierBreached ? 'Breached' : sla.supplierStatus === 'paused' ? 'Paused (internal)' : sla.atRisk ? 'At risk' : sla.supplierStatus === 'not_started' ? 'Not started' : 'Running'
-      rows.push({
-        id: t.id, storeName: storeName.get(t.store_id) ?? 'Store', branchCode: storeBranch.get(t.store_id) ?? null, title: t.title ?? 'Ticket', priority: t.priority, status: t.status,
-        ageDays: Math.floor((now.getTime() - new Date(t.created_at).getTime()) / DAY), createdAt: t.created_at, slaLabel: lbl, nextActionDueAt: sla.nextActionDueAt,
-        acknowledged: !!t.first_response_at, evidenceRequired: !!t.evidence_required,
-        beforeUploaded: !!t.before_photo_uploaded, afterUploaded: !!t.after_photo_uploaded, cocUploaded: !!t.completion_certificate_uploaded,
-      })
     }
+    const lbl = !active
+      ? (t.status === 'completed' ? 'Completed' : t.status === 'cancelled' ? 'Cancelled' : t.status === 'declined' ? 'Declined' : 'Closed')
+      : sla.supplierBreached ? 'Breached' : sla.supplierStatus === 'paused' ? 'Paused (internal)' : sla.atRisk ? 'At risk' : sla.supplierStatus === 'not_started' ? 'Not started' : 'Running'
+    const approvedAt = (raw.quote_decision_status === 'approved' ? raw.quote_decided_at : null) ?? acceptedQuoteAt.get(t.id) ?? null
+    rows.push({
+      id: t.id, storeName: storeName.get(t.store_id) ?? 'Store', branchCode: storeBranch.get(t.store_id) ?? null, title: t.title ?? 'Ticket', priority: t.priority, status: t.status,
+      ageDays: Math.floor((now.getTime() - new Date(t.created_at).getTime()) / DAY), createdAt: t.created_at, slaLabel: lbl, nextActionDueAt: sla.nextActionDueAt,
+      acknowledged: !!t.first_response_at, evidenceRequired: !!t.evidence_required,
+      beforeUploaded: !!t.before_photo_uploaded, afterUploaded: !!t.after_photo_uploaded, cocUploaded: !!t.completion_certificate_uploaded,
+      active, breached: active ? (sla.supplierBreached || sla.internalBreached) : false,
+      assignedAt: raw.quote_requested_at ?? t.created_at ?? null,
+      quoteRequestedAt: raw.quote_requested_at ?? null,
+      quoteApprovedAt: approvedAt,
+    })
   }
-  rows.sort((a, b) => (a.acknowledged === b.acknowledged ? 0 : a.acknowledged ? 1 : -1) || a.ageDays - b.ageDays)
+  // Active first, then unacknowledged, then oldest — keeps the dashboard queues useful.
+  rows.sort((a, b) => (a.active === b.active ? 0 : a.active ? -1 : 1) || (a.acknowledged === b.acknowledged ? 0 : a.acknowledged ? 1 : -1) || a.ageDays - b.ageDays)
 
   return {
     perf: calculateSupplierPerformance(supplierIds[0], tickets, rules, now),
     kpis: { open, overdue, dueToday, pendingQuotes, awaitingSignoff, evidenceMissing },
     tickets: rows,
-    quotes: (quotesRaw ?? []).map((q: any) => ({ id: q.id, ticketTitle: titleOf.get(q.ticket_id) ?? 'Ticket', amount: q.amount, status: q.status, createdAt: q.created_at })),
+    quotes: (quotesRaw ?? []).map((q: any) => ({ id: q.id, ticketTitle: titleOf.get(q.ticket_id) ?? 'Ticket', storeName: storeName.get(rawById.get(q.ticket_id)?.store_id) ?? 'Store', amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, status: q.status, createdAt: q.created_at })),
     signoffs: (signoffsRaw ?? []).map((s: any) => ({ id: s.id, ticketTitle: titleOf.get(s.ticket_id) ?? 'Ticket', status: s.status, createdAt: s.created_at })),
     rating,
     generatedAt: now.toISOString(),

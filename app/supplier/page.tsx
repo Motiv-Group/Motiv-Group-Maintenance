@@ -1,17 +1,15 @@
 export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
-import { Truck, ClipboardList, Clock, ReceiptText, ClipboardCheck, Camera, AlertTriangle, BarChart2, Gauge, Star } from 'lucide-react'
+import { Truck, ClipboardList, Clock, ReceiptText, ClipboardCheck, Camera, AlertTriangle, Star, Sparkles } from 'lucide-react'
 import { requireSupplierV3 } from '@/lib/health/guard'
-import { assembleSupplierDashboard } from '@/lib/health/data'
-import { Card, SectionCard, KpiRow, Donut, Pill, BreakdownList, type Kpi } from '@/components/exec/ui'
-import { BriefingCard } from '@/components/briefing/BriefingCard'
+import { assembleSupplierDashboard, type SupplierTicketRow } from '@/lib/health/data'
+import { Card, SectionCard, KpiRow, Donut, Pill, type Kpi } from '@/components/exec/ui'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { getDailyBriefing } from '@/lib/briefing/generate'
 import { supplierFacts } from '@/lib/briefing/facts'
 import { formatCurrency, formatDate, rmStatusMeta } from '@/lib/utils'
 
-const clamp = (n: number) => Math.max(0, Math.min(20, Math.round(n)))
 const slaTone = (l: string) =>
   l === 'Breached' ? 'text-red-600 dark:text-red-400'
   : l === 'At risk' ? 'text-amber-600 dark:text-amber-500'
@@ -19,6 +17,33 @@ const slaTone = (l: string) =>
   : l === 'Not started' ? 'text-blue-600 dark:text-blue-400'
   : 'text-[var(--text-muted)]'
 const QUOTE_TONE: Record<string, string> = { pending: 'text-[#C6A35D]', accepted: 'text-emerald-600 dark:text-emerald-400', declined: 'text-red-600 dark:text-red-400' }
+
+// One date matching the ticket's current stage: approved → requested → assigned.
+function milestone(t: SupplierTicketRow): { label: string; at: string } | null {
+  if (t.quoteApprovedAt) return { label: 'Quote approved', at: t.quoteApprovedAt }
+  if (t.quoteRequestedAt) return { label: 'Quote requested', at: t.quoteRequestedAt }
+  if (t.assignedAt) return { label: 'Assigned', at: t.assignedAt }
+  return null
+}
+
+// Shared ticket row: company + branch, then title, then the stage-matched date.
+function TicketRow({ t }: { t: SupplierTicketRow }) {
+  const sm = rmStatusMeta(t.status)
+  const m = milestone(t)
+  return (
+    <Link href={`/supplier/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] -mx-2 px-2 rounded transition">
+      <div className="min-w-0">
+        <p className="text-sm font-medium text-[var(--text)] truncate">{t.storeName}</p>
+        <p className="text-[11px] text-[var(--text-muted)] truncate">{t.title}</p>
+        {m && <p className={`text-[11px] ${sm.text}`}>{m.label} · {formatDate(m.at)}</p>}
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
+        <PriorityBadge priority={t.priority} className="w-full text-center" />
+        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${sm.cls}`}>{sm.label}</span>
+      </div>
+    </Link>
+  )
+}
 
 export default async function SupplierOverviewPage() {
   const { companyId, supplierIds, fullName } = await requireSupplierV3()
@@ -37,9 +62,10 @@ export default async function SupplierOverviewPage() {
     { label: 'Evidence Missing', value: k.evidenceMissing, icon: <Camera size={13} />, tone: k.evidenceMissing ? 'warn' : 'good', href: '/supplier/tickets' },
   ]
 
-  const needsAction = d.tickets.filter(t => t.slaLabel === 'Breached' || t.slaLabel === 'At risk' || !t.acknowledged).slice(0, 6)
-  const evidenceTodo = d.tickets.filter(t => t.evidenceRequired && !(t.beforeUploaded && t.afterUploaded && t.cocUploaded)).slice(0, 6)
-  const missingBits = (t: typeof d.tickets[number]) => [!t.beforeUploaded && 'before', !t.afterUploaded && 'after', !t.cocUploaded && 'COC'].filter(Boolean).join(', ')
+  const needsAction = d.tickets.filter(t => t.active && (t.slaLabel === 'Breached' || t.slaLabel === 'At risk' || !t.acknowledged)).slice(0, 6)
+  const evidenceTodo = d.tickets.filter(t => t.active && t.evidenceRequired && !(t.beforeUploaded && t.afterUploaded && t.cocUploaded)).slice(0, 6)
+  const recentTickets = [...d.tickets].sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)).slice(0, 8)
+  const missingBits = (t: SupplierTicketRow) => [!t.beforeUploaded && 'before', !t.afterUploaded && 'after', !t.cocUploaded && 'COC'].filter(Boolean).join(', ')
 
   return (
     <div className="space-y-5">
@@ -58,82 +84,64 @@ export default async function SupplierOverviewPage() {
             )}
           </Link>
         </div>
-        <p className="text-sm text-[var(--text-muted)] mt-0.5">Your assigned work, quotes, sign-offs and performance.</p></div>
+        <p className="text-sm text-[var(--text-muted)] mt-0.5">Your assigned work, quotes, sign-offs and performance.</p>
+      </div>
 
-      <BriefingCard briefing={briefing} scope="supplier" scopeId={briefingScopeId} />
+      {/* SLA health hero — donut + AI summary inside (matches RM / SM / Executive) */}
+      <Card className="p-6">
+        <div className="flex flex-col sm:flex-row items-center gap-6">
+          <Donut value={perf.performanceScore} status={perf.band} size={140} label="SLA" />
+          <div className="flex-1 min-w-0 w-full space-y-3 text-center sm:text-left">
+            <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
+              <h2 className="text-lg font-bold text-[var(--text)]">SLA Health</h2>
+              <Pill status={perf.band} />
+            </div>
+            {briefing?.body && (
+              <div className="flex items-start gap-2 justify-center sm:justify-start text-left">
+                <span className="shrink-0 mt-0.5 inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wide text-[#C6A35D] bg-[#C6A35D]/10 rounded-full px-1.5 py-0.5"><Sparkles size={10} /> AI</span>
+                <p className="text-sm text-[var(--text-muted)] leading-relaxed">{briefing.body}</p>
+              </div>
+            )}
+            <p className="text-sm text-[var(--text-muted)]">{perf.assignedTickets} tickets · {Math.round(perf.firstTimeFixRate * 100)}% first-fix · {perf.slaBreaches} breaches</p>
+            <Link href="/supplier/stats" className="text-xs text-[#C6A35D] hover:underline">Full performance →</Link>
+          </div>
+        </div>
+      </Card>
 
       <KpiRow kpis={kpis} />
 
-      {/* Performance — gauge + axes breakdown */}
-      <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-5 items-start">
-        <Card className="p-5 flex items-center gap-4">
-          <Donut value={perf.performanceScore} status={perf.band} size={110} label="SLA" />
-          <div>
-            <Pill status={perf.band} />
-            <p className="text-sm text-[var(--text-muted)] mt-2">{perf.assignedTickets} tickets · {Math.round(perf.firstTimeFixRate * 100)}% first-fix · {perf.slaBreaches} breaches</p>
-            <Link href="/supplier/stats" className="text-xs text-[#C6A35D] hover:underline">Full performance →</Link>
-          </div>
-        </Card>
-        <SectionCard title="Performance Breakdown" icon={<Gauge size={15} className="text-slate-600 dark:text-slate-400" />}>
-          <BreakdownList rows={[
-            { label: 'Response Time', value: perf.avgResponseMins == null ? 14 : clamp(20 - perf.avgResponseMins / 60), max: 20 },
-            { label: 'Completion Time', value: perf.avgResolutionMins == null ? 14 : clamp(20 - (perf.avgResolutionMins / 1440) * 1.5), max: 20 },
-            { label: 'First-Time Fix', value: clamp(perf.firstTimeFixRate * 20), max: 20 },
-            { label: 'Evidence Quality', value: clamp(perf.evidenceCompletionRate * 20), max: 20 },
-            { label: 'Communication', value: clamp(20 - perf.escalationCount * 3), max: 20 },
-          ]} />
-        </SectionCard>
-      </div>
-
-      {/* Action queue + evidence to upload */}
+      {/* Row 1: Needs your action · Recent quotes */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <SectionCard title="Needs Your Action" icon={<AlertTriangle size={15} className="text-amber-600 dark:text-amber-500" />} action={<Link href="/supplier/tickets" className="text-xs text-[#C6A35D] hover:underline">All</Link>}>
           {needsAction.map(t => (
             <Link key={t.id} href={`/supplier/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] -mx-2 px-2 rounded">
-              <div className="min-w-0"><p className="text-sm text-[var(--text)] truncate">{t.title}</p><p className="text-[11px] text-[var(--text-faint)] truncate">{t.storeName} · {t.priority} · {t.ageDays}d</p></div>
+              <div className="min-w-0"><p className="text-sm font-medium text-[var(--text)] truncate">{t.storeName}</p><p className="text-[11px] text-[var(--text-muted)] truncate">{t.title}</p></div>
               <span className={`text-[11px] font-semibold shrink-0 ${slaTone(t.acknowledged ? t.slaLabel : 'Not started')}`}>{t.acknowledged ? t.slaLabel : 'New'}</span>
             </Link>
           ))}
           {!needsAction.length && <p className="text-sm text-[var(--text-faint)]">Nothing needs action right now.</p>}
         </SectionCard>
+        <SectionCard title="Recent Quotes" icon={<ReceiptText size={15} className="text-amber-600 dark:text-amber-500" />} action={<Link href="/supplier/quotes" className="text-xs text-[#C6A35D] hover:underline">All</Link>}>
+          {d.quotes.slice(0, 5).map(q => (
+            <div key={q.id} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0">
+              <div className="min-w-0"><p className="text-sm font-medium text-[var(--text)] truncate">{q.storeName}</p><p className="text-[11px] text-[var(--text-muted)] truncate">{q.ticketTitle}</p><p className="text-[11px] text-[var(--text-faint)]">{formatDate(q.createdAt)}</p></div>
+              <span className="flex flex-col items-end shrink-0"><span className="text-sm text-[var(--text)]">{formatCurrency(q.amountInclVat ?? q.amount)}</span><span className="text-[10px] text-[var(--text-faint)]">{q.amountInclVat ? 'incl VAT' : 'excl VAT'}</span><span className={`text-[11px] capitalize ${QUOTE_TONE[q.status] ?? 'text-[var(--text-muted)]'}`}>{q.status}</span></span>
+            </div>
+          ))}
+          {!d.quotes.length && <p className="text-sm text-[var(--text-faint)]">No quotes submitted yet.</p>}
+        </SectionCard>
+      </div>
+
+      {/* Row 2: Evidence to upload · Pending sign-off */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <SectionCard title="Evidence to Upload" icon={<Camera size={15} className="text-sky-600 dark:text-sky-400" />}>
           {evidenceTodo.map(t => (
             <Link key={t.id} href={`/supplier/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] -mx-2 px-2 rounded">
-              <div className="min-w-0"><p className="text-sm text-[var(--text)] truncate">{t.title}</p><p className="text-[11px] text-[var(--text-faint)] truncate">{t.storeName}</p></div>
+              <div className="min-w-0"><p className="text-sm font-medium text-[var(--text)] truncate">{t.storeName}</p><p className="text-[11px] text-[var(--text-muted)] truncate">{t.title}</p></div>
               <span className="text-[11px] text-amber-600 dark:text-amber-500 shrink-0">missing: {missingBits(t)}</span>
             </Link>
           ))}
           {!evidenceTodo.length && <p className="text-sm text-[var(--text-faint)]">All evidence uploaded.</p>}
-        </SectionCard>
-      </div>
-
-      {/* Assigned tickets */}
-      <SectionCard title={`Assigned Tickets (${d.tickets.length})`} icon={<ClipboardList size={15} className="text-blue-600 dark:text-blue-400" />} action={<Link href="/supplier/tickets" className="text-xs text-[#C6A35D] hover:underline">All</Link>}>
-        {d.tickets.slice(0, 8).map(t => {
-          const sm = rmStatusMeta(t.status)
-          return (
-            <Link key={t.id} href={`/supplier/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] -mx-2 px-2 rounded">
-              <div className="min-w-0"><p className="text-sm text-[var(--text)] truncate">{t.title}</p><p className="text-[11px] text-[var(--text-faint)] truncate">{t.storeName} · {t.ageDays}d</p></div>
-              <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
-                <PriorityBadge priority={t.priority} className="w-full text-center" />
-                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${sm.cls}`}>{sm.label}</span>
-              </div>
-            </Link>
-          )
-        })}
-        {!d.tickets.length && <p className="text-sm text-[var(--text-faint)]">No open work assigned.</p>}
-      </SectionCard>
-
-      {/* Quotes + sign-offs */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <SectionCard title="Recent Quotes" icon={<ReceiptText size={15} className="text-amber-600 dark:text-amber-500" />} action={<Link href="/supplier/quotes" className="text-xs text-[#C6A35D] hover:underline">All</Link>}>
-          {d.quotes.slice(0, 5).map(q => (
-            <div key={q.id} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0">
-              <div className="min-w-0"><p className="text-sm text-[var(--text)] truncate">{q.ticketTitle}</p><p className="text-[11px] text-[var(--text-faint)]">{formatDate(q.createdAt)}</p></div>
-              <span className="flex items-center gap-2 shrink-0"><span className="text-sm text-[var(--text)]">{formatCurrency(q.amount)}</span><span className={`text-[11px] capitalize ${QUOTE_TONE[q.status] ?? 'text-[var(--text-muted)]'}`}>{q.status}</span></span>
-            </div>
-          ))}
-          {!d.quotes.length && <p className="text-sm text-[var(--text-faint)]">No quotes submitted yet.</p>}
         </SectionCard>
         <SectionCard title="Pending Sign-off" icon={<ClipboardCheck size={15} className="text-emerald-600 dark:text-emerald-400" />} action={<Link href="/supplier/signoff" className="text-xs text-[#C6A35D] hover:underline">All</Link>}>
           {d.signoffs.slice(0, 5).map(s => (
@@ -145,6 +153,12 @@ export default async function SupplierOverviewPage() {
           {!d.signoffs.length && <p className="text-sm text-[var(--text-faint)]">Nothing awaiting sign-off.</p>}
         </SectionCard>
       </div>
+
+      {/* Recent tickets — moved to the bottom */}
+      <SectionCard title="Recent Tickets" icon={<ClipboardList size={15} className="text-blue-600 dark:text-blue-400" />} action={<Link href="/supplier/tickets" className="text-xs text-[#C6A35D] hover:underline">All</Link>}>
+        {recentTickets.map(t => <TicketRow key={t.id} t={t} />)}
+        {!recentTickets.length && <p className="text-sm text-[var(--text-faint)]">No tickets yet.</p>}
+      </SectionCard>
     </div>
   )
 }
