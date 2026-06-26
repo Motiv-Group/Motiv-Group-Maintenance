@@ -115,7 +115,7 @@ export async function assembleEstateDashboard(companyId: string, now: Date = new
 
   const regionName = new Map((regionsRaw ?? []).map((r: any) => [r.id, r.name]))
   const stores = (storesRaw ?? []) as any[]
-  const storeName = new Map(stores.map(s => [s.id, [s.name, s.sub_store].filter(Boolean).join(' — ')]))
+  const storeName = new Map(stores.map(s => [s.id, storeLabel(s.name, s.sub_store)]))
   const tickets = ((ticketsRaw ?? []) as any[]).map(asTicket)
   const supplierName = new Map((suppliersRaw ?? []).map((s: any) => [s.id, s.company_name]))
 

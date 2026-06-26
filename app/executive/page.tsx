@@ -10,7 +10,7 @@ import { assembleEstateDashboard, type TrendDelta } from '@/lib/health/data'
 import { EstateHeader } from '@/components/exec/EstateHeader'
 import {
   Card, SectionCard, KpiCard, Donut, Pill, StoreDistributionDonut,
-  DistributionLegend, TrendArrow, STATUS_TEXT, type Kpi, type Trend,
+  RagBlocks, TrendArrow, STATUS_TEXT, type Kpi, type Trend,
 } from '@/components/exec/ui'
 import { getDailyBriefing } from '@/lib/briefing/generate'
 import { estateFacts } from '@/lib/briefing/facts'
@@ -79,20 +79,7 @@ export default async function ExecutiveEstatePage() {
               </div>
             )}
             {/* Health bands across the estate (all stores in the exec's regions) */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {[
-                { label: 'Controlled', value: e.counts.controlled, cls: 'bg-emerald-500/10 ring-emerald-500/30 text-emerald-600 dark:text-emerald-400' },
-                { label: 'Attention',  value: e.counts.attention,  cls: 'bg-[#C6A35D]/10 ring-[#C6A35D]/30 text-amber-600 dark:text-[#C6A35D]' },
-                { label: 'At Risk',    value: e.counts.at_risk,    cls: 'bg-red-500/10 ring-red-500/30 text-red-600 dark:text-red-400' },
-                { label: 'Critical',   value: e.counts.critical,   cls: 'bg-red-900/15 ring-red-800/40 text-red-700 dark:text-red-300' },
-              ].map(b => (
-                <div key={b.label} className={`rounded-xl ring-1 p-3 ${b.cls}`}>
-                  <div className="text-2xl font-bold leading-none">{b.value}</div>
-                  <div className="text-[11px] font-semibold mt-1">{b.label}</div>
-                  <div className="text-[10px] opacity-70">{pct(b.value, total)}% of estate</div>
-                </div>
-              ))}
-            </div>
+            <RagBlocks counts={e.counts} total={total} />
           </div>
         </div>
       </Card>
@@ -145,7 +132,7 @@ export default async function ExecutiveEstatePage() {
           <SectionCard title="Store Health Distribution">
             <div className="flex flex-col items-center gap-4">
               <StoreDistributionDonut counts={e.counts} />
-              <div className="w-full"><DistributionLegend counts={e.counts} /></div>
+              <div className="w-full"><RagBlocks counts={e.counts} total={total} /></div>
               <Link href="/executive/stores" className="text-xs text-[#C6A35D] hover:underline">View full distribution</Link>
             </div>
           </SectionCard>
@@ -187,28 +174,29 @@ export default async function ExecutiveEstatePage() {
 
       {/* Performance + decisions + cost */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
+        {/* Supplier Performance — Best Performing | Underperforming, side by side */}
         <SectionCard title="Supplier Performance Overview" icon={<Truck size={15} className="text-[#C6A35D]" />}
           action={<Link href="/executive/suppliers" className="text-xs text-[#C6A35D] hover:underline">View all</Link>}>
-          <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <div className="text-[11px] uppercase tracking-wide text-emerald-400 mb-2 flex items-center gap-1.5"><CheckCircle2 size={13} /> Best Performing</div>
               <div className="space-y-1.5">
                 {bestSuppliers.map(s => (
-                  <div key={s.id} className="flex items-center justify-between text-xs">
+                  <div key={s.id} className="flex items-center justify-between gap-2 text-xs">
                     <span className="text-[var(--text-muted)] truncate">{s.name}</span>
-                    <span className="text-emerald-400 font-semibold tabular-nums">{s.perf.performanceScore}%</span>
+                    <span className="text-emerald-400 font-semibold tabular-nums shrink-0">{s.perf.performanceScore}%</span>
                   </div>
                 ))}
                 {bestSuppliers.length === 0 && <p className="text-xs text-[var(--text-faint)]">No suppliers yet</p>}
               </div>
             </div>
-            <div>
+            <div className="border-l border-[var(--border)] pl-4">
               <div className="text-[11px] uppercase tracking-wide text-red-400 mb-2 flex items-center gap-1.5"><AlertCircle size={13} /> Underperforming</div>
               <div className="space-y-1.5">
                 {underSuppliers.map(s => (
-                  <div key={s.id} className="flex items-center justify-between text-xs">
+                  <div key={s.id} className="flex items-center justify-between gap-2 text-xs">
                     <span className="text-[var(--text-muted)] truncate">{s.name}</span>
-                    <span className="text-red-400 font-semibold tabular-nums">{s.perf.performanceScore}%</span>
+                    <span className="text-red-400 font-semibold tabular-nums shrink-0">{s.perf.performanceScore}%</span>
                   </div>
                 ))}
                 {underSuppliers.length === 0 && <p className="text-xs text-[var(--text-faint)]">None below threshold</p>}
@@ -217,55 +205,66 @@ export default async function ExecutiveEstatePage() {
           </div>
         </SectionCard>
 
+        {/* Internal Performance — three metrics across */}
         <SectionCard title="Internal Performance Overview" icon={<ShieldAlert size={15} className="text-[#C6A35D]" />}>
-          <div className="space-y-3">
-            <KpiCard kpi={{ label: 'Approval Backlog', value: e.decisionsPending, hint: `${fmtK(data.pendingDecisionValue)} pending`, icon: <FileText size={13} /> }} />
-            <KpiCard kpi={{ label: 'Internal SLA Pressure', value: e.internalSlaBreaches, hint: 'Across functions', tone: e.internalSlaBreaches ? 'warn' : 'good', trend: tr(data.trends.slaPressure) }} />
-            <KpiCard kpi={{ label: 'Bottlenecks', value: e.criticalTickets, hint: 'Critical items requiring attention', tone: e.criticalTickets ? 'bad' : 'good' }} />
+          <div className="grid grid-cols-3 gap-3">
+            <Metric label="Approval Backlog" value={e.decisionsPending} sub={`${fmtK(data.pendingDecisionValue)}`} />
+            <Metric label="Internal SLA Pressure" value={e.internalSlaBreaches} sub="Across teams" trend={tr(data.trends.slaPressure)} />
+            <Metric label="Bottlenecks" value={e.criticalTickets} sub="Critical items" note="Requires attention" />
           </div>
         </SectionCard>
 
+        {/* Executive Decisions — band · title · value · due date */}
         <SectionCard title="Executive Decisions Required" icon={<Gavel size={15} className="text-[#C6A35D]" />}
           action={<Link href="/executive/decisions" className="text-xs text-[#C6A35D] hover:underline">View all</Link>}>
-          <div className="space-y-2">
+          <div className="space-y-1">
             {actionableDecisions.slice(0, 5).map((d, i) => (
-              <div key={i} className="flex items-start justify-between gap-2 py-1.5 border-b border-[var(--border)] last:border-0">
-                <div className="min-w-0">
-                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${BAND[d.band]}`}>{d.band}</span>
-                  <p className="text-xs text-[var(--text)] mt-1 truncate">{d.title}</p>
-                </div>
-                <div className="text-right shrink-0">
-                  {d.exposureValue ? <p className="text-xs text-[var(--text)] whitespace-nowrap">{fmtK(d.exposureValue)}</p> : null}
-                  <p className="text-[10px] text-[var(--text-faint)] whitespace-nowrap">Due in {d.deadlineDays}d</p>
-                </div>
+              <div key={i} className="flex items-center gap-2 py-1.5 border-b border-[var(--border)] last:border-0">
+                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded shrink-0 w-16 text-center ${BAND[d.band]}`}>{d.band}</span>
+                <p className="text-xs text-[var(--text)] flex-1 min-w-0 truncate">{d.title}</p>
+                {d.exposureValue ? <span className="text-xs text-[var(--text-muted)] whitespace-nowrap shrink-0">{fmtK(d.exposureValue)}</span> : null}
+                <span className="text-[10px] text-[var(--text-faint)] whitespace-nowrap shrink-0 w-16 text-right">Due {new Date(Date.now() + d.deadlineDays * 86_400_000).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })}</span>
               </div>
             ))}
             {actionableDecisions.length === 0 && <p className="text-xs text-[var(--text-faint)]">No executive decisions outstanding</p>}
           </div>
         </SectionCard>
 
-        <SectionCard title="Cost &amp; Exposure" icon={<Banknote size={15} className="text-[#C6A35D]" />}
-          action={<Link href="/executive/decisions" className="text-xs text-[#C6A35D] hover:underline">Details</Link>}>
+        {/* Cost & Exposure */}
+        <SectionCard title="Cost &amp; Exposure" icon={<Banknote size={15} className="text-[#C6A35D]" />}>
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <KpiCard kpi={{ label: 'Pending Quote Value', value: fmtK(data.pendingDecisionValue), hint: `${e.decisionsPending} quotes` }} />
               <KpiCard kpi={{ label: 'High Value Approvals', value: fmtK(data.highValueApprovals.value), hint: `${data.highValueApprovals.count} items` }} />
             </div>
-            <div>
+            <div className="rounded-xl ring-1 ring-[var(--border)] p-3">
               <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-2">Top Exposure Areas</div>
               <div className="space-y-1.5">
                 {data.exposureBreakdown.map((b, i) => (
-                  <div key={i} className="flex items-center justify-between text-xs">
-                    <span className="text-[var(--text-muted)] truncate">{i + 1}. {b.label}</span>
+                  <div key={i} className="flex items-center justify-between gap-2 text-xs">
+                    <span className="text-[var(--text-muted)] truncate"><span className="text-[var(--text-faint)] mr-1">{i + 1}</span>{b.label}</span>
                     <span className="text-[var(--text)] font-semibold whitespace-nowrap">{fmtK(b.value)}</span>
                   </div>
                 ))}
                 {data.exposureBreakdown.length === 0 && <p className="text-xs text-[var(--text-faint)]">No commercial exposure</p>}
               </div>
             </div>
+            <div className="text-right"><Link href="/executive/insights/cost-exposure" className="text-xs text-[#C6A35D] hover:underline">View cost exposure details</Link></div>
           </div>
         </SectionCard>
       </div>
+    </div>
+  )
+}
+
+// One metric column for the Internal Performance Overview card.
+function Metric({ label, value, sub, trend, note }: { label: string; value: React.ReactNode; sub?: string; trend?: Trend; note?: string }) {
+  return (
+    <div>
+      <div className="text-[11px] text-[var(--text-faint)]">{label}</div>
+      <div className="text-2xl font-bold text-[var(--text)] leading-none mt-1">{value}</div>
+      {sub && <div className="text-[11px] text-[var(--text-muted)] mt-1">{sub}</div>}
+      {trend ? <div className="mt-0.5"><TrendArrow t={trend} /></div> : note ? <div className="text-[11px] text-[var(--text-faint)] mt-0.5">{note}</div> : null}
     </div>
   )
 }

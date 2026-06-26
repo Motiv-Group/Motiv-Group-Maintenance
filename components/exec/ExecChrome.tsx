@@ -10,7 +10,7 @@ import { SwipeNav } from '@/components/ui/SwipeNav'
 interface ChromeTab { href: string; label: string; icon: React.ElementType }
 
 const EXEC_TABS: ChromeTab[] = [
-  { href: '/executive',           label: 'Estate',    icon: Globe2 },
+  { href: '/executive',           label: 'Dashboard', icon: Globe2 },
   { href: '/executive/regions',   label: 'Regions',   icon: MapIcon },
   { href: '/executive/stores',    label: 'Stores',    icon: Store },
   { href: '/executive/suppliers', label: 'Suppliers', icon: Truck },

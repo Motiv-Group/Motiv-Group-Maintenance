@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Store, Building2, ShieldCheck, AlertTriangle, ClipboardList, ReceiptText, Banknote, Truck, Lock, Repeat, Gavel, CheckCircle2, Trophy, TrendingUp } from 'lucide-react'
+import { Store, Building2, ShieldAlert, AlertTriangle, AlertOctagon, ClipboardList, ReceiptText, Banknote, Truck, Lock, Repeat, Gavel, CheckCircle2, Trophy, TrendingUp } from 'lucide-react'
 import type { EstateDashboardData, StoreCard } from '@/lib/health/data'
 import { statusForScore, STATUS_LABELS } from '@/lib/health/constants'
 import { formatCurrency, formatDate } from '@/lib/utils'
@@ -15,11 +15,11 @@ const FLAT = { dir: 'flat' as const, pct: 0 }
 
 const fmtK = (n: number) => n ? (n >= 1000 ? `R ${(n / 1000).toFixed(0)}K` : formatCurrency(n)) : 'R 0,00'
 
-export function StoresTab({ data }: { data: EstateDashboardData }) {
+export function StoresTab({ data, initialStatus = 'all' }: { data: EstateDashboardData; initialStatus?: string }) {
   const stores = data.stores
   const [selId, setSelId] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
-  const [status, setStatus] = useState('all')
+  const [status, setStatus] = useState(initialStatus)
   const selected = stores.find(s => s.storeId === selId) ?? null
   const openRow = (id: string) => { setSelId(id); setOpen(true) }
   const trendOf = (id: string) => data.storeTrends[id] ?? FLAT
@@ -31,17 +31,20 @@ export function StoresTab({ data }: { data: EstateDashboardData }) {
   const regionCount = new Set(stores.map(s => s.regionId)).size
   const sum = (sel: (s: StoreCard) => number) => stores.reduce((a, s) => a + sel(s), 0)
 
+  const supplierBreaches = sum(s => s.supplierBreaches)
+  const internalBreaches = sum(s => s.internalBreaches)
   const kpis: Kpi[] = [
-    { label: 'Active Stores', value: stores.length, hint: `${regionCount} regions`, icon: <Building2 size={13} /> },
-    { label: 'Controlled', value: counts.controlled, hint: `${pct(counts.controlled, stores.length)}% of stores`, icon: <ShieldCheck size={13} />, tone: 'good' },
-    { label: 'Attention Required', value: counts.attention, icon: <AlertTriangle size={13} />, tone: 'warn' },
-    { label: 'Open Work', value: sum(s => s.openTickets), hint: `${counts.critical} critical`, icon: <ClipboardList size={13} /> },
-    { label: 'Pending Approvals', value: sum(s => s.pendingDecisions), icon: <ReceiptText size={13} /> },
-    { label: 'Cost Exposure', value: fmtK(sum(s => s.costExposure)), icon: <Banknote size={13} /> },
-    { label: 'Supplier Breaches', value: sum(s => s.supplierBreaches), icon: <Truck size={13} />, tone: sum(s => s.supplierBreaches) ? 'warn' : 'good' },
-    { label: 'Internal Breaches', value: sum(s => s.internalBreaches), icon: <Lock size={13} />, tone: sum(s => s.internalBreaches) ? 'warn' : 'good' },
-    { label: 'Repeat Defects', value: stores.filter(s => s.repeatGroups > 0).length, icon: <Repeat size={13} /> },
-    { label: 'Decisions', value: data.decisions.filter(d => d.category !== 'Monitor').length, icon: <Gavel size={13} />, tone: 'gold' },
+    { label: 'Active Stores', value: stores.length, hint: `${regionCount} regions`, icon: <Building2 size={13} />, href: '/executive/stores' },
+    { label: 'At Risk', value: counts.at_risk, hint: `${pct(counts.at_risk, stores.length)}% of stores`, icon: <ShieldAlert size={13} />, tone: counts.at_risk ? 'bad' : 'good', href: '/executive/stores?status=at_risk' },
+    { label: 'Critical', value: counts.critical, hint: `${pct(counts.critical, stores.length)}% of stores`, icon: <AlertOctagon size={13} />, tone: counts.critical ? 'bad' : 'good', href: '/executive/stores?status=critical' },
+    { label: 'Attention Required', value: counts.attention, icon: <AlertTriangle size={13} />, tone: counts.attention ? 'warn' : 'good', href: '/executive/stores?status=attention' },
+    { label: 'Open Work', value: sum(s => s.openTickets), hint: `${counts.critical} critical`, icon: <ClipboardList size={13} />, href: '/executive/insights/open-work' },
+    { label: 'Pending Approvals', value: sum(s => s.pendingDecisions), icon: <ReceiptText size={13} />, href: '/executive/decisions' },
+    { label: 'Internal Breaches', value: internalBreaches, icon: <Lock size={13} />, tone: internalBreaches ? 'warn' : 'good', href: '/executive/insights/internal-breaches' },
+    { label: 'Supplier Breaches', value: supplierBreaches, icon: <Truck size={13} />, tone: supplierBreaches ? 'warn' : 'good', href: '/executive/suppliers' },
+    { label: 'Repeat Defects', value: stores.filter(s => s.repeatGroups > 0).length, icon: <Repeat size={13} />, href: '/executive/insights/repeat-defects' },
+    { label: 'Decisions', value: data.decisions.filter(d => d.category !== 'Monitor').length, icon: <Gavel size={13} />, tone: 'gold', href: '/executive/decisions' },
+    { label: 'Cost Exposure', value: fmtK(sum(s => s.costExposure)), icon: <Banknote size={13} />, href: '/executive/insights/cost-exposure' },
   ]
 
   const ranked = [...stores].sort((a, b) => a.finalHealthScore - b.finalHealthScore)
@@ -92,7 +95,7 @@ export function StoresTab({ data }: { data: EstateDashboardData }) {
 
       <div className="space-y-5">
         <div className="space-y-5 min-w-0">
-          <SectionCard title="Store Ranking — highest attention first">
+          <SectionCard title="Store Ranking">
             <div className="overflow-x-auto -mx-1">
               <table className="w-full text-sm min-w-[820px]">
                 <thead><tr className="text-left text-[11px] text-[var(--text-faint)] border-b border-[var(--border)]">
