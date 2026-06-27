@@ -24,7 +24,9 @@ export function storeFacts(d: StoreManagerData): BriefingFacts {
   return {
     store: d.branch,
     openTickets: d.open, inProgress: d.inProgress, completedTickets: d.completed,
-    overdueTickets: h?.overdueTickets ?? 0,
+    // Same basis as the Overdue KPI / filter / per-ticket red indicator (past the
+    // resolution deadline) so the briefing count and the dashboard always agree.
+    overdueTickets: d.tickets.filter(t => t.overdue).length,
     safetyRiskOpen: h?.safetyOpen ?? 0,
     storeHealthScore: h?.finalHealthScore ?? null,
     storeHealthStatus: h?.finalStatus ?? null,
