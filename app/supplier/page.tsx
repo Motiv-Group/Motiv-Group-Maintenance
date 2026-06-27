@@ -28,13 +28,13 @@ function milestone(t: SupplierTicketRow): { label: string; at: string } | null {
 }
 
 // Shared ticket row: company + branch, then title, then the stage-matched date.
-function TicketRow({ t }: { t: SupplierTicketRow }) {
+function TicketRow({ t, company }: { t: SupplierTicketRow; company?: string }) {
   const sm = rmStatusMeta(t.status)
   const m = milestone(t)
   return (
     <Link href={`/supplier/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] -mx-2 px-2 rounded transition">
       <div className="min-w-0">
-        <p className="text-sm font-medium text-[var(--text)] truncate">{t.storeName}</p>
+        <p className="text-sm font-medium text-[var(--text)] truncate">{[company, t.storeName].filter(Boolean).join(' · ')}</p>
         <p className="text-[11px] text-[var(--text-muted)] truncate">{t.title}</p>
         {t.overdue && <p className="text-[11px] font-semibold text-red-600 dark:text-red-400">Overdue by {humanizeDuration(Date.now() - new Date(t.dueAt).getTime())}</p>}
         {m && <p className={`text-[11px] ${sm.text}`}>{m.label} · {formatDateTime(m.at)}</p>}
@@ -52,6 +52,7 @@ export default async function SupplierOverviewPage() {
   const d = await assembleSupplierDashboard(companyId, supplierIds)
   const k = d.kpis
   const perf = d.perf
+  const company = d.company
   const briefingScopeId = supplierIds.slice().sort().join(',')
   const briefing = await getDailyBriefing({ companyId, scope: 'supplier', scopeId: briefingScopeId, role: 'supplier', facts: supplierFacts(d) })
 
@@ -111,7 +112,7 @@ export default async function SupplierOverviewPage() {
           {needsAction.map(t => (
             <Link key={t.id} href={`/supplier/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] -mx-2 px-2 rounded">
               <div className="min-w-0">
-                <p className="text-sm font-medium text-[var(--text)] truncate">{t.storeName}</p>
+                <p className="text-sm font-medium text-[var(--text)] truncate">{[company, t.storeName].filter(Boolean).join(' · ')}</p>
                 <p className="text-[11px] text-[var(--text-muted)] truncate">{t.title}</p>
                 <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(t.createdAt)}</p>
               </div>
@@ -126,7 +127,7 @@ export default async function SupplierOverviewPage() {
         <SectionCard title="Recent Quotes" icon={<ReceiptText size={15} className="text-amber-600 dark:text-amber-500" />} action={<Link href="/supplier/quotes" className="text-xs text-[#C6A35D] hover:underline">All</Link>}>
           {d.quotes.slice(0, 5).map(q => (
             <div key={q.id} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0">
-              <div className="min-w-0"><p className="text-sm font-medium text-[var(--text)] truncate">{q.storeName}</p><p className="text-[11px] text-[var(--text-muted)] truncate">{q.ticketTitle}</p><p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(q.createdAt)}</p></div>
+              <div className="min-w-0"><p className="text-sm font-medium text-[var(--text)] truncate">{[company, q.storeName].filter(Boolean).join(' · ')}</p><p className="text-[11px] text-[var(--text-muted)] truncate">{q.ticketTitle}</p><p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(q.createdAt)}</p></div>
               <span className="flex flex-col items-end shrink-0"><span className="text-sm text-[var(--text)]">{formatCurrency(q.amountInclVat ?? q.amount)}</span><span className="text-[10px] text-[var(--text-faint)]">{q.amountInclVat ? 'incl VAT' : 'excl VAT'}</span><span className={`text-[11px] capitalize ${QUOTE_TONE[q.status] ?? 'text-[var(--text-muted)]'}`}>{q.status}</span></span>
             </div>
           ))}
@@ -140,7 +141,7 @@ export default async function SupplierOverviewPage() {
           {evidenceTodo.map(t => (
             <Link key={t.id} href={`/supplier/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] -mx-2 px-2 rounded">
               <div className="min-w-0">
-                <p className="text-sm font-medium text-[var(--text)] truncate">{t.storeName}</p>
+                <p className="text-sm font-medium text-[var(--text)] truncate">{[company, t.storeName].filter(Boolean).join(' · ')}</p>
                 <p className="text-[11px] text-[var(--text-muted)] truncate">{t.title}</p>
                 <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(t.createdAt)}</p>
               </div>
@@ -152,7 +153,7 @@ export default async function SupplierOverviewPage() {
         <SectionCard title="Pending Sign-off" icon={<ClipboardCheck size={15} className="text-emerald-600 dark:text-emerald-400" />} action={<Link href="/supplier/signoff" className="text-xs text-[#C6A35D] hover:underline">All</Link>}>
           {d.signoffs.slice(0, 5).map(s => (
             <div key={s.id} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0">
-              <div className="min-w-0"><p className="text-sm text-[var(--text)] truncate">{s.ticketTitle}</p><p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(s.createdAt)}</p></div>
+              <div className="min-w-0"><p className="text-sm font-medium text-[var(--text)] truncate">{[company, s.storeName].filter(Boolean).join(' · ')}</p><p className="text-[11px] text-[var(--text-muted)] truncate">{s.ticketTitle}</p><p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(s.createdAt)}</p></div>
               <span className="text-[11px] text-[var(--text-muted)] capitalize shrink-0">{s.status.replace(/_/g, ' ')}</span>
             </div>
           ))}
@@ -170,7 +171,7 @@ export default async function SupplierOverviewPage() {
             </span>
           </summary>
           <div className="mt-4">
-            {recentTickets.map(t => <TicketRow key={t.id} t={t} />)}
+            {recentTickets.map(t => <TicketRow key={t.id} t={t} company={company} />)}
             {!recentTickets.length && <p className="text-sm text-[var(--text-faint)]">No tickets yet.</p>}
             {recentTickets.length > 0 && <Link href="/supplier/tickets" className="mt-3 inline-block text-xs text-[#C6A35D] hover:underline">View all tickets →</Link>}
           </div>

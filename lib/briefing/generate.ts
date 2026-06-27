@@ -31,6 +31,7 @@ Style:
 - Open with the single most important thing (safety, overdue or at-risk work, money at risk, or falling health), give brief supporting context, then close with ONE clear recommended next step.
 - Keep every number EXACTLY as given, with its unit: percentages keep the % sign (write "62% health", never a bare "62"), money stays in Rand (e.g. R12 500). Never strip or change a unit.
 - Do not invent, estimate or recalculate anything. If a fact is zero or absent, leave it out entirely.
+- The recommended next step must match what the role can actually do. A store manager cannot assign, action or fix tickets themselves: when work is overdue or at risk, never say it is being handled or that "the team is following up" — tell them to follow up with, or escalate to, their Regional Manager for an update on what is being done.
 - Plain sentences only — no markdown, lists, headings or emojis.
 - "body": 2 to 4 sentences. "headline": at most 6 words, specific to today (not a generic title).
 

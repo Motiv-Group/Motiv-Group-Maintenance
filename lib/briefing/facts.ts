@@ -75,7 +75,7 @@ export function fallbackBriefing(role: BriefingRole, f: BriefingFacts, now: Date
   if (role === 'store_manager') {
     const parts = [`${plural(Number(f.openTickets) || 0, 'ticket')} open, ${Number(f.inProgress) || 0} in progress, ${Number(f.completedTickets) || 0} completed.`]
     if (Number(f.safetyRiskOpen) > 0) parts.push(`${plural(Number(f.safetyRiskOpen), 'safety-risk ticket')} need priority.`)
-    if (Number(f.overdueTickets) > 0) parts.push(`${plural(Number(f.overdueTickets), 'ticket')} past target — the team is following up.`)
+    if (Number(f.overdueTickets) > 0) parts.push(`${plural(Number(f.overdueTickets), 'ticket')} past target and not yet actioned — follow up with your Regional Manager for an update.`)
     else parts.push('Nothing is overdue — your store is on track.')
     return { headline: 'Your store today', body: `${g}. ${parts.join(' ')}`, source: 'fallback' }
   }

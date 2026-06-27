@@ -55,12 +55,15 @@ function milestone(t: SupplierTicketRow): { label: string; at: string } | null {
   return null
 }
 
-function TicketRow({ t }: { t: SupplierTicketRow }) {
+// `showStore` adds a Company · Branch eyebrow — used in flat sections (SLA
+// breached, archive). In store groups the heading already shows it, so it's off.
+function TicketRow({ t, company, showStore }: { t: SupplierTicketRow; company?: string; showStore?: boolean }) {
   const sm = rmStatusMeta(t.status)
   const m = milestone(t)
   return (
     <Link href={`/supplier/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2.5 -mx-2 px-2 rounded-lg border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition">
       <div className="min-w-0">
+        {showStore && <p className="text-[10px] text-[var(--text-faint)] truncate">{[company, t.storeName].filter(Boolean).join(' · ')}</p>}
         <p className="text-sm text-[var(--text)] truncate">{t.title}</p>
         <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(t.createdAt)}</p>
         {t.overdue && <p className="text-[11px] font-semibold text-red-600 dark:text-red-400">Overdue by {humanizeDuration(Date.now() - new Date(t.dueAt).getTime())}</p>}
@@ -74,7 +77,7 @@ function TicketRow({ t }: { t: SupplierTicketRow }) {
   )
 }
 
-export function SupplierTickets({ tickets, quotes }: { tickets: SupplierTicketRow[]; quotes: SupplierQuoteRow[] }) {
+export function SupplierTickets({ tickets, quotes, company }: { tickets: SupplierTicketRow[]; quotes: SupplierQuoteRow[]; company: string }) {
   const [q, setQ] = useState('')
   const [filter, setFilter] = useState<FilterKey>('all')
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
@@ -170,7 +173,7 @@ export function SupplierTickets({ tickets, quotes }: { tickets: SupplierTicketRo
             <span className="text-sm font-bold text-red-600 dark:text-red-400">SLA Breached</span>
             <span className="text-[11px] font-medium text-red-700 dark:text-red-400 bg-red-500/15 rounded-full px-2 py-0.5">{breachedRows.length}</span>
           </button>
-          {breachedOpen && <div className="px-1 mt-1">{breachedRows.map(t => <TicketRow key={t.id} t={t} />)}</div>}
+          {breachedOpen && <div className="px-1 mt-1">{breachedRows.map(t => <TicketRow key={t.id} t={t} company={company} showStore />)}</div>}
         </Card>
       )}
 
@@ -182,8 +185,11 @@ export function SupplierTickets({ tickets, quotes }: { tickets: SupplierTicketRo
             <div className="flex items-center justify-between gap-2 mb-1">
               <button onClick={() => toggle(store)} aria-expanded={!isCollapsed} className="flex items-center gap-2 min-w-0 -m-1 p-1 rounded-lg hover:bg-[var(--hover)] transition">
                 <ChevronDown size={16} className={`shrink-0 text-[var(--text-muted)] transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
-                <span className="text-sm font-bold text-[var(--text)] truncate">{store}</span>
-                <span className="text-[11px] font-medium text-[var(--text-muted)] bg-black/5 dark:bg-white/10 rounded-full px-2 py-0.5">{g.rows.length}</span>
+                <span className="min-w-0 text-left">
+                  {company && <span className="block text-[10px] text-[var(--text-faint)] truncate leading-tight">{company}</span>}
+                  <span className="block text-sm font-bold text-[var(--text)] truncate leading-tight">{store}{g.branchCode ? ` · ${g.branchCode}` : ''}</span>
+                </span>
+                <span className="text-[11px] font-medium text-[var(--text-muted)] bg-black/5 dark:bg-white/10 rounded-full px-2 py-0.5 shrink-0">{g.rows.length}</span>
               </button>
               <button onClick={() => setPanelStore(store)} title="Store overview" className="shrink-0 -m-1 p-1.5 rounded-lg text-[var(--text-faint)] hover:text-[#C6A35D] hover:bg-[#C6A35D]/10 transition"><BarChart3 size={16} /></button>
             </div>
@@ -208,8 +214,9 @@ export function SupplierTickets({ tickets, quotes }: { tickets: SupplierTicketRo
                 return (
                   <Link key={t.id} href={`/supplier/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2.5 -mx-2 px-2 rounded-lg border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition">
                     <div className="min-w-0">
+                      <p className="text-[10px] text-[var(--text-faint)] truncate">{[company, t.storeName].filter(Boolean).join(' · ')}</p>
                       <p className="text-sm text-[var(--text)] truncate">{t.title}</p>
-                      <p className="text-[11px] text-[var(--text-faint)] truncate">{t.storeName} · {formatDateTime(t.createdAt)}</p>
+                      <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(t.createdAt)}</p>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
                       <PriorityBadge priority={t.priority} className="w-full text-center" />
@@ -223,12 +230,12 @@ export function SupplierTickets({ tickets, quotes }: { tickets: SupplierTicketRo
         </Card>
       )}
 
-      {panelStore && <StorePanel store={panelStore} rows={panelRows} quotes={panelQuotes} onClose={() => setPanelStore(null)} />}
+      {panelStore && <StorePanel store={panelStore} company={company} rows={panelRows} quotes={panelQuotes} onClose={() => setPanelStore(null)} />}
     </div>
   )
 }
 
-function StorePanel({ store, rows, quotes, onClose }: { store: string; rows: SupplierTicketRow[]; quotes: SupplierQuoteRow[]; onClose: () => void }) {
+function StorePanel({ store, company, rows, quotes, onClose }: { store: string; company?: string; rows: SupplierTicketRow[]; quotes: SupplierQuoteRow[]; onClose: () => void }) {
   const c: Record<Bucket, number> = { to_quote: 0, quoted: 0, scheduled: 0, in_progress: 0, signoff: 0, completed: 0, closed: 0 }
   for (const t of rows) c[bucketOf(t.status)]++
   const total = rows.length
@@ -257,7 +264,7 @@ function StorePanel({ store, rows, quotes, onClose }: { store: string; rows: Sup
       <div className="absolute inset-0 bg-black/50" />
       <div className="relative w-full max-w-sm h-full bg-[var(--surface-2)] ring-1 ring-[var(--border)] overflow-y-auto p-5 space-y-4" onClick={e => e.stopPropagation()}>
         <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0"><h2 className="text-lg font-bold text-[var(--text)] truncate">{store}</h2><p className="text-xs text-[var(--text-muted)]">{total} ticket{total === 1 ? '' : 's'}</p></div>
+          <div className="min-w-0">{company && <p className="text-[10px] text-[var(--text-faint)] truncate">{company}</p>}<h2 className="text-lg font-bold text-[var(--text)] truncate">{store}</h2><p className="text-xs text-[var(--text-muted)]">{total} ticket{total === 1 ? '' : 's'}</p></div>
           <button onClick={onClose} className="shrink-0 -m-1 p-1.5 rounded-lg text-[var(--text-faint)] hover:text-[var(--text)] hover:bg-[var(--hover)]"><X size={18} /></button>
         </div>
 
