@@ -534,13 +534,15 @@ export interface SupplierTicketRow {
   assignedAt: string | null; quoteRequestedAt: string | null; quoteApprovedAt: string | null
   dueAt: string; overdue: boolean
 }
-export interface SupplierQuoteRow { id: string; ticketTitle: string; storeName: string; amount: number; amountInclVat: number | null; status: string; createdAt: string }
+export interface SupplierQuoteRow { id: string; ticketId: string; ticketTitle: string; storeName: string; branchCode: string | null; amount: number; amountInclVat: number | null; status: string; createdAt: string }
+export interface SupplierSignoffRow { id: string; ticketId: string; ticketTitle: string; storeName: string; branchCode: string | null; status: string; createdAt: string }
 export interface SupplierDashboardData {
   perf: SupplierPerformance
+  company: string
   kpis: { open: number; overdue: number; dueToday: number; pendingQuotes: number; awaitingSignoff: number; evidenceMissing: number }
   tickets: SupplierTicketRow[]
   quotes: SupplierQuoteRow[]
-  signoffs: { id: string; ticketTitle: string; status: string; createdAt: string }[]
+  signoffs: SupplierSignoffRow[]
   rating: { avg: number; count: number }
   generatedAt: string
 }
@@ -548,7 +550,7 @@ export interface SupplierDashboardData {
 export async function assembleSupplierDashboard(companyId: string, supplierIds: string[], now: Date = new Date()): Promise<SupplierDashboardData> {
   const db = createAdminClient()
   const emptyPerf = calculateSupplierPerformance('none', [], (p) => FALLBACK_SLA[p], now)
-  if (!supplierIds.length) return { perf: emptyPerf, kpis: { open: 0, overdue: 0, dueToday: 0, pendingQuotes: 0, awaitingSignoff: 0, evidenceMissing: 0 }, tickets: [], quotes: [], signoffs: [], rating: { avg: 5, count: 0 }, generatedAt: now.toISOString() }
+  if (!supplierIds.length) return { perf: emptyPerf, company: '', kpis: { open: 0, overdue: 0, dueToday: 0, pendingQuotes: 0, awaitingSignoff: 0, evidenceMissing: 0 }, tickets: [], quotes: [], signoffs: [], rating: { avg: 5, count: 0 }, generatedAt: now.toISOString() }
   const rules = await loadSlaResolver(db, companyId)
 
   // Own tickets (awarded) + tickets where invited to quote (competitive model).
@@ -569,10 +571,11 @@ export async function assembleSupplierDashboard(companyId: string, supplierIds: 
   const storeBranch = new Map((storesRaw ?? []).map((s: any) => [s.id, s.branch_code ?? null]))
   const titleOf = new Map(tickets.map(t => [t.id, t.title ?? 'Ticket']))
 
-  const [{ data: quotesRaw }, { data: signoffsRaw }, { data: ratingRows }] = await Promise.all([
+  const [{ data: quotesRaw }, { data: signoffsRaw }, { data: ratingRows }, { data: companyRow }] = await Promise.all([
     db.from('quotes').select('id, ticket_id, amount, amount_incl_vat, status, created_at').in('supplier_id', supplierIds).order('created_at', { ascending: false }),
     db.from('signoffs').select('id, ticket_id, status, created_at').in('supplier_id', supplierIds).order('created_at', { ascending: false }),
     db.from('ratings').select('score').in('supplier_id', supplierIds),
+    db.from('companies').select('name').eq('id', companyId).maybeSingle(),
   ])
   const ratingScores = ((ratingRows ?? []) as any[]).map(r => Number(r.score)).filter(n => Number.isFinite(n))
   // Suppliers start at a full 5★ and degrade as real ratings arrive.
@@ -605,7 +608,7 @@ export async function assembleSupplierDashboard(companyId: string, supplierIds: 
       ageDays: Math.floor((now.getTime() - new Date(t.created_at).getTime()) / DAY), createdAt: t.created_at, slaLabel: lbl, nextActionDueAt: sla.nextActionDueAt,
       acknowledged: !!t.first_response_at, evidenceRequired: !!t.evidence_required,
       beforeUploaded: !!t.before_photo_uploaded, afterUploaded: !!t.after_photo_uploaded, cocUploaded: !!t.completion_certificate_uploaded,
-      active, breached: active ? (sla.supplierBreached || sla.internalBreached) : false,
+      active, breached: active ? sla.supplierBreached : false,
       assignedAt: raw.quote_requested_at ?? t.created_at ?? null,
       quoteRequestedAt: raw.quote_requested_at ?? null,
       quoteApprovedAt: approvedAt,
@@ -615,12 +618,14 @@ export async function assembleSupplierDashboard(companyId: string, supplierIds: 
   // Active first, then unacknowledged, then oldest — keeps the dashboard queues useful.
   rows.sort((a, b) => (a.active === b.active ? 0 : a.active ? -1 : 1) || (a.acknowledged === b.acknowledged ? 0 : a.acknowledged ? 1 : -1) || a.ageDays - b.ageDays)
 
+  const storeOf = (ticketId: string) => rawById.get(ticketId)?.store_id
   return {
     perf: calculateSupplierPerformance(supplierIds[0], tickets, rules, now),
+    company: (companyRow as any)?.name ?? '',
     kpis: { open, overdue, dueToday, pendingQuotes, awaitingSignoff, evidenceMissing },
     tickets: rows,
-    quotes: (quotesRaw ?? []).map((q: any) => ({ id: q.id, ticketTitle: titleOf.get(q.ticket_id) ?? 'Ticket', storeName: storeName.get(rawById.get(q.ticket_id)?.store_id) ?? 'Store', amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, status: q.status, createdAt: q.created_at })),
-    signoffs: (signoffsRaw ?? []).map((s: any) => ({ id: s.id, ticketTitle: titleOf.get(s.ticket_id) ?? 'Ticket', status: s.status, createdAt: s.created_at })),
+    quotes: (quotesRaw ?? []).map((q: any) => ({ id: q.id, ticketId: q.ticket_id, ticketTitle: titleOf.get(q.ticket_id) ?? 'Ticket', storeName: storeName.get(storeOf(q.ticket_id)) ?? 'Store', branchCode: storeBranch.get(storeOf(q.ticket_id)) ?? null, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, status: q.status, createdAt: q.created_at })),
+    signoffs: (signoffsRaw ?? []).map((s: any) => ({ id: s.id, ticketId: s.ticket_id, ticketTitle: titleOf.get(s.ticket_id) ?? 'Ticket', storeName: storeName.get(storeOf(s.ticket_id)) ?? 'Store', branchCode: storeBranch.get(storeOf(s.ticket_id)) ?? null, status: s.status, createdAt: s.created_at })),
     rating,
     generatedAt: now.toISOString(),
   }

@@ -1,9 +1,9 @@
 export const dynamic = 'force-dynamic'
 
-import { ClipboardCheck } from 'lucide-react'
+import Link from 'next/link'
+import { ClipboardCheck, Building2, ChevronDown, ChevronUp } from 'lucide-react'
 import { requireSupplierV3 } from '@/lib/health/guard'
-import { assembleSupplierDashboard } from '@/lib/health/data'
-import { SectionCard } from '@/components/exec/ui'
+import { assembleSupplierDashboard, type SupplierSignoffRow } from '@/lib/health/data'
 import { formatDateTime } from '@/lib/utils'
 
 const TONE: Record<string, string> = { submitted: 'text-[#C6A35D]', awaiting_regional: 'text-[#C6A35D]', awaiting_store: 'text-blue-600 dark:text-blue-400', accepted: 'text-emerald-600 dark:text-emerald-400', rejected: 'text-red-600 dark:text-red-400' }
@@ -12,27 +12,49 @@ const WORD: Record<string, string> = { submitted: 'Submitted', awaiting_regional
 export default async function SupplierSignoffPage() {
   const { companyId, supplierIds } = await requireSupplierV3()
   const d = await assembleSupplierDashboard(companyId, supplierIds)
+
+  // Group sign-offs by store (within the supplier's single client company).
+  const byStore = new Map<string, SupplierSignoffRow[]>()
+  for (const s of d.signoffs) { const a = byStore.get(s.storeName) ?? []; a.push(s); byStore.set(s.storeName, a) }
+  const groups = [...byStore.entries()].sort((a, b) => a[0].localeCompare(b[0]))
+
   return (
     <div className="space-y-5">
       <div><h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><ClipboardCheck className="text-emerald-600 dark:text-emerald-400" size={22} /> Pending Sign-off</h1>
-        <p className="text-sm text-[var(--text-muted)] mt-0.5">Jobs you submitted for completion sign-off. You cannot mark jobs complete — the company confirms.</p></div>
-      <SectionCard title={`Submitted for Sign-off (${d.signoffs.length})`}>
-        <div className="overflow-x-auto -mx-1">
-          <table className="w-full text-sm min-w-[520px]">
-            <thead><tr className="text-left text-[11px] text-[var(--text-faint)] border-b border-[var(--border)]"><th className="py-2 px-2">Ticket</th><th className="px-2">Status</th><th className="px-2">Submitted</th></tr></thead>
-            <tbody>
-              {d.signoffs.map(s => (
-                <tr key={s.id} className="border-b border-[var(--border)]">
-                  <td className="py-2.5 px-2 text-[var(--text)] max-w-[300px] truncate">{s.ticketTitle}</td>
-                  <td className={`px-2 ${TONE[s.status] ?? 'text-[var(--text)]'}`}>{WORD[s.status] ?? s.status}</td>
-                  <td className="px-2 text-[var(--text-muted)] text-xs whitespace-nowrap">{formatDateTime(s.createdAt)}</td>
-                </tr>
-              ))}
-              {!d.signoffs.length && <tr><td colSpan={3} className="py-6 text-center text-[var(--text-faint)]">Nothing submitted for sign-off yet.</td></tr>}
-            </tbody>
-          </table>
+        <p className="text-sm text-[var(--text-muted)] mt-0.5">Jobs you submitted for completion sign-off, grouped by store. Tap a job to open its ticket. You cannot mark jobs complete — the company confirms.</p></div>
+
+      {!groups.length && (
+        <div className="rounded-xl border border-dashed border-[var(--border)] p-12 text-center">
+          <ClipboardCheck size={28} className="mx-auto text-[var(--text-faint)] mb-2" />
+          <p className="text-sm text-[var(--text-faint)]">Nothing submitted for sign-off yet.</p>
         </div>
-      </SectionCard>
+      )}
+
+      {groups.map(([store, rows]) => (
+        <details key={store} open className="group rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
+          <summary className="flex items-center gap-3 px-4 py-3 cursor-pointer list-none hover:bg-[var(--hover)] transition">
+            <Building2 size={16} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
+            <div className="flex-1 min-w-0">
+              {d.company && <p className="text-[10px] text-[var(--text-faint)] truncate">{d.company}</p>}
+              <p className="text-sm font-bold text-[var(--text)] truncate">{store}{rows[0].branchCode ? ` · ${rows[0].branchCode}` : ''}</p>
+            </div>
+            <span className="text-[11px] font-semibold text-[var(--text-muted)] bg-black/5 dark:bg-white/10 rounded-full px-2 py-0.5 shrink-0">{rows.length} job{rows.length !== 1 ? 's' : ''}</span>
+            <ChevronDown size={16} className="text-[var(--text-faint)] shrink-0 group-open:hidden" />
+            <ChevronUp size={16} className="text-[var(--text-faint)] shrink-0 hidden group-open:block" />
+          </summary>
+          <div className="border-t border-[var(--border)]">
+            {rows.map(s => (
+              <Link key={s.id} href={`/supplier/tickets/${s.ticketId}`} className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition">
+                <div className="min-w-0">
+                  <p className="text-sm text-[var(--text)] truncate">{s.ticketTitle}</p>
+                  <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(s.createdAt)}</p>
+                </div>
+                <span className={`text-[11px] font-semibold shrink-0 ${TONE[s.status] ?? 'text-[var(--text-muted)]'}`}>{WORD[s.status] ?? s.status}</span>
+              </Link>
+            ))}
+          </div>
+        </details>
+      ))}
     </div>
   )
 }

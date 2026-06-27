@@ -35,7 +35,10 @@ export default async function SupplierSnagPage() {
           <details key={store} open className="group rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
             <summary className="flex items-center gap-3 px-4 py-3 cursor-pointer list-none hover:bg-[var(--hover)] transition">
               <Building2 size={16} className="text-amber-500 shrink-0" />
-              <span className="flex-1 min-w-0 text-sm font-bold text-[var(--text)] truncate">{store}</span>
+              <div className="flex-1 min-w-0">
+                {d.company && <p className="text-[10px] text-[var(--text-faint)] truncate">{d.company}</p>}
+                <p className="text-sm font-bold text-[var(--text)] truncate">{store}{rows[0].branchCode ? ` · ${rows[0].branchCode}` : ''}</p>
+              </div>
               <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-500/15 rounded-full px-2 py-0.5 shrink-0">{rows.length} snag{rows.length !== 1 ? 's' : ''}</span>
               <ChevronDown size={16} className="text-[var(--text-faint)] shrink-0 group-open:hidden" />
               <ChevronUp size={16} className="text-[var(--text-faint)] shrink-0 hidden group-open:block" />

@@ -99,8 +99,6 @@ export default async function SupplierOverviewPage() {
                 <p className="text-sm text-[var(--text-muted)] leading-relaxed">{briefing.body}</p>
               </div>
             )}
-            <p className="text-sm text-[var(--text-muted)]">{perf.assignedTickets} tickets · {Math.round(perf.firstTimeFixRate * 100)}% first-fix · {perf.slaBreaches} breaches</p>
-            <Link href="/supplier/stats" className="text-xs text-[#C6A35D] hover:underline">Full performance →</Link>
           </div>
         </div>
       </Card>
@@ -112,8 +110,15 @@ export default async function SupplierOverviewPage() {
         <SectionCard title="Needs Your Action" icon={<AlertTriangle size={15} className="text-amber-600 dark:text-amber-500" />} action={<Link href="/supplier/tickets" className="text-xs text-[#C6A35D] hover:underline">All</Link>}>
           {needsAction.map(t => (
             <Link key={t.id} href={`/supplier/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] -mx-2 px-2 rounded">
-              <div className="min-w-0"><p className="text-sm font-medium text-[var(--text)] truncate">{t.storeName}</p><p className="text-[11px] text-[var(--text-muted)] truncate">{t.title}</p></div>
-              <span className={`text-[11px] font-semibold shrink-0 ${slaTone(t.acknowledged ? t.slaLabel : 'Not started')}`}>{t.acknowledged ? t.slaLabel : 'New'}</span>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-[var(--text)] truncate">{t.storeName}</p>
+                <p className="text-[11px] text-[var(--text-muted)] truncate">{t.title}</p>
+                <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(t.createdAt)}</p>
+              </div>
+              <div className="flex flex-col items-end gap-1 shrink-0">
+                <PriorityBadge priority={t.priority} />
+                <span className={`text-[11px] font-semibold ${slaTone(t.acknowledged ? t.slaLabel : 'Not started')}`}>{t.acknowledged ? t.slaLabel : 'Awaiting Quote'}</span>
+              </div>
             </Link>
           ))}
           {!needsAction.length && <p className="text-sm text-[var(--text-faint)]">Nothing needs action right now.</p>}
@@ -134,7 +139,11 @@ export default async function SupplierOverviewPage() {
         <SectionCard title="Evidence to Upload" icon={<Camera size={15} className="text-sky-600 dark:text-sky-400" />}>
           {evidenceTodo.map(t => (
             <Link key={t.id} href={`/supplier/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] -mx-2 px-2 rounded">
-              <div className="min-w-0"><p className="text-sm font-medium text-[var(--text)] truncate">{t.storeName}</p><p className="text-[11px] text-[var(--text-muted)] truncate">{t.title}</p></div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-[var(--text)] truncate">{t.storeName}</p>
+                <p className="text-[11px] text-[var(--text-muted)] truncate">{t.title}</p>
+                <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(t.createdAt)}</p>
+              </div>
               <span className="text-[11px] text-amber-600 dark:text-amber-500 shrink-0">missing: {missingBits(t)}</span>
             </Link>
           ))}
