@@ -39,7 +39,7 @@ function Row({ t }: { t: StoreManagerTicket }) {
       <div className="min-w-0">
         {t.jobRef && <p className="text-[10px] font-mono text-[var(--text-faint)]">{t.jobRef}</p>}
         <p className="text-sm text-[var(--text)] truncate">{t.title}</p>
-        <p className="text-[11px] text-[var(--text-faint)]">{t.category ?? 'General'} · {formatDateTime(t.createdAt)}{t.supplierAssigned ? ' · Supplier assigned' : ''}</p>
+        <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(t.createdAt)}</p>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_6rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
         <PriorityBadge priority={t.priority} className="w-full text-center" />
