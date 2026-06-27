@@ -13,14 +13,8 @@ import { formatCurrency, formatDateTime, humanizeDuration, rmStatusMeta } from '
 
 // Statuses in the Tickets-tab "Quote requested" (to_quote) bucket — keep in sync
 // with bucketOf() in components/supplier/SupplierTickets.tsx.
-const AWAITING_QUOTE_STATUSES = new Set(['open', 'info_requested', 'assigned', 'assessment', 'quote_requested', 'quote_revision'])
+const QUOTE_REQUESTED_STATUSES = new Set(['open', 'info_requested', 'assigned', 'assessment', 'quote_requested', 'quote_revision'])
 
-const slaTone = (l: string) =>
-  l === 'Breached' ? 'text-red-600 dark:text-red-400'
-  : l === 'At risk' ? 'text-amber-600 dark:text-amber-500'
-  : l === 'Paused (internal)' ? 'text-[var(--text-faint)]'
-  : l === 'Not started' ? 'text-blue-600 dark:text-blue-400'
-  : 'text-[var(--text-muted)]'
 const QUOTE_TONE: Record<string, string> = { pending: 'text-[#C6A35D]', accepted: 'text-emerald-600 dark:text-emerald-400', declined: 'text-red-600 dark:text-red-400' }
 
 // One date matching the ticket's current stage: approved → requested → assigned.
@@ -57,12 +51,12 @@ export default async function SupplierOverviewPage() {
   const k = d.kpis
   const perf = d.perf
   const company = d.company
-  const awaitingQuote = d.tickets.filter(t => AWAITING_QUOTE_STATUSES.has(t.status)).length
+  const quoteRequested = d.tickets.filter(t => QUOTE_REQUESTED_STATUSES.has(t.status)).length
   const briefingScopeId = supplierIds.slice().sort().join(',')
   const briefing = await getDailyBriefing({ companyId, scope: 'supplier', scopeId: briefingScopeId, role: 'supplier', facts: supplierFacts(d) })
 
   const kpis: Kpi[] = [
-    { label: 'Awaiting Quote', value: awaitingQuote, icon: <ClipboardList size={13} />, tone: 'info', href: '/supplier/tickets?filter=to_quote' },
+    { label: 'Quote requested', value: quoteRequested, icon: <ClipboardList size={13} />, tone: 'info', href: '/supplier/tickets?filter=to_quote' },
     { label: 'Overdue', value: k.overdue, icon: <AlertTriangle size={13} />, tone: k.overdue ? 'bad' : 'good', href: '/supplier/tickets?filter=breached' },
     { label: 'Due Today', value: k.dueToday, icon: <Clock size={13} />, tone: k.dueToday ? 'warn' : 'good', href: '/supplier/tickets' },
     { label: 'Pending Quotes', value: k.pendingQuotes, icon: <ReceiptText size={13} />, tone: 'gold', href: '/supplier/quotes' },
@@ -123,7 +117,7 @@ export default async function SupplierOverviewPage() {
               </div>
               <div className="flex flex-col items-end gap-1 shrink-0">
                 <PriorityBadge priority={t.priority} />
-                <span className={`text-[11px] font-semibold ${slaTone(t.acknowledged ? t.slaLabel : 'Not started')}`}>{t.acknowledged ? t.slaLabel : 'Awaiting Quote'}</span>
+                {(() => { const sm = rmStatusMeta(t.status); return <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${sm.cls}`}>{sm.label}</span> })()}
               </div>
             </Link>
           ))}
