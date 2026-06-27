@@ -31,7 +31,7 @@ const PILLS: { key: Filter; label: string; active: string; inactive: string }[] 
   { key: 'open',        label: 'Open',        active: 'bg-blue-500 text-white border-blue-500',              inactive: 'text-blue-600 dark:text-blue-400 border-blue-500/40 hover:border-blue-400' },
   { key: 'in_progress', label: 'In Progress', active: 'bg-[#C6A35D] text-[#0a0e17] border-[#C6A35D]',        inactive: 'text-amber-600 dark:text-[#C6A35D] border-[#C6A35D]/40 hover:border-[#C6A35D]' },
   { key: 'completed',   label: 'Completed',   active: 'bg-emerald-500 text-white border-emerald-500',        inactive: 'text-emerald-600 dark:text-emerald-400 border-emerald-500/40 hover:border-emerald-400' },
-  { key: 'cancelled',   label: 'Cancelled',   active: 'bg-red-500 text-white border-red-500',                inactive: 'text-red-600 dark:text-red-400 border-red-500/40 hover:border-red-400' },
+  { key: 'cancelled',   label: 'Cancelled',   active: 'bg-gray-500 text-white border-gray-500',              inactive: 'text-gray-600 dark:text-gray-400 border-gray-500/40 hover:border-gray-400' },
 ]
 
 function Row({ t }: { t: StoreManagerTicket }) {
