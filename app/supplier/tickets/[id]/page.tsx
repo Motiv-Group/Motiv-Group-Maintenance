@@ -42,16 +42,19 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   const admin = createAdminClient()
   const { data: t } = await admin.from('tickets').select('*').eq('id', params.id).single()
   if (!t || t.company_id !== companyId) redirect('/supplier/tickets')
-  const [{ data: store }, { data: updates }, { data: invite }, { data: myQuotes }, { data: technicianRows }, { data: signoffRows }] = await Promise.all([
+  const [{ data: store }, { data: updates }, { data: invite }, { data: myQuotes }, { data: technicianRows }, { data: signoffRows }, { data: snagRows }] = await Promise.all([
     admin.from('stores').select('name, sub_store').eq('id', t.store_id).single(),
     admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('ticket_suppliers').select('status').eq('ticket_id', t.id).in('supplier_id', supplierIds).maybeSingle(),
     admin.from('quotes').select('id, amount, amount_incl_vat, description, file_url, status, valid_until, created_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).order('created_at', { ascending: false }),
     admin.from('technicians').select('id, name').in('supplier_id', supplierIds).eq('active', true).order('name'),
-    admin.from('signoffs').select('id, before_urls, after_urls, coc_url, invoice_url, status, notes, created_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).order('created_at', { ascending: false }),
+    admin.from('signoffs').select('id, before_urls, after_urls, coc_url, invoice_url, status, notes, reject_reason, created_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).order('created_at', { ascending: false }),
+    admin.from('snags').select('description, required_correction, severity, status, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
   ])
   // Latest completion the supplier submitted (COC + proof-of-completion photos).
   const latestSignoff = ((signoffRows ?? []) as any[])[0] ?? null
+  // Most recent snag — explains why a completion was rejected / sent back.
+  const latestSnag = ((snagRows ?? []) as any[])[0] ?? null
   const technicians = (technicianRows ?? []) as { id: string; name: string }[]
   // Access: the awarded supplier OR a supplier invited to quote (competitive model).
   const awarded = !!t.supplier_id && supplierIds.includes(t.supplier_id)
@@ -156,6 +159,14 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
               <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 shrink-0 ${meta.badge}`}>{meta.label}</span>
             </div>
             <div className="p-4 space-y-3">
+              {latestSignoff.status === 'rejected' && (latestSignoff.reject_reason || latestSnag?.description || latestSnag?.required_correction) && (
+                <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3 space-y-1">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Why it was sent back</p>
+                  {(latestSignoff.reject_reason || latestSnag?.description) && <p className="text-sm text-[var(--text)]">{latestSignoff.reject_reason || latestSnag?.description}</p>}
+                  {latestSnag?.required_correction && <p className="text-sm text-[var(--text-muted)]"><span className="font-medium text-[var(--text)]">Required correction:</span> {latestSnag.required_correction}</p>}
+                  {latestSnag?.severity && <p className="text-[11px] text-[var(--text-muted)] capitalize">Severity: {String(latestSnag.severity).replace(/_/g, ' ')}</p>}
+                </div>
+              )}
               <DetailItem label="Submitted" value={formatDateTime(latestSignoff.created_at)} />
               <div>
                 <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Proof of completion</div>
