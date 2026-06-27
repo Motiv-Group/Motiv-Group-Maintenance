@@ -32,7 +32,7 @@ const SUPPLIER_TABS: ChromeTab[] = [
   { href: '/supplier',         label: 'Dashboard',   icon: LayoutDashboard },
   { href: '/supplier/tickets', label: 'Tickets',     icon: Ticket },
   { href: '/supplier/quotes',  label: 'Quotes',      icon: ReceiptText },
-  { href: '/supplier/signoff', label: 'Sign-off',    icon: ClipboardCheck },
+  { href: '/supplier/signoff', label: 'Signoff',     icon: ClipboardCheck },
   { href: '/supplier/snag',    label: 'Snags',       icon: AlertTriangle },
   { href: '/supplier/technicians', label: 'Technicians', icon: Users },
   { href: '/supplier/stats',   label: 'Performance', icon: BarChart2 },

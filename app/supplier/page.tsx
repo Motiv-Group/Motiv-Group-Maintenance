@@ -69,6 +69,9 @@ export default async function SupplierOverviewPage() {
   const needsAction = d.tickets.filter(t => t.active && (t.slaLabel === 'Breached' || t.slaLabel === 'At risk' || !t.acknowledged)).slice(0, 6)
   const evidenceTodo = d.tickets.filter(t => t.active && t.evidenceRequired && !(t.beforeUploaded && t.afterUploaded && t.cocUploaded)).slice(0, 6)
   const recentTickets = [...d.tickets].filter(t => t.status !== 'completed').sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)).slice(0, 8)
+  // Recent quotes exclude completed tickets; pending sign-off shows only jobs still awaiting a decision.
+  const recentQuotes = d.quotes.filter(q => q.ticketStatus !== 'completed').slice(0, 5)
+  const pendingSignoffs = d.signoffs.filter(s => ['submitted', 'awaiting_regional', 'awaiting_store'].includes(s.status)).slice(0, 5)
   const missingBits = (t: SupplierTicketRow) => [!t.beforeUploaded && 'before', !t.afterUploaded && 'after', !t.cocUploaded && 'COC'].filter(Boolean).join(', ')
 
   return (
@@ -126,13 +129,13 @@ export default async function SupplierOverviewPage() {
           {!needsAction.length && <p className="text-sm text-[var(--text-faint)]">Nothing needs action right now.</p>}
         </SectionCard>
         <SectionCard title="Recent Quotes" icon={<ReceiptText size={15} className="text-amber-600 dark:text-amber-500" />} action={<Link href="/supplier/quotes" className="text-xs text-[#C6A35D] hover:underline">All</Link>}>
-          {d.quotes.slice(0, 5).map(q => (
+          {recentQuotes.map(q => (
             <div key={q.id} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0">
               <div className="min-w-0"><p className="text-sm font-medium text-[var(--text)] truncate">{[company, q.storeName].filter(Boolean).join(' · ')}</p><p className="text-[11px] text-[var(--text-muted)] truncate">{q.ticketTitle}</p><p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(q.createdAt)}</p></div>
               <span className="flex flex-col items-end shrink-0"><span className="text-sm text-[var(--text)]">{formatCurrency(q.amountInclVat ?? q.amount)}</span><span className="text-[10px] text-[var(--text-faint)]">{q.amountInclVat ? 'incl VAT' : 'excl VAT'}</span><span className={`text-[11px] capitalize ${QUOTE_TONE[q.status] ?? 'text-[var(--text-muted)]'}`}>{q.status === 'accepted' ? 'Approved' : q.status}</span></span>
             </div>
           ))}
-          {!d.quotes.length && <p className="text-sm text-[var(--text-faint)]">No quotes submitted yet.</p>}
+          {!recentQuotes.length && <p className="text-sm text-[var(--text-faint)]">No active quotes.</p>}
         </SectionCard>
       </div>
 
@@ -152,13 +155,13 @@ export default async function SupplierOverviewPage() {
           {!evidenceTodo.length && <p className="text-sm text-[var(--text-faint)]">All evidence uploaded.</p>}
         </SectionCard>
         <SectionCard title="Pending Sign-off" icon={<ClipboardCheck size={15} className="text-emerald-600 dark:text-emerald-400" />} action={<Link href="/supplier/signoff" className="text-xs text-[#C6A35D] hover:underline">All</Link>}>
-          {d.signoffs.slice(0, 5).map(s => (
+          {pendingSignoffs.map(s => (
             <div key={s.id} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0">
               <div className="min-w-0"><p className="text-sm font-medium text-[var(--text)] truncate">{[company, s.storeName].filter(Boolean).join(' · ')}</p><p className="text-[11px] text-[var(--text-muted)] truncate">{s.ticketTitle}</p><p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(s.createdAt)}</p></div>
               <span className="text-[11px] text-[var(--text-muted)] capitalize shrink-0">{s.status.replace(/_/g, ' ')}</span>
             </div>
           ))}
-          {!d.signoffs.length && <p className="text-sm text-[var(--text-faint)]">Nothing awaiting sign-off.</p>}
+          {!pendingSignoffs.length && <p className="text-sm text-[var(--text-faint)]">Nothing awaiting sign-off.</p>}
         </SectionCard>
       </div>
 

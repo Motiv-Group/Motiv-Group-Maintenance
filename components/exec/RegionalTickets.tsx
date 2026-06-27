@@ -11,20 +11,21 @@ import { Card } from '@/components/exec/ui'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { rmStatusMeta, formatDateTime, humanizeDuration } from '@/lib/utils'
 
-type Bucket = 'open' | 'quote_requested' | 'quoted' | 'approved' | 'in_progress' | 'awaiting_signoff' | 'completed' | 'cancelled'
+type Bucket = 'open' | 'quote_requested' | 'quoted' | 'approved' | 'scheduled' | 'in_progress' | 'awaiting_signoff' | 'completed' | 'cancelled'
 function bucketOf(s: string): Bucket {
   if (s === 'open' || s === 'info_requested') return 'open'
   if (['assigned', 'quote_requested', 'assessment'].includes(s)) return 'quote_requested'
   if (['quoted', 'quote_revision'].includes(s)) return 'quoted'
   if (s === 'accepted') return 'approved'
-  if (['scheduled', 'in_progress', 'variation_review', 'variation_accepted'].includes(s)) return 'in_progress'
+  if (s === 'scheduled') return 'scheduled'
+  if (['in_progress', 'variation_review', 'variation_accepted'].includes(s)) return 'in_progress'
   if (['submitted_for_signoff', 'evidence_requested', 'snag', 'snag_assigned', 'snag_resolved', 'approved_closeout', 'pending_sign_off', 'snag_in_progress'].includes(s)) return 'awaiting_signoff'
   if (s === 'completed') return 'completed'
   return 'cancelled'
 }
-const BUCKET_LABEL: Record<Bucket, string> = { open: 'Open', quote_requested: 'Quote requested', quoted: 'Quoted', approved: 'Approved', in_progress: 'In progress', awaiting_signoff: 'Sign-off', completed: 'Completed', cancelled: 'Cancelled' }
-const BUCKET_BAR: Record<Bucket, string> = { open: 'bg-blue-500', quote_requested: 'bg-cyan-500', quoted: 'bg-violet-500', approved: 'bg-teal-500', in_progress: 'bg-[#C6A35D]', awaiting_signoff: 'bg-orange-500', completed: 'bg-emerald-500', cancelled: 'bg-red-500' }
-const BAR_ORDER: Bucket[] = ['open', 'quote_requested', 'quoted', 'approved', 'in_progress', 'awaiting_signoff', 'completed']
+const BUCKET_LABEL: Record<Bucket, string> = { open: 'Open', quote_requested: 'Quote requested', quoted: 'Quoted', approved: 'Approved', scheduled: 'Job scheduled', in_progress: 'In progress', awaiting_signoff: 'Sign-off', completed: 'Completed', cancelled: 'Cancelled' }
+const BUCKET_BAR: Record<Bucket, string> = { open: 'bg-blue-500', quote_requested: 'bg-cyan-500', quoted: 'bg-violet-500', approved: 'bg-teal-500', scheduled: 'bg-indigo-500', in_progress: 'bg-[#C6A35D]', awaiting_signoff: 'bg-orange-500', completed: 'bg-emerald-500', cancelled: 'bg-red-500' }
+const BAR_ORDER: Bucket[] = ['open', 'quote_requested', 'quoted', 'approved', 'scheduled', 'in_progress', 'awaiting_signoff', 'completed']
 
 // Urgency rank (handles classic low/medium/high/urgent and engine P1–P4).
 const URGENCY: Record<string, number> = { urgent: 0, P1: 0, high: 1, P2: 1, medium: 2, P3: 2, low: 3, P4: 3 }
@@ -39,6 +40,7 @@ const PILLS: { key: 'all' | 'breached' | Bucket; label: string; active: string; 
   { key: 'quote_requested', label: 'Quote requested', active: 'bg-cyan-500 text-white border-cyan-500', inactive: 'text-cyan-600 dark:text-cyan-400 border-cyan-500/40 hover:border-cyan-400' },
   { key: 'quoted', label: 'Quoted', active: 'bg-violet-500 text-white border-violet-500', inactive: 'text-violet-600 dark:text-violet-400 border-violet-500/40 hover:border-violet-400' },
   { key: 'approved', label: 'Approved', active: 'bg-teal-500 text-white border-teal-500', inactive: 'text-teal-600 dark:text-teal-400 border-teal-500/40 hover:border-teal-400' },
+  { key: 'scheduled', label: 'Job scheduled', active: 'bg-indigo-500 text-white border-indigo-500', inactive: 'text-indigo-600 dark:text-indigo-400 border-indigo-500/40 hover:border-indigo-400' },
   { key: 'in_progress', label: 'In progress', active: 'bg-[#C6A35D] text-[#0a0e17] border-[#C6A35D]', inactive: 'text-amber-600 dark:text-[#C6A35D] border-[#C6A35D]/40 hover:border-[#C6A35D]' },
   { key: 'awaiting_signoff', label: 'Sign-off', active: 'bg-orange-500 text-white border-orange-500', inactive: 'text-orange-600 dark:text-orange-400 border-orange-500/40 hover:border-orange-400' },
   { key: 'completed', label: 'Completed', active: 'bg-emerald-500 text-white border-emerald-500', inactive: 'text-emerald-600 dark:text-emerald-400 border-emerald-500/40 hover:border-emerald-400' },
@@ -85,7 +87,7 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
   }, [])
 
   const counts = useMemo(() => {
-    const c: Record<Bucket, number> = { open: 0, quote_requested: 0, quoted: 0, approved: 0, in_progress: 0, awaiting_signoff: 0, completed: 0, cancelled: 0 }
+    const c: Record<Bucket, number> = { open: 0, quote_requested: 0, quoted: 0, approved: 0, scheduled: 0, in_progress: 0, awaiting_signoff: 0, completed: 0, cancelled: 0 }
     for (const t of tickets) c[bucketOf(t.status)]++
     return c
   }, [tickets])
@@ -228,7 +230,7 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
 }
 
 function StorePanel({ store, rows, onClose }: { store: string; rows: RegionalTicketRow[]; onClose: () => void }) {
-  const c: Record<Bucket, number> = { open: 0, quote_requested: 0, quoted: 0, approved: 0, in_progress: 0, awaiting_signoff: 0, completed: 0, cancelled: 0 }
+  const c: Record<Bucket, number> = { open: 0, quote_requested: 0, quoted: 0, approved: 0, scheduled: 0, in_progress: 0, awaiting_signoff: 0, completed: 0, cancelled: 0 }
   for (const t of rows) c[bucketOf(t.status)]++
   const total = rows.length
   const barTotal = BAR_ORDER.reduce((s, b) => s + c[b], 0) || 1
@@ -267,7 +269,7 @@ function StorePanel({ store, rows, onClose }: { store: string; rows: RegionalTic
           <Stat label="Total" value={total} />
           <Stat label="Breached" value={breached} tone={breached ? 'text-red-600 dark:text-red-400' : 'text-[var(--text)]'} />
           <Stat label="Open / Quoting" value={c.open + c.quote_requested + c.quoted} />
-          <Stat label="In progress" value={c.approved + c.in_progress + c.awaiting_signoff} />
+          <Stat label="In progress" value={c.approved + c.scheduled + c.in_progress + c.awaiting_signoff} />
           <Stat label="Completed" value={c.completed} />
           <Stat label="Oldest open" value={`${oldest}d`} tone={oldest >= 7 ? 'text-amber-600 dark:text-amber-400' : 'text-[var(--text)]'} />
         </div>

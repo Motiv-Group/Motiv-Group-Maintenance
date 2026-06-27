@@ -129,6 +129,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
       }
       case 'approve':
         await admin.from('signoffs').update({ status: 'accepted', reviewed_by: user.id, reviewed_at: now }).eq('ticket_id', ticketId).in('status', ['submitted', 'awaiting_regional', 'awaiting_store'])
+        // Approving the sign-off completes the ticket directly (no separate close-out step).
+        updates.completed_at = now; updates.closed_out_at = now; updates.closed_out_by = user.id
         break
       case 'raise_snag':
         await admin.from('snags').insert({ company_id: ticket.company_id, ticket_id: ticketId, store_id: ticket.store_id, supplier_id: ticket.supplier_id, description: body.description ?? null, severity: body.severity ?? null, required_correction: body.required_correction ?? null, status: 'open' })
@@ -163,8 +165,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   revalidatePath(`/supplier/tickets/${ticketId}`); revalidatePath('/supplier')
   revalidatePath('/regional'); revalidatePath('/regional/tickets'); revalidatePath('/client'); revalidatePath('/executive')
-  if (action === 'close_out') {
-    // Final close-out → refresh reports + estate/regional dashboards (health scores live-compute from tickets).
+  if (action === 'close_out' || tr.to === 'completed') {
+    // Completion → refresh reports + estate/regional dashboards (health scores live-compute from tickets).
     revalidatePath('/regional/reports'); revalidatePath('/executive/reports'); revalidatePath('/executive/stores'); revalidatePath('/regional/stores')
   }
   return NextResponse.json({ ok: true, status: tr.to })

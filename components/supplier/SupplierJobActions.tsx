@@ -67,6 +67,8 @@ export function ScheduleJobCard({ ticketId, priority, createdAt, technicians = [
   const [techId, setTechId] = useState('')
 
   async function confirm(iso: string) {
+    // Date + time are enforced by the picker; the technician is optional — just confirm if left unassigned.
+    if (!techId && !window.confirm('No technician is assigned for this job. Schedule without a technician?')) return
     setBusy(true); setErr('')
     try { await transition(ticketId, { action: 'schedule', scheduledAt: iso, technicianId: techId || null }); router.refresh() }
     catch (e: any) { setErr(e.message); setBusy(false) }

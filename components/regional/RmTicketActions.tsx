@@ -44,7 +44,7 @@ export function AssignSuppliersButton({ ticketId, suppliers }: { ticketId: strin
   async function assign() {
     if (!sel.size) { setErr('Select at least one supplier.'); return }
     setBusy(true); setErr('')
-    try { await post(`/api/tickets/${ticketId}/assign`, { supplierIds: [...sel] }); router.refresh() }
+    try { await post(`/api/tickets/${ticketId}/assign`, { supplierIds: [...sel] }); setOpen(false); setBusy(false); router.refresh() }
     catch (e: any) { setErr(e.message); setBusy(false) }
   }
 
@@ -91,7 +91,7 @@ export function RequestInfoButton({ ticketId }: { ticketId: string }) {
   async function submit() {
     if (!reason.trim()) { setErr('Tell the store what you need.'); return }
     setBusy(true); setErr('')
-    try { await post(`/api/tickets/${ticketId}/transition`, { action: 'request_info', reason: reason.trim() }); router.refresh() }
+    try { await post(`/api/tickets/${ticketId}/transition`, { action: 'request_info', reason: reason.trim() }); setReason(''); setOpen(false); setBusy(false); router.refresh() }
     catch (e: any) { setErr(e.message); setBusy(false) }
   }
 
@@ -302,7 +302,7 @@ export function CancelTicketCard({ ticketId }: { ticketId: string }) {
   async function cancel() {
     setBusy(true); setErr('')
     const finalReason = reason === 'Other' ? (other.trim() || 'Other') : reason
-    try { await post(`/api/tickets/${ticketId}/transition`, { action: 'reject', reason: finalReason }); router.refresh() }
+    try { await post(`/api/tickets/${ticketId}/transition`, { action: 'reject', reason: finalReason }); setOpen(false); setBusy(false); router.refresh() }
     catch (e: any) { setErr(e.message); setBusy(false) }
   }
 

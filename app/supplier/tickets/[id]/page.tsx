@@ -1,8 +1,8 @@
 export const dynamic = 'force-dynamic'
 
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
-import { ClipboardCheck, FileText } from 'lucide-react'
+import { ClipboardCheck, FileText, Calendar } from 'lucide-react'
+import { SubmitCompletionForm } from '@/components/supplier/SubmitCompletionForm'
 import { BackLink } from '@/components/ui/BackLink'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireSupplierV3 } from '@/lib/health/guard'
@@ -52,7 +52,6 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
     admin.from('snags').select('description, required_correction, severity, status, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
   ])
   // Latest completion the supplier submitted (COC + proof-of-completion photos).
-  const latestSignoff = ((signoffRows ?? []) as any[])[0] ?? null
   // Most recent snag — explains why a completion was rejected / sent back.
   const latestSnag = ((snagRows ?? []) as any[])[0] ?? null
   const technicians = (technicianRows ?? []) as { id: string; name: string }[]
@@ -122,8 +121,15 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           </div>
         )}
 
-        {t.scheduled_at && <p className="text-xs text-[var(--text-muted)]">Scheduled: {formatDateTime(t.scheduled_at)}</p>}
-        {t.technician_id && technicians.find(x => x.id === t.technician_id) && <p className="text-xs text-[var(--text-muted)]">Technician: {technicians.find(x => x.id === t.technician_id)!.name}</p>}
+        {t.scheduled_at && (
+          <div className="flex items-center gap-2.5 rounded-xl bg-indigo-500/10 ring-1 ring-indigo-500/30 px-3.5 py-3">
+            <Calendar size={18} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
+            <div className="min-w-0">
+              <p className="text-[11px] uppercase tracking-wide font-semibold text-indigo-700 dark:text-indigo-400">Scheduled</p>
+              <p className="text-sm font-bold text-[var(--text)]">{formatDateTime(t.scheduled_at)}{t.technician_id && technicians.find(x => x.id === t.technician_id) ? ` · ${technicians.find(x => x.id === t.technician_id)!.name}` : ''}</p>
+            </div>
+          </div>
+        )}
       </Card>
 
       <Card className="p-5 space-y-3">
@@ -131,7 +137,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
         {canSubmitQuote && <SendQuoteForm ticketId={t.id} competitive />}
         {t.status === 'accepted' && <ScheduleJobCard ticketId={t.id} priority={t.priority} createdAt={t.created_at} technicians={technicians} />}
         {['in_progress', 'snag_resolved', 'evidence_requested'].includes(t.status) && (
-          <Link href={`/supplier/tickets/${t.id}/complete`} className="block w-full text-center py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition">{latestSignoff ? 'Re-submit COC & POC' : 'Submit COC & POC'}</Link>
+          <SubmitCompletionForm ticketId={t.id} />
         )}
         {t.status === 'in_progress' && <RaiseVariationCard ticketId={t.id} />}
         <WorkflowActions ticketId={t.id} status={t.status} role="supplier" exclude={['schedule', 'submit_completion', 'require_assessment', 'request_quote', 'submit_variation']} />

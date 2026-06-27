@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { redirect } from 'next/navigation'
 import { BackLink } from '@/components/ui/BackLink'
-import { CheckCircle2, FileText } from 'lucide-react'
+import { CheckCircle2, FileText, Calendar } from 'lucide-react'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireRegionalV3 } from '@/lib/health/guard'
 import { loadSlaResolver } from '@/lib/health/data'
@@ -36,7 +36,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
     admin.from('stores').select('name, sub_store').eq('id', t.store_id).single(),
     admin.from('quotes').select('id, supplier_id, amount, amount_incl_vat, description, file_url, status, valid_until, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
-    admin.from('signoffs').select('id, status, before_urls, after_urls, coc_url').eq('ticket_id', t.id).in('status', ['submitted', 'awaiting_regional', 'awaiting_store']).order('created_at', { ascending: false }),
+    admin.from('signoffs').select('id, status, before_urls, after_urls, coc_url, invoice_url, notes, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('suppliers').select('id, company_name').eq('company_id', companyId).eq('active', true).order('company_name'),
     admin.from('ticket_variations').select('description, amount, status, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('snags').select('description, status, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
@@ -44,7 +44,9 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
     admin.from('ratings').select('supplier_id, score').eq('company_id', companyId),
   ])
   const storeName = store ? storeLabel(store.name, store.sub_store) : 'Store'
-  const pendingSignoff = (signoffs ?? [])[0] ?? null
+  const allSignoffs = (signoffs ?? []) as any[]
+  const pendingSignoff = allSignoffs.find(s => ['submitted', 'awaiting_regional', 'awaiting_store'].includes(s.status)) ?? null
+  const acceptedSignoff = allSignoffs.find(s => s.status === 'accepted') ?? null
 
   // SLA due date (final resolution deadline) + overdue state.
   const rules = await loadSlaResolver(admin, t.company_id)
@@ -128,8 +130,23 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         )}
 
         {t.info_request_reason && <p className="text-xs text-amber-600 dark:text-amber-400">Info requested: {t.info_request_reason}</p>}
-        {t.scheduled_at && <p className="text-xs text-[var(--text-muted)]">Scheduled: {formatDateTime(t.scheduled_at)}</p>}
+        {t.scheduled_at && (
+          <div className="flex items-center gap-2.5 rounded-xl bg-indigo-500/10 ring-1 ring-indigo-500/30 px-3.5 py-3">
+            <Calendar size={18} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
+            <div className="min-w-0">
+              <p className="text-[11px] uppercase tracking-wide font-semibold text-indigo-700 dark:text-indigo-400">Scheduled</p>
+              <p className="text-sm font-bold text-[var(--text)]">{formatDateTime(t.scheduled_at)}</p>
+            </div>
+          </div>
+        )}
       </Card>
+
+      {(t.status === 'cancelled' || t.status === 'declined') && (
+        <div className="rounded-2xl bg-red-500/10 ring-1 ring-red-500/40 p-5 space-y-1">
+          <p className="text-sm font-bold text-red-700 dark:text-red-400">Ticket {t.status === 'declined' ? 'declined' : 'cancelled'}</p>
+          <p className="text-sm text-[var(--text-muted)]">{t.cancellation_reason || `This ticket was ${t.status === 'declined' ? 'declined' : 'cancelled'}.`}</p>
+        </div>
+      )}
 
       {pendingSignoff && (
         <Card className="p-5">
@@ -138,6 +155,42 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
             {(pendingSignoff.before_urls ?? []).map((u: string, i: number) => <a key={`b${i}`} href={u} target="_blank" className="text-[#C6A35D] underline">Before {i + 1}</a>)}
             {(pendingSignoff.after_urls ?? []).map((u: string, i: number) => <a key={`a${i}`} href={u} target="_blank" className="text-[#C6A35D] underline">After {i + 1}</a>)}
             {pendingSignoff.coc_url && <a href={pendingSignoff.coc_url} target="_blank" className="text-[#C6A35D] underline">COC</a>}
+          </div>
+        </Card>
+      )}
+
+      {/* Approved COC & POC — read-only block (mirrors the accepted-quote card) */}
+      {acceptedSignoff && (
+        <Card className="p-5 space-y-3">
+          <h2 className="text-sm font-bold text-[var(--text)]">COC &amp; POC</h2>
+          <div className="rounded-xl ring-1 ring-emerald-500/40 bg-emerald-500/5 overflow-hidden">
+            <div className="flex items-center justify-between gap-2 px-4 py-2.5 bg-emerald-500/10 border-b border-emerald-500/20">
+              <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]"><CheckCircle2 size={15} className="text-emerald-500 shrink-0" /> Approved completion</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400 bg-emerald-500/15 rounded-full px-2 py-0.5">Approved</span>
+            </div>
+            <div className="p-4 space-y-3">
+              <DetailItem label="Submitted" value={formatDateTime(acceptedSignoff.created_at)} />
+              <div>
+                <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Proof of completion</div>
+                <div className="flex flex-wrap gap-x-4 gap-y-1">
+                  {(acceptedSignoff.before_urls ?? []).map((u: string, i: number) => <a key={`b${i}`} href={u} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C6A35D] underline hover:text-amber-500">Before {i + 1}</a>)}
+                  {(acceptedSignoff.after_urls ?? []).map((u: string, i: number) => <a key={`a${i}`} href={u} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C6A35D] underline hover:text-amber-500">After {i + 1}</a>)}
+                  {!(acceptedSignoff.before_urls ?? []).length && !(acceptedSignoff.after_urls ?? []).length && <span className="text-sm text-[var(--text-faint)]">No photos</span>}
+                </div>
+              </div>
+              {(acceptedSignoff.coc_url || acceptedSignoff.invoice_url) && (
+                <div className="flex flex-wrap gap-x-4 gap-y-1">
+                  {acceptedSignoff.coc_url && <a href={acceptedSignoff.coc_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View COC</a>}
+                  {acceptedSignoff.invoice_url && <a href={acceptedSignoff.invoice_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View invoice</a>}
+                </div>
+              )}
+              {acceptedSignoff.notes && (
+                <div>
+                  <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Notes</div>
+                  <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{acceptedSignoff.notes}</p>
+                </div>
+              )}
+            </div>
           </div>
         </Card>
       )}
@@ -240,7 +293,6 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         {(updates ?? []).length ? (updates ?? []).map((u: any, i: number) => (
           <div key={i} className="py-2 border-b border-[var(--border)] last:border-0"><p className="text-sm text-[var(--text)]">{u.body}</p><p className="text-[11px] text-[var(--text-faint)]">{u.author_role} · {formatDateTime(u.created_at)}</p></div>
         )) : <p className="text-sm text-[var(--text-faint)]">No updates yet.</p>}
-        {(quotes ?? []).length > 0 && <p className="text-xs text-[var(--text-faint)] mt-2">{quotes!.length} quote(s) · latest {formatCurrency(quotes![0].amount)}</p>}
       </Card>
     </div>
   )

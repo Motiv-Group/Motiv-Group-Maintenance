@@ -116,7 +116,7 @@ export const TRANSITIONS: Record<TicketStatus, Transition[]> = {
     { action: 'reject_variation',  label: 'Reject variation',  to: 'in_progress', roles: ['regional_manager', 'executive'] },
   ],
   submitted_for_signoff: [
-    { action: 'approve',          label: 'Approve',            to: 'approved_closeout', roles: ['regional_manager', 'executive'] },
+    { action: 'approve',          label: 'Approve & complete', to: 'completed',         roles: ['regional_manager', 'executive'] },
     { action: 'request_evidence', label: 'Request more evidence', to: 'evidence_requested', roles: ['regional_manager', 'executive'] },
     { action: 'raise_snag',       label: 'Raise snag',         to: 'snag',              roles: ['regional_manager', 'executive'] },
   ],

@@ -174,7 +174,8 @@ export function rmStatusMeta(status: string): { label: string; cls: string; text
   const goldT = 'text-amber-700 dark:text-[#C6A35D]', orangeT = 'text-orange-700 dark:text-orange-400'
   const blueT = 'text-blue-700 dark:text-blue-400', tealT = 'text-teal-700 dark:text-teal-400'
   const redT = 'text-red-700 dark:text-red-400', greenT = 'text-emerald-700 dark:text-emerald-400', grayT = 'text-gray-600 dark:text-gray-400'
-  const cyan = `bg-cyan-500/15 ${cyanT}`, violet = `bg-violet-500/15 ${violetT}`, gold = `bg-[#C6A35D]/15 ${goldT}`, orange = `bg-orange-500/15 ${orangeT}`
+  const indigoT = 'text-indigo-700 dark:text-indigo-400'
+  const cyan = `bg-cyan-500/15 ${cyanT}`, violet = `bg-violet-500/15 ${violetT}`, gold = `bg-[#C6A35D]/15 ${goldT}`, orange = `bg-orange-500/15 ${orangeT}`, indigo = `bg-indigo-500/15 ${indigoT}`
   const M: Record<string, { label: string; cls: string; text: string }> = {
     open:                  { label: 'Open',              cls: `bg-blue-500/15 ${blueT}`, text: blueT },
     info_requested:        { label: 'Info requested',    cls: 'bg-amber-500/15 text-amber-700 dark:text-amber-400', text: 'text-amber-700 dark:text-amber-400' },
@@ -184,7 +185,7 @@ export function rmStatusMeta(status: string): { label: string; cls: string; text
     quoted:                { label: 'Quoted',            cls: violet, text: violetT },
     quote_revision:        { label: 'Quoted',            cls: violet, text: violetT },
     accepted:              { label: 'Approved',          cls: `bg-teal-500/15 ${tealT}`, text: tealT },
-    scheduled:             { label: 'In progress',       cls: gold, text: goldT },
+    scheduled:             { label: 'Job scheduled',     cls: indigo, text: indigoT },
     in_progress:           { label: 'In progress',       cls: gold, text: goldT },
     variation_review:      { label: 'In progress',       cls: gold, text: goldT },
     submitted_for_signoff: { label: 'Awaiting sign-off', cls: orange, text: orangeT },
