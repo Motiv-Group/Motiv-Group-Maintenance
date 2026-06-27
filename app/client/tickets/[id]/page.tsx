@@ -1,8 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
+import { BackLink } from '@/components/ui/BackLink'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireStoreManagerV3 } from '@/lib/health/guard'
 import { loadSlaResolver } from '@/lib/health/data'
@@ -54,7 +53,7 @@ export default async function StoreTicketDetailPage({ params }: { params: { id: 
 
   return (
     <div className="space-y-5">
-      <Link href="/client/tickets" className="inline-flex items-center gap-1 text-sm text-[var(--text-muted)] hover:text-[var(--text)]"><ArrowLeft size={15} /> Back to tickets</Link>
+      <BackLink fallbackHref="/client/tickets" label="Back to tickets" />
 
       {/* Progress — its own block, dots */}
       <Card className="p-5"><ClientTicketProgress status={t.status} /></Card>

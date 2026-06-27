@@ -11,6 +11,10 @@ import { getDailyBriefing } from '@/lib/briefing/generate'
 import { supplierFacts } from '@/lib/briefing/facts'
 import { formatCurrency, formatDateTime, humanizeDuration, rmStatusMeta } from '@/lib/utils'
 
+// Statuses in the Tickets-tab "Quote requested" (to_quote) bucket — keep in sync
+// with bucketOf() in components/supplier/SupplierTickets.tsx.
+const AWAITING_QUOTE_STATUSES = new Set(['open', 'info_requested', 'assigned', 'assessment', 'quote_requested', 'quote_revision'])
+
 const slaTone = (l: string) =>
   l === 'Breached' ? 'text-red-600 dark:text-red-400'
   : l === 'At risk' ? 'text-amber-600 dark:text-amber-500'
@@ -53,16 +57,17 @@ export default async function SupplierOverviewPage() {
   const k = d.kpis
   const perf = d.perf
   const company = d.company
+  const awaitingQuote = d.tickets.filter(t => AWAITING_QUOTE_STATUSES.has(t.status)).length
   const briefingScopeId = supplierIds.slice().sort().join(',')
   const briefing = await getDailyBriefing({ companyId, scope: 'supplier', scopeId: briefingScopeId, role: 'supplier', facts: supplierFacts(d) })
 
   const kpis: Kpi[] = [
-    { label: 'Open Work', value: k.open, icon: <ClipboardList size={13} />, tone: 'info', href: '/supplier/tickets' },
-    { label: 'Overdue', value: k.overdue, icon: <AlertTriangle size={13} />, tone: k.overdue ? 'bad' : 'good', href: '/supplier/tickets' },
+    { label: 'Awaiting Quote', value: awaitingQuote, icon: <ClipboardList size={13} />, tone: 'info', href: '/supplier/tickets?filter=to_quote' },
+    { label: 'Overdue', value: k.overdue, icon: <AlertTriangle size={13} />, tone: k.overdue ? 'bad' : 'good', href: '/supplier/tickets?filter=breached' },
     { label: 'Due Today', value: k.dueToday, icon: <Clock size={13} />, tone: k.dueToday ? 'warn' : 'good', href: '/supplier/tickets' },
     { label: 'Pending Quotes', value: k.pendingQuotes, icon: <ReceiptText size={13} />, tone: 'gold', href: '/supplier/quotes' },
     { label: 'Awaiting Sign-off', value: k.awaitingSignoff, icon: <ClipboardCheck size={13} />, tone: 'info', href: '/supplier/signoff' },
-    { label: 'Evidence Missing', value: k.evidenceMissing, icon: <Camera size={13} />, tone: k.evidenceMissing ? 'warn' : 'good', href: '/supplier/tickets' },
+    { label: 'Evidence Missing', value: k.evidenceMissing, icon: <Camera size={13} />, tone: k.evidenceMissing ? 'warn' : 'good', href: '/supplier/tickets?filter=evidence' },
   ]
 
   const needsAction = d.tickets.filter(t => t.active && (t.slaLabel === 'Breached' || t.slaLabel === 'At risk' || !t.acknowledged)).slice(0, 6)

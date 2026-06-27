@@ -1,8 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
+import { BackLink } from '@/components/ui/BackLink'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireSupplierV3 } from '@/lib/health/guard'
 import { SubmitCompletionForm } from '@/components/supplier/SubmitCompletionForm'
@@ -16,7 +15,7 @@ export default async function SupplierCompletePage({ params }: { params: { id: s
 
   return (
     <div className="space-y-5">
-      <Link href={`/supplier/tickets/${t.id}`} className="inline-flex items-center gap-1 text-sm text-[var(--text-muted)] hover:text-[var(--text)]"><ArrowLeft size={15} /> Back to ticket</Link>
+      <BackLink fallbackHref={`/supplier/tickets/${t.id}`} label="Back to ticket" />
       <p className="text-sm text-[var(--text-muted)]">{t.job_ref ? `${t.job_ref} · ` : ''}{t.title}</p>
       <SubmitCompletionForm ticketId={t.id} />
     </div>

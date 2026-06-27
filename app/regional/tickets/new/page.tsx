@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic'
 
-import Link from 'next/link'
-import { ArrowLeft, PlusCircle } from 'lucide-react'
+import { BackLink } from '@/components/ui/BackLink'
+import { PlusCircle } from 'lucide-react'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireRegionalV3 } from '@/lib/health/guard'
 import { RmNewTicketForm } from '@/components/regional/RmNewTicketForm'
@@ -20,7 +20,7 @@ export default async function RegionalNewTicketPage() {
 
   return (
     <div className="space-y-5">
-      <Link href="/regional/tickets" className="inline-flex items-center gap-1 text-sm text-[var(--text-muted)] hover:text-[var(--text)]"><ArrowLeft size={15} /> Back to tickets</Link>
+      <BackLink fallbackHref="/regional/tickets" label="Back to tickets" />
       <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><PlusCircle className="text-emerald-600 dark:text-emerald-400" size={22} /> Log a Ticket</h1>
       <Card className="p-5">
         <RmNewTicketForm stores={stores} suppliers={suppliers} />

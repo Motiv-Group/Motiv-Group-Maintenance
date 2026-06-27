@@ -1,8 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
+import { BackLink } from '@/components/ui/BackLink'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireRegionalV3 } from '@/lib/health/guard'
 import { Card } from '@/components/exec/ui'
@@ -23,7 +22,7 @@ export default async function SupplierReviewsPage({ params }: { params: { id: st
 
   return (
     <div className="space-y-5">
-      <Link href="/regional" className="inline-flex items-center gap-1 text-sm text-[var(--text-muted)] hover:text-[var(--text)]"><ArrowLeft size={15} /> Back to dashboard</Link>
+      <BackLink fallbackHref="/regional" label="Back to dashboard" />
 
       <Card className="p-6">
         <h1 className="text-xl font-bold text-[var(--text)]">{supplier.company_name}</h1>

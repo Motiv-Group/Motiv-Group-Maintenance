@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { PlusCircle, ImagePlus, Camera, X, ArrowLeft } from 'lucide-react'
+import { BackLink } from '@/components/ui/BackLink'
+import { PlusCircle, ImagePlus, Camera, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Card } from '@/components/exec/ui'
 import { OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
@@ -61,7 +61,7 @@ export default function LogTicketPage() {
 
   return (
     <div className="max-w-xl mx-auto space-y-5">
-      <Link href="/client/tickets" className="inline-flex items-center gap-1 text-sm text-[var(--text-muted)] hover:text-[var(--text)]"><ArrowLeft size={15} /> Back to tickets</Link>
+      <BackLink fallbackHref="/client/tickets" label="Back to tickets" />
 
       <div><h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><PlusCircle className="text-emerald-500" size={22} /> Log a Ticket</h1>
         <p className="text-sm text-[var(--text-muted)] mt-0.5">Describe the maintenance issue at your store. All fields are required.</p></div>

@@ -21,7 +21,7 @@ function bucketOf(s: string): Bucket {
   if (s === 'completed') return 'completed'
   return 'closed'   // declined / cancelled
 }
-const BUCKET_LABEL: Record<Bucket, string> = { to_quote: 'To Quote', quoted: 'Quoted', scheduled: 'Scheduled', in_progress: 'In Progress', signoff: 'Sign-off', completed: 'Completed', closed: 'Closed' }
+const BUCKET_LABEL: Record<Bucket, string> = { to_quote: 'Quote requested', quoted: 'Quoted', scheduled: 'Scheduled', in_progress: 'In Progress', signoff: 'Sign-off', completed: 'Completed', closed: 'Closed' }
 const BUCKET_BAR: Record<Bucket, string> = { to_quote: 'bg-cyan-500', quoted: 'bg-violet-500', scheduled: 'bg-teal-500', in_progress: 'bg-[#C6A35D]', signoff: 'bg-orange-500', completed: 'bg-emerald-500', closed: 'bg-red-500' }
 const BAR_ORDER: Bucket[] = ['to_quote', 'quoted', 'scheduled', 'in_progress', 'signoff', 'completed']
 
@@ -39,7 +39,7 @@ const PILLS: { key: FilterKey; label: string; active: string; inactive: string }
   { key: 'all', label: 'All', active: 'bg-slate-800 text-white border-slate-800 dark:bg-white dark:text-[#0a0e17] dark:border-white', inactive: 'text-[var(--text-muted)] border-[var(--border)] hover:border-slate-400' },
   { key: 'breached', label: 'SLA Breached', active: 'bg-red-600 text-white border-red-600', inactive: 'text-red-600 dark:text-red-400 border-red-500/50 hover:border-red-500' },
   { key: 'evidence', label: 'Missing Evidence', active: 'bg-amber-500 text-white border-amber-500', inactive: 'text-amber-600 dark:text-amber-500 border-amber-500/50 hover:border-amber-500' },
-  { key: 'to_quote', label: 'To Quote', active: 'bg-cyan-500 text-white border-cyan-500', inactive: 'text-cyan-600 dark:text-cyan-400 border-cyan-500/40 hover:border-cyan-400' },
+  { key: 'to_quote', label: 'Quote requested', active: 'bg-cyan-500 text-white border-cyan-500', inactive: 'text-cyan-600 dark:text-cyan-400 border-cyan-500/40 hover:border-cyan-400' },
   { key: 'quoted', label: 'Quoted', active: 'bg-violet-500 text-white border-violet-500', inactive: 'text-violet-600 dark:text-violet-400 border-violet-500/40 hover:border-violet-400' },
   { key: 'scheduled', label: 'Scheduled', active: 'bg-teal-500 text-white border-teal-500', inactive: 'text-teal-600 dark:text-teal-400 border-teal-500/40 hover:border-teal-400' },
   { key: 'in_progress', label: 'In Progress', active: 'bg-[#C6A35D] text-[#0a0e17] border-[#C6A35D]', inactive: 'text-amber-600 dark:text-[#C6A35D] border-[#C6A35D]/40 hover:border-[#C6A35D]' },
@@ -84,8 +84,11 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
   const [panelStore, setPanelStore] = useState<string | null>(null)
 
   useEffect(() => {
-    const s = new URLSearchParams(window.location.search).get('store')
+    const params = new URLSearchParams(window.location.search)
+    const s = params.get('store')
     if (s) setPanelStore(s)
+    const f = params.get('filter')
+    if (f && PILLS.some(p => p.key === f)) setFilter(f as FilterKey)
   }, [])
 
   const counts = useMemo(() => {
@@ -185,10 +188,7 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
             <div className="flex items-center justify-between gap-2 mb-1">
               <button onClick={() => toggle(store)} aria-expanded={!isCollapsed} className="flex items-center gap-2 min-w-0 -m-1 p-1 rounded-lg hover:bg-[var(--hover)] transition">
                 <ChevronDown size={16} className={`shrink-0 text-[var(--text-muted)] transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
-                <span className="min-w-0 text-left">
-                  {company && <span className="block text-[10px] text-[var(--text-faint)] truncate leading-tight">{company}</span>}
-                  <span className="block text-sm font-bold text-[var(--text)] truncate leading-tight">{store}{g.branchCode ? ` · ${g.branchCode}` : ''}</span>
-                </span>
+                <span className="text-sm font-bold text-[var(--text)] truncate">{[company, store].filter(Boolean).join(' · ')}{g.branchCode ? ` · ${g.branchCode}` : ''}</span>
                 <span className="text-[11px] font-medium text-[var(--text-muted)] bg-black/5 dark:bg-white/10 rounded-full px-2 py-0.5 shrink-0">{g.rows.length}</span>
               </button>
               <button onClick={() => setPanelStore(store)} title="Store overview" className="shrink-0 -m-1 p-1.5 rounded-lg text-[var(--text-faint)] hover:text-[#C6A35D] hover:bg-[#C6A35D]/10 transition"><BarChart3 size={16} /></button>

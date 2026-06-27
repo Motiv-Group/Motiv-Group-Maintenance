@@ -1,8 +1,8 @@
 export const dynamic = 'force-dynamic'
 
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
-import { ArrowLeft, CheckCircle2, FileText } from 'lucide-react'
+import { BackLink } from '@/components/ui/BackLink'
+import { CheckCircle2, FileText } from 'lucide-react'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireRegionalV3 } from '@/lib/health/guard'
 import { loadSlaResolver } from '@/lib/health/data'
@@ -82,7 +82,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
 
   return (
     <div className="space-y-5">
-      <Link href="/regional/tickets" className="inline-flex items-center gap-1 text-sm text-[var(--text-muted)] hover:text-[var(--text)]"><ArrowLeft size={15} /> Back to tickets</Link>
+      <BackLink fallbackHref="/regional/tickets" label="Back to tickets" />
 
       {/* Progress — bare, no card around it */}
       <div className="px-1 pt-1"><RmPipeline status={t.status} /></div>
