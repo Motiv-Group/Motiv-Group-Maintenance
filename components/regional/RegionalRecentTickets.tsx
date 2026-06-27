@@ -17,7 +17,8 @@ export function RegionalRecentTickets({ tickets }: { tickets: RegionalTicketRow[
   const [open, setOpen] = useState(true)
   const recent = useMemo(() => {
     const cutoff = Date.now() - WEEK_MS
-    return tickets.filter(t => new Date(t.createdAt).getTime() >= cutoff)
+    // Completed tickets live in the Tickets-tab archive, not the recent overview.
+    return tickets.filter(t => t.status !== 'completed' && new Date(t.createdAt).getTime() >= cutoff)
   }, [tickets])
 
   return (
@@ -40,7 +41,7 @@ export function RegionalRecentTickets({ tickets }: { tickets: RegionalTicketRow[
               <p className="text-sm text-[var(--text)] truncate">{t.title}</p>
               <p className="text-[11px] text-[var(--text-faint)] truncate">{t.storeName}{t.branchCode ? ` · ${t.branchCode}` : ''} · {formatDateTime(t.createdAt)}</p>
               {t.overdue && <p className="text-[11px] font-semibold text-red-600 dark:text-red-400">Overdue by {humanizeDuration(Date.now() - new Date(t.dueAt).getTime())}</p>}
-              {t.quoteRequestedAt && <p className="text-[11px] text-[var(--text-faint)] truncate">Quote requested · {formatDateTime(t.quoteRequestedAt)}</p>}
+              {t.quoteRequestedAt && <p className={`text-[11px] font-medium truncate ${sm.text}`}>Quote requested · {formatDateTime(t.quoteRequestedAt)}</p>}
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
               <PriorityBadge priority={t.priority} className="w-full text-center" />

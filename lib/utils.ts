@@ -195,7 +195,7 @@ export function rmStatusMeta(status: string): { label: string; cls: string; text
     snag_resolved:         { label: 'Awaiting sign-off', cls: orange, text: orangeT },
     approved_closeout:     { label: 'Awaiting sign-off', cls: orange, text: orangeT },
     completed:             { label: 'Completed',         cls: `bg-emerald-500/15 ${greenT}`, text: greenT },
-    cancelled:             { label: 'Cancelled',         cls: `bg-red-500/15 ${redT}`, text: redT },
+    cancelled:             { label: 'Cancelled',         cls: `bg-gray-500/15 ${grayT}`, text: grayT },
     declined:              { label: 'Declined',          cls: `bg-gray-500/15 ${grayT}`, text: grayT },
     // legacy
     pending_sign_off:      { label: 'Awaiting sign-off', cls: orange, text: orangeT },
