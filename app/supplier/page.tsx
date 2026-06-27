@@ -9,7 +9,7 @@ import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { BriefingRefresh } from '@/components/briefing/BriefingRefresh'
 import { getDailyBriefing } from '@/lib/briefing/generate'
 import { supplierFacts } from '@/lib/briefing/facts'
-import { formatCurrency, formatDateTime, rmStatusMeta } from '@/lib/utils'
+import { formatCurrency, formatDateTime, humanizeDuration, rmStatusMeta } from '@/lib/utils'
 
 const slaTone = (l: string) =>
   l === 'Breached' ? 'text-red-600 dark:text-red-400'
@@ -36,6 +36,7 @@ function TicketRow({ t }: { t: SupplierTicketRow }) {
       <div className="min-w-0">
         <p className="text-sm font-medium text-[var(--text)] truncate">{t.storeName}</p>
         <p className="text-[11px] text-[var(--text-muted)] truncate">{t.title}</p>
+        {t.overdue && <p className="text-[11px] font-semibold text-red-600 dark:text-red-400">Overdue by {humanizeDuration(Date.now() - new Date(t.dueAt).getTime())}</p>}
         {m && <p className={`text-[11px] ${sm.text}`}>{m.label} · {formatDateTime(m.at)}</p>}
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">

@@ -9,7 +9,7 @@ import { Ticket, Search, ChevronDown, BarChart3, X, PlusCircle } from 'lucide-re
 import type { RegionalTicketRow } from '@/lib/health/data'
 import { Card } from '@/components/exec/ui'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
-import { rmStatusMeta, formatDateTime } from '@/lib/utils'
+import { rmStatusMeta, formatDateTime, humanizeDuration } from '@/lib/utils'
 
 type Bucket = 'open' | 'quote_requested' | 'quoted' | 'approved' | 'in_progress' | 'awaiting_signoff' | 'completed' | 'cancelled'
 function bucketOf(s: string): Bucket {
@@ -60,7 +60,8 @@ function TicketRow({ t }: { t: RegionalTicketRow }) {
       <div className="min-w-0">
         {t.jobRef && <p className="text-[10px] font-mono text-[var(--text-faint)]">{t.jobRef}</p>}
         <p className="text-sm text-[var(--text)] truncate">{t.title}</p>
-        <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(t.createdAt)}{t.breached ? ' · ⚠ breached' : ''}</p>
+        <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(t.createdAt)}{t.breached && !t.overdue ? ' · ⚠ breached' : ''}</p>
+        {t.overdue && <p className="text-[11px] font-semibold text-red-600 dark:text-red-400">Overdue by {humanizeDuration(Date.now() - new Date(t.dueAt).getTime())}</p>}
         {m && <p className={`text-[11px] font-medium ${sm.text}`}>{m.label} · {formatDateTime(m.at)}</p>}
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">

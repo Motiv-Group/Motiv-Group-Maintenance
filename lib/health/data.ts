@@ -17,7 +17,14 @@ import { calculateSupplierPerformance, type SupplierPerformance } from './suppli
 import { detectRepeatDefects, type RepeatDefect } from './repeatDefects'
 import { getExecutiveDecisionItems, type DecisionItem } from './decisions'
 import { computeTicketSla, supplierBreachOlderThan, internalBreachOlderThan } from './sla'
+import { deriveDueDates } from './priority'
 import { clientVisibleStatus, storeLabel } from '@/lib/utils'
+
+/** Final resolution deadline + whether the ticket is overdue (active & past due). */
+function dueInfo(t: HealthTicket, rules: SlaRuleResolver, now: Date): { dueAt: string; overdue: boolean } {
+  const dueAt = deriveDueDates(t, rules(t.priority)).resolutionDue
+  return { dueAt, overdue: isActive(t.status) && now.getTime() > new Date(dueAt).getTime() }
+}
 import type { TicketStatus } from '@/lib/types'
 
 type DB = ReturnType<typeof createAdminClient>
@@ -332,6 +339,7 @@ export interface RegionalTicketRow {
   id: string; title: string; storeName: string; branchCode: string | null
   status: string; priority: Priority; jobRef: string | null; createdAt: string
   quoteRequestedAt: string | null; quoteReceivedAt: string | null; quoteAcceptedAt: string | null; breached: boolean
+  dueAt: string; overdue: boolean
 }
 export interface RegionalDashboardData {
   portfolio: RegionalHealthResult
@@ -389,6 +397,7 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
       quoteReceivedAt: firstQuoteAt.get(t.id) ?? null,
       quoteAcceptedAt: ((t as any).quote_decision_status === 'approved' ? (t as any).quote_decided_at : null) ?? acceptedQuoteAt.get(t.id) ?? null,
       breached: isActive(t.status) ? (() => { const s = computeTicketSla(t, rules(t.priority), now); return s.supplierBreached || s.internalBreached })() : false,
+      ...dueInfo(t, rules, now),
     }))
 
   const byStore = new Map<string, HealthTicket[]>()
@@ -467,7 +476,7 @@ export type ClientStatus = 'open' | 'in_progress' | 'completed' | 'cancelled'
 // ticket read "Open" on the detail page but "In Progress" on the dashboard).
 const clientVisible = (status: string): ClientStatus | null =>
   clientVisibleStatus(status as TicketStatus)
-export interface StoreManagerTicket { id: string; title: string; description: string | null; category: string | null; status: ClientStatus; priority: Priority; operationalImpact: string | null; createdAt: string; supplierAssigned: boolean; jobRef: string | null }
+export interface StoreManagerTicket { id: string; title: string; description: string | null; category: string | null; status: ClientStatus; priority: Priority; operationalImpact: string | null; createdAt: string; supplierAssigned: boolean; jobRef: string | null; dueAt: string; overdue: boolean }
 export interface StoreManagerData {
   storeName: string
   company: string
@@ -501,7 +510,8 @@ export async function assembleStoreManagerDashboard(companyId: string, storeIds:
     const v = clientVisible(t.status)
     if (!v) continue
     if (v === 'open') open++; else if (v === 'in_progress') inProgress++; else if (v === 'cancelled') cancelled++; else completed++
-    visible.push({ id: t.id, title: t.title ?? 'Untitled', description: (t as any).description ?? null, category: t.category ?? null, status: v, priority: t.priority, operationalImpact: t.operational_impact ?? null, createdAt: t.created_at, supplierAssigned: !!t.supplier_id, jobRef: (t as any).job_ref ?? null })
+    const { dueAt, overdue } = dueInfo(t, rules, now)
+    visible.push({ id: t.id, title: t.title ?? 'Untitled', description: (t as any).description ?? null, category: t.category ?? null, status: v, priority: t.priority, operationalImpact: t.operational_impact ?? null, createdAt: t.created_at, supplierAssigned: !!t.supplier_id, jobRef: (t as any).job_ref ?? null, dueAt, overdue })
   }
   visible.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
   return {
@@ -522,6 +532,7 @@ export interface SupplierTicketRow {
   acknowledged: boolean; evidenceRequired: boolean; beforeUploaded: boolean; afterUploaded: boolean; cocUploaded: boolean
   active: boolean; breached: boolean
   assignedAt: string | null; quoteRequestedAt: string | null; quoteApprovedAt: string | null
+  dueAt: string; overdue: boolean
 }
 export interface SupplierQuoteRow { id: string; ticketTitle: string; storeName: string; amount: number; amountInclVat: number | null; status: string; createdAt: string }
 export interface SupplierDashboardData {
@@ -598,6 +609,7 @@ export async function assembleSupplierDashboard(companyId: string, supplierIds: 
       assignedAt: raw.quote_requested_at ?? t.created_at ?? null,
       quoteRequestedAt: raw.quote_requested_at ?? null,
       quoteApprovedAt: approvedAt,
+      ...dueInfo(t, rules, now),
     })
   }
   // Active first, then unacknowledged, then oldest — keeps the dashboard queues useful.

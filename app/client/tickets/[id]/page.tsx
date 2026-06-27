@@ -5,11 +5,16 @@ import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireStoreManagerV3 } from '@/lib/health/guard'
+import { loadSlaResolver } from '@/lib/health/data'
+import { deriveDueDates } from '@/lib/health/priority'
+import { isActive } from '@/lib/health/types'
+import type { HealthTicket, Priority } from '@/lib/health/types'
 import { Card } from '@/components/exec/ui'
 import { WorkflowActions } from '@/components/workflow/WorkflowActions'
 import { ClientTicketProgress } from '@/components/client/ClientTicketProgress'
 import { ClientTicketStatus } from '@/components/client/ClientTicketStatus'
 import { EditTicketForm } from '@/components/client/EditTicketForm'
+import { DueDate } from '@/components/workflow/DueDate'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { formatDateTime, clientVisibleStatus } from '@/lib/utils'
 import type { TicketStatus } from '@/lib/types'
@@ -41,6 +46,12 @@ export default async function StoreTicketDetailPage({ params }: { params: { id: 
   // SM may edit/resubmit while open OR when more info has been requested.
   const canEdit = t.status === 'open' || t.status === 'info_requested'
 
+  // SLA due date (final resolution deadline) + overdue state.
+  const rules = await loadSlaResolver(admin, t.company_id)
+  const now = new Date()
+  const dueAt = deriveDueDates(t as HealthTicket, rules(t.priority as Priority)).resolutionDue
+  const overdue = isActive(t.status) && now.getTime() > new Date(dueAt).getTime()
+
   return (
     <div className="space-y-5">
       <Link href="/client/tickets" className="inline-flex items-center gap-1 text-sm text-[var(--text-muted)] hover:text-[var(--text)]"><ArrowLeft size={15} /> Back to tickets</Link>
@@ -67,6 +78,7 @@ export default async function StoreTicketDetailPage({ params }: { params: { id: 
         <div className="grid grid-cols-2 gap-x-4 gap-y-3">
           <DetailItem label="Category" value={t.category ?? 'General'} />
           <DetailItem label="Logged" value={formatDateTime(t.created_at)} />
+          <DueDate dueAt={dueAt} overdue={overdue} now={now.toISOString()} />
         </div>
 
         <div>

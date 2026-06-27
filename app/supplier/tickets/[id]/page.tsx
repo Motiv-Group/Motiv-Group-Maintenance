@@ -5,6 +5,10 @@ import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireSupplierV3 } from '@/lib/health/guard'
+import { loadSlaResolver } from '@/lib/health/data'
+import { deriveDueDates } from '@/lib/health/priority'
+import { isActive } from '@/lib/health/types'
+import type { HealthTicket, Priority } from '@/lib/health/types'
 import { Card } from '@/components/exec/ui'
 import { WorkflowActions } from '@/components/workflow/WorkflowActions'
 import { RmPipeline } from '@/components/regional/RmPipeline'
@@ -12,6 +16,7 @@ import { SupplierAttachments } from '@/components/workflow/SupplierAttachments'
 import { SendQuoteForm } from '@/components/admin/SendQuoteForm'
 import { QuoteSummary, type QuoteSummaryStatus } from '@/components/workflow/QuoteSummary'
 import { ScheduleJobCard, RaiseVariationCard } from '@/components/supplier/SupplierJobActions'
+import { DueDate } from '@/components/workflow/DueDate'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { formatDateTime, rmStatusMeta, storeLabel, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
 
@@ -41,6 +46,12 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   const awarded = !!t.supplier_id && supplierIds.includes(t.supplier_id)
   if (!awarded && !invite) redirect('/supplier/tickets')
   const storeName = storeLabel(store?.name, store?.sub_store)
+
+  // SLA due date (final resolution deadline) + overdue state.
+  const rules = await loadSlaResolver(admin, t.company_id)
+  const now = new Date()
+  const dueAt = deriveDueDates(t as HealthTicket, rules(t.priority as Priority)).resolutionDue
+  const overdue = isActive(t.status) && now.getTime() > new Date(dueAt).getTime()
 
   // Their latest submitted quote (if any) for this ticket.
   const latestQuote = ((myQuotes ?? []) as any[])[0] ?? null
@@ -83,6 +94,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           <DetailItem label="Category" value={t.category ?? 'General'} />
           <DetailItem label="Operational Impact" value={OPERATIONAL_IMPACT_LABELS[t.operational_impact ?? 'none'] ?? 'No operational impact'} />
           <DetailItem label="Logged" value={formatDateTime(t.created_at)} />
+          <DueDate dueAt={dueAt} overdue={overdue} now={now.toISOString()} />
         </div>
 
         <div>

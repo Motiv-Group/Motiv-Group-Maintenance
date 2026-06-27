@@ -20,18 +20,22 @@ export default async function StoreOverviewPage() {
   const briefing = await getDailyBriefing({ companyId, scope: 'store', scopeId: briefingScopeId, role: 'store_manager', facts: storeFacts(d) })
   const greeting = (() => { const x = new Date().getHours(); return x < 12 ? 'Good morning' : x < 17 ? 'Good afternoon' : 'Good evening' })()
 
+  // Overdue = active tickets past their resolution deadline (same basis the
+  // Overdue filter + per-ticket red indicator use, so the count always matches).
+  const overdueCount = d.tickets.filter(t => t.overdue).length
+
   // Store managers only ever see ticket status — never money or quotes.
   const kpis: Kpi[] = [
     { label: 'Open', value: d.open, icon: <ClipboardList size={13} />, tone: 'info', href: '/client/tickets?status=open' },
     { label: 'In Progress', value: d.inProgress, icon: <Wrench size={13} />, tone: 'gold', href: '/client/tickets?status=in_progress' },
     { label: 'Completed', value: d.completed, icon: <CheckCircle2 size={13} />, tone: 'good', href: '/client/tickets?status=completed' },
-    { label: 'Overdue', value: h?.overdueTickets ?? 0, icon: <AlertTriangle size={13} />, tone: (h?.overdueTickets ?? 0) ? 'bad' : 'good', href: '/client/tickets' },
+    { label: 'Overdue', value: overdueCount, icon: <AlertTriangle size={13} />, tone: overdueCount ? 'bad' : 'good', href: '/client/tickets?status=overdue' },
   ]
 
   // Status-only prompts. The SM can't action tickets — these nudge them to flag
   // anything stalling to their Regional Manager, who owns the decisions.
   const actions: { icon: React.ReactNode; text: string }[] = []
-  if ((h?.overdueTickets ?? 0) > 0) actions.push({ icon: <AlertTriangle size={15} className="text-amber-500 mt-0.5 shrink-0" />, text: `${h!.overdueTickets} ticket${h!.overdueTickets > 1 ? 's' : ''} past target. If it's affecting trade, let your Regional Manager know it isn't being actioned yet.` })
+  if (overdueCount > 0) actions.push({ icon: <AlertTriangle size={15} className="text-amber-500 mt-0.5 shrink-0" />, text: `${overdueCount} ticket${overdueCount > 1 ? 's' : ''} past target. If it's affecting trade, let your Regional Manager know it isn't being actioned yet.` })
 
   return (
     <div className="space-y-5">

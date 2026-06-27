@@ -6,7 +6,7 @@ import { ChevronDown } from 'lucide-react'
 import type { StoreManagerTicket } from '@/lib/health/data'
 import { Card } from '@/components/exec/ui'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
-import { formatDateTime } from '@/lib/utils'
+import { formatDateTime, humanizeDuration } from '@/lib/utils'
 
 const STATUS_TONE: Record<string, string> = {
   open: 'bg-blue-500/15 text-blue-700 dark:text-blue-400',
@@ -44,6 +44,7 @@ export function RecentTicketsCard({ tickets }: { tickets: StoreManagerTicket[] }
             {t.jobRef && <p className="text-[10px] font-mono text-[var(--text-faint)]">{t.jobRef}</p>}
             <p className="text-sm text-[var(--text)] truncate">{t.title}</p>
             <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(t.createdAt)}</p>
+            {t.overdue && <p className="text-[11px] font-semibold text-red-600 dark:text-red-400">Overdue by {humanizeDuration(Date.now() - new Date(t.dueAt).getTime())}</p>}
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_6rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
             <PriorityBadge priority={t.priority} className="w-full text-center" />

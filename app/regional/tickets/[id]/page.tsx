@@ -5,10 +5,15 @@ import Link from 'next/link'
 import { ArrowLeft, CheckCircle2, FileText } from 'lucide-react'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireRegionalV3 } from '@/lib/health/guard'
+import { loadSlaResolver } from '@/lib/health/data'
+import { deriveDueDates } from '@/lib/health/priority'
+import { isActive } from '@/lib/health/types'
+import type { HealthTicket, Priority } from '@/lib/health/types'
 import { Card } from '@/components/exec/ui'
 import { WorkflowActions } from '@/components/workflow/WorkflowActions'
 import { RmPipeline } from '@/components/regional/RmPipeline'
 import { AssignSuppliersButton, RequestInfoButton, RmEditTicketForm, SupplierStatusList, QuoteReviewCard, CancelTicketCard, ApproveSignoffCard } from '@/components/regional/RmTicketActions'
+import { DueDate } from '@/components/workflow/DueDate'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { formatCurrency, formatDateTime, formatDate, rmStatusMeta, storeLabel, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
 
@@ -40,6 +45,12 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   ])
   const storeName = store ? storeLabel(store.name, store.sub_store) : 'Store'
   const pendingSignoff = (signoffs ?? [])[0] ?? null
+
+  // SLA due date (final resolution deadline) + overdue state.
+  const rules = await loadSlaResolver(admin, t.company_id)
+  const now = new Date()
+  const dueAt = deriveDueDates(t as HealthTicket, rules(t.priority as Priority)).resolutionDue
+  const overdue = isActive(t.status) && now.getTime() > new Date(dueAt).getTime()
 
   // Avg star rating per supplier, so the RM sees each contractor's record when assigning.
   const ratingAgg = new Map<string, { sum: number; n: number }>()
@@ -97,6 +108,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
           <DetailItem label="Category" value={t.category ?? 'General'} />
           <DetailItem label="Operational Impact" value={OPERATIONAL_IMPACT_LABELS[t.operational_impact ?? 'none'] ?? 'No operational impact'} />
           <DetailItem label="Logged" value={formatDateTime(t.created_at)} />
+          <DueDate dueAt={dueAt} overdue={overdue} now={now.toISOString()} />
         </div>
 
         <div>

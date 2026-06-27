@@ -6,9 +6,9 @@ import { PlusCircle, Search, Ticket, ChevronDown } from 'lucide-react'
 import type { StoreManagerTicket } from '@/lib/health/data'
 import { Card } from '@/components/exec/ui'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
-import { formatDate, formatDateTime, OPERATIONAL_IMPACT_LABELS, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
+import { formatDate, formatDateTime, humanizeDuration, OPERATIONAL_IMPACT_LABELS, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
 
-type Filter = 'all' | 'open' | 'in_progress' | 'completed' | 'cancelled'
+type Filter = 'all' | 'open' | 'in_progress' | 'completed' | 'cancelled' | 'overdue'
 
 const TONE: Record<string, string> = {
   open: 'bg-blue-500/15 text-blue-700 dark:text-blue-400',
@@ -27,6 +27,7 @@ const byDateThenUrgency = (a: StoreManagerTicket, b: StoreManagerTicket) =>
 
 const PILLS: { key: Filter; label: string; active: string; inactive: string }[] = [
   { key: 'all',         label: 'All',         active: 'bg-slate-800 text-white border-slate-800 dark:bg-white dark:text-[#0a0e17] dark:border-white', inactive: 'text-[var(--text-muted)] border-[var(--border)] hover:border-slate-400' },
+  { key: 'overdue',     label: 'Overdue',     active: 'bg-red-600 text-white border-red-600',                inactive: 'text-red-600 dark:text-red-400 border-red-500/50 hover:border-red-500' },
   { key: 'open',        label: 'Open',        active: 'bg-blue-500 text-white border-blue-500',              inactive: 'text-blue-600 dark:text-blue-400 border-blue-500/40 hover:border-blue-400' },
   { key: 'in_progress', label: 'In Progress', active: 'bg-[#C6A35D] text-[#0a0e17] border-[#C6A35D]',        inactive: 'text-amber-600 dark:text-[#C6A35D] border-[#C6A35D]/40 hover:border-[#C6A35D]' },
   { key: 'completed',   label: 'Completed',   active: 'bg-emerald-500 text-white border-emerald-500',        inactive: 'text-emerald-600 dark:text-emerald-400 border-emerald-500/40 hover:border-emerald-400' },
@@ -40,6 +41,7 @@ function Row({ t }: { t: StoreManagerTicket }) {
         {t.jobRef && <p className="text-[10px] font-mono text-[var(--text-faint)]">{t.jobRef}</p>}
         <p className="text-sm text-[var(--text)] truncate">{t.title}</p>
         <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(t.createdAt)}</p>
+        {t.overdue && <p className="text-[11px] font-semibold text-red-600 dark:text-red-400">Overdue by {humanizeDuration(Date.now() - new Date(t.dueAt).getTime())}</p>}
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_6rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
         <PriorityBadge priority={t.priority} className="w-full text-center" />
@@ -70,8 +72,8 @@ export function StoreTicketsList({ tickets, initialFilter = 'all' }: { tickets: 
   const [q, setQ] = useState('')
 
   const counts = useMemo(() => {
-    const c = { open: 0, in_progress: 0, completed: 0, cancelled: 0 }
-    for (const t of tickets) if (t.status in c) (c as any)[t.status]++
+    const c = { open: 0, in_progress: 0, completed: 0, cancelled: 0, overdue: 0 }
+    for (const t of tickets) { if (t.status in c) (c as any)[t.status]++; if (t.overdue) c.overdue++ }
     return c
   }, [tickets])
 
@@ -97,7 +99,7 @@ export function StoreTicketsList({ tickets, initialFilter = 'all' }: { tickets: 
     const tokens = q.toLowerCase().split(/[\s+]+/).map(s => s.trim()).filter(Boolean)
     return haystacks
       .filter(({ t, hay }) =>
-        (filter === 'all' || t.status === filter) &&
+        (filter === 'all' || (filter === 'overdue' ? t.overdue : t.status === filter)) &&
         (tokens.length === 0 || tokens.every(tok => hay.includes(tok))))
       .map(x => x.t)
   }, [haystacks, filter, q])

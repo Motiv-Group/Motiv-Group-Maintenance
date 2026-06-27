@@ -9,7 +9,7 @@ import { ChevronDown } from 'lucide-react'
 import type { RegionalTicketRow } from '@/lib/health/data'
 import { Card } from '@/components/exec/ui'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
-import { rmStatusMeta, formatDateTime } from '@/lib/utils'
+import { rmStatusMeta, formatDateTime, humanizeDuration } from '@/lib/utils'
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 
@@ -39,6 +39,7 @@ export function RegionalRecentTickets({ tickets }: { tickets: RegionalTicketRow[
             <div className="min-w-0">
               <p className="text-sm text-[var(--text)] truncate">{t.title}</p>
               <p className="text-[11px] text-[var(--text-faint)] truncate">{t.storeName}{t.branchCode ? ` · ${t.branchCode}` : ''} · {formatDateTime(t.createdAt)}</p>
+              {t.overdue && <p className="text-[11px] font-semibold text-red-600 dark:text-red-400">Overdue by {humanizeDuration(Date.now() - new Date(t.dueAt).getTime())}</p>}
               {t.quoteRequestedAt && <p className="text-[11px] text-[var(--text-faint)] truncate">Quote requested · {formatDateTime(t.quoteRequestedAt)}</p>}
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
