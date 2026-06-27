@@ -11,6 +11,8 @@ const QUOTE_STATUS_LABEL: Record<string, string> = { pending: 'Pending', accepte
 const FILTERS: { key: string; label: string }[] = [
   { key: 'all', label: 'All' }, { key: 'pending', label: 'Pending' }, { key: 'accepted', label: 'Approved' }, { key: 'declined', label: 'Declined' },
 ]
+// Tickets past the quoting/decision/work phase belong in Sign-off / archive, not here.
+const HIDE_FROM_QUOTES = new Set(['submitted_for_signoff', 'approved_closeout', 'evidence_requested', 'snag', 'snag_assigned', 'snag_in_progress', 'snag_resolved', 'pending_sign_off', 'completed'])
 
 // What the supplier should do next, derived from the ticket's current status.
 function nextStep(ticketStatus: string): string {
@@ -34,7 +36,9 @@ export default async function SupplierQuotesPage({ searchParams }: { searchParam
   const { companyId, supplierIds } = await requireSupplierV3()
   const d = await assembleSupplierDashboard(companyId, supplierIds)
   const active = FILTERS.some(f => f.key === searchParams?.status) ? searchParams!.status! : 'all'
-  const quotesShown = active === 'all' ? d.quotes : d.quotes.filter(q => q.status === active)
+  // Drop quotes whose ticket is awaiting sign-off or already completed.
+  const visible = d.quotes.filter(q => !HIDE_FROM_QUOTES.has(q.ticketStatus))
+  const quotesShown = active === 'all' ? visible : visible.filter(q => q.status === active)
 
   // Group quotes by store (within the supplier's single client company).
   const byStore = new Map<string, SupplierQuoteRow[]>()
@@ -59,7 +63,7 @@ export default async function SupplierQuotesPage({ searchParams }: { searchParam
       {!groups.length && (
         <div className="rounded-xl border border-dashed border-[var(--border)] p-12 text-center">
           <ReceiptText size={28} className="mx-auto text-[var(--text-faint)] mb-2" />
-          <p className="text-sm text-[var(--text-faint)]">{d.quotes.length ? 'No quotes match this filter.' : 'No quotes submitted yet.'}</p>
+          <p className="text-sm text-[var(--text-faint)]">{visible.length ? 'No quotes match this filter.' : 'No active quotes.'}</p>
         </div>
       )}
 
