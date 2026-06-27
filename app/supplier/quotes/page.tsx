@@ -8,6 +8,9 @@ import { formatCurrency, formatDateTime } from '@/lib/utils'
 
 const TONE: Record<string, string> = { pending: 'text-[#C6A35D]', accepted: 'text-emerald-600 dark:text-emerald-400', declined: 'text-red-600 dark:text-red-400', revision_requested: 'text-blue-600 dark:text-blue-400' }
 const QUOTE_STATUS_LABEL: Record<string, string> = { pending: 'Pending', accepted: 'Approved', declined: 'Declined', revision_requested: 'Revision requested' }
+const FILTERS: { key: string; label: string }[] = [
+  { key: 'all', label: 'All' }, { key: 'pending', label: 'Pending' }, { key: 'accepted', label: 'Approved' }, { key: 'declined', label: 'Declined' },
+]
 
 // What the supplier should do next, derived from the ticket's current status.
 function nextStep(ticketStatus: string): string {
@@ -27,13 +30,15 @@ function nextStep(ticketStatus: string): string {
   }
 }
 
-export default async function SupplierQuotesPage() {
+export default async function SupplierQuotesPage({ searchParams }: { searchParams?: { status?: string } }) {
   const { companyId, supplierIds } = await requireSupplierV3()
   const d = await assembleSupplierDashboard(companyId, supplierIds)
+  const active = FILTERS.some(f => f.key === searchParams?.status) ? searchParams!.status! : 'all'
+  const quotesShown = active === 'all' ? d.quotes : d.quotes.filter(q => q.status === active)
 
   // Group quotes by store (within the supplier's single client company).
   const byStore = new Map<string, SupplierQuoteRow[]>()
-  for (const q of d.quotes) { const a = byStore.get(q.storeName) ?? []; a.push(q); byStore.set(q.storeName, a) }
+  for (const q of quotesShown) { const a = byStore.get(q.storeName) ?? []; a.push(q); byStore.set(q.storeName, a) }
   const groups = [...byStore.entries()].sort((a, b) => a[0].localeCompare(b[0]))
 
   return (
@@ -41,10 +46,20 @@ export default async function SupplierQuotesPage() {
       <div><h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><ReceiptText className="text-amber-600 dark:text-amber-500" size={22} /> Quotes</h1>
         <p className="text-sm text-[var(--text-muted)] mt-0.5">Quotes you have submitted, grouped by store. Tap a quote to open its ticket. Amounts show whether they include VAT.</p></div>
 
+      {/* Status filter */}
+      <div className="flex flex-wrap gap-2">
+        {FILTERS.map(f => (
+          <Link key={f.key} href={f.key === 'all' ? '/supplier/quotes' : `/supplier/quotes?status=${f.key}`}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition ${active === f.key ? 'bg-slate-800 text-white border-slate-800 dark:bg-white dark:text-[#0a0e17] dark:border-white' : 'text-[var(--text-muted)] border-[var(--border)] hover:border-slate-400'}`}>
+            {f.label}
+          </Link>
+        ))}
+      </div>
+
       {!groups.length && (
         <div className="rounded-xl border border-dashed border-[var(--border)] p-12 text-center">
           <ReceiptText size={28} className="mx-auto text-[var(--text-faint)] mb-2" />
-          <p className="text-sm text-[var(--text-faint)]">No quotes submitted yet.</p>
+          <p className="text-sm text-[var(--text-faint)]">{d.quotes.length ? 'No quotes match this filter.' : 'No quotes submitted yet.'}</p>
         </div>
       )}
 

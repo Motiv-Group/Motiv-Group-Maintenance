@@ -55,10 +55,12 @@ export function SubmitCompletionForm({ ticketId }: { ticketId: string }) {
   }
 
   async function submit() {
+    if (!coc) { setErr('Attach the Certificate of Completion (COC).'); return }
     if (photos.length < MIN_PHOTOS) { setErr(`Add at least ${MIN_PHOTOS} completion photos.`); return }
+    if (!notes.trim()) { setErr('Add notes for the regional manager.'); return }
     setBusy(true); setErr('')
     try {
-      if (coc) await addEvidence(ticketId, 'coc', await uploadTo('completion-docs', ticketId, coc))
+      await addEvidence(ticketId, 'coc', await uploadTo('completion-docs', ticketId, coc))
       for (const f of photos) await addEvidence(ticketId, 'after_photo', await uploadTo('ticket-photos', ticketId, f))
       const res = await fetch(`/api/tickets/${ticketId}/transition`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'submit_completion', notes: notes || null }) })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Submit failed')
@@ -72,7 +74,7 @@ export function SubmitCompletionForm({ ticketId }: { ticketId: string }) {
 
       {/* COC (optional) */}
       <div>
-        <label className="block text-sm font-bold text-[var(--text)] mb-1.5">Certificate of Completion (COC) <span className="font-normal text-[var(--text-muted)]">(PDF or Word, optional)</span></label>
+        <label className="block text-sm font-bold text-[var(--text)] mb-1.5">Certificate of Completion (COC) <span className="text-red-500">*</span> <span className="font-normal text-[var(--text-muted)]">(PDF or Word)</span></label>
         {coc ? (
           <div className="flex items-center gap-3 p-3 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)]">
             <FileText size={18} className="text-[#C6A35D] shrink-0" />
@@ -123,8 +125,8 @@ export function SubmitCompletionForm({ ticketId }: { ticketId: string }) {
 
       {/* Notes */}
       <div>
-        <label className="block text-sm font-bold text-[var(--text)] mb-1.5">Notes <span className="font-normal text-[var(--text-muted)]">(optional)</span></label>
-        <textarea className="w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)] min-h-[80px]" placeholder="Any notes for the regional manager…" value={notes} onChange={e => setNotes(e.target.value)} />
+        <label className="block text-sm font-bold text-[var(--text)] mb-1.5">Notes <span className="text-red-500">*</span></label>
+        <textarea className="w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)] min-h-[80px]" placeholder="Notes for the regional manager…" value={notes} onChange={e => setNotes(e.target.value)} />
       </div>
 
       {err && <p className="text-sm text-red-500">{err}</p>}

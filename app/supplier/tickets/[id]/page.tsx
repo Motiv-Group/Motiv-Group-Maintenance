@@ -77,11 +77,8 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   const quoteableStatus = ['assigned', 'assessment', 'quote_requested', 'quote_revision'].includes(t.status)
   const inviteOpen = !invite || !['declined', 'closed', 'awarded'].includes(invite.status)
   const canSubmitQuote = quoteableStatus && inviteOpen && (!latestQuote || revisionRequested)
-  // Status badge for the read-only quote card.
-  const quoteCardStatus: QuoteSummaryStatus =
-    awarded || latestQuote?.status === 'accepted' ? 'accepted'
-    : latestQuote?.status === 'declined' ? 'declined'
-    : 'pending'
+  // Map a quote's DB status to the read-only summary tone (accepted shows "Approved").
+  const quoteStatusOf = (s: string): QuoteSummaryStatus => s === 'accepted' ? 'accepted' : s === 'declined' ? 'declined' : 'pending'
 
   return (
     <div className="space-y-5">
@@ -132,66 +129,79 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
       <Card className="p-5 space-y-3">
         <h2 className="text-sm font-bold text-[var(--text)]">Next step</h2>
         {canSubmitQuote && <SendQuoteForm ticketId={t.id} competitive />}
-        {!canSubmitQuote && latestQuote && (
-          <QuoteSummary
-            title="Your submitted quote"
-            status={quoteCardStatus}
-            quote={{ id: latestQuote.id, amount: latestQuote.amount, amountInclVat: latestQuote.amount_incl_vat ?? null, description: latestQuote.description ?? null, fileUrl: latestQuote.file_url ?? null, validUntil: latestQuote.valid_until ?? null, createdAt: latestQuote.created_at }}
-          />
-        )}
         {t.status === 'accepted' && <ScheduleJobCard ticketId={t.id} priority={t.priority} createdAt={t.created_at} technicians={technicians} />}
         {['in_progress', 'snag_resolved', 'evidence_requested'].includes(t.status) && (
-          <Link href={`/supplier/tickets/${t.id}/complete`} className="block w-full text-center py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition">Submit COC &amp; POC</Link>
+          <Link href={`/supplier/tickets/${t.id}/complete`} className="block w-full text-center py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition">{latestSignoff ? 'Re-submit COC & POC' : 'Submit COC & POC'}</Link>
         )}
         {t.status === 'in_progress' && <RaiseVariationCard ticketId={t.id} />}
         <WorkflowActions ticketId={t.id} status={t.status} role="supplier" exclude={['schedule', 'submit_completion', 'require_assessment', 'request_quote', 'submit_variation']} />
       </Card>
 
-      {/* Submitted completion — COC + proof-of-completion, read-only (mirrors the quote card) */}
-      {latestSignoff && (() => {
-        const meta = SIGNOFF_META[latestSignoff.status] ?? SIGNOFF_META.submitted
-        const before = (latestSignoff.before_urls ?? []) as string[]
-        const after = (latestSignoff.after_urls ?? []) as string[]
-        return (
-          <div className={`rounded-xl ring-1 ${meta.ring} ${meta.bg} overflow-hidden`}>
-            <div className={`flex items-center justify-between gap-2 px-4 py-2.5 border-b ${meta.head}`}>
-              <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)] min-w-0"><ClipboardCheck size={15} className={`${meta.iconCls} shrink-0`} /><span className="truncate">Your submitted completion</span></span>
-              <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 shrink-0 ${meta.badge}`}>{meta.label}</span>
-            </div>
-            <div className="p-4 space-y-3">
-              {latestSignoff.status === 'rejected' && (latestSignoff.reject_reason || latestSnag?.description || latestSnag?.required_correction) && (
-                <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3 space-y-1">
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Why it was sent back</p>
-                  {(latestSignoff.reject_reason || latestSnag?.description) && <p className="text-sm text-[var(--text)]">{latestSignoff.reject_reason || latestSnag?.description}</p>}
-                  {latestSnag?.required_correction && <p className="text-sm text-[var(--text-muted)]"><span className="font-medium text-[var(--text)]">Required correction:</span> {latestSnag.required_correction}</p>}
-                  {latestSnag?.severity && <p className="text-[11px] text-[var(--text-muted)] capitalize">Severity: {String(latestSnag.severity).replace(/_/g, ' ')}</p>}
+      {/* Quotes — full history, own block (out of the Next-step box) */}
+      {(myQuotes ?? []).length > 0 && (
+        <Card className="p-5 space-y-3">
+          <h2 className="text-sm font-bold text-[var(--text)]">Quotes</h2>
+          {((myQuotes ?? []) as any[]).map((q, i, arr) => (
+            <QuoteSummary
+              key={q.id}
+              title={arr.length > 1 ? `Quote #${arr.length - i}` : 'Your submitted quote'}
+              status={quoteStatusOf(q.status)}
+              quote={{ id: q.id, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, description: q.description ?? null, fileUrl: q.file_url ?? null, validUntil: q.valid_until ?? null, createdAt: q.created_at }}
+            />
+          ))}
+        </Card>
+      )}
+
+      {/* Completions (COC & POC) — full history, own block. Latest first. */}
+      {(signoffRows ?? []).length > 0 && (
+        <Card className="p-5 space-y-3">
+          <h2 className="text-sm font-bold text-[var(--text)]">Completions (COC &amp; POC)</h2>
+          {((signoffRows ?? []) as any[]).map((s, i) => {
+            const meta = SIGNOFF_META[s.status] ?? SIGNOFF_META.submitted
+            const before = (s.before_urls ?? []) as string[]
+            const after = (s.after_urls ?? []) as string[]
+            const isLatest = i === 0
+            return (
+              <div key={s.id} className={`rounded-xl ring-1 ${meta.ring} ${meta.bg} overflow-hidden`}>
+                <div className={`flex items-center justify-between gap-2 px-4 py-2.5 border-b ${meta.head}`}>
+                  <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)] min-w-0"><ClipboardCheck size={15} className={`${meta.iconCls} shrink-0`} /><span className="truncate">Completion · {formatDateTime(s.created_at)}</span></span>
+                  <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 shrink-0 ${meta.badge}`}>{meta.label}</span>
                 </div>
-              )}
-              <DetailItem label="Submitted" value={formatDateTime(latestSignoff.created_at)} />
-              <div>
-                <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Proof of completion</div>
-                <div className="flex flex-wrap gap-x-4 gap-y-1">
-                  {before.map((u, i) => <a key={`b${i}`} href={u} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C6A35D] underline hover:text-amber-500">Before {i + 1}</a>)}
-                  {after.map((u, i) => <a key={`a${i}`} href={u} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C6A35D] underline hover:text-amber-500">After {i + 1}</a>)}
-                  {!before.length && !after.length && <span className="text-sm text-[var(--text-faint)]">No photos uploaded</span>}
+                <div className="p-4 space-y-3">
+                  {s.status === 'rejected' && (s.reject_reason || (isLatest && (latestSnag?.description || latestSnag?.required_correction))) && (
+                    <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3 space-y-1">
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Why it was sent back</p>
+                      {(s.reject_reason || (isLatest ? latestSnag?.description : null)) && <p className="text-sm text-[var(--text)]">{s.reject_reason || latestSnag?.description}</p>}
+                      {isLatest && latestSnag?.required_correction && <p className="text-sm text-[var(--text-muted)]"><span className="font-medium text-[var(--text)]">Required correction:</span> {latestSnag.required_correction}</p>}
+                      {isLatest && latestSnag?.severity && <p className="text-[11px] text-[var(--text-muted)] capitalize">Severity: {String(latestSnag.severity).replace(/_/g, ' ')}</p>}
+                    </div>
+                  )}
+                  <div>
+                    <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Proof of completion</div>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1">
+                      {before.map((u, j) => <a key={`b${j}`} href={u} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C6A35D] underline hover:text-amber-500">Before {j + 1}</a>)}
+                      {after.map((u, j) => <a key={`a${j}`} href={u} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C6A35D] underline hover:text-amber-500">After {j + 1}</a>)}
+                      {!before.length && !after.length && <span className="text-sm text-[var(--text-faint)]">No photos uploaded</span>}
+                    </div>
+                  </div>
+                  {(s.coc_url || s.invoice_url) && (
+                    <div className="flex flex-wrap gap-x-4 gap-y-1">
+                      {s.coc_url && <a href={s.coc_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View COC</a>}
+                      {s.invoice_url && <a href={s.invoice_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View invoice</a>}
+                    </div>
+                  )}
+                  {s.notes && (
+                    <div>
+                      <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Notes</div>
+                      <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{s.notes}</p>
+                    </div>
+                  )}
                 </div>
               </div>
-              {(latestSignoff.coc_url || latestSignoff.invoice_url) && (
-                <div className="flex flex-wrap gap-x-4 gap-y-1">
-                  {latestSignoff.coc_url && <a href={latestSignoff.coc_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View COC</a>}
-                  {latestSignoff.invoice_url && <a href={latestSignoff.invoice_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View invoice</a>}
-                </div>
-              )}
-              {latestSignoff.notes && (
-                <div>
-                  <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Notes</div>
-                  <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{latestSignoff.notes}</p>
-                </div>
-              )}
-            </div>
-          </div>
-        )
-      })()}
+            )
+          })}
+        </Card>
+      )}
 
       <Card className="p-5">
         <h2 className="text-sm font-bold text-[var(--text)] mb-3">Post an update</h2>

@@ -7,26 +7,43 @@ import { assembleSupplierDashboard, type SupplierSignoffRow } from '@/lib/health
 import { formatDateTime } from '@/lib/utils'
 
 const TONE: Record<string, string> = { submitted: 'text-[#C6A35D]', awaiting_regional: 'text-[#C6A35D]', awaiting_store: 'text-blue-600 dark:text-blue-400', accepted: 'text-emerald-600 dark:text-emerald-400', rejected: 'text-red-600 dark:text-red-400' }
-const WORD: Record<string, string> = { submitted: 'Submitted', awaiting_regional: 'Awaiting Regional', awaiting_store: 'Awaiting Store', accepted: 'Accepted', rejected: 'Rejected — more evidence' }
+const WORD: Record<string, string> = { submitted: 'Submitted', awaiting_regional: 'Awaiting Regional', awaiting_store: 'Awaiting Store', accepted: 'Approved', rejected: 'Rejected — more evidence' }
+const FILTERS: { key: string; label: string }[] = [
+  { key: 'all', label: 'All' }, { key: 'awaiting', label: 'Awaiting' }, { key: 'accepted', label: 'Approved' }, { key: 'rejected', label: 'Rejected' },
+]
+const AWAITING = new Set(['submitted', 'awaiting_regional', 'awaiting_store'])
+const matchesFilter = (status: string, f: string) => f === 'all' || (f === 'awaiting' ? AWAITING.has(status) : status === f)
 
-export default async function SupplierSignoffPage() {
+export default async function SupplierSignoffPage({ searchParams }: { searchParams?: { status?: string } }) {
   const { companyId, supplierIds } = await requireSupplierV3()
   const d = await assembleSupplierDashboard(companyId, supplierIds)
+  const active = FILTERS.some(f => f.key === searchParams?.status) ? searchParams!.status! : 'all'
+  const signoffsShown = d.signoffs.filter(s => matchesFilter(s.status, active))
 
   // Group sign-offs by store (within the supplier's single client company).
   const byStore = new Map<string, SupplierSignoffRow[]>()
-  for (const s of d.signoffs) { const a = byStore.get(s.storeName) ?? []; a.push(s); byStore.set(s.storeName, a) }
+  for (const s of signoffsShown) { const a = byStore.get(s.storeName) ?? []; a.push(s); byStore.set(s.storeName, a) }
   const groups = [...byStore.entries()].sort((a, b) => a[0].localeCompare(b[0]))
 
   return (
     <div className="space-y-5">
-      <div><h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><ClipboardCheck className="text-emerald-600 dark:text-emerald-400" size={22} /> Pending Sign-off</h1>
+      <div><h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><ClipboardCheck className="text-emerald-600 dark:text-emerald-400" size={22} /> Sign-off</h1>
         <p className="text-sm text-[var(--text-muted)] mt-0.5">Jobs you submitted for completion sign-off, grouped by store. Tap a job to open its ticket. You cannot mark jobs complete — the company confirms.</p></div>
+
+      {/* Status filter */}
+      <div className="flex flex-wrap gap-2">
+        {FILTERS.map(f => (
+          <Link key={f.key} href={f.key === 'all' ? '/supplier/signoff' : `/supplier/signoff?status=${f.key}`}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition ${active === f.key ? 'bg-slate-800 text-white border-slate-800 dark:bg-white dark:text-[#0a0e17] dark:border-white' : 'text-[var(--text-muted)] border-[var(--border)] hover:border-slate-400'}`}>
+            {f.label}
+          </Link>
+        ))}
+      </div>
 
       {!groups.length && (
         <div className="rounded-xl border border-dashed border-[var(--border)] p-12 text-center">
           <ClipboardCheck size={28} className="mx-auto text-[var(--text-faint)] mb-2" />
-          <p className="text-sm text-[var(--text-faint)]">Nothing submitted for sign-off yet.</p>
+          <p className="text-sm text-[var(--text-faint)]">{d.signoffs.length ? 'No sign-offs match this filter.' : 'Nothing submitted for sign-off yet.'}</p>
         </div>
       )}
 
