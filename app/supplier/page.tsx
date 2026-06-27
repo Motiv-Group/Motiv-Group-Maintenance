@@ -127,7 +127,7 @@ export default async function SupplierOverviewPage() {
           {d.quotes.slice(0, 5).map(q => (
             <div key={q.id} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0">
               <div className="min-w-0"><p className="text-sm font-medium text-[var(--text)] truncate">{[company, q.storeName].filter(Boolean).join(' · ')}</p><p className="text-[11px] text-[var(--text-muted)] truncate">{q.ticketTitle}</p><p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(q.createdAt)}</p></div>
-              <span className="flex flex-col items-end shrink-0"><span className="text-sm text-[var(--text)]">{formatCurrency(q.amountInclVat ?? q.amount)}</span><span className="text-[10px] text-[var(--text-faint)]">{q.amountInclVat ? 'incl VAT' : 'excl VAT'}</span><span className={`text-[11px] capitalize ${QUOTE_TONE[q.status] ?? 'text-[var(--text-muted)]'}`}>{q.status}</span></span>
+              <span className="flex flex-col items-end shrink-0"><span className="text-sm text-[var(--text)]">{formatCurrency(q.amountInclVat ?? q.amount)}</span><span className="text-[10px] text-[var(--text-faint)]">{q.amountInclVat ? 'incl VAT' : 'excl VAT'}</span><span className={`text-[11px] capitalize ${QUOTE_TONE[q.status] ?? 'text-[var(--text-muted)]'}`}>{q.status === 'accepted' ? 'Approved' : q.status}</span></span>
             </div>
           ))}
           {!d.quotes.length && <p className="text-sm text-[var(--text-faint)]">No quotes submitted yet.</p>}

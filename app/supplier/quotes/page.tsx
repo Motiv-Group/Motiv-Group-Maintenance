@@ -7,6 +7,25 @@ import { assembleSupplierDashboard, type SupplierQuoteRow } from '@/lib/health/d
 import { formatCurrency, formatDateTime } from '@/lib/utils'
 
 const TONE: Record<string, string> = { pending: 'text-[#C6A35D]', accepted: 'text-emerald-600 dark:text-emerald-400', declined: 'text-red-600 dark:text-red-400', revision_requested: 'text-blue-600 dark:text-blue-400' }
+const QUOTE_STATUS_LABEL: Record<string, string> = { pending: 'Pending', accepted: 'Approved', declined: 'Declined', revision_requested: 'Revision requested' }
+
+// What the supplier should do next, derived from the ticket's current status.
+function nextStep(ticketStatus: string): string {
+  switch (ticketStatus) {
+    case 'open': case 'info_requested': return 'Awaiting triage'
+    case 'assigned': case 'assessment': case 'quote_requested': case 'quote_revision': return 'Submit quote'
+    case 'quoted': case 'awaiting_decision': case 'variation_review': return 'Awaiting approval'
+    case 'accepted': return 'Schedule the job'
+    case 'scheduled': return 'Start work'
+    case 'in_progress': return 'Complete & submit evidence'
+    case 'evidence_requested': return 'Upload evidence'
+    case 'submitted_for_signoff': case 'approved_closeout': case 'snag_resolved': return 'Awaiting sign-off'
+    case 'snag': case 'snag_assigned': case 'snag_in_progress': return 'Resolve snag'
+    case 'completed': return 'Completed'
+    case 'cancelled': case 'declined': return 'Closed'
+    default: return '—'
+  }
+}
 
 export default async function SupplierQuotesPage() {
   const { companyId, supplierIds } = await requireSupplierV3()
@@ -41,14 +60,19 @@ export default async function SupplierQuotesPage() {
           <div className="border-t border-[var(--border)]">
             {quotes.map(q => (
               <Link key={q.id} href={`/supplier/tickets/${q.ticketId}`} className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition">
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <p className="text-sm text-[var(--text)] truncate">{q.ticketTitle}</p>
                   <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(q.createdAt)}</p>
+                  <p className="text-[11px] text-[#C6A35D] sm:hidden">Next: {nextStep(q.ticketStatus)}</p>
+                </div>
+                <div className="hidden sm:block shrink-0 w-32 text-right">
+                  <p className="text-[10px] uppercase tracking-wide text-[var(--text-faint)]">Next step</p>
+                  <p className="text-[11px] font-medium text-[var(--text)] truncate">{nextStep(q.ticketStatus)}</p>
                 </div>
                 <div className="flex flex-col items-end shrink-0">
                   <span className="text-sm text-[var(--text)] tabular-nums whitespace-nowrap">{formatCurrency(q.amountInclVat ?? q.amount)}</span>
                   <span className={`text-[10px] font-semibold uppercase rounded-full px-1.5 py-0.5 ${q.amountInclVat ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' : 'bg-[var(--surface-2)] text-[var(--text-muted)]'}`}>{q.amountInclVat ? 'incl VAT' : 'excl VAT'}</span>
-                  <span className={`text-[11px] capitalize ${TONE[q.status] ?? 'text-[var(--text-muted)]'}`}>{q.status.replace('_', ' ')}</span>
+                  <span className={`text-[11px] ${TONE[q.status] ?? 'text-[var(--text-muted)]'}`}>{QUOTE_STATUS_LABEL[q.status] ?? q.status.replace('_', ' ')}</span>
                 </div>
               </Link>
             ))}

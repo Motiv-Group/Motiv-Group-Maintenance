@@ -534,7 +534,7 @@ export interface SupplierTicketRow {
   assignedAt: string | null; quoteRequestedAt: string | null; quoteApprovedAt: string | null
   dueAt: string; overdue: boolean
 }
-export interface SupplierQuoteRow { id: string; ticketId: string; ticketTitle: string; storeName: string; branchCode: string | null; amount: number; amountInclVat: number | null; status: string; createdAt: string }
+export interface SupplierQuoteRow { id: string; ticketId: string; ticketTitle: string; ticketStatus: string; storeName: string; branchCode: string | null; amount: number; amountInclVat: number | null; status: string; createdAt: string }
 export interface SupplierSignoffRow { id: string; ticketId: string; ticketTitle: string; storeName: string; branchCode: string | null; status: string; createdAt: string }
 export interface SupplierDashboardData {
   perf: SupplierPerformance
@@ -624,7 +624,7 @@ export async function assembleSupplierDashboard(companyId: string, supplierIds: 
     company: (companyRow as any)?.name ?? '',
     kpis: { open, overdue, dueToday, pendingQuotes, awaitingSignoff, evidenceMissing },
     tickets: rows,
-    quotes: (quotesRaw ?? []).map((q: any) => ({ id: q.id, ticketId: q.ticket_id, ticketTitle: titleOf.get(q.ticket_id) ?? 'Ticket', storeName: storeName.get(storeOf(q.ticket_id)) ?? 'Store', branchCode: storeBranch.get(storeOf(q.ticket_id)) ?? null, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, status: q.status, createdAt: q.created_at })),
+    quotes: (quotesRaw ?? []).map((q: any) => ({ id: q.id, ticketId: q.ticket_id, ticketTitle: titleOf.get(q.ticket_id) ?? 'Ticket', ticketStatus: rawById.get(q.ticket_id)?.status ?? '', storeName: storeName.get(storeOf(q.ticket_id)) ?? 'Store', branchCode: storeBranch.get(storeOf(q.ticket_id)) ?? null, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, status: q.status, createdAt: q.created_at })),
     signoffs: (signoffsRaw ?? []).map((s: any) => ({ id: s.id, ticketId: s.ticket_id, ticketTitle: titleOf.get(s.ticket_id) ?? 'Ticket', storeName: storeName.get(storeOf(s.ticket_id)) ?? 'Store', branchCode: storeBranch.get(storeOf(s.ticket_id)) ?? null, status: s.status, createdAt: s.created_at })),
     rating,
     generatedAt: now.toISOString(),
