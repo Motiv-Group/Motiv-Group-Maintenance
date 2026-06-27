@@ -15,7 +15,7 @@ import { ClientTicketStatus } from '@/components/client/ClientTicketStatus'
 import { EditTicketForm } from '@/components/client/EditTicketForm'
 import { DueDate } from '@/components/workflow/DueDate'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
-import { formatDateTime, clientVisibleStatus } from '@/lib/utils'
+import { formatDateTime, humanizeDuration, clientVisibleStatus } from '@/lib/utils'
 import type { TicketStatus } from '@/lib/types'
 
 const CV_TONE: Record<string, string> = {
@@ -76,8 +76,12 @@ export default async function StoreTicketDetailPage({ params }: { params: { id: 
 
         <div className="grid grid-cols-2 gap-x-4 gap-y-3">
           <DetailItem label="Category" value={t.category ?? 'General'} />
-          <DetailItem label="Logged" value={formatDateTime(t.created_at)} />
-          <DueDate dueAt={dueAt} overdue={overdue} now={now.toISOString()} />
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Logged</div>
+            <div className="text-sm text-[var(--text)] mt-0.5">{formatDateTime(t.created_at)}</div>
+            {overdue && <div className="text-[11px] font-semibold text-red-600 dark:text-red-400 mt-0.5">Overdue by {humanizeDuration(now.getTime() - new Date(dueAt).getTime())}</div>}
+          </div>
+          <DueDate dueAt={dueAt} overdue={overdue} now={now.toISOString()} showOverdueText={false} />
         </div>
 
         <div>
