@@ -31,11 +31,18 @@ const TLD_TYPOS = new Set(['come', 'comm', 'con', 'cpm', 'cmo', 'ocm', 'ccom', '
 const SINGLE_DOMAIN_PROVIDERS: Record<string, string> = {
   gmail: 'gmail.com', googlemail: 'googlemail.com', icloud: 'icloud.com', me: 'me.com', mac: 'mac.com',
 }
+// Common misspellings of popular webmail second-level domains — reject outright
+// (e.g. "gmaile.com", "gmial.com", "hotmial.com"). These are never real domains.
+const EMAIL_SLD_TYPOS = new Set([
+  'gmaile', 'gmial', 'gmai', 'gmil', 'gmali', 'gmaill', 'gnail', 'gmsil', 'gamil', 'gmail1',
+  'hotmial', 'hotmai', 'hotmil', 'hatmail', 'yaho', 'yahooo', 'yhaoo', 'outlok', 'outloo', 'iclod', 'iclould',
+])
 
 /**
  * True when `raw` is a valid email address. Beyond the basic shape it requires a
- * letters-only TLD (2–24 chars), rejects common ".com" typos (e.g. ".come"), and
- * flags wrong domains for single-domain webmail providers (e.g. "gmail.co").
+ * letters-only TLD (2–24 chars), rejects common ".com" typos (e.g. ".come"),
+ * rejects misspelled provider domains (e.g. "gmaile.com"), and flags wrong
+ * domains for single-domain webmail providers (e.g. "gmail.co").
  */
 export function isValidEmail(raw: string | null | undefined): boolean {
   if (!raw) return false
@@ -43,21 +50,23 @@ export function isValidEmail(raw: string | null | undefined): boolean {
   const m = /^[^\s@]+@([a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*\.[a-z]{2,24})$/.exec(email)
   if (!m) return false
   const domain = m[1]
-  const tld = domain.slice(domain.lastIndexOf('.') + 1)
+  const labels = domain.split('.')
+  const tld = labels[labels.length - 1]
   if (TLD_TYPOS.has(tld)) return false
-  const firstLabel = domain.split('.')[0]
+  const firstLabel = labels[0]
+  if (EMAIL_SLD_TYPOS.has(firstLabel)) return false
   if (SINGLE_DOMAIN_PROVIDERS[firstLabel] && domain !== SINGLE_DOMAIN_PROVIDERS[firstLabel]) return false
   return true
 }
 
 /**
- * True when `raw` is a usable phone number. Normalises first (SA-aware), then
- * requires an E.164 string of +<10–15 digits> — accepts SA mobiles
- * (+27XXXXXXXXX) and international numbers, rejects junk / too-short input.
+ * True when `raw` is a valid South African phone number. Normalises first
+ * (SA-aware), then requires exactly +27 followed by 9 digits — so junk and
+ * too-long/too-short numbers (e.g. an extra trailing digit) are rejected.
  */
 export function isValidPhone(raw: string | null | undefined): boolean {
   const n = normalisePhone(raw)
-  return !!n && /^\+\d{10,15}$/.test(n)
+  return !!n && /^\+27\d{9}$/.test(n)
 }
 
 /** Generate a readable 12-char password (mixed case + digits, no ambiguous chars). */

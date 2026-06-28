@@ -17,7 +17,7 @@ export default async function RegionalSuppliersPage() {
           <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><Truck className="text-[#C6A35D]" size={22} /> Suppliers</h1>
           <p className="text-sm text-[var(--text-muted)] mt-0.5">Suppliers active on tickets in your region. Tap one for full details.</p>
         </div>
-        <ProvisionButton mode="suppliers" tone="green" label="Add Supplier" />
+        <ProvisionButton mode="suppliers" tone="green" label="Add Supplier" variant="modal" />
       </div>
       <RegionalSuppliersTable suppliers={suppliers} />
     </div>

@@ -132,11 +132,6 @@ export function StoreTicketsList({ tickets, initialFilter = 'all' }: { tickets: 
           {counts.in_progress > 0 && <div className="h-full bg-[#C6A35D]" style={{ width: `${barPct(counts.in_progress)}%` }} />}
           {counts.completed > 0 && <div className="h-full bg-emerald-500" style={{ width: `${barPct(counts.completed)}%` }} />}
         </div>
-        <div className="grid grid-cols-3 gap-x-4 gap-y-1 text-[11px] sm:flex sm:flex-wrap">
-          <span className="text-[var(--text-muted)]">Open {counts.open} ({barPct(counts.open)}%)</span>
-          <span className="text-[var(--text-muted)]">In Progress {counts.in_progress} ({barPct(counts.in_progress)}%)</span>
-          <span className="text-[var(--text-muted)]">Completed {counts.completed} ({barPct(counts.completed)}%)</span>
-        </div>
       </Card>
 
       {/* Filter pills — above the search */}

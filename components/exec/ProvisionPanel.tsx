@@ -2,9 +2,10 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { UserPlus, PlusCircle, ChevronDown } from 'lucide-react'
+import { UserPlus, PlusCircle, ChevronDown, X } from 'lucide-react'
 import { Card } from '@/components/exec/ui'
 import { Drawer, DrawerHeader } from '@/components/exec/Drawer'
+import { isValidEmail, isValidPhone } from '@/lib/csv'
 
 type Mode = 'exec-regions' | 'rm-stores' | 'suppliers'
 interface Opt { id: string; name: string }
@@ -54,8 +55,9 @@ export function ProvisionPanel({ mode, regions = [], stores = [] }: Props) {
   )
 }
 
-/** Top-right button that opens the provision forms in a slide-over. */
-export function ProvisionButton({ mode, regions = [], stores = [], label, tone = 'gold' }: Props & { label?: string; tone?: 'gold' | 'green' }) {
+/** Top-right button that opens the provision forms. `variant='drawer'` (default)
+ *  uses a slide-over; `variant='modal'` uses a centred pop-up. */
+export function ProvisionButton({ mode, regions = [], stores = [], label, tone = 'gold', variant = 'drawer' }: Props & { label?: string; tone?: 'gold' | 'green'; variant?: 'drawer' | 'modal' }) {
   const [open, setOpen] = useState(false)
   const btn = tone === 'green'
     ? 'text-white bg-emerald-600 hover:bg-emerald-500'
@@ -65,10 +67,25 @@ export function ProvisionButton({ mode, regions = [], stores = [], label, tone =
       <button onClick={() => setOpen(true)} className={`flex items-center gap-2 text-sm font-semibold rounded-xl px-3.5 py-2 transition ${btn}`}>
         <UserPlus size={14} /> {label ?? title(mode)}
       </button>
-      <Drawer open={open} onClose={() => setOpen(false)}>
-        <DrawerHeader onClose={() => setOpen(false)} title={<h3 className="text-lg font-bold text-[var(--text)]">{title(mode)}</h3>} />
-        <ProvisionForms mode={mode} regions={regions} stores={stores} />
-      </Drawer>
+      {variant === 'modal' ? (
+        open && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setOpen(false)}>
+            <div className="absolute inset-0 bg-black/50" />
+            <div className="relative w-full max-w-md max-h-[85vh] overflow-y-auto rounded-2xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] p-5 space-y-4" onClick={e => e.stopPropagation()}>
+              <div className="flex items-start justify-between gap-2">
+                <h3 className="text-lg font-bold text-[var(--text)]">{title(mode)}</h3>
+                <button onClick={() => setOpen(false)} aria-label="Close" className="shrink-0 -m-1 p-1.5 rounded-lg text-[var(--text-faint)] hover:text-[var(--text)] hover:bg-[var(--hover)]"><X size={18} /></button>
+              </div>
+              <ProvisionForms mode={mode} regions={regions} stores={stores} />
+            </div>
+          </div>
+        )
+      ) : (
+        <Drawer open={open} onClose={() => setOpen(false)}>
+          <DrawerHeader onClose={() => setOpen(false)} title={<h3 className="text-lg font-bold text-[var(--text)]">{title(mode)}</h3>} />
+          <ProvisionForms mode={mode} regions={regions} stores={stores} />
+        </Drawer>
+      )}
     </>
   )
 }
@@ -82,7 +99,15 @@ function Form({ action, title, fields, select, cta }: { action: string; title: s
   const input = 'w-full px-3 py-2 rounded-lg bg-[var(--input-bg)] border border-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)]'
 
   async function submit(e: React.FormEvent) {
-    e.preventDefault(); setBusy(true); setMsg(null)
+    e.preventDefault()
+    // Validate email / phone fields client-side before hitting the server.
+    for (const f of fields) {
+      const v = (vals[f.k] ?? '').trim()
+      if (!v) continue
+      if ((f.type === 'email' || f.k.toLowerCase().includes('email')) && !isValidEmail(v)) { setMsg({ ok: false, text: 'Please enter a valid email address.' }); return }
+      if ((f.type === 'tel' || f.k.toLowerCase().includes('phone')) && !isValidPhone(v)) { setMsg({ ok: false, text: 'Please enter a valid phone number.' }); return }
+    }
+    setBusy(true); setMsg(null)
     try {
       const res = await fetch('/api/provision', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, ...vals }) })
       const d = await res.json().catch(() => ({}))

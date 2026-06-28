@@ -27,8 +27,7 @@ export function RegionalStores({ stores, archived = [] }: { stores: StoreCard[];
   const selected = stores.find(s => s.storeId === selId) ?? null
   const ranked = [...stores].sort((a, b) => a.finalHealthScore - b.finalHealthScore)
 
-  async function act(action: string, storeId: string, confirmMsg?: string) {
-    if (confirmMsg && !window.confirm(confirmMsg)) return
+  async function act(action: string, storeId: string) {
     setBusy(true); setNotice(null)
     try {
       const res = await fetch('/api/provision', {
@@ -160,9 +159,9 @@ export function RegionalStores({ stores, archived = [] }: { stores: StoreCard[];
           busy={busy}
           onClose={() => setActionTarget(null)}
           onEdit={() => { const id = actionTarget.id; setActionTarget(null); setEditId(id) }}
-          onDeactivate={() => act('deactivate_store', actionTarget.id, `Are you sure you want to deactivate ${actionTarget.name}? It will be moved to the archive.`)}
+          onDeactivate={() => act('deactivate_store', actionTarget.id)}
           onReactivate={() => act('reactivate_store', actionTarget.id)}
-          onDelete={() => act('delete_store', actionTarget.id, `Are you sure you want to permanently delete ${actionTarget.name}? This cannot be undone.`)}
+          onDelete={() => act('delete_store', actionTarget.id)}
         />
       )}
 
@@ -171,12 +170,19 @@ export function RegionalStores({ stores, archived = [] }: { stores: StoreCard[];
   )
 }
 
-/** Centred pop-up listing the actions for one store. Big store name + close X. */
+/** Centred pop-up listing the actions for one store. Big store name + close X.
+ *  Destructive actions confirm in-app (no native browser dialog). */
 function StoreActionsModal({ target, busy, onClose, onEdit, onDeactivate, onReactivate, onDelete }: {
   target: ActionTarget; busy: boolean; onClose: () => void
   onEdit: () => void; onDeactivate: () => void; onReactivate: () => void; onDelete: () => void
 }) {
+  const [confirm, setConfirm] = useState<'deactivate' | 'delete' | null>(null)
   const item = 'flex items-center gap-2.5 w-full px-3.5 py-3 rounded-xl ring-1 ring-[var(--border)] text-sm font-medium text-left transition disabled:opacity-50'
+
+  const confirmCopy = confirm === 'delete'
+    ? { title: `Delete ${target.name}?`, body: 'This permanently removes the store from the database. This cannot be undone.', cta: 'Yes, delete', cls: 'bg-red-600 hover:bg-red-700', run: onDelete }
+    : { title: `Deactivate ${target.name}?`, body: 'The store will be hidden from active lists and moved to the archive. You can reactivate it later.', cta: 'Yes, deactivate', cls: 'bg-amber-500 hover:bg-amber-600 text-[#0a0e17]', run: onDeactivate }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/50" />
@@ -189,13 +195,27 @@ function StoreActionsModal({ target, busy, onClose, onEdit, onDeactivate, onReac
           </div>
           <button onClick={onClose} aria-label="Close" className="shrink-0 -m-1 p-1.5 rounded-lg text-[var(--text-faint)] hover:text-[var(--text)] hover:bg-[var(--hover)]"><X size={18} /></button>
         </div>
-        <div className="space-y-2">
-          <button type="button" disabled={busy} onClick={onEdit} className={`${item} text-[var(--text)] hover:bg-[var(--hover)]`}><Pencil size={15} className="text-[var(--text-faint)]" /> Edit store</button>
-          {target.archived
-            ? <button type="button" disabled={busy} onClick={onReactivate} className={`${item} text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10`}><RotateCcw size={15} /> Reactivate store</button>
-            : <button type="button" disabled={busy} onClick={onDeactivate} className={`${item} text-amber-600 dark:text-amber-400 hover:bg-amber-500/10`}><Power size={15} /> Deactivate store</button>}
-          <button type="button" disabled={busy} onClick={onDelete} className={`${item} text-red-600 dark:text-red-400 hover:bg-red-500/10`}><Trash2 size={15} /> Delete store</button>
-        </div>
+
+        {confirm ? (
+          <div className="space-y-3">
+            <div className="rounded-xl ring-1 ring-[var(--border)] bg-[var(--surface)] p-3">
+              <p className="text-sm font-semibold text-[var(--text)]">{confirmCopy.title}</p>
+              <p className="text-sm text-[var(--text-muted)] mt-1">{confirmCopy.body}</p>
+            </div>
+            <div className="flex gap-2">
+              <button type="button" disabled={busy} onClick={confirmCopy.run} className={`flex-1 py-2.5 rounded-xl text-white text-sm font-semibold transition disabled:opacity-50 ${confirmCopy.cls}`}>{busy ? 'Working…' : confirmCopy.cta}</button>
+              <button type="button" disabled={busy} onClick={() => setConfirm(null)} className="flex-1 py-2.5 rounded-xl ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm font-medium">Cancel</button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <button type="button" disabled={busy} onClick={onEdit} className={`${item} text-[var(--text)] hover:bg-[var(--hover)]`}><Pencil size={15} className="text-[var(--text-faint)]" /> Edit store</button>
+            {target.archived
+              ? <button type="button" disabled={busy} onClick={onReactivate} className={`${item} text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10`}><RotateCcw size={15} /> Reactivate store</button>
+              : <button type="button" disabled={busy} onClick={() => setConfirm('deactivate')} className={`${item} text-amber-600 dark:text-amber-400 hover:bg-amber-500/10`}><Power size={15} /> Deactivate store</button>}
+            <button type="button" disabled={busy} onClick={() => setConfirm('delete')} className={`${item} text-red-600 dark:text-red-400 hover:bg-red-500/10`}><Trash2 size={15} /> Delete store</button>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -206,6 +226,7 @@ function StoreActionsModal({ target, busy, onClose, onEdit, onDeactivate, onReac
 function EditStoreModal({ storeId, onClose, onSaved }: { storeId: string; onClose: () => void; onSaved: (msg: string) => void }) {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
+  const [confirming, setConfirming] = useState(false)
   const [err, setErr] = useState('')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -229,14 +250,18 @@ function EditStoreModal({ storeId, onClose, onSaved }: { storeId: string; onClos
     return () => { live = false }
   }, [storeId])
 
-  async function save(e: React.FormEvent) {
+  // Validate, then show an in-app confirm step (no native browser dialog).
+  function review(e: React.FormEvent) {
     e.preventDefault()
     if (!name.trim()) { setErr('Store name is required.'); return }
     if (hasSm) {
       if (email.trim() && !isValidEmail(email)) { setErr('Please enter a valid email address.'); return }
       if (phone.trim() && !isValidPhone(phone)) { setErr('Please enter a valid phone number.'); return }
     }
-    if (!window.confirm('Are you sure you want to save these changes?')) return
+    setErr(''); setConfirming(true)
+  }
+
+  async function doSave() {
     setBusy(true); setErr('')
     try {
       const res = await fetch('/api/provision', {
@@ -246,7 +271,7 @@ function EditStoreModal({ storeId, onClose, onSaved }: { storeId: string; onClos
       const d = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(d.error ?? 'Update failed')
       onSaved(d.message ?? 'Store updated.')
-    } catch (e: any) { setErr(e.message); setBusy(false) }
+    } catch (e: any) { setErr(e.message); setBusy(false); setConfirming(false) }
   }
 
   const input = 'w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)] focus:outline-none focus:ring-2 focus:ring-[#C6A35D]/40'
@@ -262,7 +287,7 @@ function EditStoreModal({ storeId, onClose, onSaved }: { storeId: string; onClos
         {loading ? (
           <p className="text-sm text-[var(--text-faint)] py-6 text-center">Loading…</p>
         ) : (
-          <form onSubmit={save} className="space-y-3">
+          <form onSubmit={review} className="space-y-3">
             <div>
               <label className="block text-xs text-[var(--text-muted)] mb-1">Store / branch name</label>
               <input className={input} value={name} onChange={e => setName(e.target.value)} required />
@@ -283,7 +308,17 @@ function EditStoreModal({ storeId, onClose, onSaved }: { storeId: string; onClos
               <p className="text-[11px] text-[var(--text-faint)]">No store manager linked yet — only the store name can be edited.</p>
             )}
             {err && <p className="text-sm text-red-500 bg-red-500/10 rounded-lg px-3 py-2">{err}</p>}
-            <button type="submit" disabled={busy} className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold disabled:opacity-60">{busy ? 'Saving…' : 'Save changes'}</button>
+            {confirming ? (
+              <div className="space-y-2 rounded-xl ring-1 ring-[var(--border)] bg-[var(--surface)] p-3">
+                <p className="text-sm text-[var(--text)]">Save these changes to <span className="font-semibold">{name}</span>?</p>
+                <div className="flex gap-2">
+                  <button type="button" disabled={busy} onClick={doSave} className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold disabled:opacity-60">{busy ? 'Saving…' : 'Yes, save'}</button>
+                  <button type="button" disabled={busy} onClick={() => setConfirming(false)} className="flex-1 py-2.5 rounded-xl ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm font-medium">Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <button type="submit" disabled={busy} className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold disabled:opacity-60">Save changes</button>
+            )}
           </form>
         )}
       </div>
