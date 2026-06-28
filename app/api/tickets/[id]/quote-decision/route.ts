@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { rateLimit } from '@/lib/rate-limit'
 import { sendPushToMany } from '@/lib/push'
+import { loadSlaResolver } from '@/lib/health/data'
 
 // POST /api/tickets/[id]/quote-decision — RM approves or declines a supplier's quote.
 //  approve: award that supplier (others auto-close), ticket → accepted.
@@ -37,22 +38,41 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const now = new Date().toISOString()
 
   if (action === 'decline') {
+    // RM chooses: let the same supplier re-quote, or reopen for a different supplier.
+    const requote = body.outcome === 'requote'
+    const reason = body.reason ?? null
     await admin.from('quotes').update({ status: 'declined' }).eq('id', quote.id)
-    await admin.from('ticket_suppliers').update({ status: 'declined', decline_reason: body.reason ?? null, responded_at: now }).eq('ticket_id', ticket.id).eq('supplier_id', quote.supplier_id)
-    // Re-open: the RM can now approve one of the remaining (still pending) quotes
-    // or assign a different supplier. supplier_id cleared; decision flags reset.
-    await admin.from('tickets').update({
-      status: 'open', supplier_id: null,
-      quote_decision_required: false, quote_decision_status: null,
-      current_blocker: null, blocker_owner_type: null, blocker_started_at: null, sla_paused: false,
-      last_internal_update_at: now, updated_at: now,
-    }).eq('id', ticket.id)
-    // Notify the declined supplier.
     const { data: su } = await admin.from('supplier_users').select('user_id').eq('supplier_id', quote.supplier_id)
     const ids = (su ?? []).map(r => r.user_id)
-    if (ids.length) {
-      await admin.from('notifications').insert(ids.map(id => ({ company_id: ticket.company_id, user_id: id, type: 'ticket_update', title: `Ticket: ${ticket.title ?? 'Untitled'}`, message: 'Your quote was declined.', link: `/supplier/tickets/${ticket.id}` })))
-      void sendPushToMany(ids, { title: 'Quote declined', body: ticket.title ?? '', url: `/supplier/tickets/${ticket.id}` })
+
+    if (requote) {
+      // Re-quote: keep this supplier invited, ticket → quote_requested so they can resubmit.
+      const rules = await loadSlaResolver(admin, ticket.company_id)
+      const quoteDueAt = new Date(Date.now() + rules(ticket.priority as 'P1' | 'P2' | 'P3' | 'P4').quote_due_mins * 60_000).toISOString()
+      await admin.from('ticket_suppliers').update({ status: 'invited', decline_reason: reason, responded_at: now }).eq('ticket_id', ticket.id).eq('supplier_id', quote.supplier_id)
+      await admin.from('tickets').update({
+        status: 'quote_requested', supplier_id: null, quote_required: true, quote_requested_at: now, quote_due_at: quoteDueAt,
+        quote_decision_required: false, quote_decision_status: null,
+        current_blocker: 'supplier_action', blocker_owner_type: 'supplier', blocker_started_at: now, sla_paused: false,
+        last_internal_update_at: now, updated_at: now,
+      }).eq('id', ticket.id)
+      if (ids.length) {
+        await admin.from('notifications').insert(ids.map(id => ({ company_id: ticket.company_id, user_id: id, type: 'ticket_update', title: `Ticket: ${ticket.title ?? 'Untitled'}`, message: `Quote declined${reason ? ` (${reason})` : ''} — please submit a revised quote.`, link: `/supplier/tickets/${ticket.id}` })))
+        void sendPushToMany(ids, { title: 'Revise your quote', body: ticket.title ?? '', url: `/supplier/tickets/${ticket.id}` })
+      }
+    } else {
+      // Reassign: reopen the ticket so the RM can pick a remaining quote or assign a different supplier.
+      await admin.from('ticket_suppliers').update({ status: 'declined', decline_reason: reason, responded_at: now }).eq('ticket_id', ticket.id).eq('supplier_id', quote.supplier_id)
+      await admin.from('tickets').update({
+        status: 'open', supplier_id: null,
+        quote_decision_required: false, quote_decision_status: null,
+        current_blocker: null, blocker_owner_type: null, blocker_started_at: null, sla_paused: false,
+        last_internal_update_at: now, updated_at: now,
+      }).eq('id', ticket.id)
+      if (ids.length) {
+        await admin.from('notifications').insert(ids.map(id => ({ company_id: ticket.company_id, user_id: id, type: 'ticket_update', title: `Ticket: ${ticket.title ?? 'Untitled'}`, message: `Your quote was declined${reason ? ` (${reason})` : ''}.`, link: `/supplier/tickets/${ticket.id}` })))
+        void sendPushToMany(ids, { title: 'Quote declined', body: ticket.title ?? '', url: `/supplier/tickets/${ticket.id}` })
+      }
     }
     revalidatePath('/regional'); revalidatePath(`/regional/tickets/${ticket.id}`); revalidatePath('/supplier')
     return NextResponse.json({ ok: true })

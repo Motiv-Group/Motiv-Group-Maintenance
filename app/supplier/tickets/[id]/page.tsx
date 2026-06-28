@@ -47,7 +47,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   const [{ data: store }, { data: updates }, { data: invite }, { data: myQuotes }, { data: technicianRows }, { data: signoffRows }, { data: snagRows }] = await Promise.all([
     admin.from('stores').select('name, sub_store').eq('id', t.store_id).single(),
     admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
-    admin.from('ticket_suppliers').select('status, invited_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).maybeSingle(),
+    admin.from('ticket_suppliers').select('status, invited_at, decline_reason').eq('ticket_id', t.id).in('supplier_id', supplierIds).maybeSingle(),
     admin.from('quotes').select('id, amount, amount_incl_vat, description, file_url, status, valid_until, created_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).order('created_at', { ascending: false }),
     admin.from('technicians').select('id, name').in('supplier_id', supplierIds).eq('active', true).order('name'),
     admin.from('signoffs').select('id, before_urls, after_urls, coc_url, invoice_url, status, notes, reject_reason, created_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).order('created_at', { ascending: false }),
@@ -82,7 +82,9 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   const revisionRequested = t.status === 'quote_revision'
   const quoteableStatus = ['assigned', 'assessment', 'quote_requested', 'quote_revision'].includes(t.status)
   const inviteOpen = !invite || !['declined', 'closed', 'awarded'].includes(invite.status)
-  const canSubmitQuote = quoteableStatus && inviteOpen && (!latestQuote || revisionRequested)
+  // Allow a fresh quote, a revision, or a re-quote after the RM declined-to-requote.
+  const canSubmitQuote = quoteableStatus && inviteOpen && (!latestQuote || revisionRequested || latestQuote.status === 'declined')
+  const declineReason = (invite as any)?.decline_reason ?? null
   // Map a quote's DB status to the read-only summary tone (accepted shows "Approved").
   const quoteStatusOf = (s: string): QuoteSummaryStatus => s === 'accepted' ? 'accepted' : s === 'declined' ? 'declined' : 'pending'
 
@@ -111,8 +113,8 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           <DetailItem label="Category" value={t.category ?? 'General'} />
           <DetailItem label="Operational Impact" value={OPERATIONAL_IMPACT_LABELS[t.operational_impact ?? 'none'] ?? 'No operational impact'} />
           <DetailItem label="Logged" value={formatDateTime(t.created_at)} />
-          {quoteRequestedAt && <DetailItem label="Quote requested" value={formatDateTime(quoteRequestedAt)} />}
           <DueDate dueAt={dueAt} overdue={overdue} now={now.toISOString()} />
+          {quoteRequestedAt && <DetailItem label="Quote requested" value={formatDateTime(quoteRequestedAt)} />}
         </div>
 
         <div>
@@ -144,6 +146,13 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
 
       <Card className="p-5 space-y-3">
         <h2 className="text-sm font-bold text-[var(--text)]">Next step</h2>
+        {latestQuote?.status === 'declined' && (
+          <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3 space-y-0.5">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Quote declined</p>
+            {declineReason && <p className="text-sm text-[var(--text)]">{declineReason}</p>}
+            <p className="text-sm text-[var(--text-muted)]">{canSubmitQuote ? 'Submit a revised quote below.' : 'The manager is reviewing other suppliers.'}</p>
+          </div>
+        )}
         {canSubmitQuote && <SendQuoteForm ticketId={t.id} competitive />}
         {t.status === 'accepted' && <ScheduleJobCard ticketId={t.id} priority={t.priority} createdAt={t.created_at} technicians={technicians} />}
         {['in_progress', 'snag_resolved', 'evidence_requested'].includes(t.status) && (

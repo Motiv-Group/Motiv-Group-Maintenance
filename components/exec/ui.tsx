@@ -72,8 +72,15 @@ export function KpiCard({ kpi }: { kpi: Kpi }) {
     ? <Link href={kpi.href} className="block rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C6A35D]/50">{body}</Link>
     : body
 }
+// Static lg column classes so all KPIs fit in one row on wide screens (Tailwind
+// needs the literal class names present to generate them).
+const LG_COLS: Record<number, string> = {
+  1: 'lg:grid-cols-1', 2: 'lg:grid-cols-2', 3: 'lg:grid-cols-3', 4: 'lg:grid-cols-4',
+  5: 'lg:grid-cols-5', 6: 'lg:grid-cols-6', 7: 'lg:grid-cols-7', 8: 'lg:grid-cols-8',
+}
 export function KpiRow({ kpis }: { kpis: Kpi[] }) {
-  return <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">{kpis.map((k, i) => <KpiCard key={i} kpi={k} />)}</div>
+  const lg = LG_COLS[kpis.length] ?? 'lg:grid-cols-6'
+  return <div className={`grid grid-cols-2 sm:grid-cols-3 ${lg} gap-3`}>{kpis.map((k, i) => <KpiCard key={i} kpi={k} />)}</div>
 }
 
 export type Trend = { dir: 'up' | 'down' | 'flat'; label?: string; good?: boolean }
