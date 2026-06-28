@@ -339,7 +339,7 @@ export interface RegionalTicketRow {
   id: string; title: string; storeName: string; branchCode: string | null
   status: string; priority: Priority; jobRef: string | null; createdAt: string
   quoteRequestedAt: string | null; quoteReceivedAt: string | null; quoteAcceptedAt: string | null; breached: boolean
-  dueAt: string; overdue: boolean
+  dueAt: string; overdue: boolean; reopened: boolean
 }
 export interface RegionalDashboardData {
   portfolio: RegionalHealthResult
@@ -380,11 +380,15 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
   const ticketIds = tickets.map(t => t.id)
   const { data: quoteRows } = ticketIds.length ? await db.from('quotes').select('ticket_id, status, created_at').in('ticket_id', ticketIds) : { data: [] as any[] }
   const firstQuoteAt = new Map<string, string>(); const acceptedQuoteAt = new Map<string, string>()
+  const declinedQuoteTickets = new Set<string>()
   for (const q of (quoteRows ?? []) as any[]) {
     const cur = firstQuoteAt.get(q.ticket_id)
     if (!cur || new Date(q.created_at) < new Date(cur)) firstQuoteAt.set(q.ticket_id, q.created_at)
     if (q.status === 'accepted') acceptedQuoteAt.set(q.ticket_id, q.created_at)
+    if (q.status === 'declined') declinedQuoteTickets.add(q.ticket_id)
   }
+  // Commercial-phase statuses where a declined quote means the ticket is "re-opened".
+  const COMMERCIAL = ['open', 'info_requested', 'assigned', 'assessment', 'quote_requested', 'quoted', 'quote_revision']
 
   // Ticket rows (most-recent first) for the recent card + tickets tab.
   const ticketRows: RegionalTicketRow[] = [...tickets]
@@ -398,6 +402,7 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
       quoteAcceptedAt: ((t as any).quote_decision_status === 'approved' ? (t as any).quote_decided_at : null) ?? acceptedQuoteAt.get(t.id) ?? null,
       breached: isActive(t.status) ? (() => { const s = computeTicketSla(t, rules(t.priority), now); return s.supplierBreached || s.internalBreached })() : false,
       ...dueInfo(t, rules, now),
+      reopened: declinedQuoteTickets.has(t.id) && COMMERCIAL.includes(t.status),
     }))
 
   const byStore = new Map<string, HealthTicket[]>()
@@ -468,7 +473,7 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
 // ============================================================
 // STORE MANAGER DASHBOARD (simplified, own store only)
 // ============================================================
-export type ClientStatus = 'open' | 'in_progress' | 'completed' | 'cancelled'
+export type ClientStatus = 'open' | 'info_requested' | 'in_progress' | 'completed' | 'cancelled'
 // Single source of truth for the SM/client Open → In Progress → Completed
 // collapse lives in lib/utils (clientVisibleStatus). Re-use it here so the
 // dashboard counts and the ticket-detail badge can never disagree (previously
@@ -509,7 +514,8 @@ export async function assembleStoreManagerDashboard(companyId: string, storeIds:
     if (t.status === 'info_requested') awaitingInput++
     const v = clientVisible(t.status)
     if (!v) continue
-    if (v === 'open') open++; else if (v === 'in_progress') inProgress++; else if (v === 'cancelled') cancelled++; else completed++
+    if (v === 'open') open++; else if (v === 'in_progress') inProgress++; else if (v === 'cancelled') cancelled++; else if (v === 'completed') completed++
+    // info_requested is tracked via awaitingInput (its own KPI), not the open count
     const { dueAt, overdue } = dueInfo(t, rules, now)
     visible.push({ id: t.id, title: t.title ?? 'Untitled', description: (t as any).description ?? null, category: t.category ?? null, status: v, priority: t.priority, operationalImpact: t.operational_impact ?? null, createdAt: t.created_at, supplierAssigned: !!t.supplier_id, jobRef: (t as any).job_ref ?? null, dueAt, overdue })
   }

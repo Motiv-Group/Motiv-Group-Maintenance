@@ -24,10 +24,10 @@ export function ClientTicketProgress({ status }: { status: string }) {
         return (
           <div key={s.label} className={i < STEPS.length - 1 ? 'flex items-start flex-1' : 'flex items-start'}>
             <div className="flex flex-col items-center gap-1.5 w-20">
-              <div className={`w-4 h-4 rounded-full transition ${reached ? s.dot : 'bg-white/10'} ${i === idx ? `ring-4 ${s.ring}` : ''}`} />
+              <div className={`w-4 h-4 rounded-full transition ${reached ? s.dot : 'bg-black/15 dark:bg-white/10'} ${i === idx ? `ring-4 ${s.ring}` : ''}`} />
               <span className={`text-[11px] font-medium ${reached ? s.text : 'text-[var(--text-faint)]'}`}>{s.label}</span>
             </div>
-            {i < STEPS.length - 1 && <div className={`flex-1 h-0.5 mt-[7px] rounded ${i < idx ? STEPS[i].dot : 'bg-white/10'}`} />}
+            {i < STEPS.length - 1 && <div className={`flex-1 h-0.5 mt-[7px] rounded ${i < idx ? STEPS[i].dot : 'bg-black/15 dark:bg-white/10'}`} />}
           </div>
         )
       })}

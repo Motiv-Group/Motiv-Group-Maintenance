@@ -135,7 +135,7 @@ export const STATUS_PILL: Record<TicketStatus, { active: string; inactive: strin
   snag_in_progress: { active: 'bg-pink-500 text-white border-pink-500',  inactive: 'text-pink-700 dark:text-pink-400 border-pink-200 dark:border-pink-900/40 hover:border-pink-400' },
 }
 
-export type ClientVisibleStatus = 'open' | 'in_progress' | 'completed' | 'cancelled'
+export type ClientVisibleStatus = 'open' | 'info_requested' | 'in_progress' | 'completed' | 'cancelled'
 
 /**
  * Collapse the full ticket lifecycle into what a store manager / client is
@@ -152,6 +152,7 @@ const CLIENT_IN_PROGRESS = new Set<TicketStatus>([
 export function clientVisibleStatus(status: TicketStatus): ClientVisibleStatus | null {
   if (status === 'cancelled')  return 'cancelled'
   if (status === 'completed')  return 'completed'
+  if (status === 'info_requested') return 'info_requested'
   if (CLIENT_IN_PROGRESS.has(status)) return 'in_progress'
   return 'open'
 }

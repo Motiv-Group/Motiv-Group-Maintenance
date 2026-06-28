@@ -28,7 +28,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
     const { data: links } = await admin.from('regional_users').select('region_id').eq('user_id', user.id)
     if (!ticket.region_id || !(links ?? []).some(l => l.region_id === ticket.region_id)) return NextResponse.json({ error: 'Not your ticket' }, { status: 403 })
   }
-  if (!['open', 'info_requested', 'assigned'].includes(ticket.status)) {
+  // Allowed before a quote is approved — incl. re-opened tickets (a quote was declined).
+  if (!['open', 'info_requested', 'assigned', 'assessment', 'quote_requested', 'quoted', 'quote_revision'].includes(ticket.status)) {
     return NextResponse.json({ error: 'Suppliers can only be assigned before a quote is approved.' }, { status: 400 })
   }
 

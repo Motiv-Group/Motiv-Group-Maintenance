@@ -90,7 +90,9 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   const canCancel = ['open', 'info_requested', 'assigned', 'assessment', 'quote_requested', 'quoted', 'quote_revision'].includes(t.status)
   const canEdit = ['open', 'info_requested'].includes(t.status)
   const hasQuoteBlock = supplierRows.length > 0 || reviewQuotes.length > 0 || acceptedQuotes.length > 0 || declinedQuotes.length > 0 || (variations ?? []).length > 0
-  const reQuote = ['open', 'info_requested', 'assigned'].includes(t.status) && declinedQuotes.length > 0
+  // A declined quote means the ticket is "re-opened" — true through the whole
+  // commercial phase (incl. a stale 'quoted'), until awarded/scheduled or closed.
+  const reQuote = declinedQuotes.length > 0 && ['open', 'info_requested', 'assigned', 'assessment', 'quote_requested', 'quoted', 'quote_revision'].includes(t.status)
 
   return (
     <div className="space-y-5">
@@ -227,7 +229,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         {/* Primary actions — equal-size, side by side: Assign (green) · Request info (amber) · Cancel (red) */}
         {!isTerminal && (canAssign || canCancel) && (
           <div className="flex gap-2">
-            {canAssign && <AssignSuppliersButton ticketId={t.id} suppliers={supplierList} />}
+            {(canAssign || reQuote) && <AssignSuppliersButton ticketId={t.id} suppliers={supplierList} />}
             {canAssign && <RequestInfoButton ticketId={t.id} />}
             {canCancel && <CancelTicketCard ticketId={t.id} />}
           </div>
