@@ -133,20 +133,13 @@ export function StoreTicketsList({ tickets, initialFilter = 'all' }: { tickets: 
           {counts.completed > 0 && <div className="h-full bg-emerald-500" style={{ width: `${barPct(counts.completed)}%` }} />}
         </div>
         <div className="grid grid-cols-3 gap-x-4 gap-y-1 text-[11px] sm:flex sm:flex-wrap">
-          <span className="flex items-center gap-1.5 text-[var(--text-muted)]"><i className="w-2 h-2 rounded-full bg-blue-500" />Open {counts.open} ({barPct(counts.open)}%)</span>
-          <span className="flex items-center gap-1.5 text-[var(--text-muted)]"><i className="w-2 h-2 rounded-full bg-[#C6A35D]" />In Progress {counts.in_progress} ({barPct(counts.in_progress)}%)</span>
-          <span className="flex items-center gap-1.5 text-[var(--text-muted)]"><i className="w-2 h-2 rounded-full bg-emerald-500" />Completed {counts.completed} ({barPct(counts.completed)}%)</span>
+          <span className="text-[var(--text-muted)]">Open {counts.open} ({barPct(counts.open)}%)</span>
+          <span className="text-[var(--text-muted)]">In Progress {counts.in_progress} ({barPct(counts.in_progress)}%)</span>
+          <span className="text-[var(--text-muted)]">Completed {counts.completed} ({barPct(counts.completed)}%)</span>
         </div>
       </Card>
 
-      {/* Search */}
-      <div className="relative">
-        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
-        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search tickets…"
-          className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)] focus:ring-[#C6A35D]/40 outline-none" />
-      </div>
-
-      {/* Filter pills */}
+      {/* Filter pills — above the search */}
       <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
         {PILLS.map(p => {
           const n = p.key === 'all' ? tickets.length : (counts as any)[p.key]
@@ -158,6 +151,13 @@ export function StoreTicketsList({ tickets, initialFilter = 'all' }: { tickets: 
             </button>
           )
         })}
+      </div>
+
+      {/* Search */}
+      <div className="relative">
+        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
+        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search tickets…"
+          className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)] focus:ring-[#C6A35D]/40 outline-none" />
       </div>
 
       {/* All → collapsible status groups, Completed under Archive. Specific filter → flat list. */}

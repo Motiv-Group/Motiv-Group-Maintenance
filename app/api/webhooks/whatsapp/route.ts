@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { sendPushToMany } from '@/lib/push';
-import { OPERATIONAL_IMPACT_LABELS } from '@/lib/utils';
+import { OPERATIONAL_IMPACT_LABELS, priorityWord } from '@/lib/utils';
 import type { Priority } from '@/lib/types';
 import { getBriefingForUser } from '@/lib/briefing/generate';
 import { briefingToText } from '@/lib/briefing/facts';
@@ -378,7 +378,7 @@ async function notifyRegion(
       const reviewHint = o.needsReview ? ' ⚠️ Low AI confidence — please review.' : '';
       await adminClient.from('notifications').insert(ids.map(id => ({
         company_id: o.companyId, user_id: id, type: 'new_ticket', title: 'New Ticket in Your Region',
-        message: `${o.storeName} logged a ${o.priority} ticket via WhatsApp: "${o.title}"${reviewHint}`, link: `/regional/tickets/${o.ticketId}`,
+        message: `${o.storeName} logged a ${priorityWord(o.priority)} ticket via WhatsApp: "${o.title}"${reviewHint}`, link: `/regional/tickets/${o.ticketId}`,
       })));
       void sendPushToMany(ids, { title: 'New Ticket', body: `${o.storeName}: ${o.title}`, url: `/regional/tickets/${o.ticketId}` });
     }
@@ -946,7 +946,7 @@ async function finaliseSession(
     from,
     `✅ *Ticket submitted successfully!*\n\n` +
     `*Title:* ${session.title}\n` +
-    `*Priority:* ${P_EMOJI[priority]} ${priority}\n` +
+    `*Priority:* ${P_EMOJI[priority]} ${cap(priorityWord(priority))}\n` +
     `*Photos:* ${photoUrls.length}\n\n` +
     `Your ticket has been logged and the team has been notified. 🔧`
   );

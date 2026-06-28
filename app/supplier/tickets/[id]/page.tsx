@@ -21,6 +21,7 @@ import { QuoteSummary, type QuoteSummaryStatus } from '@/components/workflow/Quo
 import { ScheduleJobCard, RaiseVariationCard } from '@/components/supplier/SupplierJobActions'
 import { DueDate } from '@/components/workflow/DueDate'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
+import { EditedLine } from '@/components/ui/EditedLine'
 import { formatDateTime, rmStatusMeta, storeLabel, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
 
 // Tone for the submitted-completion (sign-off) card — mirrors QuoteSummary.
@@ -65,6 +66,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   // Declined off the ticket (not re-invited) — show "Declined" to the supplier.
   const declinedForMe = !awarded && !!invite && ['declined', 'closed'].includes((invite as any).status)
   const storeName = storeLabel(store?.name, store?.sub_store)
+  const editorName = t.edited_by ? ((await admin.from('user_profiles').select('full_name').eq('id', t.edited_by).single()).data?.full_name ?? null) : null
 
   // SLA due date (final resolution deadline) + overdue state.
   const rules = await loadSlaResolver(admin, t.company_id)
@@ -142,6 +144,8 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
             </div>
           </div>
         )}
+
+        <EditedLine at={t.edited_at} by={editorName} />
       </Card>
 
       {breached && <BreachReason nextAction={sla.nextAction} dueAt={sla.nextActionDueAt} owner="Supplier" />}

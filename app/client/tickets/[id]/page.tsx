@@ -15,6 +15,7 @@ import { EditTicketForm } from '@/components/client/EditTicketForm'
 import { AddInfoForm } from '@/components/client/AddInfoForm'
 import { DueDate } from '@/components/workflow/DueDate'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
+import { EditedLine } from '@/components/ui/EditedLine'
 import { formatDateTime, humanizeDuration, clientVisibleStatus } from '@/lib/utils'
 import type { TicketStatus } from '@/lib/types'
 
@@ -43,6 +44,7 @@ export default async function StoreTicketDetailPage({ params }: { params: { id: 
   if (!t || !storeIds.includes(t.store_id)) redirect('/client/tickets')
 
   const { data: updates } = await admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false })
+  const editorName = t.edited_by ? ((await admin.from('user_profiles').select('full_name').eq('id', t.edited_by).single()).data?.full_name ?? null) : null
   // "Info added" = back at open after the SM resubmitted the requested info.
   const infoAdded = t.status === 'open' && !!t.info_request_reason
   // Edit / delete only while the ticket is genuinely fresh-open — once the RM has
@@ -104,6 +106,8 @@ export default async function StoreTicketDetailPage({ params }: { params: { id: 
             </div>
           </div>
         )}
+
+        <EditedLine at={t.edited_at} by={editorName} />
       </Card>
 
       {/* More info requested by the RM — show the message + an add-info / resubmit form */}

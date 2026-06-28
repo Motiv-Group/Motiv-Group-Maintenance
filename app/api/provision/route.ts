@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { rateLimit } from '@/lib/rate-limit'
 import { inviteUser } from '@/lib/invite'
 import { normalisePhone, isValidEmail, isValidPhone, generatePassword } from '@/lib/csv'
-import { sendEmail, storeInviteEmail, supplierInviteEmail } from '@/lib/email'
+import { sendEmail, storeInviteEmail, supplierInviteEmail, supplierAddedNoticeEmail } from '@/lib/email'
 import { randomBytes } from 'crypto'
 
 // POST /api/provision — delegated provisioning.
@@ -148,9 +148,19 @@ export async function POST(request: Request) {
         if (!isExec && !isRM) return forbid()
         if (!body.companyName) return NextResponse.json({ error: 'Supplier name required' }, { status: 400 })
         const supEmail = body.email ? String(body.email).trim().toLowerCase() : null
+        if (supEmail && !isValidEmail(supEmail)) return NextResponse.json({ error: 'Please enter a valid email address' }, { status: 400 })
         const { data: sup, error } = await admin.from('suppliers').insert({ company_id: companyId, company_name: body.companyName, trade: body.trade ?? null, email: supEmail }).select('id').single()
         if (error || !sup) return NextResponse.json({ error: error?.message ?? 'Failed' }, { status: 400 })
         if (supEmail) {
+          // If the email already has a Motiv login, they don't need an onboarding
+          // link — send a notice that they've been added as a supplier instead.
+          const { data: existing } = await admin.from('user_profiles').select('id').ilike('email', supEmail).maybeSingle()
+          if (existing) {
+            const { subject, html, text } = supplierAddedNoticeEmail({ companyName: body.companyName, addedBy: me?.full_name ?? null, loginUrl: `${origin.replace(/\/$/, '')}/auth/login` })
+            const emailed = await sendEmail({ to: supEmail, subject, html, text })
+            revalidatePath('/executive/suppliers'); revalidatePath('/regional/suppliers')
+            return NextResponse.json({ ok: true, emailed, message: emailed ? 'Supplier added — they already have an account, so we let them know.' : 'Supplier added. They already have an account.' })
+          }
           // Custom reusable invite token (no Supabase OTP). Valid until onboarding completes.
           const token = randomBytes(24).toString('hex')
           const { error: invErr } = await admin.from('supplier_invites').insert({ company_id: companyId, supplier_id: sup.id, email: supEmail, token })

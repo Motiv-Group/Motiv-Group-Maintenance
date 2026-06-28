@@ -17,6 +17,16 @@ const IMPACTS: { v: string; label: string }[] = [
 
 interface Props { ticketId: string; initial: { title: string; category: string; impact: string; description: string } }
 
+/** Field heading above an input/select/textarea. */
+function Labeled({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="block text-xs font-medium text-[var(--text-muted)] mb-1">{label}</label>
+      {children}
+    </div>
+  )
+}
+
 export function EditTicketForm({ ticketId, initial }: Props) {
   const router = useRouter()
   const [editing, setEditing] = useState(false)
@@ -78,12 +88,12 @@ export function EditTicketForm({ ticketId, initial }: Props) {
   return (
     <form onSubmit={save} className="space-y-3 rounded-2xl bg-[var(--surface)] ring-1 ring-[var(--border)] p-5">
       <div className="flex items-center justify-between"><span className="text-sm font-semibold text-[var(--text)]">Edit ticket</span><button type="button" onClick={() => setEditing(false)} className="text-[var(--text-faint)] hover:text-[var(--text)]"><X size={16} /></button></div>
-      <input className={input} value={title} onChange={e => setTitle(e.target.value)} placeholder="Title" required />
+      <Labeled label="Title"><input className={input} value={title} onChange={e => setTitle(e.target.value)} placeholder="Title" required /></Labeled>
       <div className="grid grid-cols-2 gap-2">
-        <select className={input} value={category} onChange={e => setCategory(e.target.value)}>{CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select>
-        <select className={input} value={impact} onChange={e => setImpact(e.target.value)}>{IMPACTS.map(i => <option key={i.v} value={i.v}>{i.label}</option>)}</select>
+        <Labeled label="Category"><select className={input} value={category} onChange={e => setCategory(e.target.value)}>{CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select></Labeled>
+        <Labeled label="Operational Impact"><select className={input} value={impact} onChange={e => setImpact(e.target.value)}>{IMPACTS.map(i => <option key={i.v} value={i.v}>{i.label}</option>)}</select></Labeled>
       </div>
-      <textarea className={`${input} min-h-[90px]`} value={description} onChange={e => setDescription(e.target.value)} placeholder="Description" required />
+      <Labeled label="Description"><textarea className={`${input} min-h-[90px]`} value={description} onChange={e => setDescription(e.target.value)} placeholder="Description" required /></Labeled>
       <p className="text-[11px] text-[var(--text-faint)]">Priority is recalculated from the operational impact.</p>
       {error && <p className="text-xs text-red-500">{error}</p>}
       <div className="flex gap-2">

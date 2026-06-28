@@ -34,7 +34,7 @@ export function ProvisionForms({ mode, regions = [], stores = [] }: Props) {
           cta={<><UserPlus size={14} /> Create account</>} />
       </>}
       {mode === 'suppliers' && (
-        <div className="lg:col-span-2"><Form action="add_supplier" title="Add supplier (optionally invite their login)" fields={[{ k: 'companyName', ph: 'Supplier company' }, { k: 'trade', ph: 'Trade (e.g. Electrical)' }, { k: 'email', ph: 'Supplier login email (optional)', type: 'email' }]} cta={<><PlusCircle size={14} /> Add supplier</>} /></div>
+        <div className="lg:col-span-2"><Form action="add_supplier" title="Add supplier (optionally invite their login)" fields={[{ k: 'companyName', ph: 'e.g. ABC Electrical', label: 'Supplier company' }, { k: 'trade', ph: 'e.g. Electrical', label: 'Trade' }, { k: 'email', ph: 'supplier@company.co.za', type: 'email', label: 'Login email (optional)' }]} cta={<><PlusCircle size={14} /> Add supplier</>} /></div>
       )}
     </div>
   )
@@ -55,11 +55,14 @@ export function ProvisionPanel({ mode, regions = [], stores = [] }: Props) {
 }
 
 /** Top-right button that opens the provision forms in a slide-over. */
-export function ProvisionButton({ mode, regions = [], stores = [], label }: Props & { label?: string }) {
+export function ProvisionButton({ mode, regions = [], stores = [], label, tone = 'gold' }: Props & { label?: string; tone?: 'gold' | 'green' }) {
   const [open, setOpen] = useState(false)
+  const btn = tone === 'green'
+    ? 'text-white bg-emerald-600 hover:bg-emerald-500'
+    : 'text-[#0a0e17] bg-[#C6A35D] hover:brightness-95'
   return (
     <>
-      <button onClick={() => setOpen(true)} className="flex items-center gap-2 text-xs font-medium text-[#0a0e17] bg-[#C6A35D] rounded-xl px-3.5 py-2 hover:brightness-95 transition">
+      <button onClick={() => setOpen(true)} className={`flex items-center gap-2 text-sm font-semibold rounded-xl px-3.5 py-2 transition ${btn}`}>
         <UserPlus size={14} /> {label ?? title(mode)}
       </button>
       <Drawer open={open} onClose={() => setOpen(false)}>
@@ -70,7 +73,7 @@ export function ProvisionButton({ mode, regions = [], stores = [], label }: Prop
   )
 }
 
-interface FieldDef { k: string; ph: string; type?: string }
+interface FieldDef { k: string; ph: string; type?: string; label?: string }
 function Form({ action, title, fields, select, cta }: { action: string; title: string; fields: FieldDef[]; select?: { k: string; label: string; opts: Opt[] }; cta: React.ReactNode }) {
   const router = useRouter()
   const [vals, setVals] = useState<Record<string, string>>({})
@@ -92,7 +95,12 @@ function Form({ action, title, fields, select, cta }: { action: string; title: s
   return (
     <form onSubmit={submit} className="space-y-2">
       <div className="text-xs text-[var(--text-muted)]">{title}</div>
-      {fields.map(f => <input key={f.k} className={input} type={f.type ?? 'text'} placeholder={f.ph} value={vals[f.k] ?? ''} onChange={e => setVals({ ...vals, [f.k]: e.target.value })} />)}
+      {fields.map(f => (
+        <div key={f.k}>
+          {f.label && <label className="block text-xs font-medium text-[var(--text-muted)] mb-1">{f.label}</label>}
+          <input className={input} type={f.type ?? 'text'} placeholder={f.ph} value={vals[f.k] ?? ''} onChange={e => setVals({ ...vals, [f.k]: e.target.value })} />
+        </div>
+      ))}
       {select && (
         <select className={input} value={vals[select.k] ?? ''} onChange={e => setVals({ ...vals, [select.k]: e.target.value })}>
           <option value="" className="bg-[var(--input-bg)]">— {select.label} —</option>

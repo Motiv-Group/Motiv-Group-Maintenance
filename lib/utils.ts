@@ -104,6 +104,17 @@ export const PRIORITY_LEVEL_LABELS: Record<string, string> = {
   urgent: 'Urgent', high: 'High', medium: 'Medium', low: 'Low',
 }
 
+// Plain priority word (low / medium / high / urgent) from either the engine's
+// P1–P4 codes or the classic words — for notification copy and chat messages
+// that should never surface raw "P1" codes to users. P1 = urgent.
+const PRIORITY_WORDS: Record<string, string> = {
+  P1: 'urgent', P2: 'high', P3: 'medium', P4: 'low',
+  urgent: 'urgent', high: 'high', medium: 'medium', low: 'low',
+}
+export function priorityWord(p?: string | null): string {
+  return PRIORITY_WORDS[String(p)] ?? 'medium'
+}
+
 // Filter-pill colours per status — active (filled) + inactive (tinted outline),
 // matching STATUS_COLORS hues so a filter reads like the status it selects.
 // Reused by the ticket filter bars across regional / supplier / client pages.

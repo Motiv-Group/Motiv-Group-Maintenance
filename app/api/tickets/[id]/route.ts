@@ -52,7 +52,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     ? String(body.priority)
     : computePriority({ severity, operational_impact: impact, ...flags })
 
-  const update: Record<string, unknown> = { title, description, category, operational_impact: impact, severity, priority, ...flags, updated_at: new Date().toISOString() }
+  const now = new Date().toISOString()
+  const update: Record<string, unknown> = { title, description, category, operational_impact: impact, severity, priority, ...flags, updated_at: now, edited_at: now, edited_by: user.id }
   if (Array.isArray(photo_urls)) update.photo_urls = photo_urls
 
   const { data, error } = await admin.from('tickets').update(update).eq('id', params.id).select().single()
@@ -60,6 +61,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
   revalidatePath('/client'); revalidatePath('/client/tickets'); revalidatePath(`/client/tickets/${params.id}`)
   revalidatePath('/regional'); revalidatePath('/regional/tickets'); revalidatePath(`/regional/tickets/${params.id}`)
+  revalidatePath(`/supplier/tickets/${params.id}`)
   return NextResponse.json({ ticket: data })
 }
 

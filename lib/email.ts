@@ -84,6 +84,37 @@ export function storeInviteEmail({
   return { subject, html, text }
 }
 
+/** Notice email for a supplier whose email already has a Motiv account — they
+ *  don't need to create a login, so we tell them they've been added instead of
+ *  sending an onboarding link. */
+export function supplierAddedNoticeEmail({ companyName, addedBy, loginUrl }: { companyName: string; addedBy?: string | null; loginUrl: string }): { subject: string; html: string; text: string } {
+  const subject = `You've been added as a supplier on Motiv`
+  const who = addedBy ? `${addedBy}` : 'A company'
+  const text = [
+    `Hi,`,
+    ``,
+    `${who} has added ${companyName} as one of their suppliers on Motiv.`,
+    `You already have a Motiv account, so there's nothing to set up — just log in to see any work they send your way:`,
+    ``,
+    loginUrl,
+    ``,
+    `— Motiv`,
+  ].join('\n')
+
+  const html = `
+  <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:480px;margin:0 auto;color:#0f172a">
+    <h2 style="color:#1e293b;margin:0 0 12px">You've been added as a supplier</h2>
+    <p style="margin:0 0 16px">${who} has added <strong>${companyName}</strong> as one of their suppliers on Motiv.</p>
+    <p style="margin:0 0 16px">You already have a Motiv account, so there's nothing to set up — just log in to see any work they send your way.</p>
+    <p style="margin:0 0 20px">
+      <a href="${loginUrl}" style="display:inline-block;background:#1e293b;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-weight:600">Log in to Motiv</a>
+    </p>
+    <p style="margin:0;color:#64748b;font-size:12px">If the button doesn't work, paste this link:<br>${loginUrl}</p>
+  </div>`
+
+  return { subject, html, text }
+}
+
 /** Build the supplier invite email — a reusable onboarding link (custom token). */
 export function supplierInviteEmail({ link, companyName }: { link: string; companyName: string }): { subject: string; html: string; text: string } {
   const subject = `You've been invited to MOTIV as a supplier`

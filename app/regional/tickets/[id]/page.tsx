@@ -17,6 +17,7 @@ import { RmPipeline } from '@/components/regional/RmPipeline'
 import { AssignSuppliersButton, RequestInfoButton, RmEditTicketForm, SupplierStatusList, QuoteReviewCard, CancelTicketCard, ApproveSignoffCard, ReQuoteButton } from '@/components/regional/RmTicketActions'
 import { DueDate } from '@/components/workflow/DueDate'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
+import { EditedLine } from '@/components/ui/EditedLine'
 import { formatCurrency, formatDateTime, formatDate, rmStatusMeta, storeLabel, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
 
 function DetailItem({ label, value }: { label: string; value: string }) {
@@ -46,6 +47,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
     admin.from('ratings').select('supplier_id, score').eq('company_id', companyId),
   ])
   const storeName = store ? storeLabel(store.name, store.sub_store) : 'Store'
+  const editorName = t.edited_by ? ((await admin.from('user_profiles').select('full_name').eq('id', t.edited_by).single()).data?.full_name ?? null) : null
   const allSignoffs = (signoffs ?? []) as any[]
   const pendingSignoff = allSignoffs.find(s => ['submitted', 'awaiting_regional', 'awaiting_store'].includes(s.status)) ?? null
   const acceptedSignoff = allSignoffs.find(s => s.status === 'accepted') ?? null
@@ -158,6 +160,8 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
             </div>
           </div>
         )}
+
+        <EditedLine at={t.edited_at} by={editorName} />
       </Card>
 
       {(t.status === 'cancelled' || t.status === 'declined') && (

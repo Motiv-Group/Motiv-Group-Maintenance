@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { rateLimit } from '@/lib/rate-limit'
 import { sendPushToMany } from '@/lib/push'
 import { computePriority } from '@/lib/health/priority'
+import { priorityWord } from '@/lib/utils'
 
 // POST /api/tickets — store manager logs a ticket (v3 model).
 export async function POST(request: Request) {
@@ -51,7 +52,7 @@ export async function POST(request: Request) {
     if (ids.length) {
       await admin.from('notifications').insert(ids.map(id => ({
         company_id: profile.company_id, user_id: id, type: 'new_ticket', title: 'New Ticket in Your Region',
-        message: `${store.name} logged a ${priority} ticket: "${title}"`, link: `/regional/tickets/${ticket.id}`,
+        message: `${store.name} logged a ${priorityWord(priority)} ticket: "${title}"`, link: `/regional/tickets/${ticket.id}`,
       })))
       void sendPushToMany(ids, { title: 'New Ticket', body: `${store.name}: ${title}`, url: `/regional/tickets/${ticket.id}` })
     }

@@ -24,7 +24,7 @@ export default async function RegionalSnagPage() {
   }
 
   return (
-    <div className="space-y-5 max-w-2xl mx-auto">
+    <div className="space-y-5">
       <div><h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><AlertTriangle className="text-red-600 dark:text-red-400" size={22} /> Snags</h1>
         <p className="text-sm text-[var(--text-muted)] mt-0.5">Open snags in your region. Resolve once corrected.</p></div>
       <RegionalSnagList rows={rows} />

@@ -12,6 +12,16 @@ async function post(url: string, body: unknown): Promise<void> {
   if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Something went wrong')
 }
 
+/** Field heading above an input/select/textarea. */
+function Labeled({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="block text-xs font-medium text-[var(--text-muted)] mb-1">{label}</label>
+      {children}
+    </div>
+  )
+}
+
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={onClose}>
@@ -149,13 +159,13 @@ export function RmEditTicketForm({ ticketId, initial }: { ticketId: string; init
       <button onClick={() => setOpen(true)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#C6A35D] hover:underline"><Pencil size={13} /> Edit ticket</button>
       {open && (
         <Modal title="Edit ticket" onClose={() => setOpen(false)}>
-          <input className={input} value={title} onChange={e => setTitle(e.target.value)} placeholder="Title" />
+          <Labeled label="Title"><input className={input} value={title} onChange={e => setTitle(e.target.value)} placeholder="Title" /></Labeled>
           <div className="grid grid-cols-2 gap-2">
-            <select className={input} value={category} onChange={e => setCategory(e.target.value)}>{CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select>
-            <select className={input} value={priority} onChange={e => setPriority(e.target.value)}>{PRIORITIES.map(p => <option key={p.v} value={p.v}>{p.label}</option>)}</select>
+            <Labeled label="Category"><select className={input} value={category} onChange={e => setCategory(e.target.value)}>{CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select></Labeled>
+            <Labeled label="Priority"><select className={input} value={priority} onChange={e => setPriority(e.target.value)}>{PRIORITIES.map(p => <option key={p.v} value={p.v}>{p.label}</option>)}</select></Labeled>
           </div>
-          <select className={input} value={impact} onChange={e => setImpact(e.target.value)}>{IMPACTS.map(i => <option key={i.v} value={i.v}>{i.label}</option>)}</select>
-          <textarea className={`${input} min-h-[90px]`} value={description} onChange={e => setDescription(e.target.value)} placeholder="Description" />
+          <Labeled label="Operational Impact"><select className={input} value={impact} onChange={e => setImpact(e.target.value)}>{IMPACTS.map(i => <option key={i.v} value={i.v}>{i.label}</option>)}</select></Labeled>
+          <Labeled label="Description"><textarea className={`${input} min-h-[90px]`} value={description} onChange={e => setDescription(e.target.value)} placeholder="Description" /></Labeled>
           {err && <p className="text-xs text-red-500">{err}</p>}
           <div className="flex gap-2">
             <button disabled={busy} onClick={save} className="flex-1 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Saving…' : 'Save'}</button>

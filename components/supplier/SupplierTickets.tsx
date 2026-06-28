@@ -153,19 +153,12 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
           {BAR_ORDER.map(b => counts[b] > 0 && <div key={b} className={`h-full ${BUCKET_BAR[b]}`} style={{ width: `${Math.round((counts[b] / barTotal) * 100)}%` }} />)}
         </div>
         <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] sm:flex sm:flex-wrap">
-          {BAR_ORDER.map(b => <span key={b} className="flex items-center gap-1.5 text-[var(--text-muted)]"><i className={`w-2 h-2 rounded-full ${BUCKET_BAR[b]}`} />{BUCKET_LABEL[b]} {counts[b]}</span>)}
-          {counts.closed > 0 && <span className="flex items-center gap-1.5 text-[var(--text-muted)]"><i className="w-2 h-2 rounded-full bg-red-500" />Closed {counts.closed}</span>}
+          {BAR_ORDER.map(b => <span key={b} className="text-[var(--text-muted)]">{BUCKET_LABEL[b]} {counts[b]}</span>)}
+          {counts.closed > 0 && <span className="text-[var(--text-muted)]">Closed {counts.closed}</span>}
         </div>
       </Card>
 
-      {/* Search */}
-      <div className="relative">
-        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
-        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search tickets…"
-          className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)] outline-none focus:ring-[#C6A35D]/40" />
-      </div>
-
-      {/* Filter pills */}
+      {/* Filter pills — above the search */}
       <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
         {PILLS.map(p => {
           const n = p.key === 'all' ? tickets.length : p.key === 'breached' ? breachedCount : p.key === 'overdue' ? overdueCount : p.key === 'declined' ? declinedCount : p.key === 'cancelled' ? cancelledCount : p.key === 'evidence' ? evidenceCount : counts[p.key]
@@ -176,6 +169,13 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
             </button>
           )
         })}
+      </div>
+
+      {/* Search */}
+      <div className="relative">
+        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
+        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search tickets…"
+          className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)] outline-none focus:ring-[#C6A35D]/40" />
       </div>
 
       {/* SLA breached — pinned at the top under the All filter, collapsible */}
