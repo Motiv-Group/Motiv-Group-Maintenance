@@ -348,6 +348,7 @@ export interface RegionalDashboardData {
   ticketActions: RegionalTicketAction[]
   tickets: RegionalTicketRow[]
   suppliers: { id: string; name: string; perf: SupplierPerformance; open: number; overdue: number; costExposure: number; avgRating: number; ratingCount: number }[]
+  quoteTotals: { accepted: number; pending: number }
   signoffsPending: number
   snagsOpen: number
   generatedAt: string
@@ -358,7 +359,7 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
   const rules = await loadSlaResolver(db, companyId)
   const empty = (): RegionalDashboardData => ({
     portfolio: calculateRegionalPortfolioHealth('portfolio', [], { criticalTicketOverdue: false, supplierBreachOver3dCount: 0, internalBreachOver3dCount: 0, repeatAcrossStores: false, highValueBlocker: false, missingCriticalUpdates: false, openTickets: 0, overdueTickets: 0, costExposure: 0 }),
-    stores: [], attentionStores: [], ticketActions: [], tickets: [], suppliers: [], signoffsPending: 0, snagsOpen: 0, generatedAt: now.toISOString(),
+    stores: [], attentionStores: [], ticketActions: [], tickets: [], suppliers: [], quoteTotals: { accepted: 0, pending: 0 }, signoffsPending: 0, snagsOpen: 0, generatedAt: now.toISOString(),
   })
   if (!regionIds.length) return empty()
 
@@ -378,13 +379,16 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
 
   // Quote milestones per ticket: first quote received + when one was accepted.
   const ticketIds = tickets.map(t => t.id)
-  const { data: quoteRows } = ticketIds.length ? await db.from('quotes').select('ticket_id, status, created_at').in('ticket_id', ticketIds) : { data: [] as any[] }
+  const { data: quoteRows } = ticketIds.length ? await db.from('quotes').select('ticket_id, status, created_at, amount').in('ticket_id', ticketIds) : { data: [] as any[] }
   const firstQuoteAt = new Map<string, string>(); const acceptedQuoteAt = new Map<string, string>()
   const declinedQuoteTickets = new Set<string>()
+  // Region-wide quote value totals (R) by status, for the RM "Quote Value" KPI.
+  let acceptedQuoteValue = 0, pendingQuoteValue = 0
   for (const q of (quoteRows ?? []) as any[]) {
     const cur = firstQuoteAt.get(q.ticket_id)
     if (!cur || new Date(q.created_at) < new Date(cur)) firstQuoteAt.set(q.ticket_id, q.created_at)
-    if (q.status === 'accepted') acceptedQuoteAt.set(q.ticket_id, q.created_at)
+    if (q.status === 'accepted') { acceptedQuoteAt.set(q.ticket_id, q.created_at); acceptedQuoteValue += Number(q.amount ?? 0) }
+    if (q.status === 'pending') pendingQuoteValue += Number(q.amount ?? 0)
     if (q.status === 'declined') declinedQuoteTickets.add(q.ticket_id)
   }
   // Commercial-phase statuses where a declined quote means the ticket is "re-opened".
@@ -475,7 +479,7 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
   }
 
   const attentionStores = [...cards].filter(c => c.finalStatus !== 'controlled').sort((a, b) => a.finalHealthScore - b.finalHealthScore)
-  return { portfolio, stores: cards, attentionStores, ticketActions, tickets: ticketRows, suppliers, signoffsPending, snagsOpen, generatedAt: now.toISOString() }
+  return { portfolio, stores: cards, attentionStores, ticketActions, tickets: ticketRows, suppliers, quoteTotals: { accepted: acceptedQuoteValue, pending: pendingQuoteValue }, signoffsPending, snagsOpen, generatedAt: now.toISOString() }
 }
 
 // ============================================================
@@ -547,7 +551,7 @@ export interface SupplierTicketRow {
   ageDays: number; createdAt: string; slaLabel: string; nextActionDueAt: string | null
   acknowledged: boolean; evidenceRequired: boolean; beforeUploaded: boolean; afterUploaded: boolean; cocUploaded: boolean
   active: boolean; breached: boolean
-  assignedAt: string | null; quoteRequestedAt: string | null; quoteApprovedAt: string | null
+  assignedAt: string | null; quoteRequestedAt: string | null; quoteSubmittedAt: string | null; quoteApprovedAt: string | null
   dueAt: string; overdue: boolean; declinedForMe: boolean
 }
 export interface SupplierQuoteRow { id: string; ticketId: string; ticketTitle: string; ticketStatus: string; storeName: string; branchCode: string | null; amount: number; amountInclVat: number | null; status: string; createdAt: string }
@@ -601,8 +605,14 @@ export async function assembleSupplierDashboard(companyId: string, supplierIds: 
   // Suppliers start at a full 5★ and degrade as real ratings arrive.
   const rating = { avg: ratingScores.length ? ratingScores.reduce((s, n) => s + n, 0) / ratingScores.length : 5, count: ratingScores.length }
   // Earliest accepted quote per ticket — fallback for the approval date.
+  // firstQuoteAt = earliest quote submitted per ticket — used for the "Quoted" milestone.
   const acceptedQuoteAt = new Map<string, string>()
-  for (const q of (quotesRaw ?? []) as any[]) if (q.status === 'accepted') acceptedQuoteAt.set(q.ticket_id, q.created_at)
+  const firstQuoteAt = new Map<string, string>()
+  for (const q of (quotesRaw ?? []) as any[]) {
+    if (q.status === 'accepted') acceptedQuoteAt.set(q.ticket_id, q.created_at)
+    const cur = firstQuoteAt.get(q.ticket_id)
+    if (!cur || new Date(q.created_at) < new Date(cur)) firstQuoteAt.set(q.ticket_id, q.created_at)
+  }
 
   const todayEnd = new Date(now); todayEnd.setHours(23, 59, 59, 999)
   let open = 0, overdue = 0, dueToday = 0, pendingQuotes = 0, awaitingSignoff = 0, evidenceMissing = 0
@@ -633,6 +643,7 @@ export async function assembleSupplierDashboard(companyId: string, supplierIds: 
       active, breached: active ? sla.supplierBreached : false,
       assignedAt: raw.quote_requested_at ?? t.created_at ?? null,
       quoteRequestedAt: raw.quote_requested_at ?? null,
+      quoteSubmittedAt: t.quote_submitted_at ?? firstQuoteAt.get(t.id) ?? null,
       quoteApprovedAt: approvedAt,
       ...dueInfo(t, rules, now),
       declinedForMe,

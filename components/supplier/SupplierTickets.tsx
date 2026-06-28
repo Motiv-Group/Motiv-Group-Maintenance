@@ -52,6 +52,7 @@ const PILLS: { key: FilterKey; label: string; active: string; inactive: string }
 
 function milestone(t: SupplierTicketRow): { label: string; at: string } | null {
   if (t.quoteApprovedAt) return { label: 'Quote approved', at: t.quoteApprovedAt }
+  if (t.quoteSubmittedAt) return { label: 'Quoted', at: t.quoteSubmittedAt }
   if (t.quoteRequestedAt) return { label: 'Quote requested', at: t.quoteRequestedAt }
   if (t.assignedAt) return { label: 'Assigned', at: t.assignedAt }
   return null

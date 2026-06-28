@@ -331,7 +331,7 @@ export function SendQuoteForm({
           ? 'bg-[#C6A35D] hover:bg-[#b8954f] text-white border-[#C6A35D] focus:ring-[#C6A35D]'
           : 'bg-green-600 hover:bg-green-700 text-white border-green-600 focus:ring-green-500'}`}
       >
-        {isEdit ? 'Edit Quote' : isVariation ? 'Raise Variation Order' : 'Send Quote to Client'}
+        {isEdit ? 'Edit Quote' : isVariation ? 'Raise Variation Order' : 'Upload Quote'}
       </Button>
     )
   }
