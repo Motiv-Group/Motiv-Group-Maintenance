@@ -24,6 +24,9 @@ import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { EditedLine } from '@/components/ui/EditedLine'
 import { formatDateTime, rmStatusMeta, storeLabel, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
 
+// Shown when the RM declined a quote without typing a reason.
+const DEFAULT_DECLINE_REASON = 'Thank you for your submission. Although your quotation was not selected for this request, we value your participation and look forward to inviting you to future opportunities.'
+
 // Tone for the submitted-completion (sign-off) card — mirrors QuoteSummary.
 const SIGNOFF_META: Record<string, { label: string; ring: string; bg: string; head: string; badge: string; iconCls: string }> = {
   accepted: { label: 'Approved', ring: 'ring-emerald-500/40', bg: 'bg-emerald-500/5', head: 'bg-emerald-500/10 border-emerald-500/20', badge: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400', iconCls: 'text-emerald-500' },
@@ -155,16 +158,16 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
         {latestQuote?.status === 'declined' && (
           <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3 space-y-0.5">
             <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Quote declined</p>
-            {declineReason && <p className="text-sm text-[var(--text)]">{declineReason}</p>}
-            <p className="text-sm text-[var(--text-muted)]">{canSubmitQuote ? 'Submit a revised quote below.' : 'The manager is reviewing other suppliers.'}</p>
+            <p className="text-sm text-[var(--text)]">{declineReason || DEFAULT_DECLINE_REASON}</p>
+            {canSubmitQuote && <p className="text-sm text-[var(--text-muted)]">Submit a revised quote below.</p>}
           </div>
         )}
         {canSubmitQuote && <SendQuoteForm ticketId={t.id} competitive />}
-        {t.status === 'accepted' && <ScheduleJobCard ticketId={t.id} priority={t.priority} createdAt={t.created_at} technicians={technicians} />}
-        {['in_progress', 'snag_resolved', 'evidence_requested'].includes(t.status) && (
+        {awarded && t.status === 'accepted' && <ScheduleJobCard ticketId={t.id} priority={t.priority} createdAt={t.created_at} technicians={technicians} />}
+        {awarded && ['in_progress', 'snag_resolved', 'evidence_requested'].includes(t.status) && (
           <SubmitCompletionForm ticketId={t.id} />
         )}
-        {t.status === 'in_progress' && <RaiseVariationCard ticketId={t.id} />}
+        {awarded && t.status === 'in_progress' && <RaiseVariationCard ticketId={t.id} />}
         <WorkflowActions ticketId={t.id} status={t.status} role="supplier" exclude={['schedule', 'submit_completion', 'require_assessment', 'request_quote', 'submit_variation']} />
       </Card>
 

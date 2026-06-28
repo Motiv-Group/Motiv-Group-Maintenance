@@ -51,6 +51,14 @@ const PILLS: { key: FilterKey; label: string; active: string; inactive: string }
 ]
 
 function milestone(t: SupplierTicketRow): { label: string; at: string } | null {
+  // A declined supplier must never see the ticket's "Quote approved" (that was
+  // another supplier) — show their own decline (or their last own milestone).
+  if (t.declinedForMe) {
+    if (t.declinedAt) return { label: 'Declined', at: t.declinedAt }
+    if (t.quoteSubmittedAt) return { label: 'Quoted', at: t.quoteSubmittedAt }
+    if (t.quoteRequestedAt) return { label: 'Quote requested', at: t.quoteRequestedAt }
+    return null
+  }
   if (t.quoteApprovedAt) return { label: 'Quote approved', at: t.quoteApprovedAt }
   if (t.quoteSubmittedAt) return { label: 'Quoted', at: t.quoteSubmittedAt }
   if (t.quoteRequestedAt) return { label: 'Quote requested', at: t.quoteRequestedAt }
@@ -70,7 +78,7 @@ function TicketRow({ t, company, showStore }: { t: SupplierTicketRow; company?: 
         <p className="text-sm text-[var(--text)] truncate">{t.title}</p>
         <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(t.createdAt)}</p>
         {t.overdue && <p className="text-[11px] font-semibold text-red-600 dark:text-red-400">Overdue by {humanizeDuration(Date.now() - new Date(t.dueAt).getTime())}</p>}
-        {m && <p className={`text-[11px] font-medium ${sm.text}`}>{m.label} · {formatDateTime(m.at)}</p>}
+        {m && <p className={`text-[11px] font-medium ${m.label === 'Declined' ? 'text-red-600 dark:text-red-400' : sm.text}`}>{m.label} · {formatDateTime(m.at)}</p>}
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
         <PriorityBadge priority={t.priority} className="w-full text-center" />

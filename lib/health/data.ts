@@ -551,7 +551,7 @@ export interface SupplierTicketRow {
   ageDays: number; createdAt: string; slaLabel: string; nextActionDueAt: string | null
   acknowledged: boolean; evidenceRequired: boolean; beforeUploaded: boolean; afterUploaded: boolean; cocUploaded: boolean
   active: boolean; breached: boolean
-  assignedAt: string | null; quoteRequestedAt: string | null; quoteSubmittedAt: string | null; quoteApprovedAt: string | null
+  assignedAt: string | null; quoteRequestedAt: string | null; quoteSubmittedAt: string | null; quoteApprovedAt: string | null; declinedAt: string | null
   dueAt: string; overdue: boolean; declinedForMe: boolean
 }
 export interface SupplierQuoteRow { id: string; ticketId: string; ticketTitle: string; ticketStatus: string; storeName: string; branchCode: string | null; amount: number; amountInclVat: number | null; status: string; createdAt: string }
@@ -596,7 +596,7 @@ export async function assembleSupplierDashboard(companyId: string, supplierIds: 
   const titleOf = new Map(tickets.map(t => [t.id, t.title ?? 'Ticket']))
 
   const [{ data: quotesRaw }, { data: signoffsRaw }, { data: ratingRows }, { data: companyRow }] = await Promise.all([
-    db.from('quotes').select('id, ticket_id, amount, amount_incl_vat, status, created_at').in('supplier_id', supplierIds).order('created_at', { ascending: false }),
+    db.from('quotes').select('id, ticket_id, amount, amount_incl_vat, status, created_at, updated_at').in('supplier_id', supplierIds).order('created_at', { ascending: false }),
     db.from('signoffs').select('id, ticket_id, status, created_at').in('supplier_id', supplierIds).order('created_at', { ascending: false }),
     db.from('ratings').select('score').in('supplier_id', supplierIds),
     db.from('companies').select('name').eq('id', companyId).maybeSingle(),
@@ -608,8 +608,15 @@ export async function assembleSupplierDashboard(companyId: string, supplierIds: 
   // firstQuoteAt = earliest quote submitted per ticket — used for the "Quoted" milestone.
   const acceptedQuoteAt = new Map<string, string>()
   const firstQuoteAt = new Map<string, string>()
+  // declinedQuoteAt = when this supplier's quote was declined (quote.updated_at).
+  const declinedQuoteAt = new Map<string, string>()
   for (const q of (quotesRaw ?? []) as any[]) {
     if (q.status === 'accepted') acceptedQuoteAt.set(q.ticket_id, q.created_at)
+    if (q.status === 'declined') {
+      const prev = declinedQuoteAt.get(q.ticket_id)
+      const at = q.updated_at ?? q.created_at
+      if (!prev || new Date(at) > new Date(prev)) declinedQuoteAt.set(q.ticket_id, at)
+    }
     const cur = firstQuoteAt.get(q.ticket_id)
     if (!cur || new Date(q.created_at) < new Date(cur)) firstQuoteAt.set(q.ticket_id, q.created_at)
   }
@@ -645,6 +652,7 @@ export async function assembleSupplierDashboard(companyId: string, supplierIds: 
       quoteRequestedAt: raw.quote_requested_at ?? null,
       quoteSubmittedAt: t.quote_submitted_at ?? firstQuoteAt.get(t.id) ?? null,
       quoteApprovedAt: approvedAt,
+      declinedAt: declinedQuoteAt.get(t.id) ?? null,
       ...dueInfo(t, rules, now),
       declinedForMe,
     })
