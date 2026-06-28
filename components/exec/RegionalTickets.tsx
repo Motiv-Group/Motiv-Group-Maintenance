@@ -70,7 +70,7 @@ function TicketRow({ t }: { t: RegionalTicketRow }) {
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
         <PriorityBadge priority={t.priority} className="w-full text-center" />
-        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${t.reopened ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : sm.cls}`}>{t.reopened ? 'Re-open' : sm.label}</span>
+        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${t.reopened ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : t.infoAdded ? 'bg-teal-500/15 text-teal-700 dark:text-teal-400' : sm.cls}`}>{t.reopened ? 'Re-open' : t.infoAdded ? 'Info added' : sm.label}</span>
       </div>
     </Link>
   )

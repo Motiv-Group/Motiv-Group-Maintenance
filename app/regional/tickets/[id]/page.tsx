@@ -93,6 +93,8 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   // A declined quote means the ticket is "re-opened" — true through the whole
   // commercial phase (incl. a stale 'quoted'), until awarded/scheduled or closed.
   const reQuote = declinedQuotes.length > 0 && ['open', 'info_requested', 'assigned', 'assessment', 'quote_requested', 'quoted', 'quote_revision'].includes(t.status)
+  // "Info added" = the SM resubmitted after an info request (back at open, reason kept).
+  const rmInfoAdded = t.status === 'open' && !!t.info_request_reason
 
   return (
     <div className="space-y-5">
@@ -113,8 +115,8 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
               <PriorityBadge priority={t.priority} className="w-full text-center" />
               {(() => {
                 const sm = rmStatusMeta(t.status)
-                const label = reQuote ? 'Re-open' : sm.label
-                const cls = reQuote ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : sm.cls
+                const label = reQuote ? 'Re-open' : rmInfoAdded ? 'Info added' : sm.label
+                const cls = reQuote ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : rmInfoAdded ? 'bg-teal-500/15 text-teal-700 dark:text-teal-400' : sm.cls
                 return <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${cls}`}>{label}</span>
               })()}
             </div>

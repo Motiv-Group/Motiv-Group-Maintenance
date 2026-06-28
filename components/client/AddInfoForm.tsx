@@ -2,9 +2,9 @@
 
 // Shown on a store-manager ticket when the RM has requested more information.
 // The SM adds a note (appended to the description) and/or extra photos, then
-// resubmits the ticket back to the RM. Edit/delete are no longer available once
-// the RM has acted — this is the only way to update the ticket.
-import { useEffect, useMemo, useState } from 'react'
+// submits — the ticket returns to the RM marked "Info added". Edit/delete are
+// no longer available once the RM has acted.
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ImagePlus, Camera, X, Send } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -27,9 +27,6 @@ export function AddInfoForm({ ticketId, title, description, category, impact, ph
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
 
-  const previews = useMemo(() => files.map(f => URL.createObjectURL(f)), [files])
-  useEffect(() => () => previews.forEach(URL.revokeObjectURL), [previews])
-
   const remaining = MAX_NEW_PHOTOS - files.length
   function addFiles(incoming: File[]) {
     setErr('')
@@ -38,7 +35,7 @@ export function AddInfoForm({ ticketId, title, description, category, impact, ph
   }
 
   async function submit() {
-    if (!info.trim() && !files.length) { setErr('Add a note or a photo before resubmitting.'); return }
+    if (!info.trim() && !files.length) { setErr('Add a note or a photo before submitting.'); return }
     setBusy(true); setErr('')
     try {
       const supabase = createClient()
@@ -59,7 +56,7 @@ export function AddInfoForm({ ticketId, title, description, category, impact, ph
       const res = await fetch(`/api/tickets/${ticketId}/transition`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'resubmit' }),
       })
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to resubmit')
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to submit')
       router.refresh()
     } catch (e: any) { setErr(e.message); setBusy(false) }
   }
@@ -81,12 +78,11 @@ export function AddInfoForm({ ticketId, title, description, category, impact, ph
         </label>
       </div>
       {files.length > 0 && (
-        <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+        <div className="space-y-1">
           {files.map((f, i) => (
-            <div key={i} className="relative aspect-square rounded-lg overflow-hidden ring-1 ring-[var(--border)]">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={previews[i]} alt="" className="w-full h-full object-cover" />
-              <button type="button" onClick={() => setFiles(p => p.filter((_, j) => j !== i))} className="absolute top-0.5 right-0.5 p-0.5 rounded-full bg-black/60 text-white"><X size={12} /></button>
+            <div key={i} className="flex items-center justify-between gap-2">
+              <span className="text-sm text-[#C6A35D] underline truncate min-w-0">{f.name}</span>
+              <button type="button" onClick={() => setFiles(p => p.filter((_, j) => j !== i))} className="shrink-0 text-[var(--text-faint)] hover:text-red-500"><X size={14} /></button>
             </div>
           ))}
         </div>
@@ -94,7 +90,7 @@ export function AddInfoForm({ ticketId, title, description, category, impact, ph
 
       {err && <p className="text-sm text-red-500">{err}</p>}
       <button onClick={submit} disabled={busy} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold disabled:opacity-50 transition">
-        <Send size={15} /> {busy ? 'Sending…' : 'Submit & resubmit'}
+        <Send size={15} /> {busy ? 'Submitting…' : 'Submit'}
       </button>
     </div>
   )

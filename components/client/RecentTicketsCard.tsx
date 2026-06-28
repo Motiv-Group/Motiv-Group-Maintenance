@@ -49,7 +49,7 @@ export function RecentTicketsCard({ tickets }: { tickets: StoreManagerTicket[] }
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_6rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
             <PriorityBadge priority={t.priority} className="w-full text-center" />
-            <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${STATUS_TONE[t.status]}`}>{STATUS_WORD[t.status]}</span>
+            <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${t.infoAdded ? 'bg-teal-500/15 text-teal-700 dark:text-teal-400' : STATUS_TONE[t.status]}`}>{t.infoAdded ? 'Info added' : STATUS_WORD[t.status]}</span>
           </div>
         </Link>
       )) : <p className="text-sm text-[var(--text-faint)]">No tickets in the last 7 days.</p>)}

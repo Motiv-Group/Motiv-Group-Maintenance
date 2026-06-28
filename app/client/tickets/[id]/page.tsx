@@ -43,9 +43,11 @@ export default async function StoreTicketDetailPage({ params }: { params: { id: 
   if (!t || !storeIds.includes(t.store_id)) redirect('/client/tickets')
 
   const { data: updates } = await admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false })
-  // Edit / delete only while the ticket is still open — once the RM has acted
-  // (e.g. requested info, assigned), the SM can only add info via AddInfoForm.
-  const canEdit = t.status === 'open'
+  // "Info added" = back at open after the SM resubmitted the requested info.
+  const infoAdded = t.status === 'open' && !!t.info_request_reason
+  // Edit / delete only while the ticket is genuinely fresh-open — once the RM has
+  // acted (requested info → info added, assigned, …) the SM can only add info.
+  const canEdit = t.status === 'open' && !t.info_request_reason
 
   // SLA due date (final resolution deadline) + overdue state.
   const rules = await loadSlaResolver(admin, t.company_id)
@@ -70,6 +72,7 @@ export default async function StoreTicketDetailPage({ params }: { params: { id: 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 w-fit shrink-0 justify-items-end">
             <PriorityBadge priority={t.priority} />
             {(() => {
+              if (infoAdded) return <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full text-center bg-teal-500/15 text-teal-700 dark:text-teal-400">Info added</span>
               const cv = clientVisibleStatus(t.status as TicketStatus)
               return cv ? <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full text-center ${CV_TONE[cv]}`}>{CV_WORD[cv]}</span> : null
             })()}

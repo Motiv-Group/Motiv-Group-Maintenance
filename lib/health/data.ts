@@ -339,7 +339,7 @@ export interface RegionalTicketRow {
   id: string; title: string; storeName: string; branchCode: string | null
   status: string; priority: Priority; jobRef: string | null; createdAt: string
   quoteRequestedAt: string | null; quoteReceivedAt: string | null; quoteAcceptedAt: string | null; breached: boolean
-  dueAt: string; overdue: boolean; reopened: boolean
+  dueAt: string; overdue: boolean; reopened: boolean; infoAdded: boolean
 }
 export interface RegionalDashboardData {
   portfolio: RegionalHealthResult
@@ -403,6 +403,7 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
       breached: isActive(t.status) ? (() => { const s = computeTicketSla(t, rules(t.priority), now); return s.supplierBreached || s.internalBreached })() : false,
       ...dueInfo(t, rules, now),
       reopened: declinedQuoteTickets.has(t.id) && COMMERCIAL.includes(t.status),
+      infoAdded: t.status === 'open' && !!(t as any).info_request_reason,
     }))
 
   const byStore = new Map<string, HealthTicket[]>()
@@ -481,7 +482,7 @@ export type ClientStatus = 'open' | 'info_requested' | 'in_progress' | 'complete
 // ticket read "Open" on the detail page but "In Progress" on the dashboard).
 const clientVisible = (status: string): ClientStatus | null =>
   clientVisibleStatus(status as TicketStatus)
-export interface StoreManagerTicket { id: string; title: string; description: string | null; category: string | null; status: ClientStatus; priority: Priority; operationalImpact: string | null; createdAt: string; supplierAssigned: boolean; jobRef: string | null; dueAt: string; overdue: boolean }
+export interface StoreManagerTicket { id: string; title: string; description: string | null; category: string | null; status: ClientStatus; priority: Priority; operationalImpact: string | null; createdAt: string; supplierAssigned: boolean; jobRef: string | null; dueAt: string; overdue: boolean; infoAdded: boolean }
 export interface StoreManagerData {
   storeName: string
   company: string
@@ -517,7 +518,9 @@ export async function assembleStoreManagerDashboard(companyId: string, storeIds:
     if (v === 'open') open++; else if (v === 'in_progress') inProgress++; else if (v === 'cancelled') cancelled++; else if (v === 'completed') completed++
     // info_requested is tracked via awaitingInput (its own KPI), not the open count
     const { dueAt, overdue } = dueInfo(t, rules, now)
-    visible.push({ id: t.id, title: t.title ?? 'Untitled', description: (t as any).description ?? null, category: t.category ?? null, status: v, priority: t.priority, operationalImpact: t.operational_impact ?? null, createdAt: t.created_at, supplierAssigned: !!t.supplier_id, jobRef: (t as any).job_ref ?? null, dueAt, overdue })
+    // "Info added" = the SM resubmitted after the RM requested info (back at open, reason kept).
+    const infoAdded = t.status === 'open' && !!(t as any).info_request_reason
+    visible.push({ id: t.id, title: t.title ?? 'Untitled', description: (t as any).description ?? null, category: t.category ?? null, status: v, priority: t.priority, operationalImpact: t.operational_impact ?? null, createdAt: t.created_at, supplierAssigned: !!t.supplier_id, jobRef: (t as any).job_ref ?? null, dueAt, overdue, infoAdded })
   }
   visible.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
   return {

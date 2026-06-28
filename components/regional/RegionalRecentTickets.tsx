@@ -45,7 +45,7 @@ export function RegionalRecentTickets({ tickets }: { tickets: RegionalTicketRow[
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
               <PriorityBadge priority={t.priority} className="w-full text-center" />
-              <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${sm.cls}`}>{sm.label}</span>
+              <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${t.infoAdded ? 'bg-teal-500/15 text-teal-700 dark:text-teal-400' : sm.cls}`}>{t.infoAdded ? 'Info added' : sm.label}</span>
             </div>
           </Link>
         )

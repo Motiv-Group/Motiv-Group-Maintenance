@@ -47,7 +47,7 @@ function Row({ t }: { t: StoreManagerTicket }) {
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_6rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
         <PriorityBadge priority={t.priority} className="w-full text-center" />
-        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${TONE[t.status]}`}>{WORD[t.status]}</span>
+        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${t.infoAdded ? 'bg-teal-500/15 text-teal-700 dark:text-teal-400' : TONE[t.status]}`}>{t.infoAdded ? 'Info added' : WORD[t.status]}</span>
       </div>
     </Link>
   )
