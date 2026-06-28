@@ -366,7 +366,7 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
     db.from('regions').select('id, name').in('id', regionIds),
     db.from('stores').select('id, name, sub_store, branch_code, region_id').eq('company_id', companyId).in('region_id', regionIds).eq('active', true).is('closed_at', null),
     db.from('tickets').select(TICKET_COLS).eq('company_id', companyId).in('region_id', regionIds),
-    db.from('suppliers').select('id, company_name').eq('company_id', companyId),
+    db.from('suppliers').select('id, company_name, active').eq('company_id', companyId),
   ])
   const regionName = new Map((regionsRaw ?? []).map((r: any) => [r.id, r.name]))
   const stores = (storesRaw ?? []) as any[]
@@ -450,12 +450,19 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
     if (!r.supplier_id || r.score == null) continue
     const a = ratingAgg.get(r.supplier_id) ?? { sum: 0, n: 0 }; a.sum += Number(r.score); a.n++; ratingAgg.set(r.supplier_id, a)
   }
-  const suppliers = [...bySupplier.entries()].map(([id, ts]) => {
-    const act = ts.filter(t => isActive(t.status))
-    const overdue = act.filter(t => { const s = computeTicketSla(t, rules(t.priority), now); return s.supplierBreached || s.internalBreached }).length
-    const ra = ratingAgg.get(id)
-    return { id, name: supplierName.get(id) ?? 'Supplier', perf: calculateSupplierPerformance(id, ts, rules, now), open: act.length, overdue, costExposure: act.reduce((s, t) => s + (t.quote_value ?? 0), 0), avgRating: ra ? ra.sum / ra.n : 5, ratingCount: ra ? ra.n : 0 }
-  }).sort((a, b) => a.perf.performanceScore - b.perf.performanceScore)
+  // Every active supplier in the company appears in the directory — those with no
+  // tickets show neutral stats (score 100) — so a freshly added supplier is visible
+  // immediately, not only once it lands on a ticket.
+  const suppliers = ((suppliersRaw ?? []) as any[])
+    .filter(s => s.active !== false)
+    .map(s => {
+      const ts = bySupplier.get(s.id) ?? []
+      const act = ts.filter(t => isActive(t.status))
+      const overdue = act.filter(t => { const x = computeTicketSla(t, rules(t.priority), now); return x.supplierBreached || x.internalBreached }).length
+      const ra = ratingAgg.get(s.id)
+      return { id: s.id, name: s.company_name ?? 'Supplier', perf: calculateSupplierPerformance(s.id, ts, rules, now), open: act.length, overdue, costExposure: act.reduce((sum: number, t: HealthTicket) => sum + (t.quote_value ?? 0), 0), avgRating: ra ? ra.sum / ra.n : 5, ratingCount: ra ? ra.n : 0 }
+    })
+    .sort((a, b) => a.perf.performanceScore - b.perf.performanceScore)
 
   let signoffsPending = 0, snagsOpen = 0
   if (storeIds.length) {

@@ -23,7 +23,7 @@ interface Detail {
 export function RegionalSuppliersTable({ suppliers }: { suppliers: Row[] }) {
   const [sel, setSel] = useState<Row | null>(null)
   return (
-    <SectionCard title="Supplier Performance in Region">
+    <SectionCard title="Suppliers">
       {/* Desktop table */}
       <div className="hidden md:block overflow-x-auto -mx-1">
         <table className="w-full text-sm min-w-[760px]">
@@ -46,7 +46,7 @@ export function RegionalSuppliersTable({ suppliers }: { suppliers: Row[] }) {
                 <td className="px-2 text-[var(--text-muted)] whitespace-nowrap">{fmtK(s.costExposure)}</td>
               </tr>
             ))}
-            {!suppliers.length && <tr><td colSpan={9} className="py-6 text-center text-[var(--text-faint)]">No suppliers active in your region yet.</td></tr>}
+            {!suppliers.length && <tr><td colSpan={9} className="py-6 text-center text-[var(--text-faint)]">No suppliers yet — add one to get started.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -75,7 +75,7 @@ export function RegionalSuppliersTable({ suppliers }: { suppliers: Row[] }) {
             </button>
           </li>
         ))}
-        {!suppliers.length && <li className="py-6 text-center text-[var(--text-faint)] text-sm">No suppliers active in your region yet.</li>}
+        {!suppliers.length && <li className="py-6 text-center text-[var(--text-faint)] text-sm">No suppliers yet — add one to get started.</li>}
       </ul>
 
       {sel && <SupplierPane row={sel} onClose={() => setSel(null)} />}
