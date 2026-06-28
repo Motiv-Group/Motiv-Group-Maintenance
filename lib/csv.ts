@@ -24,6 +24,22 @@ export function normalisePhone(raw: string | null | undefined): string | null {
   return `+${digits}`
 }
 
+/** True when `raw` is a syntactically valid email address. */
+export function isValidEmail(raw: string | null | undefined): boolean {
+  if (!raw) return false
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(raw.trim())
+}
+
+/**
+ * True when `raw` is a usable phone number. Normalises first (SA-aware), then
+ * requires an E.164 string of +<10–15 digits> — accepts SA mobiles
+ * (+27XXXXXXXXX) and international numbers, rejects junk / too-short input.
+ */
+export function isValidPhone(raw: string | null | undefined): boolean {
+  const n = normalisePhone(raw)
+  return !!n && /^\+\d{10,15}$/.test(n)
+}
+
 /** Generate a readable 12-char password (mixed case + digits, no ambiguous chars). */
 export function generatePassword(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'

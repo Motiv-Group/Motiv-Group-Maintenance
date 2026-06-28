@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { AlertCircle } from 'lucide-react'
+import { isValidEmail, isValidPhone } from '@/lib/csv'
 import type { Supplier } from '@/lib/types'
 
 const TRADES = ['Electrical', 'Plumbing', 'HVAC', 'Painting', 'Carpentry', 'Tiling', 'Roofing', 'General', 'Other']
@@ -34,6 +35,8 @@ export function SupplierEditForm({ supplier }: { supplier: Supplier }) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.company_name.trim()) { setError('Company name is required'); return }
+    if (form.email.trim() && !isValidEmail(form.email)) { setError('Please enter a valid email address'); return }
+    if (form.phone.trim() && !isValidPhone(form.phone)) { setError('Please enter a valid phone number'); return }
     setSaving(true)
     setError('')
 

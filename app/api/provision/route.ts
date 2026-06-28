@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { rateLimit } from '@/lib/rate-limit'
 import { inviteUser } from '@/lib/invite'
-import { normalisePhone } from '@/lib/csv'
+import { normalisePhone, isValidEmail, isValidPhone, generatePassword } from '@/lib/csv'
 import { sendEmail, storeInviteEmail, supplierInviteEmail } from '@/lib/email'
 import { randomBytes } from 'crypto'
 
@@ -101,6 +101,8 @@ export async function POST(request: Request) {
         if (!full_name || !email || !password || !branch_code || !store_name)
           return NextResponse.json({ error: 'Manager name, email, password, branch code and store name are all required' }, { status: 400 })
         if (String(password).length < 8) return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 })
+        if (!isValidEmail(email)) return NextResponse.json({ error: 'Please enter a valid email address' }, { status: 400 })
+        if (!isValidPhone(body.phone)) return NextResponse.json({ error: 'Please enter a valid phone number' }, { status: 400 })
         const regions = await myRegions()
         const regionId = body.regionId && regions.includes(body.regionId) ? body.regionId : regions[0]
         if (!regionId) return NextResponse.json({ error: 'You have no region' }, { status: 400 })
@@ -163,6 +165,107 @@ export async function POST(request: Request) {
           return NextResponse.json({ ok: true, emailed, actionLink: emailed ? undefined : link, message: emailed ? 'Supplier added — invite link emailed.' : 'Supplier added. Email not sent — copy this link:' })
         }
         break
+      }
+      case 'store_detail': {
+        if (!isRM) return forbid()
+        const regions = await myRegions()
+        const { data: store } = await admin.from('stores').select('id, name, sub_store, branch_code, region_id, company_id, active, closed_at').eq('id', body.storeId).single()
+        if (!store || store.company_id !== companyId || !regions.includes(store.region_id)) return NextResponse.json({ error: 'Store not in your region' }, { status: 400 })
+        const { data: links } = await admin.from('store_users').select('user_id').eq('store_id', store.id)
+        const smId = (links ?? [])[0]?.user_id ?? null
+        let sm: { userId: string; email: string | null; phone: string | null; fullName: string | null } | null = null
+        if (smId) {
+          const { data: p } = await admin.from('user_profiles').select('email, phone, full_name').eq('id', smId).single()
+          sm = { userId: smId, email: p?.email ?? null, phone: p?.phone ?? null, fullName: p?.full_name ?? null }
+        }
+        return NextResponse.json({ store: { id: store.id, name: store.name, subStore: store.sub_store, branchCode: store.branch_code, active: store.active, closedAt: store.closed_at }, sm })
+      }
+      case 'update_store': {
+        if (!isRM) return forbid()
+        const regions = await myRegions()
+        const { data: store } = await admin.from('stores').select('id, name, sub_store, region_id, company_id').eq('id', body.storeId).single()
+        if (!store || store.company_id !== companyId || !regions.includes(store.region_id)) return NextResponse.json({ error: 'Store not in your region' }, { status: 400 })
+
+        // Store name / sub-store edits.
+        const patch: Record<string, any> = {}
+        if (typeof body.store_name === 'string' && body.store_name.trim()) patch.name = body.store_name.trim()
+        if (typeof body.sub_store === 'string' && body.sub_store.trim()) patch.sub_store = body.sub_store.trim()
+        if (Object.keys(patch).length) {
+          const { error } = await admin.from('stores').update(patch).eq('id', store.id)
+          if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+        }
+
+        // Store-manager contact edits.
+        const { data: links } = await admin.from('store_users').select('user_id').eq('store_id', store.id)
+        const smId = (links ?? [])[0]?.user_id ?? null
+        const newEmail = typeof body.email === 'string' ? body.email.trim().toLowerCase() : null
+        const newPhoneRaw = typeof body.phone === 'string' ? body.phone : null
+        let emailed: boolean | undefined
+        if (smId && (newEmail || newPhoneRaw)) {
+          const { data: cur } = await admin.from('user_profiles').select('email, phone, full_name').eq('id', smId).single()
+          const profPatch: Record<string, any> = {}
+
+          if (newPhoneRaw != null && newPhoneRaw !== '') {
+            if (!isValidPhone(newPhoneRaw)) return NextResponse.json({ error: 'Please enter a valid phone number' }, { status: 400 })
+            profPatch.phone = normalisePhone(newPhoneRaw)
+          }
+
+          const emailChanged = !!newEmail && newEmail !== (cur?.email ?? '').toLowerCase()
+          if (emailChanged) {
+            if (!isValidEmail(newEmail)) return NextResponse.json({ error: 'Please enter a valid email address' }, { status: 400 })
+            const password = generatePassword()
+            const { error: authErr } = await admin.auth.admin.updateUserById(smId, { email: newEmail, password, email_confirm: true })
+            if (authErr) return NextResponse.json({ error: /already|registered|exists/i.test(authErr.message) ? 'That email already has an account' : authErr.message }, { status: 400 })
+            profPatch.email = newEmail
+            if (Object.keys(profPatch).length) await admin.from('user_profiles').update(profPatch).eq('id', smId)
+            // Email the new credentials (invite link + username + password).
+            const { data: company } = await admin.from('companies').select('name').eq('id', companyId).single()
+            const { subject, html, text } = storeInviteEmail({
+              managerName: cur?.full_name ?? '', loginUrl: `${origin.replace(/\/$/, '')}/auth/login`, email: newEmail, password,
+              rmName: me?.full_name ?? null, company: company?.name ?? (patch.name ?? store.name), subStore: patch.sub_store ?? store.sub_store ?? store.name,
+            })
+            emailed = await sendEmail({ to: newEmail, subject, html, text })
+          } else if (Object.keys(profPatch).length) {
+            await admin.from('user_profiles').update(profPatch).eq('id', smId)
+          }
+        }
+        revalidatePath('/regional/stores')
+        return NextResponse.json({ ok: true, emailed, message: emailed === undefined ? 'Store updated.' : emailed ? 'Store updated — new login details emailed.' : 'Store updated. Email not sent — share the new password manually.' })
+      }
+      case 'deactivate_store': {
+        if (!isRM) return forbid()
+        const regions = await myRegions()
+        const { data: store } = await admin.from('stores').select('id, region_id, company_id').eq('id', body.storeId).single()
+        if (!store || store.company_id !== companyId || !regions.includes(store.region_id)) return NextResponse.json({ error: 'Store not in your region' }, { status: 400 })
+        const { error } = await admin.from('stores').update({ active: false, closed_at: new Date().toISOString() }).eq('id', store.id)
+        if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+        revalidatePath('/regional/stores')
+        return NextResponse.json({ ok: true, message: 'Store deactivated.' })
+      }
+      case 'delete_store': {
+        if (!isRM) return forbid()
+        const regions = await myRegions()
+        const { data: store } = await admin.from('stores').select('id, region_id, company_id').eq('id', body.storeId).single()
+        if (!store || store.company_id !== companyId || !regions.includes(store.region_id)) return NextResponse.json({ error: 'Store not in your region' }, { status: 400 })
+        // Block hard-delete when the store has ticket history.
+        const { count } = await admin.from('tickets').select('id', { count: 'exact', head: true }).eq('store_id', store.id)
+        if ((count ?? 0) > 0) return NextResponse.json({ error: 'This store has tickets — deactivate it instead of deleting.' }, { status: 400 })
+        // Remove the store-manager account(s) tied only to this store, then the store.
+        const { data: links } = await admin.from('store_users').select('user_id').eq('store_id', store.id)
+        for (const l of (links ?? [])) {
+          const { data: others } = await admin.from('store_users').select('store_id').eq('user_id', l.user_id).neq('store_id', store.id)
+          if (!others || others.length === 0) {
+            await admin.from('store_users').delete().eq('user_id', l.user_id)
+            await admin.from('user_profiles').delete().eq('id', l.user_id)
+            await admin.auth.admin.deleteUser(l.user_id).catch(() => {})
+          } else {
+            await admin.from('store_users').delete().eq('user_id', l.user_id).eq('store_id', store.id)
+          }
+        }
+        const { error } = await admin.from('stores').delete().eq('id', store.id)
+        if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+        revalidatePath('/regional/stores')
+        return NextResponse.json({ ok: true, message: 'Store deleted.' })
       }
       default:
         return NextResponse.json({ error: 'Unknown action' }, { status: 400 })

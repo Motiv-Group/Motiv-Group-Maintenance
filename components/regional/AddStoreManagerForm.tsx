@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { UserPlus, CheckCircle, Eye, EyeOff } from 'lucide-react'
 import { Card } from '@/components/exec/ui'
-import { normalisePhone } from '@/lib/csv'
+import { normalisePhone, isValidEmail, isValidPhone } from '@/lib/csv'
 
 /** RM-only: create a store + its store-manager login in one step.
  *  Posts the `create_store_manager` action to /api/provision. */
@@ -22,6 +22,8 @@ export function AddStoreManagerForm() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
+    if (!isValidEmail(vals.email)) { setMsg({ ok: false, text: 'Please enter a valid email address.' }); return }
+    if (!isValidPhone(vals.phone)) { setMsg({ ok: false, text: 'Please enter a valid phone number.' }); return }
     setBusy(true); setMsg(null)
     try {
       const res = await fetch('/api/provision', {

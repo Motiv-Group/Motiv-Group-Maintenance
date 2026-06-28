@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { isValidEmail } from '@/lib/csv'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { MotivLogo } from '@/components/ui/MotivLogo'
@@ -12,10 +13,12 @@ export default function ForgotPasswordPage() {
   const [email, setEmail]     = useState('')
   const [loading, setLoading] = useState(false)
   const [sent, setSent]       = useState(false)
+  const [err, setErr]         = useState('')
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
-    if (!email.trim()) return
+    if (!isValidEmail(email)) { setErr('Enter a valid email address'); return }
+    setErr('')
     setLoading(true)
     const supabase = createClient()
     // Don't reveal whether the email exists — always show the same result.
@@ -58,7 +61,8 @@ export default function ForgotPasswordPage() {
                     label="Email Address"
                     placeholder="you@example.com"
                     value={email}
-                    onChange={e => setEmail(e.target.value)}
+                    onChange={e => { setEmail(e.target.value); if (err) setErr('') }}
+                    error={err || undefined}
                   />
                   <Button type="submit" loading={loading} className="w-full bg-[#C6A35D] hover:bg-[#b8954f] text-white border-[#C6A35D] focus:ring-[#C6A35D]" size="lg" disabled={!email.trim()}>
                     Send reset link

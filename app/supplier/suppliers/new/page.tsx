@@ -6,6 +6,7 @@ import { BackButton } from '@/components/ui/BackButton'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { UserPlus, Upload, CheckCircle2, AlertCircle, FileText, X } from 'lucide-react'
+import { isValidEmail, isValidPhone } from '@/lib/csv'
 
 const TRADES = ['Electrical', 'Plumbing', 'HVAC', 'Painting', 'Carpentry', 'Tiling', 'Roofing', 'General', 'Other']
 
@@ -85,6 +86,8 @@ export default function NewSupplierPage() {
   async function submitManual(e: React.FormEvent) {
     e.preventDefault()
     if (!form.company_name.trim()) { setManualError('Company name is required'); return }
+    if (form.email.trim() && !isValidEmail(form.email)) { setManualError('Please enter a valid email address'); return }
+    if (form.phone.trim() && !isValidPhone(form.phone)) { setManualError('Please enter a valid phone number'); return }
     setSaving(true)
     setManualError('')
     const res = await fetch('/api/suppliers', {

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Users, Plus, Phone, Pencil, Trash2, X, Check } from 'lucide-react'
 import { Card } from '@/components/exec/ui'
+import { isValidPhone } from '@/lib/csv'
 
 export interface Technician { id: string; name: string; phone: string }
 
@@ -20,6 +21,7 @@ export function TechniciansManager({ technicians }: { technicians: Technician[] 
 
   async function create() {
     if (!name.trim() || !phone.trim()) { setErr('Name and phone are both required.'); return }
+    if (!isValidPhone(phone)) { setErr('Please enter a valid phone number.'); return }
     setBusy(true); setErr('')
     const res = await fetch('/api/supplier/technicians', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, phone }) })
     setBusy(false)
@@ -80,6 +82,7 @@ function TechRow({ tech, editing, onEdit, onCancel, onSaved, onRemove }: {
 
   async function save() {
     if (!name.trim() || !phone.trim()) { setErr('Name and phone required.'); return }
+    if (!isValidPhone(phone)) { setErr('Please enter a valid phone number.'); return }
     setBusy(true); setErr('')
     const res = await fetch(`/api/supplier/technicians/${tech.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, phone }) })
     setBusy(false)

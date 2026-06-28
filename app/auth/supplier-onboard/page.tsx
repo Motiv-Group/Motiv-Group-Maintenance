@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/Input'
 import { PasswordInput } from '@/components/ui/PasswordInput'
 import { Button } from '@/components/ui/Button'
 import { MotivLogo } from '@/components/ui/MotivLogo'
+import { isValidPhone } from '@/lib/csv'
 import { Truck } from 'lucide-react'
 
 interface OnboardForm {
@@ -109,7 +110,7 @@ export default function SupplierOnboardPage() {
               </div>
               <Input id="company_name" label="Company Name" placeholder="Colorworx" error={errors.company_name?.message} {...register('company_name', { required: 'Company name is required' })} />
               <Input id="contact_name" label="Your Name" placeholder="Jacques Dippenaar" error={errors.contact_name?.message} {...register('contact_name', { required: 'Your name is required' })} />
-              <Input id="phone" type="tel" label="Phone Number" placeholder="+27 71 234 5678" error={errors.phone?.message} {...register('phone', { required: 'Phone number is required' })} />
+              <Input id="phone" type="tel" label="Phone Number" placeholder="+27 71 234 5678" error={errors.phone?.message} {...register('phone', { required: 'Phone number is required', validate: v => isValidPhone(v) || 'Enter a valid phone number' })} />
               <Input id="address" label="Address" placeholder="123 Main St, Cape Town" error={errors.address?.message} {...register('address')} />
               <Input id="trade" label="Trade" placeholder="e.g. Shopfitting" error={errors.trade?.message} {...register('trade')} />
               <Input id="vat_number" label="Tax / VAT Number" placeholder="4123456789" error={errors.vat_number?.message} {...register('vat_number')} />

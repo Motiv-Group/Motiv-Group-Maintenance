@@ -22,7 +22,7 @@ export function RegionalOverview({ data, name, briefing, briefingScopeId }: { da
     { label: 'Active Stores', value: p.activeStores, hint: `avg ${p.averageStoreHealth}%`, icon: <Building2 size={13} />, tone: 'info', href: '/regional/stores' },
     { label: 'Stores Need Attention', value: data.attentionStores.length, hint: 'need action', icon: <ShieldAlert size={13} />, tone: data.attentionStores.length ? 'warn' : 'good', href: '/regional/stores' },
     { label: 'Open Tickets', value: p.openTickets, hint: `${p.overdueTickets} overdue`, icon: <ClipboardList size={13} />, tone: 'orange', border: '!ring-orange-500/60', href: '/regional/tickets' },
-    { label: 'Pending Signoffs', value: data.signoffsPending, hint: 'awaiting you', icon: <ClipboardCheck size={13} />, tone: data.signoffsPending ? 'warn' : 'good', border: '!ring-orange-500/60', href: '/regional/signoff' },
+    { label: 'Pending Signoffs', value: data.signoffsPending, hint: 'awaiting you', icon: <ClipboardCheck size={13} />, tone: data.signoffsPending ? 'warn' : 'good', border: '!ring-amber-500/60', href: '/regional/signoff' },
     { label: 'Open Snags', value: data.snagsOpen, hint: 'to resolve', icon: <AlertTriangle size={13} />, tone: data.snagsOpen ? 'warn' : 'good', href: '/regional/snag' },
     { label: 'Internal Breaches', value: p.internalSlaBreaches, hint: 'internal SLA', icon: <Lock size={13} />, tone: p.internalSlaBreaches ? 'bad' : 'good', href: '/regional/tickets' },
     { label: 'Supplier Breaches', value: p.supplierSlaBreaches, hint: 'supplier SLA', icon: <Truck size={13} />, tone: p.supplierSlaBreaches ? 'bad' : 'good', href: '/regional/suppliers' },
@@ -74,7 +74,7 @@ export function RegionalOverview({ data, name, briefing, briefingScopeId }: { da
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <SectionCard title="Store Health Distribution" icon={<Building2 size={15} className="text-indigo-600 dark:text-indigo-400" />}>
           <DistributionBar counts={p.counts} />
-          <div className="mt-3"><RagBlocks counts={p.counts} /></div>
+          <div className="mt-3"><RagBlocks counts={p.counts} unitLabel="stores" /></div>
         </SectionCard>
 
         <SectionCard title="Supplier Performance" icon={<Truck size={15} className="text-teal-600 dark:text-teal-400" />} action={<Link href="/regional/suppliers" className="text-xs text-[#C6A35D] hover:underline">View all</Link>}>

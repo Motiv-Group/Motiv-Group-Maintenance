@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useForm } from 'react-hook-form'
 import { createClient } from '@/lib/supabase/client'
+import { isValidEmail, isValidPhone } from '@/lib/csv'
 import { Input } from '@/components/ui/Input'
 import { PasswordInput } from '@/components/ui/PasswordInput'
 import { Button } from '@/components/ui/Button'
@@ -180,7 +181,7 @@ export default function SignupPage() {
               label="Email Address"
               placeholder="jane@company.com"
               error={errors.email?.message}
-              {...register('email', { required: 'Email is required' })}
+              {...register('email', { required: 'Email is required', validate: v => isValidEmail(v) || 'Enter a valid email address' })}
             />
             <Input
               id="phone"
@@ -188,7 +189,7 @@ export default function SignupPage() {
               label="Phone Number"
               placeholder="+27 71 234 5678"
               error={errors.phone?.message}
-              {...register('phone', { required: 'Phone number is required' })}
+              {...register('phone', { required: 'Phone number is required', validate: v => isValidPhone(v) || 'Enter a valid phone number' })}
             />
             {role === 'executive' ? (
               <Input

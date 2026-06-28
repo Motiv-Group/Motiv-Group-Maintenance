@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
+import { isValidPhone } from '@/lib/csv'
 import { useTheme } from '@/components/providers/ThemeProvider'
 import { UserCircle2, Building2, CheckCircle2, Sun, Moon } from 'lucide-react'
 import { BackButton } from '@/components/ui/BackButton'
@@ -184,7 +185,8 @@ const { register, handleSubmit, reset, formState: { errors } } = useForm<Profile
             type="tel"
             label="Phone Number"
             placeholder="+27 71 234 5678"
-            {...register('phone')}
+            error={errors.phone?.message}
+            {...register('phone', { validate: v => !v || isValidPhone(v) || 'Enter a valid phone number' })}
           />
           <Input
             id="address"

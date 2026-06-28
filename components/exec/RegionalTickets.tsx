@@ -143,8 +143,8 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
           {BAR_ORDER.map(b => counts[b] > 0 && <div key={b} className={`h-full ${BUCKET_BAR[b]}`} style={{ width: `${Math.round((counts[b] / barTotal) * 100)}%` }} />)}
         </div>
         <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] sm:flex sm:flex-wrap">
-          {BAR_ORDER.map(b => <span key={b} className="flex items-center gap-1.5 text-[var(--text-muted)]"><i className={`w-2 h-2 rounded-full ${BUCKET_BAR[b]}`} />{BUCKET_LABEL[b]} {counts[b]}</span>)}
-          {counts.cancelled > 0 && <span className="flex items-center gap-1.5 text-[var(--text-muted)]"><i className="w-2 h-2 rounded-full bg-red-500" />Cancelled {counts.cancelled}</span>}
+          {BAR_ORDER.map(b => <span key={b} className="text-[var(--text-muted)]">{BUCKET_LABEL[b]} {counts[b]}</span>)}
+          {counts.cancelled > 0 && <span className="text-[var(--text-muted)]">Cancelled {counts.cancelled}</span>}
         </div>
       </Card>
 

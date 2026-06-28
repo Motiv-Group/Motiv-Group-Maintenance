@@ -174,7 +174,7 @@ export function DistributionLegend({ counts }: { counts: Counts }) {
 }
 
 /** RAGC health bands as coloured blocks (Controlled / Attention / At Risk / Critical). */
-export function RagBlocks({ counts, total }: { counts: Counts; total?: number }) {
+export function RagBlocks({ counts, total, unitLabel = 'estate' }: { counts: Counts; total?: number; unitLabel?: string }) {
   const t = total ?? (counts.controlled + counts.attention + counts.at_risk + counts.critical)
   const pct = (n: number) => (t > 0 ? Math.round((n / t) * 100) : 0)
   const blocks = [
@@ -189,7 +189,7 @@ export function RagBlocks({ counts, total }: { counts: Counts; total?: number })
         <div key={b.label} className={`rounded-xl ring-1 p-3 ${b.cls}`}>
           <div className="text-2xl font-bold leading-none">{b.value}</div>
           <div className="text-[11px] font-semibold mt-1">{b.label}</div>
-          <div className="text-[10px] opacity-70">{pct(b.value)}% of estate</div>
+          <div className="text-[10px] opacity-70">{pct(b.value)}% of {unitLabel}</div>
         </div>
       ))}
     </div>
