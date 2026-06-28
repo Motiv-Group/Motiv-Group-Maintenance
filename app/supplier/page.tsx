@@ -34,8 +34,9 @@ function TicketRow({ t, company }: { t: SupplierTicketRow; company?: string }) {
       <div className="min-w-0">
         <p className="text-sm font-medium text-[var(--text)] truncate">{[company, t.storeName].filter(Boolean).join(' · ')}</p>
         <p className="text-[11px] text-[var(--text-muted)] truncate">{t.title}</p>
+        <p className="text-[11px] text-[var(--text-faint)]">Logged {formatDateTime(t.createdAt)}</p>
+        {m && <p className={`text-[11px] font-medium ${sm.text}`}>{m.label} · {formatDateTime(m.at)}</p>}
         {t.overdue && <p className="text-[11px] font-semibold text-red-600 dark:text-red-400">Overdue by {humanizeDuration(Date.now() - new Date(t.dueAt).getTime())}</p>}
-        {m && <p className={`text-[11px] ${sm.text}`}>{m.label} · {formatDateTime(m.at)}</p>}
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
         <PriorityBadge priority={t.priority} className="w-full text-center" />
@@ -59,7 +60,7 @@ export default async function SupplierOverviewPage() {
 
   const kpis: Kpi[] = [
     { label: 'Quote requested', value: quoteRequested, icon: <ClipboardList size={13} />, tone: 'info', href: '/supplier/tickets?filter=to_quote' },
-    { label: 'Overdue', value: k.overdue, icon: <AlertTriangle size={13} />, tone: k.overdue ? 'bad' : 'good', href: '/supplier/tickets?filter=breached' },
+    { label: 'SLA Breached', value: k.overdue, icon: <AlertTriangle size={13} />, tone: k.overdue ? 'bad' : 'good', href: '/supplier/tickets?filter=breached' },
     { label: 'Due Today', value: k.dueToday, icon: <Clock size={13} />, tone: k.dueToday ? 'warn' : 'good', href: '/supplier/tickets' },
     { label: 'Pending Quotes', value: pendingDecision, icon: <ReceiptText size={13} />, tone: 'gold', href: '/supplier/quotes?status=pending' },
     { label: 'Awaiting Sign-off', value: k.awaitingSignoff, icon: <ClipboardCheck size={13} />, tone: 'info', href: '/supplier/signoff?status=awaiting' },
@@ -113,19 +114,22 @@ export default async function SupplierOverviewPage() {
       {/* Row 1: Needs your action · Recent quotes */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <SectionCard title="Needs Your Action" icon={<AlertTriangle size={15} className="text-amber-600 dark:text-amber-500" />} action={<Link href="/supplier/tickets" className="text-xs text-[#C6A35D] hover:underline">All</Link>}>
-          {needsAction.map(t => (
+          {needsAction.map(t => {
+            const sm = rmStatusMeta(t.status); const m = milestone(t)
+            return (
             <Link key={t.id} href={`/supplier/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] -mx-2 px-2 rounded">
               <div className="min-w-0">
                 <p className="text-sm font-medium text-[var(--text)] truncate">{[company, t.storeName].filter(Boolean).join(' · ')}</p>
                 <p className="text-[11px] text-[var(--text-muted)] truncate">{t.title}</p>
-                <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(t.createdAt)}</p>
+                <p className="text-[11px] text-[var(--text-faint)]">Logged {formatDateTime(t.createdAt)}</p>
+                {m && <p className={`text-[11px] font-medium ${sm.text}`}>{m.label} · {formatDateTime(m.at)}</p>}
               </div>
               <div className="flex flex-col items-end gap-1 shrink-0">
                 <PriorityBadge priority={t.priority} />
-                {(() => { const sm = rmStatusMeta(t.status); return <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${sm.cls}`}>{sm.label}</span> })()}
+                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${sm.cls}`}>{sm.label}</span>
               </div>
             </Link>
-          ))}
+          ) })}
           {!needsAction.length && <p className="text-sm text-[var(--text-faint)]">Nothing needs action right now.</p>}
         </SectionCard>
         <SectionCard title="Recent Quotes" icon={<ReceiptText size={15} className="text-amber-600 dark:text-amber-500" />} action={<Link href="/supplier/quotes" className="text-xs text-[#C6A35D] hover:underline">All</Link>}>

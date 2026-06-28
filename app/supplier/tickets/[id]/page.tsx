@@ -8,8 +8,10 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { requireSupplierV3 } from '@/lib/health/guard'
 import { loadSlaResolver } from '@/lib/health/data'
 import { deriveDueDates } from '@/lib/health/priority'
+import { computeTicketSla } from '@/lib/health/sla'
 import { isActive } from '@/lib/health/types'
 import type { HealthTicket, Priority } from '@/lib/health/types'
+import { BreachReason } from '@/components/workflow/BreachReason'
 import { Card } from '@/components/exec/ui'
 import { WorkflowActions } from '@/components/workflow/WorkflowActions'
 import { RmPipeline } from '@/components/regional/RmPipeline'
@@ -65,6 +67,9 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   const now = new Date()
   const dueAt = deriveDueDates(t as HealthTicket, rules(t.priority as Priority)).resolutionDue
   const overdue = isActive(t.status) && now.getTime() > new Date(dueAt).getTime()
+  // Supplier-side SLA breach + the pending action that ran past its deadline.
+  const sla = computeTicketSla(t as HealthTicket, rules(t.priority as Priority), now)
+  const breached = isActive(t.status) && sla.supplierBreached
 
   // Their latest submitted quote (if any) for this ticket.
   const latestQuote = ((myQuotes ?? []) as any[])[0] ?? null
@@ -131,6 +136,8 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           </div>
         )}
       </Card>
+
+      {breached && <BreachReason nextAction={sla.nextAction} dueAt={sla.nextActionDueAt} owner="Supplier" />}
 
       <Card className="p-5 space-y-3">
         <h2 className="text-sm font-bold text-[var(--text)]">Next step</h2>
