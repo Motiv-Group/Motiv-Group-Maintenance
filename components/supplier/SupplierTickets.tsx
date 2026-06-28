@@ -34,7 +34,7 @@ const byDateThenUrgency = (a: SupplierTicketRow, b: SupplierTicketRow) =>
 // Active tickets where evidence is required but not all of before/after/COC are uploaded.
 const missingEvidence = (t: SupplierTicketRow) => t.active && t.evidenceRequired && !(t.beforeUploaded && t.afterUploaded && t.cocUploaded)
 
-type FilterKey = 'all' | 'breached' | 'overdue' | 'evidence' | Bucket
+type FilterKey = 'all' | 'breached' | 'overdue' | 'evidence' | 'declined' | Bucket
 const PILLS: { key: FilterKey; label: string; active: string; inactive: string }[] = [
   { key: 'all', label: 'All', active: 'bg-slate-800 text-white border-slate-800 dark:bg-white dark:text-[#0a0e17] dark:border-white', inactive: 'text-[var(--text-muted)] border-[var(--border)] hover:border-slate-400' },
   { key: 'breached', label: 'SLA Breached', active: 'bg-red-600 text-white border-red-600', inactive: 'text-red-600 dark:text-red-400 border-red-500/50 hover:border-red-500' },
@@ -46,7 +46,7 @@ const PILLS: { key: FilterKey; label: string; active: string; inactive: string }
   { key: 'in_progress', label: 'In Progress', active: 'bg-[#C6A35D] text-[#0a0e17] border-[#C6A35D]', inactive: 'text-amber-600 dark:text-[#C6A35D] border-[#C6A35D]/40 hover:border-[#C6A35D]' },
   { key: 'signoff', label: 'Sign-off', active: 'bg-orange-500 text-white border-orange-500', inactive: 'text-orange-600 dark:text-orange-400 border-orange-500/40 hover:border-orange-400' },
   { key: 'completed', label: 'Completed', active: 'bg-emerald-500 text-white border-emerald-500', inactive: 'text-emerald-600 dark:text-emerald-400 border-emerald-500/40 hover:border-emerald-400' },
-  { key: 'closed', label: 'Closed', active: 'bg-red-500 text-white border-red-500', inactive: 'text-red-600 dark:text-red-400 border-red-500/40 hover:border-red-400' },
+  { key: 'declined', label: 'Declined', active: 'bg-red-500 text-white border-red-500', inactive: 'text-red-600 dark:text-red-400 border-red-500/40 hover:border-red-400' },
 ]
 
 function milestone(t: SupplierTicketRow): { label: string; at: string } | null {
@@ -100,6 +100,7 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
   const barTotal = BAR_ORDER.reduce((s, b) => s + counts[b], 0) || 1
   const breachedCount = useMemo(() => tickets.filter(t => t.breached).length, [tickets])
   const overdueCount = useMemo(() => tickets.filter(t => t.overdue).length, [tickets])
+  const declinedCount = useMemo(() => tickets.filter(t => t.quoteDeclined).length, [tickets])
   const evidenceCount = useMemo(() => tickets.filter(missingEvidence).length, [tickets])
 
   const shown = useMemo(() => {
@@ -107,6 +108,7 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
     return tickets.filter(t => {
       if (filter === 'breached') { if (!t.breached) return false }
       else if (filter === 'overdue') { if (!t.overdue) return false }
+      else if (filter === 'declined') { if (!t.quoteDeclined) return false }
       else if (filter === 'evidence') { if (!missingEvidence(t)) return false }
       else if (filter !== 'all' && bucketOf(t.status) !== filter) return false
       if (!terms.length) return true
@@ -161,7 +163,7 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
       {/* Filter pills */}
       <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
         {PILLS.map(p => {
-          const n = p.key === 'all' ? tickets.length : p.key === 'breached' ? breachedCount : p.key === 'overdue' ? overdueCount : p.key === 'evidence' ? evidenceCount : counts[p.key]
+          const n = p.key === 'all' ? tickets.length : p.key === 'breached' ? breachedCount : p.key === 'overdue' ? overdueCount : p.key === 'declined' ? declinedCount : p.key === 'evidence' ? evidenceCount : counts[p.key]
           const on = filter === p.key
           return (
             <button key={p.key} onClick={() => setFilter(p.key)} className={`px-3 py-1.5 rounded-full text-xs font-medium border transition text-center ${on ? p.active : p.inactive}`}>

@@ -532,7 +532,7 @@ export interface SupplierTicketRow {
   acknowledged: boolean; evidenceRequired: boolean; beforeUploaded: boolean; afterUploaded: boolean; cocUploaded: boolean
   active: boolean; breached: boolean
   assignedAt: string | null; quoteRequestedAt: string | null; quoteApprovedAt: string | null
-  dueAt: string; overdue: boolean
+  dueAt: string; overdue: boolean; quoteDeclined: boolean
 }
 export interface SupplierQuoteRow { id: string; ticketId: string; ticketTitle: string; ticketStatus: string; storeName: string; branchCode: string | null; amount: number; amountInclVat: number | null; status: string; createdAt: string }
 export interface SupplierSignoffRow { id: string; ticketId: string; ticketTitle: string; storeName: string; branchCode: string | null; status: string; createdAt: string }
@@ -583,6 +583,9 @@ export async function assembleSupplierDashboard(companyId: string, supplierIds: 
   // Earliest accepted quote per ticket — fallback for the approval date.
   const acceptedQuoteAt = new Map<string, string>()
   for (const q of (quotesRaw ?? []) as any[]) if (q.status === 'accepted') acceptedQuoteAt.set(q.ticket_id, q.created_at)
+  // Latest quote status per ticket (quotesRaw is newest-first) → "quote declined" flag.
+  const latestQuoteStatus = new Map<string, string>()
+  for (const q of (quotesRaw ?? []) as any[]) if (!latestQuoteStatus.has(q.ticket_id)) latestQuoteStatus.set(q.ticket_id, q.status)
 
   const todayEnd = new Date(now); todayEnd.setHours(23, 59, 59, 999)
   let open = 0, overdue = 0, dueToday = 0, pendingQuotes = 0, awaitingSignoff = 0, evidenceMissing = 0
@@ -613,6 +616,7 @@ export async function assembleSupplierDashboard(companyId: string, supplierIds: 
       quoteRequestedAt: raw.quote_requested_at ?? null,
       quoteApprovedAt: approvedAt,
       ...dueInfo(t, rules, now),
+      quoteDeclined: latestQuoteStatus.get(t.id) === 'declined',
     })
   }
   // Active first, then unacknowledged, then oldest — keeps the dashboard queues useful.

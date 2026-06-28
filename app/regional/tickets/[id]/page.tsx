@@ -42,7 +42,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
     admin.from('suppliers').select('id, company_name').eq('company_id', companyId).eq('active', true).order('company_name'),
     admin.from('ticket_variations').select('description, amount, status, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('snags').select('description, status, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
-    admin.from('ticket_suppliers').select('supplier_id, status, invited_at, suppliers(company_name)').eq('ticket_id', t.id),
+    admin.from('ticket_suppliers').select('supplier_id, status, invited_at, decline_reason, suppliers(company_name)').eq('ticket_id', t.id),
     admin.from('ratings').select('supplier_id, score').eq('company_id', companyId),
   ])
   const storeName = store ? storeLabel(store.name, store.sub_store) : 'Store'
@@ -72,11 +72,13 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   })
   const nameById = new Map<string, string>(supplierList.map(s => [s.id, s.name]))
   for (const inv of (invites ?? []) as any[]) if (inv.suppliers?.company_name) nameById.set(inv.supplier_id, inv.suppliers.company_name)
+  const declineReasonBy = new Map<string, string>()
+  for (const inv of (invites ?? []) as any[]) if (inv.decline_reason) declineReasonBy.set(inv.supplier_id, inv.decline_reason)
   const supplierRows = ((invites ?? []) as any[]).map(inv => ({ name: inv.suppliers?.company_name ?? nameById.get(inv.supplier_id) ?? 'Supplier', status: inv.status as string, invitedAt: inv.invited_at ?? null }))
   const mapQuote = (q: any) => ({
     id: q.id, supplierName: nameById.get(q.supplier_id) ?? 'Supplier', amount: q.amount,
     amountInclVat: q.amount_incl_vat ?? null, description: q.description ?? null, fileUrl: q.file_url ?? null,
-    validUntil: q.valid_until ?? null, createdAt: q.created_at,
+    validUntil: q.valid_until ?? null, createdAt: q.created_at, declineReason: declineReasonBy.get(q.supplier_id) ?? null,
   })
   const reviewQuotes = ((quotes ?? []) as any[]).filter(q => q.status === 'pending').map(mapQuote)
   const acceptedQuotes = ((quotes ?? []) as any[]).filter(q => q.status === 'accepted').map(mapQuote)
@@ -107,7 +109,12 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
           <div className="flex flex-col items-end gap-2 shrink-0">
             <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 justify-items-end">
               <PriorityBadge priority={t.priority} className="w-full text-center" />
-              {(() => { const sm = rmStatusMeta(t.status); return <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${sm.cls}`}>{sm.label}</span> })()}
+              {(() => {
+                const sm = rmStatusMeta(t.status)
+                const label = reQuote ? 'Re-open' : sm.label
+                const cls = reQuote ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : sm.cls
+                return <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${cls}`}>{label}</span>
+              })()}
             </div>
             {canEdit && <RmEditTicketForm ticketId={t.id} initial={{ title: t.title, category: t.category ?? 'General', impact: t.operational_impact ?? 'none', priority: t.priority, description: t.description }} />}
           </div>
@@ -292,6 +299,12 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
                     </span>
                   </summary>
                   <div className="border-t border-[var(--border)] p-4 space-y-3">
+                    {q.declineReason && (
+                      <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3">
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Decline reason</p>
+                        <p className="text-sm text-[var(--text)]">{q.declineReason}</p>
+                      </div>
+                    )}
                     <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                       <DetailItem label="Excl. VAT" value={formatCurrency(q.amount)} />
                       <DetailItem label="Incl. VAT" value={q.amountInclVat ? formatCurrency(q.amountInclVat) : '—'} />
