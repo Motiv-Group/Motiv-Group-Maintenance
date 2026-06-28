@@ -72,7 +72,7 @@ function TicketRow({ t, company, showStore }: { t: SupplierTicketRow; company?: 
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
         <PriorityBadge priority={t.priority} className="w-full text-center" />
-        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${sm.cls}`}>{sm.label}</span>
+        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${t.declinedForMe ? 'bg-gray-500/15 text-gray-600 dark:text-gray-400' : sm.cls}`}>{t.declinedForMe ? 'Declined' : sm.label}</span>
       </div>
     </Link>
   )
@@ -100,7 +100,7 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
   const barTotal = BAR_ORDER.reduce((s, b) => s + counts[b], 0) || 1
   const breachedCount = useMemo(() => tickets.filter(t => t.breached).length, [tickets])
   const overdueCount = useMemo(() => tickets.filter(t => t.overdue).length, [tickets])
-  const declinedCount = useMemo(() => tickets.filter(t => t.quoteDeclined).length, [tickets])
+  const declinedCount = useMemo(() => tickets.filter(t => t.declinedForMe).length, [tickets])
   const evidenceCount = useMemo(() => tickets.filter(missingEvidence).length, [tickets])
 
   const shown = useMemo(() => {
@@ -108,9 +108,11 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
     return tickets.filter(t => {
       if (filter === 'breached') { if (!t.breached) return false }
       else if (filter === 'overdue') { if (!t.overdue) return false }
-      else if (filter === 'declined') { if (!t.quoteDeclined) return false }
+      else if (filter === 'declined') { if (!t.declinedForMe) return false }
       else if (filter === 'evidence') { if (!missingEvidence(t)) return false }
       else if (filter !== 'all' && bucketOf(t.status) !== filter) return false
+      // Tickets where this supplier was declined (and not re-invited) only show under Declined.
+      if (filter !== 'declined' && t.declinedForMe) return false
       if (!terms.length) return true
       const hay = `${t.title} ${t.storeName} ${t.branchCode ?? ''} ${rmStatusMeta(t.status).label}`.toLowerCase()
       return terms.every(w => hay.includes(w))

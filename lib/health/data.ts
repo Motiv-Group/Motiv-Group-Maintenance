@@ -532,7 +532,7 @@ export interface SupplierTicketRow {
   acknowledged: boolean; evidenceRequired: boolean; beforeUploaded: boolean; afterUploaded: boolean; cocUploaded: boolean
   active: boolean; breached: boolean
   assignedAt: string | null; quoteRequestedAt: string | null; quoteApprovedAt: string | null
-  dueAt: string; overdue: boolean; quoteDeclined: boolean
+  dueAt: string; overdue: boolean; declinedForMe: boolean
 }
 export interface SupplierQuoteRow { id: string; ticketId: string; ticketTitle: string; ticketStatus: string; storeName: string; branchCode: string | null; amount: number; amountInclVat: number | null; status: string; createdAt: string }
 export interface SupplierSignoffRow { id: string; ticketId: string; ticketTitle: string; storeName: string; branchCode: string | null; status: string; createdAt: string }
@@ -553,13 +553,17 @@ export async function assembleSupplierDashboard(companyId: string, supplierIds: 
   if (!supplierIds.length) return { perf: emptyPerf, company: '', kpis: { open: 0, overdue: 0, dueToday: 0, pendingQuotes: 0, awaitingSignoff: 0, evidenceMissing: 0 }, tickets: [], quotes: [], signoffs: [], rating: { avg: 5, count: 0 }, generatedAt: now.toISOString() }
   const rules = await loadSlaResolver(db, companyId)
 
-  // Own tickets (awarded) + tickets where invited to quote (competitive model).
+  // Own tickets (awarded) + tickets where invited to quote (competitive model),
+  // plus declined/closed so the supplier still sees them under the Declined filter.
   const [{ data: bySupplier }, { data: invRows }] = await Promise.all([
     db.from('tickets').select(TICKET_COLS).eq('company_id', companyId).in('supplier_id', supplierIds),
-    db.from('ticket_suppliers').select('ticket_id').in('supplier_id', supplierIds).in('status', ['invited', 'quoted', 'awarded']),
+    db.from('ticket_suppliers').select('ticket_id, status').in('supplier_id', supplierIds).in('status', ['invited', 'quoted', 'awarded', 'declined', 'closed']),
   ])
   const owned = (bySupplier ?? []) as any[]
   const ownedIds = new Set(owned.map(t => t.id))
+  // The supplier's invite status per ticket (newest row wins if duplicated).
+  const myInviteStatus = new Map<string, string>()
+  for (const r of (invRows ?? []) as any[]) myInviteStatus.set(r.ticket_id, r.status)
   const extraIds = Array.from(new Set((invRows ?? []).map(r => r.ticket_id))).filter(id => !ownedIds.has(id))
   const { data: invitedTickets } = extraIds.length ? await db.from('tickets').select(TICKET_COLS).in('id', extraIds) : { data: [] as any[] }
   const rawAll = [...owned, ...((invitedTickets ?? []) as any[])]
@@ -583,18 +587,17 @@ export async function assembleSupplierDashboard(companyId: string, supplierIds: 
   // Earliest accepted quote per ticket — fallback for the approval date.
   const acceptedQuoteAt = new Map<string, string>()
   for (const q of (quotesRaw ?? []) as any[]) if (q.status === 'accepted') acceptedQuoteAt.set(q.ticket_id, q.created_at)
-  // Latest quote status per ticket (quotesRaw is newest-first) → "quote declined" flag.
-  const latestQuoteStatus = new Map<string, string>()
-  for (const q of (quotesRaw ?? []) as any[]) if (!latestQuoteStatus.has(q.ticket_id)) latestQuoteStatus.set(q.ticket_id, q.status)
 
   const todayEnd = new Date(now); todayEnd.setHours(23, 59, 59, 999)
   let open = 0, overdue = 0, dueToday = 0, pendingQuotes = 0, awaitingSignoff = 0, evidenceMissing = 0
   const rows: SupplierTicketRow[] = []
   for (const t of tickets) {
     const active = isActive(t.status)
+    // This supplier was declined/closed off the ticket (not awarded) — out of their active work.
+    const declinedForMe = !ownedIds.has(t.id) && ['declined', 'closed'].includes(myInviteStatus.get(t.id) ?? '')
     const sla = computeTicketSla(t, rules(t.priority), now)
     const raw: any = rawById.get(t.id) ?? {}
-    if (active) {
+    if (active && !declinedForMe) {
       open++
       if (sla.supplierBreached) overdue++
       if (sla.nextActionDueAt && new Date(sla.nextActionDueAt) <= todayEnd && new Date(sla.nextActionDueAt) >= now) dueToday++
@@ -616,7 +619,7 @@ export async function assembleSupplierDashboard(companyId: string, supplierIds: 
       quoteRequestedAt: raw.quote_requested_at ?? null,
       quoteApprovedAt: approvedAt,
       ...dueInfo(t, rules, now),
-      quoteDeclined: latestQuoteStatus.get(t.id) === 'declined',
+      declinedForMe,
     })
   }
   // Active first, then unacknowledged, then oldest — keeps the dashboard queues useful.

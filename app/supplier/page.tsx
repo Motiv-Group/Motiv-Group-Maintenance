@@ -52,27 +52,29 @@ export default async function SupplierOverviewPage() {
   const k = d.kpis
   const perf = d.perf
   const company = d.company
-  const quoteRequested = d.tickets.filter(t => QUOTE_REQUESTED_STATUSES.has(t.status)).length
+  const quoteRequested = d.tickets.filter(t => !t.declinedForMe && QUOTE_REQUESTED_STATUSES.has(t.status)).length
   // Submitted quotes awaiting the client's decision (matches the Quotes-tab Pending filter).
   const pendingDecision = d.quotes.filter(q => q.status === 'pending').length
   // Overdue = past the final resolution deadline (subset of SLA-breached).
-  const overdueCount = d.tickets.filter(t => t.overdue).length
+  const overdueCount = d.tickets.filter(t => !t.declinedForMe && t.overdue).length
   const briefingScopeId = supplierIds.slice().sort().join(',')
   const briefing = await getDailyBriefing({ companyId, scope: 'supplier', scopeId: briefingScopeId, role: 'supplier', facts: supplierFacts(d) })
 
   const kpis: Kpi[] = [
-    { label: 'Quote requested', value: quoteRequested, icon: <ClipboardList size={13} />, tone: 'info', href: '/supplier/tickets?filter=to_quote' },
-    { label: 'SLA Breached', value: k.overdue, icon: <AlertTriangle size={13} />, tone: k.overdue ? 'bad' : 'good', href: '/supplier/tickets?filter=breached' },
     { label: 'Overdue', value: overdueCount, icon: <Timer size={13} />, tone: overdueCount ? 'bad' : 'good', href: '/supplier/tickets?filter=overdue' },
+    { label: 'SLA Breached', value: k.overdue, icon: <AlertTriangle size={13} />, tone: k.overdue ? 'bad' : 'good', href: '/supplier/tickets?filter=breached' },
     { label: 'Due Today', value: k.dueToday, icon: <Clock size={13} />, tone: k.dueToday ? 'warn' : 'good', href: '/supplier/tickets' },
+    { label: 'Quote requested', value: quoteRequested, icon: <ClipboardList size={13} />, tone: 'info', href: '/supplier/tickets?filter=to_quote' },
     { label: 'Pending Quotes', value: pendingDecision, icon: <ReceiptText size={13} />, tone: 'gold', href: '/supplier/quotes?status=pending' },
     { label: 'Pending Sign-off', value: k.awaitingSignoff, icon: <ClipboardCheck size={13} />, tone: 'info', href: '/supplier/signoff?status=awaiting' },
     { label: 'Evidence Missing', value: k.evidenceMissing, icon: <Camera size={13} />, tone: k.evidenceMissing ? 'warn' : 'good', href: '/supplier/tickets?filter=evidence' },
   ]
 
-  const needsAction = d.tickets.filter(t => t.active && (t.slaLabel === 'Breached' || t.slaLabel === 'At risk' || !t.acknowledged)).slice(0, 6)
-  const evidenceTodo = d.tickets.filter(t => t.active && t.evidenceRequired && !(t.beforeUploaded && t.afterUploaded && t.cocUploaded)).slice(0, 6)
-  const recentTickets = [...d.tickets].filter(t => t.status !== 'completed').sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)).slice(0, 8)
+  // Tickets where this supplier was declined (and not re-invited) are out of their
+  // active work — kept off the dashboard blocks (they live under the Declined filter).
+  const needsAction = d.tickets.filter(t => !t.declinedForMe && t.active && (t.slaLabel === 'Breached' || t.slaLabel === 'At risk' || !t.acknowledged)).slice(0, 6)
+  const evidenceTodo = d.tickets.filter(t => !t.declinedForMe && t.active && t.evidenceRequired && !(t.beforeUploaded && t.afterUploaded && t.cocUploaded)).slice(0, 6)
+  const recentTickets = [...d.tickets].filter(t => !t.declinedForMe && t.status !== 'completed').sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)).slice(0, 8)
   // Recent quotes exclude completed tickets; pending sign-off shows only jobs still awaiting a decision.
   const recentQuotes = d.quotes.filter(q => q.ticketStatus !== 'completed').slice(0, 5)
   const pendingSignoffs = d.signoffs.filter(s => ['submitted', 'awaiting_regional', 'awaiting_store'].includes(s.status)).slice(0, 5)
@@ -137,10 +139,10 @@ export default async function SupplierOverviewPage() {
         </SectionCard>
         <SectionCard title="Recent Quotes" icon={<ReceiptText size={15} className="text-amber-600 dark:text-amber-500" />} action={<Link href="/supplier/quotes" className="text-xs text-[#C6A35D] hover:underline">All</Link>}>
           {recentQuotes.map(q => (
-            <div key={q.id} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0">
+            <Link key={q.id} href={`/supplier/tickets/${q.ticketId}`} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] -mx-2 px-2 rounded">
               <div className="min-w-0"><p className="text-sm font-medium text-[var(--text)] truncate">{[company, q.storeName].filter(Boolean).join(' · ')}</p><p className="text-[11px] text-[var(--text-muted)] truncate">{q.ticketTitle}</p><p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(q.createdAt)}</p></div>
               <span className="flex flex-col items-end shrink-0"><span className="text-sm text-[var(--text)]">{formatCurrency(q.amountInclVat ?? q.amount)}</span><span className="text-[10px] text-[var(--text-faint)]">{q.amountInclVat ? 'incl VAT' : 'excl VAT'}</span><span className={`text-[11px] capitalize ${QUOTE_TONE[q.status] ?? 'text-[var(--text-muted)]'}`}>{q.status === 'accepted' ? 'Approved' : q.status}</span></span>
-            </div>
+            </Link>
           ))}
           {!recentQuotes.length && <p className="text-sm text-[var(--text-faint)]">No active quotes.</p>}
         </SectionCard>
@@ -163,10 +165,10 @@ export default async function SupplierOverviewPage() {
         </SectionCard>
         <SectionCard title="Pending Sign-off" icon={<ClipboardCheck size={15} className="text-emerald-600 dark:text-emerald-400" />} action={<Link href="/supplier/signoff" className="text-xs text-[#C6A35D] hover:underline">All</Link>}>
           {pendingSignoffs.map(s => (
-            <div key={s.id} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0">
+            <Link key={s.id} href={`/supplier/tickets/${s.ticketId}`} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] -mx-2 px-2 rounded">
               <div className="min-w-0"><p className="text-sm font-medium text-[var(--text)] truncate">{[company, s.storeName].filter(Boolean).join(' · ')}</p><p className="text-[11px] text-[var(--text-muted)] truncate">{s.ticketTitle}</p><p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(s.createdAt)}</p></div>
               <span className="text-[11px] text-[var(--text-muted)] capitalize shrink-0">{s.status.replace(/_/g, ' ')}</span>
-            </div>
+            </Link>
           ))}
           {!pendingSignoffs.length && <p className="text-sm text-[var(--text-faint)]">Nothing awaiting sign-off.</p>}
         </SectionCard>

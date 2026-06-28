@@ -62,6 +62,8 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   // Access: the awarded supplier OR a supplier invited to quote (competitive model).
   const awarded = !!t.supplier_id && supplierIds.includes(t.supplier_id)
   if (!awarded && !invite) redirect('/supplier/tickets')
+  // Declined off the ticket (not re-invited) — show "Declined" to the supplier.
+  const declinedForMe = !awarded && !!invite && ['declined', 'closed'].includes((invite as any).status)
   const storeName = storeLabel(store?.name, store?.sub_store)
 
   // SLA due date (final resolution deadline) + overdue state.
@@ -104,7 +106,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end">
             <PriorityBadge priority={t.priority} className="w-full text-center" />
-            {(() => { const sm = rmStatusMeta(t.status); return <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${sm.cls}`}>{sm.label}</span> })()}
+            {(() => { const sm = rmStatusMeta(t.status); const cls = declinedForMe ? 'bg-gray-500/15 text-gray-600 dark:text-gray-400' : sm.cls; return <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${cls}`}>{declinedForMe ? 'Declined' : sm.label}</span> })()}
           </div>
         </div>
 
