@@ -6,8 +6,9 @@ import { sendPushToMany } from '@/lib/push'
 
 // POST /api/tickets/[id]/quote-decision — RM approves or declines a supplier's quote.
 //  approve: award that supplier (others auto-close), ticket → accepted.
-//  decline: decline that one quote (with reason); the ticket stays open for the
-//           remaining suppliers' quotes.
+//  decline: decline that one quote (with reason) and re-open the ticket so the RM
+//           can pick one of the remaining quotes OR assign a different supplier.
+//           Remaining suppliers' quotes are left pending (still selectable).
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -38,7 +39,14 @@ export async function POST(request: Request, { params }: { params: { id: string 
   if (action === 'decline') {
     await admin.from('quotes').update({ status: 'declined' }).eq('id', quote.id)
     await admin.from('ticket_suppliers').update({ status: 'declined', decline_reason: body.reason ?? null, responded_at: now }).eq('ticket_id', ticket.id).eq('supplier_id', quote.supplier_id)
-    await admin.from('tickets').update({ last_internal_update_at: now, updated_at: now }).eq('id', ticket.id)
+    // Re-open: the RM can now approve one of the remaining (still pending) quotes
+    // or assign a different supplier. supplier_id cleared; decision flags reset.
+    await admin.from('tickets').update({
+      status: 'open', supplier_id: null,
+      quote_decision_required: false, quote_decision_status: null,
+      current_blocker: null, blocker_owner_type: null, blocker_started_at: null, sla_paused: false,
+      last_internal_update_at: now, updated_at: now,
+    }).eq('id', ticket.id)
     // Notify the declined supplier.
     const { data: su } = await admin.from('supplier_users').select('user_id').eq('supplier_id', quote.supplier_id)
     const ids = (su ?? []).map(r => r.user_id)

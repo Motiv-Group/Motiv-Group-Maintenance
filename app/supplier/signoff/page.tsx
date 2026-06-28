@@ -8,8 +8,11 @@ import { formatDateTime } from '@/lib/utils'
 
 const TONE: Record<string, string> = { submitted: 'text-[#C6A35D]', awaiting_regional: 'text-[#C6A35D]', awaiting_store: 'text-blue-600 dark:text-blue-400', accepted: 'text-emerald-600 dark:text-emerald-400', rejected: 'text-red-600 dark:text-red-400' }
 const WORD: Record<string, string> = { submitted: 'Submitted', awaiting_regional: 'Awaiting Regional', awaiting_store: 'Awaiting Store', accepted: 'Approved', rejected: 'Rejected — more evidence' }
-const FILTERS: { key: string; label: string }[] = [
-  { key: 'all', label: 'All' }, { key: 'awaiting', label: 'Awaiting' }, { key: 'rejected', label: 'Rejected' },
+const NEUTRAL = { active: 'bg-slate-800 text-white border-slate-800 dark:bg-white dark:text-[#0a0e17] dark:border-white', inactive: 'text-[var(--text-muted)] border-[var(--border)] hover:border-slate-400' }
+const FILTERS: { key: string; label: string; active: string; inactive: string }[] = [
+  { key: 'all', label: 'All', ...NEUTRAL },
+  { key: 'awaiting', label: 'Awaiting', active: 'bg-[#C6A35D] text-[#0a0e17] border-[#C6A35D]', inactive: 'text-amber-600 dark:text-[#C6A35D] border-[#C6A35D]/40 hover:border-[#C6A35D]' },
+  { key: 'rejected', label: 'Rejected', active: 'bg-red-500 text-white border-red-500', inactive: 'text-red-600 dark:text-red-400 border-red-500/40 hover:border-red-400' },
 ]
 const AWAITING = new Set(['submitted', 'awaiting_regional', 'awaiting_store'])
 const matchesFilter = (status: string, f: string) => f === 'all' || (f === 'awaiting' ? AWAITING.has(status) : status === f)
@@ -36,7 +39,7 @@ export default async function SupplierSignoffPage({ searchParams }: { searchPara
       <div className="flex flex-wrap gap-2">
         {FILTERS.map(f => (
           <Link key={f.key} href={f.key === 'all' ? '/supplier/signoff' : `/supplier/signoff?status=${f.key}`}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition ${active === f.key ? 'bg-slate-800 text-white border-slate-800 dark:bg-white dark:text-[#0a0e17] dark:border-white' : 'text-[var(--text-muted)] border-[var(--border)] hover:border-slate-400'}`}>
+            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition ${active === f.key ? f.active : f.inactive}`}>
             {f.label}
           </Link>
         ))}

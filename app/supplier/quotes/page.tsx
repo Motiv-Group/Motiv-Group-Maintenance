@@ -8,8 +8,12 @@ import { formatCurrency, formatDateTime } from '@/lib/utils'
 
 const TONE: Record<string, string> = { pending: 'text-[#C6A35D]', accepted: 'text-emerald-600 dark:text-emerald-400', declined: 'text-red-600 dark:text-red-400', revision_requested: 'text-blue-600 dark:text-blue-400' }
 const QUOTE_STATUS_LABEL: Record<string, string> = { pending: 'Pending', accepted: 'Approved', declined: 'Declined', revision_requested: 'Revision requested' }
-const FILTERS: { key: string; label: string }[] = [
-  { key: 'all', label: 'All' }, { key: 'pending', label: 'Pending' }, { key: 'accepted', label: 'Approved' }, { key: 'declined', label: 'Declined' },
+const NEUTRAL = { active: 'bg-slate-800 text-white border-slate-800 dark:bg-white dark:text-[#0a0e17] dark:border-white', inactive: 'text-[var(--text-muted)] border-[var(--border)] hover:border-slate-400' }
+const FILTERS: { key: string; label: string; active: string; inactive: string }[] = [
+  { key: 'all', label: 'All', ...NEUTRAL },
+  { key: 'pending', label: 'Pending', active: 'bg-[#C6A35D] text-[#0a0e17] border-[#C6A35D]', inactive: 'text-amber-600 dark:text-[#C6A35D] border-[#C6A35D]/40 hover:border-[#C6A35D]' },
+  { key: 'accepted', label: 'Approved', active: 'bg-emerald-500 text-white border-emerald-500', inactive: 'text-emerald-600 dark:text-emerald-400 border-emerald-500/40 hover:border-emerald-400' },
+  { key: 'declined', label: 'Declined', active: 'bg-red-500 text-white border-red-500', inactive: 'text-red-600 dark:text-red-400 border-red-500/40 hover:border-red-400' },
 ]
 // Tickets past the quoting/decision/work phase belong in Sign-off / archive, not here.
 const HIDE_FROM_QUOTES = new Set(['submitted_for_signoff', 'approved_closeout', 'evidence_requested', 'snag', 'snag_assigned', 'snag_in_progress', 'snag_resolved', 'pending_sign_off', 'completed'])
@@ -54,7 +58,7 @@ export default async function SupplierQuotesPage({ searchParams }: { searchParam
       <div className="flex flex-wrap gap-2">
         {FILTERS.map(f => (
           <Link key={f.key} href={f.key === 'all' ? '/supplier/quotes' : `/supplier/quotes?status=${f.key}`}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition ${active === f.key ? 'bg-slate-800 text-white border-slate-800 dark:bg-white dark:text-[#0a0e17] dark:border-white' : 'text-[var(--text-muted)] border-[var(--border)] hover:border-slate-400'}`}>
+            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition ${active === f.key ? f.active : f.inactive}`}>
             {f.label}
           </Link>
         ))}

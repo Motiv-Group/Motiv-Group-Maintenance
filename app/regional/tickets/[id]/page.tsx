@@ -80,13 +80,15 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   })
   const reviewQuotes = ((quotes ?? []) as any[]).filter(q => q.status === 'pending').map(mapQuote)
   const acceptedQuotes = ((quotes ?? []) as any[]).filter(q => q.status === 'accepted').map(mapQuote)
+  const declinedQuotes = ((quotes ?? []) as any[]).filter(q => q.status === 'declined').map(mapQuote)
   const isTerminal = ['completed', 'cancelled', 'declined'].includes(t.status)
   const canAssign = ['open', 'info_requested'].includes(t.status)
   // Cancelling is only allowed up to (and including) quote review — once a quote
   // is accepted (status 'accepted' or later), the job is committed.
   const canCancel = ['open', 'info_requested', 'assigned', 'assessment', 'quote_requested', 'quoted', 'quote_revision'].includes(t.status)
   const canEdit = ['open', 'info_requested'].includes(t.status)
-  const hasQuoteBlock = supplierRows.length > 0 || reviewQuotes.length > 0 || acceptedQuotes.length > 0 || (variations ?? []).length > 0
+  const hasQuoteBlock = supplierRows.length > 0 || reviewQuotes.length > 0 || acceptedQuotes.length > 0 || declinedQuotes.length > 0 || (variations ?? []).length > 0
+  const reQuote = ['open', 'info_requested', 'assigned'].includes(t.status) && declinedQuotes.length > 0
 
   return (
     <div className="space-y-5">
@@ -155,6 +157,13 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
       )}
 
       {breached && <BreachReason nextAction={sla.nextAction} dueAt={sla.nextActionDueAt} owner={breachOwner} />}
+
+      {reQuote && (
+        <div className="rounded-2xl bg-amber-500/10 ring-1 ring-amber-500/40 p-4 space-y-0.5">
+          <p className="text-sm font-bold text-amber-700 dark:text-amber-400">Re-quote</p>
+          <p className="text-sm text-[var(--text-muted)]">A previous quote was declined. Pick one of the remaining quotes below, or assign a different supplier.</p>
+        </div>
+      )}
 
       {pendingSignoff && (
         <Card className="p-5">
@@ -267,6 +276,37 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
                     {q.fileUrl && <a href={q.fileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View attached quote</a>}
                   </div>
                 </div>
+              ))}
+            </div>
+          )}
+          {declinedQuotes.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Declined / not selected quotes</h3>
+              {declinedQuotes.map(q => (
+                <details key={q.id} className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
+                  <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
+                    <span className="text-sm font-semibold text-[var(--text)] min-w-0 truncate">{q.supplierName}</span>
+                    <span className="flex items-center gap-2 shrink-0">
+                      <span className="text-sm text-[var(--text)] tabular-nums">{formatCurrency(q.amount)}</span>
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:text-red-400 bg-red-500/15 rounded-full px-2 py-0.5">Declined</span>
+                    </span>
+                  </summary>
+                  <div className="border-t border-[var(--border)] p-4 space-y-3">
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                      <DetailItem label="Excl. VAT" value={formatCurrency(q.amount)} />
+                      <DetailItem label="Incl. VAT" value={q.amountInclVat ? formatCurrency(q.amountInclVat) : '—'} />
+                      <DetailItem label="Submitted" value={formatDateTime(q.createdAt)} />
+                      <DetailItem label="Valid until" value={q.validUntil ? formatDate(q.validUntil) : 'N/A'} />
+                    </div>
+                    {q.description && (
+                      <div>
+                        <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Description</div>
+                        <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{q.description}</p>
+                      </div>
+                    )}
+                    {q.fileUrl && <a href={q.fileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View attached quote</a>}
+                  </div>
+                </details>
               ))}
             </div>
           )}
