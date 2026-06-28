@@ -34,10 +34,11 @@ const byDateThenUrgency = (a: SupplierTicketRow, b: SupplierTicketRow) =>
 // Active tickets where evidence is required but not all of before/after/COC are uploaded.
 const missingEvidence = (t: SupplierTicketRow) => t.active && t.evidenceRequired && !(t.beforeUploaded && t.afterUploaded && t.cocUploaded)
 
-type FilterKey = 'all' | 'breached' | 'evidence' | Bucket
+type FilterKey = 'all' | 'breached' | 'overdue' | 'evidence' | Bucket
 const PILLS: { key: FilterKey; label: string; active: string; inactive: string }[] = [
   { key: 'all', label: 'All', active: 'bg-slate-800 text-white border-slate-800 dark:bg-white dark:text-[#0a0e17] dark:border-white', inactive: 'text-[var(--text-muted)] border-[var(--border)] hover:border-slate-400' },
   { key: 'breached', label: 'SLA Breached', active: 'bg-red-600 text-white border-red-600', inactive: 'text-red-600 dark:text-red-400 border-red-500/50 hover:border-red-500' },
+  { key: 'overdue', label: 'Overdue', active: 'bg-red-500 text-white border-red-500', inactive: 'text-red-600 dark:text-red-400 border-red-500/40 hover:border-red-400' },
   { key: 'evidence', label: 'Missing Evidence', active: 'bg-amber-500 text-white border-amber-500', inactive: 'text-amber-600 dark:text-amber-500 border-amber-500/50 hover:border-amber-500' },
   { key: 'to_quote', label: 'Quote requested', active: 'bg-cyan-500 text-white border-cyan-500', inactive: 'text-cyan-600 dark:text-cyan-400 border-cyan-500/40 hover:border-cyan-400' },
   { key: 'quoted', label: 'Quoted', active: 'bg-violet-500 text-white border-violet-500', inactive: 'text-violet-600 dark:text-violet-400 border-violet-500/40 hover:border-violet-400' },
@@ -98,12 +99,14 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
   }, [tickets])
   const barTotal = BAR_ORDER.reduce((s, b) => s + counts[b], 0) || 1
   const breachedCount = useMemo(() => tickets.filter(t => t.breached).length, [tickets])
+  const overdueCount = useMemo(() => tickets.filter(t => t.overdue).length, [tickets])
   const evidenceCount = useMemo(() => tickets.filter(missingEvidence).length, [tickets])
 
   const shown = useMemo(() => {
     const terms = q.toLowerCase().split(/\s+/).filter(Boolean)
     return tickets.filter(t => {
       if (filter === 'breached') { if (!t.breached) return false }
+      else if (filter === 'overdue') { if (!t.overdue) return false }
       else if (filter === 'evidence') { if (!missingEvidence(t)) return false }
       else if (filter !== 'all' && bucketOf(t.status) !== filter) return false
       if (!terms.length) return true
@@ -158,7 +161,7 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
       {/* Filter pills */}
       <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
         {PILLS.map(p => {
-          const n = p.key === 'all' ? tickets.length : p.key === 'breached' ? breachedCount : p.key === 'evidence' ? evidenceCount : counts[p.key]
+          const n = p.key === 'all' ? tickets.length : p.key === 'breached' ? breachedCount : p.key === 'overdue' ? overdueCount : p.key === 'evidence' ? evidenceCount : counts[p.key]
           const on = filter === p.key
           return (
             <button key={p.key} onClick={() => setFilter(p.key)} className={`px-3 py-1.5 rounded-full text-xs font-medium border transition text-center ${on ? p.active : p.inactive}`}>

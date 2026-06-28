@@ -82,13 +82,13 @@ export default async function SupplierQuotesPage({ searchParams }: { searchParam
           </summary>
           <div className="border-t border-[var(--border)]">
             {quotes.map(q => (
-              <Link key={q.id} href={`/supplier/tickets/${q.ticketId}`} className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition">
+              <Link key={q.id} href={`/supplier/tickets/${q.ticketId}`} className="flex items-center justify-between gap-4 sm:gap-8 px-4 py-2.5 border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition">
                 <div className="min-w-0 flex-1">
                   <p className="text-sm text-[var(--text)] truncate">{q.ticketTitle}</p>
                   <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(q.createdAt)}</p>
                   <p className="text-[11px] text-[#C6A35D] sm:hidden">Next: {nextStep(q.ticketStatus)}</p>
                 </div>
-                <div className="hidden sm:block shrink-0 w-32 text-right">
+                <div className="hidden sm:block shrink-0 w-32 text-left">
                   <p className="text-[10px] uppercase tracking-wide text-[var(--text-faint)]">Next step</p>
                   <p className="text-[11px] font-medium text-[var(--text)] truncate">{nextStep(q.ticketStatus)}</p>
                 </div>

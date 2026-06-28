@@ -47,12 +47,14 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   const [{ data: store }, { data: updates }, { data: invite }, { data: myQuotes }, { data: technicianRows }, { data: signoffRows }, { data: snagRows }] = await Promise.all([
     admin.from('stores').select('name, sub_store').eq('id', t.store_id).single(),
     admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
-    admin.from('ticket_suppliers').select('status').eq('ticket_id', t.id).in('supplier_id', supplierIds).maybeSingle(),
+    admin.from('ticket_suppliers').select('status, invited_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).maybeSingle(),
     admin.from('quotes').select('id, amount, amount_incl_vat, description, file_url, status, valid_until, created_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).order('created_at', { ascending: false }),
     admin.from('technicians').select('id, name').in('supplier_id', supplierIds).eq('active', true).order('name'),
     admin.from('signoffs').select('id, before_urls, after_urls, coc_url, invoice_url, status, notes, reject_reason, created_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).order('created_at', { ascending: false }),
     admin.from('snags').select('description, required_correction, severity, status, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
   ])
+  // When this supplier was requested to quote (their invite, else the ticket's request time).
+  const quoteRequestedAt = (invite as any)?.invited_at ?? t.quote_requested_at ?? null
   // Latest completion the supplier submitted (COC + proof-of-completion photos).
   // Most recent snag — explains why a completion was rejected / sent back.
   const latestSnag = ((snagRows ?? []) as any[])[0] ?? null
@@ -109,6 +111,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           <DetailItem label="Category" value={t.category ?? 'General'} />
           <DetailItem label="Operational Impact" value={OPERATIONAL_IMPACT_LABELS[t.operational_impact ?? 'none'] ?? 'No operational impact'} />
           <DetailItem label="Logged" value={formatDateTime(t.created_at)} />
+          {quoteRequestedAt && <DetailItem label="Quote requested" value={formatDateTime(quoteRequestedAt)} />}
           <DueDate dueAt={dueAt} overdue={overdue} now={now.toISOString()} />
         </div>
 

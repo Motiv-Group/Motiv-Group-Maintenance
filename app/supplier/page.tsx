@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
-import { Truck, ClipboardList, Clock, ReceiptText, ClipboardCheck, Camera, AlertTriangle, Star, Sparkles, ChevronDown, ChevronUp } from 'lucide-react'
+import { Truck, ClipboardList, Clock, ReceiptText, ClipboardCheck, Camera, AlertTriangle, Timer, Star, Sparkles, ChevronDown, ChevronUp } from 'lucide-react'
 import { requireSupplierV3 } from '@/lib/health/guard'
 import { assembleSupplierDashboard, type SupplierTicketRow } from '@/lib/health/data'
 import { Card, SectionCard, KpiRow, Donut, Pill, type Kpi } from '@/components/exec/ui'
@@ -55,12 +55,15 @@ export default async function SupplierOverviewPage() {
   const quoteRequested = d.tickets.filter(t => QUOTE_REQUESTED_STATUSES.has(t.status)).length
   // Submitted quotes awaiting the client's decision (matches the Quotes-tab Pending filter).
   const pendingDecision = d.quotes.filter(q => q.status === 'pending').length
+  // Overdue = past the final resolution deadline (subset of SLA-breached).
+  const overdueCount = d.tickets.filter(t => t.overdue).length
   const briefingScopeId = supplierIds.slice().sort().join(',')
   const briefing = await getDailyBriefing({ companyId, scope: 'supplier', scopeId: briefingScopeId, role: 'supplier', facts: supplierFacts(d) })
 
   const kpis: Kpi[] = [
     { label: 'Quote requested', value: quoteRequested, icon: <ClipboardList size={13} />, tone: 'info', href: '/supplier/tickets?filter=to_quote' },
     { label: 'SLA Breached', value: k.overdue, icon: <AlertTriangle size={13} />, tone: k.overdue ? 'bad' : 'good', href: '/supplier/tickets?filter=breached' },
+    { label: 'Overdue', value: overdueCount, icon: <Timer size={13} />, tone: overdueCount ? 'bad' : 'good', href: '/supplier/tickets?filter=overdue' },
     { label: 'Due Today', value: k.dueToday, icon: <Clock size={13} />, tone: k.dueToday ? 'warn' : 'good', href: '/supplier/tickets' },
     { label: 'Pending Quotes', value: pendingDecision, icon: <ReceiptText size={13} />, tone: 'gold', href: '/supplier/quotes?status=pending' },
     { label: 'Pending Sign-off', value: k.awaitingSignoff, icon: <ClipboardCheck size={13} />, tone: 'info', href: '/supplier/signoff?status=awaiting' },
