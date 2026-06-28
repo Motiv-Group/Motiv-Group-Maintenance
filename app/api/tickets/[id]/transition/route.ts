@@ -215,7 +215,7 @@ async function hasAccess(admin: Admin, role: WorkflowRole, userId: string, ticke
 // Targeted notifications for the moves that need someone else to act next.
 async function notify(admin: Admin, action: string, ticket: any, actorName: string | null) {
   const toSupplier = ['validate', 'request_quote', 'require_assessment', 'approve_quote', 'request_evidence', 'raise_snag', 'assign_snag', 'reject_variation']
-  const toRegion   = ['submit_quote', 'submit_completion', 'submit_variation', 'resolve_snag']
+  const toRegion   = ['submit_quote', 'submit_completion', 'submit_variation', 'resolve_snag', 'resubmit']
   const toStore    = ['request_info', 'close_out', 'reject']
   const title = `Ticket: ${ticket.title ?? 'Untitled'}`
 

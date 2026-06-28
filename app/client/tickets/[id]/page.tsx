@@ -9,10 +9,10 @@ import { deriveDueDates } from '@/lib/health/priority'
 import { isActive } from '@/lib/health/types'
 import type { HealthTicket, Priority } from '@/lib/health/types'
 import { Card } from '@/components/exec/ui'
-import { WorkflowActions } from '@/components/workflow/WorkflowActions'
 import { ClientTicketProgress } from '@/components/client/ClientTicketProgress'
 import { ClientTicketStatus } from '@/components/client/ClientTicketStatus'
 import { EditTicketForm } from '@/components/client/EditTicketForm'
+import { AddInfoForm } from '@/components/client/AddInfoForm'
 import { DueDate } from '@/components/workflow/DueDate'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { formatDateTime, humanizeDuration, clientVisibleStatus } from '@/lib/utils'
@@ -43,8 +43,9 @@ export default async function StoreTicketDetailPage({ params }: { params: { id: 
   if (!t || !storeIds.includes(t.store_id)) redirect('/client/tickets')
 
   const { data: updates } = await admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false })
-  // SM may edit/resubmit while open OR when more info has been requested.
-  const canEdit = t.status === 'open' || t.status === 'info_requested'
+  // Edit / delete only while the ticket is still open — once the RM has acted
+  // (e.g. requested info, assigned), the SM can only add info via AddInfoForm.
+  const canEdit = t.status === 'open'
 
   // SLA due date (final resolution deadline) + overdue state.
   const rules = await loadSlaResolver(admin, t.company_id)
@@ -102,24 +103,24 @@ export default async function StoreTicketDetailPage({ params }: { params: { id: 
         )}
       </Card>
 
-      {/* More info requested by the RM — show the message + let the SM edit/resubmit */}
+      {/* More info requested by the RM — show the message + an add-info / resubmit form */}
       {t.status === 'info_requested' && (
-        <div className="rounded-2xl bg-amber-500/10 ring-1 ring-amber-500/40 p-5 space-y-1">
-          <p className="text-sm font-bold text-amber-700 dark:text-amber-400">More information requested</p>
-          <p className="text-sm text-[var(--text-muted)]">{t.info_request_reason || 'Please update the details below and resubmit so we can proceed.'}</p>
-        </div>
+        <>
+          <div className="rounded-2xl bg-amber-500/10 ring-1 ring-amber-500/40 p-5 space-y-1">
+            <p className="text-sm font-bold text-amber-700 dark:text-amber-400">More information requested</p>
+            <p className="text-sm text-[var(--text-muted)]">{t.info_request_reason || 'Add the requested details (and any extra photos) below, then resubmit.'}</p>
+          </div>
+          <AddInfoForm ticketId={t.id} title={t.title} description={t.description} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} photoUrls={Array.isArray(t.photo_urls) ? t.photo_urls : []} />
+        </>
       )}
 
-      {/* Edit / delete — while open or info-requested, out of the card, spanning the block width */}
+      {/* Edit / delete — only while the ticket is still open (RM hasn't acted yet) */}
       {canEdit && (
         <EditTicketForm ticketId={t.id} initial={{ title: t.title, category: t.category ?? 'General', impact: t.operational_impact ?? 'none', description: t.description }} />
       )}
 
       {/* Plain-language status (no quote/sign-off jargon) — its own accented card */}
       <ClientTicketStatus status={t.status} cancellationReason={t.cancellation_reason} />
-
-      {/* The only SM action (resubmit on info-requested); renders nothing otherwise */}
-      <WorkflowActions ticketId={t.id} status={t.status} role="store_manager" />
 
       <Card className="p-5">
         <h2 className="text-sm font-bold text-[var(--text)] mb-3">Activity</h2>

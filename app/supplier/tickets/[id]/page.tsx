@@ -106,7 +106,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end">
             <PriorityBadge priority={t.priority} className="w-full text-center" />
-            {(() => { const sm = rmStatusMeta(t.status); const cls = declinedForMe ? 'bg-gray-500/15 text-gray-600 dark:text-gray-400' : sm.cls; return <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${cls}`}>{declinedForMe ? 'Declined' : sm.label}</span> })()}
+            {(() => { const sm = rmStatusMeta(t.status); const cls = declinedForMe ? 'bg-red-500/15 text-red-700 dark:text-red-400' : sm.cls; return <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${cls}`}>{declinedForMe ? 'Declined' : sm.label}</span> })()}
           </div>
         </div>
 
