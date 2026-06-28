@@ -20,9 +20,9 @@ const REGIONAL_TABS: ChromeTab[] = [
   { href: '/regional',          label: 'Dashboard', icon: LayoutDashboard },
   { href: '/regional/stores',   label: 'Stores',    icon: Store },
   { href: '/regional/tickets',  label: 'Tickets',   icon: Ticket },
-  { href: '/regional/suppliers', label: 'Suppliers', icon: Truck },
   { href: '/regional/signoff',  label: 'Signoff',   icon: ClipboardCheck },
   { href: '/regional/snag',     label: 'Snags',     icon: AlertTriangle },
+  { href: '/regional/suppliers', label: 'Suppliers', icon: Truck },
 ]
 const STORE_TABS: ChromeTab[] = [
   { href: '/client',         label: 'Dashboard', icon: LayoutDashboard },

@@ -14,7 +14,7 @@ import { BreachReason } from '@/components/workflow/BreachReason'
 import { Card } from '@/components/exec/ui'
 import { WorkflowActions } from '@/components/workflow/WorkflowActions'
 import { RmPipeline } from '@/components/regional/RmPipeline'
-import { AssignSuppliersButton, RequestInfoButton, RmEditTicketForm, SupplierStatusList, QuoteReviewCard, CancelTicketCard, ApproveSignoffCard } from '@/components/regional/RmTicketActions'
+import { AssignSuppliersButton, RequestInfoButton, RmEditTicketForm, SupplierStatusList, QuoteReviewCard, CancelTicketCard, ApproveSignoffCard, ReQuoteButton } from '@/components/regional/RmTicketActions'
 import { DueDate } from '@/components/workflow/DueDate'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { formatCurrency, formatDateTime, formatDate, rmStatusMeta, storeLabel, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
@@ -222,6 +222,8 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
       <Card className="p-5 space-y-4">
         <h2 className="text-sm font-bold text-[var(--text)]">Actions</h2>
 
+        {reQuote && <p className="text-xs text-[var(--text-muted)]">A quote was declined and the ticket re-opened. You can ask a declined supplier to re-quote (see <span className="font-medium text-[var(--text)]">Declined / not selected quotes</span> below), assign a different supplier, or cancel the ticket if the issue is resolved.</p>}
+
         {/* Primary actions — equal-size, side by side: Assign (green) · Request info (amber) · Cancel (red) */}
         {!isTerminal && (canAssign || canCancel) && (
           <div className="flex gap-2">
@@ -271,7 +273,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
                     <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                       <DetailItem label="Excl. VAT" value={formatCurrency(q.amount)} />
                       <DetailItem label="Incl. VAT" value={q.amountInclVat ? formatCurrency(q.amountInclVat) : '—'} />
-                      <DetailItem label="Submitted" value={formatDateTime(q.createdAt)} />
+                      <DetailItem label="Received" value={formatDateTime(q.createdAt)} />
                       <DetailItem label="Valid until" value={q.validUntil ? formatDate(q.validUntil) : 'N/A'} />
                     </div>
                     {q.description && (
@@ -308,7 +310,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
                     <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                       <DetailItem label="Excl. VAT" value={formatCurrency(q.amount)} />
                       <DetailItem label="Incl. VAT" value={q.amountInclVat ? formatCurrency(q.amountInclVat) : '—'} />
-                      <DetailItem label="Submitted" value={formatDateTime(q.createdAt)} />
+                      <DetailItem label="Received" value={formatDateTime(q.createdAt)} />
                       <DetailItem label="Valid until" value={q.validUntil ? formatDate(q.validUntil) : 'N/A'} />
                     </div>
                     {q.description && (
@@ -318,6 +320,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
                       </div>
                     )}
                     {q.fileUrl && <a href={q.fileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View attached quote</a>}
+                    {!isTerminal && <div className="pt-1"><ReQuoteButton ticketId={t.id} quoteId={q.id} /></div>}
                   </div>
                 </details>
               ))}

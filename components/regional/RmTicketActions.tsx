@@ -210,10 +210,10 @@ export function QuoteReviewCard({ ticketId, quotes }: { ticketId: string; quotes
   const [err, setErr] = useState('')
   if (!quotes.length) return <p className="text-sm text-[var(--text-faint)]">No quotes submitted yet.</p>
 
-  async function decide(quoteId: string, action: 'approve' | 'decline', outcome?: 'requote' | 'reassign') {
+  async function decide(quoteId: string, action: 'approve' | 'decline') {
     setBusy(quoteId); setErr('')
     const declineReason = action === 'decline' ? (reason === 'Other' ? (other.trim() || 'Other') : reason) : undefined
-    try { await post(`/api/tickets/${ticketId}/quote-decision`, { action, quoteId, reason: declineReason, outcome }); router.refresh() }
+    try { await post(`/api/tickets/${ticketId}/quote-decision`, { action, quoteId, reason: declineReason }); router.refresh() }
     catch (e: any) { setErr(e.message); setBusy(null) }
   }
 
@@ -226,7 +226,7 @@ export function QuoteReviewCard({ ticketId, quotes }: { ticketId: string; quotes
             <span className="text-sm font-semibold text-[var(--text)] min-w-0 truncate">{q.supplierName}</span>
             <span className="text-base font-bold text-[var(--text)] shrink-0">{formatCurrency(q.amount)}</span>
           </div>
-          <p className="text-[11px] text-[var(--text-faint)]">Submitted {formatDateTime(q.createdAt)}{q.amountInclVat ? ` · incl VAT ${formatCurrency(q.amountInclVat)}` : ''}</p>
+          <p className="text-[11px] text-[var(--text-faint)]">Received {formatDateTime(q.createdAt)}{q.amountInclVat ? ` · incl VAT ${formatCurrency(q.amountInclVat)}` : ''}</p>
           {q.description && <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{q.description}</p>}
           {q.fileUrl && <a href={q.fileUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C6A35D] underline">View attachment</a>}
 
@@ -234,10 +234,10 @@ export function QuoteReviewCard({ ticketId, quotes }: { ticketId: string; quotes
             <div className="space-y-2 pt-1">
               <select className={input} value={reason} onChange={e => setReason(e.target.value)}>{DECLINE_REASONS.map(r => <option key={r} value={r}>{r}</option>)}</select>
               {reason === 'Other' && <textarea className={`${input} min-h-[60px]`} placeholder="Reason…" value={other} onChange={e => setOther(e.target.value)} />}
-              <p className="text-[11px] text-[var(--text-muted)]">What next for this ticket?</p>
-              <button onClick={() => decide(q.id, 'decline', 'requote')} disabled={busy === q.id} className="w-full px-3 py-2 rounded-lg bg-[#C6A35D] text-[#0a0e17] text-sm font-semibold disabled:opacity-50">Decline — let this supplier re-quote</button>
-              <button onClick={() => decide(q.id, 'decline', 'reassign')} disabled={busy === q.id} className="w-full px-3 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold disabled:opacity-50">Decline — use a different supplier</button>
-              <button onClick={() => setDeclineFor(null)} className="w-full px-3 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm">Back</button>
+              <div className="flex gap-2">
+                <button onClick={() => decide(q.id, 'decline')} disabled={busy === q.id} className="px-3 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold disabled:opacity-50">Confirm decline</button>
+                <button onClick={() => setDeclineFor(null)} className="px-3 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm">Back</button>
+              </div>
             </div>
           ) : approveFor === q.id ? (
             <div className="space-y-2 pt-1">
@@ -323,5 +323,23 @@ export function CancelTicketCard({ ticketId }: { ticketId: string }) {
         </Modal>
       )}
     </>
+  )
+}
+
+// ── Ask a declined supplier to submit a revised quote ───────────
+export function ReQuoteButton({ ticketId, quoteId }: { ticketId: string; quoteId: string }) {
+  const router = useRouter()
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  async function go() {
+    setBusy(true); setErr('')
+    try { await post(`/api/tickets/${ticketId}/quote-decision`, { action: 'requote', quoteId }); router.refresh() }
+    catch (e: any) { setErr(e.message); setBusy(false) }
+  }
+  return (
+    <div>
+      <button onClick={go} disabled={busy} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#C6A35D] text-[#0a0e17] text-xs font-semibold disabled:opacity-50">{busy ? '…' : 'Ask to re-quote'}</button>
+      {err && <p className="text-xs text-red-500 mt-1">{err}</p>}
+    </div>
   )
 }
