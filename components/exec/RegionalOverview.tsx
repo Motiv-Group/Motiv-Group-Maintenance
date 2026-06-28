@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { Building2, ClipboardList, ShieldAlert, Truck, Lock, ClipboardCheck, AlertTriangle, ListTodo, Sparkles, Calendar, Banknote } from 'lucide-react'
 import type { RegionalDashboardData } from '@/lib/health/data'
-import { SectionCard, KpiCard, Pill, Donut, Card, DistributionBar, STATUS_TEXT, type Kpi } from '@/components/exec/ui'
+import { SectionCard, KpiCard, Pill, Donut, Card, DistributionBar, RagBlocks, STATUS_TEXT, type Kpi } from '@/components/exec/ui'
 import { RegionalRecentTickets } from '@/components/regional/RegionalRecentTickets'
 import { BriefingRefresh } from '@/components/briefing/BriefingRefresh'
 import { Stars } from '@/components/ui/Stars'
@@ -21,8 +21,8 @@ export function RegionalOverview({ data, name, briefing, briefingScopeId }: { da
   const kpis: Kpi[] = [
     { label: 'Active Stores', value: p.activeStores, hint: `avg ${p.averageStoreHealth}%`, icon: <Building2 size={13} />, tone: 'info', href: '/regional/stores' },
     { label: 'Stores Need Attention', value: data.attentionStores.length, hint: 'need action', icon: <ShieldAlert size={13} />, tone: data.attentionStores.length ? 'warn' : 'good', href: '/regional/stores' },
-    { label: 'Open Tickets', value: p.openTickets, hint: `${p.overdueTickets} overdue`, icon: <ClipboardList size={13} />, tone: 'info', href: '/regional/tickets' },
-    { label: 'Pending Signoffs', value: data.signoffsPending, hint: 'awaiting you', icon: <ClipboardCheck size={13} />, tone: data.signoffsPending ? 'warn' : 'good', href: '/regional/signoff' },
+    { label: 'Open Tickets', value: p.openTickets, hint: `${p.overdueTickets} overdue`, icon: <ClipboardList size={13} />, tone: 'orange', border: '!ring-orange-500/60', href: '/regional/tickets' },
+    { label: 'Pending Signoffs', value: data.signoffsPending, hint: 'awaiting you', icon: <ClipboardCheck size={13} />, tone: data.signoffsPending ? 'warn' : 'good', border: '!ring-orange-500/60', href: '/regional/signoff' },
     { label: 'Open Snags', value: data.snagsOpen, hint: 'to resolve', icon: <AlertTriangle size={13} />, tone: data.snagsOpen ? 'warn' : 'good', href: '/regional/snag' },
     { label: 'Internal Breaches', value: p.internalSlaBreaches, hint: 'internal SLA', icon: <Lock size={13} />, tone: p.internalSlaBreaches ? 'bad' : 'good', href: '/regional/tickets' },
     { label: 'Supplier Breaches', value: p.supplierSlaBreaches, hint: 'supplier SLA', icon: <Truck size={13} />, tone: p.supplierSlaBreaches ? 'bad' : 'good', href: '/regional/suppliers' },
@@ -31,6 +31,8 @@ export function RegionalOverview({ data, name, briefing, briefingScopeId }: { da
 
   const focus = buildFocus(data)
   const healthy = [...data.stores].filter(s => s.finalStatus === 'controlled').sort((a, b) => b.finalHealthScore - a.finalHealthScore)
+  // Stores needing attention, most urgent (lowest health) first.
+  const attention = [...data.attentionStores].sort((a, b) => a.finalHealthScore - b.finalHealthScore)
 
   return (
     <div className="space-y-5">
@@ -72,16 +74,11 @@ export function RegionalOverview({ data, name, briefing, briefingScopeId }: { da
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <SectionCard title="Store Health Distribution" icon={<Building2 size={15} className="text-indigo-600 dark:text-indigo-400" />}>
           <DistributionBar counts={p.counts} />
-          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[11px]">
-            <span className="flex items-center gap-1.5 text-[var(--text-muted)]"><i className="w-2 h-2 rounded-full bg-emerald-500" />Controlled {p.counts.controlled}</span>
-            <span className="flex items-center gap-1.5 text-[var(--text-muted)]"><i className="w-2 h-2 rounded-full bg-[#C6A35D]" />Attention {p.counts.attention}</span>
-            <span className="flex items-center gap-1.5 text-[var(--text-muted)]"><i className="w-2 h-2 rounded-full bg-red-400" />At Risk {p.counts.at_risk}</span>
-            <span className="flex items-center gap-1.5 text-[var(--text-muted)]"><i className="w-2 h-2 rounded-full bg-red-800" />Critical {p.counts.critical}</span>
-          </div>
+          <div className="mt-3"><RagBlocks counts={p.counts} /></div>
         </SectionCard>
 
-        <SectionCard title="Supplier Performance" icon={<Truck size={15} className="text-teal-600 dark:text-teal-400" />} action={<Link href="/regional/suppliers" className="text-xs text-[#C6A35D] hover:underline">All</Link>}>
-          {data.suppliers.map(s => (
+        <SectionCard title="Supplier Performance" icon={<Truck size={15} className="text-teal-600 dark:text-teal-400" />} action={<Link href="/regional/suppliers" className="text-xs text-[#C6A35D] hover:underline">View all</Link>}>
+          {data.suppliers.slice(0, 5).map(s => (
             <Link key={s.id} href={`/regional/supplier-reviews/${s.id}`} className="flex items-center justify-between gap-2 py-2 -mx-2 px-2 rounded-lg border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition">
               <div className="min-w-0">
                 <p className="text-sm text-[var(--text)] truncate">{s.name}</p>
@@ -100,8 +97,8 @@ export function RegionalOverview({ data, name, briefing, briefingScopeId }: { da
       </SectionCard>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <SectionCard title="Stores Requiring Attention" icon={<AlertTriangle size={15} className="text-amber-600 dark:text-amber-500" />} action={<Link href="/regional/stores" className="text-xs text-[#C6A35D] hover:underline">All</Link>}>
-          {data.attentionStores.slice(0, 8).map(s => (
+        <SectionCard title="Stores Requiring Attention" icon={<AlertTriangle size={15} className="text-amber-600 dark:text-amber-500" />} action={<Link href="/regional/stores" className="text-xs text-[#C6A35D] hover:underline">View all</Link>}>
+          {attention.slice(0, 5).map(s => (
             <div key={s.storeId} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0">
               <div className="min-w-0"><p className="text-sm text-[var(--text)] truncate">{s.storeName}</p><p className="text-[11px] text-[var(--text-faint)] truncate">{s.mainIssue}</p></div>
               <span className="flex items-center gap-2 shrink-0"><span className={`text-sm font-semibold ${STATUS_TEXT[s.finalStatus]}`}>{s.finalHealthScore}%</span><Pill status={s.finalStatus} /></span>
@@ -109,8 +106,8 @@ export function RegionalOverview({ data, name, briefing, briefingScopeId }: { da
           ))}
           {!data.attentionStores.length && <p className="text-sm text-[var(--text-faint)]">All stores controlled.</p>}
         </SectionCard>
-        <SectionCard title="Performing Well" icon={<Sparkles size={15} className="text-emerald-400" />}>
-          {healthy.slice(0, 8).map(s => (
+        <SectionCard title="Performing Well" icon={<Sparkles size={15} className="text-emerald-400" />} action={<Link href="/regional/stores" className="text-xs text-[#C6A35D] hover:underline">View all</Link>}>
+          {healthy.slice(0, 5).map(s => (
             <div key={s.storeId} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0">
               <p className="text-sm text-[var(--text)] truncate">{s.storeName}</p>
               <span className="text-xs font-semibold text-emerald-400">{s.finalHealthScore}%</span>

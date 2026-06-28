@@ -1,6 +1,6 @@
 'use client'
 
-// RM dashboard "Recent Tickets" — last 7 days, collapsible (mirrors the SM card).
+// RM dashboard "Recent Tickets" — 5 most recent, collapsible (mirrors the SM card).
 // Shows ticket title + store name/branch code + priority & status badges; the
 // whole row links to the ticket overview.
 import { useMemo, useState } from 'react'
@@ -11,14 +11,16 @@ import { Card } from '@/components/exec/ui'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { rmStatusMeta, formatDateTime, humanizeDuration } from '@/lib/utils'
 
-const WEEK_MS = 7 * 24 * 60 * 60 * 1000
+const MAX_RECENT = 5
 
 export function RegionalRecentTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
   const [open, setOpen] = useState(true)
   const recent = useMemo(() => {
-    const cutoff = Date.now() - WEEK_MS
     // Completed tickets live in the Tickets-tab archive, not the recent overview.
-    return tickets.filter(t => t.status !== 'completed' && new Date(t.createdAt).getTime() >= cutoff)
+    return tickets
+      .filter(t => t.status !== 'completed')
+      .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
+      .slice(0, MAX_RECENT)
   }, [tickets])
 
   return (
@@ -28,7 +30,7 @@ export function RegionalRecentTickets({ tickets }: { tickets: RegionalTicketRow[
           className="flex items-center gap-2 min-w-0 -m-1 p-1 rounded-lg hover:bg-black/5 dark:hover:bg-[var(--hover)] transition">
           <ChevronDown size={16} className={`shrink-0 text-[var(--text-muted)] transition-transform ${open ? 'rotate-180' : ''}`} />
           <span className="text-sm font-bold text-[var(--text)]">Recent Tickets</span>
-          <span className="text-[11px] font-medium text-[var(--text-muted)] bg-black/5 dark:bg-white/10 rounded-full px-2 py-0.5 whitespace-nowrap">Last 7 days · {recent.length}</span>
+          <span className="text-[11px] font-medium text-[var(--text-muted)] bg-black/5 dark:bg-white/10 rounded-full px-2 py-0.5 whitespace-nowrap">Latest {recent.length}</span>
         </button>
         <Link href="/regional/tickets" className="text-xs font-medium text-[#C6A35D] hover:underline shrink-0">All</Link>
       </div>
@@ -49,7 +51,7 @@ export function RegionalRecentTickets({ tickets }: { tickets: RegionalTicketRow[
             </div>
           </Link>
         )
-      }) : <p className="text-sm text-[var(--text-faint)]">No tickets in the last 7 days.</p>)}
+      }) : <p className="text-sm text-[var(--text-faint)]">No recent tickets.</p>)}
     </Card>
   )
 }

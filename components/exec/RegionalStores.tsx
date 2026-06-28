@@ -31,15 +31,15 @@ export function RegionalStores({ stores }: { stores: StoreCard[] }) {
             <table className="w-full text-sm min-w-[760px]">
               <thead><tr className="text-left text-[11px] text-[var(--text-faint)] border-b border-[var(--border)]">
                 <th className="py-2 px-2">#</th><th className="px-2">Store</th><th className="px-2">Health</th><th className="px-2">Status</th>
-                <th className="px-2">Open</th><th className="px-2">Overdue</th><th className="px-2">Approvals</th><th className="px-2">Exposure</th><th className="px-2">Main Driver</th>
+                <th className="px-2 text-center">Open</th><th className="px-2 text-center">Overdue</th><th className="px-2 text-center">Approvals</th><th className="px-2">Exposure</th><th className="px-2">Main Driver</th>
               </tr></thead>
               <tbody>
                 {ranked.map((s, i) => (
                   <tr key={s.storeId} onClick={() => { setSelId(s.storeId); setOpen(true) }} className={`border-b border-[var(--border)] cursor-pointer hover:bg-[var(--hover)] ${selId === s.storeId ? 'bg-[var(--hover)]' : ''}`}>
                     <td className="py-2.5 px-2 text-[var(--text-faint)]">{i + 1}</td><td className="px-2 text-[var(--text)]">{s.storeName}</td>
                     <td className={`px-2 font-semibold ${STATUS_TEXT[s.finalStatus]}`}>{s.finalHealthScore}%</td><td className="px-2"><Pill status={s.finalStatus} /></td>
-                    <td className="px-2 text-[var(--text)]">{s.openTickets}</td><td className="px-2 text-red-400">{s.overdueTickets}</td>
-                    <td className="px-2 text-[var(--text)]">{s.pendingDecisions}</td><td className="px-2 text-[var(--text)] whitespace-nowrap">{fmtK(s.costExposure)}</td>
+                    <td className="px-2 text-center text-[var(--text)]">{s.openTickets}</td><td className="px-2 text-center text-red-400">{s.overdueTickets}</td>
+                    <td className="px-2 text-center text-[var(--text)]">{s.pendingDecisions}</td><td className="px-2 text-[var(--text)] whitespace-nowrap">{fmtK(s.costExposure)}</td>
                     <td className="px-2 text-xs text-[var(--text-muted)] max-w-[200px] truncate">{s.mainIssue}</td>
                   </tr>
                 ))}

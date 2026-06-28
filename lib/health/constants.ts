@@ -7,11 +7,12 @@ export const STORE_WEIGHTS = {
 } as const
 
 // §8 status bands (same wording for store/region/estate)
+// Controlled 95–100 · Attention 80–94 · At Risk 51–79 · Critical 0–50
 export function statusForScore(score: number | null | undefined): HealthStatus {
   if (score == null || Number.isNaN(score)) return 'critical'
-  if (score >= 85) return 'controlled'
-  if (score >= 70) return 'attention'
-  if (score >= 50) return 'at_risk'
+  if (score >= 95) return 'controlled'
+  if (score >= 80) return 'attention'
+  if (score >= 51) return 'at_risk'
   return 'critical'
 }
 export const STATUS_RANK: Record<HealthStatus, number> = { controlled: 0, attention: 1, at_risk: 2, critical: 3 }
@@ -29,7 +30,7 @@ export const STATUS_STROKE: Record<HealthStatus, string> = {
   controlled: '#10b981', attention: '#C6A35D', at_risk: '#ef4444', critical: '#b91c1c',
 }
 export function bandCeiling(s: HealthStatus): number {
-  return s === 'critical' ? 49 : s === 'at_risk' ? 69 : s === 'attention' ? 84 : 100
+  return s === 'critical' ? 50 : s === 'at_risk' ? 79 : s === 'attention' ? 94 : 100
 }
 
 // §7.1 Operational Risk — deduction by highest active impact
@@ -65,8 +66,10 @@ export const THRESHOLDS = {
 
 // Fallback SLA if a rule row is missing (mirrors seeded P3)
 export const FALLBACK_SLA: Record<Priority, SlaTargets> = {
-  P1: { priority: 'P1', first_response_mins: 60,   attendance_mins: 240,  quote_due_mins: 240,  resolution_mins: 1440,  internal_decision_mins: 240 },
-  P2: { priority: 'P2', first_response_mins: 240,  attendance_mins: 480,  quote_due_mins: 480,  resolution_mins: 2880,  internal_decision_mins: 480 },
+  // resolution_mins is the headline "priority window" (time-to-resolve before overdue):
+  // P1 Urgent 4h · P2 High 1 day · P3 Medium 5 days · P4 Low 7 days.
+  P1: { priority: 'P1', first_response_mins: 60,   attendance_mins: 240,  quote_due_mins: 240,  resolution_mins: 240,   internal_decision_mins: 240 },
+  P2: { priority: 'P2', first_response_mins: 240,  attendance_mins: 480,  quote_due_mins: 480,  resolution_mins: 1440,  internal_decision_mins: 480 },
   P3: { priority: 'P3', first_response_mins: 1440, attendance_mins: 2880, quote_due_mins: 2880, resolution_mins: 7200,  internal_decision_mins: 2880 },
-  P4: { priority: 'P4', first_response_mins: 2880, attendance_mins: 7200, quote_due_mins: 7200, resolution_mins: 14400, internal_decision_mins: 7200 },
+  P4: { priority: 'P4', first_response_mins: 2880, attendance_mins: 7200, quote_due_mins: 7200, resolution_mins: 10080, internal_decision_mins: 7200 },
 }

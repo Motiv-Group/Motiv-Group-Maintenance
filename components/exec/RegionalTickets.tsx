@@ -33,11 +33,10 @@ const urgency = (p: string) => URGENCY[p] ?? 5
 const byDateThenUrgency = (a: RegionalTicketRow, b: RegionalTicketRow) =>
   (+new Date(b.createdAt) - +new Date(a.createdAt)) || (urgency(a.priority) - urgency(b.priority))
 
-type RmFilter = 'all' | 'breached' | 'reopened' | Bucket
+// No "All" pill: a null filter means all tickets, and clicking an active pill
+// deselects back to that default. SLA Breached + Re-open sit just before Cancelled.
+type RmFilter = 'breached' | 'reopened' | Bucket
 const PILLS: { key: RmFilter; label: string; active: string; inactive: string }[] = [
-  { key: 'all', label: 'All', active: 'bg-slate-800 text-white border-slate-800 dark:bg-white dark:text-[#0a0e17] dark:border-white', inactive: 'text-[var(--text-muted)] border-[var(--border)] hover:border-slate-400' },
-  { key: 'breached', label: 'SLA Breached', active: 'bg-red-600 text-white border-red-600', inactive: 'text-red-600 dark:text-red-400 border-red-500/50 hover:border-red-500' },
-  { key: 'reopened', label: 'Re-open', active: 'bg-amber-500 text-white border-amber-500', inactive: 'text-amber-600 dark:text-amber-400 border-amber-500/40 hover:border-amber-400' },
   { key: 'open', label: 'Open', active: 'bg-blue-500 text-white border-blue-500', inactive: 'text-blue-600 dark:text-blue-400 border-blue-500/40 hover:border-blue-400' },
   { key: 'quote_requested', label: 'Quote requested', active: 'bg-cyan-500 text-white border-cyan-500', inactive: 'text-cyan-600 dark:text-cyan-400 border-cyan-500/40 hover:border-cyan-400' },
   { key: 'quoted', label: 'Quoted', active: 'bg-violet-500 text-white border-violet-500', inactive: 'text-violet-600 dark:text-violet-400 border-violet-500/40 hover:border-violet-400' },
@@ -46,6 +45,8 @@ const PILLS: { key: RmFilter; label: string; active: string; inactive: string }[
   { key: 'in_progress', label: 'In progress', active: 'bg-[#C6A35D] text-[#0a0e17] border-[#C6A35D]', inactive: 'text-amber-600 dark:text-[#C6A35D] border-[#C6A35D]/40 hover:border-[#C6A35D]' },
   { key: 'awaiting_signoff', label: 'Sign-off', active: 'bg-orange-500 text-white border-orange-500', inactive: 'text-orange-600 dark:text-orange-400 border-orange-500/40 hover:border-orange-400' },
   { key: 'completed', label: 'Completed', active: 'bg-emerald-500 text-white border-emerald-500', inactive: 'text-emerald-600 dark:text-emerald-400 border-emerald-500/40 hover:border-emerald-400' },
+  { key: 'breached', label: 'SLA Breached', active: 'bg-red-600 text-white border-red-600', inactive: 'text-red-600 dark:text-red-400 border-red-500/50 hover:border-red-500' },
+  { key: 'reopened', label: 'Re-open', active: 'bg-amber-500 text-white border-amber-500', inactive: 'text-amber-600 dark:text-amber-400 border-amber-500/40 hover:border-amber-400' },
   { key: 'cancelled', label: 'Cancelled', active: 'bg-red-500 text-white border-red-500', inactive: 'text-red-600 dark:text-red-400 border-red-500/40 hover:border-red-400' },
 ]
 
@@ -78,7 +79,7 @@ function TicketRow({ t }: { t: RegionalTicketRow }) {
 
 export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
   const [q, setQ] = useState('')
-  const [filter, setFilter] = useState<RmFilter>('all')
+  const [filter, setFilter] = useState<RmFilter | null>(null)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [panelStore, setPanelStore] = useState<string | null>(null)
 
@@ -102,7 +103,7 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
     return tickets.filter(t => {
       if (filter === 'breached') { if (!t.breached) return false }
       else if (filter === 'reopened') { if (!t.reopened) return false }
-      else if (filter !== 'all' && bucketOf(t.status) !== filter) return false
+      else if (filter !== null && bucketOf(t.status) !== filter) return false
       if (!terms.length) return true
       const hay = `${t.title} ${t.storeName} ${t.branchCode ?? ''} ${t.jobRef ?? ''} ${rmStatusMeta(t.status).label}`.toLowerCase()
       return terms.every(w => hay.includes(w))
@@ -111,9 +112,9 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
 
   // Under "All": breached tickets pin to the top, completed drop into the Archive,
   // and the rest group by store. Everything is ordered newest → most urgent.
-  const breachedRows = useMemo(() => filter === 'all' ? shown.filter(t => t.breached).sort(byDateThenUrgency) : [], [shown, filter])
-  const liveShown = useMemo(() => (filter === 'all' ? shown.filter(t => !t.breached && bucketOf(t.status) !== 'completed') : shown).slice().sort(byDateThenUrgency), [shown, filter])
-  const archived = useMemo(() => (filter === 'all' ? shown.filter(t => bucketOf(t.status) === 'completed') : []).slice().sort(byDateThenUrgency), [shown, filter])
+  const breachedRows = useMemo(() => filter === null ? shown.filter(t => t.breached).sort(byDateThenUrgency) : [], [shown, filter])
+  const liveShown = useMemo(() => (filter === null ? shown.filter(t => !t.breached && bucketOf(t.status) !== 'completed') : shown).slice().sort(byDateThenUrgency), [shown, filter])
+  const archived = useMemo(() => (filter === null ? shown.filter(t => bucketOf(t.status) === 'completed') : []).slice().sort(byDateThenUrgency), [shown, filter])
   const [archiveOpen, setArchiveOpen] = useState(false)
   const [breachedOpen, setBreachedOpen] = useState(true)
 
@@ -147,6 +148,19 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
         </div>
       </Card>
 
+      {/* Filter pills — above the search. Click an active pill to deselect (= all). */}
+      <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
+        {PILLS.map(p => {
+          const n = p.key === 'breached' ? breachedCount : p.key === 'reopened' ? reopenedCount : counts[p.key]
+          const on = filter === p.key
+          return (
+            <button key={p.key} onClick={() => setFilter(f => f === p.key ? null : p.key)} aria-pressed={on} className={`px-3 py-1.5 rounded-full text-xs font-medium border transition text-center ${on ? p.active : p.inactive}`}>
+              {p.label} <span className="opacity-70">{n}</span>
+            </button>
+          )
+        })}
+      </div>
+
       {/* Search */}
       <div className="relative">
         <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
@@ -154,21 +168,8 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
           className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)] outline-none focus:ring-[#C6A35D]/40" />
       </div>
 
-      {/* Filter pills */}
-      <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
-        {PILLS.map(p => {
-          const n = p.key === 'all' ? tickets.length : p.key === 'breached' ? breachedCount : p.key === 'reopened' ? reopenedCount : counts[p.key]
-          const on = filter === p.key
-          return (
-            <button key={p.key} onClick={() => setFilter(p.key)} className={`px-3 py-1.5 rounded-full text-xs font-medium border transition text-center ${on ? p.active : p.inactive}`}>
-              {p.label} <span className="opacity-70">{n}</span>
-            </button>
-          )
-        })}
-      </div>
-
-      {/* SLA breached — pinned at the top under the All filter, collapsible */}
-      {filter === 'all' && breachedRows.length > 0 && (
+      {/* SLA breached — pinned at the top when no filter is active, collapsible */}
+      {filter === null && breachedRows.length > 0 && (
         <Card className="p-3 ring-1 ring-red-500/40">
           <button onClick={() => setBreachedOpen(o => !o)} aria-expanded={breachedOpen} className="w-full flex items-center gap-2 -m-1 p-1 rounded-lg hover:bg-[var(--hover)] transition">
             <ChevronDown size={16} className={`shrink-0 text-red-500 transition-transform ${breachedOpen ? '' : '-rotate-90'}`} />

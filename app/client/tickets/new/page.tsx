@@ -8,13 +8,12 @@ import { createClient } from '@/lib/supabase/client'
 import { Card } from '@/components/exec/ui'
 import { OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
 
-const CATEGORIES = ['Electrical', 'Plumbing', 'HVAC', 'Refrigeration', 'Gas', 'Structural', 'General', 'Cleaning', 'Other']
+const CATEGORIES = ['Electrical', 'Plumbing', 'HVAC', 'Refrigeration', 'Gas', 'Structural', 'Shopfront', 'General', 'Cleaning', 'Other']
 const IMPACTS = Object.entries(OPERATIONAL_IMPACT_LABELS).map(([v, label]) => ({ v, label }))
 const MAX_PHOTOS = 5
 
 export default function LogTicketPage() {
   const router = useRouter()
-  const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState('')
   const [impact, setImpact] = useState('')
@@ -38,7 +37,7 @@ export default function LogTicketPage() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
-    if (!title.trim() || !category || !impact || !description.trim()) { setError('Please complete every field.'); return }
+    if (!category || !impact || !description.trim()) { setError('Please complete every field.'); return }
     if (files.length < 2) { setError('Please add at least 2 photos of the issue.'); return }
     setLoading(true); setError('')
     try {
@@ -52,7 +51,7 @@ export default function LogTicketPage() {
       }
       const res = await fetch('/api/tickets', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, description, category, operational_impact: impact, photo_urls }),
+        body: JSON.stringify({ title: category, description, category, operational_impact: impact, photo_urls }),
       })
       if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error ?? 'Failed to log ticket') }
       router.push('/client/tickets'); router.refresh()
@@ -68,8 +67,6 @@ export default function LogTicketPage() {
 
       <Card className="p-5 sm:p-6">
         <form onSubmit={submit} className="space-y-4">
-          <Field label="Title" required><input className={input} value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Aircon not cooling" required /></Field>
-
           <Field label="Category" required>
             <select className={input} value={category} onChange={e => setCategory(e.target.value)} required>
               <option value="" disabled>Select a category…</option>

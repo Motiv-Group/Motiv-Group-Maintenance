@@ -787,10 +787,10 @@ create policy "audit read" on public.audit_logs for select
 -- 11. SEED — platform-default SLA rules (P1–P4). Per spec §13.
 -- ─────────────────────────────────────────
 insert into public.sla_rules (company_id, priority, first_response_mins, attendance_mins, quote_due_mins, resolution_mins, internal_decision_mins) values
-  (null,'P1',   60,  240,  240,  1440,  240),   -- 1h / 4h / 4h / 24h / 4h
-  (null,'P2',  240,  480,  480,  2880,  480),   -- 4h / 1bd / 1bd / 48h / 1bd
-  (null,'P3', 1440, 2880, 2880,  7200, 2880),   -- 1bd / 2bd / 2bd / 5bd / 2bd
-  (null,'P4', 2880, 7200, 7200, 14400, 7200)    -- 2bd / 5bd / 5bd / 10bd / 5bd
+  (null,'P1',   60,  240,  240,   240,  240),   -- 1h / 4h / 4h / 4h (resolution) / 4h
+  (null,'P2',  240,  480,  480,  1440,  480),   -- 4h / 1bd / 1bd / 1 day (resolution) / 1bd
+  (null,'P3', 1440, 2880, 2880,  7200, 2880),   -- 1bd / 2bd / 2bd / 5 days (resolution) / 2bd
+  (null,'P4', 2880, 7200, 7200, 10080, 7200)    -- 2bd / 5bd / 5bd / 7 days (resolution) / 5bd
 on conflict do nothing;
 
 -- ============================================================

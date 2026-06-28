@@ -630,10 +630,11 @@ create policy "View quote attach"      on storage.objects for select using      
 -- ─────────────────────────────────────────
 -- SEED — SLA rules (the only real seed). SA-market defaults; tune per region later.
 -- ─────────────────────────────────────────
+-- resolution_mins is the priority window: urgent 4h · high 1 day · medium 5 days · low 7 days.
 insert into public.sla_rules (region_id, priority, first_response_mins, attendance_mins, resolution_mins) values
-  (null, 'urgent',   60,  240,  1440),
-  (null, 'high',    240,  480,  2880),
-  (null, 'medium',  480, 1440,  5760),
+  (null, 'urgent',   60,  240,   240),
+  (null, 'high',    240,  480,  1440),
+  (null, 'medium',  480, 1440,  7200),
   (null, 'low',    1440, 2880, 10080)
 on conflict do nothing;
 

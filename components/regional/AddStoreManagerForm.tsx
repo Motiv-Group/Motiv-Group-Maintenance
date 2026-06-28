@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { UserPlus, CheckCircle } from 'lucide-react'
+import { UserPlus, CheckCircle, Eye, EyeOff } from 'lucide-react'
 import { Card } from '@/components/exec/ui'
 import { normalisePhone } from '@/lib/csv'
 
@@ -12,6 +12,7 @@ export function AddStoreManagerForm() {
   const router = useRouter()
   const [vals, setVals] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
+  const [showPw, setShowPw] = useState(false)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) => setVals(v => ({ ...v, [k]: e.target.value }))
@@ -42,7 +43,15 @@ export function AddStoreManagerForm() {
       <form onSubmit={submit} className="space-y-3">
         <Field label="Manager full name"><input className={input} value={vals.full_name ?? ''} onChange={set('full_name')} placeholder="e.g. Thabo Mokoena" required /></Field>
         <Field label="Manager email"><input className={input} type="email" value={vals.email ?? ''} onChange={set('email')} placeholder="manager@store.co.za" required /></Field>
-        <Field label="Temporary password (min 8)"><input className={input} type="password" value={vals.password ?? ''} onChange={set('password')} placeholder="At least 8 characters" minLength={8} required /></Field>
+        <Field label="Temporary password (min 8)">
+          <div className="relative">
+            <input className={`${input} pr-11`} type={showPw ? 'text' : 'password'} value={vals.password ?? ''} onChange={set('password')} placeholder="At least 8 characters" minLength={8} required />
+            <button type="button" onClick={() => setShowPw(s => !s)} aria-label={showPw ? 'Hide password' : 'Show password'} title={showPw ? 'Hide password' : 'Show password'}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-[var(--text-faint)] hover:text-[var(--text)] hover:bg-[var(--hover)] transition">
+              {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
+        </Field>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Branch code"><input className={`${input} uppercase font-mono`} value={vals.branch_code ?? ''} onChange={e => setVals(v => ({ ...v, branch_code: e.target.value.toUpperCase() }))} placeholder="e.g. CPT001" required /></Field>
           <Field label="Store / branch name"><input className={input} value={vals.store_name ?? ''} onChange={set('store_name')} placeholder="e.g. Canal Walk" required /></Field>

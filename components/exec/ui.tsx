@@ -45,7 +45,7 @@ export function SectionCard({ title, icon, action, children }: { title: string; 
   )
 }
 
-export interface Kpi { label: string; value: ReactNode; hint?: ReactNode; icon?: ReactNode; tone?: 'default' | 'info' | 'gold' | 'good' | 'warn' | 'bad' | 'neutral'; trend?: Trend; href?: string }
+export interface Kpi { label: string; value: ReactNode; hint?: ReactNode; icon?: ReactNode; tone?: 'default' | 'info' | 'gold' | 'good' | 'warn' | 'bad' | 'neutral' | 'orange'; trend?: Trend; href?: string; border?: string }
 // Tone colours the icon + label so each metric reads at a glance; the number
 // stays white for contrast.
 const TONE: Record<NonNullable<Kpi['tone']>, string> = {
@@ -56,10 +56,14 @@ const TONE: Record<NonNullable<Kpi['tone']>, string> = {
   warn:    'text-amber-600 dark:text-amber-500',
   bad:     'text-red-600 dark:text-red-400',
   neutral: 'text-[var(--text-muted)]',
+  orange:  'text-orange-600 dark:text-orange-400',
 }
 export function KpiCard({ kpi }: { kpi: Kpi }) {
+  // Default card border is the subtle ring; `border` overrides it with an accent
+  // colour (e.g. ring-orange-500/60) so a KPI can stand out.
+  const ring = kpi.border ? `ring-1 ${kpi.border}` : ''
   const body = (
-    <Card className={`p-4 flex flex-col gap-1.5 min-w-0${kpi.href ? ' h-full transition hover:ring-[#C6A35D]/50 hover:-translate-y-0.5 cursor-pointer' : ''}`}>
+    <Card className={`p-4 flex flex-col gap-1.5 min-w-0 ${ring}${kpi.href ? ' h-full transition hover:ring-[#C6A35D]/50 hover:-translate-y-0.5 cursor-pointer' : ''}`}>
       <div className={`flex items-center justify-between gap-2 text-[11px] font-semibold ${TONE[kpi.tone ?? 'default']}`}>
         <span className="flex items-center gap-1.5 truncate">{kpi.icon}{kpi.label}</span>
         {kpi.trend && <TrendArrow t={kpi.trend} />}
@@ -267,9 +271,10 @@ export function RecommendedAction({ text }: { text: string }) {
 export function StatusLegend() {
   return (
     <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-[var(--text-muted)]">
-      <span className="flex items-center gap-1.5"><i className="w-2 h-2 rounded-full bg-emerald-500" />Controlled ≥80%</span>
-      <span className="flex items-center gap-1.5"><i className="w-2 h-2 rounded-full bg-[#C6A35D]" />Attention 60–79%</span>
-      <span className="flex items-center gap-1.5"><i className="w-2 h-2 rounded-full bg-red-500" />At Risk &lt;60%</span>
+      <span className="flex items-center gap-1.5"><i className="w-2 h-2 rounded-full bg-emerald-500" />Controlled 95–100%</span>
+      <span className="flex items-center gap-1.5"><i className="w-2 h-2 rounded-full bg-[#C6A35D]" />Attention 80–94%</span>
+      <span className="flex items-center gap-1.5"><i className="w-2 h-2 rounded-full bg-red-500" />At Risk 51–79%</span>
+      <span className="flex items-center gap-1.5"><i className="w-2 h-2 rounded-full bg-red-800" />Critical ≤50%</span>
     </div>
   )
 }
