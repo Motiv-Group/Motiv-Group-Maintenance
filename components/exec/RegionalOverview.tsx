@@ -26,7 +26,8 @@ export function RegionalOverview({ data, name, briefing, briefingScopeId }: { da
     { label: 'Open Snags', value: data.snagsOpen, hint: 'to resolve', icon: <AlertTriangle size={13} />, tone: data.snagsOpen ? 'warn' : 'good', href: '/regional/snag' },
     { label: 'Internal Breaches', value: p.internalSlaBreaches, hint: 'internal SLA', icon: <Lock size={13} />, tone: p.internalSlaBreaches ? 'bad' : 'good', href: '/regional/tickets' },
     { label: 'Supplier Breaches', value: p.supplierSlaBreaches, hint: 'supplier SLA', icon: <Truck size={13} />, tone: p.supplierSlaBreaches ? 'bad' : 'good', href: '/regional/suppliers' },
-    { label: 'Accepted Value', value: fmtK(data.quoteTotals.accepted), hint: `${fmtK(data.quoteTotals.pending)} pending`, icon: <Banknote size={13} />, tone: 'neutral', href: '/regional/tickets' },
+    { label: 'Accepted Quote Value', value: fmtK(data.quoteTotals.accepted), icon: <Banknote size={13} />, tone: 'good', href: '/regional/tickets' },
+    { label: 'Pending Quote Value', value: fmtK(data.quoteTotals.pending), icon: <Banknote size={13} />, tone: 'warn', href: '/regional/tickets' },
   ]
 
   const focus = buildFocus(data)
