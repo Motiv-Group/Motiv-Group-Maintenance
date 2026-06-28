@@ -24,10 +24,30 @@ export function normalisePhone(raw: string | null | undefined): string | null {
   return `+${digits}`
 }
 
-/** True when `raw` is a syntactically valid email address. */
+// Obvious ".com" typos that are not real TLDs — reject so e.g. "gmail.come"
+// doesn't slip through (these are not valid ccTLDs/gTLDs).
+const TLD_TYPOS = new Set(['come', 'comm', 'con', 'cpm', 'cmo', 'ocm', 'ccom', 'coma', 'vom', 'xom', 'co0m'])
+// Big webmail providers that only ever use one domain — anything else is a typo.
+const SINGLE_DOMAIN_PROVIDERS: Record<string, string> = {
+  gmail: 'gmail.com', googlemail: 'googlemail.com', icloud: 'icloud.com', me: 'me.com', mac: 'mac.com',
+}
+
+/**
+ * True when `raw` is a valid email address. Beyond the basic shape it requires a
+ * letters-only TLD (2–24 chars), rejects common ".com" typos (e.g. ".come"), and
+ * flags wrong domains for single-domain webmail providers (e.g. "gmail.co").
+ */
 export function isValidEmail(raw: string | null | undefined): boolean {
   if (!raw) return false
-  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(raw.trim())
+  const email = raw.trim().toLowerCase()
+  const m = /^[^\s@]+@([a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*\.[a-z]{2,24})$/.exec(email)
+  if (!m) return false
+  const domain = m[1]
+  const tld = domain.slice(domain.lastIndexOf('.') + 1)
+  if (TLD_TYPOS.has(tld)) return false
+  const firstLabel = domain.split('.')[0]
+  if (SINGLE_DOMAIN_PROVIDERS[firstLabel] && domain !== SINGLE_DOMAIN_PROVIDERS[firstLabel]) return false
+  return true
 }
 
 /**

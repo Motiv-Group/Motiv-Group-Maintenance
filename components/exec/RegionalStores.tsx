@@ -1,26 +1,30 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Store, Plus, User, Mail, Phone, Ticket, MoreVertical, Pencil, Power, Trash2, X } from 'lucide-react'
+import { Store, Plus, User, Mail, Phone, Ticket, MoreVertical, Pencil, Power, RotateCcw, Trash2, X, ChevronDown, Archive } from 'lucide-react'
 import type { StoreCard } from '@/lib/health/data'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, formatDateTime } from '@/lib/utils'
 import { isValidEmail, isValidPhone } from '@/lib/csv'
-import { SectionCard, Pill, Donut, BreakdownList, STATUS_TEXT } from '@/components/exec/ui'
+import { Card, SectionCard, Pill, Donut, BreakdownList, STATUS_TEXT } from '@/components/exec/ui'
 import { Drawer, DrawerHeader } from '@/components/exec/Drawer'
 
 const fmtK = (n: number) => n ? (n >= 1000 ? `R ${(n / 1000).toFixed(0)}K` : formatCurrency(n)) : 'R 0'
 
-export function RegionalStores({ stores }: { stores: StoreCard[] }) {
+export interface ArchivedStore { id: string; name: string; deactivatedAt: string | null }
+type ActionTarget = { id: string; name: string; archived: boolean }
+
+export function RegionalStores({ stores, archived = [] }: { stores: StoreCard[]; archived?: ArchivedStore[] }) {
   const router = useRouter()
   const [selId, setSelId] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
+  const [actionTarget, setActionTarget] = useState<ActionTarget | null>(null)
+  const [archiveOpen, setArchiveOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null)
   const selected = stores.find(s => s.storeId === selId) ?? null
-  const editStore = stores.find(s => s.storeId === editId) ?? null
   const ranked = [...stores].sort((a, b) => a.finalHealthScore - b.finalHealthScore)
 
   async function act(action: string, storeId: string, confirmMsg?: string) {
@@ -33,12 +37,19 @@ export function RegionalStores({ stores }: { stores: StoreCard[] }) {
       })
       const d = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(d.error ?? 'Action failed')
+      setActionTarget(null)
       setNotice({ ok: true, text: d.message ?? 'Done.' })
       router.refresh()
     } catch (e: any) {
       setNotice({ ok: false, text: e.message })
     } finally { setBusy(false) }
   }
+  const kebab = (t: ActionTarget) => (
+    <button type="button" onClick={() => setActionTarget(t)} disabled={busy} aria-label={`Actions for ${t.name}`}
+      className="p-1.5 rounded-lg text-[var(--text-faint)] hover:text-[var(--text)] hover:bg-[var(--hover)] transition disabled:opacity-50">
+      <MoreVertical size={16} />
+    </button>
+  )
 
   return (
     <div className="space-y-5">
@@ -73,7 +84,7 @@ export function RegionalStores({ stores }: { stores: StoreCard[] }) {
                     <td className="px-2 text-center text-[var(--text)]">{s.pendingDecisions}</td><td className="px-2 text-[var(--text)] whitespace-nowrap">{fmtK(s.costExposure)}</td>
                     <td className="px-2 text-xs text-[var(--text-muted)] max-w-[200px] truncate">{s.mainIssue}</td>
                     <td className="px-2 text-right" onClick={e => e.stopPropagation()}>
-                      <StoreActionsMenu busy={busy} onEdit={() => setEditId(s.storeId)} onDeactivate={() => act('deactivate_store', s.storeId, `Deactivate ${s.storeName}? It will be hidden from active lists.`)} onDelete={() => act('delete_store', s.storeId, `Permanently delete ${s.storeName}? This cannot be undone.`)} />
+                      {kebab({ id: s.storeId, name: s.storeName, archived: false })}
                     </td>
                   </tr>
                 ))}
@@ -105,7 +116,7 @@ export function RegionalStores({ stores }: { stores: StoreCard[] }) {
                   </div>
                 </button>
                 <div className="absolute top-2 right-2">
-                  <StoreActionsMenu busy={busy} onEdit={() => setEditId(s.storeId)} onDeactivate={() => act('deactivate_store', s.storeId, `Deactivate ${s.storeName}? It will be hidden from active lists.`)} onDelete={() => act('delete_store', s.storeId, `Permanently delete ${s.storeName}? This cannot be undone.`)} />
+                  {kebab({ id: s.storeId, name: s.storeName, archived: false })}
                 </div>
               </li>
             ))}
@@ -113,43 +124,86 @@ export function RegionalStores({ stores }: { stores: StoreCard[] }) {
           </ul>
       </SectionCard>
 
+      {/* Archive — deactivated stores, collapsible */}
+      {archived.length > 0 && (
+        <Card className="p-3">
+          <button onClick={() => setArchiveOpen(o => !o)} aria-expanded={archiveOpen} className="w-full flex items-center gap-2 -m-1 p-1 rounded-lg hover:bg-[var(--hover)] transition">
+            <ChevronDown size={16} className={`shrink-0 text-[var(--text-muted)] transition-transform ${archiveOpen ? '' : '-rotate-90'}`} />
+            <Archive size={15} className="text-[var(--text-faint)]" />
+            <span className="text-sm font-bold text-[var(--text)]">Archive · Deactivated</span>
+            <span className="text-[11px] font-medium text-[var(--text-muted)] bg-black/5 dark:bg-white/10 rounded-full px-2 py-0.5">{archived.length}</span>
+          </button>
+          {archiveOpen && (
+            <ul className="space-y-2 mt-2">
+              {archived.map(a => (
+                <li key={a.id} className="flex items-center justify-between gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-[var(--text)] truncate">{a.name}</p>
+                    <p className="text-[11px] text-[var(--text-faint)]">
+                      <span className="text-amber-600 dark:text-amber-400 font-semibold">Deactivated</span>
+                      {a.deactivatedAt ? ` · ${formatDateTime(a.deactivatedAt)}` : ''}
+                    </p>
+                  </div>
+                  {kebab({ id: a.id, name: a.name, archived: true })}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      )}
+
       <Drawer open={open} onClose={() => setOpen(false)}>{selected && <Detail s={selected} onClose={() => setOpen(false)} />}</Drawer>
-      {editStore && <EditStoreModal store={editStore} onClose={() => setEditId(null)} onSaved={msg => { setEditId(null); setNotice({ ok: true, text: msg }); router.refresh() }} />}
+
+      {actionTarget && (
+        <StoreActionsModal
+          target={actionTarget}
+          busy={busy}
+          onClose={() => setActionTarget(null)}
+          onEdit={() => { const id = actionTarget.id; setActionTarget(null); setEditId(id) }}
+          onDeactivate={() => act('deactivate_store', actionTarget.id, `Are you sure you want to deactivate ${actionTarget.name}? It will be moved to the archive.`)}
+          onReactivate={() => act('reactivate_store', actionTarget.id)}
+          onDelete={() => act('delete_store', actionTarget.id, `Are you sure you want to permanently delete ${actionTarget.name}? This cannot be undone.`)}
+        />
+      )}
+
+      {editId && <EditStoreModal storeId={editId} onClose={() => setEditId(null)} onSaved={msg => { setEditId(null); setNotice({ ok: true, text: msg }); router.refresh() }} />}
     </div>
   )
 }
 
-/** Kebab (⋮) menu: Edit / Deactivate / Delete a store. Closes on outside click. */
-function StoreActionsMenu({ busy, onEdit, onDeactivate, onDelete }: { busy: boolean; onEdit: () => void; onDeactivate: () => void; onDelete: () => void }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    if (!open) return
-    const onDoc = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
-    document.addEventListener('mousedown', onDoc)
-    return () => document.removeEventListener('mousedown', onDoc)
-  }, [open])
-  const item = 'flex items-center gap-2 w-full px-3 py-2 text-sm text-left hover:bg-[var(--hover)] transition disabled:opacity-50'
+/** Centred pop-up listing the actions for one store. Big store name + close X. */
+function StoreActionsModal({ target, busy, onClose, onEdit, onDeactivate, onReactivate, onDelete }: {
+  target: ActionTarget; busy: boolean; onClose: () => void
+  onEdit: () => void; onDeactivate: () => void; onReactivate: () => void; onDelete: () => void
+}) {
+  const item = 'flex items-center gap-2.5 w-full px-3.5 py-3 rounded-xl ring-1 ring-[var(--border)] text-sm font-medium text-left transition disabled:opacity-50'
   return (
-    <div className="relative" ref={ref}>
-      <button type="button" onClick={() => setOpen(o => !o)} disabled={busy} aria-label="Store actions"
-        className="p-1.5 rounded-lg text-[var(--text-faint)] hover:text-[var(--text)] hover:bg-[var(--hover)] transition disabled:opacity-50">
-        <MoreVertical size={16} />
-      </button>
-      {open && (
-        <div className="absolute z-30 right-0 mt-1 w-44 rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-lg overflow-hidden py-1">
-          <button type="button" className={`${item} text-[var(--text)]`} disabled={busy} onClick={() => { setOpen(false); onEdit() }}><Pencil size={14} className="text-[var(--text-faint)]" /> Edit</button>
-          <button type="button" className={`${item} text-[var(--text)]`} disabled={busy} onClick={() => { setOpen(false); onDeactivate() }}><Power size={14} className="text-[var(--text-faint)]" /> Deactivate</button>
-          <button type="button" className={`${item} text-red-600 dark:text-red-400`} disabled={busy} onClick={() => { setOpen(false); onDelete() }}><Trash2 size={14} /> Delete</button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/50" />
+      <div className="relative w-full max-w-sm rounded-2xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] p-5 space-y-4" onClick={e => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Manage store</p>
+            <h3 className="text-xl font-bold text-[var(--text)] break-words">{target.name}</h3>
+            {target.archived && <p className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold mt-0.5">Deactivated</p>}
+          </div>
+          <button onClick={onClose} aria-label="Close" className="shrink-0 -m-1 p-1.5 rounded-lg text-[var(--text-faint)] hover:text-[var(--text)] hover:bg-[var(--hover)]"><X size={18} /></button>
         </div>
-      )}
+        <div className="space-y-2">
+          <button type="button" disabled={busy} onClick={onEdit} className={`${item} text-[var(--text)] hover:bg-[var(--hover)]`}><Pencil size={15} className="text-[var(--text-faint)]" /> Edit store</button>
+          {target.archived
+            ? <button type="button" disabled={busy} onClick={onReactivate} className={`${item} text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10`}><RotateCcw size={15} /> Reactivate store</button>
+            : <button type="button" disabled={busy} onClick={onDeactivate} className={`${item} text-amber-600 dark:text-amber-400 hover:bg-amber-500/10`}><Power size={15} /> Deactivate store</button>}
+          <button type="button" disabled={busy} onClick={onDelete} className={`${item} text-red-600 dark:text-red-400 hover:bg-red-500/10`}><Trash2 size={15} /> Delete store</button>
+        </div>
+      </div>
     </div>
   )
 }
 
 /** Edit store name + store-manager contact. Changing the email re-issues login
  *  credentials (username + new password) by email. */
-function EditStoreModal({ store, onClose, onSaved }: { store: StoreCard; onClose: () => void; onSaved: (msg: string) => void }) {
+function EditStoreModal({ storeId, onClose, onSaved }: { storeId: string; onClose: () => void; onSaved: (msg: string) => void }) {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
@@ -162,7 +216,7 @@ function EditStoreModal({ store, onClose, onSaved }: { store: StoreCard; onClose
     let live = true
     ;(async () => {
       try {
-        const res = await fetch('/api/provision', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'store_detail', storeId: store.storeId }) })
+        const res = await fetch('/api/provision', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'store_detail', storeId }) })
         const d = await res.json().catch(() => ({}))
         if (!res.ok) throw new Error(d.error ?? 'Could not load store')
         if (!live) return
@@ -173,7 +227,7 @@ function EditStoreModal({ store, onClose, onSaved }: { store: StoreCard; onClose
       } catch (e: any) { if (live) setErr(e.message) } finally { if (live) setLoading(false) }
     })()
     return () => { live = false }
-  }, [store.storeId])
+  }, [storeId])
 
   async function save(e: React.FormEvent) {
     e.preventDefault()
@@ -182,11 +236,12 @@ function EditStoreModal({ store, onClose, onSaved }: { store: StoreCard; onClose
       if (email.trim() && !isValidEmail(email)) { setErr('Please enter a valid email address.'); return }
       if (phone.trim() && !isValidPhone(phone)) { setErr('Please enter a valid phone number.'); return }
     }
+    if (!window.confirm('Are you sure you want to save these changes?')) return
     setBusy(true); setErr('')
     try {
       const res = await fetch('/api/provision', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'update_store', storeId: store.storeId, store_name: name, ...(hasSm ? { email, phone } : {}) }),
+        body: JSON.stringify({ action: 'update_store', storeId, store_name: name, ...(hasSm ? { email, phone } : {}) }),
       })
       const d = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(d.error ?? 'Update failed')

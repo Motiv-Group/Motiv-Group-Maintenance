@@ -252,6 +252,16 @@ export async function POST(request: Request) {
         revalidatePath('/regional/stores')
         return NextResponse.json({ ok: true, message: 'Store deactivated.' })
       }
+      case 'reactivate_store': {
+        if (!isRM) return forbid()
+        const regions = await myRegions()
+        const { data: store } = await admin.from('stores').select('id, region_id, company_id').eq('id', body.storeId).single()
+        if (!store || store.company_id !== companyId || !regions.includes(store.region_id)) return NextResponse.json({ error: 'Store not in your region' }, { status: 400 })
+        const { error } = await admin.from('stores').update({ active: true, closed_at: null }).eq('id', store.id)
+        if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+        revalidatePath('/regional/stores')
+        return NextResponse.json({ ok: true, message: 'Store reactivated.' })
+      }
       case 'delete_store': {
         if (!isRM) return forbid()
         const regions = await myRegions()
