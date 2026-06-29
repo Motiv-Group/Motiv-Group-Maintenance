@@ -105,7 +105,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
       case 'submit_variation': {
         const desc = String(body.description ?? '').trim()
         if (!desc) return NextResponse.json({ error: 'Variation description required' }, { status: 400 })
-        await admin.from('ticket_variations').insert({ company_id: ticket.company_id, ticket_id: ticketId, supplier_id: ticket.supplier_id, description: desc, amount: body.amount ? Number(body.amount) : null, status: 'pending', submitted_by: user.id })
+        const fileUrls = Array.isArray(body.fileUrls) ? body.fileUrls.filter((u: unknown): u is string => typeof u === 'string') : []
+        await admin.from('ticket_variations').insert({ company_id: ticket.company_id, ticket_id: ticketId, supplier_id: ticket.supplier_id, description: desc, amount: body.amount ? Number(body.amount) : null, status: 'pending', submitted_by: user.id, file_urls: fileUrls })
         break
       }
       case 'approve_variation':

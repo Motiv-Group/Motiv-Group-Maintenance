@@ -43,7 +43,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
     admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('signoffs').select('id, status, before_urls, after_urls, coc_url, invoice_url, notes, reject_reason, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('suppliers').select('id, company_name').eq('company_id', companyId).eq('active', true).order('company_name'),
-    admin.from('ticket_variations').select('description, amount, status, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
+    admin.from('ticket_variations').select('description, amount, status, created_at, file_urls').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('snags').select('description, status, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('ticket_suppliers').select('supplier_id, status, invited_at, decline_reason, suppliers(company_name)').eq('ticket_id', t.id),
     admin.from('ratings').select('supplier_id, score').eq('company_id', companyId),
@@ -347,7 +347,17 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
               <h3 className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Variation orders</h3>
               {(variations ?? []).map((v: any, i: number) => (
                 <div key={i} className="py-2 border-b border-[var(--border)] last:border-0 flex items-start justify-between gap-2">
-                  <div className="min-w-0"><p className="text-sm text-[var(--text)]">{v.description}</p><p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(v.created_at)}</p></div>
+                  <div className="min-w-0">
+                    <p className="text-sm text-[var(--text)]">{v.description}</p>
+                    <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(v.created_at)}</p>
+                    {Array.isArray(v.file_urls) && v.file_urls.length > 0 && (
+                      <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
+                        {v.file_urls.map((u: string, j: number) => (
+                          <a key={j} href={u} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[11px] font-medium text-[#C6A35D] hover:underline"><FileText size={12} /> Attachment {j + 1}</a>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   <span className="text-xs text-[var(--text)] whitespace-nowrap">{v.amount ? formatCurrency(v.amount) : '—'} · {v.status}</span>
                 </div>
               ))}

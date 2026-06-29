@@ -98,8 +98,8 @@ export default async function SupplierQuotesPage({ searchParams }: { searchParam
                   <p className="text-sm text-[var(--text)] truncate">{i.ticketTitle}</p>
                   <p className="text-[11px] text-[var(--text-faint)]">{i.status === 'requested' ? 'Requested' : 'Submitted'} · {formatDateTime(i.createdAt)}</p>
                 </div>
-                <div className="flex flex-col items-end gap-1 shrink-0 w-32">
-                  <span className="text-sm font-semibold text-[var(--text)] tabular-nums whitespace-nowrap">{i.amount != null ? formatCurrency(i.amount) : '—'}</span>
+                <div className="flex flex-col items-stretch gap-1 shrink-0 w-32">
+                  <span className="text-sm font-semibold text-[var(--text)] tabular-nums whitespace-nowrap text-left">{i.amount != null ? formatCurrency(i.amount) : '—'}</span>
                   {i.amount != null && <span className={`${BADGE} bg-[var(--surface-2)] text-[var(--text-muted)]`}>excl VAT</span>}
                   <span className={`${BADGE} ${STATUS_BADGE[i.status] ?? 'bg-[var(--surface-2)] text-[var(--text-muted)]'}`}>{STATUS_LABEL[i.status] ?? i.status.replace('_', ' ')}</span>
                 </div>

@@ -1,6 +1,15 @@
 import { History, ChevronDown } from 'lucide-react'
 import { formatDateTime } from '@/lib/utils'
-import { buildTicketTimeline, type TimelineInput } from '@/lib/ticket-timeline'
+import { buildTicketTimeline, type TimelineInput, type TimelineTone } from '@/lib/ticket-timeline'
+
+// Dot colour per event tone — reuses the app's status palette so the trail reads
+// at a glance (cyan/violet = quoting, emerald = approved/done, red = declined/snag).
+const DOT_TONE: Record<TimelineTone, string> = {
+  logged: 'bg-blue-500', quote_requested: 'bg-cyan-500', quote_submitted: 'bg-violet-500',
+  quote_approved: 'bg-emerald-500', quote_declined: 'bg-red-500', scheduled: 'bg-indigo-500',
+  completion_submitted: 'bg-[#C6A35D]', completion_approved: 'bg-emerald-500', completion_rejected: 'bg-red-500',
+  completed: 'bg-emerald-500', cancelled: 'bg-red-500', edited: 'bg-slate-400', update: 'bg-[#C6A35D]',
+}
 
 /** Collapsible event timeline for a ticket — the full life in date order with who
  *  acted. Server-safe (zero-JS via <details>). Collapsed by default. */
@@ -20,7 +29,7 @@ export function AuditTrail({ ticket }: { ticket: TimelineInput }) {
           <ol className="relative ml-1.5 space-y-4 border-l border-[var(--border)]">
             {items.map((u, i) => (
               <li key={i} className="ml-4">
-                <span className="absolute -left-[5px] mt-1 w-2.5 h-2.5 rounded-full bg-[#C6A35D] ring-2 ring-[var(--surface)]" />
+                <span className={`absolute -left-[5px] mt-1 w-2.5 h-2.5 rounded-full ring-2 ring-[var(--surface)] ${DOT_TONE[u.tone] ?? 'bg-[#C6A35D]'}`} />
                 <p className="text-sm text-[var(--text)]">{u.label}</p>
                 <p className="text-[11px] text-[var(--text-faint)]">{u.who ? `${u.who} · ` : ''}{formatDateTime(u.at)}</p>
               </li>
