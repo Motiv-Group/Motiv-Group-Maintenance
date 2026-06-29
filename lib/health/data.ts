@@ -351,6 +351,10 @@ export interface RegionalDashboardData {
   quoteTotals: { accepted: number; pending: number }
   signoffsPending: number
   snagsOpen: number
+  // Live breach counts (any active ticket currently past its deadline) for the
+  // dashboard KPIs — matches the Tickets-tab "SLA Breached" count. Distinct from
+  // the health-SCORE penalty, which only counts breaches >3 days old.
+  breachesNow: { supplier: number; internal: number }
   generatedAt: string
 }
 
@@ -359,7 +363,7 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
   const rules = await loadSlaResolver(db, companyId)
   const empty = (): RegionalDashboardData => ({
     portfolio: calculateRegionalPortfolioHealth('portfolio', [], { criticalTicketOverdue: false, supplierBreachOver3dCount: 0, internalBreachOver3dCount: 0, repeatAcrossStores: false, highValueBlocker: false, missingCriticalUpdates: false, openTickets: 0, overdueTickets: 0, costExposure: 0 }),
-    stores: [], attentionStores: [], ticketActions: [], tickets: [], suppliers: [], quoteTotals: { accepted: 0, pending: 0 }, signoffsPending: 0, snagsOpen: 0, generatedAt: now.toISOString(),
+    stores: [], attentionStores: [], ticketActions: [], tickets: [], suppliers: [], quoteTotals: { accepted: 0, pending: 0 }, signoffsPending: 0, snagsOpen: 0, breachesNow: { supplier: 0, internal: 0 }, generatedAt: now.toISOString(),
   })
   if (!regionIds.length) return empty()
 
@@ -434,6 +438,17 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
   })
   const portfolio = calculateRegionalPortfolioHealth('portfolio', cards, regionSignals(tickets, rules, now))
 
+  // Live breach counts for the KPIs: every active ticket currently past its
+  // supplier/internal deadline (no 3-day grace) — so the dashboard matches the
+  // Tickets-tab "SLA Breached" pill. The health score keeps the >3d grace above.
+  let breachSupplierNow = 0, breachInternalNow = 0
+  for (const t of tickets) {
+    if (!isActive(t.status)) continue
+    const s = computeTicketSla(t, rules(t.priority), now)
+    if (s.supplierBreached) breachSupplierNow++
+    if (s.internalBreached) breachInternalNow++
+  }
+
   const ticketActions: RegionalTicketAction[] = tickets.filter(t => isActive(t.status)).map(t => {
     const h = calculateTicketHealth(t, rules(t.priority), now)
     const lbl = h.sla.currentBlocker === 'quote_approval' ? 'Awaiting approval'
@@ -479,7 +494,7 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
   }
 
   const attentionStores = [...cards].filter(c => c.finalStatus !== 'controlled').sort((a, b) => a.finalHealthScore - b.finalHealthScore)
-  return { portfolio, stores: cards, attentionStores, ticketActions, tickets: ticketRows, suppliers, quoteTotals: { accepted: acceptedQuoteValue, pending: pendingQuoteValue }, signoffsPending, snagsOpen, generatedAt: now.toISOString() }
+  return { portfolio, stores: cards, attentionStores, ticketActions, tickets: ticketRows, suppliers, quoteTotals: { accepted: acceptedQuoteValue, pending: pendingQuoteValue }, signoffsPending, snagsOpen, breachesNow: { supplier: breachSupplierNow, internal: breachInternalNow }, generatedAt: now.toISOString() }
 }
 
 // ============================================================
