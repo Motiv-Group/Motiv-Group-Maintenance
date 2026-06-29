@@ -168,7 +168,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
         )}
         {canSubmitQuote && <SendQuoteForm ticketId={t.id} competitive priority={t.priority} createdAt={t.created_at} />}
         {awarded && t.status === 'accepted' && <ScheduleJobCard ticketId={t.id} priority={t.priority} createdAt={t.created_at} technicians={technicians} />}
-        {awarded && ['in_progress', 'snag_resolved', 'evidence_requested'].includes(t.status) && (
+        {awarded && ['in_progress', 'snag_resolved', 'snag_in_progress', 'evidence_requested'].includes(t.status) && (
           <SubmitCompletionForm ticketId={t.id} />
         )}
         {awarded && t.status === 'in_progress' && <RaiseVariationCard ticketId={t.id} />}

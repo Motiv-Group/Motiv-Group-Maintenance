@@ -22,7 +22,8 @@ export type TicketStatus =
   | 'submitted_for_signoff' // Completion Submitted · Review & Sign-off
   | 'evidence_requested'    // Request More Evidence
   | 'snag'                  // Snag Created
-  | 'snag_assigned'         // Snag Assigned
+  | 'snag_assigned'         // Snag Accepted by supplier
+  | 'snag_in_progress'      // Snag being fixed
   | 'snag_resolved'         // Snag Resolved
   | 'approved_closeout'     // Approved for Close-Out
   | 'completed'             // Final Close-Out (terminal)
@@ -53,7 +54,8 @@ export const STATUS_META: Record<TicketStatus, StatusMeta> = {
   submitted_for_signoff: { label: 'Pending Sign-off',      group: 'closeout',   tone: 'orange' },
   evidence_requested:    { label: 'Evidence Requested',    group: 'closeout',   tone: 'amber' },
   snag:                  { label: 'Snag Raised',           group: 'closeout',   tone: 'red' },
-  snag_assigned:         { label: 'Snag Assigned',         group: 'closeout',   tone: 'pink' },
+  snag_assigned:         { label: 'Snag Accepted',         group: 'closeout',   tone: 'pink' },
+  snag_in_progress:      { label: 'Snag In Progress',      group: 'closeout',   tone: 'amber' },
   snag_resolved:         { label: 'Snag Resolved',         group: 'closeout',   tone: 'teal' },
   approved_closeout:     { label: 'Approved for Close-Out',group: 'closeout',   tone: 'green' },
   completed:             { label: 'Completed',             group: 'closed',     tone: 'green' },
@@ -124,10 +126,13 @@ export const TRANSITIONS: Record<TicketStatus, Transition[]> = {
     { action: 'submit_completion', label: 'Resubmit completion', to: 'submitted_for_signoff', roles: ['supplier'] },
   ],
   snag: [
-    { action: 'assign_snag', label: 'Assign snag', to: 'snag_assigned', roles: ['regional_manager', 'supplier'] },
+    { action: 'accept_snag', label: 'Accept snag', to: 'snag_assigned', roles: ['supplier'] },
   ],
   snag_assigned: [
-    { action: 'resolve_snag', label: 'Mark snag resolved', to: 'snag_resolved', roles: ['supplier'] },
+    { action: 'start_snag', label: 'Snag in progress', to: 'snag_in_progress', roles: ['supplier'] },
+  ],
+  snag_in_progress: [
+    { action: 'submit_completion', label: 'Upload new COC & POC', to: 'submitted_for_signoff', roles: ['supplier'] },
   ],
   snag_resolved: [
     { action: 'submit_completion', label: 'Back to sign-off', to: 'submitted_for_signoff', roles: ['supplier'] },

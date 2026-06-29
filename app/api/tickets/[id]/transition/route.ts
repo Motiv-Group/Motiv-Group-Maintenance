@@ -142,6 +142,18 @@ export async function POST(request: Request, { params }: { params: { id: string 
         if (body.supplierId) updates.supplier_id = body.supplierId
         await admin.from('snags').update({ status: 'assigned', assigned_at: now, supplier_id: body.supplierId ?? ticket.supplier_id }).eq('ticket_id', ticketId).in('status', ['open'])
         break
+      case 'accept_snag': {
+        // Supplier accepts the snag and schedules when the fix will be done.
+        const when = body.scheduledAt ? new Date(body.scheduledAt) : null
+        if (!when || isNaN(when.getTime())) return NextResponse.json({ error: 'Pick when the snag will be fixed.' }, { status: 400 })
+        if (when.getTime() < Date.now() - 5 * 60_000) return NextResponse.json({ error: 'Cannot schedule in the past.' }, { status: 400 })
+        updates.scheduled_at = when.toISOString()
+        await admin.from('snags').update({ status: 'assigned', assigned_at: now, supplier_id: ticket.supplier_id }).eq('ticket_id', ticketId).in('status', ['open'])
+        break
+      }
+      case 'start_snag':
+        await admin.from('snags').update({ status: 'in_progress' }).eq('ticket_id', ticketId).in('status', ['assigned', 'open'])
+        break
       case 'resolve_snag':
         await admin.from('snags').update({ status: 'resolved' }).eq('ticket_id', ticketId).in('status', ['assigned', 'in_progress', 'open'])
         break
@@ -215,7 +227,7 @@ async function hasAccess(admin: Admin, role: WorkflowRole, userId: string, ticke
 // Targeted notifications for the moves that need someone else to act next.
 async function notify(admin: Admin, action: string, ticket: any, actorName: string | null) {
   const toSupplier = ['validate', 'request_quote', 'require_assessment', 'approve_quote', 'request_evidence', 'raise_snag', 'assign_snag', 'reject_variation']
-  const toRegion   = ['submit_quote', 'submit_completion', 'submit_variation', 'resolve_snag', 'resubmit']
+  const toRegion   = ['submit_quote', 'submit_completion', 'submit_variation', 'resolve_snag', 'resubmit', 'accept_snag', 'start_snag']
   const toStore    = ['request_info', 'close_out', 'reject']
   const title = `Ticket: ${ticket.title ?? 'Untitled'}`
 

@@ -12,6 +12,7 @@ const FIELDS: Record<string, FieldDef[]> = {
   submit_variation: [{ k: 'description', label: 'What changed / extra scope', required: true }, { k: 'amount', label: 'Extra cost (R)', type: 'number' }],
   raise_snag:       [{ k: 'description', label: 'Snag detail', required: true }],
   schedule:         [{ k: 'scheduledAt', label: 'Scheduled date/time', type: 'datetime-local', required: true }],
+  accept_snag:      [{ k: 'scheduledAt', label: 'When the snag will be fixed', type: 'datetime-local', required: true }],
   request_info:     [{ k: 'reason', label: 'What info is needed' }],
   request_evidence: [{ k: 'reason', label: 'What evidence is needed' }],
   reject_variation: [{ k: 'reason', label: 'Reason for rejection' }],
@@ -81,10 +82,14 @@ export function WorkflowActions({ ticketId, status, role, suppliers = [], exclud
 
   async function fire(t: Transition, payload: Record<string, unknown>) {
     setBusy(true); setError('')
+    // datetime-local is browser-local with no zone — convert to ISO so the server
+    // stores the correct instant (not shifted by the server's UTC clock).
+    const out = { ...payload }
+    if (typeof out.scheduledAt === 'string' && out.scheduledAt && !out.scheduledAt.endsWith('Z')) out.scheduledAt = new Date(out.scheduledAt).toISOString()
     try {
       const res = await fetch(`/api/tickets/${ticketId}/transition`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: t.action, ...payload }),
+        body: JSON.stringify({ action: t.action, ...out }),
       })
       const d = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(d.error ?? 'Failed')
