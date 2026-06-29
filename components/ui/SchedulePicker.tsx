@@ -67,7 +67,7 @@ export function SchedulePicker({ priority, createdAt, onConfirm, onCancel, busy 
     <div className="space-y-3">
       <p className="text-xs text-[var(--text-muted)]">
         {P_LABEL[priority] ?? ''} priority — schedule by{' '}
-        <span className="font-semibold text-[var(--text)]">{max.toLocaleString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>. Mon–Sat, 07:00–17:00.
+        <span className="font-semibold text-[var(--text)]">{max.toLocaleString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Johannesburg' })}</span>. Mon–Sat, 07:00–17:00.
       </p>
 
       {/* Month nav */}
@@ -122,7 +122,7 @@ export function SchedulePicker({ priority, createdAt, onConfirm, onCancel, busy 
       <div className="flex gap-2 pt-1">
         <button type="button" disabled={busy || !day || hour == null} onClick={confirm}
           className="flex-1 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold disabled:opacity-50">
-          {busy ? 'Scheduling…' : day && hour != null ? `Schedule ${day.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })} ${fmtHour(hour)}` : 'Pick a date & time'}
+          {busy ? 'Scheduling…' : day && hour != null ? `Schedule ${day.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', timeZone: 'Africa/Johannesburg' })} ${fmtHour(hour)}` : 'Pick a date & time'}
         </button>
         <button type="button" onClick={onCancel} className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold">Cancel</button>
       </div>

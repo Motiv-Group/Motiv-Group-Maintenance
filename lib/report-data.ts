@@ -50,7 +50,7 @@ export function resolveRange(period: string, from?: string, to?: string): DateRa
     label = 'Custom Range'
   }
 
-  const fmt = (d: Date) => d.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })
+  const fmt = (d: Date) => d.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Africa/Johannesburg' })
   return {
     fromISO: start.toISOString(),
     toISO:   end.toISOString(),
@@ -146,7 +146,7 @@ export async function buildSupplierModel(
     subtitle: 'Maintenance ticketing, quoting & delivery summary',
     preparedFor: supplierName,
     periodLabel: range.label,
-    generatedAt: new Date().toLocaleString('en-ZA'),
+    generatedAt: new Date().toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' }),
     sections: [
       {
         heading: 'Overview',
@@ -280,7 +280,7 @@ export async function buildRegionalModel(
     subtitle: 'Multi-store maintenance overview',
     preparedFor: rmName,
     periodLabel: range.label,
-    generatedAt: new Date().toLocaleString('en-ZA'),
+    generatedAt: new Date().toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' }),
     sections: [
       {
         heading: 'Overview',

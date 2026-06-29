@@ -230,23 +230,27 @@ export function formatCurrency(amount: number) {
   }).format(amount)
 }
 
+// All dates render in South African time (UTC+2), independent of where the code
+// runs (server SSR is UTC; client is the device tz) — so times are consistent.
+const SA_TZ = 'Africa/Johannesburg'
+
 export function formatDate(dateString: string) {
   return new Date(dateString).toLocaleDateString('en-ZA', {
-    day: 'numeric', month: 'short', year: 'numeric',
+    day: 'numeric', month: 'short', year: 'numeric', timeZone: SA_TZ,
   })
 }
 
 export function formatDateTime(dateString: string) {
   return new Date(dateString).toLocaleString('en-ZA', {
     day: 'numeric', month: 'short', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
+    hour: '2-digit', minute: '2-digit', timeZone: SA_TZ,
   })
 }
 
 export function formatDateTimeShort(dateString: string) {
   return new Date(dateString).toLocaleString('en-ZA', {
     day: 'numeric', month: 'short',
-    hour: '2-digit', minute: '2-digit',
+    hour: '2-digit', minute: '2-digit', timeZone: SA_TZ,
   })
 }
 

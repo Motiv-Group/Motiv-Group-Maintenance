@@ -301,7 +301,7 @@ async function loadSupplierSlaSeries(db: DB, companyId: string, now: Date): Prom
   const dates = [...byDate.keys()].sort().slice(-6)
   return dates.map(d => {
     const xs = byDate.get(d)!
-    return { label: new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' }), value: Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) }
+    return { label: new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', timeZone: 'Africa/Johannesburg' }), value: Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) }
   })
 }
 

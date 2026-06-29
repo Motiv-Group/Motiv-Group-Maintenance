@@ -547,7 +547,7 @@ export function SendQuoteForm({
               Valid until:{' '}
               <span className="font-medium text-gray-700 dark:text-gray-200">
                 {new Date(watch('valid_until') + 'T00:00:00').toLocaleDateString('en-ZA', {
-                  day: 'numeric', month: 'long', year: 'numeric',
+                  day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Africa/Johannesburg',
                 })}
               </span>
             </p>
