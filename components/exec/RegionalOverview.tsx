@@ -26,8 +26,6 @@ export function RegionalOverview({ data, name, briefing, briefingScopeId }: { da
     { label: 'Open Snags', value: data.snagsOpen, hint: 'to resolve', icon: <AlertTriangle size={13} />, tone: data.snagsOpen ? 'warn' : 'good', href: '/regional/snag' },
     { label: 'Internal Breaches', value: p.internalSlaBreaches, hint: 'internal SLA', icon: <Lock size={13} />, tone: p.internalSlaBreaches ? 'bad' : 'good', href: '/regional/tickets' },
     { label: 'Supplier Breaches', value: p.supplierSlaBreaches, hint: 'supplier SLA', icon: <Truck size={13} />, tone: p.supplierSlaBreaches ? 'bad' : 'good', href: '/regional/suppliers' },
-    { label: 'Accepted Quote Value', value: fmtK(data.quoteTotals.accepted), icon: <Banknote size={13} />, tone: 'good', href: '/regional/tickets' },
-    { label: 'Pending Quote Value', value: fmtK(data.quoteTotals.pending), icon: <Banknote size={13} />, tone: 'warn', href: '/regional/tickets' },
   ]
 
   const focus = buildFocus(data)
@@ -70,6 +68,7 @@ export function RegionalOverview({ data, name, briefing, briefingScopeId }: { da
 
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 gap-3">
         {kpis.map((k, i) => <KpiCard key={i} kpi={k} />)}
+        <QuoteValueCard accepted={data.quoteTotals.accepted} pending={data.quoteTotals.pending} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
@@ -120,6 +119,27 @@ export function RegionalOverview({ data, name, briefing, briefingScopeId }: { da
 
       <RegionalRecentTickets tickets={data.tickets} />
     </div>
+  )
+}
+
+/** Combined quote-value KPI: accepted + pending totals, full to the cent. */
+function QuoteValueCard({ accepted, pending }: { accepted: number; pending: number }) {
+  return (
+    <Link href="/regional/tickets" className="block rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C6A35D]/50">
+      <Card className="p-4 flex flex-col gap-1.5 min-w-0 h-full transition hover:ring-[#C6A35D]/50 hover:-translate-y-0.5 cursor-pointer">
+        <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--text-muted)]"><Banknote size={13} /> Quote Value</div>
+        <div className="space-y-1 mt-0.5">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] text-emerald-600 dark:text-emerald-400">Accepted</span>
+            <span className="text-sm font-bold text-[var(--text)] tabular-nums">{formatCurrency(accepted)}</span>
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] text-amber-600 dark:text-amber-500">Pending</span>
+            <span className="text-sm font-bold text-[var(--text)] tabular-nums">{formatCurrency(pending)}</span>
+          </div>
+        </div>
+      </Card>
+    </Link>
   )
 }
 

@@ -52,7 +52,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
     admin.from('stores').select('name, sub_store').eq('id', t.store_id).single(),
     admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('ticket_suppliers').select('status, invited_at, decline_reason').eq('ticket_id', t.id).in('supplier_id', supplierIds).maybeSingle(),
-    admin.from('quotes').select('id, amount, amount_incl_vat, description, file_url, status, valid_until, created_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).order('created_at', { ascending: false }),
+    admin.from('quotes').select('id, amount, amount_incl_vat, description, file_url, status, valid_until, created_at, updated_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).order('created_at', { ascending: false }),
     admin.from('technicians').select('id, name').in('supplier_id', supplierIds).eq('active', true).order('name'),
     admin.from('signoffs').select('id, before_urls, after_urls, coc_url, invoice_url, status, notes, reject_reason, created_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).order('created_at', { ascending: false }),
     admin.from('snags').select('description, required_correction, severity, status, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
@@ -99,8 +99,9 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
     <div className="space-y-5">
       <BackLink fallbackHref="/supplier/tickets" label="Back to tickets" />
 
-      {/* Progress — bare, no card around it (same as RM) */}
-      <div className="px-1 pt-1"><RmPipeline status={t.status} /></div>
+      {/* Progress — bare, no card around it (same as RM). Hidden once this supplier
+          was declined: the ticket's onward progress is no longer theirs. */}
+      {!declinedForMe && <div className="px-1 pt-1"><RmPipeline status={t.status} /></div>}
 
       {/* Ticket detail — same layout as the SM view */}
       <Card className="p-5 space-y-4">
@@ -121,7 +122,9 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           <DetailItem label="Operational Impact" value={OPERATIONAL_IMPACT_LABELS[t.operational_impact ?? 'none'] ?? 'No operational impact'} />
           <DetailItem label="Logged" value={formatDateTime(t.created_at)} />
           <DueDate dueAt={dueAt} overdue={overdue} now={now.toISOString()} />
-          {quoteRequestedAt && <DetailItem label="Quote requested" value={formatDateTime(quoteRequestedAt)} />}
+          {latestQuote
+            ? <DetailItem label="Quoted" value={formatDateTime(latestQuote.created_at)} />
+            : quoteRequestedAt && <DetailItem label="Quote requested" value={formatDateTime(quoteRequestedAt)} />}
         </div>
 
         <div>
@@ -138,7 +141,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           </div>
         )}
 
-        {t.scheduled_at && (
+        {!declinedForMe && t.scheduled_at && (
           <div className="flex items-center gap-2.5 rounded-xl bg-indigo-500/10 ring-1 ring-indigo-500/30 px-3.5 py-3">
             <Calendar size={18} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
             <div className="min-w-0">
@@ -151,13 +154,13 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
         <EditedLine at={t.edited_at} by={editorName} />
       </Card>
 
-      {breached && <BreachReason nextAction={sla.nextAction} dueAt={sla.nextActionDueAt} owner="Supplier" />}
+      {!declinedForMe && breached && <BreachReason nextAction={sla.nextAction} dueAt={sla.nextActionDueAt} owner="Supplier" />}
 
       <Card className="p-5 space-y-3">
         <h2 className="text-sm font-bold text-[var(--text)]">Next step</h2>
         {latestQuote?.status === 'declined' && (
           <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3 space-y-0.5">
-            <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Quote declined</p>
+            <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Quote declined{latestQuote?.updated_at ? <span className="font-medium normal-case opacity-80"> · {formatDateTime(latestQuote.updated_at)}</span> : null}</p>
             <p className="text-sm text-[var(--text)]">{declineReason || DEFAULT_DECLINE_REASON}</p>
             {canSubmitQuote && <p className="text-sm text-[var(--text-muted)]">Submit a revised quote below.</p>}
           </div>
@@ -168,7 +171,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           <SubmitCompletionForm ticketId={t.id} />
         )}
         {awarded && t.status === 'in_progress' && <RaiseVariationCard ticketId={t.id} />}
-        <WorkflowActions ticketId={t.id} status={t.status} role="supplier" exclude={['schedule', 'submit_completion', 'require_assessment', 'request_quote', 'submit_variation']} />
+        {!declinedForMe && <WorkflowActions ticketId={t.id} status={t.status} role="supplier" exclude={['schedule', 'submit_completion', 'require_assessment', 'request_quote', 'submit_variation']} />}
       </Card>
 
       {/* Quotes — full history, own block (out of the Next-step box) */}

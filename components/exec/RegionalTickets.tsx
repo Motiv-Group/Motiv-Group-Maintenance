@@ -52,7 +52,7 @@ const PILLS: { key: RmFilter; label: string; active: string; inactive: string }[
 
 function milestone(t: RegionalTicketRow): { label: string; at: string } | null {
   if (t.quoteAcceptedAt) return { label: 'Quote accepted', at: t.quoteAcceptedAt }
-  if (t.quoteReceivedAt) return { label: 'Quote received', at: t.quoteReceivedAt }
+  if (t.quoteReceivedAt) return { label: 'Quoted', at: t.quoteReceivedAt }
   if (t.quoteRequestedAt) return { label: 'Quote requested', at: t.quoteRequestedAt }
   return null
 }
