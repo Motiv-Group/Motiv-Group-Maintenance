@@ -23,6 +23,7 @@ import { DueDate } from '@/components/workflow/DueDate'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { EditedLine } from '@/components/ui/EditedLine'
 import { AuditTrail } from '@/components/ui/AuditTrail'
+import { CollapsibleSection } from '@/components/ui/CollapsibleSection'
 import { formatDateTime, rmStatusMeta, storeLabel, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
 
 // Shown when the RM declined a quote without typing a reason.
@@ -95,6 +96,12 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   const declineReason = (invite as any)?.decline_reason ?? null
   // Map a quote's DB status to the read-only summary tone (accepted shows "Approved").
   const quoteStatusOf = (s: string): QuoteSummaryStatus => s === 'accepted' ? 'accepted' : s === 'declined' ? 'declined' : 'pending'
+
+  // Collapsible blocks — the most-recent phase opens by default, the rest collapse.
+  // Once any completion (incl. snagged/under-review) exists, that block is latest;
+  // otherwise the Quotes block leads.
+  const completionsOpen = (signoffRows ?? []).length > 0 ||
+    ['submitted_for_signoff', 'evidence_requested', 'approved_closeout', 'completed', 'snag', 'snag_assigned', 'snag_in_progress', 'snag_resolved'].includes(t.status)
 
   return (
     <div className="space-y-5">
@@ -177,8 +184,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
 
       {/* Quotes — full history, own block (out of the Next-step box) */}
       {(myQuotes ?? []).length > 0 && (
-        <Card className="p-5 space-y-3">
-          <h2 className="text-sm font-bold text-[var(--text)]">Quotes</h2>
+        <CollapsibleSection title="Quotes" defaultOpen={!completionsOpen}>
           {((myQuotes ?? []) as any[]).map((q, i, arr) => (
             <QuoteSummary
               key={q.id}
@@ -187,13 +193,12 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
               quote={{ id: q.id, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, description: q.description ?? null, fileUrl: q.file_url ?? null, validUntil: q.valid_until ?? null, createdAt: q.created_at }}
             />
           ))}
-        </Card>
+        </CollapsibleSection>
       )}
 
       {/* Completions (COC & POC) — full history, own block. Latest first. */}
       {(signoffRows ?? []).length > 0 && (
-        <Card className="p-5 space-y-3">
-          <h2 className="text-sm font-bold text-[var(--text)]">Completions (COC &amp; POC)</h2>
+        <CollapsibleSection title="Completions (COC & POC)" defaultOpen={completionsOpen}>
           {((signoffRows ?? []) as any[]).map((s, i) => {
             const meta = SIGNOFF_META[s.status] ?? SIGNOFF_META.submitted
             const before = (s.before_urls ?? []) as string[]
@@ -241,7 +246,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
               </div>
             )
           })}
-        </Card>
+        </CollapsibleSection>
       )}
 
       <Card className="p-5">

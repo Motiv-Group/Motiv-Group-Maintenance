@@ -19,6 +19,7 @@ import { DueDate } from '@/components/workflow/DueDate'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { EditedLine } from '@/components/ui/EditedLine'
 import { AuditTrail } from '@/components/ui/AuditTrail'
+import { CollapsibleSection } from '@/components/ui/CollapsibleSection'
 import { formatCurrency, formatDateTime, formatDate, rmStatusMeta, storeLabel, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
 
 function DetailItem({ label, value }: { label: string; value: string }) {
@@ -100,6 +101,12 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   const reQuote = declinedQuotes.length > 0 && ['open', 'info_requested', 'assigned', 'assessment', 'quote_requested', 'quoted', 'quote_revision'].includes(t.status)
   // "Info added" = the SM resubmitted after an info request (back at open, reason kept).
   const rmInfoAdded = t.status === 'open' && !!t.info_request_reason
+
+  // Which collapsible block opens by default — the most-recent lifecycle phase.
+  // Snag (raised/in-progress) → Snag; sign-off/closeout → Completion; else Quotes.
+  const snagPhase = ['snag', 'snag_assigned', 'snag_in_progress', 'snag_resolved'].includes(t.status) || !!rejectedSignoff
+  const signoffPhase = ['submitted_for_signoff', 'evidence_requested', 'approved_closeout', 'completed'].includes(t.status) || !!acceptedSignoff
+  const phase: 'snag' | 'signoff' | 'commercial' = snagPhase ? 'snag' : signoffPhase ? 'signoff' : 'commercial'
 
   return (
     <div className="space-y-5">
@@ -196,8 +203,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
 
       {/* Approved COC & POC — read-only block (mirrors the accepted-quote card) */}
       {acceptedSignoff && (
-        <Card className="p-5 space-y-3">
-          <h2 className="text-sm font-bold text-[var(--text)]">COC &amp; POC</h2>
+        <CollapsibleSection title="COC & POC" defaultOpen={phase === 'signoff'}>
           <div className="rounded-xl ring-1 ring-emerald-500/40 bg-emerald-500/5 overflow-hidden">
             <div className="flex items-center justify-between gap-2 px-4 py-2.5 bg-emerald-500/10 border-b border-emerald-500/20">
               <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]"><CheckCircle2 size={15} className="text-emerald-500 shrink-0" /> Approved completion</span>
@@ -227,7 +233,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
               )}
             </div>
           </div>
-        </Card>
+        </CollapsibleSection>
       )}
 
       <Card className="p-5 space-y-4">
@@ -257,8 +263,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
 
       {/* Quotes & Variation Orders — suppliers requested, quotes to review, VOs */}
       {hasQuoteBlock && (
-        <Card className="p-5 space-y-4">
-          <h2 className="text-sm font-bold text-[var(--text)]">Quotes &amp; Variation Orders</h2>
+        <CollapsibleSection title="Quotes & Variation Orders" defaultOpen={phase === 'commercial'}>
           {supplierRows.length > 0 && (
             <div className="space-y-2">
               <h3 className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Suppliers requested</h3>
@@ -348,12 +353,11 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
               ))}
             </div>
           )}
-        </Card>
+        </CollapsibleSection>
       )}
 
       {((snags ?? []).length > 0 || rejectedSignoff) && (
-        <Card className="p-5 space-y-3">
-          <h2 className="text-sm font-bold text-[var(--text)]">Snags</h2>
+        <CollapsibleSection title="Snags" defaultOpen={phase === 'snag'}>
           {(snags ?? []).map((s: any, i: number) => (
             <div key={i} className="py-2 border-b border-[var(--border)] last:border-0 flex items-start justify-between gap-2">
               <p className="text-sm text-[var(--text)] min-w-0">{s.description ?? 'Snag'}</p>
@@ -398,7 +402,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
               </div>
             </div>
           )}
-        </Card>
+        </CollapsibleSection>
       )}
 
       <AuditTrail ticket={{
