@@ -14,7 +14,7 @@ import { rmStatusMeta, formatDateTime, humanizeDuration } from '@/lib/utils'
 const MAX_RECENT = 5
 
 export function RegionalRecentTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(false)
   const recent = useMemo(() => {
     // Completed tickets live in the Tickets-tab archive, not the recent overview.
     return tickets

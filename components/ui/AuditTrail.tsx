@@ -1,15 +1,11 @@
 import { History, ChevronDown } from 'lucide-react'
 import { formatDateTime } from '@/lib/utils'
+import { buildTicketTimeline, type TimelineInput } from '@/lib/ticket-timeline'
 
-const ROLE_LABEL: Record<string, string> = {
-  regional_manager: 'Regional Manager', supplier: 'Supplier', store_manager: 'Store Manager',
-  client: 'Store Manager', executive: 'Executive', system: 'System',
-}
-
-/** Collapsible event timeline for a ticket — the flow in date order with who acted.
- *  Server-safe (zero-JS via <details>). Built from ticket_updates. */
-export function AuditTrail({ updates }: { updates: { body: string; author_role: string | null; created_at: string }[] }) {
-  const items = [...updates].sort((a, b) => +new Date(a.created_at) - +new Date(b.created_at))
+/** Collapsible event timeline for a ticket — the full life in date order with who
+ *  acted. Server-safe (zero-JS via <details>). Collapsed by default. */
+export function AuditTrail({ ticket }: { ticket: TimelineInput }) {
+  const items = buildTicketTimeline(ticket)
   return (
     <details className="group rounded-2xl bg-[var(--surface)] ring-1 ring-black/10 dark:ring-white/10 shadow-sm dark:shadow-md dark:shadow-black/20 overflow-hidden">
       <summary className="flex items-center justify-between gap-2 px-5 py-4 cursor-pointer list-none hover:bg-[var(--hover)] transition">
@@ -25,8 +21,8 @@ export function AuditTrail({ updates }: { updates: { body: string; author_role: 
             {items.map((u, i) => (
               <li key={i} className="ml-4">
                 <span className="absolute -left-[5px] mt-1 w-2.5 h-2.5 rounded-full bg-[#C6A35D] ring-2 ring-[var(--surface)]" />
-                <p className="text-sm text-[var(--text)]">{u.body}</p>
-                <p className="text-[11px] text-[var(--text-faint)]">{ROLE_LABEL[u.author_role ?? ''] ?? (u.author_role ?? 'System')} · {formatDateTime(u.created_at)}</p>
+                <p className="text-sm text-[var(--text)]">{u.label}</p>
+                <p className="text-[11px] text-[var(--text-faint)]">{u.who ? `${u.who} · ` : ''}{formatDateTime(u.at)}</p>
               </li>
             ))}
           </ol>

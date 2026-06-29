@@ -38,7 +38,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
 
   const [{ data: store }, { data: quotes }, { data: updates }, { data: signoffs }, { data: suppliers }, { data: variations }, { data: snags }, { data: invites }, { data: ratingRows }] = await Promise.all([
     admin.from('stores').select('name, sub_store').eq('id', t.store_id).single(),
-    admin.from('quotes').select('id, supplier_id, amount, amount_incl_vat, description, file_url, status, valid_until, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
+    admin.from('quotes').select('id, supplier_id, amount, amount_incl_vat, description, file_url, status, valid_until, created_at, updated_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('signoffs').select('id, status, before_urls, after_urls, coc_url, invoice_url, notes, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('suppliers').select('id, company_name').eq('company_id', companyId).eq('active', true).order('company_name'),
@@ -361,7 +361,14 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         </Card>
       )}
 
-      <AuditTrail updates={(updates ?? []) as any[]} />
+      <AuditTrail ticket={{
+        createdAt: t.created_at, status: t.status, updatedAt: t.updated_at,
+        quoteRequestedAt: t.quote_requested_at, quoteSubmittedAt: t.quote_submitted_at,
+        quoteApprovedAt: t.quote_decision_status === 'approved' ? t.quote_decided_at : null,
+        scheduledAt: t.scheduled_at, completedAt: t.completed_at,
+        editedAt: t.edited_at, editedByName: editorName, cancellationReason: t.cancellation_reason,
+        quotes: (quotes ?? []) as any[], signoffs: allSignoffs, updates: (updates ?? []) as any[],
+      }} />
     </div>
   )
 }

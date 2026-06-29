@@ -166,7 +166,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
             {canSubmitQuote && <p className="text-sm text-[var(--text-muted)]">Submit a revised quote below.</p>}
           </div>
         )}
-        {canSubmitQuote && <SendQuoteForm ticketId={t.id} competitive />}
+        {canSubmitQuote && <SendQuoteForm ticketId={t.id} competitive priority={t.priority} createdAt={t.created_at} />}
         {awarded && t.status === 'accepted' && <ScheduleJobCard ticketId={t.id} priority={t.priority} createdAt={t.created_at} technicians={technicians} />}
         {awarded && ['in_progress', 'snag_resolved', 'evidence_requested'].includes(t.status) && (
           <SubmitCompletionForm ticketId={t.id} />
@@ -246,7 +246,14 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
         <SupplierAttachments ticketId={t.id} />
       </Card>
 
-      <AuditTrail updates={(updates ?? []) as any[]} />
+      <AuditTrail ticket={{
+        createdAt: t.created_at, status: t.status, updatedAt: t.updated_at,
+        quoteRequestedAt: t.quote_requested_at, quoteSubmittedAt: t.quote_submitted_at,
+        quoteApprovedAt: t.quote_decision_status === 'approved' ? t.quote_decided_at : null,
+        scheduledAt: t.scheduled_at, completedAt: t.completed_at,
+        editedAt: t.edited_at, editedByName: editorName, cancellationReason: t.cancellation_reason,
+        quotes: (myQuotes ?? []) as any[], signoffs: (signoffRows ?? []) as any[], updates: (updates ?? []) as any[],
+      }} />
     </div>
   )
 }

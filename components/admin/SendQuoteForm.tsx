@@ -7,7 +7,9 @@ import { useDropzone } from 'react-dropzone'
 import { UploadCloud, X, FileText, Loader2, Calendar, Sparkles } from 'lucide-react'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
+import { SchedulePicker } from '@/components/ui/SchedulePicker'
 import { createClient } from '@/lib/supabase/client'
+import { formatDateTime } from '@/lib/utils'
 
 /**
  * Render pages of a scanned PDF to JPEG blobs using pdfjs-dist (browser only).
@@ -77,7 +79,6 @@ interface QuoteForm {
   amount_incl_vat: number | ''
   description:     string
   valid_until:     string
-  proposed_schedule_at: string
 }
 
 export interface ExistingQuote {
@@ -106,6 +107,8 @@ export function SendQuoteForm({
   variant = 'quote',
   existingQuote = null,
   competitive = false,
+  priority = 'P3',
+  createdAt,
 }: {
   ticketId: string
   variant?: 'quote' | 'variation'
@@ -113,11 +116,18 @@ export function SendQuoteForm({
   /** Competitive model: post the quote against the invited supplier via the
    *  ticket submit-quote route (updates ticket_suppliers + status). */
   competitive?: boolean
+  /** Ticket priority + created time — used to bound the proposed-schedule picker. */
+  priority?: string
+  createdAt?: string
 }) {
   const isVariation = variant === 'variation'
   const isEdit      = !!existingQuote
+  // A proposed job start is required on a fresh competitive supplier quote.
+  const wantsSchedule = competitive && !isVariation && !isEdit
   const router = useRouter()
   const [open,       setOpen]       = useState(false)
+  const [schedule,   setSchedule]   = useState('')   // ISO of the proposed start
+  const [pickOpen,   setPickOpen]   = useState(false)
   const [loading,    setLoading]    = useState(false)
   const [error,      setError]      = useState('')
   const [file,       setFile]       = useState<File | null>(null)
@@ -256,6 +266,10 @@ export function SendQuoteForm({
       setError('Please attach the quote document (PDF, Excel, image or Word) before submitting.')
       return
     }
+    if (wantsSchedule && !schedule) {
+      setError('Please set a proposed job start date & time.')
+      return
+    }
     // Competitive supplier quote → confirm before sending.
     if (competitive && !confirmVals) { setConfirmVals(values); setError(''); return }
     await doSubmit(values)
@@ -290,7 +304,7 @@ export function SendQuoteForm({
         amount_incl_vat: values.amount_incl_vat !== '' ? Number(values.amount_incl_vat) : null,
         file_url:        fileUrl,
         valid_until:     validNA ? null : values.valid_until,
-        proposed_schedule_at: competitive && !isEdit && values.proposed_schedule_at ? new Date(values.proposed_schedule_at).toISOString() : undefined,
+        proposed_schedule_at: wantsSchedule ? schedule : undefined,
       }),
     })
 
@@ -558,13 +572,27 @@ export function SendQuoteForm({
           <input type="hidden" {...register('valid_until')} />
         </div>
 
-        {/* Proposed start date — supplier only; auto-schedules the job on approval */}
-        {competitive && !isVariation && (
+        {/* Proposed start date — supplier only; auto-schedules the job on approval.
+            Uses the same picker as post-acceptance scheduling, bounded by urgency. */}
+        {wantsSchedule && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Proposed start date &amp; time <span className="font-normal text-gray-400">(optional)</span></label>
-            <input type="datetime-local" {...register('proposed_schedule_at')}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500" />
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">If set, the job is scheduled to this time once the quote is approved.</p>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Proposed start date &amp; time <span className="text-red-500">*</span></label>
+            <button type="button" onClick={() => setPickOpen(true)}
+              className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg border border-amber-400 dark:border-[#C6A35D]/60 bg-amber-50 dark:bg-[#C6A35D]/10 text-sm text-gray-900 dark:text-[var(--text)] hover:border-amber-500 transition">
+              <span className="flex items-center gap-2"><Calendar size={15} className="text-amber-600 dark:text-[#C6A35D]" />{schedule ? formatDateTime(schedule) : 'Set proposed start'}</span>
+              <span className="text-xs text-amber-700 dark:text-[#C6A35D] font-semibold">{schedule ? 'Change' : 'Select'}</span>
+            </button>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">The job schedules to this time once the quote is approved.</p>
+            {pickOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setPickOpen(false)}>
+                <div className="absolute inset-0 bg-black/50" />
+                <div className="relative w-full max-w-sm rounded-2xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] p-5" onClick={e => e.stopPropagation()}>
+                  <p className="text-sm font-bold text-[var(--text)] mb-3">Propose a start date &amp; time</p>
+                  <SchedulePicker priority={priority} createdAt={createdAt ?? new Date().toISOString()} busy={false}
+                    onConfirm={iso => { setSchedule(iso); setPickOpen(false); setError('') }} onCancel={() => setPickOpen(false)} />
+                </div>
+              </div>
+            )}
           </div>
         )}
 

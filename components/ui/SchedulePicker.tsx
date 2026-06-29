@@ -7,7 +7,6 @@ import { useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, Calendar, Clock } from 'lucide-react'
 
 const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-const HOURS = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17] // 07:00–17:00 slots
 const WINDOW_H: Record<string, number> = { P1: 8, P2: 24, P3: 72, P4: 168 }
 const P_LABEL: Record<string, string> = { P1: 'Urgent', P2: 'High', P3: 'Medium', P4: 'Low' }
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
@@ -16,7 +15,16 @@ const startOfDay = (d: Date) => { const x = new Date(d); x.setHours(0, 0, 0, 0);
 const startOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1)
 // Monday-first column index (Mon=0 … Sun=6)
 const colOf = (d: Date) => (d.getDay() + 6) % 7
-const fmtHour = (h: number) => `${String(h).padStart(2, '0')}:00`
+const pad = (n: number) => String(n).padStart(2, '0')
+type Slot = { h: number; m: number }
+const fmtSlot = (s: Slot) => `${pad(s.h)}:${pad(s.m)}`
+// Urgent tickets get finer 30-min slots; everything else is hourly. 07:00–17:00.
+function buildSlots(priority: string): Slot[] {
+  const step = priority === 'P1' ? 30 : 60
+  const out: Slot[] = []
+  for (let mins = 7 * 60; mins <= 17 * 60; mins += step) out.push({ h: Math.floor(mins / 60), m: mins % 60 })
+  return out
+}
 
 export function SchedulePicker({ priority, createdAt, onConfirm, onCancel, busy }: {
   priority: string; createdAt: string
@@ -28,20 +36,32 @@ export function SchedulePicker({ priority, createdAt, onConfirm, onCancel, busy 
   if (max <= now) max = new Date(now.getTime() + winH * 3600_000) // window already passed → from now
   const minDay = startOfDay(now)
   const maxDay = startOfDay(max)
-
-  const [view, setView] = useState(startOfMonth(now))
-  const [day, setDay] = useState<Date | null>(null)
-  const [hour, setHour] = useState<number | null>(null)
+  const SLOTS = useMemo(() => buildSlots(priority), [priority])
 
   const dayDisabled = (d: Date) => {
     const sd = startOfDay(d)
     return sd < minDay || sd > maxDay || d.getDay() === 0 // no Sundays
   }
-  const hourDisabled = (h: number) => {
-    if (!day) return true
-    const dt = new Date(day); dt.setHours(h, 0, 0, 0)
-    return dt < now // the day is already capped to the window; only block past times
-  }
+  const slotInPast = (d: Date, s: Slot) => { const dt = new Date(d); dt.setHours(s.h, s.m, 0, 0); return dt < now }
+
+  // Earliest valid day+slot in the window — pre-selected as the suggestion so a
+  // tight (esp. urgent) deadline still defaults to something the supplier can hit.
+  const suggested = useMemo(() => {
+    for (let d = new Date(minDay); d <= maxDay; d.setDate(d.getDate() + 1)) {
+      if (d.getDay() === 0) continue
+      const day = new Date(d)
+      const s = SLOTS.find(sl => !slotInPast(day, sl))
+      if (s) return { day, slot: s }
+    }
+    return null
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [createdAt, priority])
+
+  const [view, setView] = useState(startOfMonth(suggested?.day ?? now))
+  const [day, setDay] = useState<Date | null>(suggested?.day ?? null)
+  const [slot, setSlot] = useState<Slot | null>(suggested?.slot ?? null)
+
+  const slotDisabled = (s: Slot) => !day || slotInPast(day, s)
 
   // Calendar cells for the current month view (leading blanks for alignment).
   const cells = useMemo(() => {
@@ -58,8 +78,8 @@ export function SchedulePicker({ priority, createdAt, onConfirm, onCancel, busy 
   const shiftMonth = (n: number) => setView(v => new Date(v.getFullYear(), v.getMonth() + n, 1))
 
   const confirm = () => {
-    if (!day || hour == null) return
-    const dt = new Date(day); dt.setHours(hour, 0, 0, 0)
+    if (!day || !slot) return
+    const dt = new Date(day); dt.setHours(slot.h, slot.m, 0, 0)
     onConfirm(dt.toISOString())
   }
 
@@ -69,6 +89,9 @@ export function SchedulePicker({ priority, createdAt, onConfirm, onCancel, busy 
         {P_LABEL[priority] ?? ''} priority — schedule by{' '}
         <span className="font-semibold text-[var(--text)]">{max.toLocaleString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Johannesburg' })}</span>. Mon–Sat, 07:00–17:00.
       </p>
+      {suggested && (
+        <p className="text-[11px] text-[#C6A35D]">Suggested: {suggested.day.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', timeZone: 'Africa/Johannesburg' })} {fmtSlot(suggested.slot)} — earliest slot that meets the deadline.</p>
+      )}
 
       {/* Month nav */}
       <div className="flex items-center justify-between">
@@ -86,7 +109,7 @@ export function SchedulePicker({ priority, createdAt, onConfirm, onCancel, busy 
           const selected = day && d.toDateString() === day.toDateString()
           return (
             <button key={d.toISOString()} type="button" disabled={disabled}
-              onClick={() => { setDay(d); setHour(null) }}
+              onClick={() => { setDay(d); setSlot(null) }}
               className={`aspect-square rounded-lg text-sm transition ${
                 selected ? 'bg-[#C6A35D] text-[#0a0e17] font-bold'
                 : disabled ? 'text-[var(--text-faint)] opacity-40 cursor-not-allowed'
@@ -102,16 +125,16 @@ export function SchedulePicker({ priority, createdAt, onConfirm, onCancel, busy 
         <div>
           <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5 flex items-center gap-1.5"><Clock size={12} /> Pick a time</div>
           <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5">
-            {HOURS.map(h => {
-              const disabled = hourDisabled(h)
-              const selected = hour === h
+            {SLOTS.map(s => {
+              const disabled = slotDisabled(s)
+              const selected = !!slot && slot.h === s.h && slot.m === s.m
               return (
-                <button key={h} type="button" disabled={disabled} onClick={() => setHour(h)}
+                <button key={`${s.h}:${s.m}`} type="button" disabled={disabled} onClick={() => setSlot(s)}
                   className={`py-1.5 rounded-lg text-xs font-medium border transition ${
                     selected ? 'bg-[#C6A35D] text-[#0a0e17] border-[#C6A35D]'
                     : disabled ? 'text-[var(--text-faint)] opacity-40 border-[var(--border)] cursor-not-allowed'
                     : 'text-[var(--text)] border-[var(--border)] hover:border-[#C6A35D]'}`}>
-                  {fmtHour(h)}
+                  {fmtSlot(s)}
                 </button>
               )
             })}
@@ -120,9 +143,9 @@ export function SchedulePicker({ priority, createdAt, onConfirm, onCancel, busy 
       )}
 
       <div className="flex gap-2 pt-1">
-        <button type="button" disabled={busy || !day || hour == null} onClick={confirm}
+        <button type="button" disabled={busy || !day || !slot} onClick={confirm}
           className="flex-1 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold disabled:opacity-50">
-          {busy ? 'Scheduling…' : day && hour != null ? `Schedule ${day.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', timeZone: 'Africa/Johannesburg' })} ${fmtHour(hour)}` : 'Pick a date & time'}
+          {busy ? 'Scheduling…' : day && slot ? `Schedule ${day.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', timeZone: 'Africa/Johannesburg' })} ${fmtSlot(slot)}` : 'Pick a date & time'}
         </button>
         <button type="button" onClick={onCancel} className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold">Cancel</button>
       </div>

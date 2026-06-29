@@ -19,7 +19,15 @@ const QUOTE_TONE: Record<string, string> = { pending: 'text-[#C6A35D]', accepted
 
 // One date matching the ticket's current stage: approved → requested → assigned.
 function milestone(t: SupplierTicketRow): { label: string; at: string } | null {
+  // A declined supplier never shows the ticket's onward milestones (those were another supplier).
+  if (t.declinedForMe) {
+    if (t.declinedAt) return { label: 'Declined', at: t.declinedAt }
+    if (t.quoteSubmittedAt) return { label: 'Quoted', at: t.quoteSubmittedAt }
+    if (t.quoteRequestedAt) return { label: 'Quote requested', at: t.quoteRequestedAt }
+    return null
+  }
   if (t.quoteApprovedAt) return { label: 'Quote approved', at: t.quoteApprovedAt }
+  if (t.quoteSubmittedAt) return { label: 'Quoted', at: t.quoteSubmittedAt }
   if (t.quoteRequestedAt) return { label: 'Quote requested', at: t.quoteRequestedAt }
   if (t.assignedAt) return { label: 'Assigned', at: t.assignedAt }
   return null
@@ -176,7 +184,7 @@ export default async function SupplierOverviewPage() {
 
       {/* Recent tickets — moved to the bottom, collapsible */}
       <Card className="p-5">
-        <details open className="group">
+        <details className="group">
           <summary className="flex items-center justify-between gap-2 cursor-pointer list-none">
             <h2 className="text-sm font-bold text-[var(--text)] flex items-center gap-2"><ClipboardList size={15} className="text-blue-600 dark:text-blue-400" /> Recent Tickets</h2>
             <span className="flex items-center gap-1.5 text-[var(--text-faint)]">

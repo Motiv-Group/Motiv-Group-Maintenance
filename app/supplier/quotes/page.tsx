@@ -15,6 +15,8 @@ const STATUS_BADGE: Record<string, string> = {
   revision_requested: 'bg-blue-500/15 text-blue-700 dark:text-blue-400',
 }
 const STATUS_LABEL: Record<string, string> = { requested: 'Quote requested', pending: 'Pending', accepted: 'Approved', declined: 'Declined', revision_requested: 'Revision requested' }
+// Uniform badge size so the VAT + status pills line up.
+const BADGE = 'inline-flex items-center justify-center w-full text-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide'
 
 const FILTERS: { key: string; label: string; active: string; inactive: string }[] = [
   { key: 'all', label: 'All', active: 'bg-slate-800 text-white border-slate-800 dark:bg-white dark:text-[#0a0e17] dark:border-white', inactive: 'text-[var(--text-muted)] border-[var(--border)] hover:border-slate-400' },
@@ -81,7 +83,7 @@ export default async function SupplierQuotesPage({ searchParams }: { searchParam
       )}
 
       {groups.map(([store, items]) => (
-        <details key={store} open className="group rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
+        <details key={store} className="group rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
           <summary className="flex items-center gap-3 px-4 py-3 cursor-pointer list-none hover:bg-[var(--hover)] transition">
             <Building2 size={16} className="text-[#C6A35D] shrink-0" />
             <span className="flex-1 min-w-0 text-sm font-bold text-[var(--text)] truncate">{[d.company, store].filter(Boolean).join(' · ')}{items[0].branchCode ? ` · ${items[0].branchCode}` : ''}</span>
@@ -96,10 +98,10 @@ export default async function SupplierQuotesPage({ searchParams }: { searchParam
                   <p className="text-sm text-[var(--text)] truncate">{i.ticketTitle}</p>
                   <p className="text-[11px] text-[var(--text-faint)]">{i.status === 'requested' ? 'Requested' : 'Submitted'} · {formatDateTime(i.createdAt)}</p>
                 </div>
-                <div className="flex flex-col items-end gap-1 shrink-0 w-28">
+                <div className="flex flex-col items-end gap-1 shrink-0 w-32">
                   <span className="text-sm font-semibold text-[var(--text)] tabular-nums whitespace-nowrap">{i.amount != null ? formatCurrency(i.amount) : '—'}</span>
-                  {i.amount != null && <span className="text-[10px] font-semibold uppercase rounded-full px-1.5 py-0.5 bg-[var(--surface-2)] text-[var(--text-muted)]">excl VAT</span>}
-                  <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 ${STATUS_BADGE[i.status] ?? 'bg-[var(--surface-2)] text-[var(--text-muted)]'}`}>{STATUS_LABEL[i.status] ?? i.status.replace('_', ' ')}</span>
+                  {i.amount != null && <span className={`${BADGE} bg-[var(--surface-2)] text-[var(--text-muted)]`}>excl VAT</span>}
+                  <span className={`${BADGE} ${STATUS_BADGE[i.status] ?? 'bg-[var(--surface-2)] text-[var(--text-muted)]'}`}>{STATUS_LABEL[i.status] ?? i.status.replace('_', ' ')}</span>
                 </div>
               </Link>
             ))}

@@ -20,7 +20,7 @@ const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 
 /** Store-manager dashboard "Recent Tickets" — last 7 days only, collapsible. */
 export function RecentTicketsCard({ tickets }: { tickets: StoreManagerTicket[] }) {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(false)
   const recent = useMemo(() => {
     const cutoff = Date.now() - WEEK_MS
     // Completed tickets live in the Tickets-tab archive, not the dashboard overview.

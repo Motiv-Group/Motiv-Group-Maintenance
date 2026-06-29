@@ -54,7 +54,7 @@ function Row({ t }: { t: StoreManagerTicket }) {
 }
 
 /** Collapsible status group used in the "All" view. */
-function Group({ title, tickets, defaultOpen = true }: { title: string; tickets: StoreManagerTicket[]; defaultOpen?: boolean }) {
+function Group({ title, tickets, defaultOpen = false }: { title: string; tickets: StoreManagerTicket[]; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen)
   if (!tickets.length) return null
   return (

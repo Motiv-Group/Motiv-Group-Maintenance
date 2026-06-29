@@ -29,6 +29,7 @@ async function addEvidence(ticketId: string, kind: string, url: string) {
 
 export function SubmitCompletionForm({ ticketId }: { ticketId: string }) {
   const router = useRouter()
+  const [open, setOpen] = useState(false)
   const [coc, setCoc] = useState<File | null>(null)
   const [photos, setPhotos] = useState<File[]>([])
   const [notes, setNotes] = useState('')
@@ -66,6 +67,16 @@ export function SubmitCompletionForm({ ticketId }: { ticketId: string }) {
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Submit failed')
       router.push(`/supplier/tickets/${ticketId}`); router.refresh()
     } catch (e: any) { setErr(e.message); setBusy(false) }
+  }
+
+  // Default view: a button. The full upload form only opens on click; Cancel returns here.
+  if (!open) {
+    return (
+      <button type="button" onClick={() => setOpen(true)}
+        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition">
+        <CheckCircle2 size={18} /> Upload COC &amp; POC
+      </button>
+    )
   }
 
   return (
@@ -133,7 +144,7 @@ export function SubmitCompletionForm({ ticketId }: { ticketId: string }) {
 
       <div className="grid grid-cols-2 gap-3">
         <button onClick={submit} disabled={busy} className="py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Submitting…' : 'Review & Submit'}</button>
-        <button onClick={() => router.push(`/supplier/tickets/${ticketId}`)} disabled={busy} className="py-3 rounded-xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm font-semibold disabled:opacity-50 hover:bg-[var(--hover)]">Cancel</button>
+        <button onClick={() => { setOpen(false); setErr('') }} disabled={busy} className="py-3 rounded-xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm font-semibold disabled:opacity-50 hover:bg-[var(--hover)]">Cancel</button>
       </div>
     </div>
   )

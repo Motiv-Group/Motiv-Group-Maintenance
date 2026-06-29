@@ -105,7 +105,9 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
 
   const counts = useMemo(() => {
     const c: Record<Bucket, number> = { to_quote: 0, quoted: 0, scheduled: 0, in_progress: 0, signoff: 0, completed: 0, closed: 0 }
-    for (const t of tickets) c[bucketOf(t.status)]++
+    // A ticket awarded to another supplier counts as closed (declined), not as this
+    // supplier's completed/active work.
+    for (const t of tickets) c[t.declinedForMe ? 'closed' : bucketOf(t.status)]++
     return c
   }, [tickets])
   const barTotal = BAR_ORDER.reduce((s, b) => s + counts[b], 0) || 1
