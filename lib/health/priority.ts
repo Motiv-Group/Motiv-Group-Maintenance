@@ -32,12 +32,36 @@ function addMins(iso: string, mins: number): string {
   return new Date(new Date(iso).getTime() + mins * MIN).toISOString()
 }
 
-/** Effective SLA due timestamps — explicit value if present, else created_at + rule. */
+// SA has no DST — fixed UTC+2. Night = 19:00–06:00 local.
+const SA_OFFSET_MIN = 120
+function isNightCreated(iso: string): boolean {
+  const h = (new Date(iso).getUTCHours() + 2) % 24
+  return h >= 19 || h < 6
+}
+/** The 06:00 SA after a night timestamp (same morning for 00:00–06:00, next for 19:00–24:00). */
+function nextMorningISO(iso: string): string {
+  const sa = new Date(new Date(iso).getTime() + SA_OFFSET_MIN * MIN)
+  const target = new Date(Date.UTC(sa.getUTCFullYear(), sa.getUTCMonth(), sa.getUTCDate(), 6, 0, 0, 0))
+  if (sa.getUTCHours() >= 19) target.setUTCDate(target.getUTCDate() + 1)
+  return new Date(target.getTime() - SA_OFFSET_MIN * MIN).toISOString()
+}
+/**
+ * SLA start for the created-based timers. Tickets logged 19:00–06:00 (SA) don't
+ * start their clock until 06:00 — so overnight hours aren't counted as a breach —
+ * UNLESS a quote has already been approved, after which normal timing resumes.
+ */
+function slaStart(t: HealthTicket): string {
+  const approved = t.quote_decision_status === 'approved'
+  return (!approved && isNightCreated(t.created_at)) ? nextMorningISO(t.created_at) : t.created_at
+}
+
+/** Effective SLA due timestamps — explicit value if present, else start + rule. */
 export function deriveDueDates(t: HealthTicket, s: SlaTargets) {
+  const base = slaStart(t)
   return {
-    firstResponseDue: t.first_response_due_at ?? addMins(t.created_at, s.first_response_mins),
-    attendanceDue:    t.attendance_due_at    ?? addMins(t.created_at, s.attendance_mins),
-    resolutionDue:    t.adjusted_resolution_due_at ?? t.resolution_due_at ?? addMins(t.created_at, s.resolution_mins),
+    firstResponseDue: t.first_response_due_at ?? addMins(base, s.first_response_mins),
+    attendanceDue:    t.attendance_due_at    ?? addMins(base, s.attendance_mins),
+    resolutionDue:    t.adjusted_resolution_due_at ?? t.resolution_due_at ?? addMins(base, s.resolution_mins),
     quoteDue:         t.quote_due_at ?? (t.quote_requested_at ? addMins(t.quote_requested_at, s.quote_due_mins) : null),
     internalDecisionDue: t.internal_action_due_at ?? (t.quote_submitted_at ? addMins(t.quote_submitted_at, s.internal_decision_mins) : null),
   }

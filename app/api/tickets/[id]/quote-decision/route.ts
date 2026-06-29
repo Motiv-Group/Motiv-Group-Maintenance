@@ -32,7 +32,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     if (!ticket.region_id || !(links ?? []).some(l => l.region_id === ticket.region_id)) return NextResponse.json({ error: 'Not your ticket' }, { status: 403 })
   }
 
-  const { data: quote } = await admin.from('quotes').select('id, supplier_id, status').eq('id', quoteId).eq('ticket_id', ticket.id).single()
+  const { data: quote } = await admin.from('quotes').select('id, supplier_id, status, proposed_schedule_at').eq('id', quoteId).eq('ticket_id', ticket.id).single()
   if (!quote) return NextResponse.json({ error: 'Quote not found' }, { status: 404 })
 
   const now = new Date().toISOString()
@@ -83,8 +83,13 @@ export async function POST(request: Request, { params }: { params: { id: string 
   await admin.from('quotes').update({ status: 'declined' }).eq('ticket_id', ticket.id).eq('status', 'pending').neq('id', quote.id)
   await admin.from('ticket_suppliers').update({ status: 'awarded', responded_at: now }).eq('ticket_id', ticket.id).eq('supplier_id', quote.supplier_id)
   await admin.from('ticket_suppliers').update({ status: 'closed', responded_at: now }).eq('ticket_id', ticket.id).neq('supplier_id', quote.supplier_id).in('status', ['invited', 'quoted'])
+  // If the supplier proposed a start date on the quote, schedule straight to it
+  // (skip the separate "schedule the job" step); otherwise land on 'accepted'.
+  const proposedAt = (quote as any).proposed_schedule_at as string | null
+  const scheduled = !!proposedAt && new Date(proposedAt).getTime() > 0
   await admin.from('tickets').update({
-    status: 'accepted', supplier_id: quote.supplier_id, quote_value: (ticket.quote_value ?? null),
+    status: scheduled ? 'scheduled' : 'accepted', supplier_id: quote.supplier_id, quote_value: (ticket.quote_value ?? null),
+    ...(scheduled ? { scheduled_at: proposedAt } : {}),
     quote_decision_required: false, quote_decision_status: 'approved', quote_decided_at: now,
     current_blocker: 'supplier_action', blocker_owner_type: 'supplier', blocker_started_at: now, sla_paused: false, pause_ended_at: now,
     last_internal_update_at: now, updated_at: now,

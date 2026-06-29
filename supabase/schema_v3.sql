@@ -311,6 +311,7 @@ create table if not exists public.quotes (
   file_url        text,
   status          text not null default 'pending' check (status in ('pending','accepted','declined','revision_requested')),
   decline_reason  text,
+  proposed_schedule_at timestamptz,   -- supplier's proposed job start; auto-schedules on approval
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now()
 );

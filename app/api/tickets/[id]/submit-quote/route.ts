@@ -32,10 +32,13 @@ export async function POST(request: Request, { params }: { params: { id: string 
   if (['awarded', 'closed', 'declined'].includes(invite.status)) return NextResponse.json({ error: 'This invitation is closed.' }, { status: 400 })
 
   const now = new Date().toISOString()
+  // Optional proposed start date/time — used to auto-schedule the job on approval.
+  const proposedSchedule = body.proposed_schedule_at ? new Date(body.proposed_schedule_at) : null
+  const proposed_schedule_at = proposedSchedule && !Number.isNaN(proposedSchedule.getTime()) ? proposedSchedule.toISOString() : null
   const { data: quote, error: qErr } = await admin.from('quotes').insert({
     company_id: ticket.company_id, ticket_id: ticket.id, supplier_id: invite.supplier_id, submitted_by: user.id,
     amount, amount_incl_vat: body.amount_incl_vat ?? null, file_url: body.file_url ?? null, status: 'pending',
-    description: body.description ?? null, valid_until: body.valid_until ?? null,
+    description: body.description ?? null, valid_until: body.valid_until ?? null, proposed_schedule_at,
   }).select('id').single()
   if (qErr) return NextResponse.json({ error: qErr.message }, { status: 500 })
 

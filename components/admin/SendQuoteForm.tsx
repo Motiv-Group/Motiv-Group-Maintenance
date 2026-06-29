@@ -77,6 +77,7 @@ interface QuoteForm {
   amount_incl_vat: number | ''
   description:     string
   valid_until:     string
+  proposed_schedule_at: string
 }
 
 export interface ExistingQuote {
@@ -289,6 +290,7 @@ export function SendQuoteForm({
         amount_incl_vat: values.amount_incl_vat !== '' ? Number(values.amount_incl_vat) : null,
         file_url:        fileUrl,
         valid_until:     validNA ? null : values.valid_until,
+        proposed_schedule_at: competitive && !isEdit && values.proposed_schedule_at ? new Date(values.proposed_schedule_at).toISOString() : undefined,
       }),
     })
 
@@ -555,6 +557,16 @@ export function SendQuoteForm({
 
           <input type="hidden" {...register('valid_until')} />
         </div>
+
+        {/* Proposed start date — supplier only; auto-schedules the job on approval */}
+        {competitive && !isVariation && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Proposed start date &amp; time <span className="font-normal text-gray-400">(optional)</span></label>
+            <input type="datetime-local" {...register('proposed_schedule_at')}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500" />
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">If set, the job is scheduled to this time once the quote is approved.</p>
+          </div>
+        )}
 
         {error && (
           <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm rounded-lg px-4 py-3">

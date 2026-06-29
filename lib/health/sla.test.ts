@@ -74,3 +74,23 @@ describe('computeTicketSla — internal/store clock', () => {
     expect(r.internalBreached).toBe(true)
   })
 })
+
+describe('computeTicketSla — night pause (19:00–06:00 SA)', () => {
+  // Logged 23:00 SA (21:00 UTC) → SLA clock only starts at 06:00 SA next day.
+  const nightCreated = '2026-06-20T21:00:00.000Z'
+
+  it('N1: night-logged P1 not breached during the night', () => {
+    const r = computeTicketSla(ticket({ status: 'assigned', priority: 'P1', created_at: nightCreated }), rule('P1'), new Date('2026-06-20T23:30:00.000Z'))
+    expect(r.supplierBreached).toBe(false)
+  })
+
+  it('N2: same ticket breaches after 06:00 + first-response window', () => {
+    const r = computeTicketSla(ticket({ status: 'assigned', priority: 'P1', created_at: nightCreated }), rule('P1'), new Date('2026-06-21T06:00:00.000Z'))
+    expect(r.supplierBreached).toBe(true)
+  })
+
+  it('N3: an approved quote removes the night grace (normal timing)', () => {
+    const r = computeTicketSla(ticket({ status: 'assigned', priority: 'P1', created_at: nightCreated, quote_decision_status: 'approved' }), rule('P1'), new Date('2026-06-20T23:30:00.000Z'))
+    expect(r.supplierBreached).toBe(true)
+  })
+})
