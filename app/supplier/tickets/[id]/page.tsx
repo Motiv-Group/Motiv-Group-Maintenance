@@ -18,7 +18,7 @@ import { RmPipeline } from '@/components/regional/RmPipeline'
 import { SupplierAttachments } from '@/components/workflow/SupplierAttachments'
 import { SendQuoteForm } from '@/components/admin/SendQuoteForm'
 import { QuoteSummary, type QuoteSummaryStatus } from '@/components/workflow/QuoteSummary'
-import { ScheduleJobCard, RaiseVariationCard } from '@/components/supplier/SupplierJobActions'
+import { ScheduleJobCard, RaiseVariationCard, DeclineWorkButton } from '@/components/supplier/SupplierJobActions'
 import { DueDate } from '@/components/workflow/DueDate'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { EditedLine } from '@/components/ui/EditedLine'
@@ -160,6 +160,9 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
     : ['approved_closeout', 'completed'].includes(t.status) ? 'completion'
     : 'commercial'
 
+  // Decline the work — offered before award only (invite still invited/quoted).
+  const canDecline = !awarded && !declinedForMe && !!invite && ['invited', 'quoted'].includes((invite as any).status)
+
   return (
     <div className="space-y-5">
       <BackLink fallbackHref="/supplier/tickets" label="Back to tickets" />
@@ -238,6 +241,8 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
         )}
         {awarded && t.status === 'in_progress' && <RaiseVariationCard ticketId={t.id} />}
         {!declinedForMe && <WorkflowActions ticketId={t.id} status={t.status} role="supplier" exclude={['schedule', 'submit_completion', 'require_assessment', 'request_quote', 'submit_variation']} />}
+        {/* Opt out of the job (before award) — separated from the primary actions */}
+        {canDecline && <div className="pt-2 border-t border-[var(--border)]"><DeclineWorkButton ticketId={t.id} /></div>}
       </Card>
 
       {/* Quotes — full history, own block (out of the Next-step box) */}

@@ -22,6 +22,13 @@ interface Detail {
 
 export function RegionalSuppliersTable({ suppliers }: { suppliers: Row[] }) {
   const [sel, setSel] = useState<Row | null>(null)
+  // Open a supplier's pane directly when deep-linked from the dashboard
+  // (?supplier=<id>, e.g. the Supplier Performance block).
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get('supplier')
+    if (id) { const match = suppliers.find(s => s.id === id); if (match) setSel(match) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   return (
     <SectionCard title="Suppliers">
       {/* Desktop table */}
@@ -134,6 +141,37 @@ function SupplierPane({ row, onClose }: { row: Row; onClose: () => void }) {
           <Stat label="Escalations" value={row.perf.escalationCount} />
           <Stat label="Cost exposure" value={fmtK(row.costExposure)} />
         </div>
+
+        {/* Why this score — mirrors the deductions in lib/health/supplierPerformance.ts */}
+        {(() => {
+          const p = row.perf
+          const n = p.assignedTickets || 0
+          const factors = [
+            { label: 'SLA breaches', stat: n ? `${p.slaBreaches} of ${n} jobs` : 'no jobs yet', pts: n ? (p.slaBreaches / n) * 40 : 0, max: 40 },
+            { label: 'First-time fix', stat: `${Math.round(p.firstTimeFixRate * 100)}%`, pts: (1 - p.firstTimeFixRate) * 20, max: 20 },
+            { label: 'Evidence complete', stat: `${Math.round(p.evidenceCompletionRate * 100)}%`, pts: (1 - p.evidenceCompletionRate) * 15, max: 15 },
+            { label: 'Repeat defects', stat: n ? `${p.repeatDefectInvolvement} of ${n} jobs` : '0', pts: n ? (p.repeatDefectInvolvement / n) * 15 : 0, max: 15 },
+            { label: 'Escalations', stat: `${p.escalationCount} urgent breach${p.escalationCount === 1 ? '' : 'es'}`, pts: Math.min(10, p.escalationCount * 2), max: 10 },
+          ].map(f => ({ ...f, pts: Math.round(f.pts) }))
+          return (
+            <div className="rounded-xl ring-1 ring-[var(--border)] bg-[var(--surface)] p-3 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Why this score</div>
+                <span className={`text-sm font-semibold ${STATUS_TEXT[p.band]}`}>{p.performanceScore}%</span>
+              </div>
+              <p className="text-[11px] text-[var(--text-muted)]">Starts at 100%; each factor deducts points up to its weight.</p>
+              <div className="space-y-1.5">
+                {factors.map(f => (
+                  <div key={f.label} className="flex items-center justify-between gap-2 text-xs">
+                    <span className="text-[var(--text-muted)] min-w-0 truncate">{f.label} <span className="text-[var(--text-faint)]">· {f.stat}</span></span>
+                    <span className={`shrink-0 font-medium tabular-nums ${f.pts ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>{f.pts ? `−${f.pts}` : '0'}<span className="text-[var(--text-faint)] font-normal"> / {f.max}</span></span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[11px] text-[var(--text-muted)] pt-1 border-t border-[var(--border)]"><span className="font-semibold text-[var(--text)]">Escalation</span> = an urgent (P1) job that breached its SLA. Each one costs 2 points (max 10) and flags the supplier for follow-up.</p>
+            </div>
+          )
+        })()}
 
         {/* Contact */}
         <div className="rounded-xl ring-1 ring-[var(--border)] bg-[var(--surface)] p-3 space-y-2">

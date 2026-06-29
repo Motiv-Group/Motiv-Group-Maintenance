@@ -14,6 +14,51 @@ async function transition(ticketId: string, body: Record<string, unknown>) {
   if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Something went wrong')
 }
 
+// Decline the work (before award) — preset reasons + free-text "Other". Sets the
+// supplier's invite to declined and notifies the RM; the job goes to others.
+const DECLINE_REASONS = ['Fully booked / no capacity', 'Outside our service area', 'Not our trade / speciality', 'Job too small', 'Pricing not viable', 'Other']
+export function DeclineWorkButton({ ticketId }: { ticketId: string }) {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [reason, setReason] = useState('')
+  const [other, setOther] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const input = 'w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)]'
+
+  async function submit() {
+    if (!reason) { setErr('Choose a reason.'); return }
+    const finalReason = reason === 'Other' ? other.trim() : reason
+    if (!finalReason) { setErr('Tell the manager why.'); return }
+    setBusy(true); setErr('')
+    try {
+      const res = await fetch('/api/supplier/decline-work', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticketId, reason: finalReason }) })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed')
+      router.refresh()
+    } catch (e: any) { setErr(e.message); setBusy(false) }
+  }
+
+  if (!open) {
+    return <button onClick={() => setOpen(true)} className="w-full py-2.5 rounded-xl ring-1 ring-red-500/40 text-red-600 dark:text-red-400 text-sm font-semibold hover:bg-red-500/10 transition">Decline work</button>
+  }
+  return (
+    <div className="rounded-xl ring-1 ring-[var(--border)] p-4 space-y-2">
+      <p className="text-sm font-semibold text-[var(--text)]">Decline this work</p>
+      <p className="text-xs text-[var(--text-muted)]">The manager is notified and the job goes to other suppliers. This can&apos;t be undone.</p>
+      <select className={input} value={reason} onChange={e => setReason(e.target.value)}>
+        <option value="">— Choose a reason —</option>
+        {DECLINE_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
+      </select>
+      {reason === 'Other' && <textarea className={`${input} min-h-[70px]`} placeholder="Tell the manager why…" value={other} onChange={e => setOther(e.target.value)} />}
+      {err && <p className="text-xs text-red-500">{err}</p>}
+      <div className="flex gap-2">
+        <button onClick={submit} disabled={busy} className="flex-1 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-500 disabled:opacity-50">{busy ? 'Declining…' : 'Yes, decline'}</button>
+        <button onClick={() => { setOpen(false); setErr('') }} disabled={busy} className="flex-1 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm disabled:opacity-50">Cancel</button>
+      </div>
+    </div>
+  )
+}
+
 // Upload a supporting file (photo or document) and return its public URL. Images
 // go to the photo bucket, everything else to the docs bucket.
 async function uploadAttachment(ticketId: string, file: File): Promise<string> {

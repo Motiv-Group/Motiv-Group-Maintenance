@@ -86,7 +86,7 @@ export function RegionalOverview({ data, name, briefing, briefingScopeId }: { da
 
         <SectionCard title="Supplier Performance" icon={<Truck size={15} className="text-teal-600 dark:text-teal-400" />} action={<Link href="/regional/suppliers" className="text-xs text-[#C6A35D] hover:underline">View all</Link>}>
           {data.suppliers.slice(0, 5).map(s => (
-            <Link key={s.id} href={`/regional/supplier-reviews/${s.id}`} className="flex items-center justify-between gap-2 py-2 -mx-2 px-2 rounded-lg border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition">
+            <Link key={s.id} href={`/regional/suppliers?supplier=${s.id}`} className="flex items-center justify-between gap-2 py-2 -mx-2 px-2 rounded-lg border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition">
               <div className="min-w-0">
                 <p className="text-sm text-[var(--text)] truncate">{s.name}</p>
                 <Stars value={s.avgRating} count={s.ratingCount} />
