@@ -210,8 +210,9 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           <div className="flex items-center gap-2.5 rounded-xl bg-indigo-500/10 ring-1 ring-indigo-500/30 px-3.5 py-3">
             <Calendar size={18} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
             <div className="min-w-0">
-              <p className="text-[11px] uppercase tracking-wide font-semibold text-indigo-700 dark:text-indigo-400">Scheduled</p>
+              <p className="text-[11px] uppercase tracking-wide font-semibold text-indigo-700 dark:text-indigo-400">Scheduled{t.schedule_status === 'proposed' ? ' · proposed' : ''}</p>
               <p className="text-sm font-bold text-[var(--text)]">{formatDateTime(t.scheduled_at)}{t.technician_id && technicians.find(x => x.id === t.technician_id) ? ` · ${technicians.find(x => x.id === t.technician_id)!.name}` : ''}</p>
+              {t.schedule_status === 'proposed' && <p className="text-[11px] text-amber-600 dark:text-amber-400">Past the SLA window — awaiting the manager&apos;s acceptance.</p>}
             </div>
           </div>
         )}

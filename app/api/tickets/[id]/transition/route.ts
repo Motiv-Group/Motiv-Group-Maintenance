@@ -39,6 +39,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const now = new Date().toISOString()
   const addMins = (m: number) => new Date(new Date(now).getTime() + m * 60_000).toISOString()
   const updates: Record<string, unknown> = { status: tr.to, updated_at: now }
+  // Set when a supplier schedules a custom time beyond the SLA window (a proposal
+  // the RM must accept) — drives who gets notified below.
+  let scheduleProposed = false
   // Stamp freshness against the acting side (drives the health Data-Quality + stale checks).
   const freshness = role === 'supplier' ? { last_supplier_update_at: now }
     : role === 'store_manager' ? { last_store_update_at: now }
@@ -93,10 +96,24 @@ export async function POST(request: Request, { params }: { params: { id: string 
         if (max.getTime() <= Date.now()) max = new Date(Date.now() + H * 3600_000)
         const maxEnd = new Date(max); maxEnd.setHours(23, 59, 59, 999) // day-granular window
         if (when.getTime() < Date.now() - 5 * 60_000) return NextResponse.json({ error: 'Cannot schedule in the past.' }, { status: 400 })
-        if (when.getTime() > maxEnd.getTime()) return NextResponse.json({ error: 'Scheduled date is beyond the allowed window for this priority.' }, { status: 400 })
+        // A custom time beyond the priority window is allowed, but it's a PROPOSAL
+        // the RM must accept (accept_schedule) before it counts against the SLA.
+        scheduleProposed = when.getTime() > maxEnd.getTime()
         updates.scheduled_at = when.toISOString()
+        updates.schedule_status = scheduleProposed ? 'proposed' : 'agreed'
         // Optional: assign the technician who will attend (supplier's own roster).
         if (body.technicianId !== undefined) updates.technician_id = body.technicianId || null
+        break
+      }
+      case 'accept_schedule': {
+        // RM agrees to the supplier's proposed time → it becomes the resolution
+        // deadline, so meeting it is not an SLA breach for the supplier or the RM.
+        const sched = ticket.scheduled_at
+        if (!sched) return NextResponse.json({ error: 'Nothing scheduled to accept.' }, { status: 400 })
+        updates.schedule_status = 'agreed'
+        updates.adjusted_resolution_due_at = sched
+        updates.attendance_due_at = sched
+        updates.first_response_due_at = sched
         break
       }
       case 'start_work':
@@ -174,10 +191,10 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const { error: upErr } = await admin.from('tickets').update(updates).eq('id', ticketId)
   if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 })
 
-  await notify(admin, action, ticket, prof.full_name ?? null)
+  await notify(admin, action, ticket, prof.full_name ?? null, { scheduleProposed, scheduledAt: updates.scheduled_at as string | undefined })
 
   revalidatePath(`/supplier/tickets/${ticketId}`); revalidatePath('/supplier')
-  revalidatePath('/regional'); revalidatePath('/regional/tickets'); revalidatePath('/client'); revalidatePath('/executive')
+  revalidatePath('/regional'); revalidatePath('/regional/tickets'); revalidatePath('/client'); revalidatePath('/client/visits'); revalidatePath(`/client/tickets/${ticketId}`); revalidatePath('/executive')
   if (action === 'close_out' || tr.to === 'completed') {
     // Completion → refresh reports + estate/regional dashboards (health scores live-compute from tickets).
     revalidatePath('/regional/reports'); revalidatePath('/executive/reports'); revalidatePath('/executive/stores'); revalidatePath('/regional/stores')
@@ -226,16 +243,31 @@ async function hasAccess(admin: Admin, role: WorkflowRole, userId: string, ticke
 }
 
 // Targeted notifications for the moves that need someone else to act next.
-async function notify(admin: Admin, action: string, ticket: any, actorName: string | null) {
-  const toSupplier = ['validate', 'request_quote', 'require_assessment', 'approve_quote', 'request_evidence', 'raise_snag', 'assign_snag', 'reject_variation']
+async function notify(admin: Admin, action: string, ticket: any, actorName: string | null, opts?: { scheduleProposed?: boolean; scheduledAt?: string }) {
+  const toSupplier = ['validate', 'request_quote', 'require_assessment', 'approve_quote', 'request_evidence', 'raise_snag', 'assign_snag', 'reject_variation', 'accept_schedule']
   const toRegion   = ['submit_quote', 'submit_completion', 'submit_variation', 'resolve_snag', 'resubmit', 'accept_snag', 'start_snag']
-  const toStore    = ['request_info', 'close_out', 'reject']
+  // The store manager is told whenever a visit is scheduled / agreed so they can
+  // expect the supplier on site.
+  const toStore    = ['request_info', 'close_out', 'reject', 'schedule', 'accept_schedule', 'accept_snag']
   const title = `Ticket: ${ticket.title ?? 'Untitled'}`
+  // Friendlier copy for scheduling moves; everything else uses the action verb.
+  const when = opts?.scheduledAt ? new Date(opts.scheduledAt).toLocaleString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Johannesburg' }) : null
+  const storeMsg = action === 'schedule' || action === 'accept_snag'
+    ? `Visit scheduled${when ? ` for ${when}` : ''}`
+    : action === 'accept_schedule' ? `Visit time confirmed${when ? ` for ${when}` : ''}`
+    : `Update: ${action.replace(/_/g, ' ')}`
+
+  // A custom (beyond-window) proposal also pings the RM to accept it.
+  if (action === 'schedule' && opts?.scheduleProposed && ticket.region_id) {
+    const { data } = await admin.from('regional_users').select('user_id').eq('region_id', ticket.region_id)
+    await push(admin, (data ?? []).map(r => r.user_id), ticket.company_id, title, `Proposed visit time${when ? ` (${when})` : ''} — accept to confirm`, `/regional/tickets/${ticket.id}`)
+  }
 
   if (toSupplier.includes(action) && ticket.supplier_id) {
     const { data } = await admin.from('supplier_users').select('user_id').eq('supplier_id', ticket.supplier_id)
     const ids = (data ?? []).map(r => r.user_id)
-    await push(admin, ids, ticket.company_id, title, `${actorName ?? 'A manager'} → ${action.replace(/_/g, ' ')}`, `/supplier/tickets/${ticket.id}`)
+    const msg = action === 'accept_schedule' ? `Visit time confirmed${when ? ` for ${when}` : ''}` : `${actorName ?? 'A manager'} → ${action.replace(/_/g, ' ')}`
+    await push(admin, ids, ticket.company_id, title, msg, `/supplier/tickets/${ticket.id}`)
   }
   if (toRegion.includes(action) && ticket.region_id) {
     const { data } = await admin.from('regional_users').select('user_id').eq('region_id', ticket.region_id)
@@ -243,7 +275,7 @@ async function notify(admin: Admin, action: string, ticket: any, actorName: stri
     await push(admin, ids, ticket.company_id, title, `Update: ${action.replace(/_/g, ' ')}`, `/regional/tickets/${ticket.id}`)
   }
   if (toStore.includes(action) && ticket.created_by) {
-    await push(admin, [ticket.created_by], ticket.company_id, title, `Update: ${action.replace(/_/g, ' ')}`, `/client/tickets/${ticket.id}`)
+    await push(admin, [ticket.created_by], ticket.company_id, title, storeMsg, `/client/tickets/${ticket.id}`)
   }
 }
 

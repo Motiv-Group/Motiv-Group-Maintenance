@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import { redirect } from 'next/navigation'
+import { CalendarClock } from 'lucide-react'
 import { BackLink } from '@/components/ui/BackLink'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireStoreManagerV3 } from '@/lib/health/guard'
@@ -45,6 +46,10 @@ export default async function StoreTicketDetailPage({ params }: { params: { id: 
 
   const { data: updates } = await admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false })
   const editorName = t.edited_by ? ((await admin.from('user_profiles').select('full_name').eq('id', t.edited_by).single()).data?.full_name ?? null) : null
+  // Scheduled supplier visit — who is coming and when (shown to the store manager).
+  const showVisit = !!t.scheduled_at && !['completed', 'cancelled', 'declined'].includes(t.status)
+  const visitSupplier = showVisit && t.supplier_id ? ((await admin.from('suppliers').select('company_name').eq('id', t.supplier_id).single()).data?.company_name ?? null) : null
+  const visitTech = showVisit && t.technician_id ? ((await admin.from('technicians').select('name').eq('id', t.technician_id).single()).data?.name ?? null) : null
   // "Info added" = back at open after the SM resubmitted the requested info.
   const infoAdded = t.status === 'open' && !!t.info_request_reason
   // Edit / delete only while the ticket is genuinely fresh-open — once the RM has
@@ -109,6 +114,23 @@ export default async function StoreTicketDetailPage({ params }: { params: { id: 
 
         <EditedLine at={t.edited_at} by={editorName} />
       </Card>
+
+      {/* Scheduled supplier visit — who is coming on site and when */}
+      {showVisit && t.scheduled_at && (
+        <Card className="p-5">
+          <div className="flex items-start gap-3">
+            <span className="grid place-items-center w-10 h-10 rounded-xl bg-indigo-500/10 ring-1 ring-indigo-500/30 shrink-0">
+              <CalendarClock size={20} className="text-indigo-600 dark:text-indigo-400" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[11px] uppercase tracking-wide font-semibold text-indigo-700 dark:text-indigo-400">Scheduled visit{t.schedule_status === 'proposed' ? ' · proposed' : ''}</p>
+              <p className="text-base font-bold text-[var(--text)]">{formatDateTime(t.scheduled_at)}</p>
+              <p className="text-sm text-[var(--text-muted)]">{visitSupplier ?? 'Assigned supplier'}{visitTech ? ` · ${visitTech}` : ''}</p>
+              {t.schedule_status === 'proposed' && <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-0.5">Awaiting the regional manager&apos;s confirmation.</p>}
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* More info requested by the RM — show the message + an add-info / resubmit form */}
       {t.status === 'info_requested' && (

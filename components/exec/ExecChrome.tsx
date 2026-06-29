@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Globe2, Map as MapIcon, Store, Truck, Gavel, Bell, Settings, LogOut, FileBarChart, LayoutDashboard, Ticket, ClipboardCheck, AlertTriangle, ReceiptText, BarChart2, Users } from 'lucide-react'
+import { Globe2, Map as MapIcon, Store, Truck, Gavel, Bell, Settings, LogOut, FileBarChart, LayoutDashboard, Ticket, ClipboardCheck, AlertTriangle, ReceiptText, BarChart2, Users, CalendarClock } from 'lucide-react'
 import { MotivLogo } from '@/components/ui/MotivLogo'
 import { SwipeNav } from '@/components/ui/SwipeNav'
 
@@ -27,6 +27,7 @@ const REGIONAL_TABS: ChromeTab[] = [
 const STORE_TABS: ChromeTab[] = [
   { href: '/client',         label: 'Dashboard', icon: LayoutDashboard },
   { href: '/client/tickets', label: 'Tickets',   icon: Ticket },
+  { href: '/client/visits',  label: 'Visits',    icon: CalendarClock },
 ]
 const SUPPLIER_TABS: ChromeTab[] = [
   { href: '/supplier',         label: 'Dashboard',   icon: LayoutDashboard },

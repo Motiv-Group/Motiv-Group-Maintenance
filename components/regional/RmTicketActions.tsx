@@ -308,6 +308,26 @@ export function ApproveSignoffCard({ ticketId }: { ticketId: string }) {
   )
 }
 
+// ── Accept a supplier's proposed (beyond-window) visit time ─────
+export function AcceptScheduleCard({ ticketId, scheduledAt }: { ticketId: string; scheduledAt: string }) {
+  const router = useRouter()
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  async function accept() {
+    setBusy(true); setErr('')
+    try { await post(`/api/tickets/${ticketId}/transition`, { action: 'accept_schedule' }); router.refresh() }
+    catch (e: any) { setErr(e.message); setBusy(false) }
+  }
+  return (
+    <div className="rounded-xl ring-1 ring-indigo-500/40 bg-indigo-500/5 p-4 space-y-2">
+      <p className="text-sm font-semibold text-[var(--text)]">Proposed visit time</p>
+      <p className="text-sm text-[var(--text-muted)]">The supplier proposed <span className="font-semibold text-[var(--text)]">{formatDateTime(scheduledAt)}</span>, which is past the SLA window. Accept it so meeting it won&apos;t count as a breach, or leave it for the supplier to re-schedule.</p>
+      {err && <p className="text-xs text-red-500">{err}</p>}
+      <button onClick={accept} disabled={busy} className="w-full py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Accepting…' : 'Accept proposed time'}</button>
+    </div>
+  )
+}
+
 // ── Cancel ticket (with reason) ─────────────────────────────────
 const CANCEL_REASONS = ['Duplicate ticket', 'Issue resolved itself', 'Not a maintenance issue', 'Store closed', 'Logged in error', 'Other']
 export function CancelTicketCard({ ticketId }: { ticketId: string }) {

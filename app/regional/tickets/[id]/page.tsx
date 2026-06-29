@@ -14,7 +14,7 @@ import { BreachReason } from '@/components/workflow/BreachReason'
 import { Card } from '@/components/exec/ui'
 import { WorkflowActions } from '@/components/workflow/WorkflowActions'
 import { RmPipeline } from '@/components/regional/RmPipeline'
-import { AssignSuppliersButton, RequestInfoButton, RmEditTicketForm, SupplierStatusList, QuoteReviewCard, CancelTicketCard, ApproveSignoffCard, ReQuoteButton } from '@/components/regional/RmTicketActions'
+import { AssignSuppliersButton, RequestInfoButton, RmEditTicketForm, SupplierStatusList, QuoteReviewCard, CancelTicketCard, ApproveSignoffCard, ReQuoteButton, AcceptScheduleCard } from '@/components/regional/RmTicketActions'
 import { DueDate } from '@/components/workflow/DueDate'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { EditedLine } from '@/components/ui/EditedLine'
@@ -168,8 +168,9 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
           <div className="flex items-center gap-2.5 rounded-xl bg-indigo-500/10 ring-1 ring-indigo-500/30 px-3.5 py-3">
             <Calendar size={18} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
             <div className="min-w-0">
-              <p className="text-[11px] uppercase tracking-wide font-semibold text-indigo-700 dark:text-indigo-400">Scheduled</p>
+              <p className="text-[11px] uppercase tracking-wide font-semibold text-indigo-700 dark:text-indigo-400">Scheduled{t.schedule_status === 'proposed' ? ' · proposed' : ''}</p>
               <p className="text-sm font-bold text-[var(--text)]">{formatDateTime(t.scheduled_at)}</p>
+              {t.schedule_status === 'proposed' && <p className="text-[11px] text-amber-600 dark:text-amber-400">Past the SLA window — awaiting your acceptance.</p>}
             </div>
           </div>
         )}
@@ -282,11 +283,14 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         {/* Accept sign-off with a required supplier rating */}
         {t.status === 'submitted_for_signoff' && <ApproveSignoffCard ticketId={t.id} />}
 
+        {/* Accept a supplier's proposed (beyond-window) visit time */}
+        {t.status === 'scheduled' && t.schedule_status === 'proposed' && t.scheduled_at && <AcceptScheduleCard ticketId={t.id} scheduledAt={t.scheduled_at} />}
+
         {/* Remaining lifecycle actions (request evidence, snag, variation, close) */}
         <WorkflowActions
           ticketId={t.id} status={t.status} role="regional_manager"
           suppliers={supplierList}
-          exclude={['validate', 'reject', 'request_info', 'request_quote', 'require_assessment', 'approve_quote', 'reject_quote', 'request_revision', 'proceed_no_quote', 'schedule', 'approve', 'assign_snag']}
+          exclude={['validate', 'reject', 'request_info', 'request_quote', 'require_assessment', 'approve_quote', 'reject_quote', 'request_revision', 'proceed_no_quote', 'schedule', 'approve', 'assign_snag', 'accept_schedule']}
         />
       </Card>
 
