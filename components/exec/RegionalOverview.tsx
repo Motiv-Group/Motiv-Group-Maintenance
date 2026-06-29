@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Building2, ClipboardList, ShieldAlert, Truck, Lock, ClipboardCheck, AlertTriangle, ListTodo, Sparkles, Calendar, Banknote } from 'lucide-react'
+import { Building2, ClipboardList, ShieldAlert, Truck, Lock, ClipboardCheck, AlertTriangle, ListTodo, Sparkles, Calendar, Banknote, Clock, ReceiptText } from 'lucide-react'
 import type { RegionalDashboardData } from '@/lib/health/data'
 import { SectionCard, KpiCard, Pill, Donut, Card, DistributionBar, RagBlocks, STATUS_TEXT, type Kpi } from '@/components/exec/ui'
 import { RegionalRecentTickets } from '@/components/regional/RegionalRecentTickets'
@@ -17,11 +17,18 @@ export function RegionalOverview({ data, name, briefing, briefingScopeId }: { da
   const p = data.portfolio
   const greeting = (() => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening' })()
 
+  // Quotes submitted and waiting on the RM's approve/decline decision.
+  const quotesAwaiting = data.tickets.filter(t => t.status === 'quoted').length
+
   // Every KPI carries a hint so all cards share the same height → uniform size.
+  // Tickets Overdue sits beside Stores Need Attention; Quotes Awaiting Approval
+  // beside Open Tickets. Both deep-link into the Tickets tab with the filter set.
   const kpis: Kpi[] = [
     { label: 'Active Stores', value: p.activeStores, hint: `avg ${p.averageStoreHealth}%`, icon: <Building2 size={13} />, tone: 'info', href: '/regional/stores' },
     { label: 'Stores Need Attention', value: data.attentionStores.length, hint: 'need action', icon: <ShieldAlert size={13} />, tone: data.attentionStores.length ? 'warn' : 'good', href: '/regional/stores' },
-    { label: 'Open Tickets', value: p.openTickets, hint: `${p.overdueTickets} overdue`, icon: <ClipboardList size={13} />, tone: 'orange', border: '!ring-orange-500/60', href: '/regional/tickets' },
+    { label: 'Tickets Overdue', value: p.overdueTickets, hint: 'past SLA', icon: <Clock size={13} />, tone: p.overdueTickets ? 'bad' : 'good', border: p.overdueTickets ? '!ring-red-500/60' : undefined, href: '/regional/tickets?filter=overdue' },
+    { label: 'Open Tickets', value: p.openTickets, hint: 'in progress', icon: <ClipboardList size={13} />, tone: 'orange', border: '!ring-orange-500/60', href: '/regional/tickets' },
+    { label: 'Quotes Awaiting Approval', value: quotesAwaiting, hint: 'to review', icon: <ReceiptText size={13} />, tone: quotesAwaiting ? 'warn' : 'good', border: quotesAwaiting ? '!ring-amber-500/60' : undefined, href: '/regional/tickets?filter=quoted' },
     { label: 'Pending Signoffs', value: data.signoffsPending, hint: 'awaiting you', icon: <ClipboardCheck size={13} />, tone: data.signoffsPending ? 'warn' : 'good', border: data.signoffsPending ? '!ring-amber-500/60' : '!ring-emerald-500/60', href: '/regional/signoff' },
     { label: 'Open Snags', value: data.snagsOpen, hint: 'to resolve', icon: <AlertTriangle size={13} />, tone: data.snagsOpen ? 'warn' : 'good', href: '/regional/snag' },
     { label: 'Internal Breaches', value: p.internalSlaBreaches, hint: 'internal SLA', icon: <Lock size={13} />, tone: p.internalSlaBreaches ? 'bad' : 'good', href: '/regional/tickets' },
@@ -66,7 +73,7 @@ export function RegionalOverview({ data, name, briefing, briefingScopeId }: { da
         </div>
       </Card>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3">
         {kpis.map((k, i) => <KpiCard key={i} kpi={k} />)}
         <QuoteValueCard accepted={data.quoteTotals.accepted} pending={data.quoteTotals.pending} />
       </div>
@@ -122,24 +129,23 @@ export function RegionalOverview({ data, name, briefing, briefingScopeId }: { da
   )
 }
 
-/** Combined quote-value KPI: accepted + pending totals, full to the cent. */
+/** Combined quote-value KPI: accepted + pending totals, full to the cent.
+ *  Read-only (not clickable) — it's a summary metric, not a navigation target. */
 function QuoteValueCard({ accepted, pending }: { accepted: number; pending: number }) {
   return (
-    <Link href="/regional/tickets" className="block rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C6A35D]/50">
-      <Card className="p-4 flex flex-col gap-1.5 min-w-0 h-full transition hover:ring-[#C6A35D]/50 hover:-translate-y-0.5 cursor-pointer">
-        <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--text-muted)]"><Banknote size={13} /> Quote Value</div>
-        <div className="space-y-1 mt-0.5">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] text-emerald-600 dark:text-emerald-400">Accepted</span>
-            <span className="text-sm font-bold text-[var(--text)] tabular-nums">{formatCurrency(accepted)}</span>
-          </div>
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] text-amber-600 dark:text-amber-500">Pending</span>
-            <span className="text-sm font-bold text-[var(--text)] tabular-nums">{formatCurrency(pending)}</span>
-          </div>
+    <Card className="p-4 flex flex-col gap-1.5 min-w-0 h-full">
+      <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--text-muted)]"><Banknote size={13} /> Quote Value</div>
+      <div className="space-y-1 mt-0.5">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[11px] text-emerald-600 dark:text-emerald-400">Accepted</span>
+          <span className="text-sm font-bold text-[var(--text)] tabular-nums">{formatCurrency(accepted)}</span>
         </div>
-      </Card>
-    </Link>
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[11px] text-amber-600 dark:text-amber-500">Pending</span>
+          <span className="text-sm font-bold text-[var(--text)] tabular-nums">{formatCurrency(pending)}</span>
+        </div>
+      </div>
+    </Card>
   )
 }
 

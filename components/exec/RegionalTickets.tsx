@@ -34,18 +34,18 @@ const byDateThenUrgency = (a: RegionalTicketRow, b: RegionalTicketRow) =>
   (+new Date(b.createdAt) - +new Date(a.createdAt)) || (urgency(a.priority) - urgency(b.priority))
 
 // No "All" pill: a null filter means all tickets, and clicking an active pill
-// deselects back to that default. SLA Breached + Re-open sit just before Cancelled.
-type RmFilter = 'breached' | 'reopened' | Bucket
+// deselects back to that default. SLA Breached + Overdue + Re-open sit before Cancelled.
+type RmFilter = 'breached' | 'reopened' | 'overdue' | Bucket
 const PILLS: { key: RmFilter; label: string; active: string; inactive: string }[] = [
   { key: 'open', label: 'Open', active: 'bg-blue-500 text-white border-blue-500', inactive: 'text-blue-600 dark:text-blue-400 border-blue-500/40 hover:border-blue-400' },
   { key: 'quote_requested', label: 'Quote requested', active: 'bg-cyan-500 text-white border-cyan-500', inactive: 'text-cyan-600 dark:text-cyan-400 border-cyan-500/40 hover:border-cyan-400' },
   { key: 'quoted', label: 'Quoted', active: 'bg-violet-500 text-white border-violet-500', inactive: 'text-violet-600 dark:text-violet-400 border-violet-500/40 hover:border-violet-400' },
   { key: 'approved', label: 'Approved', active: 'bg-teal-500 text-white border-teal-500', inactive: 'text-teal-600 dark:text-teal-400 border-teal-500/40 hover:border-teal-400' },
-  { key: 'scheduled', label: 'Job scheduled', active: 'bg-indigo-500 text-white border-indigo-500', inactive: 'text-indigo-600 dark:text-indigo-400 border-indigo-500/40 hover:border-indigo-400' },
   { key: 'in_progress', label: 'In progress', active: 'bg-[#C6A35D] text-[#0a0e17] border-[#C6A35D]', inactive: 'text-amber-600 dark:text-[#C6A35D] border-[#C6A35D]/40 hover:border-[#C6A35D]' },
   { key: 'awaiting_signoff', label: 'Sign-off', active: 'bg-orange-500 text-white border-orange-500', inactive: 'text-orange-600 dark:text-orange-400 border-orange-500/40 hover:border-orange-400' },
   { key: 'completed', label: 'Completed', active: 'bg-emerald-500 text-white border-emerald-500', inactive: 'text-emerald-600 dark:text-emerald-400 border-emerald-500/40 hover:border-emerald-400' },
   { key: 'breached', label: 'SLA Breached', active: 'bg-red-600 text-white border-red-600', inactive: 'text-red-600 dark:text-red-400 border-red-500/50 hover:border-red-500' },
+  { key: 'overdue', label: 'Overdue', active: 'bg-red-500 text-white border-red-500', inactive: 'text-red-600 dark:text-red-400 border-red-500/40 hover:border-red-400' },
   { key: 'reopened', label: 'Re-open', active: 'bg-amber-500 text-white border-amber-500', inactive: 'text-amber-600 dark:text-amber-400 border-amber-500/40 hover:border-amber-400' },
   { key: 'cancelled', label: 'Cancelled', active: 'bg-red-500 text-white border-red-500', inactive: 'text-red-600 dark:text-red-400 border-red-500/40 hover:border-red-400' },
 ]
@@ -84,10 +84,14 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [panelStore, setPanelStore] = useState<string | null>(null)
 
-  // Open a store's panel directly when linked from the Stores tab (?store=Name).
+  // Open a store's panel directly when linked from the Stores tab (?store=Name),
+  // or apply a filter deep-linked from a dashboard KPI (?filter=overdue|quoted…).
   useEffect(() => {
-    const s = new URLSearchParams(window.location.search).get('store')
+    const params = new URLSearchParams(window.location.search)
+    const s = params.get('store')
     if (s) setPanelStore(s)
+    const f = params.get('filter')
+    if (f && PILLS.some(p => p.key === f)) setFilter(f as RmFilter)
   }, [])
 
   const counts = useMemo(() => {
@@ -98,12 +102,14 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
   const barTotal = BAR_ORDER.reduce((s, b) => s + counts[b], 0) || 1
   const breachedCount = useMemo(() => tickets.filter(t => t.breached).length, [tickets])
   const reopenedCount = useMemo(() => tickets.filter(t => t.reopened).length, [tickets])
+  const overdueCount = useMemo(() => tickets.filter(t => t.overdue).length, [tickets])
 
   const shown = useMemo(() => {
     const terms = q.toLowerCase().split(/\s+/).filter(Boolean)
     return tickets.filter(t => {
       if (filter === 'breached') { if (!t.breached) return false }
       else if (filter === 'reopened') { if (!t.reopened) return false }
+      else if (filter === 'overdue') { if (!t.overdue) return false }
       else if (filter !== null && bucketOf(t.status) !== filter) return false
       if (!terms.length) return true
       const hay = `${t.title} ${t.storeName} ${t.branchCode ?? ''} ${t.jobRef ?? ''} ${rmStatusMeta(t.status).label}`.toLowerCase()
@@ -148,7 +154,7 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
       {/* Filter pills — above the search. Click an active pill to deselect (= all). */}
       <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
         {PILLS.map(p => {
-          const n = p.key === 'breached' ? breachedCount : p.key === 'reopened' ? reopenedCount : counts[p.key]
+          const n = p.key === 'breached' ? breachedCount : p.key === 'reopened' ? reopenedCount : p.key === 'overdue' ? overdueCount : counts[p.key as Bucket]
           const on = filter === p.key
           return (
             <button key={p.key} onClick={() => setFilter(f => f === p.key ? null : p.key)} aria-pressed={on} className={`px-3 py-1.5 rounded-full text-xs font-medium border transition text-center ${on ? p.active : p.inactive}`}>

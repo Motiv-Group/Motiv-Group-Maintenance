@@ -1,37 +1,52 @@
-'use client'
-
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { Check } from 'lucide-react'
+import Link from 'next/link'
+import { Building2 } from 'lucide-react'
 import { Card } from '@/components/exec/ui'
+import { PriorityBadge } from '@/components/ui/PriorityBadge'
+import { formatDateTime } from '@/lib/utils'
 
-export interface SnagRow { id: string; ticketId: string; ticketTitle: string; storeName: string; description: string; severity: string; createdAt: string }
+export interface SnagRow { id: string; ticketId: string; ticketTitle: string; priority: string; storeName: string; description: string; severity: string; status: string; createdAt: string }
+
+// Snag status pill — open (red) is unaddressed, accepted/in-progress are amber.
+const STATUS_META: Record<string, { label: string; cls: string }> = {
+  open:        { label: 'Open',        cls: 'bg-red-500/15 text-red-700 dark:text-red-400' },
+  assigned:    { label: 'Accepted',    cls: 'bg-amber-500/15 text-amber-700 dark:text-amber-400' },
+  in_progress: { label: 'In progress', cls: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D]' },
+}
 
 export function RegionalSnagList({ rows }: { rows: SnagRow[] }) {
-  const router = useRouter()
-  const [busy, setBusy] = useState<string | null>(null)
-  const [err, setErr] = useState('')
-
-  async function resolve(r: SnagRow) {
-    setBusy(r.id); setErr('')
-    try {
-      const res = await fetch('/api/regional/ticket-action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'resolve_snag', ticketId: r.ticketId, snagId: r.id }) })
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed')
-      router.refresh()
-    } catch (e: any) { setErr(e.message) } finally { setBusy(null) }
-  }
-
   if (!rows.length) return <Card className="p-8 text-center"><p className="text-sm text-[var(--text-faint)]">No open snags.</p></Card>
+
+  // Group by store, newest snag first within each store.
+  const byStore = new Map<string, SnagRow[]>()
+  for (const r of rows) { const a = byStore.get(r.storeName) ?? []; a.push(r); byStore.set(r.storeName, a) }
+  const groups = [...byStore.entries()].sort((a, b) => a[0].localeCompare(b[0]))
+  for (const [, items] of groups) items.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
+
   return (
-    <div className="space-y-3">
-      {err && <div className="text-sm text-red-400 bg-red-500/10 rounded-lg px-3 py-2">{err}</div>}
-      {rows.map(r => (
-        <Card key={r.id} className="p-4 flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-sm text-[var(--text)] truncate">{r.description}</p>
-            <p className="text-[11px] text-[var(--text-faint)]">{r.storeName} · {r.ticketTitle} · <span className="capitalize">{r.severity}</span></p>
+    <div className="space-y-4">
+      {groups.map(([store, items]) => (
+        <Card key={store} className="p-4 space-y-1">
+          <div className="flex items-center gap-2 mb-1">
+            <Building2 size={15} className="text-[#C6A35D] shrink-0" />
+            <span className="text-sm font-bold text-[var(--text)] truncate">{store}</span>
+            <span className="text-[11px] font-medium text-[var(--text-muted)] bg-black/5 dark:bg-white/10 rounded-full px-2 py-0.5 shrink-0">{items.length}</span>
           </div>
-          <button onClick={() => resolve(r)} disabled={busy === r.id} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 text-white text-sm font-medium disabled:opacity-50 shrink-0"><Check size={15} /> Resolve</button>
+          {items.map(r => {
+            const sm = STATUS_META[r.status] ?? STATUS_META.open
+            return (
+              <Link key={r.id} href={`/regional/tickets/${r.ticketId}`} className="flex items-center justify-between gap-3 py-2.5 -mx-2 px-2 rounded-lg border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-[var(--text)] truncate">{r.ticketTitle}</p>
+                  <p className="text-[11px] text-[var(--text-muted)] truncate">{r.description}</p>
+                  <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(r.createdAt)}</p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_6rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
+                  <PriorityBadge priority={r.priority} className="w-full text-center" />
+                  <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${sm.cls}`}>{sm.label}</span>
+                </div>
+              </Link>
+            )
+          })}
         </Card>
       ))}
     </div>
