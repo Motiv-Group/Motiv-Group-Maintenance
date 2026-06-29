@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
-import { Truck, ClipboardList, Clock, ReceiptText, ClipboardCheck, AlertTriangle, Timer, Star, Sparkles, ChevronDown, ChevronUp } from 'lucide-react'
+import { Truck, ClipboardList, Clock, ReceiptText, ClipboardCheck, AlertTriangle, Timer, Star, Sparkles, ChevronDown, ChevronUp, Camera } from 'lucide-react'
 import { requireSupplierV3 } from '@/lib/health/guard'
 import { assembleSupplierDashboard, type SupplierTicketRow } from '@/lib/health/data'
 import { Card, SectionCard, KpiRow, Donut, Pill, type Kpi } from '@/components/exec/ui'
@@ -16,6 +16,16 @@ import { formatCurrency, formatDateTime, humanizeDuration, rmStatusMeta } from '
 const QUOTE_REQUESTED_STATUSES = new Set(['open', 'info_requested', 'assigned', 'assessment', 'quote_requested', 'quote_revision'])
 
 const QUOTE_TONE: Record<string, string> = { pending: 'text-[#C6A35D]', accepted: 'text-emerald-600 dark:text-emerald-400', declined: 'text-red-600 dark:text-red-400' }
+
+// Stages where the supplier still owes completion evidence (COC + POC), with the
+// nudge shown in the "Evidence to Upload" block. Mirrors where SubmitCompletionForm
+// appears on the supplier ticket page.
+const EVIDENCE_STAGE: Record<string, string> = {
+  in_progress: 'Submit COC & POC',
+  evidence_requested: 'More evidence requested',
+  snag_in_progress: 'Re-upload COC & POC (snag fix)',
+  snag_resolved: 'Re-upload COC & POC',
+}
 
 // One date matching the ticket's current stage: approved → requested → assigned.
 function milestone(t: SupplierTicketRow): { label: string; at: string } | null {
@@ -80,6 +90,8 @@ export default async function SupplierOverviewPage() {
   // Tickets where this supplier was declined (and not re-invited) are out of their
   // active work — kept off the dashboard blocks (they live under the Declined filter).
   const needsAction = d.tickets.filter(t => !t.declinedForMe && t.active && (t.slaLabel === 'Breached' || t.slaLabel === 'At risk' || !t.acknowledged)).slice(0, 6)
+  // Jobs that still need COC & POC uploaded — by stage (work done / evidence asked / snag fix).
+  const evidenceTodo = d.tickets.filter(t => !t.declinedForMe && t.active && EVIDENCE_STAGE[t.status]).slice(0, 6)
   const recentTickets = [...d.tickets].filter(t => !t.declinedForMe && t.status !== 'completed').sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)).slice(0, 8)
   // Recent quotes exclude completed tickets; pending sign-off shows only jobs still awaiting a decision.
   const recentQuotes = d.quotes.filter(q => q.ticketStatus !== 'completed').slice(0, 5)
@@ -153,8 +165,21 @@ export default async function SupplierOverviewPage() {
         </SectionCard>
       </div>
 
-      {/* Row 2: Pending sign-off */}
-      <div>
+      {/* Row 2: Evidence to upload · Pending sign-off */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <SectionCard title="Evidence to Upload" icon={<Camera size={15} className="text-sky-600 dark:text-sky-400" />} action={<Link href="/supplier/tickets?filter=evidence" className="text-xs text-[#C6A35D] hover:underline">All</Link>}>
+          {evidenceTodo.map(t => (
+            <Link key={t.id} href={`/supplier/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] -mx-2 px-2 rounded">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-[var(--text)] truncate">{[company, t.storeName].filter(Boolean).join(' · ')}</p>
+                <p className="text-[11px] text-[var(--text-muted)] truncate">{t.title}</p>
+                <p className="text-[11px] text-[var(--text-faint)]">Logged {formatDateTime(t.createdAt)}</p>
+              </div>
+              <span className="text-[11px] font-medium text-amber-600 dark:text-amber-500 shrink-0 text-right max-w-[7.5rem]">{EVIDENCE_STAGE[t.status]}</span>
+            </Link>
+          ))}
+          {!evidenceTodo.length && <p className="text-sm text-[var(--text-faint)]">No evidence outstanding.</p>}
+        </SectionCard>
         <SectionCard title="Pending Sign-off" icon={<ClipboardCheck size={15} className="text-emerald-600 dark:text-emerald-400" />} action={<Link href="/supplier/signoff" className="text-xs text-[#C6A35D] hover:underline">All</Link>}>
           {pendingSignoffs.map(s => (
             <Link key={s.id} href={`/supplier/tickets/${s.ticketId}`} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] -mx-2 px-2 rounded">

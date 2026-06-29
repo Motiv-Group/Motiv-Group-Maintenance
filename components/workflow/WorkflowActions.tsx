@@ -31,6 +31,9 @@ const REASON_PRESETS: Record<string, string[]> = {
 const REASON_KEY: Record<string, string> = { raise_snag: 'description', request_info: 'reason', request_evidence: 'reason' }
 
 function tone(action: string): string {
+  // Accepting a snag is a positive "I'll take it" action → green (like submit/confirm).
+  if (/^accept_snag/.test(action))
+    return 'bg-green-600 text-white hover:bg-green-500'
   if (/^(approve|close_out|proceed|approve_quote|approve_variation|start_work|schedule)/.test(action))
     return 'bg-[#C6A35D] text-[#0a0e17] hover:brightness-95'
   if (/^request_evidence/.test(action))
