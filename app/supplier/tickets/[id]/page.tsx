@@ -22,6 +22,7 @@ import { ScheduleJobCard, RaiseVariationCard } from '@/components/supplier/Suppl
 import { DueDate } from '@/components/workflow/DueDate'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { EditedLine } from '@/components/ui/EditedLine'
+import { AuditTrail } from '@/components/ui/AuditTrail'
 import { formatDateTime, rmStatusMeta, storeLabel, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
 
 // Shown when the RM declined a quote without typing a reason.
@@ -245,12 +246,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
         <SupplierAttachments ticketId={t.id} />
       </Card>
 
-      <Card className="p-5">
-        <h2 className="text-sm font-bold text-[var(--text)] mb-3">Updates</h2>
-        {(updates ?? []).length ? (updates ?? []).map((u: any, i: number) => (
-          <div key={i} className="py-2 border-b border-[var(--border)] last:border-0"><p className="text-sm text-[var(--text)]">{u.body}</p><p className="text-[11px] text-[var(--text-faint)]">{u.author_role} · {formatDateTime(u.created_at)}</p></div>
-        )) : <p className="text-sm text-[var(--text-faint)]">No updates yet.</p>}
-      </Card>
+      <AuditTrail updates={(updates ?? []) as any[]} />
     </div>
   )
 }

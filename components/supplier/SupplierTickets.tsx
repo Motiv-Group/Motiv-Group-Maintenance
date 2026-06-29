@@ -91,7 +91,8 @@ function TicketRow({ t, company, showStore }: { t: SupplierTicketRow; company?: 
 export function SupplierTickets({ tickets, quotes, company }: { tickets: SupplierTicketRow[]; quotes: SupplierQuoteRow[]; company: string }) {
   const [q, setQ] = useState('')
   const [filter, setFilter] = useState<FilterKey>('all')
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  // Store groups start collapsed; the set tracks which the user has expanded.
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [panelStore, setPanelStore] = useState<string | null>(null)
 
   useEffect(() => {
@@ -137,7 +138,7 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
   const liveShown = useMemo(() => (filter === 'all' ? shown.filter(t => !t.breached && bucketOf(t.status) !== 'completed') : shown).slice().sort(byDateThenUrgency), [shown, filter])
   const archived = useMemo(() => (filter === 'all' ? shown.filter(t => bucketOf(t.status) === 'completed') : []).slice().sort(byDateThenUrgency), [shown, filter])
   const [archiveOpen, setArchiveOpen] = useState(false)
-  const [breachedOpen, setBreachedOpen] = useState(true)
+  const [breachedOpen, setBreachedOpen] = useState(false)
 
   const groups = useMemo(() => {
     const m = new Map<string, { branchCode: string | null; rows: SupplierTicketRow[] }>()
@@ -145,7 +146,7 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
     return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]))
   }, [liveShown])
 
-  const toggle = (s: string) => setCollapsed(c => { const n = new Set(c); n.has(s) ? n.delete(s) : n.add(s); return n })
+  const toggle = (s: string) => setExpanded(c => { const n = new Set(c); n.has(s) ? n.delete(s) : n.add(s); return n })
   const panelRows = useMemo(() => panelStore ? tickets.filter(t => t.storeName === panelStore) : [], [tickets, panelStore])
   const panelQuotes = useMemo(() => panelStore ? quotes.filter(qq => qq.storeName === panelStore) : [], [quotes, panelStore])
 
@@ -197,7 +198,7 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
 
       {/* Store groups */}
       {groups.map(([store, g]) => {
-        const isCollapsed = collapsed.has(store)
+        const isCollapsed = !expanded.has(store)
         return (
           <Card key={store} className="p-3">
             <div className="flex items-center justify-between gap-2 mb-1">

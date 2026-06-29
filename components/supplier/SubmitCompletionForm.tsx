@@ -12,7 +12,7 @@ import { createClient } from '@/lib/supabase/client'
 const MAX_PHOTOS = 10
 const MIN_PHOTOS = 2
 const COC_MAX_MB = 20
-const COC_ACCEPT = '.pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+const COC_ACCEPT = '.pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/*,.png,.jpg,.jpeg,.webp,.heic'
 
 async function uploadTo(bucket: string, ticketId: string, file: File): Promise<string> {
   const supabase = createClient()
@@ -74,7 +74,7 @@ export function SubmitCompletionForm({ ticketId }: { ticketId: string }) {
 
       {/* COC (optional) */}
       <div>
-        <label className="block text-sm font-bold text-[var(--text)] mb-1.5">Certificate of Completion (COC) <span className="text-red-500">*</span> <span className="font-normal text-[var(--text-muted)]">(PDF or Word)</span></label>
+        <label className="block text-sm font-bold text-[var(--text)] mb-1.5">Certificate of Completion (COC) <span className="text-red-500">*</span> <span className="font-normal text-[var(--text-muted)]">(PDF, Word or photo)</span></label>
         {coc ? (
           <div className="flex items-center gap-3 p-3 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)]">
             <FileText size={18} className="text-[#C6A35D] shrink-0" />
@@ -86,7 +86,7 @@ export function SubmitCompletionForm({ ticketId }: { ticketId: string }) {
           <label onDragOver={e => { e.preventDefault(); setDragCoc(true) }} onDragLeave={() => setDragCoc(false)} onDrop={e => { e.preventDefault(); setDragCoc(false); pickCoc(e.dataTransfer.files?.[0]) }}
             className={`flex flex-col items-center justify-center gap-1.5 py-8 rounded-xl border-2 border-dashed cursor-pointer transition ${dragCoc ? 'border-[#C6A35D] bg-[#C6A35D]/5' : 'border-[var(--border)] hover:border-[#C6A35D]/50'}`}>
             <UploadCloud size={26} className="text-[var(--text-faint)]" />
-            <span className="text-sm text-[var(--text-muted)]">PDF or Word up to {COC_MAX_MB} MB</span>
+            <span className="text-sm text-[var(--text-muted)]">PDF, Word or photo up to {COC_MAX_MB} MB</span>
             <input type="file" accept={COC_ACCEPT} className="hidden" onChange={e => pickCoc(e.target.files?.[0])} />
           </label>
         )}

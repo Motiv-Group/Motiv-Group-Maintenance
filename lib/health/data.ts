@@ -626,10 +626,12 @@ export async function assembleSupplierDashboard(companyId: string, supplierIds: 
   const rows: SupplierTicketRow[] = []
   for (const t of tickets) {
     const active = isActive(t.status)
-    // This supplier was declined/closed off the ticket (not awarded) — out of their active work.
-    const declinedForMe = !ownedIds.has(t.id) && ['declined', 'closed'].includes(myInviteStatus.get(t.id) ?? '')
-    const sla = computeTicketSla(t, rules(t.priority), now)
     const raw: any = rawById.get(t.id) ?? {}
+    // Out of this supplier's active work if they were declined/closed off the ticket,
+    // OR the ticket has been awarded to a *different* supplier.
+    const awardedToOther = !!raw.supplier_id && !ownedIds.has(t.id)
+    const declinedForMe = !ownedIds.has(t.id) && (['declined', 'closed'].includes(myInviteStatus.get(t.id) ?? '') || awardedToOther)
+    const sla = computeTicketSla(t, rules(t.priority), now)
     if (active && !declinedForMe) {
       open++
       if (sla.supplierBreached) overdue++

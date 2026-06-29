@@ -3,56 +3,65 @@ export const dynamic = 'force-dynamic'
 import Link from 'next/link'
 import { ReceiptText, Building2, ChevronDown, ChevronUp } from 'lucide-react'
 import { requireSupplierV3 } from '@/lib/health/guard'
-import { assembleSupplierDashboard, type SupplierQuoteRow } from '@/lib/health/data'
+import { assembleSupplierDashboard } from '@/lib/health/data'
 import { formatCurrency, formatDateTime } from '@/lib/utils'
 
-const TONE: Record<string, string> = { pending: 'text-[#C6A35D]', accepted: 'text-emerald-600 dark:text-emerald-400', declined: 'text-red-600 dark:text-red-400', revision_requested: 'text-blue-600 dark:text-blue-400' }
-const QUOTE_STATUS_LABEL: Record<string, string> = { pending: 'Pending', accepted: 'Approved', declined: 'Declined', revision_requested: 'Revision requested' }
-const NEUTRAL = { active: 'bg-slate-800 text-white border-slate-800 dark:bg-white dark:text-[#0a0e17] dark:border-white', inactive: 'text-[var(--text-muted)] border-[var(--border)] hover:border-slate-400' }
+// Pill (badge) classes per quote state — incl. the synthetic "requested".
+const STATUS_BADGE: Record<string, string> = {
+  requested: 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-400',
+  pending: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D]',
+  accepted: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
+  declined: 'bg-red-500/15 text-red-700 dark:text-red-400',
+  revision_requested: 'bg-blue-500/15 text-blue-700 dark:text-blue-400',
+}
+const STATUS_LABEL: Record<string, string> = { requested: 'Quote requested', pending: 'Pending', accepted: 'Approved', declined: 'Declined', revision_requested: 'Revision requested' }
+
 const FILTERS: { key: string; label: string; active: string; inactive: string }[] = [
-  { key: 'all', label: 'All', ...NEUTRAL },
+  { key: 'all', label: 'All', active: 'bg-slate-800 text-white border-slate-800 dark:bg-white dark:text-[#0a0e17] dark:border-white', inactive: 'text-[var(--text-muted)] border-[var(--border)] hover:border-slate-400' },
+  { key: 'requested', label: 'Quote requested', active: 'bg-cyan-500 text-white border-cyan-500', inactive: 'text-cyan-600 dark:text-cyan-400 border-cyan-500/40 hover:border-cyan-400' },
   { key: 'pending', label: 'Pending', active: 'bg-[#C6A35D] text-[#0a0e17] border-[#C6A35D]', inactive: 'text-amber-600 dark:text-[#C6A35D] border-[#C6A35D]/40 hover:border-[#C6A35D]' },
   { key: 'accepted', label: 'Approved', active: 'bg-emerald-500 text-white border-emerald-500', inactive: 'text-emerald-600 dark:text-emerald-400 border-emerald-500/40 hover:border-emerald-400' },
   { key: 'declined', label: 'Declined', active: 'bg-red-500 text-white border-red-500', inactive: 'text-red-600 dark:text-red-400 border-red-500/40 hover:border-red-400' },
 ]
-// Tickets past the quoting/decision/work phase belong in Sign-off / archive, not here.
+// Submitted quotes whose ticket is past the quoting/decision phase belong in Sign-off /
+// archive, not here — EXCEPT declined ones, which the supplier should still see.
 const HIDE_FROM_QUOTES = new Set(['submitted_for_signoff', 'approved_closeout', 'evidence_requested', 'snag', 'snag_assigned', 'snag_in_progress', 'snag_resolved', 'pending_sign_off', 'completed'])
+// Ticket statuses where this supplier still owes a quote.
+const AWAITING_QUOTE = new Set(['assigned', 'assessment', 'quote_requested', 'quote_revision'])
 
-// What the supplier should do next, derived from the ticket's current status.
-function nextStep(ticketStatus: string): string {
-  switch (ticketStatus) {
-    case 'open': case 'info_requested': return 'Awaiting triage'
-    case 'assigned': case 'assessment': case 'quote_requested': case 'quote_revision': return 'Submit quote'
-    case 'quoted': case 'awaiting_decision': case 'variation_review': return 'Awaiting approval'
-    case 'accepted': return 'Schedule the job'
-    case 'scheduled': return 'Start work'
-    case 'in_progress': return 'Complete & submit evidence'
-    case 'evidence_requested': return 'Upload evidence'
-    case 'submitted_for_signoff': case 'approved_closeout': case 'snag_resolved': return 'Awaiting sign-off'
-    case 'snag': case 'snag_assigned': case 'snag_in_progress': return 'Resolve snag'
-    case 'completed': return 'Completed'
-    case 'cancelled': case 'declined': return 'Closed'
-    default: return '—'
-  }
+interface QItem {
+  key: string; ticketId: string; ticketTitle: string; storeName: string; branchCode: string | null
+  createdAt: string; amount: number | null; status: string
 }
 
 export default async function SupplierQuotesPage({ searchParams }: { searchParams?: { status?: string } }) {
   const { companyId, supplierIds } = await requireSupplierV3()
   const d = await assembleSupplierDashboard(companyId, supplierIds)
   const active = FILTERS.some(f => f.key === searchParams?.status) ? searchParams!.status! : 'all'
-  // Drop quotes whose ticket is awaiting sign-off or already completed.
-  const visible = d.quotes.filter(q => !HIDE_FROM_QUOTES.has(q.ticketStatus))
-  const quotesShown = active === 'all' ? visible : visible.filter(q => q.status === active)
 
-  // Group quotes by store (within the supplier's single client company).
-  const byStore = new Map<string, SupplierQuoteRow[]>()
-  for (const q of quotesShown) { const a = byStore.get(q.storeName) ?? []; a.push(q); byStore.set(q.storeName, a) }
+  // Submitted quotes — declined ones always show; others hide once past the decision phase.
+  const quoteItems: QItem[] = d.quotes
+    .filter(q => q.status === 'declined' || !HIDE_FROM_QUOTES.has(q.ticketStatus))
+    .map(q => ({ key: `q-${q.id}`, ticketId: q.ticketId, ticketTitle: q.ticketTitle, storeName: q.storeName, branchCode: q.branchCode, createdAt: q.createdAt, amount: q.amount, status: q.status }))
+
+  // Tickets where the RM requested a quote but this supplier hasn't submitted yet.
+  const quotedTicketIds = new Set(d.quotes.map(q => q.ticketId))
+  const requestedItems: QItem[] = d.tickets
+    .filter(t => !t.declinedForMe && AWAITING_QUOTE.has(t.status) && !quotedTicketIds.has(t.id))
+    .map(t => ({ key: `r-${t.id}`, ticketId: t.id, ticketTitle: t.title, storeName: t.storeName, branchCode: t.branchCode, createdAt: t.quoteRequestedAt ?? t.createdAt, amount: null, status: 'requested' }))
+
+  const all = [...requestedItems, ...quoteItems]
+  const shown = active === 'all' ? all : all.filter(i => i.status === active)
+
+  const byStore = new Map<string, QItem[]>()
+  for (const i of shown) { const a = byStore.get(i.storeName) ?? []; a.push(i); byStore.set(i.storeName, a) }
   const groups = [...byStore.entries()].sort((a, b) => a[0].localeCompare(b[0]))
+  for (const [, items] of groups) items.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
 
   return (
     <div className="space-y-5">
       <div><h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><ReceiptText className="text-amber-600 dark:text-amber-500" size={22} /> Quotes</h1>
-        <p className="text-sm text-[var(--text-muted)] mt-0.5">Quotes you have submitted, grouped by store. Tap a quote to open its ticket. Amounts show whether they include VAT.</p></div>
+        <p className="text-sm text-[var(--text-muted)] mt-0.5">Quote requests and the quotes you have submitted, grouped by store. Tap one to open its ticket. Amounts are excl VAT.</p></div>
 
       {/* Status filter */}
       <div className="flex flex-wrap gap-2">
@@ -67,35 +76,30 @@ export default async function SupplierQuotesPage({ searchParams }: { searchParam
       {!groups.length && (
         <div className="rounded-xl border border-dashed border-[var(--border)] p-12 text-center">
           <ReceiptText size={28} className="mx-auto text-[var(--text-faint)] mb-2" />
-          <p className="text-sm text-[var(--text-faint)]">{visible.length ? 'No quotes match this filter.' : 'No active quotes.'}</p>
+          <p className="text-sm text-[var(--text-faint)]">{all.length ? 'No quotes match this filter.' : 'No active quotes.'}</p>
         </div>
       )}
 
-      {groups.map(([store, quotes]) => (
+      {groups.map(([store, items]) => (
         <details key={store} open className="group rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
           <summary className="flex items-center gap-3 px-4 py-3 cursor-pointer list-none hover:bg-[var(--hover)] transition">
             <Building2 size={16} className="text-[#C6A35D] shrink-0" />
-            <span className="flex-1 min-w-0 text-sm font-bold text-[var(--text)] truncate">{[d.company, store].filter(Boolean).join(' · ')}{quotes[0].branchCode ? ` · ${quotes[0].branchCode}` : ''}</span>
-            <span className="text-[11px] font-semibold text-[var(--text-muted)] bg-black/5 dark:bg-white/10 rounded-full px-2 py-0.5 shrink-0">{quotes.length} quote{quotes.length !== 1 ? 's' : ''}</span>
+            <span className="flex-1 min-w-0 text-sm font-bold text-[var(--text)] truncate">{[d.company, store].filter(Boolean).join(' · ')}{items[0].branchCode ? ` · ${items[0].branchCode}` : ''}</span>
+            <span className="text-[11px] font-semibold text-[var(--text-muted)] bg-black/5 dark:bg-white/10 rounded-full px-2 py-0.5 shrink-0">{items.length} quote{items.length !== 1 ? 's' : ''}</span>
             <ChevronDown size={16} className="text-[var(--text-faint)] shrink-0 group-open:hidden" />
             <ChevronUp size={16} className="text-[var(--text-faint)] shrink-0 hidden group-open:block" />
           </summary>
           <div className="border-t border-[var(--border)]">
-            {quotes.map(q => (
-              <Link key={q.id} href={`/supplier/tickets/${q.ticketId}`} className="flex items-center justify-between gap-4 sm:gap-8 px-4 py-2.5 border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition">
+            {items.map(i => (
+              <Link key={i.key} href={`/supplier/tickets/${i.ticketId}`} className="flex items-center justify-between gap-4 px-4 py-2.5 border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition">
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm text-[var(--text)] truncate">{q.ticketTitle}</p>
-                  <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(q.createdAt)}</p>
-                  <p className="text-[11px] text-[#C6A35D] sm:hidden">Next: {nextStep(q.ticketStatus)}</p>
+                  <p className="text-sm text-[var(--text)] truncate">{i.ticketTitle}</p>
+                  <p className="text-[11px] text-[var(--text-faint)]">{i.status === 'requested' ? 'Requested' : 'Submitted'} · {formatDateTime(i.createdAt)}</p>
                 </div>
-                <div className="hidden sm:block shrink-0 w-32 text-left">
-                  <p className="text-[10px] uppercase tracking-wide text-[var(--text-faint)]">Next step</p>
-                  <p className="text-[11px] font-medium text-[var(--text)] truncate">{nextStep(q.ticketStatus)}</p>
-                </div>
-                <div className="flex flex-col items-end shrink-0">
-                  <span className="text-sm text-[var(--text)] tabular-nums whitespace-nowrap">{formatCurrency(q.amountInclVat ?? q.amount)}</span>
-                  <span className={`text-[10px] font-semibold uppercase rounded-full px-1.5 py-0.5 ${q.amountInclVat ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' : 'bg-[var(--surface-2)] text-[var(--text-muted)]'}`}>{q.amountInclVat ? 'incl VAT' : 'excl VAT'}</span>
-                  <span className={`text-[11px] ${TONE[q.status] ?? 'text-[var(--text-muted)]'}`}>{QUOTE_STATUS_LABEL[q.status] ?? q.status.replace('_', ' ')}</span>
+                <div className="flex flex-col items-end gap-1 shrink-0 w-28">
+                  <span className="text-sm font-semibold text-[var(--text)] tabular-nums whitespace-nowrap">{i.amount != null ? formatCurrency(i.amount) : '—'}</span>
+                  {i.amount != null && <span className="text-[10px] font-semibold uppercase rounded-full px-1.5 py-0.5 bg-[var(--surface-2)] text-[var(--text-muted)]">excl VAT</span>}
+                  <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 ${STATUS_BADGE[i.status] ?? 'bg-[var(--surface-2)] text-[var(--text-muted)]'}`}>{STATUS_LABEL[i.status] ?? i.status.replace('_', ' ')}</span>
                 </div>
               </Link>
             ))}
