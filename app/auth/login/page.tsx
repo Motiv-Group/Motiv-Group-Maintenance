@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useForm } from 'react-hook-form'
 import { createClient } from '@/lib/supabase/client'
+import { clearCollapseState } from '@/lib/collapse-state'
 import { Input } from '@/components/ui/Input'
 import { PasswordInput } from '@/components/ui/PasswordInput'
 import { Button } from '@/components/ui/Button'
@@ -66,6 +67,9 @@ export default function LoginPage() {
       .select('role')
       .eq('id', data.user.id)
       .single()
+
+    // Fresh session → reset any remembered collapsible-section state to defaults.
+    clearCollapseState()
 
     const role = profile?.role
     let dest = '/client'

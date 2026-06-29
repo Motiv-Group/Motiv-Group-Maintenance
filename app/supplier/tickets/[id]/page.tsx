@@ -45,6 +45,55 @@ function DetailItem({ label, value }: { label: string; value: string }) {
   )
 }
 
+// One COC & POC submission card — reused across the COC/POC, Snag and Completion
+// blocks. `snag` enriches a rejected submission with the "why it was sent back" reason.
+function SignoffCard({ s, snag }: { s: any; snag?: { description?: string | null; required_correction?: string | null; severity?: string | null } | null }) {
+  const meta = SIGNOFF_META[s.status] ?? SIGNOFF_META.submitted
+  const before = (s.before_urls ?? []) as string[]
+  const after = (s.after_urls ?? []) as string[]
+  return (
+    <div className={`rounded-xl ring-1 ${meta.ring} ${meta.bg} overflow-hidden`}>
+      <div className={`flex items-center justify-between gap-2 px-4 py-2.5 border-b ${meta.head}`}>
+        <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)] min-w-0"><ClipboardCheck size={15} className={`${meta.iconCls} shrink-0`} /><span className="truncate">Completion · {formatDateTime(s.created_at)}</span></span>
+        <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 shrink-0 ${meta.badge}`}>{meta.label}</span>
+      </div>
+      <div className="p-4 space-y-3">
+        {s.status === 'rejected' && (s.reject_reason || snag?.description || snag?.required_correction) && (
+          <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3 space-y-1">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Why it was sent back</p>
+            {(s.reject_reason || snag?.description) && <p className="text-sm text-[var(--text)]">{s.reject_reason || snag?.description}</p>}
+            {snag?.required_correction && <p className="text-sm text-[var(--text-muted)]"><span className="font-medium text-[var(--text)]">Required correction:</span> {snag.required_correction}</p>}
+            {snag?.severity && <p className="text-[11px] text-[var(--text-muted)] capitalize">Severity: {String(snag.severity).replace(/_/g, ' ')}</p>}
+          </div>
+        )}
+        <div>
+          <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Proof of completion</div>
+          <div className="flex flex-wrap gap-x-4 gap-y-1">
+            {before.map((u, j) => <a key={`b${j}`} href={u} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C6A35D] underline hover:text-amber-500">Before {j + 1}</a>)}
+            {after.map((u, j) => <a key={`a${j}`} href={u} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C6A35D] underline hover:text-amber-500">After {j + 1}</a>)}
+            {!before.length && !after.length && <span className="text-sm text-[var(--text-faint)]">No photos uploaded</span>}
+          </div>
+        </div>
+        {(s.coc_url || s.invoice_url) && (
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Certificate of Completion</div>
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
+              {s.coc_url && <a href={s.coc_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View COC</a>}
+              {s.invoice_url && <a href={s.invoice_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View invoice</a>}
+            </div>
+          </div>
+        )}
+        {s.notes && (
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Notes</div>
+            <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{s.notes}</p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default async function SupplierTicketDetailPage({ params }: { params: { id: string } }) {
   const { companyId, supplierIds } = await requireSupplierV3()
   const admin = createAdminClient()
@@ -97,11 +146,19 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   // Map a quote's DB status to the read-only summary tone (accepted shows "Approved").
   const quoteStatusOf = (s: string): QuoteSummaryStatus => s === 'accepted' ? 'accepted' : s === 'declined' ? 'declined' : 'pending'
 
-  // Collapsible blocks — the most-recent phase opens by default, the rest collapse.
-  // Once any completion (incl. snagged/under-review) exists, that block is latest;
-  // otherwise the Quotes block leads.
-  const completionsOpen = (signoffRows ?? []).length > 0 ||
-    ['submitted_for_signoff', 'evidence_requested', 'approved_closeout', 'completed', 'snag', 'snag_assigned', 'snag_in_progress', 'snag_resolved'].includes(t.status)
+  // COC/POC submissions split across blocks by state: under review → COC & POC,
+  // rejected/snagged → Snag (kept for traceability), accepted → Completion.
+  const allSignoffs = (signoffRows ?? []) as any[]
+  const pendingSignoffs = allSignoffs.filter(s => ['submitted', 'awaiting_regional', 'awaiting_store'].includes(s.status))
+  const rejectedSignoffs = allSignoffs.filter(s => s.status === 'rejected')
+  const acceptedSignoff = allSignoffs.find(s => s.status === 'accepted') ?? null
+
+  // Which collapsible block opens by default — the newest lifecycle phase.
+  const phase: 'snag' | 'coc' | 'completion' | 'commercial' =
+    ['snag', 'snag_assigned', 'snag_in_progress', 'snag_resolved'].includes(t.status) ? 'snag'
+    : ['submitted_for_signoff', 'evidence_requested'].includes(t.status) ? 'coc'
+    : ['approved_closeout', 'completed'].includes(t.status) ? 'completion'
+    : 'commercial'
 
   return (
     <div className="space-y-5">
@@ -184,7 +241,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
 
       {/* Quotes — full history, own block (out of the Next-step box) */}
       {(myQuotes ?? []).length > 0 && (
-        <CollapsibleSection title="Quotes" defaultOpen={!completionsOpen}>
+        <CollapsibleSection id="ticket-quotes" title="Quotes" defaultOpen={phase === 'commercial'}>
           {((myQuotes ?? []) as any[]).map((q, i, arr) => (
             <QuoteSummary
               key={q.id}
@@ -196,56 +253,24 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
         </CollapsibleSection>
       )}
 
-      {/* Completions (COC & POC) — full history, own block. Latest first. */}
-      {(signoffRows ?? []).length > 0 && (
-        <CollapsibleSection title="Completions (COC & POC)" defaultOpen={completionsOpen}>
-          {((signoffRows ?? []) as any[]).map((s, i) => {
-            const meta = SIGNOFF_META[s.status] ?? SIGNOFF_META.submitted
-            const before = (s.before_urls ?? []) as string[]
-            const after = (s.after_urls ?? []) as string[]
-            const isLatest = i === 0
-            return (
-              <div key={s.id} className={`rounded-xl ring-1 ${meta.ring} ${meta.bg} overflow-hidden`}>
-                <div className={`flex items-center justify-between gap-2 px-4 py-2.5 border-b ${meta.head}`}>
-                  <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)] min-w-0"><ClipboardCheck size={15} className={`${meta.iconCls} shrink-0`} /><span className="truncate">Completion · {formatDateTime(s.created_at)}</span></span>
-                  <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 shrink-0 ${meta.badge}`}>{meta.label}</span>
-                </div>
-                <div className="p-4 space-y-3">
-                  {s.status === 'rejected' && (s.reject_reason || (isLatest && (latestSnag?.description || latestSnag?.required_correction))) && (
-                    <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3 space-y-1">
-                      <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Why it was sent back</p>
-                      {(s.reject_reason || (isLatest ? latestSnag?.description : null)) && <p className="text-sm text-[var(--text)]">{s.reject_reason || latestSnag?.description}</p>}
-                      {isLatest && latestSnag?.required_correction && <p className="text-sm text-[var(--text-muted)]"><span className="font-medium text-[var(--text)]">Required correction:</span> {latestSnag.required_correction}</p>}
-                      {isLatest && latestSnag?.severity && <p className="text-[11px] text-[var(--text-muted)] capitalize">Severity: {String(latestSnag.severity).replace(/_/g, ' ')}</p>}
-                    </div>
-                  )}
-                  <div>
-                    <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Proof of completion</div>
-                    <div className="flex flex-wrap gap-x-4 gap-y-1">
-                      {before.map((u, j) => <a key={`b${j}`} href={u} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C6A35D] underline hover:text-amber-500">Before {j + 1}</a>)}
-                      {after.map((u, j) => <a key={`a${j}`} href={u} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C6A35D] underline hover:text-amber-500">After {j + 1}</a>)}
-                      {!before.length && !after.length && <span className="text-sm text-[var(--text-faint)]">No photos uploaded</span>}
-                    </div>
-                  </div>
-                  {(s.coc_url || s.invoice_url) && (
-                    <div>
-                      <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Certificate of Completion</div>
-                      <div className="flex flex-wrap gap-x-4 gap-y-1">
-                        {s.coc_url && <a href={s.coc_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View COC</a>}
-                        {s.invoice_url && <a href={s.invoice_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View invoice</a>}
-                      </div>
-                    </div>
-                  )}
-                  {s.notes && (
-                    <div>
-                      <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Notes</div>
-                      <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{s.notes}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )
-          })}
+      {/* COC & POC — the submission(s) currently under review (pending sign-off) */}
+      {pendingSignoffs.length > 0 && (
+        <CollapsibleSection id="ticket-coc" title="COC & POC" defaultOpen={phase === 'coc'}>
+          {pendingSignoffs.map(s => <SignoffCard key={s.id} s={s} />)}
+        </CollapsibleSection>
+      )}
+
+      {/* Snag — rejected / sent-back completions, kept for traceability */}
+      {rejectedSignoffs.length > 0 && (
+        <CollapsibleSection id="ticket-snag" title="Snag" defaultOpen={phase === 'snag'}>
+          {rejectedSignoffs.map((s, i) => <SignoffCard key={s.id} s={s} snag={i === 0 ? latestSnag : null} />)}
+        </CollapsibleSection>
+      )}
+
+      {/* Completion — the approved COC & POC, created once sign-off is accepted */}
+      {acceptedSignoff && (
+        <CollapsibleSection id="ticket-completion" title="Completion" defaultOpen={phase === 'completion'}>
+          <SignoffCard s={acceptedSignoff} />
         </CollapsibleSection>
       )}
 

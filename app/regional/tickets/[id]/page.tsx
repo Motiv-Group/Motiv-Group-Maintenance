@@ -102,11 +102,14 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   // "Info added" = the SM resubmitted after an info request (back at open, reason kept).
   const rmInfoAdded = t.status === 'open' && !!t.info_request_reason
 
-  // Which collapsible block opens by default — the most-recent lifecycle phase.
-  // Snag (raised/in-progress) → Snag; sign-off/closeout → Completion; else Quotes.
-  const snagPhase = ['snag', 'snag_assigned', 'snag_in_progress', 'snag_resolved'].includes(t.status) || !!rejectedSignoff
-  const signoffPhase = ['submitted_for_signoff', 'evidence_requested', 'approved_closeout', 'completed'].includes(t.status) || !!acceptedSignoff
-  const phase: 'snag' | 'signoff' | 'commercial' = snagPhase ? 'snag' : signoffPhase ? 'signoff' : 'commercial'
+  // Which collapsible block opens by default — driven by the current lifecycle
+  // phase (newest activity). Snag → Snag; COC/POC under review → COC & POC;
+  // closed out → Completion; otherwise the commercial Quotes block.
+  const phase: 'snag' | 'coc' | 'completion' | 'commercial' =
+    ['snag', 'snag_assigned', 'snag_in_progress', 'snag_resolved'].includes(t.status) ? 'snag'
+    : ['submitted_for_signoff', 'evidence_requested'].includes(t.status) ? 'coc'
+    : ['approved_closeout', 'completed'].includes(t.status) ? 'completion'
+    : 'commercial'
 
   return (
     <div className="space-y-5">
@@ -190,20 +193,46 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         </div>
       )}
 
+      {/* COC & POC — the submission currently under review (pending sign-off) */}
       {pendingSignoff && (
-        <Card className="p-5">
-          <h2 className="text-sm font-bold text-[var(--text)] mb-2">Submitted evidence</h2>
-          <div className="flex flex-wrap gap-3 text-xs">
-            {(pendingSignoff.before_urls ?? []).map((u: string, i: number) => <a key={`b${i}`} href={u} target="_blank" className="text-[#C6A35D] underline">Before {i + 1}</a>)}
-            {(pendingSignoff.after_urls ?? []).map((u: string, i: number) => <a key={`a${i}`} href={u} target="_blank" className="text-[#C6A35D] underline">After {i + 1}</a>)}
-            {pendingSignoff.coc_url && <a href={pendingSignoff.coc_url} target="_blank" className="text-[#C6A35D] underline">COC</a>}
+        <CollapsibleSection id="ticket-coc" title="COC & POC" defaultOpen={phase === 'coc'}>
+          <div className="rounded-xl ring-1 ring-[#C6A35D]/40 bg-[#C6A35D]/5 overflow-hidden">
+            <div className="flex items-center justify-between gap-2 px-4 py-2.5 bg-[#C6A35D]/10 border-b border-[#C6A35D]/20">
+              <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]"><FileText size={15} className="text-[#C6A35D] shrink-0" /> Submitted completion · {formatDateTime(pendingSignoff.created_at)}</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-[#C6A35D] bg-[#C6A35D]/15 rounded-full px-2 py-0.5 shrink-0">Under review</span>
+            </div>
+            <div className="p-4 space-y-3">
+              <div>
+                <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Proof of completion</div>
+                <div className="flex flex-wrap gap-x-4 gap-y-1">
+                  {(pendingSignoff.before_urls ?? []).map((u: string, i: number) => <a key={`b${i}`} href={u} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C6A35D] underline hover:text-amber-500">Before {i + 1}</a>)}
+                  {(pendingSignoff.after_urls ?? []).map((u: string, i: number) => <a key={`a${i}`} href={u} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C6A35D] underline hover:text-amber-500">After {i + 1}</a>)}
+                  {!(pendingSignoff.before_urls ?? []).length && !(pendingSignoff.after_urls ?? []).length && <span className="text-sm text-[var(--text-faint)]">No photos</span>}
+                </div>
+              </div>
+              {(pendingSignoff.coc_url || pendingSignoff.invoice_url) && (
+                <div>
+                  <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Certificate of Completion</div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1">
+                    {pendingSignoff.coc_url && <a href={pendingSignoff.coc_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View COC</a>}
+                    {pendingSignoff.invoice_url && <a href={pendingSignoff.invoice_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View invoice</a>}
+                  </div>
+                </div>
+              )}
+              {pendingSignoff.notes && (
+                <div>
+                  <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Notes</div>
+                  <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{pendingSignoff.notes}</p>
+                </div>
+              )}
+            </div>
           </div>
-        </Card>
+        </CollapsibleSection>
       )}
 
-      {/* Approved COC & POC — read-only block (mirrors the accepted-quote card) */}
+      {/* Completion — the approved COC & POC, created once sign-off is accepted */}
       {acceptedSignoff && (
-        <CollapsibleSection title="COC & POC" defaultOpen={phase === 'signoff'}>
+        <CollapsibleSection id="ticket-completion" title="Completion" defaultOpen={phase === 'completion'}>
           <div className="rounded-xl ring-1 ring-emerald-500/40 bg-emerald-500/5 overflow-hidden">
             <div className="flex items-center justify-between gap-2 px-4 py-2.5 bg-emerald-500/10 border-b border-emerald-500/20">
               <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]"><CheckCircle2 size={15} className="text-emerald-500 shrink-0" /> Approved completion</span>
@@ -263,7 +292,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
 
       {/* Quotes & Variation Orders — suppliers requested, quotes to review, VOs */}
       {hasQuoteBlock && (
-        <CollapsibleSection title="Quotes & Variation Orders" defaultOpen={phase === 'commercial'}>
+        <CollapsibleSection id="ticket-quotes" title="Quotes & Variation Orders" defaultOpen={phase === 'commercial'}>
           {supplierRows.length > 0 && (
             <div className="space-y-2">
               <h3 className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Suppliers requested</h3>
@@ -367,7 +396,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
       )}
 
       {((snags ?? []).length > 0 || rejectedSignoff) && (
-        <CollapsibleSection title="Snags" defaultOpen={phase === 'snag'}>
+        <CollapsibleSection id="ticket-snag" title="Snags" defaultOpen={phase === 'snag'}>
           {(snags ?? []).map((s: any, i: number) => (
             <div key={i} className="py-2 border-b border-[var(--border)] last:border-0 flex items-start justify-between gap-2">
               <p className="text-sm text-[var(--text)] min-w-0">{s.description ?? 'Snag'}</p>
