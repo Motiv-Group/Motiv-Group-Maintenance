@@ -91,17 +91,22 @@ export function AssignSuppliersButton({ ticketId, suppliers }: { ticketId: strin
 }
 
 // ── Request more info (amber button → modal) ────────────────────
+const INFO_REASONS = ['Need more detail', 'Photos unclear', 'Scope unclear', 'Access details needed', 'Other']
+
 export function RequestInfoButton({ ticketId }: { ticketId: string }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
-  const [reason, setReason] = useState('')
+  const [preset, setPreset] = useState('')
+  const [other, setOther] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
 
   async function submit() {
-    if (!reason.trim()) { setErr('Tell the store what you need.'); return }
+    if (!preset) { setErr('Choose a reason.'); return }
+    const reason = preset === 'Other' ? other.trim() : preset
+    if (!reason) { setErr('Tell the store what you need.'); return }
     setBusy(true); setErr('')
-    try { await post(`/api/tickets/${ticketId}/transition`, { action: 'request_info', reason: reason.trim() }); setReason(''); setOpen(false); setBusy(false); router.refresh() }
+    try { await post(`/api/tickets/${ticketId}/transition`, { action: 'request_info', reason }); setPreset(''); setOther(''); setOpen(false); setBusy(false); router.refresh() }
     catch (e: any) { setErr(e.message); setBusy(false) }
   }
 
@@ -112,11 +117,15 @@ export function RequestInfoButton({ ticketId }: { ticketId: string }) {
       {open && (
         <Modal title="Request more information" onClose={() => setOpen(false)}>
           <p className="text-xs text-[var(--text-muted)]">The store manager will see this message and can edit + resubmit the ticket.</p>
-          <textarea autoFocus className={`${input} min-h-[90px]`} placeholder="What do you need from the store?" value={reason} onChange={e => setReason(e.target.value)} />
+          <select autoFocus className={input} value={preset} onChange={e => setPreset(e.target.value)}>
+            <option value="">— Choose a reason —</option>
+            {INFO_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
+          </select>
+          {preset === 'Other' && <textarea className={`${input} min-h-[80px]`} placeholder="What do you need from the store?" value={other} onChange={e => setOther(e.target.value)} />}
           {err && <p className="text-xs text-red-500">{err}</p>}
           <div className="flex gap-2">
-            <button disabled={busy} onClick={submit} className="flex-1 py-2 rounded-xl bg-amber-500 text-[#0a0e17] text-sm font-semibold disabled:opacity-50">{busy ? 'Sending…' : 'Send request'}</button>
-            <button onClick={() => setOpen(false)} className="flex-1 py-2 rounded-xl ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm">Cancel</button>
+            <button disabled={busy} onClick={submit} className="flex-1 py-2 rounded-xl bg-green-600 hover:bg-green-500 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Sending…' : 'Send request'}</button>
+            <button onClick={() => setOpen(false)} className="flex-1 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-semibold">Cancel</button>
           </div>
         </Modal>
       )}
@@ -294,7 +303,7 @@ export function ApproveSignoffCard({ ticketId }: { ticketId: string }) {
       <StarInput value={score} onChange={setScore} />
       <textarea className="w-full px-3 py-2 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm min-h-[60px]" placeholder="Comment on the supplier's work (optional)" value={comment} onChange={e => setComment(e.target.value)} />
       {err && <p className="text-xs text-red-500">{err}</p>}
-      <button onClick={approve} disabled={busy} className="w-full py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Submitting…' : 'Approve & accept COC/POC'}</button>
+      <button onClick={approve} disabled={busy} className="w-full py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Submitting…' : 'Accept COC/POC'}</button>
     </div>
   )
 }

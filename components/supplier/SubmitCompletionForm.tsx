@@ -58,7 +58,6 @@ export function SubmitCompletionForm({ ticketId }: { ticketId: string }) {
   async function submit() {
     if (!coc) { setErr('Attach the Certificate of Completion (COC).'); return }
     if (photos.length < MIN_PHOTOS) { setErr(`Add at least ${MIN_PHOTOS} completion photos.`); return }
-    if (!notes.trim()) { setErr('Add notes for the regional manager.'); return }
     setBusy(true); setErr('')
     try {
       await addEvidence(ticketId, 'coc', await uploadTo('completion-docs', ticketId, coc))
@@ -136,7 +135,7 @@ export function SubmitCompletionForm({ ticketId }: { ticketId: string }) {
 
       {/* Notes */}
       <div>
-        <label className="block text-sm font-bold text-[var(--text)] mb-1.5">Notes <span className="text-red-500">*</span></label>
+        <label className="block text-sm font-bold text-[var(--text)] mb-1.5">Notes <span className="font-normal text-[var(--text-muted)]">(optional)</span></label>
         <textarea className="w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)] min-h-[80px]" placeholder="Notes for the regional manager…" value={notes} onChange={e => setNotes(e.target.value)} />
       </div>
 

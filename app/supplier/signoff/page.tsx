@@ -7,7 +7,7 @@ import { assembleSupplierDashboard, type SupplierSignoffRow } from '@/lib/health
 import { formatDateTime } from '@/lib/utils'
 
 const TONE: Record<string, string> = { submitted: 'text-[#C6A35D]', awaiting_regional: 'text-[#C6A35D]', awaiting_store: 'text-blue-600 dark:text-blue-400', accepted: 'text-emerald-600 dark:text-emerald-400', rejected: 'text-red-600 dark:text-red-400' }
-const WORD: Record<string, string> = { submitted: 'Submitted', awaiting_regional: 'Awaiting Regional', awaiting_store: 'Awaiting Store', accepted: 'Approved', rejected: 'Rejected — more evidence' }
+const WORD: Record<string, string> = { submitted: 'More info', awaiting_regional: 'More info', awaiting_store: 'More info', accepted: 'Accepted', rejected: 'Rejected' }
 const NEUTRAL = { active: 'bg-slate-800 text-white border-slate-800 dark:bg-white dark:text-[#0a0e17] dark:border-white', inactive: 'text-[var(--text-muted)] border-[var(--border)] hover:border-slate-400' }
 const FILTERS: { key: string; label: string; active: string; inactive: string }[] = [
   { key: 'all', label: 'All', ...NEUTRAL },

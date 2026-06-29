@@ -20,11 +20,21 @@ const FIELDS: Record<string, FieldDef[]> = {
 const NEEDS_SUPPLIER = new Set(['validate', 'request_quote', 'require_assessment', 'assign_snag'])
 // Actions that get an explicit "Are you sure?" confirmation before firing.
 const CONFIRM_ACTIONS = new Set(['raise_snag', 'submit_variation'])
+// Pre-defined reasons (+ free-text "Other") for the reason/detail field.
+const REASON_PRESETS: Record<string, string[]> = {
+  raise_snag:       ['Work incomplete', 'Quality below standard', 'Wrong materials or spec', 'Safety concern', 'Other'],
+  request_info:     ['Need more detail', 'Photos unclear', 'Scope unclear', 'Access details needed', 'Other'],
+  request_evidence: ['Before photos missing', 'After photos missing', 'COC missing', 'Photos unclear', 'Other'],
+}
+// Which field the preset fills for each action.
+const REASON_KEY: Record<string, string> = { raise_snag: 'description', request_info: 'reason', request_evidence: 'reason' }
 
 function tone(action: string): string {
   if (/^(approve|close_out|proceed|approve_quote|approve_variation|start_work|schedule)/.test(action))
     return 'bg-[#C6A35D] text-[#0a0e17] hover:brightness-95'
-  if (/^(reject|reject_quote|reject_variation)/.test(action))
+  if (/^request_evidence/.test(action))
+    return 'bg-amber-500 text-[#0a0e17] hover:bg-amber-600'
+  if (/^(reject|reject_quote|reject_variation|raise_snag)/.test(action))
     return 'bg-red-600 text-white hover:bg-red-500'
   return 'ring-1 ring-[var(--border)] text-[var(--text)] hover:bg-[var(--hover)]'
 }
@@ -47,11 +57,15 @@ export function WorkflowActions({ ticketId, status, role, suppliers = [], exclud
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [confirm, setConfirm] = useState<{ t: Transition; payload: Record<string, unknown> } | null>(null)
+  const [preset, setPreset] = useState('')
 
   if (actions.length === 0) return null
 
   const fields = active ? (FIELDS[active.action] ?? []) : []
   const needsSupplier = active ? NEEDS_SUPPLIER.has(active.action) : false
+  const presets = active ? REASON_PRESETS[active.action] : undefined
+  const reasonKey = active ? REASON_KEY[active.action] : undefined
+  const otherChosen = preset === 'Other'
 
   // Actions that get an explicit "Are you sure?" step before firing.
   function maybeFire(t: Transition, payload: Record<string, unknown>) {
@@ -60,7 +74,7 @@ export function WorkflowActions({ ticketId, status, role, suppliers = [], exclud
   }
 
   function start(t: Transition) {
-    setError('')
+    setError(''); setPreset('')
     if ((FIELDS[t.action] ?? []).length || NEEDS_SUPPLIER.has(t.action)) { setActive(t); setVals({}) }
     else maybeFire(t, {})
   }
@@ -81,9 +95,17 @@ export function WorkflowActions({ ticketId, status, role, suppliers = [], exclud
   function submitForm(e: React.FormEvent) {
     e.preventDefault()
     if (!active) return
-    for (const f of fields) if (f.required && !vals[f.k]?.trim()) { setError(`${f.label} is required`); return }
+    if (presets) {
+      if (!preset) { setError('Choose a reason'); return }
+      if (otherChosen && !vals[reasonKey!]?.trim()) { setError('Enter a reason'); return }
+    }
+    for (const f of fields) {
+      if (presets && f.k === reasonKey) continue   // satisfied by the preset above
+      if (f.required && !vals[f.k]?.trim()) { setError(`${f.label} is required`); return }
+    }
     if (needsSupplier && !vals.supplierId) { setError('Choose a supplier'); return }
-    maybeFire(active, vals)
+    const payload = presets && !otherChosen ? { ...vals, [reasonKey!]: preset } : vals
+    maybeFire(active, payload)
   }
 
   const input = 'w-full px-3 py-2 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)]'
@@ -93,7 +115,7 @@ export function WorkflowActions({ ticketId, status, role, suppliers = [], exclud
       <div className="flex flex-wrap gap-2">
         {actions.map(t => (
           <button key={t.action} onClick={() => start(t)} disabled={busy}
-            className={`px-3 py-2 rounded-xl text-sm font-medium transition disabled:opacity-50 ${tone(t.action)} ${active?.action === t.action ? 'ring-2 ring-[#C6A35D]' : ''}`}>
+            className={`flex-1 min-w-[8rem] text-center px-3 py-2 rounded-xl text-sm font-medium transition disabled:opacity-50 ${tone(t.action)} ${active?.action === t.action ? 'ring-2 ring-[#C6A35D]' : ''}`}>
             {t.label}
           </button>
         ))}
@@ -108,13 +130,22 @@ export function WorkflowActions({ ticketId, status, role, suppliers = [], exclud
               {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           )}
-          {fields.map(f => (
-            <input key={f.k} className={input} type={f.type ?? 'text'} placeholder={f.label}
-              value={vals[f.k] ?? ''} onChange={e => setVals({ ...vals, [f.k]: e.target.value })} />
-          ))}
+          {presets && (
+            <select className={input} value={preset} onChange={e => setPreset(e.target.value)}>
+              <option value="">— Choose a reason —</option>
+              {presets.map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+          )}
+          {fields.map(f => {
+            if (presets && f.k === reasonKey && !otherChosen) return null   // preset fills it
+            return (
+              <input key={f.k} className={input} type={f.type ?? 'text'} placeholder={presets && f.k === reasonKey ? 'Type the reason…' : f.label}
+                value={vals[f.k] ?? ''} onChange={e => setVals({ ...vals, [f.k]: e.target.value })} />
+            )
+          })}
           <div className="flex gap-2">
-            <button type="submit" disabled={busy} className="px-3 py-2 rounded-lg bg-[#C6A35D] text-[#0a0e17] text-sm font-medium disabled:opacity-50">{busy ? '…' : 'Confirm'}</button>
-            <button type="button" onClick={() => { setActive(null); setError('') }} className="px-3 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm">Cancel</button>
+            <button type="submit" disabled={busy} className="flex-1 min-w-[7rem] px-3 py-2 rounded-lg bg-green-600 text-white text-sm font-semibold hover:bg-green-500 disabled:opacity-50">{busy ? '…' : 'Confirm'}</button>
+            <button type="button" onClick={() => { setActive(null); setError('') }} className="flex-1 min-w-[7rem] px-3 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-500">Cancel</button>
           </div>
         </form>
       )}
@@ -123,8 +154,8 @@ export function WorkflowActions({ ticketId, status, role, suppliers = [], exclud
         <div className="rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] p-3 space-y-2">
           <p className="text-sm text-[var(--text)]">Are you sure you want to <span className="font-semibold">{confirm.t.label.toLowerCase()}</span>?</p>
           <div className="flex gap-2">
-            <button onClick={() => { const c = confirm; setConfirm(null); fire(c.t, c.payload) }} disabled={busy} className="px-3 py-2 rounded-lg bg-[#C6A35D] text-[#0a0e17] text-sm font-semibold disabled:opacity-50">{busy ? '…' : 'Yes, continue'}</button>
-            <button onClick={() => setConfirm(null)} className="px-3 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm">Cancel</button>
+            <button onClick={() => { const c = confirm; setConfirm(null); fire(c.t, c.payload) }} disabled={busy} className="flex-1 min-w-[7rem] px-3 py-2 rounded-lg bg-green-600 text-white text-sm font-semibold hover:bg-green-500 disabled:opacity-50">{busy ? '…' : 'Yes, continue'}</button>
+            <button onClick={() => setConfirm(null)} className="flex-1 min-w-[7rem] px-3 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-500">Cancel</button>
           </div>
         </div>
       )}

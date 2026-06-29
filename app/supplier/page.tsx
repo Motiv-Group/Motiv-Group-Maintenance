@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
-import { Truck, ClipboardList, Clock, ReceiptText, ClipboardCheck, Camera, AlertTriangle, Timer, Star, Sparkles, ChevronDown, ChevronUp } from 'lucide-react'
+import { Truck, ClipboardList, Clock, ReceiptText, ClipboardCheck, AlertTriangle, Timer, Star, Sparkles, ChevronDown, ChevronUp } from 'lucide-react'
 import { requireSupplierV3 } from '@/lib/health/guard'
 import { assembleSupplierDashboard, type SupplierTicketRow } from '@/lib/health/data'
 import { Card, SectionCard, KpiRow, Donut, Pill, type Kpi } from '@/components/exec/ui'
@@ -75,18 +75,15 @@ export default async function SupplierOverviewPage() {
     { label: 'Quote requested', value: quoteRequested, icon: <ClipboardList size={13} />, tone: 'info', href: '/supplier/tickets?filter=to_quote' },
     { label: 'Pending Quotes', value: pendingDecision, icon: <ReceiptText size={13} />, tone: 'gold', href: '/supplier/quotes?status=pending' },
     { label: 'Pending Sign-off', value: k.awaitingSignoff, icon: <ClipboardCheck size={13} />, tone: 'info', href: '/supplier/signoff?status=awaiting' },
-    { label: 'Evidence Missing', value: k.evidenceMissing, icon: <Camera size={13} />, tone: k.evidenceMissing ? 'warn' : 'good', href: '/supplier/tickets?filter=evidence' },
   ]
 
   // Tickets where this supplier was declined (and not re-invited) are out of their
   // active work — kept off the dashboard blocks (they live under the Declined filter).
   const needsAction = d.tickets.filter(t => !t.declinedForMe && t.active && (t.slaLabel === 'Breached' || t.slaLabel === 'At risk' || !t.acknowledged)).slice(0, 6)
-  const evidenceTodo = d.tickets.filter(t => !t.declinedForMe && t.active && t.evidenceRequired && !(t.beforeUploaded && t.afterUploaded && t.cocUploaded)).slice(0, 6)
   const recentTickets = [...d.tickets].filter(t => !t.declinedForMe && t.status !== 'completed').sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)).slice(0, 8)
   // Recent quotes exclude completed tickets; pending sign-off shows only jobs still awaiting a decision.
   const recentQuotes = d.quotes.filter(q => q.ticketStatus !== 'completed').slice(0, 5)
   const pendingSignoffs = d.signoffs.filter(s => ['submitted', 'awaiting_regional', 'awaiting_store'].includes(s.status)).slice(0, 5)
-  const missingBits = (t: SupplierTicketRow) => [!t.beforeUploaded && 'before', !t.afterUploaded && 'after', !t.cocUploaded && 'COC'].filter(Boolean).join(', ')
 
   return (
     <div className="space-y-5">
@@ -156,21 +153,8 @@ export default async function SupplierOverviewPage() {
         </SectionCard>
       </div>
 
-      {/* Row 2: Evidence to upload · Pending sign-off */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <SectionCard title="Evidence to Upload" icon={<Camera size={15} className="text-sky-600 dark:text-sky-400" />}>
-          {evidenceTodo.map(t => (
-            <Link key={t.id} href={`/supplier/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] -mx-2 px-2 rounded">
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-[var(--text)] truncate">{[company, t.storeName].filter(Boolean).join(' · ')}</p>
-                <p className="text-[11px] text-[var(--text-muted)] truncate">{t.title}</p>
-                <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(t.createdAt)}</p>
-              </div>
-              <span className="text-[11px] text-amber-600 dark:text-amber-500 shrink-0">missing: {missingBits(t)}</span>
-            </Link>
-          ))}
-          {!evidenceTodo.length && <p className="text-sm text-[var(--text-faint)]">All evidence uploaded.</p>}
-        </SectionCard>
+      {/* Row 2: Pending sign-off */}
+      <div>
         <SectionCard title="Pending Sign-off" icon={<ClipboardCheck size={15} className="text-emerald-600 dark:text-emerald-400" />} action={<Link href="/supplier/signoff" className="text-xs text-[#C6A35D] hover:underline">All</Link>}>
           {pendingSignoffs.map(s => (
             <Link key={s.id} href={`/supplier/tickets/${s.ticketId}`} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] -mx-2 px-2 rounded">
