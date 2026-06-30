@@ -28,6 +28,9 @@ export interface TimelineInput {
   infoRequestedAt?: string | null
   infoAddedAt?: string | null
   infoRequestReason?: string | null
+  // When this supplier was declined off the ticket — the trail stops here for them
+  // (only passed on the supplier view when they're out of the job).
+  supplierDeclinedAt?: string | null
   quotes?: { amount?: number | null; status: string; created_at: string; updated_at?: string | null }[]
   signoffs?: { status: string; created_at: string }[]
   updates?: { body: string; author_role: string | null; created_at: string }[]
@@ -62,6 +65,7 @@ export function buildTicketTimeline(t: TimelineInput): TimelineEvent[] {
 
   if (t.status === 'completed') push(t.completedAt ?? t.updatedAt, 'Ticket completed', 'completed')
   if (t.status === 'cancelled') push(t.updatedAt, `Ticket cancelled${t.cancellationReason ? ` — ${t.cancellationReason}` : ''}`, 'cancelled')
+  push(t.supplierDeclinedAt, 'Declined — no further updates on this ticket', 'cancelled')
   push(t.editedAt, 'Ticket edited', 'edited', t.editedByName)
 
   for (const u of t.updates ?? []) push(u.created_at, u.body, 'update', ROLE_LABEL[u.author_role ?? ''] ?? (u.author_role ?? 'System'))

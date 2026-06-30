@@ -102,7 +102,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   const [{ data: store }, { data: updates }, { data: invite }, { data: myQuotes }, { data: technicianRows }, { data: signoffRows }, { data: snagRows }] = await Promise.all([
     admin.from('stores').select('name, sub_store').eq('id', t.store_id).single(),
     admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
-    admin.from('ticket_suppliers').select('status, invited_at, decline_reason').eq('ticket_id', t.id).in('supplier_id', supplierIds).maybeSingle(),
+    admin.from('ticket_suppliers').select('status, invited_at, decline_reason, responded_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).maybeSingle(),
     admin.from('quotes').select('id, amount, amount_incl_vat, description, file_url, status, valid_until, created_at, updated_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).order('created_at', { ascending: false }),
     admin.from('technicians').select('id, name').in('supplier_id', supplierIds).eq('active', true).order('name'),
     admin.from('signoffs').select('id, before_urls, after_urls, coc_url, invoice_url, status, notes, reject_reason, created_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).order('created_at', { ascending: false }),
@@ -287,19 +287,34 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
         </CollapsibleSection>
       )}
 
-      <Card className="p-5">
-        <h2 className="text-sm font-bold text-[var(--text)] mb-3">Post an update</h2>
-        <SupplierAttachments ticketId={t.id} />
-      </Card>
+      {/* Off the job → can't post updates either (matches the frozen audit trail). */}
+      {!declinedForMe && (
+        <Card className="p-5">
+          <h2 className="text-sm font-bold text-[var(--text)] mb-3">Post an update</h2>
+          <SupplierAttachments ticketId={t.id} />
+        </Card>
+      )}
 
-      <AuditTrail ticket={{
-        createdAt: t.created_at, status: t.status, updatedAt: t.updated_at,
-        quoteRequestedAt: t.quote_requested_at, quoteSubmittedAt: t.quote_submitted_at,
-        quoteApprovedAt: t.quote_decision_status === 'approved' ? t.quote_decided_at : null,
-        scheduledAt: t.scheduled_at, completedAt: t.completed_at,
-        editedAt: t.edited_at, editedByName: editorName, cancellationReason: t.cancellation_reason,
-        quotes: (myQuotes ?? []) as any[], signoffs: (signoffRows ?? []) as any[], updates: (updates ?? []) as any[],
-      }} />
+      {/* Once this supplier is off the job (they declined, or the RM declined their
+          quote / awarded another), the trail stops at their decline — they get no
+          further updates on the ticket's onward life. */}
+      {declinedForMe ? (
+        <AuditTrail ticket={{
+          createdAt: t.created_at,
+          quoteRequestedAt: (invite as any)?.invited_at ?? t.quote_requested_at,
+          quoteSubmittedAt: latestQuote ? latestQuote.created_at : null,
+          supplierDeclinedAt: (invite as any)?.responded_at ?? latestQuote?.updated_at ?? t.updated_at,
+        }} />
+      ) : (
+        <AuditTrail ticket={{
+          createdAt: t.created_at, status: t.status, updatedAt: t.updated_at,
+          quoteRequestedAt: t.quote_requested_at, quoteSubmittedAt: t.quote_submitted_at,
+          quoteApprovedAt: t.quote_decision_status === 'approved' ? t.quote_decided_at : null,
+          scheduledAt: t.scheduled_at, completedAt: t.completed_at,
+          editedAt: t.edited_at, editedByName: editorName, cancellationReason: t.cancellation_reason,
+          quotes: (myQuotes ?? []) as any[], signoffs: (signoffRows ?? []) as any[], updates: (updates ?? []) as any[],
+        }} />
+      )}
     </div>
   )
 }

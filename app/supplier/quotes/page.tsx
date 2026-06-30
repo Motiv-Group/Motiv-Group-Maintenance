@@ -52,13 +52,21 @@ export default async function SupplierQuotesPage({ searchParams }: { searchParam
     .filter(t => !t.declinedForMe && AWAITING_QUOTE.has(t.status) && !quotedTicketIds.has(t.id))
     .map(t => ({ key: `r-${t.id}`, ticketId: t.id, ticketTitle: t.title, storeName: t.storeName, branchCode: t.branchCode, createdAt: t.quoteRequestedAt ?? t.createdAt, amount: null, status: 'requested' }))
 
-  const all = [...requestedItems, ...quoteItems]
+  // Tickets the supplier declined before quoting (no quote row) — shown as Declined
+  // so the request still appears here. (RM-declined quotes already arrive via quoteItems.)
+  const declinedRequestItems: QItem[] = d.tickets
+    .filter(t => t.declinedForMe && !quotedTicketIds.has(t.id))
+    .map(t => ({ key: `d-${t.id}`, ticketId: t.id, ticketTitle: t.title, storeName: t.storeName, branchCode: t.branchCode, createdAt: t.declinedAt ?? t.quoteRequestedAt ?? t.createdAt, amount: null, status: 'declined' }))
+
+  const all = [...requestedItems, ...quoteItems, ...declinedRequestItems]
   const shown = active === 'all' ? all : all.filter(i => i.status === active)
 
   const byStore = new Map<string, QItem[]>()
   for (const i of shown) { const a = byStore.get(i.storeName) ?? []; a.push(i); byStore.set(i.storeName, a) }
   const groups = [...byStore.entries()].sort((a, b) => a[0].localeCompare(b[0]))
-  for (const [, items] of groups) items.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
+  // Within a store: live quotes/requests first (newest → oldest), declined ones last.
+  for (const [, items] of groups) items.sort((a, b) =>
+    (Number(a.status === 'declined') - Number(b.status === 'declined')) || (+new Date(b.createdAt) - +new Date(a.createdAt)))
 
   return (
     <div className="space-y-5">

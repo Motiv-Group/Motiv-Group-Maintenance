@@ -39,7 +39,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'This job can no longer be declined — it has moved past quoting.' }, { status: 400 })
   }
 
-  await admin.from('ticket_suppliers').update({ status: 'declined', decline_reason: reason }).eq('id', invite.id)
+  await admin.from('ticket_suppliers').update({ status: 'declined', decline_reason: reason, responded_at: new Date().toISOString() }).eq('id', invite.id)
   await admin.from('quotes').update({ status: 'declined' }).eq('ticket_id', ticketId).eq('supplier_id', invite.supplier_id).eq('status', 'pending')
 
   // Tell the region's RMs so they can pick another supplier.

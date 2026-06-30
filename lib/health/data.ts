@@ -601,13 +601,19 @@ export async function assembleSupplierDashboard(companyId: string, supplierIds: 
   // plus declined/closed so the supplier still sees them under the Declined filter.
   const [{ data: bySupplier }, { data: invRows }] = await Promise.all([
     db.from('tickets').select(TICKET_COLS).eq('company_id', companyId).in('supplier_id', supplierIds),
-    db.from('ticket_suppliers').select('ticket_id, status').in('supplier_id', supplierIds).in('status', ['invited', 'quoted', 'awarded', 'declined', 'closed']),
+    db.from('ticket_suppliers').select('ticket_id, status, responded_at').in('supplier_id', supplierIds).in('status', ['invited', 'quoted', 'awarded', 'declined', 'closed']),
   ])
   const owned = (bySupplier ?? []) as any[]
   const ownedIds = new Set(owned.map(t => t.id))
   // The supplier's invite status per ticket (newest row wins if duplicated).
   const myInviteStatus = new Map<string, string>()
-  for (const r of (invRows ?? []) as any[]) myInviteStatus.set(r.ticket_id, r.status)
+  // When the supplier was declined/closed off the ticket — used as the decline date
+  // when there's no declined quote to date it (e.g. they declined before quoting).
+  const declinedInviteAt = new Map<string, string>()
+  for (const r of (invRows ?? []) as any[]) {
+    myInviteStatus.set(r.ticket_id, r.status)
+    if (['declined', 'closed'].includes(r.status) && r.responded_at) declinedInviteAt.set(r.ticket_id, r.responded_at)
+  }
   const extraIds = Array.from(new Set((invRows ?? []).map(r => r.ticket_id))).filter(id => !ownedIds.has(id))
   const { data: invitedTickets } = extraIds.length ? await db.from('tickets').select(TICKET_COLS).in('id', extraIds) : { data: [] as any[] }
   const rawAll = [...owned, ...((invitedTickets ?? []) as any[])]
@@ -678,7 +684,7 @@ export async function assembleSupplierDashboard(companyId: string, supplierIds: 
       quoteRequestedAt: raw.quote_requested_at ?? null,
       quoteSubmittedAt: t.quote_submitted_at ?? firstQuoteAt.get(t.id) ?? null,
       quoteApprovedAt: approvedAt,
-      declinedAt: declinedQuoteAt.get(t.id) ?? null,
+      declinedAt: declinedQuoteAt.get(t.id) ?? declinedInviteAt.get(t.id) ?? null,
       ...dueInfo(t, rules, now),
       declinedForMe,
     })
