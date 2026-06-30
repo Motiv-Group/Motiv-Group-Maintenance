@@ -21,8 +21,8 @@ export function RegionalOverview({ data, name, briefing, briefingScopeId }: { da
   const p = data.portfolio
   const greeting = (() => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening' })()
 
-  // Quotes submitted and waiting on the RM's approve/decline decision.
-  const quotesAwaiting = data.tickets.filter(t => t.status === 'quoted').length
+  // Quotes (and variation orders) submitted and waiting on the RM's decision.
+  const quotesAwaiting = data.tickets.filter(t => t.status === 'quoted' || t.status === 'variation_review').length
   // "Open" = still open/info-requested AND no supplier assigned yet. Once a
   // supplier is on it, it's being handled, not open. Matches the Tickets-tab pill.
   const openCount = data.tickets.filter(t => (t.status === 'open' || t.status === 'info_requested') && !t.supplierAssigned).length

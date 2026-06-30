@@ -5,7 +5,7 @@
 // hours). The Submit COC & POC flow lives on its own page (/complete).
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Calendar, Paperclip, X, FileText } from 'lucide-react'
+import { Calendar, Paperclip, X, FileText, Wrench } from 'lucide-react'
 import { SchedulePicker } from '@/components/ui/SchedulePicker'
 import { Button } from '@/components/ui/Button'
 import { createClient } from '@/lib/supabase/client'
@@ -189,6 +189,38 @@ export function AcceptSnagCard({ ticketId, priority, createdAt }: { ticketId: st
             <p className="font-semibold text-[var(--text)]">Schedule the snag fix</p>
             {err && <p className="text-xs text-red-500">{err}</p>}
             <SchedulePicker priority={priority} createdAt={createdAt} busy={busy} onConfirm={doAccept} onCancel={() => setOpen(false)} />
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+// Assign a technician to the job — UI only for now (selection isn't persisted yet).
+export function AssignTechnicianButton({ technicians = [] }: { technicians?: { id: string; name: string }[] }) {
+  const [open, setOpen] = useState(false)
+  const [techId, setTechId] = useState('')
+  return (
+    <>
+      <button onClick={() => setOpen(true)} className="w-full py-2.5 rounded-xl ring-1 ring-[var(--border)] text-[var(--text)] text-sm font-semibold hover:bg-[var(--hover)] transition flex items-center justify-center gap-1.5">
+        <Wrench size={15} /> Assign technician
+      </button>
+      {open && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setOpen(false)}>
+          <div className="bg-[var(--surface-2)] ring-1 ring-[var(--border)] rounded-2xl p-5 max-w-sm w-full space-y-3" onClick={e => e.stopPropagation()}>
+            <p className="font-semibold text-[var(--text)]">Assign a technician</p>
+            {technicians.length ? (
+              <select value={techId} onChange={e => setTechId(e.target.value)} className="w-full px-3 py-2 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm outline-none focus:ring-[#C6A35D]/40">
+                <option value="">— Select a technician —</option>
+                {technicians.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            ) : (
+              <p className="text-xs text-[var(--text-muted)]">No technicians yet — add them under the <span className="text-[#C6A35D]">Technicians</span> tab.</p>
+            )}
+            <div className="flex gap-2">
+              <button disabled={!techId} onClick={() => setOpen(false)} className="flex-1 py-2 rounded-lg bg-[#C6A35D] text-[#0a0e17] text-sm font-semibold disabled:opacity-50">Assign</button>
+              <button onClick={() => setOpen(false)} className="flex-1 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm">Cancel</button>
+            </div>
           </div>
         </div>
       )}

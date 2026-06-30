@@ -121,15 +121,11 @@ export function RmNewTicketForm({ stores, suppliers }: { stores: { id: string; n
           <p className="text-center text-[11px] text-[var(--text-faint)] mt-2.5">{remaining} of {MAX_PHOTOS} slots remaining · drag &amp; drop also works</p>
 
           {files.length > 0 && (
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mt-3">
+            <div className="mt-3 space-y-1">
               {files.map((f, i) => (
-                <div key={i} className="relative">
-                  <button type="button" onClick={() => setPreview(previews[i])} className="block w-full aspect-square rounded-lg overflow-hidden ring-1 ring-slate-300 dark:ring-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/60" title={`View ${f.name}`}>
-                    <img src={previews[i]} alt={f.name} className="w-full h-full object-cover" />
-                  </button>
-                  <button type="button" onClick={() => setFiles(files.filter((_, j) => j !== i))} className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center shadow" title="Remove">
-                    <X size={11} />
-                  </button>
+                <div key={i} className="flex items-center justify-between gap-2">
+                  <button type="button" onClick={() => setPreview(previews[i])} className="text-sm text-[#C6A35D] underline truncate min-w-0 text-left" title={`View ${f.name}`}>Photo {i + 1} — {f.name}</button>
+                  <button type="button" onClick={() => setFiles(files.filter((_, j) => j !== i))} className="shrink-0 text-[var(--text-faint)] hover:text-red-500" title="Remove"><X size={14} /></button>
                 </div>
               ))}
             </div>

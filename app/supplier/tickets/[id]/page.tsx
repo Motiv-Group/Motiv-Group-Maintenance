@@ -18,13 +18,13 @@ import { RmPipeline } from '@/components/regional/RmPipeline'
 import { SupplierAttachments } from '@/components/workflow/SupplierAttachments'
 import { SendQuoteForm } from '@/components/admin/SendQuoteForm'
 import { QuoteSummary, type QuoteSummaryStatus } from '@/components/workflow/QuoteSummary'
-import { ScheduleJobCard, RaiseVariationCard, DeclineWorkButton, AcceptSnagCard, StartSnagButton } from '@/components/supplier/SupplierJobActions'
+import { ScheduleJobCard, RaiseVariationCard, DeclineWorkButton, AcceptSnagCard, StartSnagButton, AssignTechnicianButton } from '@/components/supplier/SupplierJobActions'
 import { DueDate } from '@/components/workflow/DueDate'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { EditedLine } from '@/components/ui/EditedLine'
 import { AuditTrail } from '@/components/ui/AuditTrail'
 import { CollapsibleSection } from '@/components/ui/CollapsibleSection'
-import { formatDateTime, rmStatusMeta, storeLabel, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
+import { formatCurrency, formatDateTime, rmStatusMeta, storeLabel, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
 
 // Shown when the RM declined a quote without typing a reason.
 const DEFAULT_DECLINE_REASON = 'Thank you for your submission. Although your quotation was not selected for this request, we value your participation and look forward to inviting you to future opportunities.'
@@ -99,7 +99,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   const admin = createAdminClient()
   const { data: t } = await admin.from('tickets').select('*').eq('id', params.id).single()
   if (!t || t.company_id !== companyId) redirect('/supplier/tickets')
-  const [{ data: store }, { data: updates }, { data: invite }, { data: myQuotes }, { data: technicianRows }, { data: signoffRows }, { data: snagRows }, { data: companyRow }] = await Promise.all([
+  const [{ data: store }, { data: updates }, { data: invite }, { data: myQuotes }, { data: technicianRows }, { data: signoffRows }, { data: snagRows }, { data: companyRow }, { data: variationRows }] = await Promise.all([
     admin.from('stores').select('name, sub_store').eq('id', t.store_id).single(),
     admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('ticket_suppliers').select('supplier_id, status, invited_at, decline_reason, responded_at, declined_by').eq('ticket_id', t.id).in('supplier_id', supplierIds).maybeSingle(),
@@ -108,7 +108,10 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
     admin.from('signoffs').select('id, before_urls, after_urls, coc_url, invoice_url, status, notes, reject_reason, created_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).order('created_at', { ascending: false }),
     admin.from('snags').select('description, required_correction, severity, status, scheduled_at, schedule_status, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('companies').select('name').eq('id', companyId).maybeSingle(),
+    admin.from('ticket_variations').select('description, amount, status, created_at, file_urls').eq('ticket_id', t.id).order('created_at', { ascending: false }),
   ])
+  // Approved variation orders — shown alongside the quote detail.
+  const approvedVOs = ((variationRows ?? []) as any[]).filter(v => v.status === 'approved')
   // Client organisation that owns the store (shown in the ticket detail).
   const companyName = (companyRow as any)?.name ?? null
   // This supplier's own trade-company name — used in the "declined by …" block.
@@ -271,12 +274,17 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
               ? <StartSnagButton ticketId={t.id} />
               : <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 text-sm text-[var(--text-muted)]">Snag fix proposed{latestSnag?.scheduled_at ? ` for ${formatDateTime(latestSnag.scheduled_at)}` : ''} — awaiting the manager&apos;s approval before you can start.</div>
           )}
+          {/* After the quote is accepted/scheduled — assign a technician (UI only for now), shown above the in-progress button. */}
+          {awarded && t.status === 'scheduled' && <AssignTechnicianButton technicians={technicians} />}
           {awarded && ['in_progress', 'snag_resolved', 'snag_in_progress', 'evidence_requested'].includes(t.status) && (
-            <SubmitCompletionForm ticketId={t.id} />
+            <SubmitCompletionForm ticketId={t.id} evidenceRequested={t.status === 'evidence_requested'} />
           )}
           {awarded && t.status === 'in_progress' && <RaiseVariationCard ticketId={t.id} />}
           {awarded && t.status === 'variation_review' && (
             <div className="rounded-xl bg-purple-500/10 ring-1 ring-purple-500/30 p-3.5 text-sm text-[var(--text-muted)]">Variation order submitted — awaiting approval from the regional manager.</div>
+          )}
+          {awarded && t.status === 'submitted_for_signoff' && (
+            <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 text-sm text-[var(--text-muted)]">COC &amp; POC submitted — awaiting the regional manager&apos;s approval.</div>
           )}
           <WorkflowActions ticketId={t.id} status={t.status} role="supplier" exclude={['schedule', 'submit_completion', 'require_assessment', 'request_quote', 'submit_variation', 'accept_snag', 'start_snag']} />
           {/* Opt out of the job (before award) — separated from the primary actions */}
@@ -284,8 +292,8 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
         </Card>
       )}
 
-      {/* Quotes — full history, own block (out of the Next-step box) */}
-      {(myQuotes ?? []).length > 0 && (
+      {/* Quotes — full history (+ approved variation orders), own block */}
+      {((myQuotes ?? []).length > 0 || approvedVOs.length > 0) && (
         <CollapsibleSection id="ticket-quotes" title="Quotes" defaultOpen={phase === 'commercial'}>
           {((myQuotes ?? []) as any[]).map((q, i, arr) => (
             <QuoteSummary
@@ -302,12 +310,36 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
               }
             />
           ))}
+          {approvedVOs.map((v, i) => (
+            <div key={i} className="rounded-xl ring-1 ring-emerald-500/40 bg-emerald-500/5 overflow-hidden">
+              <div className="flex items-center justify-between gap-2 px-4 py-2.5 bg-emerald-500/10 border-b border-emerald-500/20">
+                <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]"><FileText size={15} className="text-emerald-500 shrink-0" /> Variation order</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400 bg-emerald-500/15 rounded-full px-2 py-0.5 shrink-0">Approved</span>
+              </div>
+              <div className="p-4 space-y-2">
+                {v.amount != null && <p className="text-base font-bold text-[var(--text)]">{formatCurrency(v.amount)}</p>}
+                <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{v.description}</p>
+                <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(v.created_at)}</p>
+                {Array.isArray(v.file_urls) && v.file_urls.length > 0 && (
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 pt-0.5">
+                    {v.file_urls.map((u: string, j: number) => <a key={j} href={u} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[11px] font-medium text-[#C6A35D] hover:underline"><FileText size={12} /> Attachment {j + 1}</a>)}
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
         </CollapsibleSection>
       )}
 
       {/* COC & POC — the submission(s) currently under review (pending sign-off) */}
       {pendingSignoffs.length > 0 && (
         <CollapsibleSection id="ticket-coc" title="COC & POC" defaultOpen={phase === 'coc'}>
+          {t.status === 'evidence_requested' && t.evidence_request_reason && (
+            <div className="rounded-lg bg-amber-500/10 ring-1 ring-amber-500/30 p-3">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400">More evidence requested</p>
+              <p className="text-sm text-[var(--text)]">{t.evidence_request_reason}</p>
+            </div>
+          )}
           {pendingSignoffs.map(s => <SignoffCard key={s.id} s={s} />)}
         </CollapsibleSection>
       )}

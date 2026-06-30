@@ -27,7 +27,7 @@ async function addEvidence(ticketId: string, kind: string, url: string) {
   if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Upload failed')
 }
 
-export function SubmitCompletionForm({ ticketId }: { ticketId: string }) {
+export function SubmitCompletionForm({ ticketId, evidenceRequested = false }: { ticketId: string; evidenceRequested?: boolean }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [coc, setCoc] = useState<File | null>(null)
@@ -73,7 +73,7 @@ export function SubmitCompletionForm({ ticketId }: { ticketId: string }) {
     return (
       <button type="button" onClick={() => setOpen(true)}
         className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition">
-        <CheckCircle2 size={18} /> Upload COC &amp; POC
+        <CheckCircle2 size={18} /> {evidenceRequested ? 'Upload more evidence' : 'Upload COC & POC'}
       </button>
     )
   }
@@ -120,12 +120,11 @@ export function SubmitCompletionForm({ ticketId }: { ticketId: string }) {
           <p className="text-[11px] text-[var(--text-faint)] text-center mt-2">{remaining} of {MAX_PHOTOS} slots remaining · drag &amp; drop also works</p>
 
           {photos.length > 0 && (
-            <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 mt-3">
+            <div className="mt-3 space-y-1">
               {photos.map((f, i) => (
-                <div key={i} className="relative aspect-square rounded-lg overflow-hidden ring-1 ring-[var(--border)]">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={previews[i]} alt="" className="w-full h-full object-cover" />
-                  <button type="button" onClick={() => setPhotos(p => p.filter((_, j) => j !== i))} className="absolute top-0.5 right-0.5 p-0.5 rounded-full bg-black/60 text-white"><X size={12} /></button>
+                <div key={i} className="flex items-center justify-between gap-2">
+                  <a href={previews[i]} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C6A35D] underline truncate min-w-0">Photo {i + 1} — {f.name}</a>
+                  <button type="button" onClick={() => setPhotos(p => p.filter((_, j) => j !== i))} className="shrink-0 text-[var(--text-faint)] hover:text-red-500"><X size={14} /></button>
                 </div>
               ))}
             </div>

@@ -218,6 +218,12 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
               <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-[#C6A35D] bg-[#C6A35D]/15 rounded-full px-2 py-0.5 shrink-0">Under review</span>
             </div>
             <div className="p-4 space-y-3">
+              {t.status === 'evidence_requested' && t.evidence_request_reason && (
+                <div className="rounded-lg bg-amber-500/10 ring-1 ring-amber-500/30 p-3">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400">More evidence requested</p>
+                  <p className="text-sm text-[var(--text)]">{t.evidence_request_reason}</p>
+                </div>
+              )}
               <div>
                 <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Proof of completion</div>
                 <div className="flex flex-wrap gap-x-4 gap-y-1">
@@ -290,6 +296,13 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
           <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 flex items-start gap-2.5">
             <Clock size={16} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
             <p className="text-sm text-[var(--text-muted)]">{SNAG_WAIT_MSG[t.status]}</p>
+          </div>
+        )}
+
+        {t.status === 'evidence_requested' && (
+          <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 flex items-start gap-2.5">
+            <Clock size={16} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
+            <p className="text-sm text-[var(--text-muted)]">Awaiting the supplier to provide the additional evidence requested on the completion (COC &amp; POC).</p>
           </div>
         )}
 
@@ -423,7 +436,15 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
                       </div>
                     )}
                   </div>
-                  <span className="text-xs text-[var(--text)] whitespace-nowrap">{v.amount ? formatCurrency(v.amount) : '—'} · {v.status}</span>
+                  <div className="flex flex-col items-end gap-1 shrink-0 whitespace-nowrap">
+                    {v.amount != null && <span className="text-xs font-semibold text-[var(--text)]">{formatCurrency(v.amount)}</span>}
+                    {(() => {
+                      const meta = v.status === 'approved' ? { l: 'VO accepted', c: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' }
+                        : v.status === 'rejected' ? { l: 'VO rejected', c: 'bg-red-500/15 text-red-700 dark:text-red-400' }
+                        : { l: 'Pending', c: 'bg-amber-500/15 text-amber-700 dark:text-amber-400' }
+                      return <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 ${meta.c}`}>{meta.l}</span>
+                    })()}
+                  </div>
                 </div>
               ))}
             </div>

@@ -205,7 +205,7 @@ export function rmStatusMeta(status: string): { label: string; cls: string; text
     in_progress:           { label: 'In progress',       cls: gold, text: goldT },
     variation_review:      { label: 'Quoted VO',         cls: purple, text: purpleT },
     submitted_for_signoff: { label: 'Awaiting sign-off', cls: orange, text: orangeT },
-    evidence_requested:    { label: 'Awaiting sign-off', cls: orange, text: orangeT },
+    evidence_requested:    { label: 'Sign-off info',     cls: 'bg-amber-500/15 text-amber-700 dark:text-amber-400', text: 'text-amber-700 dark:text-amber-400' },
     snag:                  { label: 'Snag',              cls: `bg-red-500/15 ${redT}`, text: redT },
     snag_assigned:         { label: 'Snag',              cls: `bg-red-500/15 ${redT}`, text: redT },
     snag_resolved:         { label: 'Awaiting sign-off', cls: orange, text: orangeT },

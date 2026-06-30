@@ -14,7 +14,7 @@ interface Props {
   cols?: 3 | 4
 }
 
-export function PhotoUploader({ photos, previews, onAdd, onRemove, max = 5, minHint, cols = 3 }: Props) {
+export function PhotoUploader({ photos, previews, onAdd, onRemove, max = 5, minHint }: Props) {
   const browseRef = useRef<HTMLInputElement>(null)
   const cameraRef = useRef<HTMLInputElement>(null)
   const remaining = max - photos.length
@@ -38,23 +38,17 @@ export function PhotoUploader({ photos, previews, onAdd, onRemove, max = 5, minH
     e.target.value = ''
   }
 
-  const gridClass = cols === 4 ? 'grid-cols-4' : 'grid-cols-3'
-
   return (
     <div className="space-y-3">
 
-      {/* Previews */}
+      {/* Previews — shown as links (open the image in a new tab) */}
       {previews.length > 0 && (
-        <div className={`grid ${gridClass} gap-2`}>
+        <div className="space-y-1">
           {previews.map((src, i) => (
-            <div key={i} className="relative aspect-square rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-700">
-              <img src={src} alt={`Photo ${i + 1}`} className="w-full h-full object-cover" />
-              <button
-                type="button"
-                onClick={() => onRemove(i)}
-                className="absolute top-1 right-1 bg-black/50 text-white rounded-full p-0.5 hover:bg-black/70 transition-colors"
-              >
-                <X size={12} />
+            <div key={i} className="flex items-center justify-between gap-2">
+              <a href={src} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C6A35D] underline truncate min-w-0">Photo {i + 1}</a>
+              <button type="button" onClick={() => onRemove(i)} className="shrink-0 text-[var(--text-faint)] hover:text-red-500">
+                <X size={14} />
               </button>
             </div>
           ))}

@@ -79,6 +79,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
         break
       case 'request_evidence':
         updates.evidence_required = true
+        updates.evidence_request_reason = body.reason ?? null
         break
       case 'submit_quote': {
         const amount = Number(body.amount)
