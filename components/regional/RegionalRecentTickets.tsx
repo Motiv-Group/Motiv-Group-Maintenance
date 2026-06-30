@@ -24,10 +24,9 @@ export function RegionalRecentTickets({ tickets }: { tickets: RegionalTicketRow[
   }, [tickets])
 
   return (
-    <Card className="p-5">
-      <div onClick={() => setOpen(o => !o)} role="button" tabIndex={0} aria-expanded={open}
-        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(o => !o) } }}
-        className="flex items-center justify-between gap-2 mb-3 -m-1 p-1 rounded-lg cursor-pointer hover:bg-black/5 dark:hover:bg-[var(--hover)] transition">
+    <Card className="p-5 cursor-pointer hover:ring-[#C6A35D]/30 transition" onClick={() => setOpen(o => !o)} role="button" tabIndex={0} aria-expanded={open}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(o => !o) } }}>
+      <div className="flex items-center justify-between gap-2 mb-3">
         <span className="flex items-center gap-2 min-w-0">
           <ChevronDown size={16} className={`shrink-0 text-[var(--text-muted)] transition-transform ${open ? 'rotate-180' : ''}`} />
           <span className="text-sm font-bold text-[var(--text)]">Recent Tickets</span>
@@ -36,7 +35,7 @@ export function RegionalRecentTickets({ tickets }: { tickets: RegionalTicketRow[
         <Link href="/regional/tickets" onClick={e => e.stopPropagation()} className="text-xs font-medium text-[#C6A35D] hover:underline shrink-0">All</Link>
       </div>
 
-      {open && (recent.length ? recent.map(t => {
+      {open && (recent.length ? <div onClick={e => e.stopPropagation()}>{recent.map(t => {
         const sm = rmStatusMeta(t.status)
         return (
           <Link key={t.id} href={`/regional/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2 -mx-2 px-2 rounded-lg border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition">
@@ -57,7 +56,7 @@ export function RegionalRecentTickets({ tickets }: { tickets: RegionalTicketRow[
             </div>
           </Link>
         )
-      }) : <p className="text-sm text-[var(--text-faint)]">No recent tickets.</p>)}
+      })}</div> : <p className="text-sm text-[var(--text-faint)]">No recent tickets.</p>)}
     </Card>
   )
 }

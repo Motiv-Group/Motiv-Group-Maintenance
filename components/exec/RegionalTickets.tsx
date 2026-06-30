@@ -195,13 +195,13 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
 
       {/* SLA breached — pinned at the top when no filter is active, collapsible */}
       {filter === null && breachedRows.length > 0 && (
-        <Card className="p-3 ring-1 ring-red-500/40">
-          <button onClick={toggleBreached} aria-expanded={breachedOpen} className="w-full flex items-center gap-2 -m-1 p-1 rounded-lg hover:bg-[var(--hover)] transition">
+        <Card className="p-3 ring-1 ring-red-500/40 cursor-pointer hover:ring-red-500/60 transition" onClick={toggleBreached} role="button" tabIndex={0} aria-expanded={breachedOpen} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleBreached() } }}>
+          <div className="w-full flex items-center gap-2">
             <ChevronDown size={16} className={`shrink-0 text-red-500 transition-transform ${breachedOpen ? 'rotate-180' : ''}`} />
             <span className="text-sm font-bold text-red-600 dark:text-red-400">SLA Breached</span>
             <span className="text-[11px] font-medium text-red-700 dark:text-red-400 bg-red-500/15 rounded-full px-2 py-0.5">{breachedRows.length}</span>
-          </button>
-          {breachedOpen && <div className="px-1 mt-1">{breachedRows.map(t => <TicketRow key={t.id} t={t} />)}</div>}
+          </div>
+          {breachedOpen && <div className="px-1 mt-1" onClick={e => e.stopPropagation()}>{breachedRows.map(t => <TicketRow key={t.id} t={t} />)}</div>}
         </Card>
       )}
 
@@ -209,16 +209,16 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
       {groups.map(([store, g]) => {
         const isCollapsed = !expanded.has(store)
         return (
-          <Card key={store} className="p-3">
+          <Card key={store} className="p-3 cursor-pointer hover:ring-[#C6A35D]/30 transition" onClick={() => toggle(store)} role="button" tabIndex={0} aria-expanded={!isCollapsed} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(store) } }}>
             <div className="flex items-center justify-between gap-2 mb-1">
-              <button onClick={() => toggle(store)} aria-expanded={!isCollapsed} className="flex items-center gap-2 min-w-0 -m-1 p-1 rounded-lg hover:bg-[var(--hover)] transition">
+              <span className="flex items-center gap-2 min-w-0">
                 <ChevronDown size={16} className={`shrink-0 text-[var(--text-muted)] transition-transform ${isCollapsed ? '' : 'rotate-180'}`} />
                 <span className="text-sm font-bold text-[var(--text)] truncate">{store}{g.branchCode ? ` · ${g.branchCode}` : ''}</span>
                 <span className="text-[11px] font-medium text-[var(--text-muted)] bg-black/5 dark:bg-white/10 rounded-full px-2 py-0.5">{g.rows.length}</span>
-              </button>
-              <button onClick={() => setPanelStore(store)} title="Store overview" className="shrink-0 -m-1 p-1.5 rounded-lg text-[var(--text-faint)] hover:text-[#C6A35D] hover:bg-[#C6A35D]/10 transition"><BarChart3 size={16} /></button>
+              </span>
+              <button onClick={e => { e.stopPropagation(); setPanelStore(store) }} title="Store overview" className="shrink-0 -m-1 p-1.5 rounded-lg text-[var(--text-faint)] hover:text-[#C6A35D] hover:bg-[#C6A35D]/10 transition"><BarChart3 size={16} /></button>
             </div>
-            {!isCollapsed && <div className="px-1">{g.rows.map(t => <TicketRow key={t.id} t={t} />)}</div>}
+            {!isCollapsed && <div className="px-1" onClick={e => e.stopPropagation()}>{g.rows.map(t => <TicketRow key={t.id} t={t} />)}</div>}
           </Card>
         )
       })}
@@ -226,14 +226,14 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
 
       {/* Archive — completed tickets, only under the All filter */}
       {archived.length > 0 && (
-        <Card className="p-3">
-          <button onClick={toggleArchive} aria-expanded={archiveOpen} className="w-full flex items-center gap-2 -m-1 p-1 rounded-lg hover:bg-[var(--hover)] transition">
+        <Card className="p-3 cursor-pointer hover:ring-[#C6A35D]/30 transition" onClick={toggleArchive} role="button" tabIndex={0} aria-expanded={archiveOpen} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleArchive() } }}>
+          <div className="w-full flex items-center gap-2">
             <ChevronDown size={16} className={`shrink-0 text-[var(--text-muted)] transition-transform ${archiveOpen ? 'rotate-180' : ''}`} />
             <span className="text-sm font-bold text-[var(--text)]">Archive · Completed</span>
             <span className="text-[11px] font-medium text-[var(--text-muted)] bg-black/5 dark:bg-white/10 rounded-full px-2 py-0.5">{archived.length}</span>
-          </button>
+          </div>
           {archiveOpen && (
-            <div className="px-1">
+            <div className="px-1" onClick={e => e.stopPropagation()}>
               {archived.map(t => {
                 const sm = rmStatusMeta(t.status)
                 return (
