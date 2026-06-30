@@ -37,6 +37,16 @@ const urgency = (p: string) => URGENCY[p] ?? 5
 const byDateThenUrgency = (a: RegionalTicketRow, b: RegionalTicketRow) =>
   (+new Date(b.createdAt) - +new Date(a.createdAt)) || (urgency(a.priority) - urgency(b.priority))
 
+// Tint a store group's count badge by its most urgent active ticket — red for an
+// urgent (P1) ticket, orange for a high (P2) one — so pressing stores stand out.
+// Cancelled tickets don't count. Falls back to the neutral grey badge.
+function groupCountCls(rows: RegionalTicketRow[]): string {
+  const active = rows.filter(t => bucketOf(t.status, t.supplierAssigned) !== 'cancelled')
+  if (active.some(t => urgency(t.priority) === 0)) return 'bg-red-500/15 text-red-700 dark:text-red-400'
+  if (active.some(t => urgency(t.priority) === 1)) return 'bg-orange-500/15 text-orange-700 dark:text-orange-400'
+  return 'text-[var(--text-muted)] bg-black/5 dark:bg-white/10'
+}
+
 // No "All" pill: a null filter means all tickets, and clicking an active pill
 // deselects back to that default. Internal/Supplier breach + Overdue + Re-open
 // sit before Cancelled. A breach that has gone fully overdue drops out of the
@@ -231,7 +241,7 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
               <span className="flex items-center gap-2 min-w-0">
                 <ChevronDown size={16} className={`shrink-0 text-[var(--text-muted)] transition-transform ${isCollapsed ? '' : 'rotate-180'}`} />
                 <span className="text-sm font-bold text-[var(--text)] truncate">{store}{g.branchCode ? ` · ${g.branchCode}` : ''}</span>
-                <span className="text-[11px] font-medium text-[var(--text-muted)] bg-black/5 dark:bg-white/10 rounded-full px-2 py-0.5">{g.rows.length}</span>
+                <span className={`text-[11px] font-medium rounded-full px-2 py-0.5 shrink-0 ${groupCountCls(g.rows)}`}>{g.rows.length}</span>
               </span>
               <button onClick={e => { e.stopPropagation(); setPanelStore(store) }} title="Store overview" className="shrink-0 -m-1 p-1.5 rounded-lg text-[var(--text-faint)] hover:text-[#C6A35D] hover:bg-[#C6A35D]/10 transition"><BarChart3 size={16} /></button>
             </div>
