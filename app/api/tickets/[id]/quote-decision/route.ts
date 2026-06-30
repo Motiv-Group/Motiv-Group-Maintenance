@@ -47,18 +47,35 @@ export async function POST(request: Request, { params }: { params: { id: string 
   }
 
   if (action === 'decline') {
-    // Decline + re-open: the RM then chooses (in the Actions block) to let a supplier
-    // re-quote, assign a different supplier, or cancel the ticket.
+    // "Choosing another supplier" is the only destructive reason — it takes the
+    // supplier off the ticket. Every other reason (price, scope, lead time, other)
+    // is a soft decline: the same supplier is asked for an updated quote and the
+    // ticket stays in "Quote requested" until a quote is approved.
+    const hard = reason === 'Choosing another supplier'
     await admin.from('quotes').update({ status: 'declined' }).eq('id', quote.id)
-    await admin.from('ticket_suppliers').update({ status: 'declined', decline_reason: reason, declined_by: 'regional_manager', responded_at: now }).eq('ticket_id', ticket.id).eq('supplier_id', quote.supplier_id)
-    await admin.from('tickets').update({
-      status: 'open', supplier_id: null,
-      quote_decision_required: false, quote_decision_status: null,
-      current_blocker: null, blocker_owner_type: null, blocker_started_at: null, sla_paused: false,
-      last_internal_update_at: now, updated_at: now,
-    }).eq('id', ticket.id)
-    await notify(`Your quote was declined${reason ? ` (${reason})` : ''}.`, 'Quote declined')
-    revalidatePath('/regional'); revalidatePath(`/regional/tickets/${ticket.id}`); revalidatePath('/supplier')
+    if (hard) {
+      await admin.from('ticket_suppliers').update({ status: 'declined', decline_reason: reason, declined_by: 'regional_manager', responded_at: now }).eq('ticket_id', ticket.id).eq('supplier_id', quote.supplier_id)
+      await admin.from('tickets').update({
+        status: 'open', supplier_id: null,
+        quote_decision_required: false, quote_decision_status: null,
+        current_blocker: null, blocker_owner_type: null, blocker_started_at: null, sla_paused: false,
+        last_internal_update_at: now, updated_at: now,
+      }).eq('id', ticket.id)
+      await notify(`Your quote was declined${reason ? ` (${reason})` : ''}.`, 'Quote declined')
+    } else {
+      const rules = await loadSlaResolver(admin, ticket.company_id)
+      const quoteDueAt = new Date(Date.now() + rules(ticket.priority as 'P1' | 'P2' | 'P3' | 'P4').quote_due_mins * 60_000).toISOString()
+      // 'invited' + a decline_reason → shown to the RM as "Awaiting updated quote".
+      await admin.from('ticket_suppliers').update({ status: 'invited', decline_reason: reason, declined_by: null, responded_at: now }).eq('ticket_id', ticket.id).eq('supplier_id', quote.supplier_id)
+      await admin.from('tickets').update({
+        status: 'quote_requested', supplier_id: null, quote_required: true, quote_requested_at: now, quote_due_at: quoteDueAt,
+        quote_decision_required: false, quote_decision_status: null,
+        current_blocker: 'supplier_action', blocker_owner_type: 'supplier', blocker_started_at: now, sla_paused: false,
+        last_internal_update_at: now, updated_at: now,
+      }).eq('id', ticket.id)
+      await notify(`Your quote was declined (${reason}). Please submit an updated quote.`, 'Submit an updated quote')
+    }
+    revalidatePath('/regional'); revalidatePath(`/regional/tickets/${ticket.id}`); revalidatePath('/supplier'); revalidatePath(`/supplier/tickets/${ticket.id}`)
     return NextResponse.json({ ok: true })
   }
 

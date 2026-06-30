@@ -164,6 +164,38 @@ export function RaiseVariationCard({ ticketId }: { ticketId: string }) {
   )
 }
 
+// Accept a raised snag and schedule when the corrective work will happen — opens
+// the same themed calendar as Schedule job (no technician step).
+export function AcceptSnagCard({ ticketId, priority, createdAt }: { ticketId: string; priority: string; createdAt: string }) {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+
+  async function doAccept(iso: string) {
+    setBusy(true); setErr('')
+    try { await transition(ticketId, { action: 'accept_snag', scheduledAt: iso }); router.refresh() }
+    catch (e: any) { setErr(e.message); setBusy(false) }
+  }
+
+  return (
+    <>
+      <button onClick={() => setOpen(true)} className="w-full py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition flex items-center justify-center gap-1.5">
+        <Calendar size={15} /> Accept snag &amp; schedule fix
+      </button>
+      {open && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setOpen(false)}>
+          <div className="bg-[var(--surface-2)] ring-1 ring-[var(--border)] rounded-2xl p-5 max-w-sm w-full space-y-3" onClick={e => e.stopPropagation()}>
+            <p className="font-semibold text-[var(--text)]">Schedule the snag fix</p>
+            {err && <p className="text-xs text-red-500">{err}</p>}
+            <SchedulePicker priority={priority} createdAt={createdAt} busy={busy} onConfirm={doAccept} onCancel={() => setOpen(false)} />
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
 export function ScheduleJobCard({ ticketId, priority, createdAt, technicians = [] }: { ticketId: string; priority: string; createdAt: string; technicians?: { id: string; name: string }[] }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)

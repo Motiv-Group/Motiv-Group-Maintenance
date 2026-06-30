@@ -18,7 +18,7 @@ import { RmPipeline } from '@/components/regional/RmPipeline'
 import { SupplierAttachments } from '@/components/workflow/SupplierAttachments'
 import { SendQuoteForm } from '@/components/admin/SendQuoteForm'
 import { QuoteSummary, type QuoteSummaryStatus } from '@/components/workflow/QuoteSummary'
-import { ScheduleJobCard, RaiseVariationCard, DeclineWorkButton } from '@/components/supplier/SupplierJobActions'
+import { ScheduleJobCard, RaiseVariationCard, DeclineWorkButton, AcceptSnagCard } from '@/components/supplier/SupplierJobActions'
 import { DueDate } from '@/components/workflow/DueDate'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { EditedLine } from '@/components/ui/EditedLine'
@@ -159,6 +159,8 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   const declinedByLabel = declinedBy === 'supplier'
     ? (supplierCompanyName ? ` by ${supplierCompanyName}` : ' by you')
     : declinedBy === 'regional_manager' ? ' by the manager' : ''
+  // An RM decline with no typed reason falls back to the standard courteous message.
+  const declineMessage = declineReason || (declinedBy === 'regional_manager' ? DEFAULT_DECLINE_REASON : null)
   // Map a quote's DB status to the read-only summary tone (accepted shows "Approved").
   const quoteStatusOf = (s: string): QuoteSummaryStatus => s === 'accepted' ? 'accepted' : s === 'declined' ? 'declined' : 'pending'
 
@@ -247,8 +249,8 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
       {declinedForMe ? (
         <div className="rounded-2xl bg-red-500/10 ring-1 ring-red-500/40 p-5 space-y-1">
           <p className="text-sm font-bold text-red-700 dark:text-red-400">Quote request declined{declinedByLabel}</p>
-          {declineReason
-            ? <p className="text-sm text-[var(--text)]">{declineReason}</p>
+          {declineMessage
+            ? <p className="text-sm text-[var(--text)]">{declineMessage}</p>
             : <p className="text-sm text-[var(--text-muted)]">No reason was provided.</p>}
         </div>
       ) : (
@@ -263,11 +265,12 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           )}
           {canSubmitQuote && <SendQuoteForm ticketId={t.id} competitive priority={t.priority} createdAt={t.created_at} />}
           {awarded && t.status === 'accepted' && <ScheduleJobCard ticketId={t.id} priority={t.priority} createdAt={t.created_at} technicians={technicians} />}
+          {awarded && t.status === 'snag' && <AcceptSnagCard ticketId={t.id} priority={t.priority} createdAt={t.created_at} />}
           {awarded && ['in_progress', 'snag_resolved', 'snag_in_progress', 'evidence_requested'].includes(t.status) && (
             <SubmitCompletionForm ticketId={t.id} />
           )}
           {awarded && t.status === 'in_progress' && <RaiseVariationCard ticketId={t.id} />}
-          <WorkflowActions ticketId={t.id} status={t.status} role="supplier" exclude={['schedule', 'submit_completion', 'require_assessment', 'request_quote', 'submit_variation']} />
+          <WorkflowActions ticketId={t.id} status={t.status} role="supplier" exclude={['schedule', 'submit_completion', 'require_assessment', 'request_quote', 'submit_variation', 'accept_snag']} />
           {/* Opt out of the job (before award) — separated from the primary actions */}
           {canDecline && <div className="pt-1"><DeclineWorkButton ticketId={t.id} /></div>}
         </Card>

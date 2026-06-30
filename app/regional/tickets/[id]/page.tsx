@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { redirect } from 'next/navigation'
 import { BackLink } from '@/components/ui/BackLink'
-import { CheckCircle2, FileText, Calendar, CalendarClock } from 'lucide-react'
+import { CheckCircle2, FileText, Calendar, CalendarClock, Clock } from 'lucide-react'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireRegionalV3 } from '@/lib/health/guard'
 import { loadSlaResolver } from '@/lib/health/data'
@@ -21,6 +21,14 @@ import { EditedLine } from '@/components/ui/EditedLine'
 import { AuditTrail } from '@/components/ui/AuditTrail'
 import { CollapsibleSection } from '@/components/ui/CollapsibleSection'
 import { formatCurrency, formatDateTime, formatDate, rmStatusMeta, storeLabel, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
+
+// Professional "what we're waiting on" copy while a snag works its way through.
+const SNAG_WAIT_MSG: Record<string, string> = {
+  snag: 'This completion has been snagged. Awaiting the supplier to accept the snag and confirm a date to carry out the corrective work.',
+  snag_assigned: 'The supplier has accepted the snag and scheduled the corrective work. Awaiting attendance on site.',
+  snag_in_progress: 'The supplier is carrying out the corrective work and will resubmit the completion for sign-off.',
+  snag_resolved: 'The snag has been resolved. Awaiting the resubmitted completion for sign-off.',
+}
 
 function DetailItem({ label, value }: { label: string; value: string }) {
   return (
@@ -270,6 +278,13 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
 
       <Card className="p-5 space-y-4">
         <h2 className="text-sm font-bold text-[var(--text)]">Actions</h2>
+
+        {SNAG_WAIT_MSG[t.status] && (
+          <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 flex items-start gap-2.5">
+            <Clock size={16} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
+            <p className="text-sm text-[var(--text-muted)]">{SNAG_WAIT_MSG[t.status]}</p>
+          </div>
+        )}
 
         {reQuote && <p className="text-xs text-[var(--text-muted)]">A quote was declined and the ticket re-opened. You can ask a declined supplier to re-quote (see <span className="font-medium text-[var(--text)]">Declined / not selected quotes</span> below), assign a different supplier, or cancel the ticket if the issue is resolved.</p>}
 

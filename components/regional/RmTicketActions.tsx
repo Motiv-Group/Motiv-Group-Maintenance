@@ -199,7 +199,11 @@ export function SupplierStatusList({ rows }: { rows: { name: string; status: str
   return (
     <div className="space-y-2">
       {rows.map((r, i) => {
-        const m = TS_META[r.status] ?? TS_META.invited
+        // A still-invited supplier that carries a decline reason was soft-declined
+        // and asked to re-quote → "Awaiting updated quote" rather than "Waiting".
+        const m = (r.status === 'invited' && r.declineReason)
+          ? { dot: 'bg-amber-500', label: 'Awaiting updated quote', txt: 'text-amber-700 dark:text-amber-400' }
+          : (TS_META[r.status] ?? TS_META.invited)
         return (
           <div key={i} className="space-y-1.5">
             <div className="flex items-center justify-between gap-2">
