@@ -12,6 +12,7 @@ const NEUTRAL = { active: 'bg-slate-800 text-white border-slate-800 dark:bg-whit
 const FILTERS: { key: string; label: string; active: string; inactive: string }[] = [
   { key: 'all', label: 'All', ...NEUTRAL },
   { key: 'awaiting', label: 'Awaiting', active: 'bg-[#C6A35D] text-[#0a0e17] border-[#C6A35D]', inactive: 'text-amber-600 dark:text-[#C6A35D] border-[#C6A35D]/40 hover:border-[#C6A35D]' },
+  { key: 'accepted', label: 'Accepted', active: 'bg-emerald-500 text-white border-emerald-500', inactive: 'text-emerald-600 dark:text-emerald-400 border-emerald-500/40 hover:border-emerald-400' },
   { key: 'rejected', label: 'Rejected', active: 'bg-red-500 text-white border-red-500', inactive: 'text-red-600 dark:text-red-400 border-red-500/40 hover:border-red-400' },
 ]
 const AWAITING = new Set(['submitted', 'awaiting_regional', 'awaiting_store'])
@@ -21,8 +22,8 @@ export default async function SupplierSignoffPage({ searchParams }: { searchPara
   const { companyId, supplierIds } = await requireSupplierV3()
   const d = await assembleSupplierDashboard(companyId, supplierIds)
   const active = FILTERS.some(f => f.key === searchParams?.status) ? searchParams!.status! : 'all'
-  // Completed jobs (accepted sign-off) drop off this tab — they're done.
-  const visible = d.signoffs.filter(s => s.status !== 'accepted')
+  // Show the full sign-off history incl. accepted (approved) completions.
+  const visible = d.signoffs
   const signoffsShown = visible.filter(s => matchesFilter(s.status, active))
 
   // Group sign-offs by store (within the supplier's single client company).
@@ -48,7 +49,7 @@ export default async function SupplierSignoffPage({ searchParams }: { searchPara
       {!groups.length && (
         <div className="rounded-xl border border-dashed border-[var(--border)] p-12 text-center">
           <ClipboardCheck size={28} className="mx-auto text-[var(--text-faint)] mb-2" />
-          <p className="text-sm text-[var(--text-faint)]">{visible.length ? 'No sign-offs match this filter.' : 'Nothing awaiting sign-off.'}</p>
+          <p className="text-sm text-[var(--text-faint)]">{visible.length ? 'No sign-offs match this filter.' : 'No sign-offs yet.'}</p>
         </div>
       )}
 

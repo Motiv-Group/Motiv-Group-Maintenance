@@ -194,7 +194,7 @@ export default async function SupplierOverviewPage() {
       {/* Recent tickets — moved to the bottom, collapsible */}
       <Card className="p-5">
         <details className="group">
-          <summary className="flex items-center justify-between gap-2 cursor-pointer list-none">
+          <summary className="flex items-center justify-between gap-2 cursor-pointer list-none -m-1 p-1 rounded-lg hover:bg-[var(--hover)] transition">
             <h2 className="text-sm font-bold text-[var(--text)] flex items-center gap-2"><ClipboardList size={15} className="text-blue-600 dark:text-blue-400" /> Recent Tickets</h2>
             <span className="flex items-center gap-1.5 text-[var(--text-faint)]">
               <ChevronDown size={16} className="group-open:hidden" /><ChevronUp size={16} className="hidden group-open:block" />

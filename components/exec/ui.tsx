@@ -25,8 +25,8 @@ const STATUS_WORD: Record<HealthStatus, string> = {
   controlled: 'Controlled', attention: 'Attention Required', at_risk: 'At Risk', critical: 'Critical',
 }
 
-export function Pill({ status, label }: { status: HealthStatus; label?: string }) {
-  return <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${STATUS_PILL[status]}`}>{label ?? STATUS_WORD[status]}</span>
+export function Pill({ status, label, className = '' }: { status: HealthStatus; label?: string; className?: string }) {
+  return <span className={`inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full ${STATUS_PILL[status]} ${className}`}>{label ?? STATUS_WORD[status]}</span>
 }
 
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {

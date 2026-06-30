@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Building2, ChevronRight } from 'lucide-react'
+import { Building2, ChevronRight, ChevronDown } from 'lucide-react'
 import { Card } from '@/components/exec/ui'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { formatDateTime } from '@/lib/utils'
@@ -25,12 +25,14 @@ export function RegionalSnagList({ rows }: { rows: SnagRow[] }) {
   return (
     <div className="space-y-4">
       {groups.map(([store, items]) => (
-        <Card key={store} className="p-4 space-y-1">
-          <div className="flex items-center gap-2 mb-1">
+        <details key={store} open className="group rounded-2xl bg-[var(--surface)] ring-1 ring-black/10 dark:ring-white/10 shadow-sm dark:shadow-md dark:shadow-black/20 overflow-hidden">
+          <summary className="flex items-center gap-2 px-4 py-3 cursor-pointer list-none hover:bg-[var(--hover)] transition">
             <Building2 size={15} className="text-[#C6A35D] shrink-0" />
             <span className="text-sm font-bold text-[var(--text)] truncate">{store}</span>
             <span className="text-[11px] font-medium text-[var(--text-muted)] bg-black/5 dark:bg-white/10 rounded-full px-2 py-0.5 shrink-0">{items.length}</span>
-          </div>
+            <ChevronDown size={16} className="ml-auto text-[var(--text-faint)] shrink-0 transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="px-4 pb-2 border-t border-[var(--border)]">
           {items.map(r => {
             const sm = STATUS_META[r.status] ?? STATUS_META.open
             return (
@@ -48,7 +50,8 @@ export function RegionalSnagList({ rows }: { rows: SnagRow[] }) {
               </Link>
             )
           })}
-        </Card>
+          </div>
+        </details>
       ))}
     </div>
   )

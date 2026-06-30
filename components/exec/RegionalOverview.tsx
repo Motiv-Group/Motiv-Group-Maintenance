@@ -13,6 +13,10 @@ import { formatDate, formatCurrency } from '@/lib/utils'
 
 const fmtK = (n: number) => (n >= 1000 ? `R ${(n / 1000).toFixed(0)}K` : formatCurrency(n))
 
+// Short, fixed-width status labels for the "Stores Requiring Attention" list so
+// every badge is the same size (the default "Attention Required" is too wide).
+const ATTN_PILL_LABEL: Record<string, string> = { controlled: 'Controlled', attention: 'Attention', at_risk: 'At Risk', critical: 'Critical' }
+
 export function RegionalOverview({ data, name, briefing, briefingScopeId }: { data: RegionalDashboardData; name: string | null; briefing?: Briefing; briefingScopeId?: string }) {
   const p = data.portfolio
   const greeting = (() => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening' })()
@@ -108,7 +112,7 @@ export function RegionalOverview({ data, name, briefing, briefingScopeId }: { da
           {attention.slice(0, 5).map(s => (
             <div key={s.storeId} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0">
               <div className="min-w-0"><p className="text-sm text-[var(--text)] truncate">{s.storeName}</p><p className="text-[11px] text-[var(--text-faint)] truncate">{s.mainIssue}</p></div>
-              <span className="flex items-center gap-2 shrink-0"><span className={`text-sm font-semibold ${STATUS_TEXT[s.finalStatus]}`}>{s.finalHealthScore}%</span><Pill status={s.finalStatus} /></span>
+              <span className="flex items-center gap-2 shrink-0"><span className={`text-sm font-semibold ${STATUS_TEXT[s.finalStatus]}`}>{s.finalHealthScore}%</span><Pill status={s.finalStatus} label={ATTN_PILL_LABEL[s.finalStatus]} className="w-24 text-center" /></span>
             </div>
           ))}
           {!data.attentionStores.length && <p className="text-sm text-[var(--text-faint)]">All stores controlled.</p>}

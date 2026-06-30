@@ -203,13 +203,13 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
         const isCollapsed = !expanded.has(store)
         return (
           <Card key={store} className="p-3">
-            <div className="flex items-center justify-between gap-2 mb-1">
-              <button onClick={() => toggle(store)} aria-expanded={!isCollapsed} className="flex items-center gap-2 min-w-0 -m-1 p-1 rounded-lg hover:bg-[var(--hover)] transition">
+            <div onClick={() => toggle(store)} role="button" tabIndex={0} aria-expanded={!isCollapsed} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(store) } }} className="flex items-center justify-between gap-2 mb-1 -m-1 p-1 rounded-lg cursor-pointer hover:bg-[var(--hover)] transition">
+              <span className="flex items-center gap-2 min-w-0">
                 <ChevronDown size={16} className={`shrink-0 text-[var(--text-muted)] transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
                 <span className="text-sm font-bold text-[var(--text)] truncate">{[company, store].filter(Boolean).join(' · ')}{g.branchCode ? ` · ${g.branchCode}` : ''}</span>
                 <span className="text-[11px] font-medium text-[var(--text-muted)] bg-black/5 dark:bg-white/10 rounded-full px-2 py-0.5 shrink-0">{g.rows.length}</span>
-              </button>
-              <button onClick={() => setPanelStore(store)} title="Store overview" className="shrink-0 -m-1 p-1.5 rounded-lg text-[var(--text-faint)] hover:text-[#C6A35D] hover:bg-[#C6A35D]/10 transition"><BarChart3 size={16} /></button>
+              </span>
+              <button onClick={e => { e.stopPropagation(); setPanelStore(store) }} title="Store overview" className="shrink-0 -m-1 p-1.5 rounded-lg text-[var(--text-faint)] hover:text-[#C6A35D] hover:bg-[#C6A35D]/10 transition"><BarChart3 size={16} /></button>
             </div>
             {!isCollapsed && <div className="px-1">{g.rows.map(t => <TicketRow key={t.id} t={t} />)}</div>}
           </Card>

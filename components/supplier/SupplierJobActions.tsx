@@ -7,6 +7,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Calendar, Paperclip, X, FileText } from 'lucide-react'
 import { SchedulePicker } from '@/components/ui/SchedulePicker'
+import { Button } from '@/components/ui/Button'
 import { createClient } from '@/lib/supabase/client'
 
 async function transition(ticketId: string, body: Record<string, unknown>) {
@@ -39,7 +40,7 @@ export function DeclineWorkButton({ ticketId }: { ticketId: string }) {
   }
 
   if (!open) {
-    return <button onClick={() => setOpen(true)} className="w-full py-2.5 rounded-xl ring-1 ring-red-500/40 text-red-600 dark:text-red-400 text-sm font-semibold hover:bg-red-500/10 transition">Decline work</button>
+    return <Button onClick={() => setOpen(true)} variant="danger" className="w-full">Decline work</Button>
   }
   return (
     <div className="rounded-xl ring-1 ring-[var(--border)] p-4 space-y-2">

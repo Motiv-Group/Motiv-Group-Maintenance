@@ -100,7 +100,7 @@ export default async function SupplierQuotesPage({ searchParams }: { searchParam
                 </div>
                 <div className="flex flex-col items-stretch gap-1 shrink-0 w-32">
                   <span className="text-sm font-semibold text-[var(--text)] tabular-nums whitespace-nowrap text-left">{i.amount != null ? formatCurrency(i.amount) : '—'}</span>
-                  {i.amount != null && <span className={`${BADGE} bg-[var(--surface-2)] text-[var(--text-muted)]`}>excl VAT</span>}
+                  {i.amount != null && <span className={`${BADGE} bg-slate-500/15 text-slate-600 dark:text-slate-300`}>excl VAT</span>}
                   <span className={`${BADGE} ${STATUS_BADGE[i.status] ?? 'bg-[var(--surface-2)] text-[var(--text-muted)]'}`}>{STATUS_LABEL[i.status] ?? i.status.replace('_', ' ')}</span>
                 </div>
               </Link>

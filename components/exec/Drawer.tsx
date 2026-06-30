@@ -8,12 +8,12 @@ export function Drawer({ open, onClose, children }: { open: boolean; onClose: ()
   return (
     <>
       <div
-        className={`fixed inset-0 bg-black/60 z-40 transition-opacity duration-300 ${open ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        className={`fixed inset-0 bg-black/50 z-40 transition-opacity duration-300 ${open ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
         onClick={onClose}
         aria-hidden
       />
       <aside
-        className={`fixed right-0 top-0 bottom-0 z-50 w-full sm:w-[420px] bg-[var(--surface-2)] ring-1 ring-[var(--border)] overflow-y-auto transition-transform duration-300 ease-out ${open ? 'translate-x-0' : 'translate-x-full'}`}
+        className={`fixed right-0 top-0 bottom-0 z-50 w-full sm:w-96 bg-[var(--surface-2)] ring-1 ring-[var(--border)] overflow-y-auto transition-transform duration-300 ease-out ${open ? 'translate-x-0' : 'translate-x-full'}`}
         role="dialog"
         aria-modal="true"
       >
