@@ -39,6 +39,58 @@ function DetailItem({ label, value }: { label: string; value: string }) {
   )
 }
 
+// One COC/POC submission card — reused across the under-review, sent-back (snag)
+// and approved blocks so the RM sees the full submission history. A sent-back card
+// shows the reason it was returned (why another COC/POC was needed).
+function RmSignoffCard({ s, tone }: { s: any; tone: 'review' | 'snag' | 'approved' }) {
+  const meta = tone === 'approved'
+    ? { ring: 'ring-emerald-500/40', bg: 'bg-emerald-500/5', head: 'bg-emerald-500/10 border-emerald-500/20', badge: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400', label: 'Approved', Icon: CheckCircle2, iconCls: 'text-emerald-500', title: 'Approved completion' }
+    : tone === 'snag'
+    ? { ring: 'ring-red-500/40', bg: 'bg-red-500/5', head: 'bg-red-500/10 border-red-500/20', badge: 'bg-red-500/15 text-red-700 dark:text-red-400', label: 'Sent back', Icon: FileText, iconCls: 'text-red-500', title: 'Snagged completion' }
+    : { ring: 'ring-[#C6A35D]/40', bg: 'bg-[#C6A35D]/5', head: 'bg-[#C6A35D]/10 border-[#C6A35D]/20', badge: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D]', label: 'Under review', Icon: FileText, iconCls: 'text-[#C6A35D]', title: 'Submitted completion' }
+  const before = (s.before_urls ?? []) as string[]
+  const after = (s.after_urls ?? []) as string[]
+  return (
+    <div className={`rounded-xl ring-1 ${meta.ring} ${meta.bg} overflow-hidden`}>
+      <div className={`flex items-center justify-between gap-2 px-4 py-2.5 border-b ${meta.head}`}>
+        <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)] min-w-0"><meta.Icon size={15} className={`${meta.iconCls} shrink-0`} /><span className="truncate">{meta.title} · {formatDateTime(s.created_at)}</span></span>
+        <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 shrink-0 ${meta.badge}`}>{meta.label}</span>
+      </div>
+      <div className="p-4 space-y-3">
+        {tone === 'snag' && s.reject_reason && (
+          <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Why it was sent back</p>
+            <p className="text-sm text-[var(--text)]">{s.reject_reason}</p>
+          </div>
+        )}
+        <div>
+          <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Proof of completion</div>
+          <div className="flex flex-wrap gap-x-4 gap-y-1">
+            {before.map((u, i) => <a key={`b${i}`} href={u} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C6A35D] underline hover:text-amber-500">Before {i + 1}</a>)}
+            {after.map((u, i) => <a key={`a${i}`} href={u} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C6A35D] underline hover:text-amber-500">After {i + 1}</a>)}
+            {!before.length && !after.length && <span className="text-sm text-[var(--text-faint)]">No photos</span>}
+          </div>
+        </div>
+        {(s.coc_url || s.invoice_url) && (
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Certificate of Completion</div>
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
+              {s.coc_url && <a href={s.coc_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View COC</a>}
+              {s.invoice_url && <a href={s.invoice_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View invoice</a>}
+            </div>
+          </div>
+        )}
+        {s.notes && (
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Notes</div>
+            <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{s.notes}</p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default async function RegionalTicketDetailPage({ params }: { params: { id: string } }) {
   const { companyId, regionIds } = await requireRegionalV3()
   const admin = createAdminClient()
@@ -58,11 +110,12 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   ])
   const storeName = store ? storeLabel(store.name, store.sub_store) : 'Store'
   const editorName = t.edited_by ? ((await admin.from('user_profiles').select('full_name').eq('id', t.edited_by).single()).data?.full_name ?? null) : null
+  // Full COC/POC history — every submission, split by state (mirrors the supplier
+  // view). Each sent-back card carries the reason it was rejected.
   const allSignoffs = (signoffs ?? []) as any[]
-  const pendingSignoff = allSignoffs.find(s => ['submitted', 'awaiting_regional', 'awaiting_store'].includes(s.status)) ?? null
+  const pendingSignoffs = allSignoffs.filter(s => ['submitted', 'awaiting_regional', 'awaiting_store'].includes(s.status))
   const acceptedSignoff = allSignoffs.find(s => s.status === 'accepted') ?? null
-  // The completion that was snagged (rejected) — shown in the Snag block.
-  const rejectedSignoff = allSignoffs.find(s => s.status === 'rejected') ?? null
+  const rejectedSignoffs = allSignoffs.filter(s => s.status === 'rejected')
   // Snag scheduling — the supplier's proposed fix date (separate from the original
   // job schedule) and whether it's still awaiting the RM's approval.
   const latestSnag = ((snags ?? []) as any[])[0] ?? null
@@ -209,81 +262,23 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         </div>
       )}
 
-      {/* COC & POC — the submission currently under review (pending sign-off) */}
-      {pendingSignoff && (
+      {/* COC & POC — every submission currently under review (full history) */}
+      {pendingSignoffs.length > 0 && (
         <CollapsibleSection id="ticket-coc" title="COC & POC" defaultOpen={phase === 'coc'}>
-          <div className="rounded-xl ring-1 ring-[#C6A35D]/40 bg-[#C6A35D]/5 overflow-hidden">
-            <div className="flex items-center justify-between gap-2 px-4 py-2.5 bg-[#C6A35D]/10 border-b border-[#C6A35D]/20">
-              <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]"><FileText size={15} className="text-[#C6A35D] shrink-0" /> Submitted completion · {formatDateTime(pendingSignoff.created_at)}</span>
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-[#C6A35D] bg-[#C6A35D]/15 rounded-full px-2 py-0.5 shrink-0">Under review</span>
+          {t.status === 'evidence_requested' && t.evidence_request_reason && (
+            <div className="rounded-lg bg-amber-500/10 ring-1 ring-amber-500/30 p-3">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400">More evidence requested</p>
+              <p className="text-sm text-[var(--text)]">{t.evidence_request_reason}</p>
             </div>
-            <div className="p-4 space-y-3">
-              {t.status === 'evidence_requested' && t.evidence_request_reason && (
-                <div className="rounded-lg bg-amber-500/10 ring-1 ring-amber-500/30 p-3">
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400">More evidence requested</p>
-                  <p className="text-sm text-[var(--text)]">{t.evidence_request_reason}</p>
-                </div>
-              )}
-              <div>
-                <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Proof of completion</div>
-                <div className="flex flex-wrap gap-x-4 gap-y-1">
-                  {(pendingSignoff.before_urls ?? []).map((u: string, i: number) => <a key={`b${i}`} href={u} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C6A35D] underline hover:text-amber-500">Before {i + 1}</a>)}
-                  {(pendingSignoff.after_urls ?? []).map((u: string, i: number) => <a key={`a${i}`} href={u} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C6A35D] underline hover:text-amber-500">After {i + 1}</a>)}
-                  {!(pendingSignoff.before_urls ?? []).length && !(pendingSignoff.after_urls ?? []).length && <span className="text-sm text-[var(--text-faint)]">No photos</span>}
-                </div>
-              </div>
-              {(pendingSignoff.coc_url || pendingSignoff.invoice_url) && (
-                <div>
-                  <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Certificate of Completion</div>
-                  <div className="flex flex-wrap gap-x-4 gap-y-1">
-                    {pendingSignoff.coc_url && <a href={pendingSignoff.coc_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View COC</a>}
-                    {pendingSignoff.invoice_url && <a href={pendingSignoff.invoice_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View invoice</a>}
-                  </div>
-                </div>
-              )}
-              {pendingSignoff.notes && (
-                <div>
-                  <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Notes</div>
-                  <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{pendingSignoff.notes}</p>
-                </div>
-              )}
-            </div>
-          </div>
+          )}
+          {pendingSignoffs.map((s: any) => <RmSignoffCard key={s.id} s={s} tone="review" />)}
         </CollapsibleSection>
       )}
 
       {/* Completion — the approved COC & POC, created once sign-off is accepted */}
       {acceptedSignoff && (
         <CollapsibleSection id="ticket-completion" title="Completion" defaultOpen={phase === 'completion'}>
-          <div className="rounded-xl ring-1 ring-emerald-500/40 bg-emerald-500/5 overflow-hidden">
-            <div className="flex items-center justify-between gap-2 px-4 py-2.5 bg-emerald-500/10 border-b border-emerald-500/20">
-              <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]"><CheckCircle2 size={15} className="text-emerald-500 shrink-0" /> Approved completion</span>
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400 bg-emerald-500/15 rounded-full px-2 py-0.5">Approved</span>
-            </div>
-            <div className="p-4 space-y-3">
-              <DetailItem label="Submitted" value={formatDateTime(acceptedSignoff.created_at)} />
-              <div>
-                <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Proof of completion</div>
-                <div className="flex flex-wrap gap-x-4 gap-y-1">
-                  {(acceptedSignoff.before_urls ?? []).map((u: string, i: number) => <a key={`b${i}`} href={u} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C6A35D] underline hover:text-amber-500">Before {i + 1}</a>)}
-                  {(acceptedSignoff.after_urls ?? []).map((u: string, i: number) => <a key={`a${i}`} href={u} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C6A35D] underline hover:text-amber-500">After {i + 1}</a>)}
-                  {!(acceptedSignoff.before_urls ?? []).length && !(acceptedSignoff.after_urls ?? []).length && <span className="text-sm text-[var(--text-faint)]">No photos</span>}
-                </div>
-              </div>
-              {(acceptedSignoff.coc_url || acceptedSignoff.invoice_url) && (
-                <div className="flex flex-wrap gap-x-4 gap-y-1">
-                  {acceptedSignoff.coc_url && <a href={acceptedSignoff.coc_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View COC</a>}
-                  {acceptedSignoff.invoice_url && <a href={acceptedSignoff.invoice_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View invoice</a>}
-                </div>
-              )}
-              {acceptedSignoff.notes && (
-                <div>
-                  <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Notes</div>
-                  <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{acceptedSignoff.notes}</p>
-                </div>
-              )}
-            </div>
-          </div>
+          <RmSignoffCard s={acceptedSignoff} tone="approved" />
         </CollapsibleSection>
       )}
 
@@ -452,48 +447,10 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         </CollapsibleSection>
       )}
 
-      {((snags ?? []).length > 0 || rejectedSignoff) && (
+      {((snags ?? []).length > 0 || rejectedSignoffs.length > 0) && (
         <CollapsibleSection id="ticket-snag" title="Snags" defaultOpen={phase === 'snag'}>
-          {/* The snagged COC/POC submission — full overview, like the accepted block. */}
-          {rejectedSignoff && (
-            <div className="rounded-xl ring-1 ring-red-500/40 bg-red-500/5 overflow-hidden">
-              <div className="flex items-center justify-between gap-2 px-4 py-2.5 bg-red-500/10 border-b border-red-500/20">
-                <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]"><FileText size={15} className="text-red-500 shrink-0" /> Snagged completion · {formatDateTime(rejectedSignoff.created_at)}</span>
-                <span className="text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:text-red-400 bg-red-500/15 rounded-full px-2 py-0.5 shrink-0">Snag</span>
-              </div>
-              <div className="p-4 space-y-3">
-                {rejectedSignoff.reject_reason && (
-                  <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3">
-                    <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Snag reason</p>
-                    <p className="text-sm text-[var(--text)]">{rejectedSignoff.reject_reason}</p>
-                  </div>
-                )}
-                <div>
-                  <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Proof of completion</div>
-                  <div className="flex flex-wrap gap-x-4 gap-y-1">
-                    {(rejectedSignoff.before_urls ?? []).map((u: string, i: number) => <a key={`b${i}`} href={u} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C6A35D] underline hover:text-amber-500">Before {i + 1}</a>)}
-                    {(rejectedSignoff.after_urls ?? []).map((u: string, i: number) => <a key={`a${i}`} href={u} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C6A35D] underline hover:text-amber-500">After {i + 1}</a>)}
-                    {!(rejectedSignoff.before_urls ?? []).length && !(rejectedSignoff.after_urls ?? []).length && <span className="text-sm text-[var(--text-faint)]">No photos</span>}
-                  </div>
-                </div>
-                {(rejectedSignoff.coc_url || rejectedSignoff.invoice_url) && (
-                  <div>
-                    <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Certificate of Completion</div>
-                    <div className="flex flex-wrap gap-x-4 gap-y-1">
-                      {rejectedSignoff.coc_url && <a href={rejectedSignoff.coc_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View COC</a>}
-                      {rejectedSignoff.invoice_url && <a href={rejectedSignoff.invoice_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View invoice</a>}
-                    </div>
-                  </div>
-                )}
-                {rejectedSignoff.notes && (
-                  <div>
-                    <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Notes</div>
-                    <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{rejectedSignoff.notes}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+          {/* Every snagged / sent-back COC/POC submission, each with the reason it was returned. */}
+          {rejectedSignoffs.map((s: any) => <RmSignoffCard key={s.id} s={s} tone="snag" />)}
         </CollapsibleSection>
       )}
 

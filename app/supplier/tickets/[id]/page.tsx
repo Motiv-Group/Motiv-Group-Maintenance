@@ -277,7 +277,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           {/* After the quote is accepted/scheduled — assign a technician (UI only for now), shown above the in-progress button. */}
           {awarded && t.status === 'scheduled' && <AssignTechnicianButton technicians={technicians} />}
           {awarded && ['in_progress', 'snag_resolved', 'snag_in_progress', 'evidence_requested'].includes(t.status) && (
-            <SubmitCompletionForm ticketId={t.id} evidenceRequested={t.status === 'evidence_requested'} />
+            <SubmitCompletionForm ticketId={t.id} evidenceRequested={t.status === 'evidence_requested'} requireBoth={t.status !== 'evidence_requested'} />
           )}
           {awarded && t.status === 'in_progress' && <RaiseVariationCard ticketId={t.id} />}
           {awarded && t.status === 'variation_review' && (

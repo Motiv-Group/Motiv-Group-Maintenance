@@ -27,7 +27,7 @@ async function addEvidence(ticketId: string, kind: string, url: string) {
   if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Upload failed')
 }
 
-export function SubmitCompletionForm({ ticketId, evidenceRequested = false }: { ticketId: string; evidenceRequested?: boolean }) {
+export function SubmitCompletionForm({ ticketId, evidenceRequested = false, requireBoth = true }: { ticketId: string; evidenceRequested?: boolean; requireBoth?: boolean }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [coc, setCoc] = useState<File | null>(null)
@@ -56,11 +56,16 @@ export function SubmitCompletionForm({ ticketId, evidenceRequested = false }: { 
   }
 
   async function submit() {
-    if (!coc) { setErr('Attach the Certificate of Completion (COC).'); return }
-    if (photos.length < MIN_PHOTOS) { setErr(`Add at least ${MIN_PHOTOS} completion photos.`); return }
+    if (requireBoth) {
+      if (!coc) { setErr('Attach the Certificate of Completion (COC).'); return }
+      if (photos.length < MIN_PHOTOS) { setErr(`Add at least ${MIN_PHOTOS} completion photos.`); return }
+    } else if (!coc && photos.length === 0) {
+      // Re-uploading after an evidence request — only the missing piece is needed.
+      setErr('Attach the COC or at least one completion photo.'); return
+    }
     setBusy(true); setErr('')
     try {
-      await addEvidence(ticketId, 'coc', await uploadTo('completion-docs', ticketId, coc))
+      if (coc) await addEvidence(ticketId, 'coc', await uploadTo('completion-docs', ticketId, coc))
       for (const f of photos) await addEvidence(ticketId, 'after_photo', await uploadTo('ticket-photos', ticketId, f))
       const res = await fetch(`/api/tickets/${ticketId}/transition`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'submit_completion', notes: notes || null }) })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Submit failed')
@@ -81,10 +86,11 @@ export function SubmitCompletionForm({ ticketId, evidenceRequested = false }: { 
   return (
     <div className="rounded-2xl bg-[var(--surface)] ring-1 ring-[var(--border)] p-5 sm:p-6 space-y-5">
       <h2 className="flex items-center gap-2 text-lg font-bold text-[var(--text)]"><CheckCircle2 size={20} className="text-emerald-500" /> Submit COC &amp; POC for Sign-off</h2>
+      {!requireBoth && <p className="text-sm text-[var(--text-muted)]">Add the COC and/or completion photos — at least one is required.</p>}
 
-      {/* COC (optional) */}
+      {/* COC */}
       <div>
-        <label className="block text-sm font-bold text-[var(--text)] mb-1.5">Certificate of Completion (COC) <span className="text-red-500">*</span> <span className="font-normal text-[var(--text-muted)]">(PDF, Word or photo)</span></label>
+        <label className="block text-sm font-bold text-[var(--text)] mb-1.5">Certificate of Completion (COC) {requireBoth && <span className="text-red-500">*</span>} <span className="font-normal text-[var(--text-muted)]">(PDF, Word or photo)</span></label>
         {coc ? (
           <div className="flex items-center gap-3 p-3 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)]">
             <FileText size={18} className="text-[#C6A35D] shrink-0" />
@@ -104,7 +110,7 @@ export function SubmitCompletionForm({ ticketId, evidenceRequested = false }: { 
 
       {/* POC photos (required) */}
       <div>
-        <label className="block text-sm font-bold text-[var(--text)] mb-1.5">Proof of Completion (POC) Photos <span className="text-red-500">*</span> <span className="font-normal text-[var(--text-muted)]">(minimum {MIN_PHOTOS}, up to {MAX_PHOTOS})</span></label>
+        <label className="block text-sm font-bold text-[var(--text)] mb-1.5">Proof of Completion (POC) Photos {requireBoth && <span className="text-red-500">*</span>} <span className="font-normal text-[var(--text-muted)]">({requireBoth ? `minimum ${MIN_PHOTOS}, ` : ''}up to {MAX_PHOTOS})</span></label>
         <div onDragOver={e => { e.preventDefault(); setDragPoc(true) }} onDragLeave={() => setDragPoc(false)} onDrop={e => { e.preventDefault(); setDragPoc(false); addPhotos(Array.from(e.dataTransfer.files ?? [])) }}
           className={`rounded-xl border-2 border-dashed p-3 transition ${dragPoc ? 'border-[#C6A35D] bg-[#C6A35D]/5' : 'border-[var(--border)]'}`}>
           <div className="grid grid-cols-2 gap-2">
