@@ -492,13 +492,14 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
     })
     .sort((a, b) => a.perf.performanceScore - b.perf.performanceScore)
 
-  let signoffsPending = 0, snagsOpen = 0
+  // Pending sign-offs = tickets currently awaiting the RM's sign-off (status
+  // submitted_for_signoff) — matches the Signoff tab exactly. Counting signoff ROWS
+  // over-counts: a ticket sent back for more evidence keeps its 'submitted' row but
+  // its status moves to evidence_requested, so it should drop out of this count.
+  const signoffsPending = tickets.filter(t => t.status === 'submitted_for_signoff').length
+  let snagsOpen = 0
   if (storeIds.length) {
-    const [{ count: sc }, { count: nc }] = await Promise.all([
-      db.from('signoffs').select('id', { count: 'exact', head: true }).in('status', ['submitted', 'awaiting_regional', 'awaiting_store']).in('ticket_id', tickets.map(t => t.id).length ? tickets.map(t => t.id) : ['00000000-0000-0000-0000-000000000000']),
-      db.from('snags').select('id', { count: 'exact', head: true }).eq('company_id', companyId).in('store_id', storeIds).in('status', ['open', 'in_progress']),
-    ])
-    signoffsPending = sc ?? 0
+    const { count: nc } = await db.from('snags').select('id', { count: 'exact', head: true }).eq('company_id', companyId).in('store_id', storeIds).in('status', ['open', 'in_progress'])
     snagsOpen = nc ?? 0
   }
 
