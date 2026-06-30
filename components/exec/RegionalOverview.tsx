@@ -35,8 +35,8 @@ export function RegionalOverview({ data, name, briefing, briefingScopeId }: { da
     { label: 'Quotes Awaiting Approval', value: quotesAwaiting, hint: 'to review', icon: <ReceiptText size={13} />, tone: quotesAwaiting ? 'warn' : 'good', border: quotesAwaiting ? '!ring-amber-500/60' : undefined, href: '/regional/tickets?filter=quoted' },
     { label: 'Pending Signoffs', value: data.signoffsPending, hint: 'awaiting you', icon: <ClipboardCheck size={13} />, tone: data.signoffsPending ? 'warn' : 'good', border: data.signoffsPending ? '!ring-amber-500/60' : '!ring-emerald-500/60', href: '/regional/signoff' },
     { label: 'Open Snags', value: data.snagsOpen, hint: 'to resolve', icon: <AlertTriangle size={13} />, tone: data.snagsOpen ? 'warn' : 'good', href: '/regional/snag' },
-    { label: 'Internal Breaches', value: data.breachesNow.internal, hint: 'internal SLA', icon: <Lock size={13} />, tone: data.breachesNow.internal ? 'bad' : 'good', href: '/regional/tickets?filter=breached' },
-    { label: 'Supplier Breaches', value: data.breachesNow.supplier, hint: 'supplier SLA', icon: <Truck size={13} />, tone: data.breachesNow.supplier ? 'bad' : 'good', href: '/regional/tickets?filter=breached' },
+    { label: 'Internal Breaches', value: data.breachesNow.internal, hint: 'internal SLA', icon: <Lock size={13} />, tone: data.breachesNow.internal ? 'bad' : 'good', href: '/regional/tickets?filter=internal_breach' },
+    { label: 'Supplier Breaches', value: data.breachesNow.supplier, hint: 'supplier SLA', icon: <Truck size={13} />, tone: data.breachesNow.supplier ? 'bad' : 'good', href: '/regional/tickets?filter=supplier_breach' },
   ]
 
   const focus = buildFocus(data)

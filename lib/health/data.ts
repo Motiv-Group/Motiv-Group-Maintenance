@@ -338,7 +338,8 @@ export interface RegionalTicketAction {
 export interface RegionalTicketRow {
   id: string; title: string; storeName: string; branchCode: string | null
   status: string; priority: Priority; jobRef: string | null; createdAt: string
-  quoteRequestedAt: string | null; quoteReceivedAt: string | null; quoteAcceptedAt: string | null; breached: boolean
+  quoteRequestedAt: string | null; quoteReceivedAt: string | null; quoteAcceptedAt: string | null
+  breached: boolean; supplierBreached: boolean; internalBreached: boolean
   dueAt: string; overdue: boolean; reopened: boolean; infoAdded: boolean
 }
 export interface RegionalDashboardData {
@@ -401,18 +402,22 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
   // Ticket rows (most-recent first) for the recent card + tickets tab.
   const ticketRows: RegionalTicketRow[] = [...tickets]
     .sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at))
-    .map(t => ({
+    .map(t => {
+      const s = isActive(t.status) ? computeTicketSla(t, rules(t.priority), now) : null
+      return {
       id: t.id, title: t.title ?? 'Untitled',
       storeName: storeName.get(t.store_id) ?? 'Store', branchCode: storeBranch.get(t.store_id) ?? null,
       status: t.status, priority: t.priority, jobRef: (t as any).job_ref ?? null, createdAt: t.created_at,
       quoteRequestedAt: (t as any).quote_requested_at ?? null,
       quoteReceivedAt: firstQuoteAt.get(t.id) ?? null,
       quoteAcceptedAt: ((t as any).quote_decision_status === 'approved' ? (t as any).quote_decided_at : null) ?? acceptedQuoteAt.get(t.id) ?? null,
-      breached: isActive(t.status) ? (() => { const s = computeTicketSla(t, rules(t.priority), now); return s.supplierBreached || s.internalBreached })() : false,
+      breached: !!s && (s.supplierBreached || s.internalBreached),
+      supplierBreached: !!s?.supplierBreached, internalBreached: !!s?.internalBreached,
       ...dueInfo(t, rules, now),
       reopened: declinedQuoteTickets.has(t.id) && COMMERCIAL.includes(t.status),
       infoAdded: t.status === 'open' && !!(t as any).info_request_reason,
-    }))
+      }
+    })
 
   const byStore = new Map<string, HealthTicket[]>()
   for (const t of tickets) { const a = byStore.get(t.store_id) ?? []; a.push(t); byStore.set(t.store_id, a) }
@@ -438,13 +443,15 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
   })
   const portfolio = calculateRegionalPortfolioHealth('portfolio', cards, regionSignals(tickets, rules, now))
 
-  // Live breach counts for the KPIs: every active ticket currently past its
-  // supplier/internal deadline (no 3-day grace) — so the dashboard matches the
-  // Tickets-tab "SLA Breached" pill. The health score keeps the >3d grace above.
+  // Live breach counts for the KPIs: an active ticket past its supplier/internal
+  // deadline but NOT yet fully overdue (overdue ones are counted by the separate
+  // Overdue KPI) — so the dashboard matches the split Tickets-tab pills. The
+  // health score keeps its own >3d grace above.
   let breachSupplierNow = 0, breachInternalNow = 0
   for (const t of tickets) {
     if (!isActive(t.status)) continue
     const s = computeTicketSla(t, rules(t.priority), now)
+    if (dueInfo(t, rules, now).overdue) continue
     if (s.supplierBreached) breachSupplierNow++
     if (s.internalBreached) breachInternalNow++
   }

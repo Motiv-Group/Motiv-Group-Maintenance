@@ -34,8 +34,10 @@ const byDateThenUrgency = (a: RegionalTicketRow, b: RegionalTicketRow) =>
   (+new Date(b.createdAt) - +new Date(a.createdAt)) || (urgency(a.priority) - urgency(b.priority))
 
 // No "All" pill: a null filter means all tickets, and clicking an active pill
-// deselects back to that default. SLA Breached + Overdue + Re-open sit before Cancelled.
-type RmFilter = 'breached' | 'reopened' | 'overdue' | Bucket
+// deselects back to that default. Internal/Supplier breach + Overdue + Re-open
+// sit before Cancelled. A breach that has gone fully overdue drops out of the
+// breach pills and shows only under Overdue.
+type RmFilter = 'internal_breach' | 'supplier_breach' | 'reopened' | 'overdue' | Bucket
 const PILLS: { key: RmFilter; label: string; active: string; inactive: string }[] = [
   { key: 'open', label: 'Open', active: 'bg-blue-500 text-white border-blue-500', inactive: 'text-blue-600 dark:text-blue-400 border-blue-500/40 hover:border-blue-400' },
   { key: 'quote_requested', label: 'Quote requested', active: 'bg-cyan-500 text-white border-cyan-500', inactive: 'text-cyan-600 dark:text-cyan-400 border-cyan-500/40 hover:border-cyan-400' },
@@ -44,7 +46,8 @@ const PILLS: { key: RmFilter; label: string; active: string; inactive: string }[
   { key: 'in_progress', label: 'In progress', active: 'bg-[#C6A35D] text-[#0a0e17] border-[#C6A35D]', inactive: 'text-amber-600 dark:text-[#C6A35D] border-[#C6A35D]/40 hover:border-[#C6A35D]' },
   { key: 'awaiting_signoff', label: 'Sign-off', active: 'bg-orange-500 text-white border-orange-500', inactive: 'text-orange-600 dark:text-orange-400 border-orange-500/40 hover:border-orange-400' },
   { key: 'completed', label: 'Completed', active: 'bg-emerald-500 text-white border-emerald-500', inactive: 'text-emerald-600 dark:text-emerald-400 border-emerald-500/40 hover:border-emerald-400' },
-  { key: 'breached', label: 'SLA Breached', active: 'bg-red-600 text-white border-red-600', inactive: 'text-red-600 dark:text-red-400 border-red-500/50 hover:border-red-500' },
+  { key: 'internal_breach', label: 'Internal Breached', active: 'bg-red-600 text-white border-red-600', inactive: 'text-red-600 dark:text-red-400 border-red-500/50 hover:border-red-500' },
+  { key: 'supplier_breach', label: 'Supplier Breached', active: 'bg-orange-600 text-white border-orange-600', inactive: 'text-orange-600 dark:text-orange-400 border-orange-500/50 hover:border-orange-500' },
   { key: 'overdue', label: 'Overdue', active: 'bg-red-500 text-white border-red-500', inactive: 'text-red-600 dark:text-red-400 border-red-500/40 hover:border-red-400' },
   { key: 'reopened', label: 'Re-open', active: 'bg-amber-500 text-white border-amber-500', inactive: 'text-amber-600 dark:text-amber-400 border-amber-500/40 hover:border-amber-400' },
   { key: 'cancelled', label: 'Cancelled', active: 'bg-red-500 text-white border-red-500', inactive: 'text-red-600 dark:text-red-400 border-red-500/40 hover:border-red-400' },
@@ -100,14 +103,18 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
     return c
   }, [tickets])
   const barTotal = BAR_ORDER.reduce((s, b) => s + counts[b], 0) || 1
-  const breachedCount = useMemo(() => tickets.filter(t => t.breached).length, [tickets])
+  // A breach only counts here while it's NOT yet overdue — once overdue it moves
+  // to the Overdue pill (so it isn't double-counted).
+  const internalBreachCount = useMemo(() => tickets.filter(t => t.internalBreached && !t.overdue).length, [tickets])
+  const supplierBreachCount = useMemo(() => tickets.filter(t => t.supplierBreached && !t.overdue).length, [tickets])
   const reopenedCount = useMemo(() => tickets.filter(t => t.reopened).length, [tickets])
   const overdueCount = useMemo(() => tickets.filter(t => t.overdue).length, [tickets])
 
   const shown = useMemo(() => {
     const terms = q.toLowerCase().split(/\s+/).filter(Boolean)
     return tickets.filter(t => {
-      if (filter === 'breached') { if (!t.breached) return false }
+      if (filter === 'internal_breach') { if (!(t.internalBreached && !t.overdue)) return false }
+      else if (filter === 'supplier_breach') { if (!(t.supplierBreached && !t.overdue)) return false }
       else if (filter === 'reopened') { if (!t.reopened) return false }
       else if (filter === 'overdue') { if (!t.overdue) return false }
       else if (filter !== null && bucketOf(t.status) !== filter) return false
@@ -119,8 +126,11 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
 
   // Under "All": breached tickets pin to the top, completed drop into the Archive,
   // and the rest group by store. Everything is ordered newest → most urgent.
-  const breachedRows = useMemo(() => filter === null ? shown.filter(t => t.breached).sort(byDateThenUrgency) : [], [shown, filter])
-  const liveShown = useMemo(() => (filter === null ? shown.filter(t => !t.breached && bucketOf(t.status) !== 'completed') : shown).slice().sort(byDateThenUrgency), [shown, filter])
+  // "Breach" pinned at the top = a supplier/internal breach that hasn't gone fully
+  // overdue yet (overdue ones live under the Overdue filter / in their store group).
+  const isLiveBreach = (t: RegionalTicketRow) => (t.internalBreached || t.supplierBreached) && !t.overdue
+  const breachedRows = useMemo(() => filter === null ? shown.filter(isLiveBreach).sort(byDateThenUrgency) : [], [shown, filter])
+  const liveShown = useMemo(() => (filter === null ? shown.filter(t => !isLiveBreach(t) && bucketOf(t.status) !== 'completed') : shown).slice().sort(byDateThenUrgency), [shown, filter])
   const archived = useMemo(() => (filter === null ? shown.filter(t => bucketOf(t.status) === 'completed') : []).slice().sort(byDateThenUrgency), [shown, filter])
   const [archiveOpen, setArchiveOpen] = useState(false)
   const [breachedOpen, setBreachedOpen] = useState(false)
@@ -154,7 +164,7 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
       {/* Filter pills — above the search. Click an active pill to deselect (= all). */}
       <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
         {PILLS.map(p => {
-          const n = p.key === 'breached' ? breachedCount : p.key === 'reopened' ? reopenedCount : p.key === 'overdue' ? overdueCount : counts[p.key as Bucket]
+          const n = p.key === 'internal_breach' ? internalBreachCount : p.key === 'supplier_breach' ? supplierBreachCount : p.key === 'reopened' ? reopenedCount : p.key === 'overdue' ? overdueCount : counts[p.key as Bucket]
           const on = filter === p.key
           return (
             <button key={p.key} onClick={() => setFilter(f => f === p.key ? null : p.key)} aria-pressed={on} className={`px-3 py-1.5 rounded-full text-xs font-medium border transition text-center ${on ? p.active : p.inactive}`}>

@@ -111,7 +111,9 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
     return c
   }, [tickets])
   const barTotal = BAR_ORDER.reduce((s, b) => s + counts[b], 0) || 1
-  const breachedCount = useMemo(() => tickets.filter(t => t.breached).length, [tickets])
+  // A supplier-side breach only counts while not yet fully overdue — once overdue
+  // it moves to the Overdue pill (RM-side breaches never affect the supplier).
+  const breachedCount = useMemo(() => tickets.filter(t => t.breached && !t.overdue).length, [tickets])
   const overdueCount = useMemo(() => tickets.filter(t => t.overdue).length, [tickets])
   const declinedCount = useMemo(() => tickets.filter(t => t.declinedForMe).length, [tickets])
   const cancelledCount = useMemo(() => tickets.filter(t => t.status === 'cancelled').length, [tickets])
@@ -120,7 +122,7 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
   const shown = useMemo(() => {
     const terms = q.toLowerCase().split(/\s+/).filter(Boolean)
     return tickets.filter(t => {
-      if (filter === 'breached') { if (!t.breached) return false }
+      if (filter === 'breached') { if (!(t.breached && !t.overdue)) return false }
       else if (filter === 'overdue') { if (!t.overdue) return false }
       else if (filter === 'declined') { if (!t.declinedForMe) return false }
       else if (filter === 'cancelled') { if (t.status !== 'cancelled') return false }
@@ -136,8 +138,8 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
 
   // Under "All": breached pins to the top, completed drops into the Archive, the
   // rest groups by store. Everything is ordered newest → most urgent.
-  const breachedRows = useMemo(() => filter === 'all' ? shown.filter(t => t.breached).sort(byDateThenUrgency) : [], [shown, filter])
-  const liveShown = useMemo(() => (filter === 'all' ? shown.filter(t => !t.breached && bucketOf(t.status) !== 'completed') : shown).slice().sort(byDateThenUrgency), [shown, filter])
+  const breachedRows = useMemo(() => filter === 'all' ? shown.filter(t => t.breached && !t.overdue).sort(byDateThenUrgency) : [], [shown, filter])
+  const liveShown = useMemo(() => (filter === 'all' ? shown.filter(t => !(t.breached && !t.overdue) && bucketOf(t.status) !== 'completed') : shown).slice().sort(byDateThenUrgency), [shown, filter])
   const archived = useMemo(() => (filter === 'all' ? shown.filter(t => bucketOf(t.status) === 'completed') : []).slice().sort(byDateThenUrgency), [shown, filter])
   const [archiveOpen, setArchiveOpen] = useState(false)
   const [breachedOpen, setBreachedOpen] = useState(false)
