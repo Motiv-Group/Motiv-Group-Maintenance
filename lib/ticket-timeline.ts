@@ -31,6 +31,8 @@ export interface TimelineInput {
   // When this supplier was declined off the ticket — the trail stops here for them
   // (only passed on the supplier view when they're out of the job).
   supplierDeclinedAt?: string | null
+  // The supplier's proposed snag-fix date (distinct from the original job schedule).
+  snagScheduledAt?: string | null
   quotes?: { amount?: number | null; status: string; created_at: string; updated_at?: string | null }[]
   signoffs?: { status: string; created_at: string }[]
   updates?: { body: string; author_role: string | null; created_at: string }[]
@@ -56,10 +58,11 @@ export function buildTicketTimeline(t: TimelineInput): TimelineEvent[] {
   if (!(t.quotes ?? []).some(q => q.status === 'accepted')) push(t.quoteApprovedAt, 'Quote approved', 'quote_approved', 'Regional Manager')
 
   push(t.scheduledAt, 'Job scheduled', 'scheduled', 'Supplier')
+  push(t.snagScheduledAt, 'Snag job scheduled', 'scheduled', 'Supplier')
 
   for (const s of t.signoffs ?? []) {
     if (s.status === 'accepted') push(s.created_at, 'Completion approved', 'completion_approved', 'Regional Manager')
-    else if (s.status === 'rejected') push(s.created_at, 'Completion sent back', 'completion_rejected', 'Regional Manager')
+    else if (s.status === 'rejected') push(s.created_at, 'Snagged', 'completion_rejected', 'Regional Manager')
     else push(s.created_at, 'Completion submitted', 'completion_submitted', 'Supplier')
   }
 

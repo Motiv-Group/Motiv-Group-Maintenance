@@ -42,6 +42,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
   // Set when a supplier schedules a custom time beyond the SLA window (a proposal
   // the RM must accept) — drives who gets notified below.
   let scheduleProposed = false
+  // The supplier's proposed snag-fix date (stored on the snag, not the ticket).
+  let snagFixAt: string | undefined
   // Stamp freshness against the acting side (drives the health Data-Quality + stale checks).
   const freshness = role === 'supplier' ? { last_supplier_update_at: now }
     : role === 'store_manager' ? { last_store_update_at: now }
@@ -152,6 +154,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
       }
       case 'approve':
         await admin.from('signoffs').update({ status: 'accepted', reviewed_by: user.id, reviewed_at: now }).eq('ticket_id', ticketId).in('status', ['submitted', 'awaiting_regional', 'awaiting_store'])
+        // Accepting the sign-off closes any open snag — a snag stays open until the
+        // corrective work is completed and the RM accepts it.
+        await admin.from('snags').update({ status: 'resolved' }).eq('ticket_id', ticketId).in('status', ['open', 'assigned', 'in_progress'])
         // Approving the sign-off completes the ticket directly (no separate close-out step).
         updates.completed_at = now; updates.closed_out_at = now; updates.closed_out_by = user.id
         break
@@ -166,17 +171,27 @@ export async function POST(request: Request, { params }: { params: { id: string 
         await admin.from('snags').update({ status: 'assigned', assigned_at: now, supplier_id: body.supplierId ?? ticket.supplier_id }).eq('ticket_id', ticketId).in('status', ['open'])
         break
       case 'accept_snag': {
-        // Supplier accepts the snag and schedules when the fix will be done.
+        // Supplier accepts the snag and proposes when the fix will be done. The date
+        // is stored on the snag (proposed) and sent to the RM to approve — the original
+        // job's tickets.scheduled_at is left untouched (kept for the audit trail).
         const when = body.scheduledAt ? new Date(body.scheduledAt) : null
         if (!when || isNaN(when.getTime())) return NextResponse.json({ error: 'Pick when the snag will be fixed.' }, { status: 400 })
         if (when.getTime() < Date.now() - 5 * 60_000) return NextResponse.json({ error: 'Cannot schedule in the past.' }, { status: 400 })
-        updates.scheduled_at = when.toISOString()
-        await admin.from('snags').update({ status: 'assigned', assigned_at: now, supplier_id: ticket.supplier_id }).eq('ticket_id', ticketId).in('status', ['open'])
+        snagFixAt = when.toISOString()
+        await admin.from('snags').update({ status: 'assigned', assigned_at: now, supplier_id: ticket.supplier_id, scheduled_at: snagFixAt, schedule_status: 'proposed' }).eq('ticket_id', ticketId).in('status', ['open'])
         break
       }
-      case 'start_snag':
+      case 'approve_snag':
+        // RM approves the proposed snag-fix date → the supplier can start the work.
+        await admin.from('snags').update({ schedule_status: 'agreed' }).eq('ticket_id', ticketId).eq('schedule_status', 'proposed')
+        break
+      case 'start_snag': {
+        // Only after the RM has approved the proposed snag-fix date.
+        const { data: snag } = await admin.from('snags').select('schedule_status').eq('ticket_id', ticketId).in('status', ['assigned', 'in_progress', 'open']).order('created_at', { ascending: false }).limit(1).maybeSingle()
+        if (snag && snag.schedule_status !== 'agreed') return NextResponse.json({ error: 'The manager still needs to approve the snag schedule.' }, { status: 400 })
         await admin.from('snags').update({ status: 'in_progress' }).eq('ticket_id', ticketId).in('status', ['assigned', 'open'])
         break
+      }
       case 'resolve_snag':
         await admin.from('snags').update({ status: 'resolved' }).eq('ticket_id', ticketId).in('status', ['assigned', 'in_progress', 'open'])
         break
@@ -196,7 +211,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const { error: upErr } = await admin.from('tickets').update(updates).eq('id', ticketId)
   if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 })
 
-  await notify(admin, action, ticket, prof.full_name ?? null, { scheduleProposed, scheduledAt: updates.scheduled_at as string | undefined })
+  await notify(admin, action, ticket, prof.full_name ?? null, { scheduleProposed, scheduledAt: (updates.scheduled_at as string | undefined) ?? snagFixAt })
 
   revalidatePath(`/supplier/tickets/${ticketId}`); revalidatePath('/supplier')
   revalidatePath('/regional'); revalidatePath('/regional/tickets'); revalidatePath('/client'); revalidatePath('/client/visits'); revalidatePath(`/client/tickets/${ticketId}`); revalidatePath('/executive')
@@ -249,7 +264,7 @@ async function hasAccess(admin: Admin, role: WorkflowRole, userId: string, ticke
 
 // Targeted notifications for the moves that need someone else to act next.
 async function notify(admin: Admin, action: string, ticket: any, actorName: string | null, opts?: { scheduleProposed?: boolean; scheduledAt?: string }) {
-  const toSupplier = ['validate', 'request_quote', 'require_assessment', 'approve_quote', 'request_evidence', 'raise_snag', 'assign_snag', 'reject_variation', 'accept_schedule']
+  const toSupplier = ['validate', 'request_quote', 'require_assessment', 'approve_quote', 'request_evidence', 'raise_snag', 'assign_snag', 'reject_variation', 'accept_schedule', 'approve_snag']
   const toRegion   = ['submit_quote', 'submit_completion', 'submit_variation', 'resolve_snag', 'resubmit', 'accept_snag', 'start_snag']
   // The store manager is told whenever a visit is scheduled / agreed so they can
   // expect the supplier on site.
@@ -257,8 +272,9 @@ async function notify(admin: Admin, action: string, ticket: any, actorName: stri
   const title = `Ticket: ${ticket.title ?? 'Untitled'}`
   // Friendlier copy for scheduling moves; everything else uses the action verb.
   const when = opts?.scheduledAt ? new Date(opts.scheduledAt).toLocaleString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Johannesburg' }) : null
-  const storeMsg = action === 'schedule' || action === 'accept_snag'
+  const storeMsg = action === 'schedule'
     ? `Visit scheduled${when ? ` for ${when}` : ''}`
+    : action === 'accept_snag' ? `Snag fix scheduled${when ? ` for ${when}` : ''}`
     : action === 'accept_schedule' ? `Visit time confirmed${when ? ` for ${when}` : ''}`
     : action === 'reject' ? 'Ticket cancelled'
     : `Update: ${action.replace(/_/g, ' ')}`
@@ -272,14 +288,18 @@ async function notify(admin: Admin, action: string, ticket: any, actorName: stri
   if (toSupplier.includes(action) && ticket.supplier_id) {
     const { data } = await admin.from('supplier_users').select('user_id').eq('supplier_id', ticket.supplier_id)
     const ids = (data ?? []).map(r => r.user_id)
-    const msg = action === 'accept_schedule' ? `Visit time confirmed${when ? ` for ${when}` : ''}` : `${actorName ?? 'A manager'} → ${action.replace(/_/g, ' ')}`
+    const msg = action === 'accept_schedule' ? `Visit time confirmed${when ? ` for ${when}` : ''}`
+      : action === 'approve_snag' ? 'Snag schedule approved — you can start the corrective work'
+      : `${actorName ?? 'A manager'} → ${action.replace(/_/g, ' ')}`
     await push(admin, ids, ticket.company_id, title, msg, `/supplier/tickets/${ticket.id}`)
   }
   if (toRegion.includes(action) && ticket.region_id) {
     const { data } = await admin.from('regional_users').select('user_id').eq('region_id', ticket.region_id)
     const ids = (data ?? []).map(r => r.user_id)
     // "resubmit" = the store manager supplied the info the RM asked for.
-    const regionMsg = action === 'resubmit' ? 'Information added' : `Update: ${action.replace(/_/g, ' ')}`
+    const regionMsg = action === 'resubmit' ? 'Information added'
+      : action === 'accept_snag' ? `Snag fix proposed${when ? ` for ${when}` : ''} — approve to confirm`
+      : `Update: ${action.replace(/_/g, ' ')}`
     await push(admin, ids, ticket.company_id, title, regionMsg, `/regional/tickets/${ticket.id}`)
   }
   if (toStore.includes(action) && ticket.created_by) {

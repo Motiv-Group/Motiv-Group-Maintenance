@@ -18,7 +18,7 @@ import { RmPipeline } from '@/components/regional/RmPipeline'
 import { SupplierAttachments } from '@/components/workflow/SupplierAttachments'
 import { SendQuoteForm } from '@/components/admin/SendQuoteForm'
 import { QuoteSummary, type QuoteSummaryStatus } from '@/components/workflow/QuoteSummary'
-import { ScheduleJobCard, RaiseVariationCard, DeclineWorkButton, AcceptSnagCard } from '@/components/supplier/SupplierJobActions'
+import { ScheduleJobCard, RaiseVariationCard, DeclineWorkButton, AcceptSnagCard, StartSnagButton } from '@/components/supplier/SupplierJobActions'
 import { DueDate } from '@/components/workflow/DueDate'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { EditedLine } from '@/components/ui/EditedLine'
@@ -106,7 +106,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
     admin.from('quotes').select('id, amount, amount_incl_vat, description, file_url, status, valid_until, proposed_schedule_at, created_at, updated_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).order('created_at', { ascending: false }),
     admin.from('technicians').select('id, name').in('supplier_id', supplierIds).eq('active', true).order('name'),
     admin.from('signoffs').select('id, before_urls, after_urls, coc_url, invoice_url, status, notes, reject_reason, created_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).order('created_at', { ascending: false }),
-    admin.from('snags').select('description, required_correction, severity, status, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
+    admin.from('snags').select('description, required_correction, severity, status, scheduled_at, schedule_status, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('companies').select('name').eq('id', companyId).maybeSingle(),
   ])
   // Client organisation that owns the store (shown in the ticket detail).
@@ -121,6 +121,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   // Latest completion the supplier submitted (COC + proof-of-completion photos).
   // Most recent snag — explains why a completion was rejected / sent back.
   const latestSnag = ((snagRows ?? []) as any[])[0] ?? null
+  const snagScheduledAt = ((snagRows ?? []) as any[]).find(s => s.scheduled_at)?.scheduled_at ?? null
   const technicians = (technicianRows ?? []) as { id: string; name: string }[]
   // Access: the awarded supplier OR a supplier invited to quote (competitive model).
   const awarded = !!t.supplier_id && supplierIds.includes(t.supplier_id)
@@ -159,8 +160,9 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   const declinedByLabel = declinedBy === 'supplier'
     ? (supplierCompanyName ? ` by ${supplierCompanyName}` : ' by you')
     : declinedBy === 'regional_manager' ? ' by the manager' : ''
-  // An RM decline with no typed reason falls back to the standard courteous message.
-  const declineMessage = declineReason || (declinedBy === 'regional_manager' ? DEFAULT_DECLINE_REASON : null)
+  // No typed reason → the standard courteous message (also fits the "not selected"
+  // case where another supplier was awarded).
+  const declineMessage = declineReason || DEFAULT_DECLINE_REASON
   // Map a quote's DB status to the read-only summary tone (accepted shows "Approved").
   const quoteStatusOf = (s: string): QuoteSummaryStatus => s === 'accepted' ? 'accepted' : s === 'declined' ? 'declined' : 'pending'
 
@@ -249,9 +251,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
       {declinedForMe ? (
         <div className="rounded-2xl bg-red-500/10 ring-1 ring-red-500/40 p-5 space-y-1">
           <p className="text-sm font-bold text-red-700 dark:text-red-400">Quote request declined{declinedByLabel}</p>
-          {declineMessage
-            ? <p className="text-sm text-[var(--text)]">{declineMessage}</p>
-            : <p className="text-sm text-[var(--text-muted)]">No reason was provided.</p>}
+          <p className="text-sm text-[var(--text)]">{declineMessage}</p>
         </div>
       ) : (
         <Card className="p-5 space-y-3">
@@ -266,11 +266,16 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           {canSubmitQuote && <SendQuoteForm ticketId={t.id} competitive priority={t.priority} createdAt={t.created_at} />}
           {awarded && t.status === 'accepted' && <ScheduleJobCard ticketId={t.id} priority={t.priority} createdAt={t.created_at} technicians={technicians} />}
           {awarded && t.status === 'snag' && <AcceptSnagCard ticketId={t.id} priority={t.priority} createdAt={t.created_at} />}
+          {awarded && t.status === 'snag_assigned' && (
+            latestSnag?.schedule_status === 'agreed'
+              ? <StartSnagButton ticketId={t.id} />
+              : <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 text-sm text-[var(--text-muted)]">Snag fix proposed{latestSnag?.scheduled_at ? ` for ${formatDateTime(latestSnag.scheduled_at)}` : ''} — awaiting the manager&apos;s approval before you can start.</div>
+          )}
           {awarded && ['in_progress', 'snag_resolved', 'snag_in_progress', 'evidence_requested'].includes(t.status) && (
             <SubmitCompletionForm ticketId={t.id} />
           )}
           {awarded && t.status === 'in_progress' && <RaiseVariationCard ticketId={t.id} />}
-          <WorkflowActions ticketId={t.id} status={t.status} role="supplier" exclude={['schedule', 'submit_completion', 'require_assessment', 'request_quote', 'submit_variation', 'accept_snag']} />
+          <WorkflowActions ticketId={t.id} status={t.status} role="supplier" exclude={['schedule', 'submit_completion', 'require_assessment', 'request_quote', 'submit_variation', 'accept_snag', 'start_snag']} />
           {/* Opt out of the job (before award) — separated from the primary actions */}
           {canDecline && <div className="pt-1"><DeclineWorkButton ticketId={t.id} /></div>}
         </Card>
@@ -343,6 +348,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           quoteApprovedAt: t.quote_decision_status === 'approved' ? t.quote_decided_at : null,
           scheduledAt: t.scheduled_at, completedAt: t.completed_at,
           editedAt: t.edited_at, editedByName: editorName, cancellationReason: t.cancellation_reason,
+          snagScheduledAt,
           quotes: (myQuotes ?? []) as any[], signoffs: (signoffRows ?? []) as any[], updates: (updates ?? []) as any[],
         }} />
       )}

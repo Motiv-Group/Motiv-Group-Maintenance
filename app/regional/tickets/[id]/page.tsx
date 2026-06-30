@@ -14,7 +14,7 @@ import { BreachReason } from '@/components/workflow/BreachReason'
 import { Card } from '@/components/exec/ui'
 import { WorkflowActions } from '@/components/workflow/WorkflowActions'
 import { RmPipeline } from '@/components/regional/RmPipeline'
-import { AssignSuppliersButton, RequestInfoButton, RmEditTicketForm, SupplierStatusList, QuoteReviewCard, CancelTicketCard, ApproveSignoffCard, ReQuoteButton, AcceptScheduleCard } from '@/components/regional/RmTicketActions'
+import { AssignSuppliersButton, RequestInfoButton, RmEditTicketForm, SupplierStatusList, QuoteReviewCard, CancelTicketCard, ApproveSignoffCard, ReQuoteButton, AcceptScheduleCard, AcceptSnagScheduleCard } from '@/components/regional/RmTicketActions'
 import { DueDate } from '@/components/workflow/DueDate'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { EditedLine } from '@/components/ui/EditedLine'
@@ -24,8 +24,8 @@ import { formatCurrency, formatDateTime, formatDate, rmStatusMeta, storeLabel, O
 
 // Professional "what we're waiting on" copy while a snag works its way through.
 const SNAG_WAIT_MSG: Record<string, string> = {
-  snag: 'This completion has been snagged. Awaiting the supplier to accept the snag and confirm a date to carry out the corrective work.',
-  snag_assigned: 'The supplier has accepted the snag and scheduled the corrective work. Awaiting attendance on site.',
+  snag: 'This completion has been snagged. Awaiting the supplier to accept the snag and propose a date to carry out the corrective work.',
+  snag_assigned: 'The snag schedule is approved. The supplier will carry out the corrective work on the agreed date and resubmit the completion for sign-off.',
   snag_in_progress: 'The supplier is carrying out the corrective work and will resubmit the completion for sign-off.',
   snag_resolved: 'The snag has been resolved. Awaiting the resubmitted completion for sign-off.',
 }
@@ -52,7 +52,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
     admin.from('signoffs').select('id, status, before_urls, after_urls, coc_url, invoice_url, notes, reject_reason, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('suppliers').select('id, company_name').eq('company_id', companyId).eq('active', true).order('company_name'),
     admin.from('ticket_variations').select('description, amount, status, created_at, file_urls').eq('ticket_id', t.id).order('created_at', { ascending: false }),
-    admin.from('snags').select('description, status, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
+    admin.from('snags').select('description, status, scheduled_at, schedule_status, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('ticket_suppliers').select('supplier_id, status, invited_at, decline_reason, suppliers(company_name)').eq('ticket_id', t.id),
     admin.from('ratings').select('supplier_id, score').eq('company_id', companyId),
   ])
@@ -63,6 +63,11 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   const acceptedSignoff = allSignoffs.find(s => s.status === 'accepted') ?? null
   // The completion that was snagged (rejected) — shown in the Snag block.
   const rejectedSignoff = allSignoffs.find(s => s.status === 'rejected') ?? null
+  // Snag scheduling — the supplier's proposed fix date (separate from the original
+  // job schedule) and whether it's still awaiting the RM's approval.
+  const latestSnag = ((snags ?? []) as any[])[0] ?? null
+  const snagScheduledAt = ((snags ?? []) as any[]).find(s => s.scheduled_at)?.scheduled_at ?? null
+  const snagAwaitingApproval = t.status === 'snag_assigned' && latestSnag?.schedule_status === 'proposed' && !!latestSnag?.scheduled_at
 
   // SLA due date (final resolution deadline) + overdue state.
   const rules = await loadSlaResolver(admin, t.company_id)
@@ -279,7 +284,9 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
       <Card className="p-5 space-y-4">
         <h2 className="text-sm font-bold text-[var(--text)]">Actions</h2>
 
-        {SNAG_WAIT_MSG[t.status] && (
+        {snagAwaitingApproval && latestSnag?.scheduled_at && <AcceptSnagScheduleCard ticketId={t.id} scheduledAt={latestSnag.scheduled_at} />}
+
+        {SNAG_WAIT_MSG[t.status] && !snagAwaitingApproval && (
           <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 flex items-start gap-2.5">
             <Clock size={16} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
             <p className="text-sm text-[var(--text-muted)]">{SNAG_WAIT_MSG[t.status]}</p>
@@ -307,7 +314,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         <WorkflowActions
           ticketId={t.id} status={t.status} role="regional_manager"
           suppliers={supplierList}
-          exclude={['validate', 'reject', 'request_info', 'request_quote', 'require_assessment', 'approve_quote', 'reject_quote', 'request_revision', 'proceed_no_quote', 'schedule', 'approve', 'assign_snag', 'accept_schedule']}
+          exclude={['validate', 'reject', 'request_info', 'request_quote', 'require_assessment', 'approve_quote', 'reject_quote', 'request_revision', 'proceed_no_quote', 'schedule', 'approve', 'assign_snag', 'accept_schedule', 'approve_snag']}
         />
       </Card>
 
@@ -426,13 +433,6 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
 
       {((snags ?? []).length > 0 || rejectedSignoff) && (
         <CollapsibleSection id="ticket-snag" title="Snags" defaultOpen={phase === 'snag'}>
-          {(snags ?? []).map((s: any, i: number) => (
-            <div key={i} className="py-2 border-b border-[var(--border)] last:border-0 flex items-start justify-between gap-2">
-              <p className="text-sm text-[var(--text)] min-w-0">{s.description ?? 'Snag'}</p>
-              <span className="text-xs text-[var(--text)] capitalize whitespace-nowrap">{String(s.status).replace(/_/g, ' ')}</span>
-            </div>
-          ))}
-
           {/* The snagged COC/POC submission — full overview, like the accepted block. */}
           {rejectedSignoff && (
             <div className="rounded-xl ring-1 ring-red-500/40 bg-red-500/5 overflow-hidden">
@@ -456,9 +456,12 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
                   </div>
                 </div>
                 {(rejectedSignoff.coc_url || rejectedSignoff.invoice_url) && (
-                  <div className="flex flex-wrap gap-x-4 gap-y-1">
-                    {rejectedSignoff.coc_url && <a href={rejectedSignoff.coc_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View COC</a>}
-                    {rejectedSignoff.invoice_url && <a href={rejectedSignoff.invoice_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View invoice</a>}
+                  <div>
+                    <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Certificate of Completion</div>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1">
+                      {rejectedSignoff.coc_url && <a href={rejectedSignoff.coc_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View COC</a>}
+                      {rejectedSignoff.invoice_url && <a href={rejectedSignoff.invoice_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View invoice</a>}
+                    </div>
                   </div>
                 )}
                 {rejectedSignoff.notes && (
@@ -480,6 +483,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         scheduledAt: t.scheduled_at, completedAt: t.completed_at,
         editedAt: t.edited_at, editedByName: editorName, cancellationReason: t.cancellation_reason,
         infoRequestedAt: t.info_requested_at, infoAddedAt: t.info_added_at, infoRequestReason: t.info_request_reason,
+        snagScheduledAt,
         quotes: (quotes ?? []) as any[], signoffs: allSignoffs, updates: (updates ?? []) as any[],
       }} />
     </div>

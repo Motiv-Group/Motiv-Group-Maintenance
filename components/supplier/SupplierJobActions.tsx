@@ -196,6 +196,24 @@ export function AcceptSnagCard({ ticketId, priority, createdAt }: { ticketId: st
   )
 }
 
+// Start the snag fix — only shown once the RM has approved the proposed date.
+export function StartSnagButton({ ticketId }: { ticketId: string }) {
+  const router = useRouter()
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  async function go() {
+    setBusy(true); setErr('')
+    try { await transition(ticketId, { action: 'start_snag' }); router.refresh() }
+    catch (e: any) { setErr(e.message); setBusy(false) }
+  }
+  return (
+    <>
+      <button onClick={go} disabled={busy} className="w-full py-2.5 rounded-xl bg-[#C6A35D] hover:bg-amber-600 text-[#0a0e17] text-sm font-semibold transition disabled:opacity-50">{busy ? 'Starting…' : 'Start snag fix (in progress)'}</button>
+      {err && <p className="text-xs text-red-500">{err}</p>}
+    </>
+  )
+}
+
 export function ScheduleJobCard({ ticketId, priority, createdAt, technicians = [] }: { ticketId: string; priority: string; createdAt: string; technicians?: { id: string; name: string }[] }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)

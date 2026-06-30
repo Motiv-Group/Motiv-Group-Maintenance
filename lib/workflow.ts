@@ -130,7 +130,8 @@ export const TRANSITIONS: Record<TicketStatus, Transition[]> = {
     { action: 'accept_snag', label: 'Accept snag', to: 'snag_assigned', roles: ['supplier'] },
   ],
   snag_assigned: [
-    { action: 'start_snag', label: 'Snag in progress', to: 'snag_in_progress', roles: ['supplier'] },
+    { action: 'approve_snag', label: 'Approve snag schedule', to: 'snag_assigned',   roles: ['regional_manager', 'executive'] },
+    { action: 'start_snag',   label: 'Snag in progress',     to: 'snag_in_progress', roles: ['supplier'] },
   ],
   snag_in_progress: [
     { action: 'submit_completion', label: 'Upload new COC & POC', to: 'submitted_for_signoff', roles: ['supplier'] },
