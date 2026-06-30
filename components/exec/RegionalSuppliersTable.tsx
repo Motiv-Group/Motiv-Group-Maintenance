@@ -9,6 +9,7 @@ import type { RegionalDashboardData } from '@/lib/health/data'
 import { SectionCard, Pill, STATUS_TEXT } from '@/components/exec/ui'
 import { Stars } from '@/components/ui/Stars'
 import { MapLink } from '@/components/ui/MapLink'
+import { SlideOver } from '@/components/ui/SlideOver'
 import { formatCurrency, formatDate } from '@/lib/utils'
 
 type Row = RegionalDashboardData['suppliers'][number]
@@ -116,9 +117,9 @@ function SupplierPane({ row, onClose }: { row: Row; onClose: () => void }) {
   )
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/50" />
-      <div className="relative w-full max-w-sm h-full bg-[var(--surface-2)] ring-1 ring-[var(--border)] overflow-y-auto p-5 space-y-4" onClick={e => e.stopPropagation()}>
+    <SlideOver onClose={onClose}>
+      {close => (
+        <>
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <h2 className="text-lg font-bold text-[var(--text)] truncate flex items-center gap-2"><Truck size={18} className="text-[#C6A35D] shrink-0" />{row.name}</h2>
@@ -128,7 +129,7 @@ function SupplierPane({ row, onClose }: { row: Row; onClose: () => void }) {
             </div>
             <div className="mt-1"><Stars value={row.avgRating} count={row.ratingCount} size={14} /></div>
           </div>
-          <button onClick={onClose} className="shrink-0 -m-1 p-1.5 rounded-lg text-[var(--text-faint)] hover:text-[var(--text)] hover:bg-[var(--hover)]"><X size={18} /></button>
+          <button onClick={close} className="shrink-0 -m-1 p-1.5 rounded-lg text-[var(--text-faint)] hover:text-[var(--text)] hover:bg-[var(--hover)]"><X size={18} /></button>
         </div>
 
         {/* Performance stats */}
@@ -217,7 +218,8 @@ function SupplierPane({ row, onClose }: { row: Row; onClose: () => void }) {
             </>
           ) : (!loading && <p className="text-xs text-[var(--text-faint)]">No written feedback yet.</p>)}
         </div>
-      </div>
-    </div>
+        </>
+      )}
+    </SlideOver>
   )
 }

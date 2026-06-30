@@ -9,6 +9,7 @@ import { Ticket, Search, ChevronDown, BarChart3, X, PlusCircle } from 'lucide-re
 import type { RegionalTicketRow } from '@/lib/health/data'
 import { Card } from '@/components/exec/ui'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
+import { SlideOver } from '@/components/ui/SlideOver'
 import { rmStatusMeta, formatDateTime, humanizeDuration } from '@/lib/utils'
 
 type Bucket = 'open' | 'quote_requested' | 'quoted' | 'approved' | 'scheduled' | 'in_progress' | 'awaiting_signoff' | 'completed' | 'cancelled'
@@ -264,12 +265,12 @@ function StorePanel({ store, rows, onClose }: { store: string; rows: RegionalTic
   )
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/50" />
-      <div className="relative w-full max-w-sm h-full bg-[var(--surface-2)] ring-1 ring-[var(--border)] overflow-y-auto p-5 space-y-4" onClick={e => e.stopPropagation()}>
+    <SlideOver onClose={onClose}>
+      {close => (
+        <>
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0"><h2 className="text-lg font-bold text-[var(--text)] truncate">{store}</h2><p className="text-xs text-[var(--text-muted)]">{total} ticket{total === 1 ? '' : 's'}</p></div>
-          <button onClick={onClose} className="shrink-0 -m-1 p-1.5 rounded-lg text-[var(--text-faint)] hover:text-[var(--text)] hover:bg-[var(--hover)]"><X size={18} /></button>
+          <button onClick={close} className="shrink-0 -m-1 p-1.5 rounded-lg text-[var(--text-faint)] hover:text-[var(--text)] hover:bg-[var(--hover)]"><X size={18} /></button>
         </div>
 
         <div className="space-y-2">
@@ -296,7 +297,8 @@ function StorePanel({ store, rows, onClose }: { store: string; rows: RegionalTic
           <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Tickets</div>
           {rows.map(t => <TicketRow key={t.id} t={t} />)}
         </div>
-      </div>
-    </div>
+        </>
+      )}
+    </SlideOver>
   )
 }
