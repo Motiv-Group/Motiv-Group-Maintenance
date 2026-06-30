@@ -186,7 +186,7 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
       {filter === null && breachedRows.length > 0 && (
         <Card className="p-3 ring-1 ring-red-500/40">
           <button onClick={() => setBreachedOpen(o => !o)} aria-expanded={breachedOpen} className="w-full flex items-center gap-2 -m-1 p-1 rounded-lg hover:bg-[var(--hover)] transition">
-            <ChevronDown size={16} className={`shrink-0 text-red-500 transition-transform ${breachedOpen ? '' : '-rotate-90'}`} />
+            <ChevronDown size={16} className={`shrink-0 text-red-500 transition-transform ${breachedOpen ? 'rotate-180' : ''}`} />
             <span className="text-sm font-bold text-red-600 dark:text-red-400">SLA Breached</span>
             <span className="text-[11px] font-medium text-red-700 dark:text-red-400 bg-red-500/15 rounded-full px-2 py-0.5">{breachedRows.length}</span>
           </button>
@@ -201,7 +201,7 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
           <Card key={store} className="p-3">
             <div className="flex items-center justify-between gap-2 mb-1">
               <button onClick={() => toggle(store)} aria-expanded={!isCollapsed} className="flex items-center gap-2 min-w-0 -m-1 p-1 rounded-lg hover:bg-[var(--hover)] transition">
-                <ChevronDown size={16} className={`shrink-0 text-[var(--text-muted)] transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
+                <ChevronDown size={16} className={`shrink-0 text-[var(--text-muted)] transition-transform ${isCollapsed ? '' : 'rotate-180'}`} />
                 <span className="text-sm font-bold text-[var(--text)] truncate">{store}{g.branchCode ? ` · ${g.branchCode}` : ''}</span>
                 <span className="text-[11px] font-medium text-[var(--text-muted)] bg-black/5 dark:bg-white/10 rounded-full px-2 py-0.5">{g.rows.length}</span>
               </button>
@@ -217,7 +217,7 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
       {archived.length > 0 && (
         <Card className="p-3">
           <button onClick={() => setArchiveOpen(o => !o)} aria-expanded={archiveOpen} className="w-full flex items-center gap-2 -m-1 p-1 rounded-lg hover:bg-[var(--hover)] transition">
-            <ChevronDown size={16} className={`shrink-0 text-[var(--text-muted)] transition-transform ${archiveOpen ? '' : '-rotate-90'}`} />
+            <ChevronDown size={16} className={`shrink-0 text-[var(--text-muted)] transition-transform ${archiveOpen ? 'rotate-180' : ''}`} />
             <span className="text-sm font-bold text-[var(--text)]">Archive · Completed</span>
             <span className="text-[11px] font-medium text-[var(--text-muted)] bg-black/5 dark:bg-white/10 rounded-full px-2 py-0.5">{archived.length}</span>
           </button>

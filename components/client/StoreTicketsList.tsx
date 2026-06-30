@@ -60,7 +60,7 @@ function Group({ title, tickets, defaultOpen = false }: { title: string; tickets
   return (
     <Card className="p-2">
       <button onClick={() => setOpen(o => !o)} aria-expanded={open} className="w-full flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-[var(--hover)] transition">
-        <ChevronDown size={16} className={`shrink-0 text-[var(--text-muted)] transition-transform ${open ? '' : '-rotate-90'}`} />
+        <ChevronDown size={16} className={`shrink-0 text-[var(--text-muted)] transition-transform ${open ? 'rotate-180' : ''}`} />
         <span className="text-sm font-bold text-[var(--text)]">{title}</span>
         <span className="text-[11px] font-medium text-[var(--text-muted)] bg-black/5 dark:bg-white/10 rounded-full px-2 py-0.5">{tickets.length}</span>
       </button>

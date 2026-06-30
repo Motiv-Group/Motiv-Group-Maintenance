@@ -135,7 +135,7 @@ export function RegionalStores({ stores, archived = [] }: { stores: StoreCard[];
       {archived.length > 0 && (
         <Card className="p-3">
           <button onClick={() => setArchiveOpen(o => !o)} aria-expanded={archiveOpen} className="w-full flex items-center gap-2 -m-1 p-1 rounded-lg hover:bg-[var(--hover)] transition">
-            <ChevronDown size={16} className={`shrink-0 text-[var(--text-muted)] transition-transform ${archiveOpen ? '' : '-rotate-90'}`} />
+            <ChevronDown size={16} className={`shrink-0 text-[var(--text-muted)] transition-transform ${archiveOpen ? 'rotate-180' : ''}`} />
             <Archive size={15} className="text-[var(--text-faint)]" />
             <span className="text-sm font-bold text-[var(--text)]">Archive · Deactivated</span>
             <span className="text-[11px] font-medium text-[var(--text-muted)] bg-black/5 dark:bg-white/10 rounded-full px-2 py-0.5">{archived.length}</span>
