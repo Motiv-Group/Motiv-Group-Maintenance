@@ -27,12 +27,23 @@ export default async function SupplierReviewsPage() {
   const { data: ratings } = supplierIds.length
     ? await adminDb
         .from('ratings')
-        .select('id, score, comment, created_at, ticket_id, tickets(title)')
+        .select('id, score, comment, created_at, ticket_id')
         .in('supplier_id', supplierIds)
         .order('created_at', { ascending: false })
     : { data: [] as any[] }
 
-  const reviews = (ratings ?? []) as any[]
+  // Resolve ticket titles in a separate query — the ratings→tickets relationship
+  // isn't embeddable (no FK), so a `tickets(title)` embed errors and returns nothing.
+  // Ratings whose ticket has since been deleted are dropped from the list.
+  const ratingRows = (ratings ?? []) as any[]
+  const ticketIds = [...new Set(ratingRows.map(r => r.ticket_id).filter(Boolean))]
+  const { data: ticketRows } = ticketIds.length
+    ? await adminDb.from('tickets').select('id, title').in('id', ticketIds)
+    : { data: [] as any[] }
+  const titleById = new Map(((ticketRows ?? []) as any[]).map(t => [t.id, t.title]))
+  const reviews = ratingRows
+    .filter(r => !r.ticket_id || titleById.has(r.ticket_id))
+    .map(r => ({ ...r, ticketTitle: r.ticket_id ? titleById.get(r.ticket_id) : null }))
   // Suppliers start at a full 5★ and degrade as real reviews arrive.
   const avgRating = reviews.length > 0
     ? reviews.reduce((s, r) => s + r.score, 0) / reviews.length
@@ -63,7 +74,7 @@ export default async function SupplierReviewsPage() {
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                    {r.tickets?.title ?? 'Unknown ticket'}
+                    {r.ticketTitle ?? 'Unknown ticket'}
                   </p>
                   <p className="text-xs text-gray-400 mt-0.5">{formatDateTime(r.created_at)}</p>
                 </div>

@@ -27,10 +27,17 @@ export async function POST(request: Request) {
     if (!ticket.region_id || !(links ?? []).some(l => l.region_id === ticket.region_id)) return NextResponse.json({ error: 'Not your ticket' }, { status: 403 })
   }
 
-  const { error } = await admin.from('ratings').insert({
+  // One rating per supplier per ticket: re-rating (e.g. accepting again after a
+  // snag fix) updates the existing row instead of stacking a duplicate.
+  const fields = {
     company_id: ticket.company_id, ticket_id: ticket.id, supplier_id: ticket.supplier_id,
     rated_by: user.id, score, comment: typeof body.comment === 'string' && body.comment.trim() ? body.comment.trim() : null,
-  })
+  }
+  const { data: existing } = await admin.from('ratings').select('id').eq('ticket_id', ticket.id).eq('supplier_id', ticket.supplier_id).order('created_at', { ascending: false }).limit(1)
+  const existingId = (existing ?? [])[0]?.id as string | undefined
+  const { error } = existingId
+    ? await admin.from('ratings').update(fields).eq('id', existingId)
+    : await admin.from('ratings').insert(fields)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })
 }
