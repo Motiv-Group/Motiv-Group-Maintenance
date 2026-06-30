@@ -110,10 +110,10 @@ export function RegionalOverview({ data, name, briefing, briefingScopeId }: { da
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <SectionCard title="Stores Requiring Attention" icon={<AlertTriangle size={15} className="text-amber-600 dark:text-amber-500" />} action={<Link href="/regional/stores" className="text-xs text-[#C6A35D] hover:underline">View all</Link>}>
           {attention.slice(0, 5).map(s => (
-            <div key={s.storeId} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0">
+            <Link key={s.storeId} href={`/regional/stores?store=${s.storeId}`} className="flex items-center justify-between gap-2 py-2 -mx-2 px-2 rounded-lg border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition">
               <div className="min-w-0"><p className="text-sm text-[var(--text)] truncate">{s.storeName}</p><p className="text-[11px] text-[var(--text-faint)] truncate">{s.mainIssue}</p></div>
               <span className="flex items-center gap-2 shrink-0"><span className={`text-sm font-semibold ${STATUS_TEXT[s.finalStatus]}`}>{s.finalHealthScore}%</span><Pill status={s.finalStatus} label={ATTN_PILL_LABEL[s.finalStatus]} className="w-24 text-center" /></span>
-            </div>
+            </Link>
           ))}
           {!data.attentionStores.length && <p className="text-sm text-[var(--text-faint)]">All stores controlled.</p>}
         </SectionCard>

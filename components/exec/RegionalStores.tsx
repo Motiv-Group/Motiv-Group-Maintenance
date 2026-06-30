@@ -27,6 +27,14 @@ export function RegionalStores({ stores, archived = [] }: { stores: StoreCard[];
   const selected = stores.find(s => s.storeId === selId) ?? null
   const ranked = [...stores].sort((a, b) => a.finalHealthScore - b.finalHealthScore)
 
+  // Deep-link from the dashboard "Stores Requiring Attention" list — open the
+  // store's side panel directly (?store=<id>).
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get('store')
+    if (id && stores.some(s => s.storeId === id)) { setSelId(id); setOpen(true) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   async function act(action: string, storeId: string) {
     setBusy(true); setNotice(null)
     try {

@@ -8,6 +8,7 @@ import { Truck, X, User, Mail, Phone, MapPin, Wrench, ChevronDown } from 'lucide
 import type { RegionalDashboardData } from '@/lib/health/data'
 import { SectionCard, Pill, STATUS_TEXT } from '@/components/exec/ui'
 import { Stars } from '@/components/ui/Stars'
+import { MapLink } from '@/components/ui/MapLink'
 import { formatCurrency, formatDate } from '@/lib/utils'
 
 type Row = RegionalDashboardData['suppliers'][number]
@@ -182,7 +183,7 @@ function SupplierPane({ row, onClose }: { row: Row; onClose: () => void }) {
               {c?.trade && <div className="flex items-center gap-2 text-sm text-[var(--text)]"><Wrench size={14} className="text-[var(--text-faint)] shrink-0" />{c.trade}</div>}
               {c?.email && <a href={`mailto:${c.email}`} className="flex items-center gap-2 text-sm text-[var(--text)] hover:text-[#C6A35D]"><Mail size={14} className="text-[var(--text-faint)] shrink-0" /><span className="truncate">{c.email}</span></a>}
               {c?.phone && <a href={`tel:${c.phone}`} className="flex items-center gap-2 text-sm text-[var(--text)] hover:text-[#C6A35D]"><Phone size={14} className="text-[var(--text-faint)] shrink-0" />{c.phone}</a>}
-              {c?.address && <div className="flex items-start gap-2 text-sm text-[var(--text)]"><MapPin size={14} className="text-[var(--text-faint)] shrink-0 mt-0.5" />{c.address}</div>}
+              {c?.address && <div className="flex items-start gap-2 text-sm text-[var(--text)]"><MapPin size={14} className="text-[var(--text-faint)] shrink-0 mt-0.5" /><MapLink address={c.address} className="hover:text-[#C6A35D]">{c.address}</MapLink></div>}
               {!c?.contactName && !c?.email && !c?.phone && !c?.address && <p className="text-sm text-[var(--text-faint)]">No contact details on file.</p>}
             </div>
           )}

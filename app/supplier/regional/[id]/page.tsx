@@ -108,7 +108,7 @@ export default async function RMDetailPage({ params }: { params: { id: string } 
                     { icon: User,   label: 'Manager',      value: branch.full_name,   href: null },
                     { icon: Mail,   label: 'Email',        value: branch.email,       href: branch.email  ? `mailto:${branch.email}`  : null },
                     { icon: Phone,  label: 'Phone',        value: branch.phone,       href: branch.phone  ? `tel:${branch.phone}`      : null },
-                    { icon: MapPin, label: 'Address',      value: branch.address,     href: null },
+                    { icon: MapPin, label: 'Address',      value: branch.address,     href: branch.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(branch.address)}` : null },
                     { icon: Hash,   label: 'Branch Code',  value: branch.branch_code, href: null },
                   ].map(({ icon: Icon, label, value, href }) =>
                     value ? (

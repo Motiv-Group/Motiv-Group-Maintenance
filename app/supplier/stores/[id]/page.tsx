@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { BackButton } from '@/components/ui/BackButton'
 import { Mail, Phone, MapPin, Building2 } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
+import { MapLink } from '@/components/ui/MapLink'
 import { AssignRMForm } from '@/components/admin/AssignRMForm'
 import {
   STATUS_COLORS, STATUS_LABELS,
@@ -80,7 +81,7 @@ export default async function AdminStoreDetailPage({ params }: { params: { id: s
         {store.address && (
           <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
             <MapPin size={14} className="text-gray-400" />
-            <span>{store.address}</span>
+            <MapLink address={store.address} className="hover:underline">{store.address}</MapLink>
           </div>
         )}
       </div>
