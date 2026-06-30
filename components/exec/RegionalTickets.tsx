@@ -3,7 +3,7 @@
 // RM Tickets tab — search, full status filters + distribution bar, collapsible
 // store groups, and a slide-out store panel. Each row shows the latest quote
 // milestone (requested → received → accepted) coloured to the status.
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Ticket, Search, ChevronDown, BarChart3, X, PlusCircle } from 'lucide-react'
 import type { RegionalTicketRow } from '@/lib/health/data'
@@ -14,8 +14,10 @@ import { readCollapse, writeCollapse, readCollapseSet, writeCollapseSet } from '
 import { rmStatusMeta, formatDateTime, humanizeDuration } from '@/lib/utils'
 
 type Bucket = 'open' | 'quote_requested' | 'quoted' | 'approved' | 'scheduled' | 'in_progress' | 'awaiting_signoff' | 'completed' | 'cancelled'
-function bucketOf(s: string): Bucket {
-  if (s === 'open' || s === 'info_requested') return 'open'
+// A ticket counts as "Open" only while it's still open/info-requested AND has no
+// supplier on it — once an RM assigns a supplier it moves to "Quote requested".
+function bucketOf(s: string, supplierAssigned = false): Bucket {
+  if (s === 'open' || s === 'info_requested') return supplierAssigned ? 'quote_requested' : 'open'
   if (['assigned', 'quote_requested', 'assessment'].includes(s)) return 'quote_requested'
   if (['quoted', 'quote_revision'].includes(s)) return 'quoted'
   if (s === 'accepted') return 'approved'
@@ -52,7 +54,7 @@ const PILLS: { key: RmFilter; label: string; active: string; inactive: string }[
   { key: 'supplier_breach', label: 'Supplier Breached', active: 'bg-orange-600 text-white border-orange-600', inactive: 'text-orange-600 dark:text-orange-400 border-orange-500/50 hover:border-orange-500' },
   { key: 'overdue', label: 'Overdue', active: 'bg-red-500 text-white border-red-500', inactive: 'text-red-600 dark:text-red-400 border-red-500/40 hover:border-red-400' },
   { key: 'reopened', label: 'Re-open', active: 'bg-amber-500 text-white border-amber-500', inactive: 'text-amber-600 dark:text-amber-400 border-amber-500/40 hover:border-amber-400' },
-  { key: 'cancelled', label: 'Cancelled', active: 'bg-red-500 text-white border-red-500', inactive: 'text-red-600 dark:text-red-400 border-red-500/40 hover:border-red-400' },
+  { key: 'cancelled', label: 'Cancelled', active: 'bg-gray-500 text-white border-gray-500', inactive: 'text-gray-600 dark:text-gray-400 border-gray-500/40 hover:border-gray-400' },
 ]
 
 function milestone(t: RegionalTicketRow): { label: string; at: string } | null {
@@ -101,7 +103,7 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
 
   const counts = useMemo(() => {
     const c: Record<Bucket, number> = { open: 0, quote_requested: 0, quoted: 0, approved: 0, scheduled: 0, in_progress: 0, awaiting_signoff: 0, completed: 0, cancelled: 0 }
-    for (const t of tickets) c[bucketOf(t.status)]++
+    for (const t of tickets) c[bucketOf(t.status, t.supplierAssigned)]++
     return c
   }, [tickets])
   const barTotal = BAR_ORDER.reduce((s, b) => s + counts[b], 0) || 1
@@ -119,7 +121,7 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
       else if (filter === 'supplier_breach') { if (!(t.supplierBreached && !t.overdue)) return false }
       else if (filter === 'reopened') { if (!t.reopened) return false }
       else if (filter === 'overdue') { if (!t.overdue) return false }
-      else if (filter !== null && bucketOf(t.status) !== filter) return false
+      else if (filter !== null && bucketOf(t.status, t.supplierAssigned) !== filter) return false
       if (!terms.length) return true
       const hay = `${t.title} ${t.storeName} ${t.branchCode ?? ''} ${t.jobRef ?? ''} ${rmStatusMeta(t.status).label}`.toLowerCase()
       return terms.every(w => hay.includes(w))
@@ -132,8 +134,8 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
   // overdue yet (overdue ones live under the Overdue filter / in their store group).
   const isLiveBreach = (t: RegionalTicketRow) => (t.internalBreached || t.supplierBreached) && !t.overdue
   const breachedRows = useMemo(() => filter === null ? shown.filter(isLiveBreach).sort(byDateThenUrgency) : [], [shown, filter])
-  const liveShown = useMemo(() => (filter === null ? shown.filter(t => !isLiveBreach(t) && bucketOf(t.status) !== 'completed') : shown).slice().sort(byDateThenUrgency), [shown, filter])
-  const archived = useMemo(() => (filter === null ? shown.filter(t => bucketOf(t.status) === 'completed') : []).slice().sort(byDateThenUrgency), [shown, filter])
+  const liveShown = useMemo(() => (filter === null ? shown.filter(t => !isLiveBreach(t) && bucketOf(t.status, t.supplierAssigned) !== 'completed') : shown).slice().sort(byDateThenUrgency), [shown, filter])
+  const archived = useMemo(() => (filter === null ? shown.filter(t => bucketOf(t.status, t.supplierAssigned) === 'completed') : []).slice().sort(byDateThenUrgency), [shown, filter])
   const [archiveOpen, setArchiveOpen] = useState(false)
   const [breachedOpen, setBreachedOpen] = useState(false)
 
@@ -155,6 +157,20 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
   const toggleBreached = () => setBreachedOpen(o => { const v = !o; writeCollapse('rm-tickets-breached', v); return v })
   const toggleArchive = () => setArchiveOpen(o => { const v = !o; writeCollapse('rm-tickets-archive', v); return v })
   const panelRows = useMemo(() => panelStore ? tickets.filter(t => t.storeName === panelStore) : [], [tickets, panelStore])
+
+  // Arriving from a dashboard KPI (?filter=…) auto-expands every list so the
+  // tickets are visible immediately — runs once, only for the deep-link (not for
+  // manual pill clicks). The expanded state is persisted like any other.
+  const didAutoExpand = useRef(false)
+  useEffect(() => {
+    if (didAutoExpand.current || !filter) return
+    if (!new URLSearchParams(window.location.search).get('filter')) return
+    didAutoExpand.current = true
+    const names = groups.map(([s]) => s)
+    setExpanded(new Set(names)); writeCollapseSet('rm-tickets-expanded', names)
+    setBreachedOpen(true); writeCollapse('rm-tickets-breached', true)
+    setArchiveOpen(true); writeCollapse('rm-tickets-archive', true)
+  }, [filter, groups])
 
   return (
     <div className="space-y-5">
@@ -261,11 +277,11 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
 
 function StorePanel({ store, rows, onClose }: { store: string; rows: RegionalTicketRow[]; onClose: () => void }) {
   const c: Record<Bucket, number> = { open: 0, quote_requested: 0, quoted: 0, approved: 0, scheduled: 0, in_progress: 0, awaiting_signoff: 0, completed: 0, cancelled: 0 }
-  for (const t of rows) c[bucketOf(t.status)]++
+  for (const t of rows) c[bucketOf(t.status, t.supplierAssigned)]++
   const total = rows.length
   const barTotal = BAR_ORDER.reduce((s, b) => s + c[b], 0) || 1
   const breached = rows.filter(t => t.breached).length
-  const active = rows.filter(t => { const b = bucketOf(t.status); return b !== 'completed' && b !== 'cancelled' })
+  const active = rows.filter(t => { const b = bucketOf(t.status, t.supplierAssigned); return b !== 'completed' && b !== 'cancelled' })
   const oldest = active.length ? Math.max(...active.map(t => Math.floor((Date.now() - new Date(t.createdAt).getTime()) / 86_400_000))) : 0
 
   const Stat = ({ label, value, tone = '' }: { label: string; value: number | string; tone?: string }) => (

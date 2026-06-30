@@ -341,6 +341,7 @@ export interface RegionalTicketRow {
   quoteRequestedAt: string | null; quoteReceivedAt: string | null; quoteAcceptedAt: string | null
   breached: boolean; supplierBreached: boolean; internalBreached: boolean
   dueAt: string; overdue: boolean; reopened: boolean; infoAdded: boolean
+  supplierAssigned: boolean
 }
 export interface RegionalDashboardData {
   portfolio: RegionalHealthResult
@@ -416,6 +417,7 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
       ...dueInfo(t, rules, now),
       reopened: declinedQuoteTickets.has(t.id) && COMMERCIAL.includes(t.status),
       infoAdded: t.status === 'open' && !!(t as any).info_request_reason,
+      supplierAssigned: !!(t as any).supplier_id,
       }
     })
 

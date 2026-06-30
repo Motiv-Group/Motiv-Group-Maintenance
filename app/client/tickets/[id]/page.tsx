@@ -66,8 +66,11 @@ export default async function StoreTicketDetailPage({ params }: { params: { id: 
     <div className="space-y-5">
       <BackLink fallbackHref="/client/tickets" label="Back to tickets" />
 
-      {/* Progress — its own block, dots */}
-      <Card className="p-5"><ClientTicketProgress status={t.status} /></Card>
+      {/* Progress — its own block, dots. Hidden once the ticket is closed off
+          (cancelled / declined); the status card below already explains why. */}
+      {!['cancelled', 'declined'].includes(t.status) && (
+        <Card className="p-5"><ClientTicketProgress status={t.status} /></Card>
+      )}
 
       {/* Ticket detail — all info, structured */}
       <Card className="p-5 space-y-4">

@@ -49,7 +49,7 @@ export default async function StoreVisitsPage() {
 
   return (
     <div className="space-y-5">
-      <div>
+      <div className="pb-2">
         <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><CalendarClock className="text-indigo-600 dark:text-indigo-400" size={22} /> Visits</h1>
         <p className="text-sm text-[var(--text-muted)] mt-0.5">Upcoming supplier visits to your store{storeIds.length > 1 ? 's' : ''}. Tap one to open its ticket.</p>
       </div>
@@ -70,7 +70,7 @@ export default async function StoreVisitsPage() {
             <div className="min-w-0 flex-1">
               <p className="text-sm font-bold text-[var(--text)]">{formatDateTime(r.scheduledAt)}{r.proposed ? ' · proposed' : ''}</p>
               <p className="text-sm text-[var(--text)] truncate">{r.title}</p>
-              <p className="text-[11px] text-[var(--text-faint)] truncate flex items-center gap-1.5"><Wrench size={11} /> {r.supplier}{r.technician ? ` · ${r.technician}` : ''} · {r.storeName}</p>
+              <p className="text-[11px] text-[var(--text-faint)] truncate flex items-center gap-1.5"><Wrench size={11} /> {r.supplier}{r.technician ? ` · ${r.technician}` : ''}</p>
             </div>
             <ChevronRight size={16} className="text-[var(--text-faint)] shrink-0" />
           </Card>

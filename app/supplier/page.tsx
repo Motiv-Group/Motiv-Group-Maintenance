@@ -1,10 +1,11 @@
 export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
-import { Truck, ClipboardList, Clock, ReceiptText, ClipboardCheck, AlertTriangle, Timer, Star, Sparkles, ChevronDown, ChevronUp, Camera } from 'lucide-react'
+import { Truck, ClipboardList, Clock, ReceiptText, ClipboardCheck, AlertTriangle, Timer, Star, Sparkles, Camera } from 'lucide-react'
 import { requireSupplierV3 } from '@/lib/health/guard'
 import { assembleSupplierDashboard, type SupplierTicketRow } from '@/lib/health/data'
 import { Card, SectionCard, KpiRow, Donut, Pill, type Kpi } from '@/components/exec/ui'
+import { CollapsibleCard } from '@/components/ui/CollapsibleCard'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { BriefingRefresh } from '@/components/briefing/BriefingRefresh'
 import { getDailyBriefing } from '@/lib/briefing/generate'
@@ -191,22 +192,13 @@ export default async function SupplierOverviewPage() {
         </SectionCard>
       </div>
 
-      {/* Recent tickets — moved to the bottom, collapsible (whole header bar toggles) */}
-      <Card className="p-0 overflow-hidden">
-        <details className="group">
-          <summary className="flex items-center justify-between gap-2 px-5 py-4 cursor-pointer list-none hover:bg-[var(--hover)] transition">
-            <h2 className="text-sm font-bold text-[var(--text)] flex items-center gap-2"><ClipboardList size={15} className="text-blue-600 dark:text-blue-400" /> Recent Tickets</h2>
-            <span className="flex items-center gap-1.5 text-[var(--text-faint)]">
-              <ChevronDown size={16} className="group-open:hidden" /><ChevronUp size={16} className="hidden group-open:block" />
-            </span>
-          </summary>
-          <div className="px-5 pb-5">
-            {recentTickets.map(t => <TicketRow key={t.id} t={t} company={company} />)}
-            {!recentTickets.length && <p className="text-sm text-[var(--text-faint)]">No tickets yet.</p>}
-            {recentTickets.length > 0 && <Link href="/supplier/tickets" className="mt-3 inline-block text-xs text-[#C6A35D] hover:underline">View all tickets →</Link>}
-          </div>
-        </details>
-      </Card>
+      {/* Recent tickets — moved to the bottom, collapsible (whole header bar toggles;
+          remembers its state across navigation, like the RM / SM recent lists). */}
+      <CollapsibleCard persistKey="supplier-recent-open" header={<h2 className="text-sm font-bold text-[var(--text)] flex items-center gap-2"><ClipboardList size={15} className="text-blue-600 dark:text-blue-400" /> Recent Tickets</h2>}>
+        {recentTickets.map(t => <TicketRow key={t.id} t={t} company={company} />)}
+        {!recentTickets.length && <p className="text-sm text-[var(--text-faint)]">No tickets yet.</p>}
+        {recentTickets.length > 0 && <Link href="/supplier/tickets" className="mt-3 inline-block text-xs text-[#C6A35D] hover:underline">View all tickets →</Link>}
+      </CollapsibleCard>
     </div>
   )
 }

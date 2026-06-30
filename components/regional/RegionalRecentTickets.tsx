@@ -3,18 +3,22 @@
 // RM dashboard "Recent Tickets" — 5 most recent, collapsible (mirrors the SM card).
 // Shows ticket title + store name/branch code + priority & status badges; the
 // whole row links to the ticket overview.
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { ChevronDown } from 'lucide-react'
 import type { RegionalTicketRow } from '@/lib/health/data'
 import { Card } from '@/components/exec/ui'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
+import { readCollapse, writeCollapse } from '@/lib/collapse-state'
 import { rmStatusMeta, formatDateTime, humanizeDuration } from '@/lib/utils'
 
 const MAX_RECENT = 5
 
 export function RegionalRecentTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
   const [open, setOpen] = useState(false)
+  // Remember the expand/collapse choice across navigation (wiped on next sign-in).
+  useEffect(() => { const v = readCollapse('rm-recent-open'); if (v !== null) setOpen(v) }, [])
+  const toggle = () => setOpen(o => { const v = !o; writeCollapse('rm-recent-open', v); return v })
   const recent = useMemo(() => {
     // Completed tickets live in the Tickets-tab archive, not the recent overview.
     return tickets
@@ -24,8 +28,8 @@ export function RegionalRecentTickets({ tickets }: { tickets: RegionalTicketRow[
   }, [tickets])
 
   return (
-    <Card className="p-5 cursor-pointer hover:ring-[#C6A35D]/30 transition" onClick={() => setOpen(o => !o)} role="button" tabIndex={0} aria-expanded={open}
-      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(o => !o) } }}>
+    <Card className="p-5 cursor-pointer hover:ring-[#C6A35D]/30 transition" onClick={toggle} role="button" tabIndex={0} aria-expanded={open}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle() } }}>
       <div className="flex items-center justify-between gap-2 mb-3">
         <span className="flex items-center gap-2 min-w-0">
           <ChevronDown size={16} className={`shrink-0 text-[var(--text-muted)] transition-transform ${open ? 'rotate-180' : ''}`} />

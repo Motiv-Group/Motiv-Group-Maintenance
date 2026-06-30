@@ -255,6 +255,7 @@ async function notify(admin: Admin, action: string, ticket: any, actorName: stri
   const storeMsg = action === 'schedule' || action === 'accept_snag'
     ? `Visit scheduled${when ? ` for ${when}` : ''}`
     : action === 'accept_schedule' ? `Visit time confirmed${when ? ` for ${when}` : ''}`
+    : action === 'reject' ? 'Ticket cancelled'
     : `Update: ${action.replace(/_/g, ' ')}`
 
   // A custom (beyond-window) proposal also pings the RM to accept it.
@@ -272,7 +273,9 @@ async function notify(admin: Admin, action: string, ticket: any, actorName: stri
   if (toRegion.includes(action) && ticket.region_id) {
     const { data } = await admin.from('regional_users').select('user_id').eq('region_id', ticket.region_id)
     const ids = (data ?? []).map(r => r.user_id)
-    await push(admin, ids, ticket.company_id, title, `Update: ${action.replace(/_/g, ' ')}`, `/regional/tickets/${ticket.id}`)
+    // "resubmit" = the store manager supplied the info the RM asked for.
+    const regionMsg = action === 'resubmit' ? 'Information added' : `Update: ${action.replace(/_/g, ' ')}`
+    await push(admin, ids, ticket.company_id, title, regionMsg, `/regional/tickets/${ticket.id}`)
   }
   if (toStore.includes(action) && ticket.created_by) {
     await push(admin, [ticket.created_by], ticket.company_id, title, storeMsg, `/client/tickets/${ticket.id}`)
