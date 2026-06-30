@@ -21,6 +21,7 @@ const DECLINE_REASONS = ['Fully booked / no capacity', 'Outside our service area
 export function DeclineWorkButton({ ticketId }: { ticketId: string }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
+  const [confirming, setConfirming] = useState(false)
   const [reason, setReason] = useState('')
   const [other, setOther] = useState('')
   const [busy, setBusy] = useState(false)
@@ -52,10 +53,24 @@ export function DeclineWorkButton({ ticketId }: { ticketId: string }) {
       </select>
       {reason === 'Other' && <textarea className={`${input} min-h-[70px]`} placeholder="Tell the manager why…" value={other} onChange={e => setOther(e.target.value)} />}
       {err && <p className="text-xs text-red-500">{err}</p>}
-      <div className="flex gap-2">
-        <button onClick={submit} disabled={busy} className="flex-1 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-500 disabled:opacity-50">{busy ? 'Declining…' : 'Yes, decline'}</button>
-        <button onClick={() => { setOpen(false); setErr('') }} disabled={busy} className="flex-1 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm disabled:opacity-50">Cancel</button>
-      </div>
+      {confirming ? (
+        <div className="space-y-2">
+          <p className="text-sm text-[var(--text)]">Are you sure you want to decline this work?</p>
+          <div className="flex gap-2">
+            <button onClick={submit} disabled={busy} className="flex-1 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-500 disabled:opacity-50">{busy ? 'Declining…' : 'Yes, decline'}</button>
+            <button onClick={() => setConfirming(false)} disabled={busy} className="flex-1 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm disabled:opacity-50">Back</button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex gap-2">
+          <button onClick={() => {
+            if (!reason) { setErr('Choose a reason.'); return }
+            if (reason === 'Other' && !other.trim()) { setErr('Tell the manager why.'); return }
+            setErr(''); setConfirming(true)
+          }} className="flex-1 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-500">Decline work</button>
+          <button onClick={() => { setOpen(false); setErr(''); setConfirming(false) }} className="flex-1 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm">Cancel</button>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,11 +1,12 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { PlusCircle, Search, Ticket, ChevronDown } from 'lucide-react'
 import type { StoreManagerTicket } from '@/lib/health/data'
 import { Card } from '@/components/exec/ui'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
+import { readCollapse, writeCollapse } from '@/lib/collapse-state'
 import { formatDate, formatDateTime, humanizeDuration, OPERATIONAL_IMPACT_LABELS, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
 
 type Filter = 'all' | 'open' | 'info_requested' | 'in_progress' | 'completed' | 'cancelled' | 'overdue'
@@ -56,10 +57,12 @@ function Row({ t }: { t: StoreManagerTicket }) {
 /** Collapsible status group used in the "All" view. */
 function Group({ title, tickets, defaultOpen = false }: { title: string; tickets: StoreManagerTicket[]; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen)
+  // Remember the user's choice across navigation (wiped on next sign-in).
+  useEffect(() => { const v = readCollapse(`sm-group-${title}`); if (v !== null) setOpen(v) }, [title])
   if (!tickets.length) return null
   return (
     <Card className="p-2">
-      <button onClick={() => setOpen(o => !o)} aria-expanded={open} className="w-full flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-[var(--hover)] transition">
+      <button onClick={() => setOpen(o => { const v = !o; writeCollapse(`sm-group-${title}`, v); return v })} aria-expanded={open} className="w-full flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-[var(--hover)] transition">
         <ChevronDown size={16} className={`shrink-0 text-[var(--text-muted)] transition-transform ${open ? 'rotate-180' : ''}`} />
         <span className="text-sm font-bold text-[var(--text)]">{title}</span>
         <span className="text-[11px] font-medium text-[var(--text-muted)] bg-black/5 dark:bg-white/10 rounded-full px-2 py-0.5">{tickets.length}</span>

@@ -17,6 +17,20 @@ export function writeCollapse(id: string, open: boolean): void {
   try { window.localStorage.setItem(PREFIX + id, open ? '1' : '0') } catch { /* storage unavailable */ }
 }
 
+/** Read a remembered set of expanded keys (e.g. which store groups are open). */
+export function readCollapseSet(id: string): string[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const v = window.localStorage.getItem(PREFIX + id)
+    return v ? (JSON.parse(v) as string[]) : []
+  } catch { return [] }
+}
+
+export function writeCollapseSet(id: string, keys: string[]): void {
+  if (typeof window === 'undefined') return
+  try { window.localStorage.setItem(PREFIX + id, JSON.stringify(keys)) } catch { /* storage unavailable */ }
+}
+
 /** Wipe every remembered collapse state — call on sign-in to reset to defaults. */
 export function clearCollapseState(): void {
   if (typeof window === 'undefined') return

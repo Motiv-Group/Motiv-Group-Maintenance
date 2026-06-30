@@ -10,6 +10,7 @@ import type { RegionalTicketRow } from '@/lib/health/data'
 import { Card } from '@/components/exec/ui'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { SlideOver } from '@/components/ui/SlideOver'
+import { readCollapse, writeCollapse, readCollapseSet, writeCollapseSet } from '@/lib/collapse-state'
 import { rmStatusMeta, formatDateTime, humanizeDuration } from '@/lib/utils'
 
 type Bucket = 'open' | 'quote_requested' | 'quoted' | 'approved' | 'scheduled' | 'in_progress' | 'awaiting_signoff' | 'completed' | 'cancelled'
@@ -136,13 +137,23 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
   const [archiveOpen, setArchiveOpen] = useState(false)
   const [breachedOpen, setBreachedOpen] = useState(false)
 
+  // Restore the expand/collapse state the user left (per-session; wiped on sign-in)
+  // so navigating into a ticket and back keeps the lists exactly as they were.
+  useEffect(() => {
+    setExpanded(new Set(readCollapseSet('rm-tickets-expanded')))
+    setBreachedOpen(readCollapse('rm-tickets-breached') ?? false)
+    setArchiveOpen(readCollapse('rm-tickets-archive') ?? false)
+  }, [])
+
   const groups = useMemo(() => {
     const m = new Map<string, { branchCode: string | null; rows: RegionalTicketRow[] }>()
     for (const t of liveShown) { const g = m.get(t.storeName) ?? { branchCode: t.branchCode, rows: [] }; g.rows.push(t); m.set(t.storeName, g) }
     return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]))
   }, [liveShown])
 
-  const toggle = (s: string) => setExpanded(c => { const n = new Set(c); n.has(s) ? n.delete(s) : n.add(s); return n })
+  const toggle = (s: string) => setExpanded(c => { const n = new Set(c); n.has(s) ? n.delete(s) : n.add(s); writeCollapseSet('rm-tickets-expanded', [...n]); return n })
+  const toggleBreached = () => setBreachedOpen(o => { const v = !o; writeCollapse('rm-tickets-breached', v); return v })
+  const toggleArchive = () => setArchiveOpen(o => { const v = !o; writeCollapse('rm-tickets-archive', v); return v })
   const panelRows = useMemo(() => panelStore ? tickets.filter(t => t.storeName === panelStore) : [], [tickets, panelStore])
 
   return (
@@ -185,7 +196,7 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
       {/* SLA breached — pinned at the top when no filter is active, collapsible */}
       {filter === null && breachedRows.length > 0 && (
         <Card className="p-3 ring-1 ring-red-500/40">
-          <button onClick={() => setBreachedOpen(o => !o)} aria-expanded={breachedOpen} className="w-full flex items-center gap-2 -m-1 p-1 rounded-lg hover:bg-[var(--hover)] transition">
+          <button onClick={toggleBreached} aria-expanded={breachedOpen} className="w-full flex items-center gap-2 -m-1 p-1 rounded-lg hover:bg-[var(--hover)] transition">
             <ChevronDown size={16} className={`shrink-0 text-red-500 transition-transform ${breachedOpen ? 'rotate-180' : ''}`} />
             <span className="text-sm font-bold text-red-600 dark:text-red-400">SLA Breached</span>
             <span className="text-[11px] font-medium text-red-700 dark:text-red-400 bg-red-500/15 rounded-full px-2 py-0.5">{breachedRows.length}</span>
@@ -216,7 +227,7 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
       {/* Archive — completed tickets, only under the All filter */}
       {archived.length > 0 && (
         <Card className="p-3">
-          <button onClick={() => setArchiveOpen(o => !o)} aria-expanded={archiveOpen} className="w-full flex items-center gap-2 -m-1 p-1 rounded-lg hover:bg-[var(--hover)] transition">
+          <button onClick={toggleArchive} aria-expanded={archiveOpen} className="w-full flex items-center gap-2 -m-1 p-1 rounded-lg hover:bg-[var(--hover)] transition">
             <ChevronDown size={16} className={`shrink-0 text-[var(--text-muted)] transition-transform ${archiveOpen ? 'rotate-180' : ''}`} />
             <span className="text-sm font-bold text-[var(--text)]">Archive · Completed</span>
             <span className="text-[11px] font-medium text-[var(--text-muted)] bg-black/5 dark:bg-white/10 rounded-full px-2 py-0.5">{archived.length}</span>

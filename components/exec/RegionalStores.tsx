@@ -8,7 +8,8 @@ import type { StoreCard } from '@/lib/health/data'
 import { formatCurrency, formatDateTime } from '@/lib/utils'
 import { isValidEmail, isValidPhone } from '@/lib/csv'
 import { Card, SectionCard, Pill, Donut, BreakdownList, STATUS_TEXT } from '@/components/exec/ui'
-import { Drawer, DrawerHeader } from '@/components/exec/Drawer'
+import { DrawerHeader } from '@/components/exec/Drawer'
+import { SlideOver } from '@/components/ui/SlideOver'
 
 const fmtK = (n: number) => n ? (n >= 1000 ? `R ${(n / 1000).toFixed(0)}K` : formatCurrency(n)) : 'R 0'
 
@@ -159,7 +160,7 @@ export function RegionalStores({ stores, archived = [] }: { stores: StoreCard[];
         </Card>
       )}
 
-      <Drawer open={open} onClose={() => setOpen(false)}>{selected && <Detail s={selected} onClose={() => setOpen(false)} />}</Drawer>
+      {open && selected && <SlideOver onClose={() => setOpen(false)}>{close => <Detail s={selected} onClose={close} />}</SlideOver>}
 
       {actionTarget && (
         <StoreActionsModal
