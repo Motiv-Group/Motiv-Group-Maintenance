@@ -34,7 +34,7 @@ export interface TimelineInput {
   // The supplier's proposed snag-fix date (distinct from the original job schedule).
   snagScheduledAt?: string | null
   quotes?: { amount?: number | null; status: string; created_at: string; updated_at?: string | null }[]
-  signoffs?: { status: string; created_at: string }[]
+  signoffs?: { status: string; created_at: string; reviewed_at?: string | null; reject_reason?: string | null }[]
   updates?: { body: string; author_role: string | null; created_at: string }[]
 }
 
@@ -60,10 +60,13 @@ export function buildTicketTimeline(t: TimelineInput): TimelineEvent[] {
   push(t.scheduledAt, 'Job scheduled', 'scheduled', 'Supplier')
   push(t.snagScheduledAt, 'Snag job scheduled', 'scheduled', 'Supplier')
 
+  // Each signoff row is one COC/POC submission: log the submission, then its
+  // outcome (approved / snagged / sent back for more evidence) at review time.
   for (const s of t.signoffs ?? []) {
-    if (s.status === 'accepted') push(s.created_at, 'Completion approved', 'completion_approved', 'Regional Manager')
-    else if (s.status === 'rejected') push(s.created_at, 'Snagged', 'completion_rejected', 'Regional Manager')
-    else push(s.created_at, 'Completion submitted', 'completion_submitted', 'Supplier')
+    push(s.created_at, 'Completion submitted', 'completion_submitted', 'Supplier')
+    if (s.status === 'accepted') push(s.reviewed_at ?? s.created_at, 'Completion approved', 'completion_approved', 'Regional Manager')
+    else if (s.status === 'rejected') push(s.reviewed_at ?? s.created_at, 'Snagged', 'completion_rejected', 'Regional Manager')
+    else if (s.status === 'evidence_requested') push(s.reviewed_at ?? s.created_at, `More information requested on COC & POC${s.reject_reason ? ` — ${s.reject_reason}` : ''}`, 'info_requested', 'Regional Manager')
   }
 
   if (t.status === 'completed') push(t.completedAt ?? t.updatedAt, 'Ticket completed', 'completed')

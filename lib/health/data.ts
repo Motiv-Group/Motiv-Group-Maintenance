@@ -499,7 +499,10 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
   const signoffsPending = tickets.filter(t => t.status === 'submitted_for_signoff').length
   let snagsOpen = 0
   if (storeIds.length) {
-    const { count: nc } = await db.from('snags').select('id', { count: 'exact', head: true }).eq('company_id', companyId).in('store_id', storeIds).in('status', ['open', 'in_progress'])
+    // A snag stays "open" from raise through accept (assigned) and the fix
+    // (in_progress) until the RM accepts the corrective work (resolved). Counting
+    // only open/in_progress dropped accepted snags, so the KPI read 0 with a live snag.
+    const { count: nc } = await db.from('snags').select('id', { count: 'exact', head: true }).eq('company_id', companyId).in('store_id', storeIds).in('status', ['open', 'assigned', 'in_progress'])
     snagsOpen = nc ?? 0
   }
 

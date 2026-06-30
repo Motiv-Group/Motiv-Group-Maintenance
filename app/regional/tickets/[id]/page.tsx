@@ -42,11 +42,13 @@ function DetailItem({ label, value }: { label: string; value: string }) {
 // One COC/POC submission card — reused across the under-review, sent-back (snag)
 // and approved blocks so the RM sees the full submission history. A sent-back card
 // shows the reason it was returned (why another COC/POC was needed).
-function RmSignoffCard({ s, tone }: { s: any; tone: 'review' | 'snag' | 'approved' }) {
+function RmSignoffCard({ s, tone }: { s: any; tone: 'review' | 'snag' | 'approved' | 'evidence' }) {
   const meta = tone === 'approved'
     ? { ring: 'ring-emerald-500/40', bg: 'bg-emerald-500/5', head: 'bg-emerald-500/10 border-emerald-500/20', badge: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400', label: 'Approved', Icon: CheckCircle2, iconCls: 'text-emerald-500', title: 'Approved completion' }
     : tone === 'snag'
     ? { ring: 'ring-red-500/40', bg: 'bg-red-500/5', head: 'bg-red-500/10 border-red-500/20', badge: 'bg-red-500/15 text-red-700 dark:text-red-400', label: 'Sent back', Icon: FileText, iconCls: 'text-red-500', title: 'Snagged completion' }
+    : tone === 'evidence'
+    ? { ring: 'ring-amber-500/40', bg: 'bg-amber-500/5', head: 'bg-amber-500/10 border-amber-500/20', badge: 'bg-amber-500/15 text-amber-700 dark:text-amber-400', label: 'More info requested', Icon: FileText, iconCls: 'text-amber-500', title: 'Sent back for more evidence' }
     : { ring: 'ring-[#C6A35D]/40', bg: 'bg-[#C6A35D]/5', head: 'bg-[#C6A35D]/10 border-[#C6A35D]/20', badge: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D]', label: 'Under review', Icon: FileText, iconCls: 'text-[#C6A35D]', title: 'Submitted completion' }
   const before = (s.before_urls ?? []) as string[]
   const after = (s.after_urls ?? []) as string[]
@@ -60,6 +62,12 @@ function RmSignoffCard({ s, tone }: { s: any; tone: 'review' | 'snag' | 'approve
         {tone === 'snag' && s.reject_reason && (
           <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3">
             <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Why it was sent back</p>
+            <p className="text-sm text-[var(--text)]">{s.reject_reason}</p>
+          </div>
+        )}
+        {tone === 'evidence' && s.reject_reason && (
+          <div className="rounded-lg bg-amber-500/10 ring-1 ring-amber-500/30 p-3">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400">Why more evidence was requested</p>
             <p className="text-sm text-[var(--text)]">{s.reject_reason}</p>
           </div>
         )}
@@ -101,7 +109,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
     admin.from('stores').select('name, sub_store').eq('id', t.store_id).single(),
     admin.from('quotes').select('id, supplier_id, amount, amount_incl_vat, description, file_url, status, valid_until, proposed_schedule_at, created_at, updated_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
-    admin.from('signoffs').select('id, status, before_urls, after_urls, coc_url, invoice_url, notes, reject_reason, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
+    admin.from('signoffs').select('id, status, before_urls, after_urls, coc_url, invoice_url, notes, reject_reason, reviewed_at, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('suppliers').select('id, company_name').eq('company_id', companyId).eq('active', true).order('company_name'),
     admin.from('ticket_variations').select('description, amount, status, created_at, file_urls').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('snags').select('description, status, scheduled_at, schedule_status, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
@@ -116,6 +124,9 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   const pendingSignoffs = allSignoffs.filter(s => ['submitted', 'awaiting_regional', 'awaiting_store'].includes(s.status))
   const acceptedSignoff = allSignoffs.find(s => s.status === 'accepted') ?? null
   const rejectedSignoffs = allSignoffs.filter(s => s.status === 'rejected')
+  // Submissions sent back for more evidence (not snagged) — kept in the history with
+  // the reason the RM asked for more.
+  const evidenceRequestedSignoffs = allSignoffs.filter(s => s.status === 'evidence_requested')
   // Snag scheduling — the supplier's proposed fix date (separate from the original
   // job schedule) and whether it's still awaiting the RM's approval.
   const latestSnag = ((snags ?? []) as any[])[0] ?? null
@@ -242,6 +253,17 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
             </div>
           </div>
         )}
+        {/* Snag fix schedule — the supplier's proposed corrective-work date (separate from the original job). */}
+        {latestSnag?.scheduled_at && ['assigned', 'in_progress'].includes(latestSnag.status) && (
+          <div className="flex items-center gap-2.5 rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 px-3.5 py-3">
+            <Calendar size={18} className="text-amber-600 dark:text-amber-400 shrink-0" />
+            <div className="min-w-0">
+              <p className="text-[11px] uppercase tracking-wide font-semibold text-amber-700 dark:text-amber-400">Snag fix scheduled{latestSnag.schedule_status === 'proposed' ? ' · proposed' : ''}</p>
+              <p className="text-sm font-bold text-[var(--text)]">{formatDateTime(latestSnag.scheduled_at)}</p>
+              {latestSnag.schedule_status === 'proposed' && <p className="text-[11px] text-amber-600 dark:text-amber-400">Awaiting your approval.</p>}
+            </div>
+          </div>
+        )}
 
         <EditedLine at={t.edited_at} by={editorName} />
       </Card>
@@ -262,16 +284,17 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         </div>
       )}
 
-      {/* COC & POC — every submission currently under review (full history) */}
-      {pendingSignoffs.length > 0 && (
+      {/* COC & POC — every submission: under review, plus any sent back for more evidence (full history) */}
+      {(pendingSignoffs.length > 0 || evidenceRequestedSignoffs.length > 0) && (
         <CollapsibleSection id="ticket-coc" title="COC & POC" defaultOpen={phase === 'coc'}>
           {t.status === 'evidence_requested' && t.evidence_request_reason && (
             <div className="rounded-lg bg-amber-500/10 ring-1 ring-amber-500/30 p-3">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400">More evidence requested</p>
+              <p className="text-[11px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400">Waiting on the supplier to provide more evidence</p>
               <p className="text-sm text-[var(--text)]">{t.evidence_request_reason}</p>
             </div>
           )}
           {pendingSignoffs.map((s: any) => <RmSignoffCard key={s.id} s={s} tone="review" />)}
+          {evidenceRequestedSignoffs.map((s: any) => <RmSignoffCard key={s.id} s={s} tone="evidence" />)}
         </CollapsibleSection>
       )}
 

@@ -80,6 +80,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
       case 'request_evidence':
         updates.evidence_required = true
         updates.evidence_request_reason = body.reason ?? null
+        // Record the sent-back submission distinctly so the trail reads "More info
+        // requested" (not a snag), and a later snag only rejects the next submission.
+        await admin.from('signoffs').update({ status: 'evidence_requested', reject_reason: body.reason ?? null, reviewed_by: user.id, reviewed_at: now }).eq('ticket_id', ticketId).in('status', ['submitted', 'awaiting_regional', 'awaiting_store'])
         break
       case 'submit_quote': {
         const amount = Number(body.amount)
