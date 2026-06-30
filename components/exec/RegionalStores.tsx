@@ -342,7 +342,7 @@ function Detail({ s, onClose }: { s: StoreCard; onClose?: () => void }) {
       <div><div className={`text-3xl font-bold ${STATUS_TEXT[s.finalStatus]}`}>{s.finalHealthScore}%</div><p className="text-xs text-[var(--text-muted)] mt-1">Open {s.openTickets} · Overdue {s.overdueTickets} · Pending approvals {s.pendingDecisions}</p></div>
 
       {/* Store manager contact */}
-      <div className="rounded-xl ring-1 ring-[var(--border)] bg-[var(--surface-2)] p-3 space-y-2">
+      <div className="rounded-xl ring-1 ring-[var(--border)] bg-[var(--surface)] p-3 space-y-2">
         <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Store Manager</div>
         {s.sm ? (
           <div className="space-y-1.5">
@@ -355,7 +355,7 @@ function Detail({ s, onClose }: { s: StoreCard; onClose?: () => void }) {
         )}
       </div>
 
-      {/* Summary grid */}
+      {/* Summary grid — matches the Suppliers-pane stat cards (raised surface) */}
       <div className="grid grid-cols-2 gap-2">
         {[
           { label: 'Open', value: String(s.openTickets) },
@@ -363,9 +363,9 @@ function Detail({ s, onClose }: { s: StoreCard; onClose?: () => void }) {
           { label: 'Pending approvals', value: String(s.pendingDecisions) },
           { label: 'Cost exposure', value: formatCurrency(s.costExposure) },
         ].map(c => (
-          <div key={c.label} className="rounded-lg ring-1 ring-[var(--border)] p-2.5">
-            <div className="text-[10px] uppercase tracking-wide text-[var(--text-faint)]">{c.label}</div>
-            <div className="text-sm font-semibold text-[var(--text)] mt-0.5">{c.value}</div>
+          <div key={c.label} className="rounded-xl bg-[var(--surface)] ring-1 ring-[var(--border)] p-3">
+            <div className="text-xl font-bold text-[var(--text)]">{c.value}</div>
+            <div className="text-[11px] text-[var(--text-faint)]">{c.label}</div>
           </div>
         ))}
       </div>
