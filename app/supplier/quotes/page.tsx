@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { ReceiptText, Building2, ChevronDown, ChevronUp } from 'lucide-react'
 import { requireSupplierV3 } from '@/lib/health/guard'
 import { assembleSupplierDashboard } from '@/lib/health/data'
+import { PersistentDetails } from '@/components/ui/PersistentDetails'
 import { formatCurrency, formatDateTime } from '@/lib/utils'
 
 // Pill (badge) classes per quote state — incl. the synthetic "requested".
@@ -94,7 +95,7 @@ export default async function SupplierQuotesPage({ searchParams }: { searchParam
       )}
 
       {groups.map(([store, items]) => (
-        <details key={store} className="group rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
+        <PersistentDetails key={store} persistKey={`supplier-quotes-${store}`} className="group rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
           <summary className="flex items-center gap-3 px-4 py-3 cursor-pointer list-none hover:bg-[var(--hover)] transition">
             <Building2 size={16} className="text-[#C6A35D] shrink-0" />
             <span className="flex-1 min-w-0 text-sm font-bold text-[var(--text)] truncate">{[d.company, store].filter(Boolean).join(' · ')}{items[0].branchCode ? ` · ${items[0].branchCode}` : ''}</span>
@@ -117,7 +118,7 @@ export default async function SupplierQuotesPage({ searchParams }: { searchParam
               </Link>
             ))}
           </div>
-        </details>
+        </PersistentDetails>
       ))}
     </div>
   )

@@ -99,15 +99,23 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   const admin = createAdminClient()
   const { data: t } = await admin.from('tickets').select('*').eq('id', params.id).single()
   if (!t || t.company_id !== companyId) redirect('/supplier/tickets')
-  const [{ data: store }, { data: updates }, { data: invite }, { data: myQuotes }, { data: technicianRows }, { data: signoffRows }, { data: snagRows }] = await Promise.all([
+  const [{ data: store }, { data: updates }, { data: invite }, { data: myQuotes }, { data: technicianRows }, { data: signoffRows }, { data: snagRows }, { data: companyRow }] = await Promise.all([
     admin.from('stores').select('name, sub_store').eq('id', t.store_id).single(),
     admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
-    admin.from('ticket_suppliers').select('status, invited_at, decline_reason, responded_at, declined_by').eq('ticket_id', t.id).in('supplier_id', supplierIds).maybeSingle(),
-    admin.from('quotes').select('id, amount, amount_incl_vat, description, file_url, status, valid_until, created_at, updated_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).order('created_at', { ascending: false }),
+    admin.from('ticket_suppliers').select('supplier_id, status, invited_at, decline_reason, responded_at, declined_by').eq('ticket_id', t.id).in('supplier_id', supplierIds).maybeSingle(),
+    admin.from('quotes').select('id, amount, amount_incl_vat, description, file_url, status, valid_until, proposed_schedule_at, created_at, updated_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).order('created_at', { ascending: false }),
     admin.from('technicians').select('id, name').in('supplier_id', supplierIds).eq('active', true).order('name'),
     admin.from('signoffs').select('id, before_urls, after_urls, coc_url, invoice_url, status, notes, reject_reason, created_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).order('created_at', { ascending: false }),
     admin.from('snags').select('description, required_correction, severity, status, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
+    admin.from('companies').select('name').eq('id', companyId).maybeSingle(),
   ])
+  // Client organisation that owns the store (shown in the ticket detail).
+  const companyName = (companyRow as any)?.name ?? null
+  // This supplier's own trade-company name — used in the "declined by …" block.
+  const myInviteSupplierId = (invite as any)?.supplier_id ?? null
+  const supplierCompanyName = myInviteSupplierId
+    ? ((await admin.from('suppliers').select('company_name').eq('id', myInviteSupplierId).maybeSingle()).data?.company_name ?? null)
+    : null
   // When this supplier was requested to quote (their invite, else the ticket's request time).
   const quoteRequestedAt = (invite as any)?.invited_at ?? t.quote_requested_at ?? null
   // Latest completion the supplier submitted (COC + proof-of-completion photos).
@@ -147,7 +155,10 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   const canSubmitQuote = quoteableStatus && inviteOpen && (!latestQuote || revisionRequested || latestQuote.status === 'declined')
   const declineReason = (invite as any)?.decline_reason ?? null
   const declinedBy = ((invite as any)?.declined_by ?? null) as 'supplier' | 'regional_manager' | null
-  const declinedByWho = declinedBy === 'supplier' ? 'you' : declinedBy === 'regional_manager' ? 'the manager' : null
+  // Who declined → shown in the "Quote request declined by …" block title.
+  const declinedByLabel = declinedBy === 'supplier'
+    ? (supplierCompanyName ? ` by ${supplierCompanyName}` : ' by you')
+    : declinedBy === 'regional_manager' ? ' by the manager' : ''
   // Map a quote's DB status to the read-only summary tone (accepted shows "Approved").
   const quoteStatusOf = (s: string): QuoteSummaryStatus => s === 'accepted' ? 'accepted' : s === 'declined' ? 'declined' : 'pending'
 
@@ -190,6 +201,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
         </div>
 
         <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+          {companyName && <DetailItem label="Company" value={companyName} />}
           <DetailItem label="Store" value={storeName} />
           <DetailItem label="Category" value={t.category ?? 'General'} />
           <DetailItem label="Operational Impact" value={OPERATIONAL_IMPACT_LABELS[t.operational_impact ?? 'none'] ?? 'No operational impact'} />
@@ -234,9 +246,10 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
       {/* Off the ticket → no "Next step", just why this quote request was declined. */}
       {declinedForMe ? (
         <div className="rounded-2xl bg-red-500/10 ring-1 ring-red-500/40 p-5 space-y-1">
-          <p className="text-sm font-bold text-red-700 dark:text-red-400">Quote request declined</p>
-          <p className="text-sm text-[var(--text-muted)]">This quote request was declined{declinedByWho ? ` by ${declinedByWho}` : ''}.</p>
-          {declineReason && <p className="text-sm text-[var(--text)]"><span className="font-medium">Reason:</span> {declineReason}</p>}
+          <p className="text-sm font-bold text-red-700 dark:text-red-400">Quote request declined{declinedByLabel}</p>
+          {declineReason
+            ? <p className="text-sm text-[var(--text)]">{declineReason}</p>
+            : <p className="text-sm text-[var(--text-muted)]">No reason was provided.</p>}
         </div>
       ) : (
         <Card className="p-5 space-y-3">
@@ -256,7 +269,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           {awarded && t.status === 'in_progress' && <RaiseVariationCard ticketId={t.id} />}
           <WorkflowActions ticketId={t.id} status={t.status} role="supplier" exclude={['schedule', 'submit_completion', 'require_assessment', 'request_quote', 'submit_variation']} />
           {/* Opt out of the job (before award) — separated from the primary actions */}
-          {canDecline && <div className="pt-2 border-t border-[var(--border)]"><DeclineWorkButton ticketId={t.id} /></div>}
+          {canDecline && <div className="pt-1"><DeclineWorkButton ticketId={t.id} /></div>}
         </Card>
       )}
 
@@ -269,7 +282,13 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
               title={arr.length > 1 ? `Quote #${arr.length - i}` : 'Your submitted quote'}
               status={quoteStatusOf(q.status)}
               quote={{ id: q.id, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, description: q.description ?? null, fileUrl: q.file_url ?? null, validUntil: q.valid_until ?? null, createdAt: q.created_at }}
-              schedule={q.status === 'accepted' && t.scheduled_at ? { at: t.scheduled_at, proposed: t.schedule_status === 'proposed', technician: scheduledTechName, audience: 'supplier' } : null}
+              schedule={
+                q.status === 'accepted' && t.scheduled_at
+                  ? { at: t.scheduled_at, proposed: t.schedule_status === 'proposed', technician: scheduledTechName, audience: 'supplier' }
+                  : q.proposed_schedule_at
+                  ? { at: q.proposed_schedule_at, proposed: true, audience: 'supplier' }
+                  : null
+              }
             />
           ))}
         </CollapsibleSection>

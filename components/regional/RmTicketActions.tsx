@@ -3,7 +3,7 @@
 // RM ticket-page custom actions for the competitive-quoting model.
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, Pencil } from 'lucide-react'
+import { Search, Pencil, CalendarClock } from 'lucide-react'
 import { StarInput, Stars } from '@/components/ui/Stars'
 import { formatCurrency, formatDateTime } from '@/lib/utils'
 
@@ -224,7 +224,7 @@ export function SupplierStatusList({ rows }: { rows: { name: string; status: str
 }
 
 // ── Quote review (approve / decline with reason) ────────────────
-export interface ReviewQuote { id: string; supplierName: string; amount: number; amountInclVat: number | null; description: string | null; fileUrl: string | null; createdAt: string }
+export interface ReviewQuote { id: string; supplierName: string; amount: number; amountInclVat: number | null; description: string | null; fileUrl: string | null; createdAt: string; proposedScheduleAt?: string | null }
 const DECLINE_REASONS = ['Price too high', 'Scope unclear / incomplete', 'Choosing another supplier', 'Lead time too long', 'Other']
 
 export function QuoteReviewCard({ ticketId, quotes }: { ticketId: string; quotes: ReviewQuote[] }) {
@@ -254,6 +254,13 @@ export function QuoteReviewCard({ ticketId, quotes }: { ticketId: string; quotes
             <span className="text-base font-bold text-[var(--text)] shrink-0">{formatCurrency(q.amount)}</span>
           </div>
           <p className="text-[11px] text-[var(--text-faint)]">Received {formatDateTime(q.createdAt)}{q.amountInclVat ? ` · incl VAT ${formatCurrency(q.amountInclVat)}` : ''}</p>
+          {q.proposedScheduleAt && (
+            <div className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-500/10 ring-1 ring-indigo-500/30 px-2.5 py-1 text-[13px]">
+              <CalendarClock size={14} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
+              <span className="text-[var(--text-muted)]">Proposed visit</span>
+              <span className="font-semibold text-[var(--text)]">{formatDateTime(q.proposedScheduleAt)}</span>
+            </div>
+          )}
           {q.description && <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{q.description}</p>}
           {q.fileUrl && <a href={q.fileUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C6A35D] underline">View attachment</a>}
 

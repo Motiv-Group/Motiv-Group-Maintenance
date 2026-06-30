@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { ClipboardCheck, Building2, ChevronDown, ChevronUp } from 'lucide-react'
 import { requireSupplierV3 } from '@/lib/health/guard'
 import { assembleSupplierDashboard, type SupplierSignoffRow } from '@/lib/health/data'
+import { PersistentDetails } from '@/components/ui/PersistentDetails'
 import { formatDateTime } from '@/lib/utils'
 
 const TONE: Record<string, string> = { submitted: 'text-[#C6A35D]', awaiting_regional: 'text-[#C6A35D]', awaiting_store: 'text-blue-600 dark:text-blue-400', accepted: 'text-emerald-600 dark:text-emerald-400', rejected: 'text-red-600 dark:text-red-400' }
@@ -54,7 +55,7 @@ export default async function SupplierSignoffPage({ searchParams }: { searchPara
       )}
 
       {groups.map(([store, rows]) => (
-        <details key={store} className="group rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
+        <PersistentDetails key={store} persistKey={`supplier-signoff-${store}`} className="group rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
           <summary className="flex items-center gap-3 px-4 py-3 cursor-pointer list-none hover:bg-[var(--hover)] transition">
             <Building2 size={16} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
             <span className="flex-1 min-w-0 text-sm font-bold text-[var(--text)] truncate">{[d.company, store].filter(Boolean).join(' · ')}{rows[0].branchCode ? ` · ${rows[0].branchCode}` : ''}</span>
@@ -73,7 +74,7 @@ export default async function SupplierSignoffPage({ searchParams }: { searchPara
               </Link>
             ))}
           </div>
-        </details>
+        </PersistentDetails>
       ))}
     </div>
   )
