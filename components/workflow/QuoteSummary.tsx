@@ -1,8 +1,7 @@
 // Read-only quote view — the professional "submitted/accepted quote" card shared
 // by the RM and supplier ticket pages. Pure/server-safe (no client hooks).
-import { CheckCircle2, FileText, Clock, XCircle } from 'lucide-react'
+import { CheckCircle2, FileText, Clock, XCircle, CalendarClock } from 'lucide-react'
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils'
-import { ScheduledVisitRow } from '@/components/workflow/ScheduledVisitRow'
 
 export type QuoteSummaryStatus = 'pending' | 'accepted' | 'declined' | 'awarded'
 
@@ -48,13 +47,20 @@ export function QuoteSummary({ quote, status, title, schedule }: { quote: QuoteS
         <span className={`text-[10px] font-semibold uppercase tracking-wide ${tone.badgeText} ${tone.badge} rounded-full px-2 py-0.5 shrink-0`}>{tone.label}</span>
       </div>
       <div className="p-4 space-y-3">
-        {schedule && <ScheduledVisitRow scheduledAt={schedule.at} proposed={schedule.proposed} technician={schedule.technician} audience={schedule.audience} />}
         <div className="grid grid-cols-2 gap-x-4 gap-y-3">
           <Item label="Excl. VAT" value={formatCurrency(quote.amount)} />
           <Item label="Incl. VAT" value={quote.amountInclVat ? formatCurrency(quote.amountInclVat) : '—'} />
           <Item label="Submitted" value={formatDateTime(quote.createdAt)} />
           <Item label="Valid until" value={quote.validUntil ? formatDate(quote.validUntil) : 'N/A'} />
         </div>
+        {schedule && (
+          <div className="flex items-center gap-2 text-sm flex-wrap">
+            <CalendarClock size={15} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
+            <span className="text-[var(--text-muted)]">Scheduled visit</span>
+            <span className="font-semibold text-[var(--text)]">{formatDateTime(schedule.at)}{schedule.technician ? ` · ${schedule.technician}` : ''}</span>
+            {schedule.proposed && <span className="text-[11px] text-amber-600 dark:text-amber-400">(proposed)</span>}
+          </div>
+        )}
         {quote.description && (
           <div>
             <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Description</div>

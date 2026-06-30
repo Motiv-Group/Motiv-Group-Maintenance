@@ -50,7 +50,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     // Decline + re-open: the RM then chooses (in the Actions block) to let a supplier
     // re-quote, assign a different supplier, or cancel the ticket.
     await admin.from('quotes').update({ status: 'declined' }).eq('id', quote.id)
-    await admin.from('ticket_suppliers').update({ status: 'declined', decline_reason: reason, responded_at: now }).eq('ticket_id', ticket.id).eq('supplier_id', quote.supplier_id)
+    await admin.from('ticket_suppliers').update({ status: 'declined', decline_reason: reason, declined_by: 'regional_manager', responded_at: now }).eq('ticket_id', ticket.id).eq('supplier_id', quote.supplier_id)
     await admin.from('tickets').update({
       status: 'open', supplier_id: null,
       quote_decision_required: false, quote_decision_status: null,

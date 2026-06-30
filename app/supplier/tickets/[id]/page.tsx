@@ -102,7 +102,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   const [{ data: store }, { data: updates }, { data: invite }, { data: myQuotes }, { data: technicianRows }, { data: signoffRows }, { data: snagRows }] = await Promise.all([
     admin.from('stores').select('name, sub_store').eq('id', t.store_id).single(),
     admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
-    admin.from('ticket_suppliers').select('status, invited_at, decline_reason, responded_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).maybeSingle(),
+    admin.from('ticket_suppliers').select('status, invited_at, decline_reason, responded_at, declined_by').eq('ticket_id', t.id).in('supplier_id', supplierIds).maybeSingle(),
     admin.from('quotes').select('id, amount, amount_incl_vat, description, file_url, status, valid_until, created_at, updated_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).order('created_at', { ascending: false }),
     admin.from('technicians').select('id, name').in('supplier_id', supplierIds).eq('active', true).order('name'),
     admin.from('signoffs').select('id, before_urls, after_urls, coc_url, invoice_url, status, notes, reject_reason, created_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).order('created_at', { ascending: false }),
@@ -133,9 +133,8 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
 
   // Their latest submitted quote (if any) for this ticket.
   const latestQuote = ((myQuotes ?? []) as any[])[0] ?? null
-  const hasAcceptedQuote = ((myQuotes ?? []) as any[]).some(q => q.status === 'accepted')
-  // The scheduled visit is shown prominently inside the accepted quote (below); the
-  // technician name (if assigned) rides along with it.
+  // The scheduled visit shows neatly inside the accepted quote (below) and as the
+  // indigo callout in the ticket detail; the technician name rides along with it.
   const scheduledTechName = t.technician_id ? (technicians.find(x => x.id === t.technician_id)?.name ?? null) : null
   // A quote can be (re)submitted while the ticket is in a quote-requesting state
   // (covers both the competitive 'assigned' invite and the legacy 'quote_requested'
@@ -147,6 +146,8 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   // Allow a fresh quote, a revision, or a re-quote after the RM declined-to-requote.
   const canSubmitQuote = quoteableStatus && inviteOpen && (!latestQuote || revisionRequested || latestQuote.status === 'declined')
   const declineReason = (invite as any)?.decline_reason ?? null
+  const declinedBy = ((invite as any)?.declined_by ?? null) as 'supplier' | 'regional_manager' | null
+  const declinedByWho = declinedBy === 'supplier' ? 'you' : declinedBy === 'regional_manager' ? 'the manager' : null
   // Map a quote's DB status to the read-only summary tone (accepted shows "Approved").
   const quoteStatusOf = (s: string): QuoteSummaryStatus => s === 'accepted' ? 'accepted' : s === 'declined' ? 'declined' : 'pending'
 
@@ -184,7 +185,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end">
             <PriorityBadge priority={t.priority} className="w-full text-center" />
-            {(() => { const sm = rmStatusMeta(t.status); const cls = declinedForMe ? 'bg-red-500/15 text-red-700 dark:text-red-400' : sm.cls; return <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${cls}`}>{declinedForMe ? 'Declined' : sm.label}</span> })()}
+            {(() => { const sm = rmStatusMeta(t.status); const cls = declinedForMe ? 'bg-red-500/15 text-red-700 dark:text-red-400' : sm.cls; return <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${cls}`}>{declinedForMe ? (declinedBy === 'supplier' ? 'Declined (you)' : 'Declined') : sm.label}</span> })()}
           </div>
         </div>
 
@@ -213,9 +214,8 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           </div>
         )}
 
-        {/* Scheduled visit lives inside the accepted quote (below). Shown here only
-            as a fallback when there's no accepted quote to host it. */}
-        {!declinedForMe && t.scheduled_at && !hasAcceptedQuote && (
+        {/* Scheduled visit — its own callout in the ticket detail block. */}
+        {!declinedForMe && t.scheduled_at && (
           <div className="flex items-center gap-2.5 rounded-xl bg-indigo-500/10 ring-1 ring-indigo-500/30 px-3.5 py-3">
             <Calendar size={18} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
             <div className="min-w-0">
@@ -231,25 +231,34 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
 
       {!declinedForMe && breached && <BreachReason nextAction={sla.nextAction} dueAt={sla.nextActionDueAt} owner="Supplier" />}
 
-      <Card className="p-5 space-y-3">
-        <h2 className="text-sm font-bold text-[var(--text)]">Next step</h2>
-        {latestQuote?.status === 'declined' && (
-          <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3 space-y-0.5">
-            <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Quote declined{latestQuote?.updated_at ? <span className="font-medium normal-case opacity-80"> · {formatDateTime(latestQuote.updated_at)}</span> : null}</p>
-            <p className="text-sm text-[var(--text)]">{declineReason || DEFAULT_DECLINE_REASON}</p>
-            {canSubmitQuote && <p className="text-sm text-[var(--text-muted)]">Submit a revised quote below.</p>}
-          </div>
-        )}
-        {canSubmitQuote && <SendQuoteForm ticketId={t.id} competitive priority={t.priority} createdAt={t.created_at} />}
-        {awarded && t.status === 'accepted' && <ScheduleJobCard ticketId={t.id} priority={t.priority} createdAt={t.created_at} technicians={technicians} />}
-        {awarded && ['in_progress', 'snag_resolved', 'snag_in_progress', 'evidence_requested'].includes(t.status) && (
-          <SubmitCompletionForm ticketId={t.id} />
-        )}
-        {awarded && t.status === 'in_progress' && <RaiseVariationCard ticketId={t.id} />}
-        {!declinedForMe && <WorkflowActions ticketId={t.id} status={t.status} role="supplier" exclude={['schedule', 'submit_completion', 'require_assessment', 'request_quote', 'submit_variation']} />}
-        {/* Opt out of the job (before award) — separated from the primary actions */}
-        {canDecline && <div className="pt-2 border-t border-[var(--border)]"><DeclineWorkButton ticketId={t.id} /></div>}
-      </Card>
+      {/* Off the ticket → no "Next step", just why this quote request was declined. */}
+      {declinedForMe ? (
+        <div className="rounded-2xl bg-red-500/10 ring-1 ring-red-500/40 p-5 space-y-1">
+          <p className="text-sm font-bold text-red-700 dark:text-red-400">Quote request declined</p>
+          <p className="text-sm text-[var(--text-muted)]">This quote request was declined{declinedByWho ? ` by ${declinedByWho}` : ''}.</p>
+          {declineReason && <p className="text-sm text-[var(--text)]"><span className="font-medium">Reason:</span> {declineReason}</p>}
+        </div>
+      ) : (
+        <Card className="p-5 space-y-3">
+          <h2 className="text-sm font-bold text-[var(--text)]">Next step</h2>
+          {latestQuote?.status === 'declined' && (
+            <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3 space-y-0.5">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Quote declined{latestQuote?.updated_at ? <span className="font-medium normal-case opacity-80"> · {formatDateTime(latestQuote.updated_at)}</span> : null}</p>
+              <p className="text-sm text-[var(--text)]">{declineReason || DEFAULT_DECLINE_REASON}</p>
+              {canSubmitQuote && <p className="text-sm text-[var(--text-muted)]">Submit a revised quote below.</p>}
+            </div>
+          )}
+          {canSubmitQuote && <SendQuoteForm ticketId={t.id} competitive priority={t.priority} createdAt={t.created_at} />}
+          {awarded && t.status === 'accepted' && <ScheduleJobCard ticketId={t.id} priority={t.priority} createdAt={t.created_at} technicians={technicians} />}
+          {awarded && ['in_progress', 'snag_resolved', 'snag_in_progress', 'evidence_requested'].includes(t.status) && (
+            <SubmitCompletionForm ticketId={t.id} />
+          )}
+          {awarded && t.status === 'in_progress' && <RaiseVariationCard ticketId={t.id} />}
+          <WorkflowActions ticketId={t.id} status={t.status} role="supplier" exclude={['schedule', 'submit_completion', 'require_assessment', 'request_quote', 'submit_variation']} />
+          {/* Opt out of the job (before award) — separated from the primary actions */}
+          {canDecline && <div className="pt-2 border-t border-[var(--border)]"><DeclineWorkButton ticketId={t.id} /></div>}
+        </Card>
+      )}
 
       {/* Quotes — full history, own block (out of the Next-step box) */}
       {(myQuotes ?? []).length > 0 && (

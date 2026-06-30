@@ -33,7 +33,7 @@ const AWAITING_QUOTE = new Set(['assigned', 'assessment', 'quote_requested', 'qu
 
 interface QItem {
   key: string; ticketId: string; ticketTitle: string; storeName: string; branchCode: string | null
-  createdAt: string; amount: number | null; status: string
+  createdAt: string; amount: number | null; status: string; byYou?: boolean
 }
 
 export default async function SupplierQuotesPage({ searchParams }: { searchParams?: { status?: string } }) {
@@ -41,10 +41,13 @@ export default async function SupplierQuotesPage({ searchParams }: { searchParam
   const d = await assembleSupplierDashboard(companyId, supplierIds)
   const active = FILTERS.some(f => f.key === searchParams?.status) ? searchParams!.status! : 'all'
 
+  // Who declined each ticket for this supplier ('supplier' = they declined it).
+  const declinedByByTicket = new Map(d.tickets.map(t => [t.id, t.declinedBy]))
+
   // Submitted quotes — declined ones always show; others hide once past the decision phase.
   const quoteItems: QItem[] = d.quotes
     .filter(q => q.status === 'declined' || !HIDE_FROM_QUOTES.has(q.ticketStatus))
-    .map(q => ({ key: `q-${q.id}`, ticketId: q.ticketId, ticketTitle: q.ticketTitle, storeName: q.storeName, branchCode: q.branchCode, createdAt: q.createdAt, amount: q.amount, status: q.status }))
+    .map(q => ({ key: `q-${q.id}`, ticketId: q.ticketId, ticketTitle: q.ticketTitle, storeName: q.storeName, branchCode: q.branchCode, createdAt: q.createdAt, amount: q.amount, status: q.status, byYou: q.status === 'declined' && declinedByByTicket.get(q.ticketId) === 'supplier' }))
 
   // Tickets where the RM requested a quote but this supplier hasn't submitted yet.
   const quotedTicketIds = new Set(d.quotes.map(q => q.ticketId))
@@ -56,7 +59,7 @@ export default async function SupplierQuotesPage({ searchParams }: { searchParam
   // so the request still appears here. (RM-declined quotes already arrive via quoteItems.)
   const declinedRequestItems: QItem[] = d.tickets
     .filter(t => t.declinedForMe && !quotedTicketIds.has(t.id))
-    .map(t => ({ key: `d-${t.id}`, ticketId: t.id, ticketTitle: t.title, storeName: t.storeName, branchCode: t.branchCode, createdAt: t.declinedAt ?? t.quoteRequestedAt ?? t.createdAt, amount: null, status: 'declined' }))
+    .map(t => ({ key: `d-${t.id}`, ticketId: t.id, ticketTitle: t.title, storeName: t.storeName, branchCode: t.branchCode, createdAt: t.declinedAt ?? t.quoteRequestedAt ?? t.createdAt, amount: null, status: 'declined', byYou: t.declinedBy === 'supplier' }))
 
   const all = [...requestedItems, ...quoteItems, ...declinedRequestItems]
   const shown = active === 'all' ? all : all.filter(i => i.status === active)
@@ -109,7 +112,7 @@ export default async function SupplierQuotesPage({ searchParams }: { searchParam
                 <div className="flex flex-col items-stretch gap-1 shrink-0 w-32">
                   <span className="text-sm font-semibold text-[var(--text)] tabular-nums whitespace-nowrap text-left">{i.amount != null ? formatCurrency(i.amount) : '—'}</span>
                   {i.amount != null && <span className={`${BADGE} bg-slate-500/15 text-slate-600 dark:text-slate-300`}>excl VAT</span>}
-                  <span className={`${BADGE} ${STATUS_BADGE[i.status] ?? 'bg-[var(--surface-2)] text-[var(--text-muted)]'}`}>{STATUS_LABEL[i.status] ?? i.status.replace('_', ' ')}</span>
+                  <span className={`${BADGE} ${STATUS_BADGE[i.status] ?? 'bg-[var(--surface-2)] text-[var(--text-muted)]'}`}>{i.status === 'declined' && i.byYou ? 'Declined (you)' : (STATUS_LABEL[i.status] ?? i.status.replace('_', ' '))}</span>
                 </div>
               </Link>
             ))}

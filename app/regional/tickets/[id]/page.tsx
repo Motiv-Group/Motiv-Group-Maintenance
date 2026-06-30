@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { redirect } from 'next/navigation'
 import { BackLink } from '@/components/ui/BackLink'
-import { CheckCircle2, FileText, Calendar } from 'lucide-react'
+import { CheckCircle2, FileText, Calendar, CalendarClock } from 'lucide-react'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireRegionalV3 } from '@/lib/health/guard'
 import { loadSlaResolver } from '@/lib/health/data'
@@ -16,7 +16,6 @@ import { WorkflowActions } from '@/components/workflow/WorkflowActions'
 import { RmPipeline } from '@/components/regional/RmPipeline'
 import { AssignSuppliersButton, RequestInfoButton, RmEditTicketForm, SupplierStatusList, QuoteReviewCard, CancelTicketCard, ApproveSignoffCard, ReQuoteButton, AcceptScheduleCard } from '@/components/regional/RmTicketActions'
 import { DueDate } from '@/components/workflow/DueDate'
-import { ScheduledVisitRow } from '@/components/workflow/ScheduledVisitRow'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { EditedLine } from '@/components/ui/EditedLine'
 import { AuditTrail } from '@/components/ui/AuditTrail'
@@ -165,9 +164,8 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         )}
 
         {t.info_request_reason && <p className="text-xs text-amber-600 dark:text-amber-400">Info requested: {t.info_request_reason}</p>}
-        {/* Scheduled visit lives inside the accepted quote (below). Shown here only
-            as a fallback when there's no accepted quote to host it. */}
-        {t.scheduled_at && acceptedQuotes.length === 0 && (
+        {/* Scheduled visit — its own callout in the ticket detail block. */}
+        {t.scheduled_at && (
           <div className="flex items-center gap-2.5 rounded-xl bg-indigo-500/10 ring-1 ring-indigo-500/30 px-3.5 py-3">
             <Calendar size={18} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
             <div className="min-w-0">
@@ -322,13 +320,20 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
                     <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400 bg-emerald-500/15 rounded-full px-2 py-0.5 shrink-0">Accepted</span>
                   </div>
                   <div className="p-4 space-y-3">
-                    {t.scheduled_at && <ScheduledVisitRow scheduledAt={t.scheduled_at} proposed={t.schedule_status === 'proposed'} audience="rm" />}
                     <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                       <DetailItem label="Excl. VAT" value={formatCurrency(q.amount)} />
                       <DetailItem label="Incl. VAT" value={q.amountInclVat ? formatCurrency(q.amountInclVat) : '—'} />
                       <DetailItem label="Received" value={formatDateTime(q.createdAt)} />
                       <DetailItem label="Valid until" value={q.validUntil ? formatDate(q.validUntil) : 'N/A'} />
                     </div>
+                    {t.scheduled_at && (
+                      <div className="flex items-center gap-2 text-sm flex-wrap">
+                        <CalendarClock size={15} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
+                        <span className="text-[var(--text-muted)]">Scheduled visit</span>
+                        <span className="font-semibold text-[var(--text)]">{formatDateTime(t.scheduled_at)}</span>
+                        {t.schedule_status === 'proposed' && <span className="text-[11px] text-amber-600 dark:text-amber-400">(proposed)</span>}
+                      </div>
+                    )}
                     {q.description && (
                       <div>
                         <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Description</div>

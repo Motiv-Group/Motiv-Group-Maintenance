@@ -7,6 +7,7 @@ const STAGES = [
   { label: 'Quote requested',   dot: 'bg-cyan-500',    ring: 'ring-cyan-500/30',    text: 'text-cyan-600 dark:text-cyan-400' },
   { label: 'Quoted',            dot: 'bg-violet-500',  ring: 'ring-violet-500/30',  text: 'text-violet-600 dark:text-violet-400' },
   { label: 'Approved',          dot: 'bg-teal-500',    ring: 'ring-teal-500/30',    text: 'text-teal-600 dark:text-teal-400' },
+  { label: 'Job scheduled',     dot: 'bg-indigo-500',  ring: 'ring-indigo-500/30',  text: 'text-indigo-600 dark:text-indigo-400' },
   { label: 'In progress',       dot: 'bg-[#C6A35D]',   ring: 'ring-[#C6A35D]/30',   text: 'text-amber-600 dark:text-[#C6A35D]' },
   { label: 'Awaiting sign-off', dot: 'bg-orange-500',  ring: 'ring-orange-500/30',  text: 'text-orange-600 dark:text-orange-400' },
   { label: 'Completed',         dot: 'bg-emerald-500', ring: 'ring-emerald-500/30', text: 'text-emerald-600 dark:text-emerald-400' },
@@ -17,9 +18,10 @@ const IDX: Record<string, number> = {
   assigned: 1, quote_requested: 1, assessment: 1,
   quoted: 2, quote_revision: 2,
   accepted: 3,
-  scheduled: 4, in_progress: 4, variation_review: 4, variation_accepted: 4,
-  submitted_for_signoff: 5, evidence_requested: 5, snag: 5, snag_assigned: 5, snag_resolved: 5, approved_closeout: 5, pending_sign_off: 5, snag_in_progress: 5,
-  completed: 6,
+  scheduled: 4,
+  in_progress: 5, variation_review: 5, variation_accepted: 5,
+  submitted_for_signoff: 6, evidence_requested: 6, snag: 6, snag_assigned: 6, snag_resolved: 6, approved_closeout: 6, pending_sign_off: 6, snag_in_progress: 6,
+  completed: 7,
 }
 export function RmPipeline({ status }: { status: string }) {
   if (status === 'cancelled' || status === 'declined') {

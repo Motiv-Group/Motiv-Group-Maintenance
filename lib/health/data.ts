@@ -576,7 +576,7 @@ export interface SupplierTicketRow {
   acknowledged: boolean; evidenceRequired: boolean; beforeUploaded: boolean; afterUploaded: boolean; cocUploaded: boolean
   active: boolean; breached: boolean
   assignedAt: string | null; quoteRequestedAt: string | null; quoteSubmittedAt: string | null; quoteApprovedAt: string | null; declinedAt: string | null
-  dueAt: string; overdue: boolean; declinedForMe: boolean
+  dueAt: string; overdue: boolean; declinedForMe: boolean; declinedBy: 'supplier' | 'regional_manager' | null
 }
 export interface SupplierQuoteRow { id: string; ticketId: string; ticketTitle: string; ticketStatus: string; storeName: string; branchCode: string | null; amount: number; amountInclVat: number | null; status: string; createdAt: string }
 export interface SupplierSignoffRow { id: string; ticketId: string; ticketTitle: string; storeName: string; branchCode: string | null; status: string; createdAt: string }
@@ -601,7 +601,7 @@ export async function assembleSupplierDashboard(companyId: string, supplierIds: 
   // plus declined/closed so the supplier still sees them under the Declined filter.
   const [{ data: bySupplier }, { data: invRows }] = await Promise.all([
     db.from('tickets').select(TICKET_COLS).eq('company_id', companyId).in('supplier_id', supplierIds),
-    db.from('ticket_suppliers').select('ticket_id, status, responded_at').in('supplier_id', supplierIds).in('status', ['invited', 'quoted', 'awarded', 'declined', 'closed']),
+    db.from('ticket_suppliers').select('ticket_id, status, responded_at, declined_by').in('supplier_id', supplierIds).in('status', ['invited', 'quoted', 'awarded', 'declined', 'closed']),
   ])
   const owned = (bySupplier ?? []) as any[]
   const ownedIds = new Set(owned.map(t => t.id))
@@ -610,9 +610,12 @@ export async function assembleSupplierDashboard(companyId: string, supplierIds: 
   // When the supplier was declined/closed off the ticket — used as the decline date
   // when there's no declined quote to date it (e.g. they declined before quoting).
   const declinedInviteAt = new Map<string, string>()
+  // Who took them off it: 'supplier' (self) vs 'regional_manager' (declined quote).
+  const declinedByOf = new Map<string, 'supplier' | 'regional_manager'>()
   for (const r of (invRows ?? []) as any[]) {
     myInviteStatus.set(r.ticket_id, r.status)
     if (['declined', 'closed'].includes(r.status) && r.responded_at) declinedInviteAt.set(r.ticket_id, r.responded_at)
+    if (r.declined_by === 'supplier' || r.declined_by === 'regional_manager') declinedByOf.set(r.ticket_id, r.declined_by)
   }
   const extraIds = Array.from(new Set((invRows ?? []).map(r => r.ticket_id))).filter(id => !ownedIds.has(id))
   const { data: invitedTickets } = extraIds.length ? await db.from('tickets').select(TICKET_COLS).in('id', extraIds) : { data: [] as any[] }
@@ -687,6 +690,7 @@ export async function assembleSupplierDashboard(companyId: string, supplierIds: 
       declinedAt: declinedQuoteAt.get(t.id) ?? declinedInviteAt.get(t.id) ?? null,
       ...dueInfo(t, rules, now),
       declinedForMe,
+      declinedBy: declinedForMe ? (declinedByOf.get(t.id) ?? null) : null,
     })
   }
   // Active first, then unacknowledged, then oldest — keeps the dashboard queues useful.

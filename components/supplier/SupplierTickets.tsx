@@ -13,19 +13,20 @@ import { SlideOver } from '@/components/ui/SlideOver'
 import { readCollapse, writeCollapse, readCollapseSet, writeCollapseSet } from '@/lib/collapse-state'
 import { rmStatusMeta, formatDateTime, humanizeDuration } from '@/lib/utils'
 
-type Bucket = 'to_quote' | 'quoted' | 'scheduled' | 'in_progress' | 'signoff' | 'completed' | 'closed'
+type Bucket = 'to_quote' | 'quoted' | 'approved' | 'scheduled' | 'in_progress' | 'signoff' | 'completed' | 'closed'
 function bucketOf(s: string): Bucket {
   if (['open', 'info_requested', 'assigned', 'assessment', 'quote_requested', 'quote_revision'].includes(s)) return 'to_quote'
   if (s === 'quoted') return 'quoted'
-  if (['accepted', 'scheduled'].includes(s)) return 'scheduled'
+  if (s === 'accepted') return 'approved'
+  if (s === 'scheduled') return 'scheduled'
   if (['in_progress', 'variation_review', 'variation_accepted'].includes(s)) return 'in_progress'
   if (['submitted_for_signoff', 'evidence_requested', 'snag', 'snag_assigned', 'snag_resolved', 'approved_closeout', 'pending_sign_off', 'snag_in_progress'].includes(s)) return 'signoff'
   if (s === 'completed') return 'completed'
   return 'closed'   // declined / cancelled
 }
-const BUCKET_LABEL: Record<Bucket, string> = { to_quote: 'Quote requested', quoted: 'Quoted', scheduled: 'Quote approved', in_progress: 'In Progress', signoff: 'Sign-off', completed: 'Completed', closed: 'Closed' }
-const BUCKET_BAR: Record<Bucket, string> = { to_quote: 'bg-cyan-500', quoted: 'bg-violet-500', scheduled: 'bg-teal-500', in_progress: 'bg-[#C6A35D]', signoff: 'bg-orange-500', completed: 'bg-emerald-500', closed: 'bg-red-500' }
-const BAR_ORDER: Bucket[] = ['to_quote', 'quoted', 'scheduled', 'in_progress', 'signoff', 'completed']
+const BUCKET_LABEL: Record<Bucket, string> = { to_quote: 'Quote requested', quoted: 'Quoted', approved: 'Quote approved', scheduled: 'Job scheduled', in_progress: 'In Progress', signoff: 'Sign-off', completed: 'Completed', closed: 'Closed' }
+const BUCKET_BAR: Record<Bucket, string> = { to_quote: 'bg-cyan-500', quoted: 'bg-violet-500', approved: 'bg-teal-500', scheduled: 'bg-indigo-500', in_progress: 'bg-[#C6A35D]', signoff: 'bg-orange-500', completed: 'bg-emerald-500', closed: 'bg-red-500' }
+const BAR_ORDER: Bucket[] = ['to_quote', 'quoted', 'approved', 'scheduled', 'in_progress', 'signoff', 'completed']
 
 // Urgency rank (handles classic low/medium/high/urgent and engine P1–P4).
 const URGENCY: Record<string, number> = { urgent: 0, P1: 0, high: 1, P2: 1, medium: 2, P3: 2, low: 3, P4: 3 }
@@ -44,7 +45,8 @@ const PILLS: { key: FilterKey; label: string; active: string; inactive: string }
   { key: 'evidence', label: 'Missing Evidence', active: 'bg-amber-500 text-white border-amber-500', inactive: 'text-amber-600 dark:text-amber-500 border-amber-500/50 hover:border-amber-500' },
   { key: 'to_quote', label: 'Quote requested', active: 'bg-cyan-500 text-white border-cyan-500', inactive: 'text-cyan-600 dark:text-cyan-400 border-cyan-500/40 hover:border-cyan-400' },
   { key: 'quoted', label: 'Quoted', active: 'bg-violet-500 text-white border-violet-500', inactive: 'text-violet-600 dark:text-violet-400 border-violet-500/40 hover:border-violet-400' },
-  { key: 'scheduled', label: 'Quote approved', active: 'bg-teal-500 text-white border-teal-500', inactive: 'text-teal-600 dark:text-teal-400 border-teal-500/40 hover:border-teal-400' },
+  { key: 'approved', label: 'Quote approved', active: 'bg-teal-500 text-white border-teal-500', inactive: 'text-teal-600 dark:text-teal-400 border-teal-500/40 hover:border-teal-400' },
+  { key: 'scheduled', label: 'Job scheduled', active: 'bg-indigo-500 text-white border-indigo-500', inactive: 'text-indigo-600 dark:text-indigo-400 border-indigo-500/40 hover:border-indigo-400' },
   { key: 'in_progress', label: 'In Progress', active: 'bg-[#C6A35D] text-[#0a0e17] border-[#C6A35D]', inactive: 'text-amber-600 dark:text-[#C6A35D] border-[#C6A35D]/40 hover:border-[#C6A35D]' },
   { key: 'signoff', label: 'Sign-off', active: 'bg-orange-500 text-white border-orange-500', inactive: 'text-orange-600 dark:text-orange-400 border-orange-500/40 hover:border-orange-400' },
   { key: 'completed', label: 'Completed', active: 'bg-emerald-500 text-white border-emerald-500', inactive: 'text-emerald-600 dark:text-emerald-400 border-emerald-500/40 hover:border-emerald-400' },
@@ -56,7 +58,8 @@ function milestone(t: SupplierTicketRow): { label: string; at: string } | null {
   // A declined supplier must never see the ticket's "Quote approved" (that was
   // another supplier) — show their own decline (or their last own milestone).
   if (t.declinedForMe) {
-    if (t.declinedAt) return { label: 'Declined', at: t.declinedAt }
+    const declinedLabel = t.declinedBy === 'supplier' ? 'Declined (you)' : 'Declined'
+    if (t.declinedAt) return { label: declinedLabel, at: t.declinedAt }
     if (t.quoteSubmittedAt) return { label: 'Quoted', at: t.quoteSubmittedAt }
     if (t.quoteRequestedAt) return { label: 'Quote requested', at: t.quoteRequestedAt }
     return null
@@ -80,11 +83,11 @@ function TicketRow({ t, company, showStore }: { t: SupplierTicketRow; company?: 
         <p className="text-sm text-[var(--text)] truncate">{t.title}</p>
         <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(t.createdAt)}</p>
         {t.overdue && <p className="text-[11px] font-semibold text-red-600 dark:text-red-400">Overdue by {humanizeDuration(Date.now() - new Date(t.dueAt).getTime())}</p>}
-        {m && <p className={`text-[11px] font-medium ${m.label === 'Declined' ? 'text-red-600 dark:text-red-400' : sm.text}`}>{m.label} · {formatDateTime(m.at)}</p>}
+        {m && <p className={`text-[11px] font-medium ${m.label.startsWith('Declined') ? 'text-red-600 dark:text-red-400' : sm.text}`}>{m.label} · {formatDateTime(m.at)}</p>}
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
         <PriorityBadge priority={t.priority} className="w-full text-center" />
-        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${t.declinedForMe ? 'bg-red-500/15 text-red-700 dark:text-red-400' : sm.cls}`}>{t.declinedForMe ? 'Declined' : sm.label}</span>
+        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${t.declinedForMe ? 'bg-red-500/15 text-red-700 dark:text-red-400' : sm.cls}`}>{t.declinedForMe ? (t.declinedBy === 'supplier' ? 'Declined (you)' : 'Declined') : sm.label}</span>
       </div>
     </Link>
   )
@@ -106,7 +109,7 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
   }, [])
 
   const counts = useMemo(() => {
-    const c: Record<Bucket, number> = { to_quote: 0, quoted: 0, scheduled: 0, in_progress: 0, signoff: 0, completed: 0, closed: 0 }
+    const c: Record<Bucket, number> = { to_quote: 0, quoted: 0, approved: 0, scheduled: 0, in_progress: 0, signoff: 0, completed: 0, closed: 0 }
     // A ticket awarded to another supplier counts as closed (declined), not as this
     // supplier's completed/active work.
     for (const t of tickets) c[t.declinedForMe ? 'closed' : bucketOf(t.status)]++
@@ -268,7 +271,7 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
 }
 
 function StorePanel({ store, company, rows, quotes, onClose }: { store: string; company?: string; rows: SupplierTicketRow[]; quotes: SupplierQuoteRow[]; onClose: () => void }) {
-  const c: Record<Bucket, number> = { to_quote: 0, quoted: 0, scheduled: 0, in_progress: 0, signoff: 0, completed: 0, closed: 0 }
+  const c: Record<Bucket, number> = { to_quote: 0, quoted: 0, approved: 0, scheduled: 0, in_progress: 0, signoff: 0, completed: 0, closed: 0 }
   for (const t of rows) c[bucketOf(t.status)]++
   const total = rows.length
   const barTotal = BAR_ORDER.reduce((s, b) => s + c[b], 0) || 1
@@ -324,7 +327,7 @@ function StorePanel({ store, company, rows, quotes, onClose }: { store: string; 
 
         <div className="grid grid-cols-2 gap-2">
           <Stat label="To quote / quoted" value={c.to_quote + c.quoted} />
-          <Stat label="In progress" value={c.scheduled + c.in_progress} />
+          <Stat label="In progress" value={c.approved + c.scheduled + c.in_progress} />
           <Stat label="Sign-off" value={c.signoff} tone={c.signoff ? 'text-orange-600 dark:text-orange-400' : 'text-[var(--text)]'} />
           <Stat label="Completed" value={c.completed} />
         </div>
