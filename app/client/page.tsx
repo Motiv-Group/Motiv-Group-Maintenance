@@ -28,6 +28,7 @@ export default async function StoreOverviewPage() {
   const kpis: Kpi[] = [
     { label: 'Open', value: d.open, icon: <ClipboardList size={13} />, tone: 'info', href: '/client/tickets?status=open' },
     { label: 'Info Requested', value: d.awaitingInput, icon: <Info size={13} />, tone: d.awaitingInput ? 'warn' : 'good', href: '/client/tickets?status=info_requested' },
+    { label: 'Job Scheduled', value: d.scheduled, icon: <Calendar size={13} />, tone: 'info', href: '/client/tickets?status=scheduled' },
     { label: 'In Progress', value: d.inProgress, icon: <Wrench size={13} />, tone: 'gold', href: '/client/tickets?status=in_progress' },
     { label: 'Completed', value: d.completed, icon: <CheckCircle2 size={13} />, tone: 'good', href: '/client/tickets?status=completed' },
     { label: 'Overdue', value: overdueCount, icon: <AlertTriangle size={13} />, tone: overdueCount ? 'bad' : 'good', href: '/client/tickets?status=overdue' },
@@ -84,7 +85,7 @@ export default async function StoreOverviewPage() {
       )}
 
       {/* KPI grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
         {kpis.map((k, i) => <KpiCard key={i} kpi={k} />)}
       </div>
 

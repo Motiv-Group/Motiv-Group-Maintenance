@@ -146,7 +146,7 @@ export const STATUS_PILL: Record<TicketStatus, { active: string; inactive: strin
   snag_in_progress: { active: 'bg-pink-500 text-white border-pink-500',  inactive: 'text-pink-700 dark:text-pink-400 border-pink-200 dark:border-pink-900/40 hover:border-pink-400' },
 }
 
-export type ClientVisibleStatus = 'open' | 'info_requested' | 'in_progress' | 'completed' | 'cancelled'
+export type ClientVisibleStatus = 'open' | 'info_requested' | 'scheduled' | 'in_progress' | 'completed' | 'cancelled'
 
 /**
  * Collapse the full ticket lifecycle into what a store manager / client is
@@ -156,14 +156,18 @@ export type ClientVisibleStatus = 'open' | 'info_requested' | 'in_progress' | 'c
  * ticket never disappears from their view. Cancelled is shown explicitly.
  */
 const CLIENT_IN_PROGRESS = new Set<TicketStatus>([
-  'scheduled', 'in_progress', 'variation_review', 'variation_accepted',
+  'in_progress', 'variation_review', 'variation_accepted',
   'submitted_for_signoff', 'evidence_requested', 'snag', 'snag_assigned', 'snag_resolved',
   'approved_closeout', 'pending_sign_off', 'snag_in_progress',
 ])
+// "Job scheduled" = approved/scheduled but not yet started — the SM's own step
+// between Open and In Progress; In Progress begins when the supplier starts work.
+const CLIENT_SCHEDULED = new Set<TicketStatus>(['accepted', 'scheduled'])
 export function clientVisibleStatus(status: TicketStatus): ClientVisibleStatus | null {
   if (status === 'cancelled')  return 'cancelled'
   if (status === 'completed')  return 'completed'
   if (status === 'info_requested') return 'info_requested'
+  if (CLIENT_SCHEDULED.has(status)) return 'scheduled'
   if (CLIENT_IN_PROGRESS.has(status)) return 'in_progress'
   return 'open'
 }
@@ -186,8 +190,8 @@ export function rmStatusMeta(status: string): { label: string; cls: string; text
   const goldT = 'text-amber-700 dark:text-[#C6A35D]', orangeT = 'text-orange-700 dark:text-orange-400'
   const blueT = 'text-blue-700 dark:text-blue-400', tealT = 'text-teal-700 dark:text-teal-400'
   const redT = 'text-red-700 dark:text-red-400', greenT = 'text-emerald-700 dark:text-emerald-400', grayT = 'text-gray-600 dark:text-gray-400'
-  const indigoT = 'text-indigo-700 dark:text-indigo-400'
-  const cyan = `bg-cyan-500/15 ${cyanT}`, violet = `bg-violet-500/15 ${violetT}`, gold = `bg-[#C6A35D]/15 ${goldT}`, orange = `bg-orange-500/15 ${orangeT}`, indigo = `bg-indigo-500/15 ${indigoT}`
+  const indigoT = 'text-indigo-700 dark:text-indigo-400', purpleT = 'text-purple-700 dark:text-purple-400'
+  const cyan = `bg-cyan-500/15 ${cyanT}`, violet = `bg-violet-500/15 ${violetT}`, gold = `bg-[#C6A35D]/15 ${goldT}`, orange = `bg-orange-500/15 ${orangeT}`, indigo = `bg-indigo-500/15 ${indigoT}`, purple = `bg-purple-500/15 ${purpleT}`
   const M: Record<string, { label: string; cls: string; text: string }> = {
     open:                  { label: 'Open',              cls: `bg-blue-500/15 ${blueT}`, text: blueT },
     info_requested:        { label: 'Info requested',    cls: 'bg-amber-500/15 text-amber-700 dark:text-amber-400', text: 'text-amber-700 dark:text-amber-400' },
@@ -199,7 +203,7 @@ export function rmStatusMeta(status: string): { label: string; cls: string; text
     accepted:              { label: 'Approved',          cls: `bg-teal-500/15 ${tealT}`, text: tealT },
     scheduled:             { label: 'Job scheduled',     cls: indigo, text: indigoT },
     in_progress:           { label: 'In progress',       cls: gold, text: goldT },
-    variation_review:      { label: 'In progress',       cls: gold, text: goldT },
+    variation_review:      { label: 'Quoted VO',         cls: purple, text: purpleT },
     submitted_for_signoff: { label: 'Awaiting sign-off', cls: orange, text: orangeT },
     evidence_requested:    { label: 'Awaiting sign-off', cls: orange, text: orangeT },
     snag:                  { label: 'Snag',              cls: `bg-red-500/15 ${redT}`, text: redT },

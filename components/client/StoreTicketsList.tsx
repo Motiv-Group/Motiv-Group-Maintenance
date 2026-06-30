@@ -9,16 +9,17 @@ import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { readCollapse, writeCollapse } from '@/lib/collapse-state'
 import { formatDate, formatDateTime, humanizeDuration, OPERATIONAL_IMPACT_LABELS, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
 
-type Filter = 'all' | 'open' | 'info_requested' | 'in_progress' | 'completed' | 'cancelled' | 'overdue'
+type Filter = 'all' | 'open' | 'info_requested' | 'scheduled' | 'in_progress' | 'completed' | 'cancelled' | 'overdue'
 
 const TONE: Record<string, string> = {
   open: 'bg-blue-500/15 text-blue-700 dark:text-blue-400',
   info_requested: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
+  scheduled: 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-400',
   in_progress: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D]',
   completed: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
   cancelled: 'bg-gray-500/15 text-gray-600 dark:text-gray-400',
 }
-const WORD: Record<string, string> = { open: 'Open', info_requested: 'Info Requested', in_progress: 'In Progress', completed: 'Completed', cancelled: 'Cancelled' }
+const WORD: Record<string, string> = { open: 'Open', info_requested: 'Info Requested', scheduled: 'Job scheduled', in_progress: 'In Progress', completed: 'Completed', cancelled: 'Cancelled' }
 
 // Urgency rank (handles classic low/medium/high/urgent and engine P1–P4).
 const URGENCY: Record<string, number> = { urgent: 0, P1: 0, high: 1, P2: 1, medium: 2, P3: 2, low: 3, P4: 3 }
@@ -32,6 +33,7 @@ const PILLS: { key: Filter; label: string; active: string; inactive: string }[] 
   { key: 'overdue',     label: 'Overdue',     active: 'bg-red-600 text-white border-red-600',                inactive: 'text-red-600 dark:text-red-400 border-red-500/50 hover:border-red-500' },
   { key: 'open',        label: 'Open',        active: 'bg-blue-500 text-white border-blue-500',              inactive: 'text-blue-600 dark:text-blue-400 border-blue-500/40 hover:border-blue-400' },
   { key: 'info_requested', label: 'Info Requested', active: 'bg-amber-500 text-white border-amber-500',     inactive: 'text-amber-600 dark:text-amber-400 border-amber-500/40 hover:border-amber-400' },
+  { key: 'scheduled',   label: 'Job scheduled', active: 'bg-indigo-500 text-white border-indigo-500',       inactive: 'text-indigo-600 dark:text-indigo-400 border-indigo-500/40 hover:border-indigo-400' },
   { key: 'in_progress', label: 'In Progress', active: 'bg-[#C6A35D] text-[#0a0e17] border-[#C6A35D]',        inactive: 'text-amber-600 dark:text-[#C6A35D] border-[#C6A35D]/40 hover:border-[#C6A35D]' },
   { key: 'completed',   label: 'Completed',   active: 'bg-emerald-500 text-white border-emerald-500',        inactive: 'text-emerald-600 dark:text-emerald-400 border-emerald-500/40 hover:border-emerald-400' },
   { key: 'cancelled',   label: 'Cancelled',   active: 'bg-gray-500 text-white border-gray-500',              inactive: 'text-gray-600 dark:text-gray-400 border-gray-500/40 hover:border-gray-400' },
@@ -78,7 +80,7 @@ export function StoreTicketsList({ tickets, initialFilter = 'all' }: { tickets: 
   const [q, setQ] = useState('')
 
   const counts = useMemo(() => {
-    const c = { open: 0, info_requested: 0, in_progress: 0, completed: 0, cancelled: 0, overdue: 0 }
+    const c = { open: 0, info_requested: 0, scheduled: 0, in_progress: 0, completed: 0, cancelled: 0, overdue: 0 }
     for (const t of tickets) { if (t.status in c) (c as any)[t.status]++; if (t.overdue) c.overdue++ }
     return c
   }, [tickets])
@@ -116,8 +118,8 @@ export function StoreTicketsList({ tickets, initialFilter = 'all' }: { tickets: 
   const archived = useMemo(() => shown.filter(t => t.status === 'completed').sort(byDateThenUrgency), [shown])
   const shownSorted = useMemo(() => [...shown].sort(byDateThenUrgency), [shown])
 
-  // Distribution bar excludes cancelled + completed (live work only).
-  const barTotal = counts.open + counts.in_progress + counts.completed || 1
+  // Distribution bar excludes cancelled (live work only).
+  const barTotal = counts.open + counts.scheduled + counts.in_progress + counts.completed || 1
   const barPct = (n: number) => Math.round((n / barTotal) * 100)
 
   return (
@@ -133,6 +135,7 @@ export function StoreTicketsList({ tickets, initialFilter = 'all' }: { tickets: 
       <Card className="p-4 space-y-2">
         <div className="h-3 rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden flex">
           {counts.open > 0 && <div className="h-full bg-blue-500" style={{ width: `${barPct(counts.open)}%` }} />}
+          {counts.scheduled > 0 && <div className="h-full bg-indigo-500" style={{ width: `${barPct(counts.scheduled)}%` }} />}
           {counts.in_progress > 0 && <div className="h-full bg-[#C6A35D]" style={{ width: `${barPct(counts.in_progress)}%` }} />}
           {counts.completed > 0 && <div className="h-full bg-emerald-500" style={{ width: `${barPct(counts.completed)}%` }} />}
         </div>

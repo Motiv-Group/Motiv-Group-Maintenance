@@ -275,6 +275,9 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
             <SubmitCompletionForm ticketId={t.id} />
           )}
           {awarded && t.status === 'in_progress' && <RaiseVariationCard ticketId={t.id} />}
+          {awarded && t.status === 'variation_review' && (
+            <div className="rounded-xl bg-purple-500/10 ring-1 ring-purple-500/30 p-3.5 text-sm text-[var(--text-muted)]">Variation order submitted — awaiting approval from the regional manager.</div>
+          )}
           <WorkflowActions ticketId={t.id} status={t.status} role="supplier" exclude={['schedule', 'submit_completion', 'require_assessment', 'request_quote', 'submit_variation', 'accept_snag', 'start_snag']} />
           {/* Opt out of the job (before award) — separated from the primary actions */}
           {canDecline && <div className="pt-1"><DeclineWorkButton ticketId={t.id} /></div>}

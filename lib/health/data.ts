@@ -509,7 +509,7 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
 // ============================================================
 // STORE MANAGER DASHBOARD (simplified, own store only)
 // ============================================================
-export type ClientStatus = 'open' | 'info_requested' | 'in_progress' | 'completed' | 'cancelled'
+export type ClientStatus = 'open' | 'info_requested' | 'scheduled' | 'in_progress' | 'completed' | 'cancelled'
 // Single source of truth for the SM/client Open → In Progress → Completed
 // collapse lives in lib/utils (clientVisibleStatus). Re-use it here so the
 // dashboard counts and the ticket-detail badge can never disagree (previously
@@ -524,7 +524,7 @@ export interface StoreManagerData {
   branch: string
   branchCode: string
   health: StoreHealthResult | null
-  open: number; inProgress: number; completed: number; cancelled: number
+  open: number; scheduled: number; inProgress: number; completed: number; cancelled: number
   awaitingInput: number
   tickets: StoreManagerTicket[]
   generatedAt: string
@@ -532,7 +532,7 @@ export interface StoreManagerData {
 
 export async function assembleStoreManagerDashboard(companyId: string, storeIds: string[], now: Date = new Date()): Promise<StoreManagerData> {
   const db = createAdminClient()
-  if (!storeIds.length) return { storeName: 'Store', company: '', branch: '', branchCode: '', health: null, open: 0, inProgress: 0, completed: 0, cancelled: 0, awaitingInput: 0, tickets: [], generatedAt: now.toISOString() }
+  if (!storeIds.length) return { storeName: 'Store', company: '', branch: '', branchCode: '', health: null, open: 0, scheduled: 0, inProgress: 0, completed: 0, cancelled: 0, awaitingInput: 0, tickets: [], generatedAt: now.toISOString() }
   const rules = await loadSlaResolver(db, companyId)
   const [{ data: storesRaw }, { data: ticketsRaw }, { data: companyRow }] = await Promise.all([
     db.from('stores').select('id, name, sub_store, branch_code, region_id').in('id', storeIds),
@@ -544,13 +544,13 @@ export async function assembleStoreManagerDashboard(companyId: string, storeIds:
   const primary = stores[0]
   const health = primary ? calculateStoreHealth({ id: primary.id, region_id: primary.region_id }, tickets.filter(t => t.store_id === primary.id), rules, now) : null
 
-  let open = 0, inProgress = 0, completed = 0, cancelled = 0, awaitingInput = 0
+  let open = 0, scheduled = 0, inProgress = 0, completed = 0, cancelled = 0, awaitingInput = 0
   const visible: StoreManagerTicket[] = []
   for (const t of tickets) {
     if (t.status === 'info_requested') awaitingInput++
     const v = clientVisible(t.status)
     if (!v) continue
-    if (v === 'open') open++; else if (v === 'in_progress') inProgress++; else if (v === 'cancelled') cancelled++; else if (v === 'completed') completed++
+    if (v === 'open') open++; else if (v === 'scheduled') scheduled++; else if (v === 'in_progress') inProgress++; else if (v === 'cancelled') cancelled++; else if (v === 'completed') completed++
     // info_requested is tracked via awaitingInput (its own KPI), not the open count
     const { dueAt, overdue } = dueInfo(t, rules, now)
     // "Info added" = the SM resubmitted after the RM requested info (back at open, reason kept).
@@ -563,7 +563,7 @@ export async function assembleStoreManagerDashboard(companyId: string, storeIds:
     company: (companyRow as any)?.name ?? '',
     branch: primary?.sub_store || primary?.name || 'Store',
     branchCode: primary?.branch_code ?? '',
-    health, open, inProgress, completed, cancelled, awaitingInput, tickets: visible, generatedAt: now.toISOString(),
+    health, open, scheduled, inProgress, completed, cancelled, awaitingInput, tickets: visible, generatedAt: now.toISOString(),
   }
 }
 
@@ -667,7 +667,10 @@ export async function assembleSupplierDashboard(companyId: string, supplierIds: 
     const sla = computeTicketSla(t, rules(t.priority), now)
     if (active && !declinedForMe) {
       open++
-      if (sla.supplierBreached) overdue++
+      // "SLA Breached" KPI excludes tickets that have gone fully overdue — those are
+      // counted by the separate Overdue KPI/filter, so the count matches the
+      // Tickets-tab "SLA Breached" pill (breached && !overdue).
+      if (sla.supplierBreached && !dueInfo(t, rules, now).overdue) overdue++
       if (sla.nextActionDueAt && new Date(sla.nextActionDueAt) <= todayEnd && new Date(sla.nextActionDueAt) >= now) dueToday++
       if (t.status === 'submitted_for_signoff') awaitingSignoff++
       if (t.quote_required && !t.quote_submitted_at) pendingQuotes++

@@ -19,10 +19,10 @@ type Bucket = 'open' | 'quote_requested' | 'quoted' | 'approved' | 'scheduled' |
 function bucketOf(s: string, supplierAssigned = false): Bucket {
   if (s === 'open' || s === 'info_requested') return supplierAssigned ? 'quote_requested' : 'open'
   if (['assigned', 'quote_requested', 'assessment'].includes(s)) return 'quote_requested'
-  if (['quoted', 'quote_revision'].includes(s)) return 'quoted'
+  if (['quoted', 'quote_revision', 'variation_review'].includes(s)) return 'quoted'
   if (s === 'accepted') return 'approved'
   if (s === 'scheduled') return 'scheduled'
-  if (['in_progress', 'variation_review', 'variation_accepted'].includes(s)) return 'in_progress'
+  if (['in_progress', 'variation_accepted'].includes(s)) return 'in_progress'
   if (['submitted_for_signoff', 'evidence_requested', 'snag', 'snag_assigned', 'snag_resolved', 'approved_closeout', 'pending_sign_off', 'snag_in_progress'].includes(s)) return 'awaiting_signoff'
   if (s === 'completed') return 'completed'
   return 'cancelled'

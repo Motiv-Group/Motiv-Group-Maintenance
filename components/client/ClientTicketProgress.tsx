@@ -5,9 +5,10 @@ import { clientVisibleStatus } from '@/lib/utils'
 import type { TicketStatus } from '@/lib/types'
 
 const STEPS = [
-  { label: 'Open',        dot: 'bg-blue-500',    ring: 'ring-blue-500/30',    text: 'text-blue-600 dark:text-blue-400' },
-  { label: 'In Progress', dot: 'bg-[#C6A35D]',   ring: 'ring-[#C6A35D]/30',   text: 'text-amber-600 dark:text-[#C6A35D]' },
-  { label: 'Completed',   dot: 'bg-emerald-500', ring: 'ring-emerald-500/30', text: 'text-emerald-600 dark:text-emerald-400' },
+  { label: 'Open',          dot: 'bg-blue-500',    ring: 'ring-blue-500/30',    text: 'text-blue-600 dark:text-blue-400' },
+  { label: 'Job scheduled', dot: 'bg-indigo-500',  ring: 'ring-indigo-500/30',  text: 'text-indigo-600 dark:text-indigo-400' },
+  { label: 'In Progress',   dot: 'bg-[#C6A35D]',   ring: 'ring-[#C6A35D]/30',   text: 'text-amber-600 dark:text-[#C6A35D]' },
+  { label: 'Completed',     dot: 'bg-emerald-500', ring: 'ring-emerald-500/30', text: 'text-emerald-600 dark:text-emerald-400' },
 ] as const
 
 export function ClientTicketProgress({ status }: { status: string }) {
@@ -15,7 +16,7 @@ export function ClientTicketProgress({ status }: { status: string }) {
   if (cv === null || cv === 'cancelled') {
     return <p className="text-center text-sm text-[var(--text-faint)]">This ticket was cancelled.</p>
   }
-  const idx = cv === 'completed' ? 2 : cv === 'in_progress' ? 1 : 0
+  const idx = cv === 'completed' ? 3 : cv === 'in_progress' ? 2 : cv === 'scheduled' ? 1 : 0
 
   return (
     <div className="flex items-start px-1">

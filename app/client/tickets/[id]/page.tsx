@@ -23,11 +23,12 @@ import type { TicketStatus } from '@/lib/types'
 const CV_TONE: Record<string, string> = {
   open: 'bg-blue-500/15 text-blue-700 dark:text-blue-400',
   info_requested: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
+  scheduled: 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-400',
   in_progress: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D]',
   completed: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
   cancelled: 'bg-gray-500/15 text-gray-600 dark:text-gray-400',
 }
-const CV_WORD: Record<string, string> = { open: 'Open', info_requested: 'Info Requested', in_progress: 'In Progress', completed: 'Completed', cancelled: 'Cancelled' }
+const CV_WORD: Record<string, string> = { open: 'Open', info_requested: 'Info Requested', scheduled: 'Job scheduled', in_progress: 'In Progress', completed: 'Completed', cancelled: 'Cancelled' }
 
 function DetailItem({ label, value }: { label: string; value: string }) {
   return (
