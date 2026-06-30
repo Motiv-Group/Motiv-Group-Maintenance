@@ -133,6 +133,10 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
 
   // Their latest submitted quote (if any) for this ticket.
   const latestQuote = ((myQuotes ?? []) as any[])[0] ?? null
+  const hasAcceptedQuote = ((myQuotes ?? []) as any[]).some(q => q.status === 'accepted')
+  // The scheduled visit is shown prominently inside the accepted quote (below); the
+  // technician name (if assigned) rides along with it.
+  const scheduledTechName = t.technician_id ? (technicians.find(x => x.id === t.technician_id)?.name ?? null) : null
   // A quote can be (re)submitted while the ticket is in a quote-requesting state
   // (covers both the competitive 'assigned' invite and the legacy 'quote_requested'
   // path) and the invitation isn't closed. Once submitted the ticket moves to
@@ -209,12 +213,14 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           </div>
         )}
 
-        {!declinedForMe && t.scheduled_at && (
+        {/* Scheduled visit lives inside the accepted quote (below). Shown here only
+            as a fallback when there's no accepted quote to host it. */}
+        {!declinedForMe && t.scheduled_at && !hasAcceptedQuote && (
           <div className="flex items-center gap-2.5 rounded-xl bg-indigo-500/10 ring-1 ring-indigo-500/30 px-3.5 py-3">
             <Calendar size={18} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
             <div className="min-w-0">
               <p className="text-[11px] uppercase tracking-wide font-semibold text-indigo-700 dark:text-indigo-400">Scheduled{t.schedule_status === 'proposed' ? ' · proposed' : ''}</p>
-              <p className="text-sm font-bold text-[var(--text)]">{formatDateTime(t.scheduled_at)}{t.technician_id && technicians.find(x => x.id === t.technician_id) ? ` · ${technicians.find(x => x.id === t.technician_id)!.name}` : ''}</p>
+              <p className="text-sm font-bold text-[var(--text)]">{formatDateTime(t.scheduled_at)}{scheduledTechName ? ` · ${scheduledTechName}` : ''}</p>
               {t.schedule_status === 'proposed' && <p className="text-[11px] text-amber-600 dark:text-amber-400">Past the SLA window — awaiting the manager&apos;s acceptance.</p>}
             </div>
           </div>
@@ -254,6 +260,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
               title={arr.length > 1 ? `Quote #${arr.length - i}` : 'Your submitted quote'}
               status={quoteStatusOf(q.status)}
               quote={{ id: q.id, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, description: q.description ?? null, fileUrl: q.file_url ?? null, validUntil: q.valid_until ?? null, createdAt: q.created_at }}
+              schedule={q.status === 'accepted' && t.scheduled_at ? { at: t.scheduled_at, proposed: t.schedule_status === 'proposed', technician: scheduledTechName, audience: 'supplier' } : null}
             />
           ))}
         </CollapsibleSection>

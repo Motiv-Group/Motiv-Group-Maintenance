@@ -5,7 +5,8 @@ import { buildTicketTimeline, type TimelineInput, type TimelineTone } from '@/li
 // Dot colour per event tone — reuses the app's status palette so the trail reads
 // at a glance (cyan/violet = quoting, emerald = approved/done, red = declined/snag).
 const DOT_TONE: Record<TimelineTone, string> = {
-  logged: 'bg-blue-500', quote_requested: 'bg-cyan-500', quote_submitted: 'bg-violet-500',
+  logged: 'bg-blue-500', info_requested: 'bg-amber-500', info_added: 'bg-teal-500',
+  quote_requested: 'bg-cyan-500', quote_submitted: 'bg-violet-500',
   quote_approved: 'bg-emerald-500', quote_declined: 'bg-red-500', scheduled: 'bg-indigo-500',
   completion_submitted: 'bg-[#C6A35D]', completion_approved: 'bg-emerald-500', completion_rejected: 'bg-red-500',
   completed: 'bg-emerald-500', cancelled: 'bg-red-500', edited: 'bg-slate-400', update: 'bg-[#C6A35D]',

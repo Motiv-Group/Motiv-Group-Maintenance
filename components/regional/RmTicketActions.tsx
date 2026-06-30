@@ -194,20 +194,28 @@ const TS_META: Record<string, { dot: string; label: string; txt: string }> = {
   declined: { dot: 'bg-red-500',     label: 'Declined',          txt: 'text-red-600 dark:text-red-400' },
   closed:   { dot: 'bg-gray-400',    label: 'Closed',            txt: 'text-[var(--text-faint)]' },
 }
-export function SupplierStatusList({ rows }: { rows: { name: string; status: string; invitedAt?: string | null }[] }) {
+export function SupplierStatusList({ rows }: { rows: { name: string; status: string; invitedAt?: string | null; declineReason?: string | null }[] }) {
   if (!rows.length) return null
   return (
     <div className="space-y-2">
       {rows.map((r, i) => {
         const m = TS_META[r.status] ?? TS_META.invited
         return (
-          <div key={i} className="flex items-center justify-between gap-2">
-            <span className="flex items-center gap-2 text-sm text-[var(--text)] min-w-0">
-              <i className={`w-2.5 h-2.5 rounded-full shrink-0 ${m.dot}`} />
-              <span className="truncate">{r.name}</span>
-              {r.invitedAt && <span className="text-[11px] text-[var(--text-faint)] shrink-0 hidden sm:inline">· requested {formatDateTime(r.invitedAt)}</span>}
-            </span>
-            <span className={`text-[11px] font-semibold shrink-0 ${m.txt}`}>{m.label}</span>
+          <div key={i} className="space-y-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="flex items-center gap-2 text-sm text-[var(--text)] min-w-0">
+                <i className={`w-2.5 h-2.5 rounded-full shrink-0 ${m.dot}`} />
+                <span className="truncate">{r.name}</span>
+                {r.invitedAt && <span className="text-[11px] text-[var(--text-faint)] shrink-0 hidden sm:inline">· requested {formatDateTime(r.invitedAt)}</span>}
+              </span>
+              <span className={`text-[11px] font-semibold shrink-0 ${m.txt}`}>{m.label}</span>
+            </div>
+            {r.status === 'declined' && r.declineReason && (
+              <div className="ml-[18px] rounded-lg bg-red-500/10 ring-1 ring-red-500/30 px-3 py-2">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Reason for declining</p>
+                <p className="text-sm text-[var(--text)]">{r.declineReason}</p>
+              </div>
+            )}
           </div>
         )
       })}

@@ -4,7 +4,7 @@
 
 // Semantic tone per event → coloured dot in the audit trail. Mirrors the status
 // palette used across the app (quote=cyan/violet, approve=emerald, snag/cancel=red…).
-export type TimelineTone = 'logged' | 'quote_requested' | 'quote_submitted' | 'quote_approved' | 'quote_declined' | 'scheduled' | 'completion_submitted' | 'completion_approved' | 'completion_rejected' | 'completed' | 'cancelled' | 'edited' | 'update'
+export type TimelineTone = 'logged' | 'info_requested' | 'info_added' | 'quote_requested' | 'quote_submitted' | 'quote_approved' | 'quote_declined' | 'scheduled' | 'completion_submitted' | 'completion_approved' | 'completion_rejected' | 'completed' | 'cancelled' | 'edited' | 'update'
 export interface TimelineEvent { at: string; label: string; who?: string | null; tone: TimelineTone }
 
 const ROLE_LABEL: Record<string, string> = {
@@ -24,6 +24,10 @@ export interface TimelineInput {
   editedByName?: string | null
   cancellationReason?: string | null
   updatedAt?: string | null
+  // RM↔Store-Manager "more information" exchange (only passed on the RM view).
+  infoRequestedAt?: string | null
+  infoAddedAt?: string | null
+  infoRequestReason?: string | null
   quotes?: { amount?: number | null; status: string; created_at: string; updated_at?: string | null }[]
   signoffs?: { status: string; created_at: string }[]
   updates?: { body: string; author_role: string | null; created_at: string }[]
@@ -34,6 +38,9 @@ export function buildTicketTimeline(t: TimelineInput): TimelineEvent[] {
   const push = (at: string | null | undefined, label: string, tone: TimelineTone, who?: string | null) => { if (at) ev.push({ at, label, tone, who: who ?? null }) }
 
   push(t.createdAt, 'Ticket logged', 'logged')
+  // The "more info" loop — RM asked, store manager answered (RM audit trail only).
+  push(t.infoRequestedAt, `More information requested${t.infoRequestReason ? ` — ${t.infoRequestReason}` : ''}`, 'info_requested', 'Regional Manager')
+  push(t.infoAddedAt, 'Information added', 'info_added', 'Store Manager')
   push(t.quoteRequestedAt, 'Quote requested', 'quote_requested', 'Regional Manager')
   push(t.quoteSubmittedAt, 'Quote submitted', 'quote_submitted', 'Supplier')
 

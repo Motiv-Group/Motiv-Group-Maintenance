@@ -16,6 +16,7 @@ import { WorkflowActions } from '@/components/workflow/WorkflowActions'
 import { RmPipeline } from '@/components/regional/RmPipeline'
 import { AssignSuppliersButton, RequestInfoButton, RmEditTicketForm, SupplierStatusList, QuoteReviewCard, CancelTicketCard, ApproveSignoffCard, ReQuoteButton, AcceptScheduleCard } from '@/components/regional/RmTicketActions'
 import { DueDate } from '@/components/workflow/DueDate'
+import { ScheduledVisitRow } from '@/components/workflow/ScheduledVisitRow'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { EditedLine } from '@/components/ui/EditedLine'
 import { AuditTrail } from '@/components/ui/AuditTrail'
@@ -80,7 +81,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   for (const inv of (invites ?? []) as any[]) if (inv.suppliers?.company_name) nameById.set(inv.supplier_id, inv.suppliers.company_name)
   const declineReasonBy = new Map<string, string>()
   for (const inv of (invites ?? []) as any[]) if (inv.decline_reason) declineReasonBy.set(inv.supplier_id, inv.decline_reason)
-  const supplierRows = ((invites ?? []) as any[]).map(inv => ({ name: inv.suppliers?.company_name ?? nameById.get(inv.supplier_id) ?? 'Supplier', status: inv.status as string, invitedAt: inv.invited_at ?? null }))
+  const supplierRows = ((invites ?? []) as any[]).map(inv => ({ name: inv.suppliers?.company_name ?? nameById.get(inv.supplier_id) ?? 'Supplier', status: inv.status as string, invitedAt: inv.invited_at ?? null, declineReason: inv.decline_reason ?? null }))
   const mapQuote = (q: any) => ({
     id: q.id, supplierName: nameById.get(q.supplier_id) ?? 'Supplier', amount: q.amount,
     amountInclVat: q.amount_incl_vat ?? null, description: q.description ?? null, fileUrl: q.file_url ?? null,
@@ -164,7 +165,9 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         )}
 
         {t.info_request_reason && <p className="text-xs text-amber-600 dark:text-amber-400">Info requested: {t.info_request_reason}</p>}
-        {t.scheduled_at && (
+        {/* Scheduled visit lives inside the accepted quote (below). Shown here only
+            as a fallback when there's no accepted quote to host it. */}
+        {t.scheduled_at && acceptedQuotes.length === 0 && (
           <div className="flex items-center gap-2.5 rounded-xl bg-indigo-500/10 ring-1 ring-indigo-500/30 px-3.5 py-3">
             <Calendar size={18} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
             <div className="min-w-0">
@@ -319,6 +322,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
                     <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400 bg-emerald-500/15 rounded-full px-2 py-0.5 shrink-0">Accepted</span>
                   </div>
                   <div className="p-4 space-y-3">
+                    {t.scheduled_at && <ScheduledVisitRow scheduledAt={t.scheduled_at} proposed={t.schedule_status === 'proposed'} audience="rm" />}
                     <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                       <DetailItem label="Excl. VAT" value={formatCurrency(q.amount)} />
                       <DetailItem label="Incl. VAT" value={q.amountInclVat ? formatCurrency(q.amountInclVat) : '—'} />
@@ -454,6 +458,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         quoteApprovedAt: t.quote_decision_status === 'approved' ? t.quote_decided_at : null,
         scheduledAt: t.scheduled_at, completedAt: t.completed_at,
         editedAt: t.edited_at, editedByName: editorName, cancellationReason: t.cancellation_reason,
+        infoRequestedAt: t.info_requested_at, infoAddedAt: t.info_added_at, infoRequestReason: t.info_request_reason,
         quotes: (quotes ?? []) as any[], signoffs: allSignoffs, updates: (updates ?? []) as any[],
       }} />
     </div>

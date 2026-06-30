@@ -26,6 +26,10 @@ export function RegionalOverview({ data, name, briefing, briefingScopeId }: { da
   // "Open" = still open/info-requested AND no supplier assigned yet. Once a
   // supplier is on it, it's being handled, not open. Matches the Tickets-tab pill.
   const openCount = data.tickets.filter(t => (t.status === 'open' || t.status === 'info_requested') && !t.supplierAssigned).length
+  // "Overdue" = active tickets past their final resolution deadline — same rule as
+  // the Tickets-tab Overdue pill. (Distinct from a mid-SLA breach, which the
+  // Internal/Supplier Breach KPIs count.)
+  const overdueCount = data.tickets.filter(t => t.overdue).length
 
   // Every KPI carries a hint so all cards share the same height → uniform size.
   // Tickets Overdue sits beside Stores Need Attention; Quotes Awaiting Approval
@@ -33,7 +37,7 @@ export function RegionalOverview({ data, name, briefing, briefingScopeId }: { da
   const kpis: Kpi[] = [
     { label: 'Active Stores', value: p.activeStores, hint: `avg ${p.averageStoreHealth}%`, icon: <Building2 size={13} />, tone: 'info', href: '/regional/stores' },
     { label: 'Stores Need Attention', value: data.attentionStores.length, hint: 'need action', icon: <ShieldAlert size={13} />, tone: data.attentionStores.length ? 'warn' : 'good', href: '/regional/stores' },
-    { label: 'Tickets Overdue', value: p.overdueTickets, hint: 'past SLA', icon: <Clock size={13} />, tone: p.overdueTickets ? 'bad' : 'good', border: p.overdueTickets ? '!ring-red-500/60' : undefined, href: '/regional/tickets?filter=overdue' },
+    { label: 'Tickets Overdue', value: overdueCount, hint: 'past deadline', icon: <Clock size={13} />, tone: overdueCount ? 'bad' : 'good', border: overdueCount ? '!ring-red-500/60' : undefined, href: '/regional/tickets?filter=overdue' },
     { label: 'Open Tickets', value: openCount, hint: 'unassigned', icon: <ClipboardList size={13} />, tone: 'orange', border: '!ring-orange-500/60', href: '/regional/tickets?filter=open' },
     { label: 'Quotes Awaiting Approval', value: quotesAwaiting, hint: 'to review', icon: <ReceiptText size={13} />, tone: quotesAwaiting ? 'warn' : 'good', border: quotesAwaiting ? '!ring-amber-500/60' : undefined, href: '/regional/tickets?filter=quoted' },
     { label: 'Pending Signoffs', value: data.signoffsPending, hint: 'awaiting you', icon: <ClipboardCheck size={13} />, tone: data.signoffsPending ? 'warn' : 'good', border: data.signoffsPending ? '!ring-amber-500/60' : '!ring-emerald-500/60', href: '/regional/signoff' },

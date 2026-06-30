@@ -58,6 +58,11 @@ export async function POST(request: Request, { params }: { params: { id: string 
         break
       case 'request_info':
         updates.info_request_reason = body.reason ?? null
+        updates.info_requested_at = now
+        break
+      case 'resubmit':
+        // Store manager supplied the requested info — stamp it for the audit trail.
+        updates.info_added_at = now
         break
       case 'reject':
         updates.cancellation_reason = body.reason ?? null
@@ -178,7 +183,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       case 'close_out':
         updates.completed_at = now; updates.closed_out_at = now; updates.closed_out_by = user.id
         break
-      // validate / reject / resubmit / proceed_no_quote / request_evidence: status-only
+      // validate / reject / proceed_no_quote / request_evidence: status-only
     }
   } catch (e: any) {
     return NextResponse.json({ error: e?.message ?? 'Action failed' }, { status: 400 })

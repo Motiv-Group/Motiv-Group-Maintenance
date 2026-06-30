@@ -2,6 +2,7 @@
 // by the RM and supplier ticket pages. Pure/server-safe (no client hooks).
 import { CheckCircle2, FileText, Clock, XCircle } from 'lucide-react'
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils'
+import { ScheduledVisitRow } from '@/components/workflow/ScheduledVisitRow'
 
 export type QuoteSummaryStatus = 'pending' | 'accepted' | 'declined' | 'awarded'
 
@@ -32,7 +33,9 @@ function Item({ label, value }: { label: string; value: string }) {
   )
 }
 
-export function QuoteSummary({ quote, status, title }: { quote: QuoteSummaryData; status: QuoteSummaryStatus; title?: string }) {
+export interface QuoteSchedule { at: string; proposed?: boolean; technician?: string | null; audience?: 'rm' | 'supplier' }
+
+export function QuoteSummary({ quote, status, title, schedule }: { quote: QuoteSummaryData; status: QuoteSummaryStatus; title?: string; schedule?: QuoteSchedule | null }) {
   const tone = TONE[status]
   const Icon = tone.icon
   return (
@@ -45,6 +48,7 @@ export function QuoteSummary({ quote, status, title }: { quote: QuoteSummaryData
         <span className={`text-[10px] font-semibold uppercase tracking-wide ${tone.badgeText} ${tone.badge} rounded-full px-2 py-0.5 shrink-0`}>{tone.label}</span>
       </div>
       <div className="p-4 space-y-3">
+        {schedule && <ScheduledVisitRow scheduledAt={schedule.at} proposed={schedule.proposed} technician={schedule.technician} audience={schedule.audience} />}
         <div className="grid grid-cols-2 gap-x-4 gap-y-3">
           <Item label="Excl. VAT" value={formatCurrency(quote.amount)} />
           <Item label="Incl. VAT" value={quote.amountInclVat ? formatCurrency(quote.amountInclVat) : '—'} />
