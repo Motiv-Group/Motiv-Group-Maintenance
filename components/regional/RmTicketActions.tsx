@@ -37,7 +37,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 
 // ── Assign suppliers (button → modal with search + multi-select) ─
 type SupplierChoice = { id: string; name: string; avgRating?: number; ratingCount?: number }
-export function AssignSuppliersButton({ ticketId, suppliers, motivSuppliers = [] }: { ticketId: string; suppliers: SupplierChoice[]; motivSuppliers?: SupplierChoice[] }) {
+export function AssignSuppliersButton({ ticketId, suppliers, motivSuppliers = [], declinedSupplierIds = [] }: { ticketId: string; suppliers: SupplierChoice[]; motivSuppliers?: SupplierChoice[]; declinedSupplierIds?: string[] }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [tab, setTab] = useState<'mine' | 'motiv'>('mine')
@@ -45,7 +45,10 @@ export function AssignSuppliersButton({ ticketId, suppliers, motivSuppliers = []
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
-  const toggle = (id: string) => setSel(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const [confirmReinvite, setConfirmReinvite] = useState(false)
+  const declinedSet = useMemo(() => new Set(declinedSupplierIds), [declinedSupplierIds])
+  const nameById = useMemo(() => new Map([...suppliers, ...motivSuppliers].map(s => [s.id, s.name])), [suppliers, motivSuppliers])
+  const toggle = (id: string) => setSel(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); setConfirmReinvite(false); return n })
 
   // Selection spans both lists; the tab just switches which directory is shown.
   const activeList = tab === 'motiv' ? motivSuppliers : suppliers
@@ -55,12 +58,18 @@ export function AssignSuppliersButton({ ticketId, suppliers, motivSuppliers = []
       .filter(s => !term || s.name.toLowerCase().includes(term))
       .sort((a, b) => (sel.has(b.id) ? 1 : 0) - (sel.has(a.id) ? 1 : 0) || a.name.localeCompare(b.name))
   }, [activeList, q, sel])
+  const reselected = useMemo(() => [...sel].filter(id => declinedSet.has(id)), [sel, declinedSet])
 
-  async function assign() {
-    if (!sel.size) { setErr('Select at least one supplier.'); return }
+  async function doAssign() {
     setBusy(true); setErr('')
-    try { await post(`/api/tickets/${ticketId}/assign`, { supplierIds: [...sel] }); setOpen(false); setBusy(false); router.refresh() }
+    try { await post(`/api/tickets/${ticketId}/assign`, { supplierIds: [...sel] }); setOpen(false); setBusy(false); setConfirmReinvite(false); router.refresh() }
     catch (e: any) { setErr(e.message); setBusy(false) }
+  }
+  function assign() {
+    if (!sel.size) { setErr('Select at least one supplier.'); return }
+    // A supplier that previously declined this ticket → warn before re-sending.
+    if (reselected.length && !confirmReinvite) { setConfirmReinvite(true); setErr(''); return }
+    doAssign()
   }
 
   const tabCls = (on: boolean) => `flex-1 py-1.5 rounded-lg text-xs font-semibold transition ${on ? 'bg-[#C6A35D] text-[#0a0e17]' : 'ring-1 ring-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--hover)]'}`
@@ -84,16 +93,21 @@ export function AssignSuppliersButton({ ticketId, suppliers, motivSuppliers = []
             {shown.map(s => (
               <label key={s.id} className={`flex items-center gap-2 text-sm px-2 py-2 rounded-lg cursor-pointer ${sel.has(s.id) ? 'bg-[#C6A35D]/10' : 'hover:bg-[var(--hover)]'}`}>
                 <input type="checkbox" checked={sel.has(s.id)} onChange={() => toggle(s.id)} className="accent-[#C6A35D] w-4 h-4" />
-                <span className="truncate text-[var(--text)] flex-1 min-w-0">{s.name}</span>
+                <span className="truncate text-[var(--text)] flex-1 min-w-0">{s.name}{declinedSet.has(s.id) && <span className="ml-1.5 text-[10px] font-semibold text-red-500">· declined before</span>}</span>
                 <span className="shrink-0"><Stars value={s.avgRating ?? 5} count={s.ratingCount} size={12} /></span>
               </label>
             ))}
             {!shown.length && <p className="text-sm text-[var(--text-faint)] px-2 py-2">{tab === 'motiv' ? 'No Motiv suppliers available.' : 'No matching suppliers.'}</p>}
           </div>
+          {confirmReinvite && (
+            <div className="rounded-lg bg-amber-500/10 ring-1 ring-amber-500/40 p-3">
+              <p className="text-sm text-[var(--text)]"><span className="font-semibold">{reselected.map(id => nameById.get(id) ?? 'Supplier').join(', ')}</span> declined the previous quote request for this ticket. Send it to them again?</p>
+            </div>
+          )}
           {err && <p className="text-xs text-red-500">{err}</p>}
           <div className="flex gap-2">
-            <button disabled={busy} onClick={assign} className="flex-1 py-2 rounded-xl bg-green-600 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Assigning…' : `Assign${sel.size ? ` (${sel.size})` : ''}`}</button>
-            <button onClick={() => setOpen(false)} className="flex-1 py-2 rounded-xl ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm">Cancel</button>
+            <button disabled={busy} onClick={assign} className="flex-1 py-2 rounded-xl bg-green-600 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Assigning…' : confirmReinvite ? 'Yes, send again' : `Assign${sel.size ? ` (${sel.size})` : ''}`}</button>
+            <button onClick={() => { confirmReinvite ? setConfirmReinvite(false) : setOpen(false) }} className="flex-1 py-2 rounded-xl ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm">{confirmReinvite ? 'Back' : 'Cancel'}</button>
           </div>
         </Modal>
       )}

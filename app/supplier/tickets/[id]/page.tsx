@@ -103,7 +103,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   const [{ data: store }, { data: updates }, { data: invite }, { data: myQuotes }, { data: technicianRows }, { data: signoffRows }, { data: snagRows }, { data: companyRow }, { data: variationRows }] = await Promise.all([
     admin.from('stores').select('name, sub_store').eq('id', t.store_id).single(),
     admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
-    admin.from('ticket_suppliers').select('supplier_id, status, invited_at, decline_reason, responded_at, declined_by').eq('ticket_id', t.id).in('supplier_id', supplierIds).maybeSingle(),
+    admin.from('ticket_suppliers').select('supplier_id, status, invited_at, decline_reason, responded_at, declined_by, requote_requested_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).maybeSingle(),
     admin.from('quotes').select('id, amount, amount_incl_vat, description, file_url, status, valid_until, proposed_schedule_at, created_at, updated_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).order('created_at', { ascending: false }),
     admin.from('technicians').select('id, name').in('supplier_id', supplierIds).eq('active', true).order('name'),
     admin.from('signoffs').select('id, before_urls, after_urls, coc_url, invoice_url, status, notes, reject_reason, reviewed_at, created_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).order('created_at', { ascending: false }),
@@ -173,9 +173,12 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   // (e.g. the ticket reading "Quoted" because a different supplier quoted). Awarded →
   // the real status; their own quote in → "Quoted"; nothing submitted → "Quote requested".
   const supplierStatus = awarded ? t.status : (latestQuote?.status === 'pending' ? 'quoted' : 'quote_requested')
-  // Soft decline where the RM asked this supplier to submit a revised quote (audit trail).
-  const requoteRequestedAt = (latestQuote?.status === 'declined' && (invite as any)?.status === 'invited' && (invite as any)?.decline_reason)
-    ? ((invite as any)?.responded_at ?? latestQuote?.updated_at ?? null) : null
+  // The RM asked this supplier to (re-)submit a quote — either a soft decline of their
+  // quote, or a re-assign after they'd previously declined (requote_requested_at).
+  const reQuoteByRm = !!(invite as any)?.requote_requested_at && (invite as any)?.status === 'invited'
+  const requoteRequestedAt = (invite as any)?.requote_requested_at
+    ?? ((latestQuote?.status === 'declined' && (invite as any)?.status === 'invited' && (invite as any)?.decline_reason)
+      ? ((invite as any)?.responded_at ?? latestQuote?.updated_at ?? null) : null)
   // Map a quote's DB status to the read-only summary tone (accepted shows "Approved").
   const quoteStatusOf = (s: string): QuoteSummaryStatus => s === 'accepted' ? 'accepted' : s === 'declined' ? 'declined' : 'pending'
 
@@ -285,6 +288,12 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
               <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Quote declined{latestQuote?.updated_at ? <span className="font-medium normal-case opacity-80"> · {formatDateTime(latestQuote.updated_at)}</span> : null}</p>
               <p className="text-sm text-[var(--text)]">{declineReason || DEFAULT_DECLINE_REASON}</p>
               {canSubmitQuote && <p className="text-sm text-[var(--text-muted)]">Submit a revised quote below.</p>}
+            </div>
+          )}
+          {reQuoteByRm && canSubmitQuote && (
+            <div className="rounded-lg bg-[#C6A35D]/10 ring-1 ring-[#C6A35D]/30 p-3 space-y-0.5">
+              <p className="text-sm font-bold text-amber-700 dark:text-[#C6A35D]">The regional manager requested a re-quote</p>
+              <p className="text-sm text-[var(--text-muted)]">Your previous quote request for this ticket was declined. Please submit a new quote below.</p>
             </div>
           )}
           {canSubmitQuote && <SendQuoteForm ticketId={t.id} competitive priority={t.priority} createdAt={t.created_at} />}

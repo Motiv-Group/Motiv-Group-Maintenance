@@ -434,7 +434,7 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
       breached: !!s && (s.supplierBreached || s.internalBreached),
       supplierBreached: !!s?.supplierBreached, internalBreached: !!s?.internalBreached,
       ...dueInfo(t, rules, now),
-      reopened: declinedQuoteTickets.has(t.id) && COMMERCIAL.includes(t.status),
+      reopened: declinedQuoteTickets.has(t.id) && COMMERCIAL.includes(t.status) && t.status !== 'assigned',
       infoAdded: t.status === 'open' && !!(t as any).info_request_reason,
       supplierAssigned: !!(t as any).supplier_id,
       allSuppliersDeclined: allDeclinedOf(t),

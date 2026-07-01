@@ -167,6 +167,9 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   // Every invited supplier declined (and none awarded) → the ticket re-opens for the
   // RM and reads "Declined (Supplier)"; each decline is listed in the audit trail.
   const allSuppliersDeclined = supplierRows.length > 0 && supplierRows.every(r => ['declined', 'closed'].includes(r.status)) && !t.supplier_id
+  // Suppliers who previously declined/were-declined on this ticket — the assign
+  // pop-up warns before re-sending them the quote request.
+  const declinedSupplierIds = ((invites ?? []) as any[]).filter(i => ['declined', 'closed'].includes(i.status)).map(i => i.supplier_id)
   const supplierDeclines = allSuppliersDeclined
     ? ((invites ?? []) as any[]).filter(i => ['declined', 'closed'].includes(i.status)).map(i => ({ name: i.suppliers?.company_name ?? nameById.get(i.supplier_id) ?? 'Supplier', at: i.responded_at ?? i.invited_at })).filter(d => d.at)
     : []
@@ -188,7 +191,9 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   const hasQuoteBlock = supplierRows.length > 0 || reviewQuotes.length > 0 || acceptedQuotes.length > 0 || declinedQuotes.length > 0 || (variations ?? []).length > 0
   // A declined quote means the ticket is "re-opened" — true through the whole
   // commercial phase (incl. a stale 'quoted'), until awarded/scheduled or closed.
-  const reQuote = declinedQuotes.length > 0 && ['open', 'info_requested', 'assigned', 'assessment', 'quote_requested', 'quoted', 'quote_revision'].includes(t.status)
+  // Excludes 'assigned' — once the RM has (re)assigned, the ticket reads "Quote
+  // requested" again, not "Re-open".
+  const reQuote = declinedQuotes.length > 0 && ['open', 'info_requested', 'assessment', 'quote_requested', 'quoted', 'quote_revision'].includes(t.status)
   // "Info added" = the SM resubmitted after an info request (back at open, reason kept).
   const rmInfoAdded = t.status === 'open' && !!t.info_request_reason
 
@@ -361,7 +366,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         {/* Primary actions — equal-size, side by side: Assign (green) · Request info (amber) · Cancel (red) */}
         {!isTerminal && (canAssign || canCancel) && (
           <div className="flex gap-2">
-            {(canAssign || reQuote) && <AssignSuppliersButton ticketId={t.id} suppliers={supplierList} motivSuppliers={motivSupplierList} />}
+            {(canAssign || reQuote) && <AssignSuppliersButton ticketId={t.id} suppliers={supplierList} motivSuppliers={motivSupplierList} declinedSupplierIds={declinedSupplierIds} />}
             {canAssign && <RequestInfoButton ticketId={t.id} />}
             {canCancel && <CancelTicketCard ticketId={t.id} />}
           </div>
