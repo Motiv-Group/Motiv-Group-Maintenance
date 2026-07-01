@@ -114,7 +114,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
     admin.from('suppliers').select('id, company_name').eq('company_id', companyId).eq('active', true).order('company_name'),
     admin.from('ticket_variations').select('description, amount, warranty, status, reject_reason, reviewed_at, created_at, file_urls').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('snags').select('description, status, scheduled_at, schedule_status, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
-    admin.from('ticket_suppliers').select('supplier_id, status, invited_at, responded_at, decline_reason, suppliers(company_name)').eq('ticket_id', t.id),
+    admin.from('ticket_suppliers').select('supplier_id, status, invited_at, responded_at, decline_reason, declined_by, suppliers(company_name)').eq('ticket_id', t.id),
     admin.from('ratings').select('supplier_id, score').eq('company_id', companyId),
   ])
   const storeName = store ? storeLabel(store.name, store.sub_store) : 'Store'
@@ -163,17 +163,20 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   for (const inv of (invites ?? []) as any[]) if (inv.suppliers?.company_name) nameById.set(inv.supplier_id, inv.suppliers.company_name)
   const declineReasonBy = new Map<string, string>()
   for (const inv of (invites ?? []) as any[]) if (inv.decline_reason) declineReasonBy.set(inv.supplier_id, inv.decline_reason)
-  const supplierRows = ((invites ?? []) as any[]).map(inv => ({ name: inv.suppliers?.company_name ?? nameById.get(inv.supplier_id) ?? 'Supplier', status: inv.status as string, invitedAt: inv.invited_at ?? null, declineReason: inv.decline_reason ?? null }))
+  const supplierRows = ((invites ?? []) as any[]).map(inv => ({ name: inv.suppliers?.company_name ?? nameById.get(inv.supplier_id) ?? 'Supplier', status: inv.status as string, invitedAt: inv.invited_at ?? null, declineReason: inv.decline_reason ?? null, declinedBy: (inv.declined_by ?? null) as 'supplier' | 'regional_manager' | null }))
   // Every invited supplier declined (and none awarded) → the ticket moves to the
   // real "suppliers_declined" status and reads "Declined (Supplier)"; each decline
   // is listed in the audit trail. (Kept as an invite-derived fallback too.)
-  const allSuppliersDeclined = t.status === 'suppliers_declined' || (supplierRows.length > 0 && supplierRows.every(r => ['declined', 'closed'].includes(r.status)) && !t.supplier_id)
+  const allSuppliersDeclined = t.status === 'suppliers_declined' || (supplierRows.length > 0 && !t.supplier_id && supplierRows.every(r => ['declined', 'closed'].includes(r.status)) && supplierRows.some(r => r.declinedBy === 'supplier'))
   // Suppliers who previously declined/were-declined on this ticket — the assign
   // pop-up warns before re-sending them the quote request.
   const declinedSupplierIds = ((invites ?? []) as any[]).filter(i => ['declined', 'closed'].includes(i.status)).map(i => i.supplier_id)
-  // "Suppliers requested" shows only the currently-invited suppliers, so a re-assign
-  // looks like a fresh one; declined ones live in the declined-quotes history below.
+  // "Suppliers requested" shows the currently-active invites PLUS suppliers who
+  // declined the quote request themselves (shown with a red dot + their reason, so
+  // they don't just disappear). Quotes the RM declined stay in the declined-quotes
+  // section below; 'closed' losers (another supplier was awarded) are hidden.
   const activeSupplierRows = supplierRows.filter(r => !['declined', 'closed'].includes(r.status))
+  const requestedSupplierRows = supplierRows.filter(r => r.status !== 'closed' && !(r.status === 'declined' && r.declinedBy === 'regional_manager'))
   // Freshly (re)assigned and awaiting quotes → a clean "new suppliers assigned" note.
   const awaitingSupplierQuotes = ['assigned', 'assessment', 'quote_requested', 'quote_revision'].includes(t.status) && activeSupplierRows.some(r => r.status === 'invited')
   const supplierDeclines = allSuppliersDeclined
@@ -412,10 +415,10 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
       {/* Quotes & Variation Orders — suppliers requested, quotes to review, VOs */}
       {hasQuoteBlock && (
         <CollapsibleSection id="ticket-quotes" title="Quotes & Variation Orders" defaultOpen={phase === 'commercial'}>
-          {activeSupplierRows.length > 0 && (
+          {requestedSupplierRows.length > 0 && (
             <div className="space-y-2">
               <h3 className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Suppliers requested</h3>
-              <SupplierStatusList rows={activeSupplierRows} />
+              <SupplierStatusList rows={requestedSupplierRows} />
             </div>
           )}
           {reviewQuotes.length > 0 && (

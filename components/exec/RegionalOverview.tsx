@@ -155,21 +155,20 @@ function QuoteValueCard({ accepted, pending, voPending }: { accepted: number; pe
   return (
     <Card className="p-4 flex flex-col gap-1.5 min-w-0 h-full">
       <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--text-muted)]"><Banknote size={13} /> Quote Value</div>
-      <div className="space-y-1 mt-0.5">
+      <div className="space-y-0.5 mt-0.5">
         <div className="flex items-center justify-between gap-2">
           <span className="text-[11px] text-emerald-600 dark:text-emerald-400">Accepted</span>
-          <span className="text-sm font-bold text-[var(--text)] tabular-nums">{formatCurrency(accepted)}</span>
+          <span className="text-[13px] font-bold text-[var(--text)] tabular-nums">{formatCurrency(accepted)}</span>
         </div>
         <div className="flex items-center justify-between gap-2">
           <span className="text-[11px] text-amber-600 dark:text-amber-500">Pending</span>
-          <span className="text-sm font-bold text-[var(--text)] tabular-nums">{formatCurrency(pending)}</span>
+          <span className="text-[13px] font-bold text-[var(--text)] tabular-nums">{formatCurrency(pending)}</span>
         </div>
         <div className="flex items-center justify-between gap-2">
           <span className="text-[11px] text-purple-600 dark:text-purple-400">VO pending</span>
-          <span className="text-sm font-bold text-[var(--text)] tabular-nums">{formatCurrency(voPending)}</span>
+          <span className="text-[13px] font-bold text-[var(--text)] tabular-nums">{formatCurrency(voPending)}</span>
         </div>
       </div>
-      <div className="text-[10px] text-[var(--text-faint)] mt-auto pt-1">Accepted incl. approved VOs</div>
     </Card>
   )
 }

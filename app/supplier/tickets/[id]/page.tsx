@@ -166,9 +166,10 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   const declinedByLabel = declinedBy === 'supplier'
     ? (supplierCompanyName ? ` by ${supplierCompanyName}` : ' by you')
     : declinedBy === 'regional_manager' ? ' by the client' : ''
-  // A client decline (chose another supplier) always shows the courteous "not
-  // selected" message, never the internal reason; otherwise fall back to it too.
-  const declineMessage = declinedBy === 'regional_manager' ? DEFAULT_DECLINE_REASON : (declineReason || DEFAULT_DECLINE_REASON)
+  // Show the actual decline reason (the RM's reason for a declined quote, or the
+  // supplier's own reason if they declined the request), falling back to the
+  // courteous "not selected" message when no reason was captured.
+  const declineMessage = declineReason || DEFAULT_DECLINE_REASON
   // This supplier's OWN view of the status — never leak another supplier's progress
   // (e.g. the ticket reading "Quoted" because a different supplier quoted). Awarded →
   // the real status; their own quote in → "Quoted"; nothing submitted → "Quote requested".
@@ -284,7 +285,8 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
       {/* Off the ticket → no "Next step", just why this quote request was declined. */}
       {declinedForMe ? (
         <div className="rounded-2xl bg-red-500/10 ring-1 ring-red-500/40 p-5 space-y-1">
-          <p className="text-sm font-bold text-red-700 dark:text-red-400">Quote request declined{declinedByLabel}</p>
+          {/* "Quote declined" once they'd submitted a quote; otherwise the request itself. */}
+          <p className="text-sm font-bold text-red-700 dark:text-red-400">{latestQuote ? 'Quote declined' : 'Quote request declined'}{declinedByLabel}</p>
           <p className="text-sm text-[var(--text)]">{declineMessage}</p>
         </div>
       ) : (

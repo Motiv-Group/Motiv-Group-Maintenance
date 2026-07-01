@@ -264,21 +264,16 @@ export function QuoteReviewCard({ ticketId, quotes }: { ticketId: string; quotes
   const [reason, setReason] = useState(DECLINE_REASONS[0])
   const [other, setOther] = useState('')
   const [err, setErr] = useState('')
-  const [sentMsg, setSentMsg] = useState('')
   if (!quotes.length) return <p className="text-sm text-[var(--text-faint)]">No quotes submitted yet.</p>
 
   async function decide(quoteId: string, action: 'approve' | 'decline') {
     setBusy(quoteId); setErr('')
     const declineReason = action === 'decline' ? (reason === 'Other' ? (other.trim() || 'Other') : reason) : undefined
     try {
+      // Declining just declines the quote (with the reason) — the supplier is NOT
+      // auto-asked to re-quote; that only happens via the "Ask to re-quote" button.
       await post(`/api/tickets/${ticketId}/quote-decision`, { action, quoteId, reason: declineReason })
-      // A soft decline (not "Choosing another supplier") asks the supplier to re-quote
-      // — confirm the request was delivered, then refresh.
-      if (action === 'decline' && declineReason !== 'Choosing another supplier') {
-        setBusy(null); setDeclineFor(null)
-        setSentMsg(`Re-quote request sent to ${quotes.find(x => x.id === quoteId)?.supplierName ?? 'the supplier'}.`)
-        setTimeout(() => { setSentMsg(''); router.refresh() }, 1800)
-      } else { router.refresh() }
+      router.refresh()
     }
     catch (e: any) { setErr(e.message); setBusy(null) }
   }
@@ -328,7 +323,6 @@ export function QuoteReviewCard({ ticketId, quotes }: { ticketId: string; quotes
           )}
         </div>
       ))}
-      {sentMsg && <p className="text-xs text-emerald-600 dark:text-emerald-400">{sentMsg}</p>}
       {err && <p className="text-xs text-red-500">{err}</p>}
     </div>
   )

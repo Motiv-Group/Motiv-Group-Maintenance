@@ -47,45 +47,38 @@ export async function POST(request: Request, { params }: { params: { id: string 
   }
 
   if (action === 'decline') {
-    // "Choosing another supplier" is the only destructive reason — it takes the
-    // supplier off the ticket. Every other reason (price, scope, lead time, other)
-    // is a soft decline: the same supplier is asked for an updated quote and the
-    // ticket stays in "Quote requested" until a quote is approved.
-    const hard = reason === 'Choosing another supplier'
+    // Decline this supplier's quote WITHOUT auto-asking for a revised one. The
+    // supplier is notified with the reason and taken off the ticket (invite
+    // 'declined', by the RM) — they can't re-submit until the RM explicitly
+    // presses "Ask to re-quote" (the 'requote' action below).
     await admin.from('quotes').update({ status: 'declined' }).eq('id', quote.id)
-    if (hard) {
-      await admin.from('ticket_suppliers').update({ status: 'declined', decline_reason: reason, declined_by: 'regional_manager', responded_at: now }).eq('ticket_id', ticket.id).eq('supplier_id', quote.supplier_id)
-      await admin.from('tickets').update({
-        status: 'open', supplier_id: null,
-        quote_decision_required: false, quote_decision_status: null,
-        current_blocker: null, blocker_owner_type: null, blocker_started_at: null, sla_paused: false,
-        last_internal_update_at: now, updated_at: now,
-      }).eq('id', ticket.id)
-      // The declined supplier gets the courteous "not selected" message, never the
-      // internal reason ("Choosing another supplier").
-      await notify('Thank you for your submission. Although your quotation was not selected for this request, we value your participation and look forward to inviting you to future opportunities.', 'Quote declined')
-    } else {
-      const rules = await loadSlaResolver(admin, ticket.company_id)
-      const quoteDueAt = new Date(Date.now() + rules(ticket.priority as 'P1' | 'P2' | 'P3' | 'P4').quote_due_mins * 60_000).toISOString()
-      // 'invited' + a decline_reason → shown to the RM as "Awaiting updated quote".
-      await admin.from('ticket_suppliers').update({ status: 'invited', decline_reason: reason, declined_by: null, responded_at: now }).eq('ticket_id', ticket.id).eq('supplier_id', quote.supplier_id)
-      await admin.from('tickets').update({
-        status: 'quote_requested', supplier_id: null, quote_required: true, quote_requested_at: now, quote_due_at: quoteDueAt,
-        quote_decision_required: false, quote_decision_status: null,
-        current_blocker: 'supplier_action', blocker_owner_type: 'supplier', blocker_started_at: now, sla_paused: false,
-        last_internal_update_at: now, updated_at: now,
-      }).eq('id', ticket.id)
-      await notify(`Your quote was declined (${reason}). Please submit an updated quote.`, 'Submit an updated quote')
-    }
+    await admin.from('ticket_suppliers').update({ status: 'declined', decline_reason: reason, declined_by: 'regional_manager', responded_at: now }).eq('ticket_id', ticket.id).eq('supplier_id', quote.supplier_id)
+    // Other quotes still pending → keep reviewing them ('quoted', RM decision
+    // pending); otherwise the ticket awaits the RM's next move (re-quote a declined
+    // one or re-assign) — in both cases the RM now owns the next action.
+    const { data: pend } = await admin.from('quotes').select('id').eq('ticket_id', ticket.id).eq('status', 'pending')
+    const hasPending = (pend ?? []).length > 0
+    await admin.from('tickets').update({
+      status: hasPending ? 'quoted' : 'quote_requested', supplier_id: null,
+      quote_decision_required: hasPending, quote_decision_status: hasPending ? 'pending' : null,
+      current_blocker: hasPending ? 'quote_approval' : 'reassignment', blocker_owner_type: 'regional_manager', blocker_started_at: now,
+      sla_paused: hasPending, ...(hasPending ? { pause_reason: 'awaiting_decision', pause_started_at: now } : { pause_ended_at: now }),
+      last_internal_update_at: now, updated_at: now,
+    }).eq('id', ticket.id)
+    const supplierMsg = reason
+      ? `Your quote was declined — ${reason}.`
+      : 'Thank you for your submission. Although your quotation was not selected for this request, we value your participation and look forward to inviting you to future opportunities.'
+    await notify(supplierMsg, 'Quote declined')
     revalidatePath('/regional'); revalidatePath(`/regional/tickets/${ticket.id}`); revalidatePath('/supplier'); revalidatePath(`/supplier/tickets/${ticket.id}`)
     return NextResponse.json({ ok: true })
   }
 
   if (action === 'requote') {
-    // Ask the (previously declined) supplier to submit a revised quote.
+    // Ask the (previously declined) supplier to submit a revised quote — re-invite
+    // them and stamp requote_requested_at so their page shows the re-quote prompt.
     const rules = await loadSlaResolver(admin, ticket.company_id)
     const quoteDueAt = new Date(Date.now() + rules(ticket.priority as 'P1' | 'P2' | 'P3' | 'P4').quote_due_mins * 60_000).toISOString()
-    await admin.from('ticket_suppliers').update({ status: 'invited', responded_at: now }).eq('ticket_id', ticket.id).eq('supplier_id', quote.supplier_id)
+    await admin.from('ticket_suppliers').update({ status: 'invited', declined_by: null, requote_requested_at: now, responded_at: now }).eq('ticket_id', ticket.id).eq('supplier_id', quote.supplier_id)
     await admin.from('tickets').update({
       status: 'quote_requested', supplier_id: null, quote_required: true, quote_requested_at: now, quote_due_at: quoteDueAt,
       quote_decision_required: false, quote_decision_status: null,
