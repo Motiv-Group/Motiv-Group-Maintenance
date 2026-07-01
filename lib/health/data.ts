@@ -342,8 +342,6 @@ export interface RegionalTicketRow {
   breached: boolean; supplierBreached: boolean; internalBreached: boolean
   dueAt: string; overdue: boolean; reopened: boolean; infoAdded: boolean
   supplierAssigned: boolean
-  // Every invited supplier declined and the ticket re-opened (awaiting re-assign).
-  allSuppliersDeclined: boolean
 }
 export interface RegionalDashboardData {
   portfolio: RegionalHealthResult
@@ -407,16 +405,6 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
     if (v.status === 'approved') acceptedQuoteValue += Number(v.amount ?? 0)
     else if (v.status === 'pending') voPendingValue += Number(v.amount ?? 0)
   }
-  // Per-ticket invite statuses → detect when EVERY invited supplier has declined
-  // (the ticket re-opens to 'open' for the RM; shown under the "Declined" filter).
-  const { data: inviteRows } = ticketIds.length ? await db.from('ticket_suppliers').select('ticket_id, status').in('ticket_id', ticketIds) : { data: [] as any[] }
-  const invitesByTicket = new Map<string, string[]>()
-  for (const r of (inviteRows ?? []) as any[]) { const a = invitesByTicket.get(r.ticket_id) ?? []; a.push(r.status); invitesByTicket.set(r.ticket_id, a) }
-  const allDeclinedOf = (t: any): boolean => {
-    if (t.status === 'suppliers_declined') return true
-    const inv = invitesByTicket.get(t.id) ?? []
-    return !t.supplier_id && ['open', 'info_requested'].includes(t.status) && inv.length > 0 && inv.every(s => ['declined', 'closed'].includes(s))
-  }
   // Commercial-phase statuses where a declined quote means the ticket is "re-opened".
   const COMMERCIAL = ['open', 'info_requested', 'assigned', 'assessment', 'quote_requested', 'quoted', 'quote_revision']
 
@@ -438,7 +426,6 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
       reopened: declinedQuoteTickets.has(t.id) && COMMERCIAL.includes(t.status) && t.status !== 'assigned',
       infoAdded: t.status === 'open' && !!(t as any).info_request_reason,
       supplierAssigned: !!(t as any).supplier_id,
-      allSuppliersDeclined: allDeclinedOf(t),
       }
     })
 
