@@ -152,7 +152,10 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   // path) and the invitation isn't closed. Once submitted the ticket moves to
   // 'quoted' and the quote is shown read-only — re-submission only on a revision.
   const revisionRequested = t.status === 'quote_revision'
-  const quoteableStatus = ['assigned', 'assessment', 'quote_requested', 'quote_revision'].includes(t.status)
+  // Pre-award commercial phase where an invited supplier may still quote. 'quoted' is
+  // included so a supplier can quote even after ANOTHER supplier has already quoted
+  // (the global ticket flips to 'quoted' on the first quote) — they're independent.
+  const quoteableStatus = ['assigned', 'assessment', 'quote_requested', 'quote_revision', 'quoted'].includes(t.status)
   const inviteOpen = !invite || !['declined', 'closed', 'awarded'].includes(invite.status)
   // Allow a fresh quote, a revision, or a re-quote after the RM declined-to-requote.
   const canSubmitQuote = quoteableStatus && inviteOpen && (!latestQuote || revisionRequested || latestQuote.status === 'declined')
@@ -199,7 +202,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
 
       {/* Progress — bare, no card around it (same as RM). Hidden once this supplier
           was declined: the ticket's onward progress is no longer theirs. */}
-      {!declinedForMe && <div className="px-1 pt-1"><RmPipeline status={t.status} /></div>}
+      {!declinedForMe && <div className="px-1 pt-1"><RmPipeline status={supplierStatus} /></div>}
 
       {/* Ticket detail — same layout as the SM view */}
       <Card className="p-5 space-y-4">
@@ -305,7 +308,9 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
             <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 text-sm text-[var(--text-muted)]">COC &amp; POC submitted — awaiting the regional manager&apos;s approval.</div>
           )}
           {/* submit_quote is handled by SendQuoteForm above — exclude the duplicate button. */}
-          <WorkflowActions ticketId={t.id} status={t.status} role="supplier" exclude={['schedule', 'submit_completion', 'require_assessment', 'request_quote', 'submit_variation', 'accept_snag', 'start_snag', 'submit_quote']} />
+          {/* Scoped to this supplier's own state so a non-awarded supplier never sees
+              actions triggered by another supplier's progress. */}
+          <WorkflowActions ticketId={t.id} status={supplierStatus} role="supplier" exclude={['schedule', 'submit_completion', 'require_assessment', 'request_quote', 'submit_variation', 'accept_snag', 'start_snag', 'submit_quote']} />
           {/* Opt out of the job (before award) — separated from the primary actions */}
           {canDecline && <div className="pt-1"><DeclineWorkButton ticketId={t.id} /></div>}
         </Card>
@@ -394,8 +399,9 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
         </CollapsibleSection>
       )}
 
-      {/* Off the job → can't post updates either (matches the frozen audit trail). */}
-      {!declinedForMe && (
+      {/* Only the AWARDED supplier posts updates — a still-competing supplier's note
+          would otherwise surface in the awarded supplier's trail (they're isolated). */}
+      {awarded && (
         <Card className="p-5">
           <h2 className="text-sm font-bold text-[var(--text)] mb-3">Post an update</h2>
           <SupplierAttachments ticketId={t.id} />
