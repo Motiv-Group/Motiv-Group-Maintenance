@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { ClipboardCheck, FileText, Calendar } from 'lucide-react'
 import { SubmitCompletionForm } from '@/components/supplier/SubmitCompletionForm'
 import { BackLink } from '@/components/ui/BackLink'
+import { RecordTicketView } from '@/components/ui/RecordTicketView'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireSupplierV3 } from '@/lib/health/guard'
 import { loadSlaResolver } from '@/lib/health/data'
@@ -133,6 +134,10 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   const declinedForMe = !awarded && !!invite && ['declined', 'closed'].includes((invite as any).status)
   const storeName = storeLabel(store?.name, store?.sub_store)
   const editorName = t.edited_by ? ((await admin.from('user_profiles').select('full_name').eq('id', t.edited_by).single()).data?.full_name ?? null) : null
+  // Audit-trail view tracking: who opened this ticket's items. The supplier's own
+  // "view" is of the store's logged photos (the job brief).
+  const { data: viewRows } = await admin.from('ticket_views').select('viewer_role, item_type, first_viewed_at').eq('ticket_id', t.id)
+  const viewItems = (Array.isArray(t.photo_urls) && t.photo_urls.length) ? ['photos'] : []
 
   // SLA due date (final resolution deadline) + overdue state.
   const rules = await loadSlaResolver(admin, t.company_id)
@@ -189,6 +194,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
 
   return (
     <div className="space-y-5">
+      {!declinedForMe && <RecordTicketView ticketId={t.id} items={viewItems} />}
       <BackLink fallbackHref="/supplier/tickets" label="Back to tickets" />
 
       {/* Progress — bare, no card around it (same as RM). Hidden once this supplier
@@ -384,6 +390,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
       {declinedForMe ? (
         <AuditTrail ticket={{
           createdAt: t.created_at,
+          startAt: (invite as any)?.invited_at ?? t.quote_requested_at,
           quoteRequestedAt: (invite as any)?.invited_at ?? t.quote_requested_at,
           quoteSubmittedAt: latestQuote ? latestQuote.created_at : null,
           supplierDeclinedAt: (invite as any)?.responded_at ?? latestQuote?.updated_at ?? t.updated_at,
@@ -391,12 +398,13 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
       ) : (
         <AuditTrail ticket={{
           createdAt: t.created_at, status: t.status, updatedAt: t.updated_at,
+          startAt: (invite as any)?.invited_at ?? t.quote_requested_at,
           quoteRequestedAt: t.quote_requested_at, quoteSubmittedAt: t.quote_submitted_at,
           quoteApprovedAt: t.quote_decision_status === 'approved' ? t.quote_decided_at : null,
           scheduledAt: t.scheduled_at, completedAt: t.completed_at,
           editedAt: t.edited_at, editedByName: editorName, cancellationReason: t.cancellation_reason,
           snagScheduledAt,
-          quotes: (myQuotes ?? []) as any[], signoffs: (signoffRows ?? []) as any[], updates: (updates ?? []) as any[],
+          quotes: (myQuotes ?? []) as any[], signoffs: (signoffRows ?? []) as any[], updates: (updates ?? []) as any[], views: (viewRows ?? []) as any[],
         }} />
       )}
     </div>

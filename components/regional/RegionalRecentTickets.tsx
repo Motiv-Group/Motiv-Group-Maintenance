@@ -20,9 +20,9 @@ export function RegionalRecentTickets({ tickets }: { tickets: RegionalTicketRow[
   useEffect(() => { const v = readCollapse('rm-recent-open'); if (v !== null) setOpen(v) }, [])
   const toggle = () => setOpen(o => { const v = !o; writeCollapse('rm-recent-open', v); return v })
   const recent = useMemo(() => {
-    // Completed tickets live in the Tickets-tab archive, not the recent overview.
+    // Completed tickets live in the Tickets-tab archive; cancelled ones are hidden.
     return tickets
-      .filter(t => t.status !== 'completed')
+      .filter(t => t.status !== 'completed' && t.status !== 'cancelled')
       .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
       .slice(0, MAX_RECENT)
   }, [tickets])

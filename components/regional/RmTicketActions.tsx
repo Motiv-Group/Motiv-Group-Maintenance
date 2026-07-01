@@ -34,22 +34,25 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 }
 
 // ── Assign suppliers (button → modal with search + multi-select) ─
-export function AssignSuppliersButton({ ticketId, suppliers }: { ticketId: string; suppliers: { id: string; name: string; avgRating?: number; ratingCount?: number }[] }) {
+type SupplierChoice = { id: string; name: string; avgRating?: number; ratingCount?: number }
+export function AssignSuppliersButton({ ticketId, suppliers, motivSuppliers = [] }: { ticketId: string; suppliers: SupplierChoice[]; motivSuppliers?: SupplierChoice[] }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
+  const [tab, setTab] = useState<'mine' | 'motiv'>('mine')
   const [q, setQ] = useState('')
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const toggle = (id: string) => setSel(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
 
-  // Selected float to the top; then alphabetical; filtered by the search box.
+  // Selection spans both lists; the tab just switches which directory is shown.
+  const activeList = tab === 'motiv' ? motivSuppliers : suppliers
   const shown = useMemo(() => {
     const term = q.trim().toLowerCase()
-    return [...suppliers]
+    return [...activeList]
       .filter(s => !term || s.name.toLowerCase().includes(term))
       .sort((a, b) => (sel.has(b.id) ? 1 : 0) - (sel.has(a.id) ? 1 : 0) || a.name.localeCompare(b.name))
-  }, [suppliers, q, sel])
+  }, [activeList, q, sel])
 
   async function assign() {
     if (!sel.size) { setErr('Select at least one supplier.'); return }
@@ -58,12 +61,18 @@ export function AssignSuppliersButton({ ticketId, suppliers }: { ticketId: strin
     catch (e: any) { setErr(e.message); setBusy(false) }
   }
 
+  const tabCls = (on: boolean) => `flex-1 py-1.5 rounded-lg text-xs font-semibold transition ${on ? 'bg-[#C6A35D] text-[#0a0e17]' : 'ring-1 ring-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--hover)]'}`
   return (
     <>
       <button onClick={() => setOpen(true)} className="flex-1 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition">Assign supplier</button>
       {open && (
         <Modal title="Assign suppliers" onClose={() => setOpen(false)}>
-          <p className="text-xs text-[var(--text-muted)]">Search and select one or more suppliers to invite to quote.</p>
+          <p className="text-xs text-[var(--text-muted)]">Search and select one or more suppliers to invite to quote — from your own list or the Motiv directory.</p>
+          {/* Switch directories; the selection carries across both. */}
+          <div className="flex gap-2">
+            <button onClick={() => setTab('mine')} className={tabCls(tab === 'mine')}>My suppliers ({suppliers.length})</button>
+            <button onClick={() => setTab('motiv')} className={tabCls(tab === 'motiv')}>Motiv suppliers ({motivSuppliers.length})</button>
+          </div>
           <div className="relative">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
             <input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="Search suppliers…"
@@ -77,7 +86,7 @@ export function AssignSuppliersButton({ ticketId, suppliers }: { ticketId: strin
                 <span className="shrink-0"><Stars value={s.avgRating ?? 5} count={s.ratingCount} size={12} /></span>
               </label>
             ))}
-            {!shown.length && <p className="text-sm text-[var(--text-faint)] px-2 py-2">No matching suppliers.</p>}
+            {!shown.length && <p className="text-sm text-[var(--text-faint)] px-2 py-2">{tab === 'motiv' ? 'No Motiv suppliers available.' : 'No matching suppliers.'}</p>}
           </div>
           {err && <p className="text-xs text-red-500">{err}</p>}
           <div className="flex gap-2">

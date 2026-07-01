@@ -15,13 +15,27 @@ async function transition(ticketId: string, body: Record<string, unknown>) {
   if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Something went wrong')
 }
 
-// Decline the work (before award) — preset reasons + free-text "Other". Sets the
-// supplier's invite to declined and notifies the RM; the job goes to others.
+// Centered pop-up (mirrors the RM "Request more info" modal) for supplier actions.
+function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-[var(--surface-2)] ring-1 ring-[var(--border)] rounded-2xl p-5 max-w-md w-full space-y-3 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between gap-2">
+          <p className="font-semibold text-[var(--text)]">{title}</p>
+          <button onClick={onClose} className="p-1 -m-1 text-[var(--text-faint)] hover:text-[var(--text)]"><X size={18} /></button>
+        </div>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+// Decline the work (before award) — a pop-up with preset reasons + free-text
+// "Other". Sets the supplier's invite to declined and notifies the RM.
 const DECLINE_REASONS = ['Fully booked / no capacity', 'Outside our service area', 'Not our trade / speciality', 'Pricing not viable', 'Other']
 export function DeclineWorkButton({ ticketId }: { ticketId: string }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
-  const [confirming, setConfirming] = useState(false)
   const [reason, setReason] = useState('')
   const [other, setOther] = useState('')
   const [busy, setBusy] = useState(false)
@@ -40,38 +54,25 @@ export function DeclineWorkButton({ ticketId }: { ticketId: string }) {
     } catch (e: any) { setErr(e.message); setBusy(false) }
   }
 
-  if (!open) {
-    return <Button onClick={() => setOpen(true)} variant="danger" className="w-full">Decline work</Button>
-  }
   return (
-    <div className="rounded-xl ring-1 ring-[var(--border)] p-4 space-y-2">
-      <p className="text-sm font-semibold text-[var(--text)]">Decline this work</p>
-      <p className="text-xs text-[var(--text-muted)]">The manager is notified and the job goes to other suppliers. This can&apos;t be undone.</p>
-      <select className={input} value={reason} onChange={e => setReason(e.target.value)}>
-        <option value="">— Choose a reason —</option>
-        {DECLINE_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
-      </select>
-      {reason === 'Other' && <textarea className={`${input} min-h-[70px]`} placeholder="Tell the manager why…" value={other} onChange={e => setOther(e.target.value)} />}
-      {err && <p className="text-xs text-red-500">{err}</p>}
-      {confirming ? (
-        <div className="space-y-2">
-          <p className="text-sm text-[var(--text)]">Are you sure you want to decline this work?</p>
+    <>
+      <Button onClick={() => setOpen(true)} variant="danger" className="w-full">Decline work</Button>
+      {open && (
+        <Modal title="Decline this work" onClose={() => { if (!busy) setOpen(false) }}>
+          <p className="text-xs text-[var(--text-muted)]">The manager is notified and the job goes to other suppliers. This can&apos;t be undone.</p>
+          <select autoFocus className={input} value={reason} onChange={e => { setReason(e.target.value); setErr('') }}>
+            <option value="">— Choose a reason —</option>
+            {DECLINE_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
+          </select>
+          {reason === 'Other' && <textarea className={`${input} min-h-[80px]`} placeholder="Tell the manager why…" value={other} onChange={e => setOther(e.target.value)} />}
+          {err && <p className="text-xs text-red-500">{err}</p>}
           <div className="flex gap-2">
-            <button onClick={submit} disabled={busy} className="flex-1 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-500 disabled:opacity-50">{busy ? 'Declining…' : 'Yes, decline'}</button>
-            <button onClick={() => setConfirming(false)} disabled={busy} className="flex-1 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm disabled:opacity-50">Back</button>
+            <button onClick={submit} disabled={busy} className="flex-1 py-2 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-500 disabled:opacity-50">{busy ? 'Declining…' : 'Decline work'}</button>
+            <button onClick={() => setOpen(false)} disabled={busy} className="flex-1 py-2 rounded-xl ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm disabled:opacity-50">Cancel</button>
           </div>
-        </div>
-      ) : (
-        <div className="flex gap-2">
-          <button onClick={() => {
-            if (!reason) { setErr('Choose a reason.'); return }
-            if (reason === 'Other' && !other.trim()) { setErr('Tell the manager why.'); return }
-            setErr(''); setConfirming(true)
-          }} className="flex-1 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-500">Decline work</button>
-          <button onClick={() => { setOpen(false); setErr(''); setConfirming(false) }} className="flex-1 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm">Cancel</button>
-        </div>
+        </Modal>
       )}
-    </div>
+    </>
   )
 }
 

@@ -18,6 +18,7 @@ import { AssignSuppliersButton, RequestInfoButton, RmEditTicketForm, SupplierSta
 import { DueDate } from '@/components/workflow/DueDate'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { EditedLine } from '@/components/ui/EditedLine'
+import { RecordTicketView } from '@/components/ui/RecordTicketView'
 import { AuditTrail } from '@/components/ui/AuditTrail'
 import { CollapsibleSection } from '@/components/ui/CollapsibleSection'
 import { formatCurrency, formatDateTime, formatDate, rmStatusMeta, storeLabel, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
@@ -118,6 +119,11 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   ])
   const storeName = store ? storeLabel(store.name, store.sub_store) : 'Store'
   const editorName = t.edited_by ? ((await admin.from('user_profiles').select('full_name').eq('id', t.edited_by).single()).data?.full_name ?? null) : null
+  // Motiv-curated supplier pool (assign pop-up) + who has viewed this ticket's items.
+  const [{ data: motivSuppliers }, { data: viewRows }] = await Promise.all([
+    admin.from('suppliers').select('id, company_name').eq('is_motiv', true).eq('active', true).order('company_name'),
+    admin.from('ticket_views').select('viewer_role, item_type, first_viewed_at').eq('ticket_id', t.id),
+  ])
   // Full COC/POC history — every submission, split by state (mirrors the supplier
   // view). Each sent-back card carries the reason it was rejected.
   const allSignoffs = (signoffs ?? []) as any[]
@@ -132,6 +138,12 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   const latestSnag = ((snags ?? []) as any[])[0] ?? null
   const snagScheduledAt = ((snags ?? []) as any[]).find(s => s.scheduled_at)?.scheduled_at ?? null
   const snagAwaitingApproval = t.status === 'snag_assigned' && latestSnag?.schedule_status === 'proposed' && !!latestSnag?.scheduled_at
+  // Record the RM's first view of each key item present on the ticket (audit trail).
+  const viewItems = [
+    ((quotes ?? []) as any[]).length ? 'quote' : null,
+    ((Array.isArray(t.photo_urls) && t.photo_urls.length) || allSignoffs.some((s: any) => (s.after_urls ?? []).length || (s.before_urls ?? []).length)) ? 'photos' : null,
+    allSignoffs.some((s: any) => s.coc_url) ? 'coc' : null,
+  ].filter(Boolean) as string[]
 
   // SLA due date (final resolution deadline) + overdue state.
   const rules = await loadSlaResolver(admin, t.company_id)
@@ -149,11 +161,11 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
     if (!r.supplier_id) continue
     const a = ratingAgg.get(r.supplier_id) ?? { sum: 0, n: 0 }; a.sum += Number(r.score); a.n++; ratingAgg.set(r.supplier_id, a)
   }
-  const supplierList = (suppliers ?? []).map((s: any) => {
-    const ra = ratingAgg.get(s.id)
-    return { id: s.id, name: s.company_name, avgRating: ra ? ra.sum / ra.n : 5, ratingCount: ra ? ra.n : 0 }
-  })
-  const nameById = new Map<string, string>(supplierList.map(s => [s.id, s.name]))
+  const toSupplierCard = (s: any) => { const ra = ratingAgg.get(s.id); return { id: s.id, name: s.company_name, avgRating: ra ? ra.sum / ra.n : 5, ratingCount: ra ? ra.n : 0 } }
+  const supplierList = (suppliers ?? []).map(toSupplierCard)
+  // Motiv-curated suppliers the RM can also invite (shown under a toggle in the pop-up).
+  const motivSupplierList = ((motivSuppliers ?? []) as any[]).filter(s => !supplierList.some(m => m.id === s.id)).map(toSupplierCard)
+  const nameById = new Map<string, string>([...supplierList, ...motivSupplierList].map(s => [s.id, s.name]))
   for (const inv of (invites ?? []) as any[]) if (inv.suppliers?.company_name) nameById.set(inv.supplier_id, inv.suppliers.company_name)
   const declineReasonBy = new Map<string, string>()
   for (const inv of (invites ?? []) as any[]) if (inv.decline_reason) declineReasonBy.set(inv.supplier_id, inv.decline_reason)
@@ -191,6 +203,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
 
   return (
     <div className="space-y-5">
+      <RecordTicketView ticketId={t.id} items={viewItems} />
       <BackLink fallbackHref="/regional/tickets" label="Back to tickets" />
 
       {/* Progress — bare, no card around it */}
@@ -209,13 +222,12 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
               {(() => {
                 const sm = rmStatusMeta(t.status)
                 const label = reQuote ? 'Re-open' : rmInfoAdded ? 'Info added' : sm.label
-                // Freshly-added info shows red to draw the RM's eye; it falls back to the
-                // normal status colour the moment the ticket moves to the next step.
-                const cls = reQuote ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : rmInfoAdded ? 'bg-red-500/15 text-red-700 dark:text-red-400' : sm.cls
+                // "Info added" reads like an "Info requested" badge (amber); the fresh
+                // answer itself is highlighted red in the description until the RM acts.
+                const cls = reQuote ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : rmInfoAdded ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : sm.cls
                 return <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${cls}`}>{label}</span>
               })()}
             </div>
-            {canEdit && <RmEditTicketForm ticketId={t.id} initial={{ title: t.title, category: t.category ?? 'General', impact: t.operational_impact ?? 'none', priority: t.priority, description: t.description }} />}
           </div>
         </div>
 
@@ -229,7 +241,19 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
 
         <div>
           <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Description</div>
-          <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{t.description}</p>
+          {(() => {
+            // The store manager's answer is appended as "— Added info: …" (AddInfoForm).
+            // Highlight those segments red until the RM moves the ticket on; then normal.
+            const [base, ...added] = String(t.description ?? '').split('\n\n— Added info: ')
+            return (
+              <p className="text-sm whitespace-pre-line">
+                <span className="text-[var(--text-muted)]">{base}</span>
+                {added.map((seg, i) => (
+                  <span key={i} className={rmInfoAdded ? 'text-red-600 dark:text-red-400 font-medium' : 'text-[var(--text-muted)]'}>{`\n\n— Added info: ${seg}`}</span>
+                ))}
+              </p>
+            )
+          })()}
         </div>
 
         {Array.isArray(t.photo_urls) && t.photo_urls.length > 0 && (
@@ -268,6 +292,8 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         )}
 
         <EditedLine at={t.edited_at} by={editorName} />
+        {/* Edit ticket — bottom-right of the detail block, in line with the last row. */}
+        {canEdit && <div className="flex justify-end"><RmEditTicketForm ticketId={t.id} initial={{ title: t.title, category: t.category ?? 'General', impact: t.operational_impact ?? 'none', priority: t.priority, description: t.description }} /></div>}
       </Card>
 
       {(t.status === 'cancelled' || t.status === 'declined') && (
@@ -331,7 +357,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         {/* Primary actions — equal-size, side by side: Assign (green) · Request info (amber) · Cancel (red) */}
         {!isTerminal && (canAssign || canCancel) && (
           <div className="flex gap-2">
-            {(canAssign || reQuote) && <AssignSuppliersButton ticketId={t.id} suppliers={supplierList} />}
+            {(canAssign || reQuote) && <AssignSuppliersButton ticketId={t.id} suppliers={supplierList} motivSuppliers={motivSupplierList} />}
             {canAssign && <RequestInfoButton ticketId={t.id} />}
             {canCancel && <CancelTicketCard ticketId={t.id} />}
           </div>
@@ -487,7 +513,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         editedAt: t.edited_at, editedByName: editorName, cancellationReason: t.cancellation_reason,
         infoRequestedAt: t.info_requested_at, infoAddedAt: t.info_added_at, infoRequestReason: t.info_request_reason,
         snagScheduledAt,
-        quotes: (quotes ?? []) as any[], signoffs: allSignoffs, updates: (updates ?? []) as any[],
+        quotes: (quotes ?? []) as any[], signoffs: allSignoffs, updates: (updates ?? []) as any[], views: (viewRows ?? []) as any[],
       }} />
     </div>
   )

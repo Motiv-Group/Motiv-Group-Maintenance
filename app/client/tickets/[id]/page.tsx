@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic'
 import { redirect } from 'next/navigation'
 import { CalendarClock } from 'lucide-react'
 import { BackLink } from '@/components/ui/BackLink'
+import { RecordTicketView } from '@/components/ui/RecordTicketView'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireStoreManagerV3 } from '@/lib/health/guard'
 import { loadSlaResolver } from '@/lib/health/data'
@@ -65,6 +66,7 @@ export default async function StoreTicketDetailPage({ params }: { params: { id: 
 
   return (
     <div className="space-y-5">
+      {Array.isArray(t.photo_urls) && t.photo_urls.length > 0 && <RecordTicketView ticketId={t.id} items={['photos']} />}
       <BackLink fallbackHref="/client/tickets" label="Back to tickets" />
 
       {/* Progress — its own block, dots. Hidden once the ticket is closed off

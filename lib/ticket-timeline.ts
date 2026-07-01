@@ -4,7 +4,7 @@
 
 // Semantic tone per event → coloured dot in the audit trail. Mirrors the status
 // palette used across the app (quote=cyan/violet, approve=emerald, snag/cancel=red…).
-export type TimelineTone = 'logged' | 'info_requested' | 'info_added' | 'quote_requested' | 'quote_submitted' | 'quote_approved' | 'quote_declined' | 'scheduled' | 'completion_submitted' | 'completion_approved' | 'completion_rejected' | 'completed' | 'cancelled' | 'edited' | 'update'
+export type TimelineTone = 'logged' | 'info_requested' | 'info_added' | 'quote_requested' | 'quote_submitted' | 'quote_approved' | 'quote_declined' | 'scheduled' | 'completion_submitted' | 'completion_approved' | 'completion_rejected' | 'completed' | 'cancelled' | 'edited' | 'update' | 'viewed'
 export interface TimelineEvent { at: string; label: string; who?: string | null; tone: TimelineTone }
 
 const ROLE_LABEL: Record<string, string> = {
@@ -31,12 +31,19 @@ export interface TimelineInput {
   // When this supplier was declined off the ticket — the trail stops here for them
   // (only passed on the supplier view when they're out of the job).
   supplierDeclinedAt?: string | null
+  // Hide everything before this instant — the supplier's trail starts at the quote
+  // request (they weren't involved while the ticket was being logged / triaged).
+  startAt?: string | null
   // The supplier's proposed snag-fix date (distinct from the original job schedule).
   snagScheduledAt?: string | null
   quotes?: { amount?: number | null; status: string; created_at: string; updated_at?: string | null }[]
   signoffs?: { status: string; created_at: string; reviewed_at?: string | null; reject_reason?: string | null }[]
   updates?: { body: string; author_role: string | null; created_at: string }[]
+  // Who first opened the ticket's quote / photos / COC (audit-trail view tracking).
+  views?: { viewer_role: string | null; item_type: string; first_viewed_at: string }[]
 }
+
+const VIEW_LABEL: Record<string, string> = { quote: 'viewed the quote', photos: 'viewed the photos', coc: 'viewed the COC & POC' }
 
 export function buildTicketTimeline(t: TimelineInput): TimelineEvent[] {
   const ev: TimelineEvent[] = []
@@ -75,6 +82,8 @@ export function buildTicketTimeline(t: TimelineInput): TimelineEvent[] {
   push(t.editedAt, 'Ticket edited', 'edited', t.editedByName)
 
   for (const u of t.updates ?? []) push(u.created_at, u.body, 'update', ROLE_LABEL[u.author_role ?? ''] ?? (u.author_role ?? 'System'))
+  for (const v of t.views ?? []) push(v.first_viewed_at, VIEW_LABEL[v.item_type] ?? 'viewed an attachment', 'viewed', ROLE_LABEL[v.viewer_role ?? ''] ?? (v.viewer_role ?? 'System'))
 
-  return ev.sort((a, b) => +new Date(a.at) - +new Date(b.at))
+  const sorted = ev.sort((a, b) => +new Date(a.at) - +new Date(b.at))
+  return t.startAt ? sorted.filter(e => +new Date(e.at) >= +new Date(t.startAt!)) : sorted
 }
