@@ -52,8 +52,8 @@ const missingEvidence = (t: SupplierTicketRow) => t.active && t.evidenceRequired
 // don't count. Falls back to the neutral grey badge.
 function groupCountCls(rows: SupplierTicketRow[]): string {
   const active = rows.filter(t => t.active && !t.declinedForMe)
-  if (active.some(t => urgency(t.priority) === 0)) return 'bg-red-500/15 text-red-700 dark:text-red-400'
-  if (active.some(t => urgency(t.priority) === 1)) return 'bg-orange-500/15 text-orange-700 dark:text-orange-400'
+  if (active.some(t => urgency(t.priority) === 0)) return 'bg-red-500 text-white'       // urgent (P1)
+  if (active.some(t => urgency(t.priority) === 1)) return 'bg-orange-500 text-white'    // high (P2)
   return 'text-[var(--text-muted)] bg-black/5 dark:bg-white/10'
 }
 

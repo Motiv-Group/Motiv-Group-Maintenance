@@ -28,15 +28,16 @@ const urgency = (p: string) => URGENCY[p] ?? 5
 const byDateThenUrgency = (a: StoreManagerTicket, b: StoreManagerTicket) =>
   (+new Date(b.createdAt) - +new Date(a.createdAt)) || (urgency(a.priority) - urgency(b.priority))
 
+// No "All" pill — the default (unselected) view is the collapsible status groups.
+// Open leads; Overdue sits last. Clicking the active pill returns to the groups.
 const PILLS: { key: Filter; label: string; active: string; inactive: string }[] = [
-  { key: 'all',         label: 'All',         active: 'bg-slate-800 text-white border-slate-800 dark:bg-white dark:text-[#0a0e17] dark:border-white', inactive: 'text-[var(--text-muted)] border-[var(--border)] hover:border-slate-400' },
-  { key: 'overdue',     label: 'Overdue',     active: 'bg-red-600 text-white border-red-600',                inactive: 'text-red-600 dark:text-red-400 border-red-500/50 hover:border-red-500' },
   { key: 'open',        label: 'Open',        active: 'bg-blue-500 text-white border-blue-500',              inactive: 'text-blue-600 dark:text-blue-400 border-blue-500/40 hover:border-blue-400' },
   { key: 'info_requested', label: 'Info Requested', active: 'bg-amber-500 text-white border-amber-500',     inactive: 'text-amber-600 dark:text-amber-400 border-amber-500/40 hover:border-amber-400' },
   { key: 'scheduled',   label: 'Job scheduled', active: 'bg-indigo-500 text-white border-indigo-500',       inactive: 'text-indigo-600 dark:text-indigo-400 border-indigo-500/40 hover:border-indigo-400' },
   { key: 'in_progress', label: 'In Progress', active: 'bg-[#C6A35D] text-[#0a0e17] border-[#C6A35D]',        inactive: 'text-amber-600 dark:text-[#C6A35D] border-[#C6A35D]/40 hover:border-[#C6A35D]' },
   { key: 'completed',   label: 'Completed',   active: 'bg-emerald-500 text-white border-emerald-500',        inactive: 'text-emerald-600 dark:text-emerald-400 border-emerald-500/40 hover:border-emerald-400' },
   { key: 'cancelled',   label: 'Cancelled',   active: 'bg-gray-500 text-white border-gray-500',              inactive: 'text-gray-600 dark:text-gray-400 border-gray-500/40 hover:border-gray-400' },
+  { key: 'overdue',     label: 'Overdue',     active: 'bg-red-600 text-white border-red-600',                inactive: 'text-red-600 dark:text-red-400 border-red-500/50 hover:border-red-500' },
 ]
 
 function Row({ t }: { t: StoreManagerTicket }) {
@@ -147,7 +148,7 @@ export function StoreTicketsList({ tickets, initialFilter = 'all' }: { tickets: 
           const n = p.key === 'all' ? tickets.length : (counts as any)[p.key]
           const on = filter === p.key
           return (
-            <button key={p.key} onClick={() => setFilter(p.key)}
+            <button key={p.key} onClick={() => setFilter(f => f === p.key ? 'all' : p.key)}
               className={`px-3 py-1.5 rounded-full text-xs font-medium border transition text-center ${on ? p.active : p.inactive}`}>
               {p.label} <span className="opacity-70">{n}</span>
             </button>

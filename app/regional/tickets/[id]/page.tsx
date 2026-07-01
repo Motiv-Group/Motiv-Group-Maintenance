@@ -290,9 +290,11 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
           </div>
         )}
 
-        <EditedLine at={t.edited_at} by={editorName} />
-        {/* Edit ticket — bottom-left of the detail block, in line with the last text. */}
-        {canEdit && <div className="flex justify-start"><RmEditTicketForm ticketId={t.id} initial={{ title: t.title, category: t.category ?? 'General', impact: t.operational_impact ?? 'none', priority: t.priority, description: t.description }} /></div>}
+        {/* Last text on the left, Edit ticket on the right, on the same line. */}
+        <div className="flex items-end justify-between gap-2">
+          <EditedLine at={t.edited_at} by={editorName} />
+          {canEdit && <RmEditTicketForm ticketId={t.id} initial={{ title: t.title, category: t.category ?? 'General', impact: t.operational_impact ?? 'none', priority: t.priority, description: t.description }} />}
+        </div>
       </Card>
 
       {(t.status === 'cancelled' || t.status === 'declined') && (

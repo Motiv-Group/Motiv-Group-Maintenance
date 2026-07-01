@@ -26,11 +26,11 @@ export default async function StoreOverviewPage() {
 
   // Store managers only ever see ticket status — never money or quotes.
   const kpis: Kpi[] = [
-    { label: 'Open', value: d.open, icon: <ClipboardList size={13} />, tone: 'info', href: '/client/tickets?status=open' },
+    { label: 'Open', value: d.open, icon: <ClipboardList size={13} />, tone: 'info', actionable: true, href: '/client/tickets?status=open' },
     { label: 'Info Requested', value: d.awaitingInput, icon: <Info size={13} />, tone: 'warn', actionable: true, href: '/client/tickets?status=info_requested' },
-    { label: 'Job Scheduled', value: d.scheduled, icon: <Calendar size={13} />, tone: 'info', href: '/client/tickets?status=scheduled' },
-    { label: 'In Progress', value: d.inProgress, icon: <Wrench size={13} />, tone: 'gold', href: '/client/tickets?status=in_progress' },
-    { label: 'Completed', value: d.completed, icon: <CheckCircle2 size={13} />, tone: 'good', href: '/client/tickets?status=completed' },
+    { label: 'Job Scheduled', value: d.scheduled, icon: <Calendar size={13} />, tone: 'info', actionable: true, href: '/client/tickets?status=scheduled' },
+    { label: 'In Progress', value: d.inProgress, icon: <Wrench size={13} />, tone: 'gold', actionable: true, href: '/client/tickets?status=in_progress' },
+    { label: 'Completed', value: d.completed, icon: <CheckCircle2 size={13} />, tone: 'good', actionable: true, href: '/client/tickets?status=completed' },
     { label: 'Overdue', value: overdueCount, icon: <AlertTriangle size={13} />, tone: 'bad', actionable: true, href: '/client/tickets?status=overdue' },
   ]
 

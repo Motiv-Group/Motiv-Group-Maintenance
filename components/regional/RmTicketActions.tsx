@@ -345,43 +345,44 @@ export function RmAddWorkForm({ ticketId, description, photoUrls, title, categor
         if (!error) newUrls.push(supabase.storage.from('ticket-photos').getPublicUrl(path).data.publicUrl)
       }
       const newDescription = `${description}\n\n— Added by RM: ${text.trim()}`
-      await post(`/api/tickets/${ticketId}`, { title, description: newDescription, category, operational_impact: impact, photo_urls: [...photoUrls, ...newUrls] })
+      // The ticket endpoint is PATCH-only — POSTing here was the "something went wrong".
+      const res = await fetch(`/api/tickets/${ticketId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, description: newDescription, category, operational_impact: impact, photo_urls: [...photoUrls, ...newUrls] }) })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to add the extra work.')
       setBusy(false); setOpen(false); setText(''); setFiles([]); router.refresh()
     } catch (e: any) { setErr(e.message); setBusy(false) }
   }
 
-  if (!open) {
-    return (
+  return (
+    <>
       <button onClick={() => setOpen(true)} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl ring-1 ring-[#C6A35D]/40 text-[#C6A35D] text-sm font-semibold hover:bg-[#C6A35D]/10 transition">
         <Plus size={16} /> Add extra work
       </button>
-    )
-  }
-  return (
-    <div className="rounded-xl ring-1 ring-[var(--border)] bg-[var(--surface)] p-4 space-y-2">
-      <p className="text-sm font-semibold text-[var(--text)]">Add extra work to this ticket</p>
-      <p className="text-xs text-[var(--text-muted)]">Extra scope you know of — added to the ticket brief before a supplier is assigned.</p>
-      <textarea className={`${input} min-h-[80px]`} placeholder="Describe the extra work needed…" value={text} onChange={e => { setText(e.target.value); setErr('') }} />
-      <label className={`flex items-center justify-center gap-2 py-2.5 rounded-lg ring-1 ring-[var(--border)] text-sm text-[var(--text)] transition cursor-pointer hover:border-[#C6A35D] hover:bg-[var(--hover)]`}>
-        <ImagePlus size={15} /> Add photos <span className="text-[var(--text-faint)]">(optional)</span>
-        <input type="file" accept="image/*" multiple className="hidden" onChange={e => setFiles(p => [...p, ...Array.from(e.target.files ?? [])].slice(0, 5))} />
-      </label>
-      {files.length > 0 && (
-        <ul className="space-y-1">
-          {files.map((f, i) => (
-            <li key={i} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)]">
-              <FileText size={14} className="text-[#C6A35D] shrink-0" /><span className="text-xs text-[var(--text)] truncate flex-1">{f.name}</span>
-              <button type="button" onClick={() => setFiles(p => p.filter((_, j) => j !== i))} className="p-0.5 text-[var(--text-faint)] hover:text-red-500"><X size={14} /></button>
-            </li>
-          ))}
-        </ul>
+      {open && (
+        <Modal title="Add extra work to this ticket" onClose={() => { if (!busy) { setOpen(false); setErr('') } }}>
+          <p className="text-xs text-[var(--text-muted)]">Extra scope you know of — added to the ticket brief before a supplier is assigned.</p>
+          <textarea autoFocus className={`${input} min-h-[90px]`} placeholder="Describe the extra work needed…" value={text} onChange={e => { setText(e.target.value); setErr('') }} />
+          <label className="flex items-center justify-center gap-2 py-2.5 rounded-lg ring-1 ring-[var(--border)] text-sm text-[var(--text)] transition cursor-pointer hover:border-[#C6A35D] hover:bg-[var(--hover)]">
+            <ImagePlus size={15} /> Add photos <span className="text-[var(--text-faint)]">(optional)</span>
+            <input type="file" accept="image/*" multiple className="hidden" onChange={e => setFiles(p => [...p, ...Array.from(e.target.files ?? [])].slice(0, 5))} />
+          </label>
+          {files.length > 0 && (
+            <ul className="space-y-1">
+              {files.map((f, i) => (
+                <li key={i} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)]">
+                  <FileText size={14} className="text-[#C6A35D] shrink-0" /><span className="text-xs text-[var(--text)] truncate flex-1">{f.name}</span>
+                  <button type="button" onClick={() => setFiles(p => p.filter((_, j) => j !== i))} className="p-0.5 text-[var(--text-faint)] hover:text-red-500"><X size={14} /></button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {err && <p className="text-xs text-red-500">{err}</p>}
+          <div className="flex gap-2">
+            <button onClick={submit} disabled={busy} className="flex-1 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Adding…' : 'Add to ticket'}</button>
+            <button onClick={() => { setOpen(false); setErr('') }} disabled={busy} className="flex-1 py-2 rounded-xl ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm disabled:opacity-50">Cancel</button>
+          </div>
+        </Modal>
       )}
-      {err && <p className="text-xs text-red-500">{err}</p>}
-      <div className="flex gap-2">
-        <button onClick={submit} disabled={busy} className="flex-1 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Adding…' : 'Add to ticket'}</button>
-        <button onClick={() => { setOpen(false); setErr('') }} disabled={busy} className="flex-1 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm disabled:opacity-50">Cancel</button>
-      </div>
-    </div>
+    </>
   )
 }
 
