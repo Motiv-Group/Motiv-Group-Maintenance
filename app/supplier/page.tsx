@@ -12,10 +12,6 @@ import { getDailyBriefing } from '@/lib/briefing/generate'
 import { supplierFacts } from '@/lib/briefing/facts'
 import { formatCurrency, formatDateTime, humanizeDuration, rmStatusMeta } from '@/lib/utils'
 
-// Statuses in the Tickets-tab "Quote requested" (to_quote) bucket — keep in sync
-// with bucketOf() in components/supplier/SupplierTickets.tsx.
-const QUOTE_REQUESTED_STATUSES = new Set(['open', 'info_requested', 'assigned', 'assessment', 'quote_requested', 'quote_revision'])
-
 const QUOTE_TONE: Record<string, string> = { pending: 'text-[#C6A35D]', accepted: 'text-emerald-600 dark:text-emerald-400', declined: 'text-red-600 dark:text-red-400' }
 
 // Stages where the supplier still owes completion evidence (COC + POC), with the
@@ -26,6 +22,13 @@ const EVIDENCE_STAGE: Record<string, string> = {
   evidence_requested: 'More evidence requested',
   snag_in_progress: 'Re-upload COC & POC (snag fix)',
   snag_resolved: 'Re-upload COC & POC',
+}
+
+// Isolation: the status THIS supplier should see — never another supplier's progress
+// (e.g. "Quoted" because someone else quoted). Mirrors myStatus in SupplierTickets.
+function myStatus(t: SupplierTicketRow): string {
+  if (t.awardedToMe || t.declinedForMe) return t.status
+  return t.quotedByMe ? 'quoted' : 'quote_requested'
 }
 
 // One date matching the ticket's current stage: approved → requested → assigned.
@@ -46,7 +49,7 @@ function milestone(t: SupplierTicketRow): { label: string; at: string } | null {
 
 // Shared ticket row: company + branch, then title, then the stage-matched date.
 function TicketRow({ t, company }: { t: SupplierTicketRow; company?: string }) {
-  const sm = rmStatusMeta(t.status)
+  const sm = rmStatusMeta(myStatus(t))
   const m = milestone(t)
   return (
     <Link href={`/supplier/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] -mx-2 px-2 rounded transition">
@@ -71,7 +74,7 @@ export default async function SupplierOverviewPage() {
   const k = d.kpis
   const perf = d.perf
   const company = d.company
-  const quoteRequested = d.tickets.filter(t => !t.declinedForMe && QUOTE_REQUESTED_STATUSES.has(t.status)).length
+  const quoteRequested = d.tickets.filter(t => !t.declinedForMe && myStatus(t) === 'quote_requested').length
   // Submitted quotes awaiting the client's decision (matches the Quotes-tab Pending filter).
   const pendingDecision = d.quotes.filter(q => q.status === 'pending').length
   // Overdue = past the final resolution deadline (subset of SLA-breached).
@@ -138,7 +141,7 @@ export default async function SupplierOverviewPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <SectionCard title="Needs Your Action" icon={<AlertTriangle size={15} className="text-amber-600 dark:text-amber-500" />} action={<Link href="/supplier/tickets" className="text-xs text-[#C6A35D] hover:underline">All</Link>}>
           {needsAction.map(t => {
-            const sm = rmStatusMeta(t.status); const m = milestone(t)
+            const sm = rmStatusMeta(myStatus(t)); const m = milestone(t)
             return (
             <Link key={t.id} href={`/supplier/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] -mx-2 px-2 rounded">
               <div className="min-w-0">
