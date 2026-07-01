@@ -170,6 +170,11 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   // Suppliers who previously declined/were-declined on this ticket — the assign
   // pop-up warns before re-sending them the quote request.
   const declinedSupplierIds = ((invites ?? []) as any[]).filter(i => ['declined', 'closed'].includes(i.status)).map(i => i.supplier_id)
+  // "Suppliers requested" shows only the currently-invited suppliers, so a re-assign
+  // looks like a fresh one; declined ones live in the declined-quotes history below.
+  const activeSupplierRows = supplierRows.filter(r => !['declined', 'closed'].includes(r.status))
+  // Freshly (re)assigned and awaiting quotes → a clean "new suppliers assigned" note.
+  const awaitingSupplierQuotes = ['assigned', 'assessment', 'quote_requested', 'quote_revision'].includes(t.status) && activeSupplierRows.some(r => r.status === 'invited')
   const supplierDeclines = allSuppliersDeclined
     ? ((invites ?? []) as any[]).filter(i => ['declined', 'closed'].includes(i.status)).map(i => ({ name: i.suppliers?.company_name ?? nameById.get(i.supplier_id) ?? 'Supplier', at: i.responded_at ?? i.invited_at })).filter(d => d.at)
     : []
@@ -311,13 +316,6 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
 
       {breached && <BreachReason nextAction={sla.nextAction} dueAt={sla.nextActionDueAt} owner={breachOwner} />}
 
-      {reQuote && (
-        <div className="rounded-2xl bg-amber-500/10 ring-1 ring-amber-500/40 p-4 space-y-0.5">
-          <p className="text-sm font-bold text-amber-700 dark:text-amber-400">Re-quote</p>
-          <p className="text-sm text-[var(--text-muted)]">A previous quote was declined. Pick one of the remaining quotes below, or assign a different supplier.</p>
-        </div>
-      )}
-
       {/* COC & POC — every submission: under review, plus any sent back for more evidence (full history) */}
       {(pendingSignoffs.length > 0 || evidenceRequestedSignoffs.length > 0) && (
         <CollapsibleSection id="ticket-coc" title="COC & POC" defaultOpen={phase === 'coc'}>
@@ -358,7 +356,12 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
           </div>
         )}
 
-        {reQuote && <p className="text-xs text-[var(--text-muted)]">A quote was declined and the ticket re-opened. You can ask a declined supplier to re-quote (see <span className="font-medium text-[var(--text)]">Declined / not selected quotes</span> below), assign a different supplier, or cancel the ticket if the issue is resolved.</p>}
+        {awaitingSupplierQuotes && (
+          <div className="rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/30 p-3.5 flex items-start gap-2.5">
+            <CheckCircle2 size={16} className="text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+            <p className="text-sm text-[var(--text-muted)]">Supplier{activeSupplierRows.filter(r => r.status === 'invited').length === 1 ? '' : 's'} assigned — awaiting their quote{activeSupplierRows.filter(r => r.status === 'invited').length === 1 ? '' : 's'}.</p>
+          </div>
+        )}
 
         {/* Add extra work — before a supplier is assigned; disappears once assigned. */}
         {canAssign && <RmAddWorkForm ticketId={t.id} description={t.description ?? ''} photoUrls={Array.isArray(t.photo_urls) ? t.photo_urls : []} title={t.title} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} />}
@@ -392,10 +395,10 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
       {/* Quotes & Variation Orders — suppliers requested, quotes to review, VOs */}
       {hasQuoteBlock && (
         <CollapsibleSection id="ticket-quotes" title="Quotes & Variation Orders" defaultOpen={phase === 'commercial'}>
-          {supplierRows.length > 0 && (
+          {activeSupplierRows.length > 0 && (
             <div className="space-y-2">
               <h3 className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Suppliers requested</h3>
-              <SupplierStatusList rows={supplierRows} />
+              <SupplierStatusList rows={activeSupplierRows} />
             </div>
           )}
           {reviewQuotes.length > 0 && (
