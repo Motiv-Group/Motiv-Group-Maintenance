@@ -80,10 +80,10 @@ export default async function SupplierOverviewPage() {
   const briefing = await getDailyBriefing({ companyId, scope: 'supplier', scopeId: briefingScopeId, role: 'supplier', facts: supplierFacts(d) })
 
   const kpis: Kpi[] = [
-    { label: 'Overdue', value: overdueCount, icon: <Timer size={13} />, tone: overdueCount ? 'bad' : 'good', href: '/supplier/tickets?filter=overdue' },
-    { label: 'SLA Breached', value: k.overdue, icon: <AlertTriangle size={13} />, tone: k.overdue ? 'bad' : 'good', href: '/supplier/tickets?filter=breached' },
-    { label: 'Due Today', value: k.dueToday, icon: <Clock size={13} />, tone: k.dueToday ? 'warn' : 'good', href: '/supplier/tickets' },
-    { label: 'Quote requested', value: quoteRequested, icon: <ClipboardList size={13} />, tone: 'info', href: '/supplier/tickets?filter=to_quote' },
+    { label: 'Overdue', value: overdueCount, icon: <Timer size={13} />, tone: 'bad', actionable: true, href: '/supplier/tickets?filter=overdue' },
+    { label: 'SLA Breached', value: k.overdue, icon: <AlertTriangle size={13} />, tone: 'bad', actionable: true, href: '/supplier/tickets?filter=breached' },
+    { label: 'Due Today', value: k.dueToday, icon: <Clock size={13} />, tone: 'warn', actionable: true, href: '/supplier/tickets' },
+    { label: 'Quote requested', value: quoteRequested, icon: <ClipboardList size={13} />, tone: 'info', actionable: true, href: '/supplier/tickets?filter=to_quote' },
     { label: 'Pending Quotes', value: pendingDecision, icon: <ReceiptText size={13} />, tone: 'gold', href: '/supplier/quotes?status=pending' },
     { label: 'Pending Sign-off', value: k.awaitingSignoff, icon: <ClipboardCheck size={13} />, tone: 'info', href: '/supplier/signoff?status=awaiting' },
   ]

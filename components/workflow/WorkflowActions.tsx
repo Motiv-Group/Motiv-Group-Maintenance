@@ -20,15 +20,16 @@ const FIELDS: Record<string, FieldDef[]> = {
 // Actions where a supplier must be chosen/assigned.
 const NEEDS_SUPPLIER = new Set(['validate', 'request_quote', 'require_assessment', 'assign_snag'])
 // Actions that get an explicit "Are you sure?" confirmation before firing.
-const CONFIRM_ACTIONS = new Set(['raise_snag', 'submit_variation'])
+const CONFIRM_ACTIONS = new Set(['raise_snag', 'submit_variation', 'approve_variation', 'reject_variation'])
 // Pre-defined reasons (+ free-text "Other") for the reason/detail field.
 const REASON_PRESETS: Record<string, string[]> = {
   raise_snag:       ['Work incomplete', 'Quality below standard', 'Wrong materials or spec', 'Safety concern', 'Other'],
   request_info:     ['Need more detail', 'Photos unclear', 'Scope unclear', 'Access details needed', 'Other'],
   request_evidence: ['Before photos missing', 'After photos missing', 'COC missing', 'Photos unclear', 'Other'],
+  reject_variation: ['Cost too high', 'Not budgeted', 'Outside agreed scope', 'Needs more detail / justification', 'Obtain another quote', 'Other'],
 }
 // Which field the preset fills for each action.
-const REASON_KEY: Record<string, string> = { raise_snag: 'description', request_info: 'reason', request_evidence: 'reason' }
+const REASON_KEY: Record<string, string> = { raise_snag: 'description', request_info: 'reason', request_evidence: 'reason', reject_variation: 'reason' }
 
 function tone(action: string): string {
   // Accepting a snag is a positive "I'll take it" action → green (like submit/confirm).

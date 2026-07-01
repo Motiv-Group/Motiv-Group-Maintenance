@@ -45,7 +45,7 @@ export function SectionCard({ title, icon, action, children }: { title: string; 
   )
 }
 
-export interface Kpi { label: string; value: ReactNode; hint?: ReactNode; icon?: ReactNode; tone?: 'default' | 'info' | 'gold' | 'good' | 'warn' | 'bad' | 'neutral' | 'orange'; trend?: Trend; href?: string; border?: string }
+export interface Kpi { label: string; value: ReactNode; hint?: ReactNode; icon?: ReactNode; tone?: 'default' | 'info' | 'gold' | 'good' | 'warn' | 'bad' | 'neutral' | 'orange'; trend?: Trend; href?: string; border?: string; actionable?: boolean }
 // Tone colours the icon + label so each metric reads at a glance; the number
 // stays white for contrast.
 const TONE: Record<NonNullable<Kpi['tone']>, string> = {
@@ -58,13 +58,29 @@ const TONE: Record<NonNullable<Kpi['tone']>, string> = {
   neutral: 'text-[var(--text-muted)]',
   orange:  'text-orange-600 dark:text-orange-400',
 }
+// Accent ring per tone — an actionable KPI with work outstanding takes its tone
+// colour as the border too, so "needs action" reads at a glance.
+const TONE_BORDER: Record<NonNullable<Kpi['tone']>, string> = {
+  default: '!ring-[var(--border)]',
+  info:    '!ring-blue-500/60',
+  gold:    '!ring-[#C6A35D]/60',
+  good:    '!ring-emerald-500/60',
+  warn:    '!ring-amber-500/60',
+  bad:     '!ring-red-500/60',
+  neutral: '!ring-[var(--border)]',
+  orange:  '!ring-orange-500/60',
+}
 export function KpiCard({ kpi }: { kpi: Kpi }) {
-  // Default card border is the subtle ring; `border` overrides it with an accent
-  // colour (e.g. ring-orange-500/60) so a KPI can stand out.
-  const ring = kpi.border ? `ring-1 ${kpi.border}` : ''
+  // An "actionable" KPI flags outstanding work: at 0 it reads green with no accent
+  // border (all clear); above 0 it takes its tone colour for the border too. A
+  // plain KPI keeps its given tone and optional `border` accent.
+  const clear = !!kpi.actionable && kpi.value === 0
+  const effTone: NonNullable<Kpi['tone']> = clear ? 'good' : (kpi.tone ?? 'default')
+  const accent = clear ? undefined : (kpi.actionable ? (kpi.border ?? TONE_BORDER[kpi.tone ?? 'default']) : kpi.border)
+  const ring = accent ? `ring-1 ${accent}` : ''
   const body = (
     <Card className={`p-4 flex flex-col gap-1.5 min-w-0 ${ring}${kpi.href ? ' h-full transition hover:ring-[#C6A35D]/50 hover:-translate-y-0.5 cursor-pointer' : ''}`}>
-      <div className={`flex items-center justify-between gap-2 text-[11px] font-semibold ${TONE[kpi.tone ?? 'default']}`}>
+      <div className={`flex items-center justify-between gap-2 text-[11px] font-semibold ${TONE[effTone]}`}>
         <span className="flex items-center gap-1.5 truncate">{kpi.icon}{kpi.label}</span>
         {kpi.trend && <TrendArrow t={kpi.trend} />}
       </div>

@@ -397,6 +397,13 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
     if (q.status === 'pending') pendingQuoteValue += Number(q.amount ?? 0)
     if (q.status === 'declined') declinedQuoteTickets.add(q.ticket_id)
   }
+  // Variation orders fold into the same Quote Value totals: approved VOs add to
+  // Accepted, pending (awaiting-approval) VOs add to Pending.
+  const { data: variationRows } = ticketIds.length ? await db.from('ticket_variations').select('status, amount').in('ticket_id', ticketIds) : { data: [] as any[] }
+  for (const v of (variationRows ?? []) as any[]) {
+    if (v.status === 'approved') acceptedQuoteValue += Number(v.amount ?? 0)
+    else if (v.status === 'pending') pendingQuoteValue += Number(v.amount ?? 0)
+  }
   // Commercial-phase statuses where a declined quote means the ticket is "re-opened".
   const COMMERCIAL = ['open', 'info_requested', 'assigned', 'assessment', 'quote_requested', 'quoted', 'quote_revision']
 

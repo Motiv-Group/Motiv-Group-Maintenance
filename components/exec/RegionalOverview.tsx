@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Building2, ClipboardList, ShieldAlert, Truck, Lock, ClipboardCheck, AlertTriangle, ListTodo, Sparkles, Calendar, Banknote, Clock, ReceiptText } from 'lucide-react'
+import { Building2, ClipboardList, ShieldAlert, Truck, Lock, ClipboardCheck, AlertTriangle, ListTodo, Sparkles, Calendar, Banknote, Clock, ReceiptText, FileText } from 'lucide-react'
 import type { RegionalDashboardData } from '@/lib/health/data'
 import { SectionCard, KpiCard, Pill, Donut, Card, DistributionBar, RagBlocks, STATUS_TEXT, type Kpi } from '@/components/exec/ui'
 import { RegionalRecentTickets } from '@/components/regional/RegionalRecentTickets'
@@ -21,8 +21,10 @@ export function RegionalOverview({ data, name, briefing, briefingScopeId }: { da
   const p = data.portfolio
   const greeting = (() => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening' })()
 
-  // Quotes (and variation orders) submitted and waiting on the RM's decision.
-  const quotesAwaiting = data.tickets.filter(t => t.status === 'quoted' || t.status === 'variation_review').length
+  // Quotes waiting on the RM's decision (variation orders get their own KPI below).
+  const quotesAwaiting = data.tickets.filter(t => t.status === 'quoted').length
+  // Variation orders submitted and waiting on the RM to approve/reject.
+  const voAwaiting = data.tickets.filter(t => t.status === 'variation_review').length
   // "Open" = still open/info-requested AND no supplier assigned yet. Once a
   // supplier is on it, it's being handled, not open. Matches the Tickets-tab pill.
   const openCount = data.tickets.filter(t => (t.status === 'open' || t.status === 'info_requested') && !t.supplierAssigned).length
@@ -34,16 +36,19 @@ export function RegionalOverview({ data, name, briefing, briefingScopeId }: { da
   // Every KPI carries a hint so all cards share the same height → uniform size.
   // Tickets Overdue sits beside Stores Need Attention; Quotes Awaiting Approval
   // beside Open Tickets. Both deep-link into the Tickets tab with the filter set.
+  // `actionable` KPIs go green (no border) at 0 and take their tone colour as the
+  // border when there's work to do. Active Stores is a plain info metric.
   const kpis: Kpi[] = [
     { label: 'Active Stores', value: p.activeStores, hint: `avg ${p.averageStoreHealth}%`, icon: <Building2 size={13} />, tone: 'info', href: '/regional/stores' },
-    { label: 'Stores Need Attention', value: data.attentionStores.length, hint: 'need action', icon: <ShieldAlert size={13} />, tone: data.attentionStores.length ? 'warn' : 'good', href: '/regional/stores' },
-    { label: 'Tickets Overdue', value: overdueCount, hint: 'past deadline', icon: <Clock size={13} />, tone: overdueCount ? 'bad' : 'good', border: overdueCount ? '!ring-red-500/60' : undefined, href: '/regional/tickets?filter=overdue' },
-    { label: 'Open Tickets', value: openCount, hint: 'unassigned', icon: <ClipboardList size={13} />, tone: 'orange', border: '!ring-orange-500/60', href: '/regional/tickets?filter=open' },
-    { label: 'Quotes Awaiting Approval', value: quotesAwaiting, hint: 'to review', icon: <ReceiptText size={13} />, tone: quotesAwaiting ? 'warn' : 'good', border: quotesAwaiting ? '!ring-amber-500/60' : undefined, href: '/regional/tickets?filter=quoted' },
-    { label: 'Pending Signoffs', value: data.signoffsPending, hint: 'awaiting you', icon: <ClipboardCheck size={13} />, tone: data.signoffsPending ? 'warn' : 'good', border: data.signoffsPending ? '!ring-amber-500/60' : '!ring-emerald-500/60', href: '/regional/signoff' },
-    { label: 'Open Snags', value: data.snagsOpen, hint: 'to resolve', icon: <AlertTriangle size={13} />, tone: data.snagsOpen ? 'warn' : 'good', href: '/regional/snag' },
-    { label: 'Internal Breaches', value: data.breachesNow.internal, hint: 'internal SLA', icon: <Lock size={13} />, tone: data.breachesNow.internal ? 'bad' : 'good', href: '/regional/tickets?filter=internal_breach' },
-    { label: 'Supplier Breaches', value: data.breachesNow.supplier, hint: 'supplier SLA', icon: <Truck size={13} />, tone: data.breachesNow.supplier ? 'bad' : 'good', href: '/regional/tickets?filter=supplier_breach' },
+    { label: 'Stores Need Attention', value: data.attentionStores.length, hint: 'need action', icon: <ShieldAlert size={13} />, tone: 'warn', actionable: true, href: '/regional/stores' },
+    { label: 'Tickets Overdue', value: overdueCount, hint: 'past deadline', icon: <Clock size={13} />, tone: 'bad', actionable: true, href: '/regional/tickets?filter=overdue' },
+    { label: 'Open Tickets', value: openCount, hint: 'unassigned', icon: <ClipboardList size={13} />, tone: 'orange', actionable: true, href: '/regional/tickets?filter=open' },
+    { label: 'Quotes Awaiting Approval', value: quotesAwaiting, hint: 'to review', icon: <ReceiptText size={13} />, tone: 'warn', actionable: true, href: '/regional/tickets?filter=quoted' },
+    { label: 'VOs Awaiting Approval', value: voAwaiting, hint: 'to review', icon: <FileText size={13} />, tone: 'warn', actionable: true, href: '/regional/tickets?filter=quoted' },
+    { label: 'Pending Signoffs', value: data.signoffsPending, hint: 'awaiting you', icon: <ClipboardCheck size={13} />, tone: 'warn', actionable: true, href: '/regional/signoff' },
+    { label: 'Open Snags', value: data.snagsOpen, hint: 'to resolve', icon: <AlertTriangle size={13} />, tone: 'warn', actionable: true, href: '/regional/snag' },
+    { label: 'Internal Breaches', value: data.breachesNow.internal, hint: 'internal SLA', icon: <Lock size={13} />, tone: 'bad', actionable: true, href: '/regional/tickets?filter=internal_breach' },
+    { label: 'Supplier Breaches', value: data.breachesNow.supplier, hint: 'supplier SLA', icon: <Truck size={13} />, tone: 'bad', actionable: true, href: '/regional/tickets?filter=supplier_breach' },
   ]
 
   const focus = buildFocus(data)
@@ -140,7 +145,8 @@ export function RegionalOverview({ data, name, briefing, briefingScopeId }: { da
   )
 }
 
-/** Combined quote-value KPI: accepted + pending totals, full to the cent.
+/** Combined quote-value KPI: accepted + pending totals, full to the cent. Both
+ *  include variation orders — approved VOs add to Accepted, pending VOs to Pending.
  *  Read-only (not clickable) — it's a summary metric, not a navigation target. */
 function QuoteValueCard({ accepted, pending }: { accepted: number; pending: number }) {
   return (
@@ -156,6 +162,7 @@ function QuoteValueCard({ accepted, pending }: { accepted: number; pending: numb
           <span className="text-sm font-bold text-[var(--text)] tabular-nums">{formatCurrency(pending)}</span>
         </div>
       </div>
+      <div className="text-[10px] text-[var(--text-faint)] mt-auto pt-1">incl. variation orders</div>
     </Card>
   )
 }

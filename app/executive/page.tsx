@@ -49,15 +49,15 @@ export default async function ExecutiveEstatePage() {
 
   const kpis: Kpi[] = [
     { label: 'Stores', value: total, hint: `${data.totalRegions} regions`, icon: <Building2 size={13} />, tone: 'info', href: '/executive/stores' },
-    { label: 'Attention Stores', value: e.counts.attention, hint: `${pct(e.counts.attention, total)}% of estate`, icon: <AlertTriangle size={13} />, tone: e.counts.attention ? 'bad' : 'good', href: '/executive/stores' },
+    { label: 'Attention Stores', value: e.counts.attention, hint: `${pct(e.counts.attention, total)}% of estate`, icon: <AlertTriangle size={13} />, tone: 'bad', actionable: true, href: '/executive/stores' },
     { label: 'Open Work', value: e.openTickets, hint: 'vs last week', icon: <ClipboardList size={13} />, tone: 'info', trend: tr(data.trends.openWork), href: '/executive/stores' },
-    { label: 'Supplier Breaches', value: e.supplierSlaBreaches, hint: `${supplierBreachSuppliers} supplier${supplierBreachSuppliers === 1 ? '' : 's'}`, icon: <Truck size={13} />, tone: e.supplierSlaBreaches ? 'bad' : 'good', trend: tr(data.trends.supplierBreaches), href: '/executive/suppliers' },
-    { label: 'Internal Breaches', value: e.internalSlaBreaches, hint: 'Across functions', icon: <ShieldAlert size={13} />, tone: e.internalSlaBreaches ? 'bad' : 'good', href: '/executive/decisions' },
-    { label: 'Pending Approvals', value: e.decisionsPending, hint: `${fmtK(data.pendingDecisionValue)} backlog`, icon: <FileText size={13} />, tone: 'gold', href: '/executive/decisions' },
+    { label: 'Supplier Breaches', value: e.supplierSlaBreaches, hint: `${supplierBreachSuppliers} supplier${supplierBreachSuppliers === 1 ? '' : 's'}`, icon: <Truck size={13} />, tone: 'bad', actionable: true, trend: tr(data.trends.supplierBreaches), href: '/executive/suppliers' },
+    { label: 'Internal Breaches', value: e.internalSlaBreaches, hint: 'Across functions', icon: <ShieldAlert size={13} />, tone: 'bad', actionable: true, href: '/executive/decisions' },
+    { label: 'Pending Approvals', value: e.decisionsPending, hint: `${fmtK(data.pendingDecisionValue)} backlog`, icon: <FileText size={13} />, tone: 'gold', actionable: true, href: '/executive/decisions' },
     { label: 'Cost Exposure', value: fmtK(e.costExposure), hint: 'High value items', icon: <Banknote size={13} />, tone: 'neutral', trend: tr(data.trends.cost), href: '/executive/decisions' },
-    { label: 'Repeat Defects', value: data.repeatDefects.length, hint: `${pct(data.repeatDefects.length, e.openTickets)}% of total work`, icon: <Repeat size={13} />, tone: data.repeatDefects.length ? 'warn' : 'good', href: '/executive/stores' },
-    { label: 'Region Alerts', value: regionAlerts, hint: 'Requiring attention', icon: <Globe2 size={13} />, tone: regionAlerts ? 'warn' : 'good', href: '/executive/regions' },
-    { label: 'Decisions Required', value: actionableDecisions.length, hint: 'Executive actions', icon: <Gavel size={13} />, tone: 'gold', href: '/executive/decisions' },
+    { label: 'Repeat Defects', value: data.repeatDefects.length, hint: `${pct(data.repeatDefects.length, e.openTickets)}% of total work`, icon: <Repeat size={13} />, tone: 'warn', actionable: true, href: '/executive/stores' },
+    { label: 'Region Alerts', value: regionAlerts, hint: 'Requiring attention', icon: <Globe2 size={13} />, tone: 'warn', actionable: true, href: '/executive/regions' },
+    { label: 'Decisions Required', value: actionableDecisions.length, hint: 'Executive actions', icon: <Gavel size={13} />, tone: 'gold', actionable: true, href: '/executive/decisions' },
   ]
 
   return (
