@@ -48,7 +48,10 @@ export default async function SupplierQuotesPage({ searchParams }: { searchParam
   // Submitted quotes — declined ones always show; others hide once past the decision phase.
   const quoteItems: QItem[] = d.quotes
     .filter(q => q.status === 'declined' || !HIDE_FROM_QUOTES.has(q.ticketStatus))
-    .map(q => ({ key: `q-${q.id}`, ticketId: q.ticketId, ticketTitle: q.ticketTitle, storeName: q.storeName, branchCode: q.branchCode, createdAt: q.createdAt, amount: q.amount, status: q.status, byYou: q.status === 'declined' && declinedByByTicket.get(q.ticketId) === 'supplier', byClient: q.status === 'declined' && declinedByByTicket.get(q.ticketId) === 'regional_manager' }))
+    // A quote is only ever declined by the supplier (they declined the work) or by the
+    // client/RM (declined the quote, incl. a soft decline that re-invites, or awarding
+    // another supplier). So anything not declined-by-you is "Declined (Client)".
+    .map(q => ({ key: `q-${q.id}`, ticketId: q.ticketId, ticketTitle: q.ticketTitle, storeName: q.storeName, branchCode: q.branchCode, createdAt: q.createdAt, amount: q.amount, status: q.status, byYou: q.status === 'declined' && declinedByByTicket.get(q.ticketId) === 'supplier', byClient: q.status === 'declined' && declinedByByTicket.get(q.ticketId) !== 'supplier' }))
 
   // Tickets where the RM requested a quote but this supplier hasn't submitted yet.
   const quotedTicketIds = new Set(d.quotes.map(q => q.ticketId))
