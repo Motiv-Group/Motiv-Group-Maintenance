@@ -91,7 +91,7 @@ export function RegionalOverview({ data, name, briefing, briefingScopeId }: { da
 
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3">
         {kpis.map((k, i) => <KpiCard key={i} kpi={k} />)}
-        <QuoteValueCard accepted={data.quoteTotals.accepted} pending={data.quoteTotals.pending} />
+        <QuoteValueCard accepted={data.quoteTotals.accepted} pending={data.quoteTotals.pending} voPending={data.quoteTotals.voPending} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
@@ -145,10 +145,9 @@ export function RegionalOverview({ data, name, briefing, briefingScopeId }: { da
   )
 }
 
-/** Combined quote-value KPI: accepted + pending totals, full to the cent. Both
- *  include variation orders — approved VOs add to Accepted, pending VOs to Pending.
- *  Read-only (not clickable) — it's a summary metric, not a navigation target. */
-function QuoteValueCard({ accepted, pending }: { accepted: number; pending: number }) {
+/** Combined quote-value KPI: accepted (incl. approved VOs), pending quotes, and
+ *  pending variation orders as their own line. Read-only summary metric. */
+function QuoteValueCard({ accepted, pending, voPending }: { accepted: number; pending: number; voPending: number }) {
   return (
     <Card className="p-4 flex flex-col gap-1.5 min-w-0 h-full">
       <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--text-muted)]"><Banknote size={13} /> Quote Value</div>
@@ -161,8 +160,12 @@ function QuoteValueCard({ accepted, pending }: { accepted: number; pending: numb
           <span className="text-[11px] text-amber-600 dark:text-amber-500">Pending</span>
           <span className="text-sm font-bold text-[var(--text)] tabular-nums">{formatCurrency(pending)}</span>
         </div>
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[11px] text-purple-600 dark:text-purple-400">VO pending</span>
+          <span className="text-sm font-bold text-[var(--text)] tabular-nums">{formatCurrency(voPending)}</span>
+        </div>
       </div>
-      <div className="text-[10px] text-[var(--text-faint)] mt-auto pt-1">incl. variation orders</div>
+      <div className="text-[10px] text-[var(--text-faint)] mt-auto pt-1">Accepted incl. approved VOs</div>
     </Card>
   )
 }

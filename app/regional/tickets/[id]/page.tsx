@@ -14,7 +14,7 @@ import { BreachReason } from '@/components/workflow/BreachReason'
 import { Card } from '@/components/exec/ui'
 import { WorkflowActions } from '@/components/workflow/WorkflowActions'
 import { RmPipeline } from '@/components/regional/RmPipeline'
-import { AssignSuppliersButton, RequestInfoButton, RmEditTicketForm, SupplierStatusList, QuoteReviewCard, CancelTicketCard, ApproveSignoffCard, ReQuoteButton, AcceptScheduleCard, AcceptSnagScheduleCard } from '@/components/regional/RmTicketActions'
+import { AssignSuppliersButton, RequestInfoButton, RmEditTicketForm, SupplierStatusList, QuoteReviewCard, CancelTicketCard, ApproveSignoffCard, ReQuoteButton, AcceptScheduleCard, AcceptSnagScheduleCard, VariationReviewCard, RmAddWorkForm } from '@/components/regional/RmTicketActions'
 import { DueDate } from '@/components/workflow/DueDate'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { EditedLine } from '@/components/ui/EditedLine'
@@ -353,6 +353,9 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
 
         {reQuote && <p className="text-xs text-[var(--text-muted)]">A quote was declined and the ticket re-opened. You can ask a declined supplier to re-quote (see <span className="font-medium text-[var(--text)]">Declined / not selected quotes</span> below), assign a different supplier, or cancel the ticket if the issue is resolved.</p>}
 
+        {/* Add extra work — before a supplier is assigned; disappears once assigned. */}
+        {canAssign && <RmAddWorkForm ticketId={t.id} description={t.description ?? ''} photoUrls={Array.isArray(t.photo_urls) ? t.photo_urls : []} title={t.title} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} />}
+
         {/* Primary actions — equal-size, side by side: Assign (green) · Request info (amber) · Cancel (red) */}
         {!isTerminal && (canAssign || canCancel) && (
           <div className="flex gap-2">
@@ -368,11 +371,14 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         {/* Accept a supplier's proposed (beyond-window) visit time */}
         {t.status === 'scheduled' && t.schedule_status === 'proposed' && t.scheduled_at && <AcceptScheduleCard ticketId={t.id} scheduledAt={t.scheduled_at} />}
 
-        {/* Remaining lifecycle actions (request evidence, snag, variation, close) */}
+        {/* Variation order review — dedicated approve (confirm-over-buttons) + decline pop-up. */}
+        {t.status === 'variation_review' && <VariationReviewCard ticketId={t.id} />}
+
+        {/* Remaining lifecycle actions (request evidence, snag, close) */}
         <WorkflowActions
           ticketId={t.id} status={t.status} role="regional_manager"
           suppliers={supplierList}
-          exclude={['validate', 'reject', 'request_info', 'request_quote', 'require_assessment', 'approve_quote', 'reject_quote', 'request_revision', 'proceed_no_quote', 'schedule', 'approve', 'assign_snag', 'accept_schedule', 'approve_snag']}
+          exclude={['validate', 'reject', 'request_info', 'request_quote', 'require_assessment', 'approve_quote', 'reject_quote', 'request_revision', 'proceed_no_quote', 'schedule', 'approve', 'assign_snag', 'accept_schedule', 'approve_snag', 'approve_variation', 'reject_variation']}
         />
       </Card>
 

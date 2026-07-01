@@ -3,9 +3,10 @@
 // RM ticket-page custom actions for the competitive-quoting model.
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, Pencil, CalendarClock } from 'lucide-react'
+import { Search, Pencil, CalendarClock, Plus, ImagePlus, X, FileText } from 'lucide-react'
 import { StarInput, Stars } from '@/components/ui/Stars'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
+import { createClient } from '@/lib/supabase/client'
 import { formatCurrency, formatDateTime } from '@/lib/utils'
 
 async function post(url: string, body: unknown): Promise<void> {
@@ -169,7 +170,7 @@ export function RmEditTicketForm({ ticketId, initial }: { ticketId: string; init
     try {
       const res = await fetch(`/api/tickets/${ticketId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, description, category, operational_impact: impact, priority }) })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to save')
-      setOpen(false); router.refresh()
+      setBusy(false); setOpen(false); router.refresh()   // reset busy so a second edit isn't stuck on "Saving…"
     } catch (e: any) { setErr(e.message); setBusy(false) }
   }
 
@@ -315,6 +316,133 @@ export function QuoteReviewCard({ ticketId, quotes }: { ticketId: string; quotes
       ))}
       {sentMsg && <p className="text-xs text-emerald-600 dark:text-emerald-400">{sentMsg}</p>}
       {err && <p className="text-xs text-red-500">{err}</p>}
+    </div>
+  )
+}
+
+// ── RM adds extra work to the ticket (before a supplier is assigned) ─
+export function RmAddWorkForm({ ticketId, description, photoUrls, title, category, impact }: {
+  ticketId: string; description: string; photoUrls: string[]; title: string; category: string; impact: string
+}) {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [text, setText] = useState('')
+  const [files, setFiles] = useState<File[]>([])
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const input = 'w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)]'
+
+  async function submit() {
+    if (!text.trim()) { setErr('Describe the extra work.'); return }
+    setBusy(true); setErr('')
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      const newUrls: string[] = []
+      for (const f of files.filter(f => f.type.startsWith('image/'))) {
+        const path = `${user?.id ?? 'rm'}/${ticketId}/${Date.now()}-${Math.random().toString(36).slice(2)}-${f.name.replace(/[^\w.\-]/g, '_')}`
+        const { error } = await supabase.storage.from('ticket-photos').upload(path, f, { upsert: true })
+        if (!error) newUrls.push(supabase.storage.from('ticket-photos').getPublicUrl(path).data.publicUrl)
+      }
+      const newDescription = `${description}\n\n— Added by RM: ${text.trim()}`
+      await post(`/api/tickets/${ticketId}`, { title, description: newDescription, category, operational_impact: impact, photo_urls: [...photoUrls, ...newUrls] })
+      setBusy(false); setOpen(false); setText(''); setFiles([]); router.refresh()
+    } catch (e: any) { setErr(e.message); setBusy(false) }
+  }
+
+  if (!open) {
+    return (
+      <button onClick={() => setOpen(true)} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl ring-1 ring-[#C6A35D]/40 text-[#C6A35D] text-sm font-semibold hover:bg-[#C6A35D]/10 transition">
+        <Plus size={16} /> Add extra work
+      </button>
+    )
+  }
+  return (
+    <div className="rounded-xl ring-1 ring-[var(--border)] bg-[var(--surface)] p-4 space-y-2">
+      <p className="text-sm font-semibold text-[var(--text)]">Add extra work to this ticket</p>
+      <p className="text-xs text-[var(--text-muted)]">Extra scope you know of — added to the ticket brief before a supplier is assigned.</p>
+      <textarea className={`${input} min-h-[80px]`} placeholder="Describe the extra work needed…" value={text} onChange={e => { setText(e.target.value); setErr('') }} />
+      <label className={`flex items-center justify-center gap-2 py-2.5 rounded-lg ring-1 ring-[var(--border)] text-sm text-[var(--text)] transition cursor-pointer hover:border-[#C6A35D] hover:bg-[var(--hover)]`}>
+        <ImagePlus size={15} /> Add photos <span className="text-[var(--text-faint)]">(optional)</span>
+        <input type="file" accept="image/*" multiple className="hidden" onChange={e => setFiles(p => [...p, ...Array.from(e.target.files ?? [])].slice(0, 5))} />
+      </label>
+      {files.length > 0 && (
+        <ul className="space-y-1">
+          {files.map((f, i) => (
+            <li key={i} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)]">
+              <FileText size={14} className="text-[#C6A35D] shrink-0" /><span className="text-xs text-[var(--text)] truncate flex-1">{f.name}</span>
+              <button type="button" onClick={() => setFiles(p => p.filter((_, j) => j !== i))} className="p-0.5 text-[var(--text-faint)] hover:text-red-500"><X size={14} /></button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {err && <p className="text-xs text-red-500">{err}</p>}
+      <div className="flex gap-2">
+        <button onClick={submit} disabled={busy} className="flex-1 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Adding…' : 'Add to ticket'}</button>
+        <button onClick={() => { setOpen(false); setErr('') }} disabled={busy} className="flex-1 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm disabled:opacity-50">Cancel</button>
+      </div>
+    </div>
+  )
+}
+
+// ── Variation order review (approve / decline) ──────────────────
+const VO_DECLINE_REASONS = ['Cost too high', 'Not budgeted', 'Outside agreed scope', 'Needs more detail / justification', 'Obtain another quote', 'Other']
+export function VariationReviewCard({ ticketId }: { ticketId: string }) {
+  const router = useRouter()
+  const [busy, setBusy] = useState(false)
+  const [confirmApprove, setConfirmApprove] = useState(false)   // approve confirm sits over the buttons
+  const [declineOpen, setDeclineOpen] = useState(false)         // decline is a pop-up
+  const [reason, setReason] = useState('')
+  const [other, setOther] = useState('')
+  const [err, setErr] = useState('')
+  const input = 'w-full px-3 py-2 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm'
+
+  async function act(action: 'approve_variation' | 'reject_variation', reasonText?: string) {
+    setBusy(true); setErr('')
+    try { await post(`/api/tickets/${ticketId}/transition`, { action, reason: reasonText }); router.refresh() }
+    catch (e: any) { setErr(e.message); setBusy(false) }
+  }
+  function submitDecline() {
+    if (!reason) { setErr('Choose a reason.'); return }
+    const r = reason === 'Other' ? other.trim() : reason
+    if (!r) { setErr('Enter a reason.'); return }
+    act('reject_variation', r)
+  }
+
+  return (
+    <div className="space-y-2">
+      {confirmApprove ? (
+        // "Are you sure?" replaces the buttons in place (no separate row).
+        <div className="rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] p-3 space-y-2">
+          <p className="text-sm text-[var(--text)]">Are you sure you want to approve the variation order?</p>
+          <div className="flex gap-2">
+            <button onClick={() => act('approve_variation')} disabled={busy} className="flex-1 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Approving…' : 'Yes, approve'}</button>
+            <button onClick={() => setConfirmApprove(false)} disabled={busy} className="flex-1 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm disabled:opacity-50">Cancel</button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex gap-2">
+          <button onClick={() => { setErr(''); setConfirmApprove(true) }} className="flex-1 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition">Approve variation order</button>
+          <button onClick={() => { setReason(''); setOther(''); setErr(''); setDeclineOpen(true) }} className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-semibold transition">Decline variation order</button>
+        </div>
+      )}
+      {err && !declineOpen && <p className="text-xs text-red-500">{err}</p>}
+
+      {declineOpen && (
+        <Modal title="Decline variation order" onClose={() => { if (!busy) { setDeclineOpen(false); setErr('') } }}>
+          <p className="text-xs text-[var(--text-muted)]">The supplier is notified. Choose why the variation order is declined.</p>
+          <select autoFocus className={input} value={reason} onChange={e => { setReason(e.target.value); setErr('') }}>
+            <option value="">— Choose a reason —</option>
+            {VO_DECLINE_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
+          </select>
+          {reason === 'Other' && <textarea className={`${input} min-h-[80px]`} placeholder="Reason…" value={other} onChange={e => setOther(e.target.value)} />}
+          {err && <p className="text-xs text-red-500">{err}</p>}
+          <div className="flex gap-2">
+            <button onClick={submitDecline} disabled={busy} className="flex-1 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Declining…' : 'Decline variation order'}</button>
+            <button onClick={() => { setDeclineOpen(false); setErr('') }} disabled={busy} className="flex-1 py-2 rounded-xl ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm disabled:opacity-50">Cancel</button>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }

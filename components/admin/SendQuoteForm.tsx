@@ -79,6 +79,7 @@ interface QuoteForm {
   amount_incl_vat: number | ''
   description:     string
   valid_until:     string
+  warranty:        string
 }
 
 export interface ExistingQuote {
@@ -140,6 +141,7 @@ export function SendQuoteForm({
   const [parseError,  setParseError]  = useState<'scanned' | 'generic' | false>(false)
   const [needAmount,  setNeedAmount]  = useState(false)   // parsed ok but amount couldn't be read confidently
   const [validNA,     setValidNA]     = useState(isEdit ? existingQuote!.valid_until === null : false)
+  const [warrantyNA,  setWarrantyNA]  = useState(false)   // quote warranty: manual text or explicit N/A
 
   const { register, handleSubmit, reset, watch, setValue, getValues, formState: { errors } } = useForm<QuoteForm>({
     defaultValues: existingQuote
@@ -257,9 +259,14 @@ export function SendQuoteForm({
   }
 
   async function onSubmit(values: QuoteForm) {
-    // valid_until is required unless user explicitly chose N/A
-    if (!validNA && !values.valid_until) {
+    // valid_until is required for a quote (unless N/A); not applicable to a variation.
+    if (!isVariation && !validNA && !values.valid_until) {
       setError('Please select a Valid Until date or choose N/A.')
+      return
+    }
+    // Warranty / guarantee is required on a quote — typed manually or explicit N/A.
+    if (!isVariation && !warrantyNA && !values.warranty?.trim()) {
+      setError('Please state the warranty / guarantee, or select N/A.')
       return
     }
     if (!file && !existingFileUrl) {
@@ -292,6 +299,19 @@ export function SendQuoteForm({
       }
     }
 
+    // Competitive variation order → the v3 transition endpoint (ticket_variations),
+    // not the quotes table. Same form as a quote, minus the schedule.
+    if (competitive && isVariation) {
+      const res = await fetch(`/api/tickets/${ticketId}/transition`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'submit_variation', description: values.description, amount: values.amount ? Number(values.amount) : undefined, fileUrls: fileUrl ? [fileUrl] : [] }),
+      })
+      if (!res.ok) { setError((await res.json().catch(() => ({}))).error || 'Failed to submit variation order'); setLoading(false); return }
+      reset(); if (filePreview) URL.revokeObjectURL(filePreview)
+      setFilePreview(null); setFile(null); setOpen(false); setValidNA(false); setWarrantyNA(false); router.refresh(); setLoading(false)
+      return
+    }
+
     const url = isEdit ? `/api/quotes/${existingQuote!.id}` : competitive ? `/api/tickets/${ticketId}/submit-quote` : '/api/quotes'
     const res = await fetch(url, {
       method: isEdit ? 'PATCH' : 'POST',
@@ -304,6 +324,7 @@ export function SendQuoteForm({
         amount_incl_vat: values.amount_incl_vat !== '' ? Number(values.amount_incl_vat) : null,
         file_url:        fileUrl,
         valid_until:     validNA ? null : values.valid_until,
+        warranty:        warrantyNA ? 'N/A' : (values.warranty?.trim() || null),
         proposed_schedule_at: wantsSchedule ? schedule : undefined,
       }),
     })
@@ -322,7 +343,7 @@ export function SendQuoteForm({
     setOpen(false)
     setAutofilled(false)
     setNeedAmount(false)
-    setValidNA(false)
+    setValidNA(false); setWarrantyNA(false)
     router.refresh()
     setLoading(false)
   }
@@ -335,7 +356,7 @@ export function SendQuoteForm({
     setFile(null)
     setAutofilled(false)
     setNeedAmount(false)
-    setValidNA(false)
+    setValidNA(false); setWarrantyNA(false)
     reset()
   }
 
@@ -405,7 +426,7 @@ export function SendQuoteForm({
                   if (filePreview) URL.revokeObjectURL(filePreview)
                   setFilePreview(null); setFile(null)
                   setAutofilled(false); setNeedAmount(false); setParseError(false)
-                  setValidNA(false)
+                  setValidNA(false); setWarrantyNA(false)
                   reset({ amount: undefined as any, amount_incl_vat: '', description: '', valid_until: '' })
                 }}
                 className="p-1 text-gray-400 hover:text-red-500 rounded transition-colors"
@@ -514,7 +535,38 @@ export function SendQuoteForm({
           {errors.description && <p className="mt-1 text-xs text-red-600">{errors.description.message}</p>}
         </div>
 
-        {/* Valid Until */}
+        {/* Warranty / Guarantee — quotes only, required (manual text or N/A) */}
+        {!isVariation && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Warranty / Guarantee <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              rows={2}
+              disabled={warrantyNA}
+              placeholder="e.g. 12-month workmanship guarantee, 2-year parts warranty…"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none disabled:opacity-50"
+              {...register('warranty')}
+            />
+            <div className="flex items-center gap-2 mt-1.5">
+              <button
+                type="button"
+                onClick={() => { setWarrantyNA(v => !v); if (!warrantyNA) setValue('warranty', ''); setError('') }}
+                className={`inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                  warrantyNA
+                    ? 'bg-gray-600 text-white border-gray-600'
+                    : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-gray-400'
+                }`}
+              >
+                N/A
+              </button>
+              <span className="text-xs text-gray-400">No warranty? Describe it manually, or select N/A.</span>
+            </div>
+          </div>
+        )}
+
+        {/* Valid Until — quotes only (a variation order has no validity date) */}
+        {!isVariation && (
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
             Valid Until <span className="text-red-500">*</span>
@@ -527,7 +579,7 @@ export function SendQuoteForm({
                 <button
                   key={p.label}
                   type="button"
-                  onClick={() => { setValue('valid_until', val); setValidNA(false) }}
+                  onClick={() => { setValue('valid_until', val); setValidNA(false); setWarrantyNA(false) }}
                   className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
                     isActive
                       ? 'bg-[#C6A35D] text-white border-[#C6A35D]'
@@ -571,6 +623,7 @@ export function SendQuoteForm({
 
           <input type="hidden" {...register('valid_until')} />
         </div>
+        )}
 
         {/* Proposed start date — supplier only; auto-schedules the job on approval.
             Uses the same picker as post-acceptance scheduling, bounded by urgency. */}
@@ -604,9 +657,9 @@ export function SendQuoteForm({
 
         {confirmVals && (
           <div className="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 p-3 space-y-2">
-            <p className="text-sm text-amber-800 dark:text-amber-200">Send this quote to the manager? Please double-check the amount and details first.</p>
+            <p className="text-sm text-amber-800 dark:text-amber-200">{isVariation ? 'Submit this variation order to the manager?' : 'Send this quote to the manager?'} Please double-check the amount and details first.</p>
             <div className="flex gap-2">
-              <button type="button" onClick={() => doSubmit(confirmVals)} disabled={loading} className="px-3 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-semibold disabled:opacity-50">{loading ? 'Sending…' : 'Yes, send quote'}</button>
+              <button type="button" onClick={() => doSubmit(confirmVals)} disabled={loading} className="px-3 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-semibold disabled:opacity-50">{loading ? 'Submitting…' : isVariation ? 'Yes, submit variation order' : 'Yes, send quote'}</button>
               <button type="button" onClick={() => setConfirmVals(null)} className="px-3 py-2 rounded-lg ring-1 ring-gray-300 dark:ring-gray-600 text-gray-600 dark:text-gray-300 text-sm">Back</button>
             </div>
           </div>

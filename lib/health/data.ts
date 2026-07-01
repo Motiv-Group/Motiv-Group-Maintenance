@@ -350,7 +350,7 @@ export interface RegionalDashboardData {
   ticketActions: RegionalTicketAction[]
   tickets: RegionalTicketRow[]
   suppliers: { id: string; name: string; perf: SupplierPerformance; open: number; overdue: number; costExposure: number; avgRating: number; ratingCount: number }[]
-  quoteTotals: { accepted: number; pending: number }
+  quoteTotals: { accepted: number; pending: number; voPending: number }
   signoffsPending: number
   snagsOpen: number
   // Live breach counts (any active ticket currently past its deadline) for the
@@ -365,7 +365,7 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
   const rules = await loadSlaResolver(db, companyId)
   const empty = (): RegionalDashboardData => ({
     portfolio: calculateRegionalPortfolioHealth('portfolio', [], { criticalTicketOverdue: false, supplierBreachOver3dCount: 0, internalBreachOver3dCount: 0, repeatAcrossStores: false, highValueBlocker: false, missingCriticalUpdates: false, openTickets: 0, overdueTickets: 0, costExposure: 0 }),
-    stores: [], attentionStores: [], ticketActions: [], tickets: [], suppliers: [], quoteTotals: { accepted: 0, pending: 0 }, signoffsPending: 0, snagsOpen: 0, breachesNow: { supplier: 0, internal: 0 }, generatedAt: now.toISOString(),
+    stores: [], attentionStores: [], ticketActions: [], tickets: [], suppliers: [], quoteTotals: { accepted: 0, pending: 0, voPending: 0 }, signoffsPending: 0, snagsOpen: 0, breachesNow: { supplier: 0, internal: 0 }, generatedAt: now.toISOString(),
   })
   if (!regionIds.length) return empty()
 
@@ -397,12 +397,13 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
     if (q.status === 'pending') pendingQuoteValue += Number(q.amount ?? 0)
     if (q.status === 'declined') declinedQuoteTickets.add(q.ticket_id)
   }
-  // Variation orders fold into the same Quote Value totals: approved VOs add to
-  // Accepted, pending (awaiting-approval) VOs add to Pending.
+  // Variation orders: an APPROVED VO adds to the Accepted quote value; a PENDING VO
+  // (awaiting the RM's approval) is tracked as its own "VO pending" total.
+  let voPendingValue = 0
   const { data: variationRows } = ticketIds.length ? await db.from('ticket_variations').select('status, amount').in('ticket_id', ticketIds) : { data: [] as any[] }
   for (const v of (variationRows ?? []) as any[]) {
     if (v.status === 'approved') acceptedQuoteValue += Number(v.amount ?? 0)
-    else if (v.status === 'pending') pendingQuoteValue += Number(v.amount ?? 0)
+    else if (v.status === 'pending') voPendingValue += Number(v.amount ?? 0)
   }
   // Commercial-phase statuses where a declined quote means the ticket is "re-opened".
   const COMMERCIAL = ['open', 'info_requested', 'assigned', 'assessment', 'quote_requested', 'quoted', 'quote_revision']
@@ -514,7 +515,7 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
   }
 
   const attentionStores = [...cards].filter(c => c.finalStatus !== 'controlled').sort((a, b) => a.finalHealthScore - b.finalHealthScore)
-  return { portfolio, stores: cards, attentionStores, ticketActions, tickets: ticketRows, suppliers, quoteTotals: { accepted: acceptedQuoteValue, pending: pendingQuoteValue }, signoffsPending, snagsOpen, breachesNow: { supplier: breachSupplierNow, internal: breachInternalNow }, generatedAt: now.toISOString() }
+  return { portfolio, stores: cards, attentionStores, ticketActions, tickets: ticketRows, suppliers, quoteTotals: { accepted: acceptedQuoteValue, pending: pendingQuoteValue, voPending: voPendingValue }, signoffsPending, snagsOpen, breachesNow: { supplier: breachSupplierNow, internal: breachInternalNow }, generatedAt: now.toISOString() }
 }
 
 // ============================================================
