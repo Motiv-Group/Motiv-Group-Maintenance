@@ -17,7 +17,7 @@ async function transition(ticketId: string, body: Record<string, unknown>) {
 
 // Decline the work (before award) — preset reasons + free-text "Other". Sets the
 // supplier's invite to declined and notifies the RM; the job goes to others.
-const DECLINE_REASONS = ['Fully booked / no capacity', 'Outside our service area', 'Not our trade / speciality', 'Job too small', 'Pricing not viable', 'Other']
+const DECLINE_REASONS = ['Fully booked / no capacity', 'Outside our service area', 'Not our trade / speciality', 'Pricing not viable', 'Other']
 export function DeclineWorkButton({ ticketId }: { ticketId: string }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)

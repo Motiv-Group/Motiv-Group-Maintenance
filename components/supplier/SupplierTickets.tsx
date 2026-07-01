@@ -34,8 +34,9 @@ const urgency = (p: string) => URGENCY[p] ?? 5
 const byDateThenUrgency = (a: SupplierTicketRow, b: SupplierTicketRow) =>
   (+new Date(b.createdAt) - +new Date(a.createdAt)) || (urgency(a.priority) - urgency(b.priority))
 
-// Active tickets where evidence is required but not all of before/after/COC are uploaded.
-const missingEvidence = (t: SupplierTicketRow) => t.active && t.evidenceRequired && !(t.beforeUploaded && t.afterUploaded && t.cocUploaded)
+// Active tickets where evidence is required but the supplier hasn't uploaded the
+// after photos + COC (before photos come from ticket logging, not the supplier).
+const missingEvidence = (t: SupplierTicketRow) => t.active && t.evidenceRequired && !(t.afterUploaded && t.cocUploaded)
 
 type FilterKey = 'all' | 'breached' | 'overdue' | 'evidence' | 'declined' | 'cancelled' | Bucket
 const PILLS: { key: FilterKey; label: string; active: string; inactive: string }[] = [
@@ -58,7 +59,7 @@ function milestone(t: SupplierTicketRow): { label: string; at: string } | null {
   // A declined supplier must never see the ticket's "Quote approved" (that was
   // another supplier) — show their own decline (or their last own milestone).
   if (t.declinedForMe) {
-    const declinedLabel = t.declinedBy === 'supplier' ? 'Declined (you)' : 'Declined'
+    const declinedLabel = t.declinedBy === 'supplier' ? 'Declined (you)' : t.declinedBy === 'regional_manager' ? 'Declined (Client)' : 'Declined'
     if (t.declinedAt) return { label: declinedLabel, at: t.declinedAt }
     if (t.quoteSubmittedAt) return { label: 'Quoted', at: t.quoteSubmittedAt }
     if (t.quoteRequestedAt) return { label: 'Quote requested', at: t.quoteRequestedAt }
@@ -87,7 +88,7 @@ function TicketRow({ t, company, showStore }: { t: SupplierTicketRow; company?: 
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
         <PriorityBadge priority={t.priority} className="w-full text-center" />
-        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${t.declinedForMe ? 'bg-red-500/15 text-red-700 dark:text-red-400' : sm.cls}`}>{t.declinedForMe ? (t.declinedBy === 'supplier' ? 'Declined (you)' : 'Declined') : sm.label}</span>
+        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${t.declinedForMe ? 'bg-red-500/15 text-red-700 dark:text-red-400' : sm.cls}`}>{t.declinedForMe ? (t.declinedBy === 'supplier' ? 'Declined (you)' : t.declinedBy === 'regional_manager' ? 'Declined (Client)' : 'Declined') : sm.label}</span>
       </div>
     </Link>
   )
@@ -284,7 +285,7 @@ function StorePanel({ store, company, rows, quotes, onClose }: { store: string; 
   const decided = quotes.filter(qq => qq.status === 'accepted' || qq.status === 'declined')
   const acceptRate = decided.length ? Math.round(100 * decided.filter(qq => qq.status === 'accepted').length / decided.length) : null
   const evReq = active.filter(t => t.evidenceRequired)
-  const evDone = evReq.filter(t => t.beforeUploaded && t.afterUploaded && t.cocUploaded).length
+  const evDone = evReq.filter(t => t.afterUploaded && t.cocUploaded).length
   const evRate = evReq.length ? Math.round(100 * evDone / evReq.length) : null
 
   const Stat = ({ label, value, tone = '' }: { label: string; value: number | string; tone?: string }) => (

@@ -159,13 +159,14 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   const canSubmitQuote = quoteableStatus && inviteOpen && (!latestQuote || revisionRequested || latestQuote.status === 'declined')
   const declineReason = (invite as any)?.decline_reason ?? null
   const declinedBy = ((invite as any)?.declined_by ?? null) as 'supplier' | 'regional_manager' | null
-  // Who declined → shown in the "Quote request declined by …" block title.
+  // Who declined → shown in the "Quote request declined by …" block title. The
+  // client's manager declining shows as "the client" from the supplier's side.
   const declinedByLabel = declinedBy === 'supplier'
     ? (supplierCompanyName ? ` by ${supplierCompanyName}` : ' by you')
-    : declinedBy === 'regional_manager' ? ' by the manager' : ''
-  // No typed reason → the standard courteous message (also fits the "not selected"
-  // case where another supplier was awarded).
-  const declineMessage = declineReason || DEFAULT_DECLINE_REASON
+    : declinedBy === 'regional_manager' ? ' by the client' : ''
+  // A client decline (chose another supplier) always shows the courteous "not
+  // selected" message, never the internal reason; otherwise fall back to it too.
+  const declineMessage = declinedBy === 'regional_manager' ? DEFAULT_DECLINE_REASON : (declineReason || DEFAULT_DECLINE_REASON)
   // Map a quote's DB status to the read-only summary tone (accepted shows "Approved").
   const quoteStatusOf = (s: string): QuoteSummaryStatus => s === 'accepted' ? 'accepted' : s === 'declined' ? 'declined' : 'pending'
 
@@ -203,7 +204,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end">
             <PriorityBadge priority={t.priority} className="w-full text-center" />
-            {(() => { const sm = rmStatusMeta(t.status); const cls = declinedForMe ? 'bg-red-500/15 text-red-700 dark:text-red-400' : sm.cls; return <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${cls}`}>{declinedForMe ? (declinedBy === 'supplier' ? 'Declined (you)' : 'Declined') : sm.label}</span> })()}
+            {(() => { const sm = rmStatusMeta(t.status); const cls = declinedForMe ? 'bg-red-500/15 text-red-700 dark:text-red-400' : sm.cls; return <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${cls}`}>{declinedForMe ? (declinedBy === 'supplier' ? 'Declined (you)' : declinedBy === 'regional_manager' ? 'Declined (Client)' : 'Declined') : sm.label}</span> })()}
           </div>
         </div>
 

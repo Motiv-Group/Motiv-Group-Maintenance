@@ -37,9 +37,12 @@ export function calculateSupplierPerformance(
     .map(t => (new Date(t.completed_at ?? t.updated_at).getTime() - new Date(t.created_at).getTime()) / MIN))
   const repeatDefectInvolvement = tickets.filter(t => t.repeat_defect_flag).length
   const firstTimeFixRate = completed.length ? completed.filter(t => !t.repeat_defect_flag).length / completed.length : 1
+  // Evidence the supplier is responsible for = after photos + COC. Before photos
+  // are captured when the ticket is logged (tickets.photo_urls), not by the
+  // supplier, so they don't count against the supplier's evidence completion.
   const needEvidence = completed.filter(t => t.evidence_required)
   const evidenceCompletionRate = needEvidence.length
-    ? needEvidence.filter(t => t.before_photo_uploaded && t.after_photo_uploaded && t.completion_certificate_uploaded).length / needEvidence.length : 1
+    ? needEvidence.filter(t => t.after_photo_uploaded && t.completion_certificate_uploaded).length / needEvidence.length : 1
 
   let score = 100
   if (assigned > 0) score -= (slaBreaches / assigned) * 40

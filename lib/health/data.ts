@@ -678,7 +678,8 @@ export async function assembleSupplierDashboard(companyId: string, supplierIds: 
       if (sla.nextActionDueAt && new Date(sla.nextActionDueAt) <= todayEnd && new Date(sla.nextActionDueAt) >= now) dueToday++
       if (t.status === 'submitted_for_signoff') awaitingSignoff++
       if (t.quote_required && !t.quote_submitted_at) pendingQuotes++
-      if (t.evidence_required && !(t.before_photo_uploaded && t.after_photo_uploaded && t.completion_certificate_uploaded)) evidenceMissing++
+      // Supplier owes after photos + COC; before photos come from ticket logging.
+      if (t.evidence_required && !(t.after_photo_uploaded && t.completion_certificate_uploaded)) evidenceMissing++
     }
     const lbl = !active
       ? (t.status === 'completed' ? 'Completed' : t.status === 'cancelled' ? 'Cancelled' : t.status === 'declined' ? 'Declined' : 'Closed')

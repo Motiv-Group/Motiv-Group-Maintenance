@@ -55,9 +55,10 @@ export function calculateSupplierPerformance(
     ? completed.filter(t => !t.repeat_defect_flag).length / completed.length
     : 1
 
+  // Supplier owes after photos + COC; before photos come from ticket logging.
   const needEvidence = completed.filter(t => t.evidence_required)
   const evidenceCompletionRate = needEvidence.length > 0
-    ? needEvidence.filter(t => t.before_photo_uploaded && t.after_photo_uploaded && t.completion_certificate_uploaded).length / needEvidence.length
+    ? needEvidence.filter(t => t.after_photo_uploaded && t.completion_certificate_uploaded).length / needEvidence.length
     : 1
 
   // Score: deductive from 100

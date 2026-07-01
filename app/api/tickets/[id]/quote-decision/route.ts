@@ -61,7 +61,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
         current_blocker: null, blocker_owner_type: null, blocker_started_at: null, sla_paused: false,
         last_internal_update_at: now, updated_at: now,
       }).eq('id', ticket.id)
-      await notify(`Your quote was declined${reason ? ` (${reason})` : ''}.`, 'Quote declined')
+      // The declined supplier gets the courteous "not selected" message, never the
+      // internal reason ("Choosing another supplier").
+      await notify('Thank you for your submission. Although your quotation was not selected for this request, we value your participation and look forward to inviting you to future opportunities.', 'Quote declined')
     } else {
       const rules = await loadSlaResolver(admin, ticket.company_id)
       const quoteDueAt = new Date(Date.now() + rules(ticket.priority as 'P1' | 'P2' | 'P3' | 'P4').quote_due_mins * 60_000).toISOString()

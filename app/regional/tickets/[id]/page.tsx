@@ -209,7 +209,9 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
               {(() => {
                 const sm = rmStatusMeta(t.status)
                 const label = reQuote ? 'Re-open' : rmInfoAdded ? 'Info added' : sm.label
-                const cls = reQuote ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : rmInfoAdded ? 'bg-teal-500/15 text-teal-700 dark:text-teal-400' : sm.cls
+                // Freshly-added info shows red to draw the RM's eye; it falls back to the
+                // normal status colour the moment the ticket moves to the next step.
+                const cls = reQuote ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : rmInfoAdded ? 'bg-red-500/15 text-red-700 dark:text-red-400' : sm.cls
                 return <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${cls}`}>{label}</span>
               })()}
             </div>
