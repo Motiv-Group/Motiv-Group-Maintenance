@@ -14,11 +14,11 @@ const STAGES = [
 ] as const
 
 const IDX: Record<string, number> = {
-  open: 0, info_requested: 0,
+  open: 0, info_requested: 0, suppliers_declined: 0,
   assigned: 1, quote_requested: 1, assessment: 1,
   quoted: 2, quote_revision: 2,
   accepted: 3,
-  scheduled: 4,
+  scheduled: 4, vo_declined: 4,
   in_progress: 5, variation_review: 5, variation_accepted: 5,
   submitted_for_signoff: 6, evidence_requested: 6, snag: 6, snag_assigned: 6, snag_resolved: 6, approved_closeout: 6, pending_sign_off: 6, snag_in_progress: 6,
   completed: 7,

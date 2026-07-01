@@ -4,10 +4,10 @@ export type TicketStatus =
   // canonical lifecycle (see lib/workflow.ts)
   | 'open' | 'info_requested' | 'assigned' | 'assessment'
   | 'quote_requested' | 'quoted' | 'quote_revision' | 'accepted'
-  | 'scheduled' | 'in_progress' | 'variation_review'
+  | 'scheduled' | 'in_progress' | 'variation_review' | 'vo_declined'
   | 'submitted_for_signoff' | 'evidence_requested'
   | 'snag' | 'snag_assigned' | 'snag_resolved'
-  | 'approved_closeout' | 'completed' | 'cancelled' | 'declined'
+  | 'approved_closeout' | 'suppliers_declined' | 'completed' | 'cancelled' | 'declined'
   // legacy v2 values still referenced by some UI
   | 'pending_sign_off' | 'snag_in_progress' | 'variation_pending' | 'variation_accepted'
 export type QuoteStatus = 'pending' | 'accepted' | 'declined'

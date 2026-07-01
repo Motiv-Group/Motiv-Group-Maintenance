@@ -4,7 +4,7 @@
 
 // Semantic tone per event → coloured dot in the audit trail. Mirrors the status
 // palette used across the app (quote=cyan/violet, approve=emerald, snag/cancel=red…).
-export type TimelineTone = 'logged' | 'info_requested' | 'info_added' | 'quote_requested' | 'quote_submitted' | 'quote_approved' | 'quote_declined' | 'scheduled' | 'completion_submitted' | 'completion_approved' | 'completion_rejected' | 'completed' | 'cancelled' | 'edited' | 'update' | 'viewed'
+export type TimelineTone = 'logged' | 'info_requested' | 'info_added' | 'quote_requested' | 'quote_submitted' | 'quote_approved' | 'quote_declined' | 'scheduled' | 'completion_submitted' | 'completion_approved' | 'completion_rejected' | 'completed' | 'cancelled' | 'edited' | 'update' | 'viewed' | 'variation' | 'variation_approved' | 'variation_declined'
 export interface TimelineEvent { at: string; label: string; who?: string | null; tone: TimelineTone }
 
 const ROLE_LABEL: Record<string, string> = {
@@ -40,7 +40,11 @@ export interface TimelineInput {
   requoteRequestedAt?: string | null
   // Every supplier's decline (name + when) — shown on the RM trail once ALL declined.
   supplierDeclines?: { name: string; at: string }[]
-  quotes?: { amount?: number | null; status: string; created_at: string; updated_at?: string | null }[]
+  // When the supplier marked the job in progress (moved past the VO stage).
+  workStartedAt?: string | null
+  quotes?: { amount?: number | null; status: string; created_at: string; updated_at?: string | null; supplierName?: string | null }[]
+  // Variation orders raised on the ticket → raised / approved / declined events.
+  variations?: { status: string; created_at: string; reviewed_at?: string | null; reject_reason?: string | null }[]
   signoffs?: { status: string; created_at: string; reviewed_at?: string | null; reject_reason?: string | null }[]
   updates?: { body: string; author_role: string | null; created_at: string }[]
   // Who first opened which specific item on the ticket (audit-trail view tracking).
@@ -61,10 +65,13 @@ export function buildTicketTimeline(t: TimelineInput): TimelineEvent[] {
   push(t.quoteRequestedAt, 'Quote requested', 'quote_requested', 'Regional Manager')
   push(t.quoteSubmittedAt, 'Quote submitted', 'quote_submitted', 'Supplier')
 
-  // Quote outcomes from the quote rows (amount + accept/decline time).
+  // Quote outcomes from the quote rows (amount + accept/decline time). When the
+  // supplier's name is known (competitive quoting) it's named, so the RM trail
+  // reads which supplier was approved and which were declined.
   for (const q of t.quotes ?? []) {
-    if (q.status === 'accepted') push(q.updated_at ?? q.created_at, 'Quote approved', 'quote_approved', 'Regional Manager')
-    else if (q.status === 'declined') push(q.updated_at ?? q.created_at, 'Quote declined', 'quote_declined', 'Regional Manager')
+    const who = q.supplierName ? ` — ${q.supplierName}` : ''
+    if (q.status === 'accepted') push(q.updated_at ?? q.created_at, `Quote approved${who}`, 'quote_approved', 'Regional Manager')
+    else if (q.status === 'declined') push(q.updated_at ?? q.created_at, `Quote declined${who}`, 'quote_declined', 'Regional Manager')
   }
   // Fallback if no quote rows were supplied but the ticket records an approval.
   if (!(t.quotes ?? []).some(q => q.status === 'accepted')) push(t.quoteApprovedAt, 'Quote approved', 'quote_approved', 'Regional Manager')
@@ -73,6 +80,15 @@ export function buildTicketTimeline(t: TimelineInput): TimelineEvent[] {
   for (const d of t.supplierDeclines ?? []) push(d.at, `Quote request declined by ${d.name}`, 'quote_declined', 'Supplier')
   push(t.scheduledAt, 'Job scheduled', 'scheduled', 'Supplier')
   push(t.snagScheduledAt, 'Snag job scheduled', 'scheduled', 'Supplier')
+
+  // Variation-order lifecycle: raised by the supplier, then the RM's decision.
+  for (const v of t.variations ?? []) {
+    push(v.created_at, 'Variation order raised', 'variation', 'Supplier')
+    if (v.status === 'approved') push(v.reviewed_at ?? v.created_at, 'Variation order approved', 'variation_approved', 'Regional Manager')
+    else if (v.status === 'rejected') push(v.reviewed_at ?? v.created_at, `Variation order declined${v.reject_reason ? ` — ${v.reject_reason}` : ''}`, 'variation_declined', 'Regional Manager')
+  }
+  // The supplier marked the job in progress (after clearing the VO stage).
+  push(t.workStartedAt, 'Marked job in progress', 'scheduled', 'Supplier')
 
   // Each signoff row is one COC/POC submission: log the submission, then its
   // outcome (approved / snagged / sent back for more evidence) at review time.

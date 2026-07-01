@@ -11,6 +11,7 @@ const DOT_TONE: Record<TimelineTone, string> = {
   completion_submitted: 'bg-[#C6A35D]', completion_approved: 'bg-emerald-500', completion_rejected: 'bg-red-500',
   completed: 'bg-emerald-500', cancelled: 'bg-red-500', edited: 'bg-slate-400', update: 'bg-[#C6A35D]',
   viewed: 'bg-slate-400',
+  variation: 'bg-purple-500', variation_approved: 'bg-emerald-500', variation_declined: 'bg-red-500',
 }
 
 /** Collapsible event timeline for a ticket — the full life in date order with who

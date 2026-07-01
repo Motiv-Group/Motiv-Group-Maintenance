@@ -43,15 +43,17 @@ export async function POST(request: Request) {
   await admin.from('ticket_suppliers').update({ status: 'declined', decline_reason: reason, declined_by: 'supplier', responded_at: nowIso }).eq('id', invite.id)
   await admin.from('quotes').update({ status: 'declined' }).eq('ticket_id', ticketId).eq('supplier_id', invite.supplier_id).eq('status', 'pending')
 
-  // If EVERY invited supplier has now declined, re-open the ticket so the RM's
-  // assign / request-info / cancel buttons return. The RM page flags it "Declined
-  // (Supplier)" and lists each supplier's decline in the audit trail.
+  // If EVERY invited supplier has now declined, move the ticket to its own
+  // "suppliers_declined" status — it's no longer "open": the RM must re-assign
+  // (or cancel). The dashboards/lists count it distinctly and the RM page lists
+  // each supplier's decline in the audit trail.
   const { data: allInvites } = await admin.from('ticket_suppliers').select('status').eq('ticket_id', ticketId)
   const allDeclined = !ticket.supplier_id && (allInvites ?? []).length > 0 && (allInvites ?? []).every(i => ['declined', 'closed'].includes(i.status))
   if (allDeclined) {
     await admin.from('tickets').update({
-      status: 'open', supplier_id: null, quote_required: false,
-      current_blocker: null, blocker_owner_type: null, blocker_started_at: null, sla_paused: false,
+      status: 'suppliers_declined', supplier_id: null, quote_required: false,
+      // The RM now owns the next action (re-assign / cancel).
+      current_blocker: 'reassignment', blocker_owner_type: 'regional_manager', blocker_started_at: nowIso, sla_paused: false,
       last_internal_update_at: nowIso, updated_at: nowIso,
     }).eq('id', ticketId)
   }

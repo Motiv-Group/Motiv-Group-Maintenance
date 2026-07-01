@@ -134,7 +134,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
         const desc = String(body.description ?? '').trim()
         if (!desc) return NextResponse.json({ error: 'Variation description required' }, { status: 400 })
         const fileUrls = Array.isArray(body.fileUrls) ? body.fileUrls.filter((u: unknown): u is string => typeof u === 'string') : []
-        await admin.from('ticket_variations').insert({ company_id: ticket.company_id, ticket_id: ticketId, supplier_id: ticket.supplier_id, description: desc, amount: body.amount ? Number(body.amount) : null, status: 'pending', submitted_by: user.id, file_urls: fileUrls })
+        const warranty = typeof body.warranty === 'string' && body.warranty.trim() ? body.warranty.trim() : null
+        await admin.from('ticket_variations').insert({ company_id: ticket.company_id, ticket_id: ticketId, supplier_id: ticket.supplier_id, description: desc, amount: body.amount ? Number(body.amount) : null, warranty, status: 'pending', submitted_by: user.id, file_urls: fileUrls })
         break
       }
       case 'approve_variation':
@@ -268,7 +269,7 @@ async function hasAccess(admin: Admin, role: WorkflowRole, userId: string, ticke
 
 // Targeted notifications for the moves that need someone else to act next.
 async function notify(admin: Admin, action: string, ticket: any, actorName: string | null, opts?: { scheduleProposed?: boolean; scheduledAt?: string }) {
-  const toSupplier = ['validate', 'request_quote', 'require_assessment', 'approve_quote', 'request_evidence', 'raise_snag', 'assign_snag', 'reject_variation', 'accept_schedule', 'approve_snag']
+  const toSupplier = ['validate', 'request_quote', 'require_assessment', 'approve_quote', 'request_evidence', 'raise_snag', 'assign_snag', 'approve_variation', 'reject_variation', 'accept_schedule', 'approve_snag']
   const toRegion   = ['submit_quote', 'submit_completion', 'submit_variation', 'resolve_snag', 'resubmit', 'accept_snag', 'start_snag']
   // The store manager is told whenever a visit is scheduled / agreed so they can
   // expect the supplier on site.
@@ -294,6 +295,8 @@ async function notify(admin: Admin, action: string, ticket: any, actorName: stri
     const ids = (data ?? []).map(r => r.user_id)
     const msg = action === 'accept_schedule' ? `Visit time confirmed${when ? ` for ${when}` : ''}`
       : action === 'approve_snag' ? 'Snag schedule approved — you can start the corrective work'
+      : action === 'approve_variation' ? 'Variation order approved — you can continue'
+      : action === 'reject_variation' ? 'Variation order declined — re-submit a revised VO or message the manager'
       : `${actorName ?? 'A manager'} → ${action.replace(/_/g, ' ')}`
     await push(admin, ids, ticket.company_id, title, msg, `/supplier/tickets/${ticket.id}`)
   }

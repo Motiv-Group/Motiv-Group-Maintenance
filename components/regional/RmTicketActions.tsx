@@ -358,7 +358,7 @@ export function RmAddWorkForm({ ticketId, description, photoUrls, title, categor
         const { error } = await supabase.storage.from('ticket-photos').upload(path, f, { upsert: true })
         if (!error) newUrls.push(supabase.storage.from('ticket-photos').getPublicUrl(path).data.publicUrl)
       }
-      const newDescription = `${description}\n\n— Added by RM: ${text.trim()}`
+      const newDescription = `${description}\n\n— Extra Work: ${text.trim()}`
       // The ticket endpoint is PATCH-only — POSTing here was the "something went wrong".
       const res = await fetch(`/api/tickets/${ticketId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, description: newDescription, category, operational_impact: impact, photo_urls: [...photoUrls, ...newUrls] }) })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to add the extra work.')

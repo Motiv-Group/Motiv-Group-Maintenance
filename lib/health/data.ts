@@ -413,6 +413,7 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
   const invitesByTicket = new Map<string, string[]>()
   for (const r of (inviteRows ?? []) as any[]) { const a = invitesByTicket.get(r.ticket_id) ?? []; a.push(r.status); invitesByTicket.set(r.ticket_id, a) }
   const allDeclinedOf = (t: any): boolean => {
+    if (t.status === 'suppliers_declined') return true
     const inv = invitesByTicket.get(t.id) ?? []
     return !t.supplier_id && ['open', 'info_requested'].includes(t.status) && inv.length > 0 && inv.every(s => ['declined', 'closed'].includes(s))
   }
@@ -610,7 +611,7 @@ export interface SupplierSignoffRow { id: string; ticketId: string; ticketTitle:
 export interface SupplierDashboardData {
   perf: SupplierPerformance
   company: string
-  kpis: { open: number; overdue: number; dueToday: number; pendingQuotes: number; awaitingSignoff: number; evidenceMissing: number }
+  kpis: { open: number; overdue: number; dueToday: number; pendingQuotes: number; awaitingSignoff: number; evidenceMissing: number; scheduled: number }
   tickets: SupplierTicketRow[]
   quotes: SupplierQuoteRow[]
   signoffs: SupplierSignoffRow[]
@@ -621,7 +622,7 @@ export interface SupplierDashboardData {
 export async function assembleSupplierDashboard(companyId: string, supplierIds: string[], now: Date = new Date()): Promise<SupplierDashboardData> {
   const db = createAdminClient()
   const emptyPerf = calculateSupplierPerformance('none', [], (p) => FALLBACK_SLA[p], now)
-  if (!supplierIds.length) return { perf: emptyPerf, company: '', kpis: { open: 0, overdue: 0, dueToday: 0, pendingQuotes: 0, awaitingSignoff: 0, evidenceMissing: 0 }, tickets: [], quotes: [], signoffs: [], rating: { avg: 5, count: 0 }, generatedAt: now.toISOString() }
+  if (!supplierIds.length) return { perf: emptyPerf, company: '', kpis: { open: 0, overdue: 0, dueToday: 0, pendingQuotes: 0, awaitingSignoff: 0, evidenceMissing: 0, scheduled: 0 }, tickets: [], quotes: [], signoffs: [], rating: { avg: 5, count: 0 }, generatedAt: now.toISOString() }
   const rules = await loadSlaResolver(db, companyId)
 
   // Own tickets (awarded) + tickets where invited to quote (competitive model),
@@ -682,7 +683,7 @@ export async function assembleSupplierDashboard(companyId: string, supplierIds: 
   }
 
   const todayEnd = new Date(now); todayEnd.setHours(23, 59, 59, 999)
-  let open = 0, overdue = 0, dueToday = 0, pendingQuotes = 0, awaitingSignoff = 0, evidenceMissing = 0
+  let open = 0, overdue = 0, dueToday = 0, pendingQuotes = 0, awaitingSignoff = 0, evidenceMissing = 0, scheduled = 0
   const rows: SupplierTicketRow[] = []
   for (const t of tickets) {
     const active = isActive(t.status)
@@ -702,6 +703,8 @@ export async function assembleSupplierDashboard(companyId: string, supplierIds: 
       if (sla.supplierBreached && !dueInfo(t, rules, now).overdue) overdue++
       if (sla.nextActionDueAt && new Date(sla.nextActionDueAt) <= todayEnd && new Date(sla.nextActionDueAt) >= now) dueToday++
       if (t.status === 'submitted_for_signoff') awaitingSignoff++
+      // Job scheduled but not yet started — the supplier's own awarded work.
+      if (t.status === 'scheduled' && awardedToMe) scheduled++
       if (t.quote_required && !t.quote_submitted_at) pendingQuotes++
       // Supplier owes after photos + COC; before photos come from ticket logging.
       if (t.evidence_required && !(t.after_photo_uploaded && t.completion_certificate_uploaded)) evidenceMissing++
@@ -735,7 +738,7 @@ export async function assembleSupplierDashboard(companyId: string, supplierIds: 
   return {
     perf: calculateSupplierPerformance(supplierIds[0], tickets, rules, now),
     company: (companyRow as any)?.name ?? '',
-    kpis: { open, overdue, dueToday, pendingQuotes, awaitingSignoff, evidenceMissing },
+    kpis: { open, overdue, dueToday, pendingQuotes, awaitingSignoff, evidenceMissing, scheduled },
     tickets: rows,
     quotes: (quotesRaw ?? []).map((q: any) => ({ id: q.id, ticketId: q.ticket_id, ticketTitle: titleOf.get(q.ticket_id) ?? 'Ticket', ticketStatus: rawById.get(q.ticket_id)?.status ?? '', storeName: storeName.get(storeOf(q.ticket_id)) ?? 'Store', branchCode: storeBranch.get(storeOf(q.ticket_id)) ?? null, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, status: q.status, createdAt: q.created_at })),
     signoffs: (signoffsRaw ?? []).map((s: any) => ({ id: s.id, ticketId: s.ticket_id, ticketTitle: titleOf.get(s.ticket_id) ?? 'Ticket', storeName: storeName.get(storeOf(s.ticket_id)) ?? 'Store', branchCode: storeBranch.get(storeOf(s.ticket_id)) ?? null, status: s.status, createdAt: s.created_at })),

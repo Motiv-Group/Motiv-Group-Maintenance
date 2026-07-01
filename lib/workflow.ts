@@ -19,6 +19,7 @@ export type TicketStatus =
   | 'scheduled'             // Job Scheduled
   | 'in_progress'           // Work In Progress
   | 'variation_review'      // Variation Submitted / Review
+  | 'vo_declined'           // Variation Order declined — supplier to re-submit / message RM
   | 'submitted_for_signoff' // Completion Submitted · Review & Sign-off
   | 'evidence_requested'    // Request More Evidence
   | 'snag'                  // Snag Created
@@ -26,6 +27,7 @@ export type TicketStatus =
   | 'snag_in_progress'      // Snag being fixed
   | 'snag_resolved'         // Snag Resolved
   | 'approved_closeout'     // Approved for Close-Out
+  | 'suppliers_declined'    // Every invited supplier declined — RM to re-assign
   | 'completed'             // Final Close-Out (terminal)
   | 'cancelled'             // Reject / Cancel (terminal)
   | 'declined'              // Quote rejected (terminal)
@@ -51,6 +53,7 @@ export const STATUS_META: Record<TicketStatus, StatusMeta> = {
   scheduled:             { label: 'Scheduled',             group: 'execution',  tone: 'indigo' },
   in_progress:           { label: 'In Progress',           group: 'execution',  tone: 'amber' },
   variation_review:      { label: 'Variation Review',      group: 'execution',  tone: 'purple' },
+  vo_declined:           { label: 'VO Declined',           group: 'execution',  tone: 'red' },
   submitted_for_signoff: { label: 'Pending Sign-off',      group: 'closeout',   tone: 'orange' },
   evidence_requested:    { label: 'Evidence Requested',    group: 'closeout',   tone: 'amber' },
   snag:                  { label: 'Snag Raised',           group: 'closeout',   tone: 'red' },
@@ -58,6 +61,7 @@ export const STATUS_META: Record<TicketStatus, StatusMeta> = {
   snag_in_progress:      { label: 'Snag In Progress',      group: 'closeout',   tone: 'amber' },
   snag_resolved:         { label: 'Snag Resolved',         group: 'closeout',   tone: 'teal' },
   approved_closeout:     { label: 'Approved for Close-Out',group: 'closeout',   tone: 'green' },
+  suppliers_declined:    { label: 'Declined (Supplier)',   group: 'commercial', tone: 'red' },
   completed:             { label: 'Completed',             group: 'closed',     tone: 'green' },
   cancelled:             { label: 'Cancelled',             group: 'closed',     tone: 'gray' },
   declined:              { label: 'Declined',              group: 'closed',     tone: 'slate' },
@@ -107,16 +111,25 @@ export const TRANSITIONS: Record<TicketStatus, Transition[]> = {
     { action: 'schedule', label: 'Schedule job', to: 'scheduled', roles: ['supplier', 'regional_manager'] },
   ],
   scheduled: [
-    { action: 'accept_schedule', label: 'Accept proposed time', to: 'scheduled', roles: ['regional_manager', 'executive'] },
-    { action: 'start_work', label: 'Mark as In progress', to: 'in_progress', roles: ['supplier'] },
+    { action: 'accept_schedule',  label: 'Accept proposed time', to: 'scheduled',        roles: ['regional_manager', 'executive'] },
+    // Variation orders are raised in the scheduled phase — before the supplier
+    // marks the job in progress.
+    { action: 'submit_variation', label: 'Raise Variation',      to: 'variation_review', roles: ['supplier'] },
+    { action: 'start_work',       label: 'Mark as In progress',  to: 'in_progress',      roles: ['supplier'] },
   ],
   in_progress: [
-    { action: 'submit_variation',   label: 'Raise Variation',    to: 'variation_review',      roles: ['supplier'] },
     { action: 'submit_completion',  label: 'Submit COC & POC',   to: 'submitted_for_signoff', roles: ['supplier'] },
   ],
   variation_review: [
-    { action: 'approve_variation', label: 'Approve variation', to: 'in_progress', roles: ['regional_manager', 'executive'] },
-    { action: 'reject_variation',  label: 'Reject variation',  to: 'in_progress', roles: ['regional_manager', 'executive'] },
+    // Approving a VO returns to the scheduled phase (supplier can raise more or
+    // mark in progress); declining moves the ticket to the vo_declined state.
+    { action: 'approve_variation', label: 'Approve variation', to: 'scheduled',    roles: ['regional_manager', 'executive'] },
+    { action: 'reject_variation',  label: 'Reject variation',  to: 'vo_declined',  roles: ['regional_manager', 'executive'] },
+  ],
+  vo_declined: [
+    // Supplier responds to a declined VO: re-submit a revised one, or proceed.
+    { action: 'submit_variation', label: 'Re-submit Variation',  to: 'variation_review', roles: ['supplier'] },
+    { action: 'start_work',       label: 'Mark as In progress',  to: 'in_progress',      roles: ['supplier'] },
   ],
   submitted_for_signoff: [
     { action: 'approve',          label: 'Approve & complete', to: 'completed',         roles: ['regional_manager', 'executive'] },
@@ -141,6 +154,11 @@ export const TRANSITIONS: Record<TicketStatus, Transition[]> = {
   ],
   approved_closeout: [
     { action: 'close_out', label: 'Final close-out', to: 'completed', roles: ['regional_manager', 'executive'] },
+  ],
+  // Every invited supplier declined — the RM re-assigns (via /assign, not a
+  // workflow transition) or cancels the ticket.
+  suppliers_declined: [
+    { action: 'reject', label: 'Cancel', to: 'cancelled', roles: ['regional_manager', 'executive'] },
   ],
   completed:  [],
   cancelled:  [],

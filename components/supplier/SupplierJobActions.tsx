@@ -5,9 +5,10 @@
 // hours). The Submit COC & POC flow lives on its own page (/complete).
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Calendar, X, FileText, Wrench } from 'lucide-react'
+import { Calendar, X, FileText, Wrench, Plus, CheckCircle2, PlayCircle } from 'lucide-react'
 import { SchedulePicker } from '@/components/ui/SchedulePicker'
 import { Button } from '@/components/ui/Button'
+import { SendQuoteForm } from '@/components/admin/SendQuoteForm'
 import { createClient } from '@/lib/supabase/client'
 
 async function transition(ticketId: string, body: Record<string, unknown>) {
@@ -138,6 +139,72 @@ export function AssignTechnicianButton({ technicians = [] }: { technicians?: { i
         </div>
       )}
     </>
+  )
+}
+
+// Mark the job in progress (start_work). Shown only after the supplier has raised
+// their variation orders (or declared there are none) in the scheduled phase.
+export function MarkInProgressButton({ ticketId }: { ticketId: string }) {
+  const router = useRouter()
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  async function go() {
+    setBusy(true); setErr('')
+    try { await transition(ticketId, { action: 'start_work' }); router.refresh() }
+    catch (e: any) { setErr(e.message); setBusy(false) }
+  }
+  return (
+    <div>
+      <button onClick={go} disabled={busy} className="w-full py-2.5 rounded-xl bg-[#C6A35D] hover:brightness-95 text-[#0a0e17] text-sm font-semibold transition disabled:opacity-50 flex items-center justify-center gap-1.5">
+        <PlayCircle size={15} /> {busy ? 'Starting…' : 'Mark in progress'}
+      </button>
+      {err && <p className="text-xs text-red-500 mt-1">{err}</p>}
+    </div>
+  )
+}
+
+// Variation-order gate for the scheduled / vo_declined phase: raise a variation
+// order (or declare there are none) BEFORE marking the job in progress. Once the
+// supplier confirms "No (more) variation orders", the "Mark in progress" button
+// appears. On vo_declined it leads with the RM's decline reason and lets the
+// supplier re-submit a revised VO (or message the manager via the update box).
+export function SupplierVariationGate({ ticketId, priority, createdAt, variationCount, status, declineReason }: {
+  ticketId: string; priority: string; createdAt: string; variationCount: number
+  status: 'scheduled' | 'vo_declined'; declineReason?: string | null
+}) {
+  const [showForm, setShowForm] = useState(false)
+  const [noMore, setNoMore] = useState(false)
+  const hasVOs = variationCount > 0 || status === 'vo_declined'
+  const noLabel = hasVOs ? 'No more variation orders' : 'No variation orders'
+  const raiseLabel = status === 'vo_declined' ? 'Re-submit variation order' : hasVOs ? 'Raise another variation order' : 'Raise variation order'
+
+  return (
+    <div className="space-y-3">
+      {status === 'vo_declined' && (
+        <div className="rounded-xl bg-red-500/10 ring-1 ring-red-500/30 p-3.5 space-y-1">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Variation order declined</p>
+          <p className="text-sm text-[var(--text)]">{declineReason || 'The regional manager declined your variation order.'}</p>
+          <p className="text-sm text-[var(--text-muted)]">Submit a revised variation order, or send the manager a message below. When you&apos;re ready, mark the job in progress.</p>
+        </div>
+      )}
+
+      {noMore ? (
+        <MarkInProgressButton ticketId={ticketId} />
+      ) : (
+        <>
+          <p className="text-sm text-[var(--text-muted)]">Raise any variation orders needed before you start. Once there are none outstanding, mark the job in progress.</p>
+          <div className="flex gap-2">
+            <button onClick={() => setShowForm(v => !v)} className="flex-1 py-2.5 rounded-xl bg-[#C6A35D] hover:brightness-95 text-white text-sm font-semibold transition flex items-center justify-center gap-1.5">
+              <Plus size={15} /> {raiseLabel}
+            </button>
+            <button onClick={() => setNoMore(true)} className="flex-1 py-2.5 rounded-xl ring-1 ring-[var(--border)] text-[var(--text)] text-sm font-semibold hover:bg-[var(--hover)] transition flex items-center justify-center gap-1.5">
+              <CheckCircle2 size={15} /> {noLabel}
+            </button>
+          </div>
+          {showForm && <SendQuoteForm ticketId={ticketId} variant="variation" competitive priority={priority} createdAt={createdAt} defaultOpen onClose={() => setShowForm(false)} />}
+        </>
+      )}
+    </div>
   )
 }
 

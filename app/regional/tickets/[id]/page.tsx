@@ -112,7 +112,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
     admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('signoffs').select('id, status, before_urls, after_urls, coc_url, invoice_url, notes, reject_reason, reviewed_at, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('suppliers').select('id, company_name').eq('company_id', companyId).eq('active', true).order('company_name'),
-    admin.from('ticket_variations').select('description, amount, status, created_at, file_urls').eq('ticket_id', t.id).order('created_at', { ascending: false }),
+    admin.from('ticket_variations').select('description, amount, warranty, status, reject_reason, reviewed_at, created_at, file_urls').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('snags').select('description, status, scheduled_at, schedule_status, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('ticket_suppliers').select('supplier_id, status, invited_at, responded_at, decline_reason, suppliers(company_name)').eq('ticket_id', t.id),
     admin.from('ratings').select('supplier_id, score').eq('company_id', companyId),
@@ -164,9 +164,10 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   const declineReasonBy = new Map<string, string>()
   for (const inv of (invites ?? []) as any[]) if (inv.decline_reason) declineReasonBy.set(inv.supplier_id, inv.decline_reason)
   const supplierRows = ((invites ?? []) as any[]).map(inv => ({ name: inv.suppliers?.company_name ?? nameById.get(inv.supplier_id) ?? 'Supplier', status: inv.status as string, invitedAt: inv.invited_at ?? null, declineReason: inv.decline_reason ?? null }))
-  // Every invited supplier declined (and none awarded) → the ticket re-opens for the
-  // RM and reads "Declined (Supplier)"; each decline is listed in the audit trail.
-  const allSuppliersDeclined = supplierRows.length > 0 && supplierRows.every(r => ['declined', 'closed'].includes(r.status)) && !t.supplier_id
+  // Every invited supplier declined (and none awarded) → the ticket moves to the
+  // real "suppliers_declined" status and reads "Declined (Supplier)"; each decline
+  // is listed in the audit trail. (Kept as an invite-derived fallback too.)
+  const allSuppliersDeclined = t.status === 'suppliers_declined' || (supplierRows.length > 0 && supplierRows.every(r => ['declined', 'closed'].includes(r.status)) && !t.supplier_id)
   // Suppliers who previously declined/were-declined on this ticket — the assign
   // pop-up warns before re-sending them the quote request.
   const declinedSupplierIds = ((invites ?? []) as any[]).filter(i => ['declined', 'closed'].includes(i.status)).map(i => i.supplier_id)
@@ -188,10 +189,12 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   const acceptedQuotes = ((quotes ?? []) as any[]).filter(q => q.status === 'accepted').map(mapQuote)
   const declinedQuotes = ((quotes ?? []) as any[]).filter(q => q.status === 'declined').map(mapQuote)
   const isTerminal = ['completed', 'cancelled', 'declined'].includes(t.status)
-  const canAssign = ['open', 'info_requested'].includes(t.status)
+  // Assigning / adding work / requesting info is available before a supplier is on
+  // the ticket — incl. when every invited supplier declined (suppliers_declined).
+  const canAssign = ['open', 'info_requested', 'suppliers_declined'].includes(t.status)
   // Cancelling is only allowed up to (and including) quote review — once a quote
   // is accepted (status 'accepted' or later), the job is committed.
-  const canCancel = ['open', 'info_requested', 'assigned', 'assessment', 'quote_requested', 'quoted', 'quote_revision'].includes(t.status)
+  const canCancel = ['open', 'info_requested', 'assigned', 'assessment', 'quote_requested', 'quoted', 'quote_revision', 'suppliers_declined'].includes(t.status)
   const canEdit = ['open', 'info_requested'].includes(t.status)
   const hasQuoteBlock = supplierRows.length > 0 || reviewQuotes.length > 0 || acceptedQuotes.length > 0 || declinedQuotes.length > 0 || (variations ?? []).length > 0
   // A declined quote means the ticket is "re-opened" — true through the whole
@@ -251,15 +254,21 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         <div>
           <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Description</div>
           {(() => {
-            // The store manager's answer is appended as "— Added info: …" (AddInfoForm).
-            // Highlight those segments red until the RM moves the ticket on; then normal.
-            const [base, ...added] = String(t.description ?? '').split('\n\n— Added info: ')
+            // Two kinds of appended segment are highlighted red until the RM moves the
+            // ticket on: the store manager's answer ("— Added info: …", red while the
+            // info is freshly added) and the RM's own extra scope ("— Extra Work: …",
+            // red until a supplier is assigned / re-assigned). Everything else is muted.
+            const parts = String(t.description ?? '').split(/(\n\n— (?:Added info|Extra Work): )/)
+            const segs: JSX.Element[] = []
+            for (let i = 1; i < parts.length; i += 2) {
+              const sep = parts[i], seg = parts[i + 1] ?? ''
+              const hot = sep.includes('Extra Work') ? canAssign : rmInfoAdded
+              segs.push(<span key={i} className={hot ? 'text-red-600 dark:text-red-400 font-medium' : 'text-[var(--text-muted)]'}>{`${sep}${seg}`}</span>)
+            }
             return (
               <p className="text-sm whitespace-pre-line">
-                <span className="text-[var(--text-muted)]">{base}</span>
-                {added.map((seg, i) => (
-                  <span key={i} className={rmInfoAdded ? 'text-red-600 dark:text-red-400 font-medium' : 'text-[var(--text-muted)]'}>{`\n\n— Added info: ${seg}`}</span>
-                ))}
+                <span className="text-[var(--text-muted)]">{parts[0]}</span>
+                {segs}
               </p>
             )
           })()}
@@ -356,6 +365,14 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
           </div>
         )}
 
+        {/* Variation order declined — the supplier now owns the next step. */}
+        {t.status === 'vo_declined' && (
+          <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 flex items-start gap-2.5">
+            <Clock size={16} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
+            <p className="text-sm text-[var(--text-muted)]">You declined the variation order. Awaiting the supplier&apos;s response — they can submit a revised variation order or message you before the job proceeds.</p>
+          </div>
+        )}
+
         {awaitingSupplierQuotes && (
           <div className="rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/30 p-3.5 flex items-start gap-2.5">
             <CheckCircle2 size={16} className="text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
@@ -370,7 +387,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         {!isTerminal && (canAssign || canCancel) && (
           <div className="flex gap-2">
             {(canAssign || reQuote) && <AssignSuppliersButton ticketId={t.id} suppliers={supplierList} motivSuppliers={motivSupplierList} declinedSupplierIds={declinedSupplierIds} />}
-            {canAssign && <RequestInfoButton ticketId={t.id} />}
+            {['open', 'info_requested'].includes(t.status) && <RequestInfoButton ticketId={t.id} />}
             {canCancel && <CancelTicketCard ticketId={t.id} />}
           </div>
         )}
@@ -475,7 +492,9 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
                       </div>
                     )}
                     {q.fileUrl && <a href={q.fileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View attached quote</a>}
-                    {!isTerminal && <div className="pt-1"><ReQuoteButton ticketId={t.id} quoteId={q.id} /></div>}
+                    {/* Re-quote is only offered while the ticket is still live and un-awarded
+                        — hidden once a quote is approved or every supplier has declined. */}
+                    {!isTerminal && acceptedQuotes.length === 0 && !allSuppliersDeclined && <div className="pt-1"><ReQuoteButton ticketId={t.id} quoteId={q.id} /></div>}
                   </div>
                 </details>
               ))}
@@ -488,6 +507,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
                 <div key={i} className="py-2 border-b border-[var(--border)] last:border-0 flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="text-sm text-[var(--text)]">{v.description}</p>
+                    {v.warranty && <p className="text-[11px] text-[var(--text-muted)] mt-0.5"><span className="font-medium text-[var(--text)]">Warranty:</span> {v.warranty}</p>}
                     <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(v.created_at)}</p>
                     {Array.isArray(v.file_urls) && v.file_urls.length > 0 && (
                       <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
@@ -528,7 +548,10 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         editedAt: t.edited_at, editedByName: editorName, cancellationReason: t.cancellation_reason,
         infoRequestedAt: t.info_requested_at, infoAddedAt: t.info_added_at, infoRequestReason: t.info_request_reason,
         snagScheduledAt,
-        quotes: (quotes ?? []) as any[], signoffs: allSignoffs, updates: (updates ?? []) as any[], views: (viewRows ?? []) as any[],
+        workStartedAt: t.attended_at ?? null,
+        quotes: ((quotes ?? []) as any[]).map(q => ({ ...q, supplierName: nameById.get(q.supplier_id) ?? null })),
+        variations: (variations ?? []) as any[],
+        signoffs: allSignoffs, updates: (updates ?? []) as any[], views: (viewRows ?? []) as any[],
         supplierDeclines,
       }} />
     </div>

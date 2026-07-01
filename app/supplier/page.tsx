@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
-import { Truck, ClipboardList, Clock, ReceiptText, ClipboardCheck, AlertTriangle, Timer, Star, Sparkles, Camera } from 'lucide-react'
+import { Truck, ClipboardList, Clock, ReceiptText, ClipboardCheck, AlertTriangle, Timer, Star, Sparkles, Camera, Calendar } from 'lucide-react'
 import { requireSupplierV3 } from '@/lib/health/guard'
 import { assembleSupplierDashboard, type SupplierTicketRow } from '@/lib/health/data'
 import { Card, SectionCard, KpiRow, Donut, Pill, type Kpi } from '@/components/exec/ui'
@@ -88,6 +88,7 @@ export default async function SupplierOverviewPage() {
     { label: 'Due Today', value: k.dueToday, icon: <Clock size={13} />, tone: 'warn', actionable: true, href: '/supplier/tickets' },
     { label: 'Quote requested', value: quoteRequested, icon: <ClipboardList size={13} />, tone: 'info', actionable: true, href: '/supplier/tickets?filter=to_quote' },
     { label: 'Pending Quotes', value: pendingDecision, icon: <ReceiptText size={13} />, tone: 'gold', href: '/supplier/quotes?status=pending' },
+    { label: 'Job Scheduled', value: k.scheduled, icon: <Calendar size={13} />, tone: 'info', actionable: true, href: '/supplier/tickets?filter=scheduled' },
     { label: 'Pending Sign-off', value: k.awaitingSignoff, icon: <ClipboardCheck size={13} />, tone: 'info', href: '/supplier/signoff?status=awaiting' },
   ]
 

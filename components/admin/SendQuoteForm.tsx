@@ -110,6 +110,8 @@ export function SendQuoteForm({
   competitive = false,
   priority = 'P3',
   createdAt,
+  defaultOpen = false,
+  onClose,
 }: {
   ticketId: string
   variant?: 'quote' | 'variation'
@@ -120,13 +122,17 @@ export function SendQuoteForm({
   /** Ticket priority + created time — used to bound the proposed-schedule picker. */
   priority?: string
   createdAt?: string
+  /** Render already expanded (caller controls the trigger button). */
+  defaultOpen?: boolean
+  /** Called when the form is cancelled/closed — lets the caller hide it. */
+  onClose?: () => void
 }) {
   const isVariation = variant === 'variation'
   const isEdit      = !!existingQuote
   // A proposed job start is required on a fresh competitive supplier quote.
   const wantsSchedule = competitive && !isVariation && !isEdit
   const router = useRouter()
-  const [open,       setOpen]       = useState(false)
+  const [open,       setOpen]       = useState(defaultOpen)
   const [schedule,   setSchedule]   = useState('')   // ISO of the proposed start
   const [pickOpen,   setPickOpen]   = useState(false)
   const [loading,    setLoading]    = useState(false)
@@ -264,8 +270,9 @@ export function SendQuoteForm({
       setError('Please select a Valid Until date or choose N/A.')
       return
     }
-    // Warranty / guarantee is required on a quote — typed manually or explicit N/A.
-    if (!isVariation && !warrantyNA && !values.warranty?.trim()) {
+    // Warranty / guarantee is required on a quote AND a variation order — typed
+    // manually or explicit N/A.
+    if (!warrantyNA && !values.warranty?.trim()) {
       setError('Please state the warranty / guarantee, or select N/A.')
       return
     }
@@ -304,7 +311,7 @@ export function SendQuoteForm({
     if (competitive && isVariation) {
       const res = await fetch(`/api/tickets/${ticketId}/transition`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'submit_variation', description: values.description, amount: values.amount ? Number(values.amount) : undefined, fileUrls: fileUrl ? [fileUrl] : [] }),
+        body: JSON.stringify({ action: 'submit_variation', description: values.description, amount: values.amount ? Number(values.amount) : undefined, warranty: warrantyNA ? 'N/A' : (values.warranty?.trim() || null), fileUrls: fileUrl ? [fileUrl] : [] }),
       })
       if (!res.ok) { setError((await res.json().catch(() => ({}))).error || 'Failed to submit variation order'); setLoading(false); return }
       reset(); if (filePreview) URL.revokeObjectURL(filePreview)
@@ -358,6 +365,7 @@ export function SendQuoteForm({
     setNeedAmount(false)
     setValidNA(false); setWarrantyNA(false)
     reset()
+    onClose?.()
   }
 
   if (!open) {
@@ -535,35 +543,34 @@ export function SendQuoteForm({
           {errors.description && <p className="mt-1 text-xs text-red-600">{errors.description.message}</p>}
         </div>
 
-        {/* Warranty / Guarantee — quotes only, required (manual text or N/A) */}
-        {!isVariation && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Warranty / Guarantee <span className="text-red-500">*</span>
-            </label>
-            <textarea
-              rows={2}
-              disabled={warrantyNA}
-              placeholder="e.g. 12-month workmanship guarantee, 2-year parts warranty…"
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none disabled:opacity-50"
-              {...register('warranty')}
-            />
-            <div className="flex items-center gap-2 mt-1.5">
-              <button
-                type="button"
-                onClick={() => { setWarrantyNA(v => !v); if (!warrantyNA) setValue('warranty', ''); setError('') }}
-                className={`inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-                  warrantyNA
-                    ? 'bg-gray-600 text-white border-gray-600'
-                    : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-gray-400'
-                }`}
-              >
-                N/A
-              </button>
-              <span className="text-xs text-gray-400">No warranty? Describe it manually, or select N/A.</span>
-            </div>
+        {/* Warranty / Guarantee — on quotes AND variation orders, required (manual text or N/A) */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Warranty / Guarantee <span className="text-red-500">*</span>
+          </label>
+          <textarea
+            rows={2}
+            disabled={warrantyNA}
+            placeholder="e.g. 12-month workmanship guarantee, 2-year parts warranty…"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none disabled:opacity-50"
+            {...register('warranty')}
+          />
+          <div className="flex items-center gap-2 mt-1.5">
+            {/* N/A active state matches the "Valid until" selected colour (gold). */}
+            <button
+              type="button"
+              onClick={() => { setWarrantyNA(v => !v); if (!warrantyNA) setValue('warranty', ''); setError('') }}
+              className={`inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                warrantyNA
+                  ? 'bg-[#C6A35D] text-white border-[#C6A35D]'
+                  : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-[#C6A35D]'
+              }`}
+            >
+              N/A
+            </button>
+            <span className="text-xs text-gray-400">No warranty? Describe it manually, or select N/A.</span>
           </div>
-        )}
+        </div>
 
         {/* Valid Until — quotes only (a variation order has no validity date) */}
         {!isVariation && (

@@ -26,12 +26,15 @@ export function RegionalOverview({ data, name, briefing, briefingScopeId }: { da
   // Variation orders submitted and waiting on the RM to approve/reject.
   const voAwaiting = data.tickets.filter(t => t.status === 'variation_review').length
   // "Open" = still open/info-requested AND no supplier assigned yet. Once a
-  // supplier is on it, it's being handled, not open. Matches the Tickets-tab pill.
-  const openCount = data.tickets.filter(t => (t.status === 'open' || t.status === 'info_requested') && !t.supplierAssigned).length
+  // supplier is on it, it's being handled, not open. Tickets where every supplier
+  // declined are counted only by their own KPI. Matches the Tickets-tab pill.
+  const openCount = data.tickets.filter(t => (t.status === 'open' || t.status === 'info_requested') && !t.supplierAssigned && !t.allSuppliersDeclined).length
   // "Overdue" = active tickets past their final resolution deadline — same rule as
   // the Tickets-tab Overdue pill. (Distinct from a mid-SLA breach, which the
   // Internal/Supplier Breach KPIs count.)
   const overdueCount = data.tickets.filter(t => t.overdue).length
+  // Every invited supplier declined — the RM must re-assign these tickets.
+  const supplierDeclinedCount = data.tickets.filter(t => t.allSuppliersDeclined).length
 
   // Every KPI carries a hint so all cards share the same height → uniform size.
   // Tickets Overdue sits beside Stores Need Attention; Quotes Awaiting Approval
@@ -43,6 +46,7 @@ export function RegionalOverview({ data, name, briefing, briefingScopeId }: { da
     { label: 'Stores Need Attention', value: data.attentionStores.length, hint: 'need action', icon: <ShieldAlert size={13} />, tone: 'warn', actionable: true, href: '/regional/stores' },
     { label: 'Tickets Overdue', value: overdueCount, hint: 'past deadline', icon: <Clock size={13} />, tone: 'bad', actionable: true, href: '/regional/tickets?filter=overdue' },
     { label: 'Open Tickets', value: openCount, hint: 'unassigned', icon: <ClipboardList size={13} />, tone: 'orange', actionable: true, href: '/regional/tickets?filter=open' },
+    { label: 'Declined by Supplier', value: supplierDeclinedCount, hint: 're-assign', icon: <Truck size={13} />, tone: 'bad', actionable: true, href: '/regional/tickets?filter=supplier_declined' },
     { label: 'Quotes Awaiting Approval', value: quotesAwaiting, hint: 'to review', icon: <ReceiptText size={13} />, tone: 'warn', actionable: true, href: '/regional/tickets?filter=quoted' },
     { label: 'VOs Awaiting Approval', value: voAwaiting, hint: 'to review', icon: <FileText size={13} />, tone: 'warn', actionable: true, href: '/regional/tickets?filter=quoted' },
     { label: 'Pending Signoffs', value: data.signoffsPending, hint: 'awaiting you', icon: <ClipboardCheck size={13} />, tone: 'warn', actionable: true, href: '/regional/signoff' },

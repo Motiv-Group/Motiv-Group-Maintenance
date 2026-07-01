@@ -18,7 +18,7 @@ function bucketOf(s: string): Bucket {
   if (['open', 'info_requested', 'assigned', 'assessment', 'quote_requested', 'quote_revision'].includes(s)) return 'to_quote'
   if (['quoted', 'variation_review'].includes(s)) return 'quoted'
   if (s === 'accepted') return 'approved'
-  if (s === 'scheduled') return 'scheduled'
+  if (['scheduled', 'vo_declined'].includes(s)) return 'scheduled'
   if (['in_progress', 'variation_accepted'].includes(s)) return 'in_progress'
   if (['submitted_for_signoff', 'evidence_requested', 'snag', 'snag_assigned', 'snag_resolved', 'approved_closeout', 'pending_sign_off', 'snag_in_progress'].includes(s)) return 'signoff'
   if (s === 'completed') return 'completed'

@@ -32,12 +32,14 @@ export const STATUS_LABELS: Record<TicketStatus, string> = {
   scheduled:        'Scheduled',
   in_progress: 'In Progress',
   variation_review: 'Variation Review',
+  vo_declined:      'VO Declined',
   submitted_for_signoff: 'Pending Sign-off',
   evidence_requested:    'Evidence Requested',
   snag:             'Snag',
   snag_assigned:    'Snag Assigned',
   snag_resolved:    'Snag Resolved',
   approved_closeout:'Approved for Close-Out',
+  suppliers_declined: 'Declined (Supplier)',
   completed:   'Completed',
   cancelled:   'Cancelled',
   declined:    'Declined',
@@ -62,12 +64,14 @@ export const STATUS_COLORS: Record<TicketStatus, string> = {
   scheduled:        'bg-indigo-100 text-indigo-700 dark:bg-indigo-950  dark:text-indigo-400',
   in_progress: 'bg-amber-100   text-amber-700   dark:bg-amber-950   dark:text-amber-400',
   variation_review: 'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-400',
+  vo_declined:      'bg-red-100    text-red-700    dark:bg-red-950    dark:text-red-400',
   submitted_for_signoff: 'bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-400',
   evidence_requested:    'bg-amber-100  text-amber-700  dark:bg-amber-950   dark:text-amber-400',
   snag:             'bg-red-100    text-red-700    dark:bg-red-950    dark:text-red-400',
   snag_assigned:    'bg-pink-100   text-pink-700   dark:bg-pink-950    dark:text-pink-400',
   snag_resolved:    'bg-teal-100   text-teal-700   dark:bg-teal-950    dark:text-teal-400',
   approved_closeout:'bg-green-100  text-green-700  dark:bg-green-950   dark:text-green-400',
+  suppliers_declined: 'bg-red-100   text-red-700    dark:bg-red-950    dark:text-red-400',
   completed:   'bg-green-100   text-green-700   dark:bg-green-950   dark:text-green-400',
   declined:    'bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-950 dark:text-fuchsia-400',
   cancelled:   'bg-gray-100    text-gray-600    dark:bg-gray-800    dark:text-gray-400',
@@ -130,12 +134,14 @@ export const STATUS_PILL: Record<TicketStatus, { active: string; inactive: strin
   scheduled:   { active: 'bg-indigo-500 text-white border-indigo-500',   inactive: 'text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-900/40 hover:border-indigo-400' },
   in_progress: { active: 'bg-amber-500 text-white border-amber-500',     inactive: 'text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-900/40 hover:border-amber-400' },
   variation_review: { active: 'bg-purple-500 text-white border-purple-500', inactive: 'text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-900/40 hover:border-purple-400' },
+  vo_declined: { active: 'bg-red-500 text-white border-red-500',          inactive: 'text-red-700 dark:text-red-400 border-red-200 dark:border-red-900/40 hover:border-red-400' },
   submitted_for_signoff: { active: 'bg-orange-500 text-white border-orange-500', inactive: 'text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-900/40 hover:border-orange-400' },
   evidence_requested: { active: 'bg-amber-500 text-white border-amber-500', inactive: 'text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-900/40 hover:border-amber-400' },
   snag:        { active: 'bg-red-500 text-white border-red-500',         inactive: 'text-red-700 dark:text-red-400 border-red-200 dark:border-red-900/40 hover:border-red-400' },
   snag_assigned: { active: 'bg-pink-500 text-white border-pink-500',     inactive: 'text-pink-700 dark:text-pink-400 border-pink-200 dark:border-pink-900/40 hover:border-pink-400' },
   snag_resolved: { active: 'bg-teal-500 text-white border-teal-500',     inactive: 'text-teal-600 dark:text-teal-400 border-teal-200 dark:border-teal-900/40 hover:border-teal-400' },
   approved_closeout: { active: 'bg-green-600 text-white border-green-600', inactive: 'text-green-600 dark:text-green-400 border-green-200 dark:border-green-900/40 hover:border-green-400' },
+  suppliers_declined: { active: 'bg-red-600 text-white border-red-600',  inactive: 'text-red-700 dark:text-red-400 border-red-200 dark:border-red-900/40 hover:border-red-400' },
   completed:   { active: 'bg-green-600 text-white border-green-600',     inactive: 'text-green-600 dark:text-green-400 border-green-200 dark:border-green-900/40 hover:border-green-400' },
   declined:    { active: 'bg-fuchsia-600 text-white border-fuchsia-600', inactive: 'text-fuchsia-600 dark:text-fuchsia-400 border-fuchsia-200 dark:border-fuchsia-900/40 hover:border-fuchsia-400' },
   cancelled:   { active: 'bg-gray-500 text-white border-gray-500',       inactive: 'text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:border-gray-400' },
@@ -162,7 +168,8 @@ const CLIENT_IN_PROGRESS = new Set<TicketStatus>([
 ])
 // "Job scheduled" = approved/scheduled but not yet started — the SM's own step
 // between Open and In Progress; In Progress begins when the supplier starts work.
-const CLIENT_SCHEDULED = new Set<TicketStatus>(['accepted', 'scheduled'])
+// vo_declined sits in the scheduled phase (VOs are handled before work starts).
+const CLIENT_SCHEDULED = new Set<TicketStatus>(['accepted', 'scheduled', 'vo_declined'])
 export function clientVisibleStatus(status: TicketStatus): ClientVisibleStatus | null {
   if (status === 'cancelled')  return 'cancelled'
   if (status === 'completed')  return 'completed'
@@ -204,12 +211,14 @@ export function rmStatusMeta(status: string): { label: string; cls: string; text
     scheduled:             { label: 'Job scheduled',     cls: indigo, text: indigoT },
     in_progress:           { label: 'In progress',       cls: gold, text: goldT },
     variation_review:      { label: 'Quoted VO',         cls: purple, text: purpleT },
+    vo_declined:           { label: 'VO declined',       cls: `bg-red-500/15 ${redT}`, text: redT },
     submitted_for_signoff: { label: 'Awaiting sign-off', cls: orange, text: orangeT },
     evidence_requested:    { label: 'Sign-off info',     cls: 'bg-amber-500/15 text-amber-700 dark:text-amber-400', text: 'text-amber-700 dark:text-amber-400' },
     snag:                  { label: 'Snag',              cls: `bg-red-500/15 ${redT}`, text: redT },
     snag_assigned:         { label: 'Snag',              cls: `bg-red-500/15 ${redT}`, text: redT },
     snag_resolved:         { label: 'Awaiting sign-off', cls: orange, text: orangeT },
     approved_closeout:     { label: 'Awaiting sign-off', cls: orange, text: orangeT },
+    suppliers_declined:    { label: 'Declined (Supplier)', cls: `bg-red-500/15 ${redT}`, text: redT },
     completed:             { label: 'Completed',         cls: `bg-emerald-500/15 ${greenT}`, text: greenT },
     cancelled:             { label: 'Cancelled',         cls: `bg-gray-500/15 ${grayT}`, text: grayT },
     declined:              { label: 'Declined',          cls: `bg-gray-500/15 ${grayT}`, text: grayT },

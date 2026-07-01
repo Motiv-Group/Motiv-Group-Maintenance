@@ -21,7 +21,7 @@ function bucketOf(s: string, supplierAssigned = false): Bucket {
   if (['assigned', 'quote_requested', 'assessment'].includes(s)) return 'quote_requested'
   if (['quoted', 'quote_revision', 'variation_review'].includes(s)) return 'quoted'
   if (s === 'accepted') return 'approved'
-  if (s === 'scheduled') return 'scheduled'
+  if (['scheduled', 'vo_declined'].includes(s)) return 'scheduled'
   if (['in_progress', 'variation_accepted'].includes(s)) return 'in_progress'
   if (['submitted_for_signoff', 'evidence_requested', 'snag', 'snag_assigned', 'snag_resolved', 'approved_closeout', 'pending_sign_off', 'snag_in_progress'].includes(s)) return 'awaiting_signoff'
   if (s === 'completed') return 'completed'
@@ -115,7 +115,9 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
 
   const counts = useMemo(() => {
     const c: Record<Bucket, number> = { open: 0, quote_requested: 0, quoted: 0, approved: 0, scheduled: 0, in_progress: 0, awaiting_signoff: 0, completed: 0, cancelled: 0 }
-    for (const t of tickets) c[bucketOf(t.status, t.supplierAssigned)]++
+    // "Declined (Supplier)" tickets are counted only by their own pill — never as
+    // Open or Cancelled — so the buckets stay clean.
+    for (const t of tickets) { if (t.allSuppliersDeclined) continue; c[bucketOf(t.status, t.supplierAssigned)]++ }
     return c
   }, [tickets])
   const barTotal = BAR_ORDER.reduce((s, b) => s + counts[b], 0) || 1
@@ -135,7 +137,9 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
       else if (filter === 'reopened') { if (!t.reopened) return false }
       else if (filter === 'overdue') { if (!t.overdue) return false }
       else if (filter === 'supplier_declined') { if (!t.allSuppliersDeclined) return false }
-      else if (filter !== null && bucketOf(t.status, t.supplierAssigned) !== filter) return false
+      // Any other status/bucket filter (incl. Cancelled) never shows declined-by-
+      // supplier tickets — they live under the Declined pill and the "All" groups.
+      else if (filter !== null) { if (t.allSuppliersDeclined) return false; if (bucketOf(t.status, t.supplierAssigned) !== filter) return false }
       if (!terms.length) return true
       const hay = `${t.title} ${t.storeName} ${t.branchCode ?? ''} ${t.jobRef ?? ''} ${rmStatusMeta(t.status).label}`.toLowerCase()
       return terms.every(w => hay.includes(w))

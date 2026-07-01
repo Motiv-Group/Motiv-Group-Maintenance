@@ -113,10 +113,8 @@ export function StoreTicketsList({ tickets, initialFilter = 'all' }: { tickets: 
       .map(x => x.t)
   }, [haystacks, filter, q])
 
-  // "All" view: active tickets as a plain list (newest → urgency); completed go
-  // into a collapsible Archive. Only the Archive collapses.
-  const active = useMemo(() => shown.filter(t => t.status !== 'completed').sort(byDateThenUrgency), [shown])
-  const archived = useMemo(() => shown.filter(t => t.status === 'completed').sort(byDateThenUrgency), [shown])
+  // "All" view: every ticket in one list (newest → urgency), shown under a single
+  // "All Tickets" collapsible. A specific filter → the same flat list, filtered.
   const shownSorted = useMemo(() => [...shown].sort(byDateThenUrgency), [shown])
 
   // Distribution bar excludes cancelled (live work only).
@@ -163,17 +161,12 @@ export function StoreTicketsList({ tickets, initialFilter = 'all' }: { tickets: 
           className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)] focus:ring-[#C6A35D]/40 outline-none" />
       </div>
 
-      {/* All → collapsible status groups (collapsed by default, state remembered until
-          sign-out), Completed under Archive. A specific filter → flat list. */}
+      {/* All → every ticket under one collapsible "All Tickets" heading (newest →
+          most urgent), open by default with its state remembered until sign-out.
+          A specific filter → flat list. */}
       {filter === 'all' ? (
         shown.length ? (
-          <div className="space-y-3">
-            {(['open', 'info_requested', 'scheduled', 'in_progress', 'cancelled'] as const).map(st => (
-              <Group key={st} title={WORD[st]} tickets={active.filter(t => t.status === st)} />
-            ))}
-            {!active.length && <Card className="p-2"><p className="text-sm text-[var(--text-faint)] text-center py-6">No active tickets — see the archive below.</p></Card>}
-            <Group title="Archive · Completed" tickets={archived} defaultOpen={false} />
-          </div>
+          <Group title="All Tickets" tickets={shownSorted} defaultOpen />
         ) : (
           <Card className="p-2"><p className="text-sm text-[var(--text-faint)] text-center py-8">{tickets.length ? 'No tickets match.' : 'No tickets yet.'}</p></Card>
         )
