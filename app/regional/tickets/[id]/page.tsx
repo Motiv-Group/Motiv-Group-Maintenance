@@ -18,7 +18,7 @@ import { AssignSuppliersButton, RequestInfoButton, RmEditTicketForm, SupplierSta
 import { DueDate } from '@/components/workflow/DueDate'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { EditedLine } from '@/components/ui/EditedLine'
-import { RecordTicketView } from '@/components/ui/RecordTicketView'
+import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { AuditTrail } from '@/components/ui/AuditTrail'
 import { CollapsibleSection } from '@/components/ui/CollapsibleSection'
 import { formatCurrency, formatDateTime, formatDate, rmStatusMeta, storeLabel, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
@@ -43,7 +43,7 @@ function DetailItem({ label, value }: { label: string; value: string }) {
 // One COC/POC submission card — reused across the under-review, sent-back (snag)
 // and approved blocks so the RM sees the full submission history. A sent-back card
 // shows the reason it was returned (why another COC/POC was needed).
-function RmSignoffCard({ s, tone }: { s: any; tone: 'review' | 'snag' | 'approved' | 'evidence' }) {
+function RmSignoffCard({ s, tone, ticketId }: { s: any; tone: 'review' | 'snag' | 'approved' | 'evidence'; ticketId: string }) {
   const meta = tone === 'approved'
     ? { ring: 'ring-emerald-500/40', bg: 'bg-emerald-500/5', head: 'bg-emerald-500/10 border-emerald-500/20', badge: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400', label: 'Approved', Icon: CheckCircle2, iconCls: 'text-emerald-500', title: 'Approved completion' }
     : tone === 'snag'
@@ -75,8 +75,8 @@ function RmSignoffCard({ s, tone }: { s: any; tone: 'review' | 'snag' | 'approve
         <div>
           <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Proof of completion</div>
           <div className="flex flex-wrap gap-x-4 gap-y-1">
-            {before.map((u, i) => <a key={`b${i}`} href={u} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C6A35D] underline hover:text-amber-500">Before {i + 1}</a>)}
-            {after.map((u, i) => <a key={`a${i}`} href={u} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C6A35D] underline hover:text-amber-500">After {i + 1}</a>)}
+            {before.map((u, i) => <ViewTrackedLink key={`b${i}`} ticketId={ticketId} itemType="photo" itemLabel={`Before photo ${i + 1}`} href={u} className="text-sm text-[#C6A35D] underline hover:text-amber-500">Before {i + 1}</ViewTrackedLink>)}
+            {after.map((u, i) => <ViewTrackedLink key={`a${i}`} ticketId={ticketId} itemType="photo" itemLabel={`Completion photo ${i + 1}`} href={u} className="text-sm text-[#C6A35D] underline hover:text-amber-500">After {i + 1}</ViewTrackedLink>)}
             {!before.length && !after.length && <span className="text-sm text-[var(--text-faint)]">No photos</span>}
           </div>
         </div>
@@ -84,8 +84,8 @@ function RmSignoffCard({ s, tone }: { s: any; tone: 'review' | 'snag' | 'approve
           <div>
             <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Certificate of Completion</div>
             <div className="flex flex-wrap gap-x-4 gap-y-1">
-              {s.coc_url && <a href={s.coc_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View COC</a>}
-              {s.invoice_url && <a href={s.invoice_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View invoice</a>}
+              {s.coc_url && <ViewTrackedLink ticketId={ticketId} itemType="coc" itemLabel="COC" href={s.coc_url} className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View COC</ViewTrackedLink>}
+              {s.invoice_url && <ViewTrackedLink ticketId={ticketId} itemType="invoice" itemLabel="Invoice" href={s.invoice_url} className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View invoice</ViewTrackedLink>}
             </div>
           </div>
         )}
@@ -114,7 +114,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
     admin.from('suppliers').select('id, company_name').eq('company_id', companyId).eq('active', true).order('company_name'),
     admin.from('ticket_variations').select('description, amount, status, created_at, file_urls').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('snags').select('description, status, scheduled_at, schedule_status, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
-    admin.from('ticket_suppliers').select('supplier_id, status, invited_at, decline_reason, suppliers(company_name)').eq('ticket_id', t.id),
+    admin.from('ticket_suppliers').select('supplier_id, status, invited_at, responded_at, decline_reason, suppliers(company_name)').eq('ticket_id', t.id),
     admin.from('ratings').select('supplier_id, score').eq('company_id', companyId),
   ])
   const storeName = store ? storeLabel(store.name, store.sub_store) : 'Store'
@@ -122,7 +122,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   // Motiv-curated supplier pool (assign pop-up) + who has viewed this ticket's items.
   const [{ data: motivSuppliers }, { data: viewRows }] = await Promise.all([
     admin.from('suppliers').select('id, company_name').eq('is_motiv', true).eq('active', true).order('company_name'),
-    admin.from('ticket_views').select('viewer_role, item_type, first_viewed_at').eq('ticket_id', t.id),
+    admin.from('ticket_views').select('viewer_role, item_type, item_label, first_viewed_at').eq('ticket_id', t.id),
   ])
   // Full COC/POC history — every submission, split by state (mirrors the supplier
   // view). Each sent-back card carries the reason it was rejected.
@@ -138,12 +138,6 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   const latestSnag = ((snags ?? []) as any[])[0] ?? null
   const snagScheduledAt = ((snags ?? []) as any[]).find(s => s.scheduled_at)?.scheduled_at ?? null
   const snagAwaitingApproval = t.status === 'snag_assigned' && latestSnag?.schedule_status === 'proposed' && !!latestSnag?.scheduled_at
-  // Record the RM's first view of each key item present on the ticket (audit trail).
-  const viewItems = [
-    ((quotes ?? []) as any[]).length ? 'quote' : null,
-    ((Array.isArray(t.photo_urls) && t.photo_urls.length) || allSignoffs.some((s: any) => (s.after_urls ?? []).length || (s.before_urls ?? []).length)) ? 'photos' : null,
-    allSignoffs.some((s: any) => s.coc_url) ? 'coc' : null,
-  ].filter(Boolean) as string[]
 
   // SLA due date (final resolution deadline) + overdue state.
   const rules = await loadSlaResolver(admin, t.company_id)
@@ -170,6 +164,12 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   const declineReasonBy = new Map<string, string>()
   for (const inv of (invites ?? []) as any[]) if (inv.decline_reason) declineReasonBy.set(inv.supplier_id, inv.decline_reason)
   const supplierRows = ((invites ?? []) as any[]).map(inv => ({ name: inv.suppliers?.company_name ?? nameById.get(inv.supplier_id) ?? 'Supplier', status: inv.status as string, invitedAt: inv.invited_at ?? null, declineReason: inv.decline_reason ?? null }))
+  // Every invited supplier declined (and none awarded) → the ticket re-opens for the
+  // RM and reads "Declined (Supplier)"; each decline is listed in the audit trail.
+  const allSuppliersDeclined = supplierRows.length > 0 && supplierRows.every(r => ['declined', 'closed'].includes(r.status)) && !t.supplier_id
+  const supplierDeclines = allSuppliersDeclined
+    ? ((invites ?? []) as any[]).filter(i => ['declined', 'closed'].includes(i.status)).map(i => ({ name: i.suppliers?.company_name ?? nameById.get(i.supplier_id) ?? 'Supplier', at: i.responded_at ?? i.invited_at })).filter(d => d.at)
+    : []
   const mapQuote = (q: any) => ({
     id: q.id, supplierName: nameById.get(q.supplier_id) ?? 'Supplier', amount: q.amount,
     amountInclVat: q.amount_incl_vat ?? null, description: q.description ?? null, fileUrl: q.file_url ?? null,
@@ -203,7 +203,6 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
 
   return (
     <div className="space-y-5">
-      <RecordTicketView ticketId={t.id} items={viewItems} />
       <BackLink fallbackHref="/regional/tickets" label="Back to tickets" />
 
       {/* Progress — bare, no card around it */}
@@ -221,10 +220,10 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
               <PriorityBadge priority={t.priority} className="w-full text-center" />
               {(() => {
                 const sm = rmStatusMeta(t.status)
-                const label = reQuote ? 'Re-open' : rmInfoAdded ? 'Info added' : sm.label
+                const label = allSuppliersDeclined ? 'Declined (Supplier)' : reQuote ? 'Re-open' : rmInfoAdded ? 'Info added' : sm.label
                 // "Info added" reads like an "Info requested" badge (amber); the fresh
                 // answer itself is highlighted red in the description until the RM acts.
-                const cls = reQuote ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : rmInfoAdded ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : sm.cls
+                const cls = allSuppliersDeclined ? 'bg-red-500/15 text-red-700 dark:text-red-400' : reQuote ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : rmInfoAdded ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : sm.cls
                 return <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${cls}`}>{label}</span>
               })()}
             </div>
@@ -261,7 +260,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
             <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Photos</div>
             <div className="flex flex-wrap gap-x-4 gap-y-1">
               {t.photo_urls.map((u: string, i: number) => (
-                <a key={i} href={u} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C6A35D] underline hover:text-amber-500">Photo {i + 1}</a>
+                <ViewTrackedLink key={i} ticketId={t.id} itemType="photo" itemLabel={`Photo ${i + 1}`} href={u} className="text-sm text-[#C6A35D] underline hover:text-amber-500">Photo {i + 1}</ViewTrackedLink>
               ))}
             </div>
           </div>
@@ -292,8 +291,8 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         )}
 
         <EditedLine at={t.edited_at} by={editorName} />
-        {/* Edit ticket — bottom-right of the detail block, in line with the last row. */}
-        {canEdit && <div className="flex justify-end"><RmEditTicketForm ticketId={t.id} initial={{ title: t.title, category: t.category ?? 'General', impact: t.operational_impact ?? 'none', priority: t.priority, description: t.description }} /></div>}
+        {/* Edit ticket — bottom-left of the detail block, in line with the last text. */}
+        {canEdit && <div className="flex justify-start"><RmEditTicketForm ticketId={t.id} initial={{ title: t.title, category: t.category ?? 'General', impact: t.operational_impact ?? 'none', priority: t.priority, description: t.description }} /></div>}
       </Card>
 
       {(t.status === 'cancelled' || t.status === 'declined') && (
@@ -321,15 +320,15 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
               <p className="text-sm text-[var(--text)]">{t.evidence_request_reason}</p>
             </div>
           )}
-          {pendingSignoffs.map((s: any) => <RmSignoffCard key={s.id} s={s} tone="review" />)}
-          {evidenceRequestedSignoffs.map((s: any) => <RmSignoffCard key={s.id} s={s} tone="evidence" />)}
+          {pendingSignoffs.map((s: any) => <RmSignoffCard key={s.id} s={s} tone="review" ticketId={t.id} />)}
+          {evidenceRequestedSignoffs.map((s: any) => <RmSignoffCard key={s.id} s={s} tone="evidence" ticketId={t.id} />)}
         </CollapsibleSection>
       )}
 
       {/* Completion — the approved COC & POC, created once sign-off is accepted */}
       {acceptedSignoff && (
         <CollapsibleSection id="ticket-completion" title="Completion" defaultOpen={phase === 'completion'}>
-          <RmSignoffCard s={acceptedSignoff} tone="approved" />
+          <RmSignoffCard s={acceptedSignoff} tone="approved" ticketId={t.id} />
         </CollapsibleSection>
       )}
 
@@ -501,7 +500,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
       {((snags ?? []).length > 0 || rejectedSignoffs.length > 0) && (
         <CollapsibleSection id="ticket-snag" title="Snags" defaultOpen={phase === 'snag'}>
           {/* Every snagged / sent-back COC/POC submission, each with the reason it was returned. */}
-          {rejectedSignoffs.map((s: any) => <RmSignoffCard key={s.id} s={s} tone="snag" />)}
+          {rejectedSignoffs.map((s: any) => <RmSignoffCard key={s.id} s={s} tone="snag" ticketId={t.id} />)}
         </CollapsibleSection>
       )}
 
@@ -514,6 +513,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         infoRequestedAt: t.info_requested_at, infoAddedAt: t.info_added_at, infoRequestReason: t.info_request_reason,
         snagScheduledAt,
         quotes: (quotes ?? []) as any[], signoffs: allSignoffs, updates: (updates ?? []) as any[], views: (viewRows ?? []) as any[],
+        supplierDeclines,
       }} />
     </div>
   )

@@ -39,16 +39,31 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'This job can no longer be declined — it has moved past quoting.' }, { status: 400 })
   }
 
-  await admin.from('ticket_suppliers').update({ status: 'declined', decline_reason: reason, declined_by: 'supplier', responded_at: new Date().toISOString() }).eq('id', invite.id)
+  const nowIso = new Date().toISOString()
+  await admin.from('ticket_suppliers').update({ status: 'declined', decline_reason: reason, declined_by: 'supplier', responded_at: nowIso }).eq('id', invite.id)
   await admin.from('quotes').update({ status: 'declined' }).eq('ticket_id', ticketId).eq('supplier_id', invite.supplier_id).eq('status', 'pending')
+
+  // If EVERY invited supplier has now declined, re-open the ticket so the RM's
+  // assign / request-info / cancel buttons return. The RM page flags it "Declined
+  // (Supplier)" and lists each supplier's decline in the audit trail.
+  const { data: allInvites } = await admin.from('ticket_suppliers').select('status').eq('ticket_id', ticketId)
+  const allDeclined = !ticket.supplier_id && (allInvites ?? []).length > 0 && (allInvites ?? []).every(i => ['declined', 'closed'].includes(i.status))
+  if (allDeclined) {
+    await admin.from('tickets').update({
+      status: 'open', supplier_id: null, quote_required: false,
+      current_blocker: null, blocker_owner_type: null, blocker_started_at: null, sla_paused: false,
+      last_internal_update_at: nowIso, updated_at: nowIso,
+    }).eq('id', ticketId)
+  }
 
   // Tell the region's RMs so they can pick another supplier.
   if (ticket.region_id) {
     const { data: rms } = await admin.from('regional_users').select('user_id').eq('region_id', ticket.region_id)
     const ids = (rms ?? []).map(r => r.user_id)
     if (ids.length) {
-      await admin.from('notifications').insert(ids.map(id => ({ company_id: ticket.company_id, user_id: id, type: 'ticket_update', title: `Supplier declined: ${ticket.title ?? 'Untitled'}`, message: `A supplier declined the work — ${reason}`, link: `/regional/tickets/${ticketId}` })))
-      void sendPushToMany(ids, { title: 'A supplier declined the work', body: reason, url: `/regional/tickets/${ticketId}` })
+      const msg = allDeclined ? `All invited suppliers have declined — re-assign the ticket. Last reason: ${reason}` : `A supplier declined the work — ${reason}`
+      await admin.from('notifications').insert(ids.map(id => ({ company_id: ticket.company_id, user_id: id, type: 'ticket_update', title: `Supplier declined: ${ticket.title ?? 'Untitled'}`, message: msg, link: `/regional/tickets/${ticketId}` })))
+      void sendPushToMany(ids, { title: allDeclined ? 'All suppliers declined' : 'A supplier declined the work', body: reason, url: `/regional/tickets/${ticketId}` })
     }
   }
 

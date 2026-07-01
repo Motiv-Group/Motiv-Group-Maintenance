@@ -28,8 +28,8 @@ export function RecentTicketsCard({ tickets }: { tickets: StoreManagerTicket[] }
   const toggle = () => setOpen(o => { const v = !o; writeCollapse('sm-recent-open', v); return v })
   const recent = useMemo(() => {
     const cutoff = Date.now() - WEEK_MS
-    // Completed tickets live in the Tickets-tab archive, not the dashboard overview.
-    return tickets.filter(t => t.status !== 'completed' && new Date(t.createdAt).getTime() >= cutoff)
+    // Completed tickets live in the Tickets-tab archive; cancelled ones are hidden.
+    return tickets.filter(t => t.status !== 'completed' && t.status !== 'cancelled' && new Date(t.createdAt).getTime() >= cutoff)
   }, [tickets])
 
   return (

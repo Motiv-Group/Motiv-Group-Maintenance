@@ -3,7 +3,7 @@
 // Supplier Tickets tab — search, supplier-workflow filters + distribution bar,
 // collapsible store groups, and a slide-out store panel with SLA / work / quote
 // stats. Mirrors the RM tickets tab, tailored to the supplier's lifecycle.
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Ticket, Search, ChevronDown, BarChart3, X } from 'lucide-react'
 import type { SupplierTicketRow, SupplierQuoteRow } from '@/lib/health/data'
@@ -27,6 +27,15 @@ function bucketOf(s: string): Bucket {
 const BUCKET_LABEL: Record<Bucket, string> = { to_quote: 'Quote requested', quoted: 'Quoted', approved: 'Quote approved', scheduled: 'Job scheduled', in_progress: 'In Progress', signoff: 'Sign-off', completed: 'Completed', closed: 'Closed' }
 const BUCKET_BAR: Record<Bucket, string> = { to_quote: 'bg-cyan-500', quoted: 'bg-violet-500', approved: 'bg-teal-500', scheduled: 'bg-indigo-500', in_progress: 'bg-[#C6A35D]', signoff: 'bg-orange-500', completed: 'bg-emerald-500', closed: 'bg-red-500' }
 const BAR_ORDER: Bucket[] = ['to_quote', 'quoted', 'approved', 'scheduled', 'in_progress', 'signoff', 'completed']
+
+// Isolation: the status THIS supplier should see. Until awarded, they only ever see
+// their own quote state ("Quoted" if they quoted, else "Quote requested") — never
+// another supplier's progress. Awarded/declined use the real status (badge handles it).
+function myStatus(t: SupplierTicketRow): string {
+  if (t.awardedToMe || t.declinedForMe) return t.status
+  return t.quotedByMe ? 'quoted' : 'quote_requested'
+}
+const bucketOfRow = (t: SupplierTicketRow) => bucketOf(myStatus(t))
 
 // Urgency rank (handles classic low/medium/high/urgent and engine P1–P4).
 const URGENCY: Record<string, number> = { urgent: 0, P1: 0, high: 1, P2: 1, medium: 2, P3: 2, low: 3, P4: 3 }
@@ -86,7 +95,7 @@ function milestone(t: SupplierTicketRow): { label: string; at: string } | null {
 // `showStore` adds a Company · Branch eyebrow — used in flat sections (SLA
 // breached, archive). In store groups the heading already shows it, so it's off.
 function TicketRow({ t, company, showStore }: { t: SupplierTicketRow; company?: string; showStore?: boolean }) {
-  const sm = rmStatusMeta(t.status)
+  const sm = rmStatusMeta(myStatus(t))
   const m = milestone(t)
   return (
     <Link href={`/supplier/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2.5 -mx-2 px-2 rounded-lg border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition">
@@ -124,7 +133,7 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
     const c: Record<Bucket, number> = { to_quote: 0, quoted: 0, approved: 0, scheduled: 0, in_progress: 0, signoff: 0, completed: 0, closed: 0 }
     // A ticket awarded to another supplier counts as closed (declined), not as this
     // supplier's completed/active work.
-    for (const t of tickets) c[t.declinedForMe ? 'closed' : bucketOf(t.status)]++
+    for (const t of tickets) c[t.declinedForMe ? 'closed' : bucketOfRow(t)]++
     return c
   }, [tickets])
   const barTotal = BAR_ORDER.reduce((s, b) => s + counts[b], 0) || 1
@@ -144,11 +153,11 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
       else if (filter === 'declined') { if (!t.declinedForMe) return false }
       else if (filter === 'cancelled') { if (t.status !== 'cancelled') return false }
       else if (filter === 'evidence') { if (!missingEvidence(t)) return false }
-      else if (filter !== 'all' && bucketOf(t.status) !== filter) return false
+      else if (filter !== 'all' && bucketOfRow(t) !== filter) return false
       // Tickets where this supplier was declined (and not re-invited) only show under Declined / Cancelled.
       if (filter !== 'declined' && filter !== 'cancelled' && t.declinedForMe) return false
       if (!terms.length) return true
-      const hay = `${t.title} ${t.storeName} ${t.branchCode ?? ''} ${rmStatusMeta(t.status).label}`.toLowerCase()
+      const hay = `${t.title} ${t.storeName} ${t.branchCode ?? ''} ${rmStatusMeta(myStatus(t)).label}`.toLowerCase()
       return terms.every(w => hay.includes(w))
     })
   }, [tickets, q, filter])
@@ -156,8 +165,8 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
   // Under "All": breached pins to the top, completed drops into the Archive, the
   // rest groups by store. Everything is ordered newest → most urgent.
   const breachedRows = useMemo(() => filter === 'all' ? shown.filter(t => t.breached && !t.overdue).sort(byDateThenUrgency) : [], [shown, filter])
-  const liveShown = useMemo(() => (filter === 'all' ? shown.filter(t => !(t.breached && !t.overdue) && bucketOf(t.status) !== 'completed') : shown).slice().sort(byDateThenUrgency), [shown, filter])
-  const archived = useMemo(() => (filter === 'all' ? shown.filter(t => bucketOf(t.status) === 'completed') : []).slice().sort(byDateThenUrgency), [shown, filter])
+  const liveShown = useMemo(() => (filter === 'all' ? shown.filter(t => !(t.breached && !t.overdue) && bucketOfRow(t) !== 'completed') : shown).slice().sort(byDateThenUrgency), [shown, filter])
+  const archived = useMemo(() => (filter === 'all' ? shown.filter(t => bucketOfRow(t) === 'completed') : []).slice().sort(byDateThenUrgency), [shown, filter])
   const [archiveOpen, setArchiveOpen] = useState(false)
   const [breachedOpen, setBreachedOpen] = useState(false)
 
@@ -174,6 +183,19 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
     for (const t of liveShown) { const g = m.get(t.storeName) ?? { branchCode: t.branchCode, rows: [] }; g.rows.push(t); m.set(t.storeName, g) }
     return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]))
   }, [liveShown])
+
+  // Arriving from a dashboard KPI (?filter=…) auto-expands the lists so the tickets
+  // are visible immediately — runs once, only for the deep-link (not manual clicks).
+  const didAutoExpand = useRef(false)
+  useEffect(() => {
+    if (didAutoExpand.current || filter === 'all') return
+    if (!new URLSearchParams(window.location.search).get('filter')) return
+    didAutoExpand.current = true
+    const names = groups.map(([s]) => s)
+    setExpanded(new Set(names)); writeCollapseSet('supplier-tickets-expanded', names)
+    setBreachedOpen(true); writeCollapse('supplier-tickets-breached', true)
+    setArchiveOpen(true); writeCollapse('supplier-tickets-archive', true)
+  }, [filter, groups])
 
   const toggle = (s: string) => setExpanded(c => { const n = new Set(c); n.has(s) ? n.delete(s) : n.add(s); writeCollapseSet('supplier-tickets-expanded', [...n]); return n })
   const toggleBreached = () => setBreachedOpen(o => { const v = !o; writeCollapse('supplier-tickets-breached', v); return v })
@@ -257,7 +279,7 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
           {archiveOpen && (
             <div className="px-1" onClick={e => e.stopPropagation()}>
               {archived.map(t => {
-                const sm = rmStatusMeta(t.status)
+                const sm = rmStatusMeta(myStatus(t))
                 return (
                   <Link key={t.id} href={`/supplier/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2.5 -mx-2 px-2 rounded-lg border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition">
                     <div className="min-w-0">
@@ -284,7 +306,7 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
 
 function StorePanel({ store, company, rows, quotes, onClose }: { store: string; company?: string; rows: SupplierTicketRow[]; quotes: SupplierQuoteRow[]; onClose: () => void }) {
   const c: Record<Bucket, number> = { to_quote: 0, quoted: 0, approved: 0, scheduled: 0, in_progress: 0, signoff: 0, completed: 0, closed: 0 }
-  for (const t of rows) c[bucketOf(t.status)]++
+  for (const t of rows) c[bucketOfRow(t)]++
   const total = rows.length
   const barTotal = BAR_ORDER.reduce((s, b) => s + c[b], 0) || 1
   const active = rows.filter(t => t.active)

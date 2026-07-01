@@ -5,6 +5,7 @@ import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Search, Pencil, CalendarClock } from 'lucide-react'
 import { StarInput, Stars } from '@/components/ui/Stars'
+import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { formatCurrency, formatDateTime } from '@/lib/utils'
 
 async function post(url: string, body: unknown): Promise<void> {
@@ -248,12 +249,22 @@ export function QuoteReviewCard({ ticketId, quotes }: { ticketId: string; quotes
   const [reason, setReason] = useState(DECLINE_REASONS[0])
   const [other, setOther] = useState('')
   const [err, setErr] = useState('')
+  const [sentMsg, setSentMsg] = useState('')
   if (!quotes.length) return <p className="text-sm text-[var(--text-faint)]">No quotes submitted yet.</p>
 
   async function decide(quoteId: string, action: 'approve' | 'decline') {
     setBusy(quoteId); setErr('')
     const declineReason = action === 'decline' ? (reason === 'Other' ? (other.trim() || 'Other') : reason) : undefined
-    try { await post(`/api/tickets/${ticketId}/quote-decision`, { action, quoteId, reason: declineReason }); router.refresh() }
+    try {
+      await post(`/api/tickets/${ticketId}/quote-decision`, { action, quoteId, reason: declineReason })
+      // A soft decline (not "Choosing another supplier") asks the supplier to re-quote
+      // — confirm the request was delivered, then refresh.
+      if (action === 'decline' && declineReason !== 'Choosing another supplier') {
+        setBusy(null); setDeclineFor(null)
+        setSentMsg(`Re-quote request sent to ${quotes.find(x => x.id === quoteId)?.supplierName ?? 'the supplier'}.`)
+        setTimeout(() => { setSentMsg(''); router.refresh() }, 1800)
+      } else { router.refresh() }
+    }
     catch (e: any) { setErr(e.message); setBusy(null) }
   }
 
@@ -275,7 +286,7 @@ export function QuoteReviewCard({ ticketId, quotes }: { ticketId: string; quotes
             </div>
           )}
           {q.description && <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{q.description}</p>}
-          {q.fileUrl && <a href={q.fileUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C6A35D] underline">View attachment</a>}
+          {q.fileUrl && <ViewTrackedLink ticketId={ticketId} itemType="quote" itemLabel={`${q.supplierName}'s quote`} href={q.fileUrl} className="text-sm text-[#C6A35D] underline">View attachment</ViewTrackedLink>}
 
           {declineFor === q.id ? (
             <div className="space-y-2 pt-1">
@@ -302,6 +313,7 @@ export function QuoteReviewCard({ ticketId, quotes }: { ticketId: string; quotes
           )}
         </div>
       ))}
+      {sentMsg && <p className="text-xs text-emerald-600 dark:text-emerald-400">{sentMsg}</p>}
       {err && <p className="text-xs text-red-500">{err}</p>}
     </div>
   )
@@ -418,14 +430,20 @@ export function ReQuoteButton({ ticketId, quoteId }: { ticketId: string; quoteId
   const router = useRouter()
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  const [sent, setSent] = useState(false)
   async function go() {
     setBusy(true); setErr('')
-    try { await post(`/api/tickets/${ticketId}/quote-decision`, { action: 'requote', quoteId }); router.refresh() }
-    catch (e: any) { setErr(e.message); setBusy(false) }
+    try {
+      await post(`/api/tickets/${ticketId}/quote-decision`, { action: 'requote', quoteId })
+      setBusy(false); setSent(true)
+      setTimeout(() => setSent(false), 4000)   // clear the confirmation after a moment
+      router.refresh()
+    } catch (e: any) { setErr(e.message); setBusy(false) }
   }
   return (
     <div>
-      <button onClick={go} disabled={busy} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#C6A35D] text-[#0a0e17] text-xs font-semibold disabled:opacity-50">{busy ? '…' : 'Ask to re-quote'}</button>
+      <button onClick={go} disabled={busy} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#C6A35D] text-[#0a0e17] text-xs font-semibold disabled:opacity-50">{busy ? 'Sending…' : 'Ask to re-quote'}</button>
+      {sent && <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">Re-quote request sent to the supplier.</p>}
       {err && <p className="text-xs text-red-500 mt-1">{err}</p>}
     </div>
   )

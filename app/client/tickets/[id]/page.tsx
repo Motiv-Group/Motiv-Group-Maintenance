@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic'
 import { redirect } from 'next/navigation'
 import { CalendarClock } from 'lucide-react'
 import { BackLink } from '@/components/ui/BackLink'
-import { RecordTicketView } from '@/components/ui/RecordTicketView'
+import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireStoreManagerV3 } from '@/lib/health/guard'
 import { loadSlaResolver } from '@/lib/health/data'
@@ -66,7 +66,6 @@ export default async function StoreTicketDetailPage({ params }: { params: { id: 
 
   return (
     <div className="space-y-5">
-      {Array.isArray(t.photo_urls) && t.photo_urls.length > 0 && <RecordTicketView ticketId={t.id} items={['photos']} />}
       <BackLink fallbackHref="/client/tickets" label="Back to tickets" />
 
       {/* Progress — its own block, dots. Hidden once the ticket is closed off
@@ -112,7 +111,7 @@ export default async function StoreTicketDetailPage({ params }: { params: { id: 
             <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Photos</div>
             <div className="flex flex-wrap gap-x-4 gap-y-1">
               {t.photo_urls.map((u: string, i: number) => (
-                <a key={i} href={u} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C6A35D] underline hover:text-amber-500">Photo {i + 1}</a>
+                <ViewTrackedLink key={i} ticketId={t.id} itemType="photo" itemLabel={`Photo ${i + 1}`} href={u} className="text-sm text-[#C6A35D] underline hover:text-amber-500">Photo {i + 1}</ViewTrackedLink>
               ))}
             </div>
           </div>

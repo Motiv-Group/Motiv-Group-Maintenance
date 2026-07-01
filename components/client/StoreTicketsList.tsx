@@ -162,14 +162,15 @@ export function StoreTicketsList({ tickets, initialFilter = 'all' }: { tickets: 
           className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)] focus:ring-[#C6A35D]/40 outline-none" />
       </div>
 
-      {/* All → collapsible status groups, Completed under Archive. Specific filter → flat list. */}
+      {/* All → collapsible status groups (collapsed by default, state remembered until
+          sign-out), Completed under Archive. A specific filter → flat list. */}
       {filter === 'all' ? (
         shown.length ? (
           <div className="space-y-3">
-            <Card className="p-2">
-              {active.map(t => <Row key={t.id} t={t} />)}
-              {!active.length && <p className="text-sm text-[var(--text-faint)] text-center py-6">No active tickets — see the archive below.</p>}
-            </Card>
+            {(['open', 'info_requested', 'scheduled', 'in_progress', 'cancelled'] as const).map(st => (
+              <Group key={st} title={WORD[st]} tickets={active.filter(t => t.status === st)} />
+            ))}
+            {!active.length && <Card className="p-2"><p className="text-sm text-[var(--text-faint)] text-center py-6">No active tickets — see the archive below.</p></Card>}
             <Group title="Archive · Completed" tickets={archived} defaultOpen={false} />
           </div>
         ) : (

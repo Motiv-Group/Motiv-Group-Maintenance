@@ -588,6 +588,9 @@ export interface SupplierTicketRow {
   active: boolean; breached: boolean
   assignedAt: string | null; quoteRequestedAt: string | null; quoteSubmittedAt: string | null; quoteApprovedAt: string | null; declinedAt: string | null
   dueAt: string; overdue: boolean; declinedForMe: boolean; declinedBy: 'supplier' | 'regional_manager' | null
+  // Isolation: this supplier's OWN involvement, so the list never leaks another
+  // supplier's progress (e.g. "Quoted" because someone else quoted).
+  quotedByMe: boolean; awardedToMe: boolean
 }
 export interface SupplierQuoteRow { id: string; ticketId: string; ticketTitle: string; ticketStatus: string; storeName: string; branchCode: string | null; amount: number; amountInclVat: number | null; status: string; createdAt: string }
 export interface SupplierSignoffRow { id: string; ticketId: string; ticketTitle: string; storeName: string; branchCode: string | null; status: string; createdAt: string }
@@ -675,6 +678,8 @@ export async function assembleSupplierDashboard(companyId: string, supplierIds: 
     // OR the ticket has been awarded to a *different* supplier.
     const awardedToOther = !!raw.supplier_id && !ownedIds.has(t.id)
     const declinedForMe = !ownedIds.has(t.id) && (['declined', 'closed'].includes(myInviteStatus.get(t.id) ?? '') || awardedToOther)
+    const awardedToMe = ownedIds.has(t.id)
+    const quotedByMe = awardedToMe || ['quoted', 'awarded'].includes(myInviteStatus.get(t.id) ?? '')
     const sla = computeTicketSla(t, rules(t.priority), now)
     if (active && !declinedForMe) {
       open++
@@ -700,12 +705,14 @@ export async function assembleSupplierDashboard(companyId: string, supplierIds: 
       active, breached: active ? sla.supplierBreached : false,
       assignedAt: raw.quote_requested_at ?? t.created_at ?? null,
       quoteRequestedAt: raw.quote_requested_at ?? null,
-      quoteSubmittedAt: t.quote_submitted_at ?? firstQuoteAt.get(t.id) ?? null,
-      quoteApprovedAt: approvedAt,
+      // Scope the quote milestones to their own quote so the list can't leak another's.
+      quoteSubmittedAt: quotedByMe ? (t.quote_submitted_at ?? firstQuoteAt.get(t.id) ?? null) : null,
+      quoteApprovedAt: awardedToMe ? approvedAt : null,
       declinedAt: declinedQuoteAt.get(t.id) ?? declinedInviteAt.get(t.id) ?? null,
       ...dueInfo(t, rules, now),
       declinedForMe,
       declinedBy: declinedForMe ? (declinedByOf.get(t.id) ?? null) : null,
+      quotedByMe, awardedToMe,
     })
   }
   // Active first, then unacknowledged, then oldest — keeps the dashboard queues useful.

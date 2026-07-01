@@ -36,14 +36,19 @@ export interface TimelineInput {
   startAt?: string | null
   // The supplier's proposed snag-fix date (distinct from the original job schedule).
   snagScheduledAt?: string | null
+  // When the RM declined this supplier's quote but asked them to submit a revised one.
+  requoteRequestedAt?: string | null
+  // Every supplier's decline (name + when) — shown on the RM trail once ALL declined.
+  supplierDeclines?: { name: string; at: string }[]
   quotes?: { amount?: number | null; status: string; created_at: string; updated_at?: string | null }[]
   signoffs?: { status: string; created_at: string; reviewed_at?: string | null; reject_reason?: string | null }[]
   updates?: { body: string; author_role: string | null; created_at: string }[]
-  // Who first opened the ticket's quote / photos / COC (audit-trail view tracking).
-  views?: { viewer_role: string | null; item_type: string; first_viewed_at: string }[]
+  // Who first opened which specific item on the ticket (audit-trail view tracking).
+  views?: { viewer_role: string | null; item_type: string; item_label?: string | null; first_viewed_at: string }[]
 }
 
-const VIEW_LABEL: Record<string, string> = { quote: 'viewed the quote', photos: 'viewed the photos', coc: 'viewed the COC & POC' }
+// Fallback wording when a view has no specific label (older, section-level rows).
+const VIEW_LABEL: Record<string, string> = { quote: 'the quote', photos: 'the photos', photo: 'a photo', coc: 'the COC & POC', invoice: 'the invoice' }
 
 export function buildTicketTimeline(t: TimelineInput): TimelineEvent[] {
   const ev: TimelineEvent[] = []
@@ -64,6 +69,8 @@ export function buildTicketTimeline(t: TimelineInput): TimelineEvent[] {
   // Fallback if no quote rows were supplied but the ticket records an approval.
   if (!(t.quotes ?? []).some(q => q.status === 'accepted')) push(t.quoteApprovedAt, 'Quote approved', 'quote_approved', 'Regional Manager')
 
+  push(t.requoteRequestedAt, 'Quote declined — revised quote requested', 'quote_declined', 'Regional Manager')
+  for (const d of t.supplierDeclines ?? []) push(d.at, `Quote request declined by ${d.name}`, 'quote_declined', 'Supplier')
   push(t.scheduledAt, 'Job scheduled', 'scheduled', 'Supplier')
   push(t.snagScheduledAt, 'Snag job scheduled', 'scheduled', 'Supplier')
 
@@ -82,7 +89,7 @@ export function buildTicketTimeline(t: TimelineInput): TimelineEvent[] {
   push(t.editedAt, 'Ticket edited', 'edited', t.editedByName)
 
   for (const u of t.updates ?? []) push(u.created_at, u.body, 'update', ROLE_LABEL[u.author_role ?? ''] ?? (u.author_role ?? 'System'))
-  for (const v of t.views ?? []) push(v.first_viewed_at, VIEW_LABEL[v.item_type] ?? 'viewed an attachment', 'viewed', ROLE_LABEL[v.viewer_role ?? ''] ?? (v.viewer_role ?? 'System'))
+  for (const v of t.views ?? []) push(v.first_viewed_at, `Viewed ${v.item_label || VIEW_LABEL[v.item_type] || 'an attachment'}`, 'viewed', ROLE_LABEL[v.viewer_role ?? ''] ?? (v.viewer_role ?? 'System'))
 
   const sorted = ev.sort((a, b) => +new Date(a.at) - +new Date(b.at))
   return t.startAt ? sorted.filter(e => +new Date(e.at) >= +new Date(t.startAt!)) : sorted

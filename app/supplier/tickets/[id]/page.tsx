@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import { ClipboardCheck, FileText, Calendar } from 'lucide-react'
 import { SubmitCompletionForm } from '@/components/supplier/SubmitCompletionForm'
 import { BackLink } from '@/components/ui/BackLink'
-import { RecordTicketView } from '@/components/ui/RecordTicketView'
+import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireSupplierV3 } from '@/lib/health/guard'
 import { loadSlaResolver } from '@/lib/health/data'
@@ -134,10 +134,6 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   const declinedForMe = !awarded && !!invite && ['declined', 'closed'].includes((invite as any).status)
   const storeName = storeLabel(store?.name, store?.sub_store)
   const editorName = t.edited_by ? ((await admin.from('user_profiles').select('full_name').eq('id', t.edited_by).single()).data?.full_name ?? null) : null
-  // Audit-trail view tracking: who opened this ticket's items. The supplier's own
-  // "view" is of the store's logged photos (the job brief).
-  const { data: viewRows } = await admin.from('ticket_views').select('viewer_role, item_type, first_viewed_at').eq('ticket_id', t.id)
-  const viewItems = (Array.isArray(t.photo_urls) && t.photo_urls.length) ? ['photos'] : []
 
   // SLA due date (final resolution deadline) + overdue state.
   const rules = await loadSlaResolver(admin, t.company_id)
@@ -172,6 +168,13 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   // A client decline (chose another supplier) always shows the courteous "not
   // selected" message, never the internal reason; otherwise fall back to it too.
   const declineMessage = declinedBy === 'regional_manager' ? DEFAULT_DECLINE_REASON : (declineReason || DEFAULT_DECLINE_REASON)
+  // This supplier's OWN view of the status — never leak another supplier's progress
+  // (e.g. the ticket reading "Quoted" because a different supplier quoted). Awarded →
+  // the real status; their own quote in → "Quoted"; nothing submitted → "Quote requested".
+  const supplierStatus = awarded ? t.status : (latestQuote?.status === 'pending' ? 'quoted' : 'quote_requested')
+  // Soft decline where the RM asked this supplier to submit a revised quote (audit trail).
+  const requoteRequestedAt = (latestQuote?.status === 'declined' && (invite as any)?.status === 'invited' && (invite as any)?.decline_reason)
+    ? ((invite as any)?.responded_at ?? latestQuote?.updated_at ?? null) : null
   // Map a quote's DB status to the read-only summary tone (accepted shows "Approved").
   const quoteStatusOf = (s: string): QuoteSummaryStatus => s === 'accepted' ? 'accepted' : s === 'declined' ? 'declined' : 'pending'
 
@@ -194,7 +197,6 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
 
   return (
     <div className="space-y-5">
-      {!declinedForMe && <RecordTicketView ticketId={t.id} items={viewItems} />}
       <BackLink fallbackHref="/supplier/tickets" label="Back to tickets" />
 
       {/* Progress — bare, no card around it (same as RM). Hidden once this supplier
@@ -210,7 +212,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end">
             <PriorityBadge priority={t.priority} className="w-full text-center" />
-            {(() => { const sm = rmStatusMeta(t.status); const cls = declinedForMe ? 'bg-red-500/15 text-red-700 dark:text-red-400' : sm.cls; return <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${cls}`}>{declinedForMe ? (declinedBy === 'supplier' ? 'Declined (you)' : declinedBy === 'regional_manager' ? 'Declined (Client)' : 'Declined') : sm.label}</span> })()}
+            {(() => { const sm = rmStatusMeta(supplierStatus); const cls = declinedForMe ? 'bg-red-500/15 text-red-700 dark:text-red-400' : sm.cls; return <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${cls}`}>{declinedForMe ? (declinedBy === 'supplier' ? 'Declined (you)' : declinedBy === 'regional_manager' ? 'Declined (Client)' : 'Declined') : sm.label}</span> })()}
           </div>
         </div>
 
@@ -235,7 +237,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           <div>
             <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Photos</div>
             <div className="flex flex-wrap gap-x-4 gap-y-1">
-              {t.photo_urls.map((u: string, i: number) => <a key={i} href={u} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C6A35D] underline hover:text-amber-500">Photo {i + 1}</a>)}
+              {t.photo_urls.map((u: string, i: number) => <ViewTrackedLink key={i} ticketId={t.id} itemType="photo" itemLabel={`Photo ${i + 1}`} href={u} className="text-sm text-[#C6A35D] underline hover:text-amber-500">Photo {i + 1}</ViewTrackedLink>)}
             </div>
           </div>
         )}
@@ -304,7 +306,8 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           {awarded && t.status === 'submitted_for_signoff' && (
             <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 text-sm text-[var(--text-muted)]">COC &amp; POC submitted — awaiting the regional manager&apos;s approval.</div>
           )}
-          <WorkflowActions ticketId={t.id} status={t.status} role="supplier" exclude={['schedule', 'submit_completion', 'require_assessment', 'request_quote', 'submit_variation', 'accept_snag', 'start_snag']} />
+          {/* submit_quote is handled by SendQuoteForm above — exclude the duplicate button. */}
+          <WorkflowActions ticketId={t.id} status={t.status} role="supplier" exclude={['schedule', 'submit_completion', 'require_assessment', 'request_quote', 'submit_variation', 'accept_snag', 'start_snag', 'submit_quote']} />
           {/* Opt out of the job (before award) — separated from the primary actions */}
           {canDecline && <div className="pt-1"><DeclineWorkButton ticketId={t.id} /></div>}
         </Card>
@@ -384,27 +387,30 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
         </Card>
       )}
 
-      {/* Once this supplier is off the job (they declined, or the RM declined their
-          quote / awarded another), the trail stops at their decline — they get no
-          further updates on the ticket's onward life. */}
-      {declinedForMe ? (
+      {/* Isolation: a supplier only ever sees THEIR OWN involvement. Until they're
+          awarded the job, the trail is scoped to their invite + their own quote (no
+          other supplier's progress, and no view events — suppliers must not learn of
+          each other). Once awarded, it's their job and shows the full progression. */}
+      {!awarded ? (
         <AuditTrail ticket={{
           createdAt: t.created_at,
           startAt: (invite as any)?.invited_at ?? t.quote_requested_at,
           quoteRequestedAt: (invite as any)?.invited_at ?? t.quote_requested_at,
-          quoteSubmittedAt: latestQuote ? latestQuote.created_at : null,
-          supplierDeclinedAt: (invite as any)?.responded_at ?? latestQuote?.updated_at ?? t.updated_at,
+          quoteSubmittedAt: latestQuote?.created_at ?? null,
+          requoteRequestedAt,
+          quotes: (myQuotes ?? []) as any[],
+          supplierDeclinedAt: declinedForMe ? ((invite as any)?.responded_at ?? latestQuote?.updated_at ?? t.updated_at) : null,
         }} />
       ) : (
         <AuditTrail ticket={{
           createdAt: t.created_at, status: t.status, updatedAt: t.updated_at,
           startAt: (invite as any)?.invited_at ?? t.quote_requested_at,
-          quoteRequestedAt: t.quote_requested_at, quoteSubmittedAt: t.quote_submitted_at,
+          quoteRequestedAt: t.quote_requested_at, quoteSubmittedAt: latestQuote?.created_at ?? t.quote_submitted_at,
           quoteApprovedAt: t.quote_decision_status === 'approved' ? t.quote_decided_at : null,
           scheduledAt: t.scheduled_at, completedAt: t.completed_at,
           editedAt: t.edited_at, editedByName: editorName, cancellationReason: t.cancellation_reason,
-          snagScheduledAt,
-          quotes: (myQuotes ?? []) as any[], signoffs: (signoffRows ?? []) as any[], updates: (updates ?? []) as any[], views: (viewRows ?? []) as any[],
+          snagScheduledAt, requoteRequestedAt,
+          quotes: (myQuotes ?? []) as any[], signoffs: (signoffRows ?? []) as any[], updates: (updates ?? []) as any[],
         }} />
       )}
     </div>
