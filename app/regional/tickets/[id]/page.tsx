@@ -490,6 +490,15 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         {/* Variation order review — dedicated approve (confirm-over-buttons) + decline pop-up. */}
         {t.status === 'variation_review' && <VariationReviewCard ticketId={t.id} />}
 
+        {/* Quote approved / awarded — waiting on the supplier to attend. They flag when
+            they're on their way or on site by marking the ticket in progress. */}
+        {['accepted', 'scheduled'].includes(t.status) && (
+          <div className="rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/30 p-3.5 flex items-start gap-2.5">
+            <CheckCircle2 size={16} className="text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+            <p className="text-sm text-[var(--text-muted)]"><span className="font-semibold text-[var(--text)]">{nameById.get(t.supplier_id) ?? 'The supplier'}</span> has been awarded the job. They&apos;ll let you know when they&apos;re on their way or on site by marking the ticket in progress.</p>
+          </div>
+        )}
+
         {/* In progress — the supplier has started; reassure the RM the job is being attended to. */}
         {t.status === 'in_progress' && (
           <div className="rounded-xl bg-[#C6A35D]/10 ring-1 ring-[#C6A35D]/30 p-3.5 text-sm text-[var(--text-muted)]">Work in progress — the supplier is on site or en route to attend to the job. The completion certificate and proof-of-completion photos will follow once the work is done.</div>
