@@ -44,6 +44,9 @@ export interface TimelineInput {
   // When the RM asked this supplier to submit a revised quote (re-quote) → its own
   // "Revised quote requested" event, distinct from the decline that preceded it.
   requoteRequestedAt?: string | null
+  // Every re-quote round (durable) → one "Revised quote requested" event each.
+  // Overrides requoteRequestedAt when non-empty.
+  requoteRequests?: (string | null)[]
   // Every supplier's decline (name + when) — shown on the RM trail once ALL declined.
   supplierDeclines?: { name: string; at: string }[]
   // When the supplier marked the job in progress (moved past the VO stage).
@@ -89,7 +92,11 @@ export function buildTicketTimeline(t: TimelineInput): TimelineEvent[] {
   // Fallback if no quote rows were supplied but the ticket records an approval.
   if (!(t.quotes ?? []).some(q => q.status === 'accepted')) push(t.quoteApprovedAt, 'Quote approved', 'quote_approved', 'Regional Manager')
 
-  push(t.requoteRequestedAt, 'Revised quote requested', 'quote_requested', 'Regional Manager')
+  // A "Revised quote requested" event per re-quote round (durable), else the single
+  // fallback timestamp.
+  const requoteTimes = (t.requoteRequests ?? []).filter(Boolean) as string[]
+  for (const at of new Set(requoteTimes.length ? requoteTimes : (t.requoteRequestedAt ? [t.requoteRequestedAt] : [])))
+    push(at, 'Revised quote requested', 'quote_requested', 'Regional Manager')
   for (const d of t.supplierDeclines ?? []) push(d.at, `Quote request declined by ${d.name}`, 'quote_declined', 'Supplier')
   push(t.scheduledAt, 'Job scheduled', 'scheduled', 'Supplier')
   push(t.snagScheduledAt, 'Snag job scheduled', 'scheduled', 'Supplier')
