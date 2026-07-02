@@ -41,7 +41,8 @@ export interface TimelineInput {
   startAt?: string | null
   // The supplier's proposed snag-fix date (distinct from the original job schedule).
   snagScheduledAt?: string | null
-  // When the RM declined this supplier's quote but asked them to submit a revised one.
+  // When the RM asked this supplier to submit a revised quote (re-quote) → its own
+  // "Revised quote requested" event, distinct from the decline that preceded it.
   requoteRequestedAt?: string | null
   // Every supplier's decline (name + when) — shown on the RM trail once ALL declined.
   supplierDeclines?: { name: string; at: string }[]
@@ -88,7 +89,7 @@ export function buildTicketTimeline(t: TimelineInput): TimelineEvent[] {
   // Fallback if no quote rows were supplied but the ticket records an approval.
   if (!(t.quotes ?? []).some(q => q.status === 'accepted')) push(t.quoteApprovedAt, 'Quote approved', 'quote_approved', 'Regional Manager')
 
-  push(t.requoteRequestedAt, 'Quote declined — revised quote requested', 'quote_declined', 'Regional Manager')
+  push(t.requoteRequestedAt, 'Revised quote requested', 'quote_requested', 'Regional Manager')
   for (const d of t.supplierDeclines ?? []) push(d.at, `Quote request declined by ${d.name}`, 'quote_declined', 'Supplier')
   push(t.scheduledAt, 'Job scheduled', 'scheduled', 'Supplier')
   push(t.snagScheduledAt, 'Snag job scheduled', 'scheduled', 'Supplier')
