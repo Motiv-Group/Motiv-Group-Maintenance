@@ -200,10 +200,14 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   // Durable audit events for THIS supplier: every request-decline (survives re-invite)
   // and every quote-request round. RM quote-declines already come from the quote rows.
   const myDeclines = ((declineRows ?? []) as any[]).map(d => ({ name: supplierCompanyName ?? 'you', at: d.declined_at })).filter(d => d.at)
-  // Each quote-request round shown as a single "Quote requested" (the NULL initial +
-  // any re-quote to this supplier) — no separate "Revised quote requested" duplicate.
-  const myQuoteRequests = ((requoteRows ?? []) as any[])
-    .filter(r => r.supplier_id === null || supplierIds.includes(r.supplier_id))
+  // Each quote-request round shown once as "Quote requested". Rounds attributed to
+  // this supplier are theirs; unattributed (legacy NULL) rounds only count as the
+  // INITIAL invite (the earliest one) — later NULL rounds were re-assigns of OTHER
+  // suppliers and must not show a spurious "Quote requested" on this supplier's trail.
+  const allRequestRows = (requoteRows ?? []) as any[]
+  const earliestRequestAt = allRequestRows.reduce<string | null>((m, r) => (r.requested_at && (!m || r.requested_at < m) ? r.requested_at : m), null)
+  const myQuoteRequests = allRequestRows
+    .filter(r => supplierIds.includes(r.supplier_id) || (r.supplier_id === null && r.requested_at === earliestRequestAt))
     .map(r => r.requested_at).filter(Boolean)
   // Trail starts at this supplier's EARLIEST involvement (first request / quote /
   // decline) — a re-invite resets invited_at to "now", so anchoring to it would hide
