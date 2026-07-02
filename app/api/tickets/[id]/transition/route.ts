@@ -75,6 +75,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
         break
       case 'request_quote':
         updates.quote_required = true; updates.quote_requested_at = now; updates.quote_due_at = addMins(tgt.quote_due_mins)
+        // Set-once so the FIRST quote request survives later re-requests in the trail.
+        updates.first_quote_requested_at = ticket.first_quote_requested_at ?? now
         if (body.supplierId) updates.supplier_id = body.supplierId
         break
       case 'request_evidence':

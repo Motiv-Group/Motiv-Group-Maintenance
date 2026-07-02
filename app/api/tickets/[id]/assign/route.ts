@@ -61,6 +61,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   await admin.from('tickets').update({
     status: 'assigned', supplier_id: null, quote_required: true, quote_requested_at: now, quote_due_at: quoteDueAt,
+    // Set-once: the FIRST quote request stays in the audit trail across re-assigns.
+    first_quote_requested_at: (ticket as any).first_quote_requested_at ?? now,
     current_blocker: 'supplier_action', blocker_owner_type: 'supplier', blocker_started_at: now, sla_paused: false,
     last_internal_update_at: now, updated_at: now,
   }).eq('id', ticket.id)

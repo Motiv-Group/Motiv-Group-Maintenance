@@ -120,9 +120,11 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   const storeName = store ? storeLabel(store.name, store.sub_store) : 'Store'
   const editorName = t.edited_by ? ((await admin.from('user_profiles').select('full_name').eq('id', t.edited_by).single()).data?.full_name ?? null) : null
   // Motiv-curated supplier pool (assign pop-up) + who has viewed this ticket's items.
-  const [{ data: motivSuppliers }, { data: viewRows }] = await Promise.all([
+  const [{ data: motivSuppliers }, { data: viewRows }, { data: declineRows }] = await Promise.all([
     admin.from('suppliers').select('id, company_name').eq('is_motiv', true).eq('active', true).order('company_name'),
     admin.from('ticket_views').select('viewer_role, item_type, item_label, first_viewed_at').eq('ticket_id', t.id),
+    // Durable supplier request-declines — kept even after the supplier is re-invited.
+    admin.from('ticket_supplier_declines').select('supplier_id, reason, declined_at').eq('ticket_id', t.id).order('declined_at', { ascending: true }),
   ])
   // Full COC/POC history — every submission, split by state (mirrors the supplier
   // view). Each sent-back card carries the reason it was rejected.
@@ -179,13 +181,13 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   const requestedSupplierRows = supplierRows.filter(r => r.status !== 'closed' && !(r.status === 'declined' && r.declinedBy === 'regional_manager'))
   // Freshly (re)assigned and awaiting quotes → a clean "new suppliers assigned" note.
   const awaitingSupplierQuotes = ['assigned', 'assessment', 'quote_requested', 'quote_revision'].includes(t.status) && activeSupplierRows.some(r => r.status === 'invited')
-  // Only suppliers who declined the quote REQUEST themselves (declined_by
-  // 'supplier'). A supplier whose quote the RM declined (declined_by
-  // 'regional_manager') is shown as "Quote declined — {name}" via the quote rows,
-  // not here — otherwise it wrongly reads as if they refused to quote.
-  const supplierDeclines = allSuppliersDeclined
-    ? ((invites ?? []) as any[]).filter(i => ['declined', 'closed'].includes(i.status) && i.declined_by === 'supplier').map(i => ({ name: i.suppliers?.company_name ?? nameById.get(i.supplier_id) ?? 'Supplier', at: i.responded_at ?? i.invited_at })).filter(d => d.at)
-    : []
+  // Suppliers who declined the quote REQUEST themselves, from the durable log — so
+  // each decline stays in the trail forever, even after the RM re-invites the same
+  // supplier (which resets their ticket_suppliers row). A supplier whose quote the
+  // RM declined is shown as "Quote declined — {name}" via the quote rows, not here.
+  const supplierDeclines = ((declineRows ?? []) as any[])
+    .map(d => ({ name: nameById.get(d.supplier_id) ?? 'Supplier', at: d.declined_at }))
+    .filter(d => d.at)
   const mapQuote = (q: any) => ({
     id: q.id, supplierName: nameById.get(q.supplier_id) ?? 'Supplier', amount: q.amount,
     amountInclVat: q.amount_incl_vat ?? null, description: q.description ?? null, fileUrl: q.file_url ?? null,
@@ -550,7 +552,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
 
       <AuditTrail ticket={{
         createdAt: t.created_at, status: t.status, updatedAt: t.updated_at,
-        quoteRequestedAt: t.quote_requested_at, quoteSubmittedAt: t.quote_submitted_at,
+        quoteRequestedAt: t.first_quote_requested_at ?? t.quote_requested_at, quoteSubmittedAt: t.quote_submitted_at,
         quoteApprovedAt: t.quote_decision_status === 'approved' ? t.quote_decided_at : null,
         scheduledAt: t.scheduled_at, completedAt: t.completed_at,
         editedAt: t.edited_at, editedByName: editorName, editNote: t.edit_note, cancellationReason: t.cancellation_reason,

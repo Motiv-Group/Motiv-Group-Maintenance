@@ -92,6 +92,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
     await admin.from('ticket_suppliers').update({ status: 'invited', declined_by: null, requote_requested_at: now, responded_at: now }).eq('ticket_id', ticket.id).eq('supplier_id', quote.supplier_id)
     await admin.from('tickets').update({
       status: 'quote_requested', supplier_id: null, quote_required: true, quote_requested_at: now, quote_due_at: quoteDueAt,
+      // Set-once: keep the FIRST quote request in the audit trail.
+      first_quote_requested_at: (ticket as any).first_quote_requested_at ?? now,
       quote_decision_required: false, quote_decision_status: null,
       current_blocker: 'supplier_action', blocker_owner_type: 'supplier', blocker_started_at: now, sla_paused: false,
       last_internal_update_at: now, updated_at: now,
