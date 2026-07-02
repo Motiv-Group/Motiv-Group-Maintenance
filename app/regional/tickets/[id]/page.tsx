@@ -175,26 +175,24 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   // Suppliers who previously declined/were-declined on this ticket — the assign
   // pop-up warns before re-sending them the quote request.
   const declinedSupplierIds = ((invites ?? []) as any[]).filter(i => ['declined', 'closed'].includes(i.status)).map(i => i.supplier_id)
-  // "Suppliers requested" shows the currently-active invites PLUS suppliers who
-  // declined the quote request themselves (shown with a red dot + their reason, so
-  // they don't just disappear). Quotes the RM declined stay in the declined-quotes
-  // section below; 'closed' losers (another supplier was awarded) are hidden.
+  // "Suppliers requested" shows only the currently-active invites. Suppliers who
+  // declined (their own request-decline, or a quote the RM declined) are moved to the
+  // Archive block; 'closed' losers (another supplier was awarded) are hidden.
   const activeSupplierRows = supplierRows.filter(r => !['declined', 'closed'].includes(r.status))
-  const requestedSupplierRows = supplierRows.filter(r => r.status !== 'closed' && !(r.status === 'declined' && r.declinedBy === 'regional_manager'))
   // Freshly (re)assigned and awaiting quotes → a clean "new suppliers assigned" note.
   const awaitingSupplierQuotes = ['assigned', 'assessment', 'quote_requested', 'quote_revision'].includes(t.status) && activeSupplierRows.some(r => r.status === 'invited')
   // Suppliers who declined the quote REQUEST themselves, from the durable log — so
-  // each decline stays in the trail forever, even after the RM re-invites the same
-  // supplier (which resets their ticket_suppliers row). A supplier whose quote the
-  // RM declined is shown as "Quote declined — {name}" via the quote rows, not here.
+  // each decline stays forever, even after the RM re-invites the same supplier (which
+  // resets their ticket_suppliers row). Shown in the Archive block + the audit trail.
+  // A supplier whose quote the RM declined is a declined quote, shown separately.
   const supplierDeclines = ((declineRows ?? []) as any[])
-    .map(d => ({ name: nameById.get(d.supplier_id) ?? 'Supplier', at: d.declined_at }))
+    .map(d => ({ name: nameById.get(d.supplier_id) ?? 'Supplier', reason: (d.reason ?? null) as string | null, at: d.declined_at }))
     .filter(d => d.at)
   const mapQuote = (q: any) => ({
     id: q.id, supplierName: nameById.get(q.supplier_id) ?? 'Supplier', amount: q.amount,
     amountInclVat: q.amount_incl_vat ?? null, description: q.description ?? null, fileUrl: q.file_url ?? null,
     validUntil: q.valid_until ?? null, createdAt: q.created_at, declineReason: declineReasonBy.get(q.supplier_id) ?? null,
-    proposedScheduleAt: q.proposed_schedule_at ?? null,
+    proposedScheduleAt: q.proposed_schedule_at ?? null, declinedAt: q.updated_at ?? null,
   })
   const reviewQuotes = ((quotes ?? []) as any[]).filter(q => q.status === 'pending').map(mapQuote)
   const acceptedQuotes = ((quotes ?? []) as any[]).filter(q => q.status === 'accepted').map(mapQuote)
@@ -209,7 +207,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   const canEdit = ['open', 'info_requested'].includes(t.status)
   // Gate the main Quotes block on its OWN content (declined quotes now live in the
   // separate Archive block, so they don't keep an otherwise-empty block open).
-  const hasQuoteBlock = requestedSupplierRows.length > 0 || reviewQuotes.length > 0 || acceptedQuotes.length > 0 || (variations ?? []).length > 0
+  const hasQuoteBlock = activeSupplierRows.length > 0 || reviewQuotes.length > 0 || acceptedQuotes.length > 0 || (variations ?? []).length > 0
   // A quote was declined but the ticket is still in the commercial phase → let the
   // RM invite additional suppliers (add to the existing invites) alongside reviewing
   // any remaining quotes. Excludes 'assigned' (the RM has just (re)assigned).
@@ -432,10 +430,10 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
       {/* Quotes & Variation Orders — suppliers requested, quotes to review, VOs */}
       {hasQuoteBlock && (
         <CollapsibleSection id="ticket-quotes" title="Quotes & Variation Orders" defaultOpen={phase === 'commercial'}>
-          {requestedSupplierRows.length > 0 && (
+          {activeSupplierRows.length > 0 && (
             <div className="space-y-2">
               <h3 className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Suppliers requested</h3>
-              <SupplierStatusList rows={requestedSupplierRows} />
+              <SupplierStatusList rows={activeSupplierRows} />
             </div>
           )}
           {reviewQuotes.length > 0 && (
@@ -515,7 +513,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
 
       {/* Archive — declined / not-selected quotes (by the RM or the supplier), moved
           out of the main Quotes block. Each is a click-to-expand row with its reason. */}
-      {declinedQuotes.length > 0 && (
+      {(declinedQuotes.length > 0 || supplierDeclines.length > 0) && (
         <CollapsibleSection id="ticket-quotes-archive" title="Archive">
           {declinedQuotes.map(q => (
             <details key={q.id} className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
@@ -537,7 +535,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
                   <DetailItem label="Excl. VAT" value={formatCurrency(q.amount)} />
                   <DetailItem label="Incl. VAT" value={q.amountInclVat ? formatCurrency(q.amountInclVat) : '—'} />
                   <DetailItem label="Received" value={formatDateTime(q.createdAt)} />
-                  <DetailItem label="Valid until" value={q.validUntil ? formatDate(q.validUntil) : 'N/A'} />
+                  <DetailItem label="Declined" value={q.declinedAt ? formatDateTime(q.declinedAt) : '—'} />
                 </div>
                 {q.description && (
                   <div>
@@ -549,6 +547,28 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
                 {/* Re-quote is only offered while the ticket is still live and un-awarded
                     — hidden once a quote is approved or every supplier has declined. */}
                 {!isTerminal && acceptedQuotes.length === 0 && !allSuppliersDeclined && <div className="pt-1"><ReQuoteButton ticketId={t.id} quoteId={q.id} /></div>}
+              </div>
+            </details>
+          ))}
+          {/* Suppliers who declined the quote REQUEST themselves — same card style as a
+              declined quote, with the reason and the date it was declined. */}
+          {supplierDeclines.map((d, i) => (
+            <details key={`rd-${i}`} className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
+              <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
+                <span className="text-sm font-semibold text-[var(--text)] min-w-0 truncate">{d.name}</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:text-red-400 bg-red-500/15 rounded-full px-2 py-0.5 shrink-0">Declined</span>
+              </summary>
+              <div className="border-t border-[var(--border)] p-4 space-y-3">
+                {d.reason && (
+                  <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Decline reason</p>
+                    <p className="text-sm text-[var(--text)]">{d.reason}</p>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                  <DetailItem label="Type" value="Declined quote request" />
+                  <DetailItem label="Declined" value={formatDateTime(d.at)} />
+                </div>
               </div>
             </details>
           ))}
