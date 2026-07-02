@@ -48,10 +48,10 @@ function groupCountCls(rows: RegionalTicketRow[]): string {
 }
 
 // No "All" pill: a null filter means all tickets, and clicking an active pill
-// deselects back to that default. Internal/Supplier breach + Overdue + Re-open
-// sit before Cancelled. A breach that has gone fully overdue drops out of the
-// breach pills and shows only under Overdue.
-type RmFilter = 'internal_breach' | 'supplier_breach' | 'reopened' | 'overdue' | Bucket
+// deselects back to that default. Internal/Supplier breach + Overdue sit before
+// Cancelled. A breach that has gone fully overdue drops out of the breach pills
+// and shows only under Overdue.
+type RmFilter = 'internal_breach' | 'supplier_breach' | 'overdue' | Bucket
 const PILLS: { key: RmFilter; label: string; active: string; inactive: string }[] = [
   { key: 'open', label: 'Open', active: 'bg-blue-500 text-white border-blue-500', inactive: 'text-blue-600 dark:text-blue-400 border-blue-500/40 hover:border-blue-400' },
   { key: 'quote_requested', label: 'Quote requested', active: 'bg-cyan-500 text-white border-cyan-500', inactive: 'text-cyan-600 dark:text-cyan-400 border-cyan-500/40 hover:border-cyan-400' },
@@ -64,7 +64,6 @@ const PILLS: { key: RmFilter; label: string; active: string; inactive: string }[
   { key: 'internal_breach', label: 'Internal Breached', active: 'bg-red-600 text-white border-red-600', inactive: 'text-red-600 dark:text-red-400 border-red-500/50 hover:border-red-500' },
   { key: 'supplier_breach', label: 'Supplier Breached', active: 'bg-orange-600 text-white border-orange-600', inactive: 'text-orange-600 dark:text-orange-400 border-orange-500/50 hover:border-orange-500' },
   { key: 'overdue', label: 'Overdue', active: 'bg-red-500 text-white border-red-500', inactive: 'text-red-600 dark:text-red-400 border-red-500/40 hover:border-red-400' },
-  { key: 'reopened', label: 'Re-open', active: 'bg-amber-500 text-white border-amber-500', inactive: 'text-amber-600 dark:text-amber-400 border-amber-500/40 hover:border-amber-400' },
   { key: 'cancelled', label: 'Cancelled', active: 'bg-gray-500 text-white border-gray-500', inactive: 'text-gray-600 dark:text-gray-400 border-gray-500/40 hover:border-gray-400' },
 ]
 
@@ -89,7 +88,7 @@ function TicketRow({ t }: { t: RegionalTicketRow }) {
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
         <PriorityBadge priority={t.priority} className="w-full text-center" />
-        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${t.reopened ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : t.infoAdded ? 'bg-teal-500/15 text-teal-700 dark:text-teal-400' : sm.cls}`}>{t.reopened ? 'Re-open' : t.infoAdded ? 'Info added' : sm.label}</span>
+        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${t.infoAdded ? 'bg-teal-500/15 text-teal-700 dark:text-teal-400' : sm.cls}`}>{t.infoAdded ? 'Info added' : sm.label}</span>
       </div>
     </Link>
   )
@@ -122,7 +121,6 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
   // to the Overdue pill (so it isn't double-counted).
   const internalBreachCount = useMemo(() => tickets.filter(t => t.internalBreached && !t.overdue).length, [tickets])
   const supplierBreachCount = useMemo(() => tickets.filter(t => t.supplierBreached && !t.overdue).length, [tickets])
-  const reopenedCount = useMemo(() => tickets.filter(t => t.reopened).length, [tickets])
   const overdueCount = useMemo(() => tickets.filter(t => t.overdue).length, [tickets])
 
   const shown = useMemo(() => {
@@ -130,7 +128,6 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
     return tickets.filter(t => {
       if (filter === 'internal_breach') { if (!(t.internalBreached && !t.overdue)) return false }
       else if (filter === 'supplier_breach') { if (!(t.supplierBreached && !t.overdue)) return false }
-      else if (filter === 'reopened') { if (!t.reopened) return false }
       else if (filter === 'overdue') { if (!t.overdue) return false }
       else if (filter !== null && bucketOf(t.status, t.supplierAssigned) !== filter) return false
       if (!terms.length) return true
@@ -203,7 +200,7 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
       {/* Filter pills — above the search. Click an active pill to deselect (= all). */}
       <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
         {PILLS.map(p => {
-          const n = p.key === 'internal_breach' ? internalBreachCount : p.key === 'supplier_breach' ? supplierBreachCount : p.key === 'reopened' ? reopenedCount : p.key === 'overdue' ? overdueCount : counts[p.key as Bucket]
+          const n = p.key === 'internal_breach' ? internalBreachCount : p.key === 'supplier_breach' ? supplierBreachCount : p.key === 'overdue' ? overdueCount : counts[p.key as Bucket]
           const on = filter === p.key
           return (
             <button key={p.key} onClick={() => setFilter(f => f === p.key ? null : p.key)} aria-pressed={on} className={`px-3 py-1.5 rounded-full text-xs font-medium border transition text-center ${on ? p.active : p.inactive}`}>

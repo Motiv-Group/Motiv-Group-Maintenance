@@ -204,11 +204,10 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   const canCancel = ['open', 'info_requested', 'assigned', 'assessment', 'quote_requested', 'quoted', 'quote_revision', 'suppliers_declined'].includes(t.status)
   const canEdit = ['open', 'info_requested'].includes(t.status)
   const hasQuoteBlock = supplierRows.length > 0 || reviewQuotes.length > 0 || acceptedQuotes.length > 0 || declinedQuotes.length > 0 || (variations ?? []).length > 0
-  // A declined quote means the ticket is "re-opened" — true through the whole
-  // commercial phase (incl. a stale 'quoted'), until awarded/scheduled or closed.
-  // Excludes 'assigned' — once the RM has (re)assigned, the ticket reads "Quote
-  // requested" again, not "Re-open".
-  const reQuote = declinedQuotes.length > 0 && ['open', 'info_requested', 'assessment', 'quote_requested', 'quoted', 'quote_revision'].includes(t.status)
+  // A quote was declined but the ticket is still in the commercial phase → let the
+  // RM invite additional suppliers (add to the existing invites) alongside reviewing
+  // any remaining quotes. Excludes 'assigned' (the RM has just (re)assigned).
+  const canAddSuppliers = declinedQuotes.length > 0 && ['open', 'info_requested', 'assessment', 'quote_requested', 'quoted', 'quote_revision'].includes(t.status)
   // "Info added" = the SM resubmitted after an info request (back at open, reason kept).
   const rmInfoAdded = t.status === 'open' && !!t.info_request_reason
 
@@ -240,12 +239,12 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
               <PriorityBadge priority={t.priority} className="w-full text-center" />
               {(() => {
                 const sm = rmStatusMeta(t.status)
-                // A ticket where every supplier declined is back at 'open' — it reads
-                // "Open" (or "Re-open" if a quote was declined). "Info added" reads like
-                // an "Info requested" badge (amber); the fresh answer is highlighted red
-                // in the description until the RM acts.
-                const label = reQuote ? 'Re-open' : rmInfoAdded ? 'Info added' : sm.label
-                const cls = reQuote ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : rmInfoAdded ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : sm.cls
+                // A ticket where every supplier declined is back at 'open' and simply
+                // reads "Open". "Info added" reads like an "Info requested" badge
+                // (amber); the fresh answer is highlighted red in the description until
+                // the RM acts.
+                const label = rmInfoAdded ? 'Info added' : sm.label
+                const cls = rmInfoAdded ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : sm.cls
                 return <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${cls}`}>{label}</span>
               })()}
             </div>
@@ -395,7 +394,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         {/* Primary actions — equal-size, side by side: Assign (green) · Request info (amber) · Cancel (red) */}
         {!isTerminal && (canAssign || canCancel) && (
           <div className="flex gap-2">
-            {(canAssign || reQuote) && <AssignSuppliersButton ticketId={t.id} suppliers={supplierList} motivSuppliers={motivSupplierList} declinedSupplierIds={declinedSupplierIds} />}
+            {(canAssign || canAddSuppliers) && <AssignSuppliersButton ticketId={t.id} suppliers={supplierList} motivSuppliers={motivSupplierList} declinedSupplierIds={declinedSupplierIds} />}
             {['open', 'info_requested'].includes(t.status) && <RequestInfoButton ticketId={t.id} />}
             {canCancel && <CancelTicketCard ticketId={t.id} />}
           </div>

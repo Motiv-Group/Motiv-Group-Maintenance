@@ -340,7 +340,7 @@ export interface RegionalTicketRow {
   status: string; priority: Priority; jobRef: string | null; createdAt: string
   quoteRequestedAt: string | null; quoteReceivedAt: string | null; quoteAcceptedAt: string | null
   breached: boolean; supplierBreached: boolean; internalBreached: boolean
-  dueAt: string; overdue: boolean; reopened: boolean; infoAdded: boolean
+  dueAt: string; overdue: boolean; infoAdded: boolean
   supplierAssigned: boolean
 }
 export interface RegionalDashboardData {
@@ -387,7 +387,6 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
   const ticketIds = tickets.map(t => t.id)
   const { data: quoteRows } = ticketIds.length ? await db.from('quotes').select('ticket_id, status, created_at, amount').in('ticket_id', ticketIds) : { data: [] as any[] }
   const firstQuoteAt = new Map<string, string>(); const acceptedQuoteAt = new Map<string, string>()
-  const declinedQuoteTickets = new Set<string>()
   // Region-wide quote value totals (R) by status, for the RM "Quote Value" KPI.
   let acceptedQuoteValue = 0, pendingQuoteValue = 0
   for (const q of (quoteRows ?? []) as any[]) {
@@ -395,7 +394,6 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
     if (!cur || new Date(q.created_at) < new Date(cur)) firstQuoteAt.set(q.ticket_id, q.created_at)
     if (q.status === 'accepted') { acceptedQuoteAt.set(q.ticket_id, q.created_at); acceptedQuoteValue += Number(q.amount ?? 0) }
     if (q.status === 'pending') pendingQuoteValue += Number(q.amount ?? 0)
-    if (q.status === 'declined') declinedQuoteTickets.add(q.ticket_id)
   }
   // Variation orders: an APPROVED VO adds to the Accepted quote value; a PENDING VO
   // (awaiting the RM's approval) is tracked as its own "VO pending" total.
@@ -405,9 +403,6 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
     if (v.status === 'approved') acceptedQuoteValue += Number(v.amount ?? 0)
     else if (v.status === 'pending') voPendingValue += Number(v.amount ?? 0)
   }
-  // Commercial-phase statuses where a declined quote means the ticket is "re-opened".
-  const COMMERCIAL = ['open', 'info_requested', 'assigned', 'assessment', 'quote_requested', 'quoted', 'quote_revision']
-
   // Ticket rows (most-recent first) for the recent card + tickets tab.
   const ticketRows: RegionalTicketRow[] = [...tickets]
     .sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at))
@@ -423,7 +418,6 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
       breached: !!s && (s.supplierBreached || s.internalBreached),
       supplierBreached: !!s?.supplierBreached, internalBreached: !!s?.internalBreached,
       ...dueInfo(t, rules, now),
-      reopened: declinedQuoteTickets.has(t.id) && COMMERCIAL.includes(t.status) && t.status !== 'assigned',
       infoAdded: t.status === 'open' && !!(t as any).info_request_reason,
       supplierAssigned: !!(t as any).supplier_id,
       }
