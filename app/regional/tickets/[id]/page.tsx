@@ -91,7 +91,9 @@ function RmDeclinedQuoteCard({ q, ticketId, canReQuote, open = false }: { q: any
 // One COC/POC submission card — reused across the under-review, sent-back (snag)
 // and approved blocks so the RM sees the full submission history. A sent-back card
 // shows the reason it was returned (why another COC/POC was needed).
-function RmSignoffCard({ s, tone, ticketId, collapsible = false, defaultOpen = false, title }: { s: any; tone: 'review' | 'snag' | 'approved' | 'evidence'; ticketId: string; collapsible?: boolean; defaultOpen?: boolean; title?: string }) {
+function RmSignoffCard({ s, tone, ticketId, collapsible = false, defaultOpen = false, title, reason }: { s: any; tone: 'review' | 'snag' | 'approved' | 'evidence'; ticketId: string; collapsible?: boolean; defaultOpen?: boolean; title?: string; reason?: string | null }) {
+  // Prefer the durable round reason; fall back to the reason stored on the signoff.
+  const reasonText = reason ?? s.reject_reason
   const meta = tone === 'approved'
     ? { ring: 'ring-emerald-500/40', bg: 'bg-emerald-500/5', head: 'bg-emerald-500/10 border-emerald-500/20', badge: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400', label: 'Approved', Icon: CheckCircle2, iconCls: 'text-emerald-500', title: 'Approved completion' }
     : tone === 'snag'
@@ -110,16 +112,16 @@ function RmSignoffCard({ s, tone, ticketId, collapsible = false, defaultOpen = f
   )
   const body = (
     <>
-        {tone === 'snag' && s.reject_reason && (
+        {tone === 'snag' && reasonText && (
           <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3">
             <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Why it was sent back</p>
-            <p className="text-sm text-[var(--text)]">{s.reject_reason}</p>
+            <p className="text-sm text-[var(--text)]">{reasonText}</p>
           </div>
         )}
-        {tone === 'evidence' && s.reject_reason && (
+        {tone === 'evidence' && reasonText && (
           <div className="rounded-lg bg-amber-500/10 ring-1 ring-amber-500/30 p-3">
             <p className="text-[11px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400">Why more evidence was requested</p>
-            <p className="text-sm text-[var(--text)]">{s.reject_reason}</p>
+            <p className="text-sm text-[var(--text)]">{reasonText}</p>
           </div>
         )}
         <div>
@@ -190,7 +192,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   const { data: t } = await admin.from('tickets').select('*').eq('id', params.id).single()
   if (!t || !t.region_id || !regionIds.includes(t.region_id)) redirect('/regional/tickets')
 
-  const [{ data: store }, { data: quotes }, { data: updates }, { data: signoffs }, { data: suppliers }, { data: variations }, { data: snags }, { data: invites }, { data: ratingRows }] = await Promise.all([
+  const [{ data: store }, { data: quotes }, { data: updates }, { data: signoffs }, { data: suppliers }, { data: variations }, { data: snags }, { data: invites }, { data: ratingRows }, { data: roundRows }] = await Promise.all([
     admin.from('stores').select('name, sub_store').eq('id', t.store_id).single(),
     admin.from('quotes').select('id, supplier_id, amount, amount_incl_vat, description, file_url, status, valid_until, proposed_schedule_at, decline_reason, created_at, updated_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
@@ -200,6 +202,10 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
     admin.from('snags').select('description, status, scheduled_at, schedule_status, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('ticket_suppliers').select('supplier_id, status, invited_at, responded_at, decline_reason, declined_by, suppliers(company_name)').eq('ticket_id', t.id),
     admin.from('ratings').select('supplier_id, score').eq('company_id', companyId),
+    // Durable COC/POC review-round log — drives the "Submission #N" numbers + the
+    // sent-back reason on the archived round cards (falls back to the signoff rows
+    // for tickets predating this table). Null if the table isn't migrated yet.
+    admin.from('signoff_rounds').select('signoff_id, round_no, kind, reason').eq('ticket_id', t.id),
   ])
   const storeName = store ? storeLabel(store.name, store.sub_store) : 'Store'
   const editorName = t.edited_by ? ((await admin.from('user_profiles').select('full_name').eq('id', t.edited_by).single()).data?.full_name ?? null) : null
@@ -232,6 +238,13 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   // cards in the Archive, newest first. The live under-review one stays in COC & POC;
   // the approved one in Completion.
   const supersededSubmissions = [...evidenceRequestedSignoffs, ...rejectedSignoffs].sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at))
+  // Durable review-round log drives the number / kind / reason on each round card;
+  // falls back to the signoff row (submission ordinal + reject_reason + status) for
+  // tickets that predate the signoff_rounds table.
+  const roundBySignoff = new Map<string, { round_no: number; kind: string; reason: string | null }>()
+  for (const r of ((roundRows ?? []) as any[])) if (r.signoff_id) roundBySignoff.set(r.signoff_id, { round_no: r.round_no, kind: r.kind, reason: r.reason ?? null })
+  const submissionLabel = (s: any) => `Submission #${roundBySignoff.get(s.id)?.round_no ?? submissionNo.get(s.id) ?? '?'}`
+  const submissionTone = (s: any): 'snag' | 'evidence' => (roundBySignoff.get(s.id)?.kind ?? (s.status === 'rejected' ? 'snag' : 'evidence')) === 'snag' ? 'snag' : 'evidence'
   // Snag scheduling — the supplier's proposed fix date (separate from the original
   // job schedule) and whether it's still awaiting the RM's approval.
   const latestSnag = ((snags ?? []) as any[])[0] ?? null
@@ -508,7 +521,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
           that were sent back (evidence / snag) live in the Archive as round cards. */}
       {pendingSignoffs.length > 0 && (
         <CollapsibleSection id="ticket-coc" title="COC & POC" defaultOpen={phase === 'coc'}>
-          {pendingSignoffs.map((s: any) => <RmSignoffCard key={s.id} s={s} tone="review" ticketId={t.id} title={`Submission #${submissionNo.get(s.id)}`} collapsible defaultOpen />)}
+          {pendingSignoffs.map((s: any) => <RmSignoffCard key={s.id} s={s} tone="review" ticketId={t.id} title={submissionLabel(s)} collapsible defaultOpen />)}
         </CollapsibleSection>
       )}
 
@@ -712,7 +725,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
           {/* Superseded COC/POC submissions — sent back for more evidence or snagged.
               Each is a collapsed "Submission #N" round card showing the RM's reason. */}
           {supersededSubmissions.map((s: any) => (
-            <RmSignoffCard key={s.id} s={s} tone={s.status === 'rejected' ? 'snag' : 'evidence'} ticketId={t.id} title={`Submission #${submissionNo.get(s.id)}`} collapsible />
+            <RmSignoffCard key={s.id} s={s} tone={submissionTone(s)} ticketId={t.id} title={submissionLabel(s)} reason={roundBySignoff.get(s.id)?.reason ?? s.reject_reason} collapsible />
           ))}
           {/* Archived declines are already re-invited or superseded — no re-quote here.
               Losing quoters (quote declined when the job was awarded) show the courteous

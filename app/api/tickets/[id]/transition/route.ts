@@ -13,8 +13,11 @@ type Admin = ReturnType<typeof createAdminClient>
 // submission being sent back. round_no is 1-based per ticket. Mirrors the quote-
 // request rounds log.
 async function logSignoffRound(admin: Admin, ticket: any, signoffId: string | null, kind: 'evidence' | 'snag', reason: string | null, now: string) {
-  const { count } = await admin.from('signoff_rounds').select('id', { count: 'exact', head: true }).eq('ticket_id', ticket.id)
-  await admin.from('signoff_rounds').insert({ company_id: ticket.company_id, ticket_id: ticket.id, signoff_id: signoffId, kind, reason, round_no: (count ?? 0) + 1, created_at: now })
+  // round_no = the reviewed submission's ordinal. The submission being sent back is
+  // the latest one, so the count of signoffs (which already includes it) is its
+  // number — this lines up with the "Submission #N" the RM sees.
+  const { count } = await admin.from('signoffs').select('id', { count: 'exact', head: true }).eq('ticket_id', ticket.id)
+  await admin.from('signoff_rounds').insert({ company_id: ticket.company_id, ticket_id: ticket.id, signoff_id: signoffId, kind, reason, round_no: count ?? 1, created_at: now })
 }
 
 // The COC/POC submission currently under review (the one an evidence-request or snag
