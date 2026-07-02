@@ -40,6 +40,46 @@ function DetailItem({ label, value }: { label: string; value: string }) {
   )
 }
 
+// A declined-quote card (RM- or supplier-declined) — click to expand. Used both in
+// the Quotes block (live declines, with the "Ask to re-quote" action) and the Archive
+// (superseded declines).
+function RmDeclinedQuoteCard({ q, ticketId, canReQuote, open = false }: { q: any; ticketId: string; canReQuote: boolean; open?: boolean }) {
+  return (
+    <details open={open} className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
+      <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
+        <span className="text-sm font-semibold text-[var(--text)] min-w-0 truncate">{q.supplierName}</span>
+        <span className="flex items-center gap-2 shrink-0">
+          <span className="text-sm text-[var(--text)] tabular-nums">{formatCurrency(q.amount)}</span>
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:text-red-400 bg-red-500/15 rounded-full px-2 py-0.5">Declined</span>
+        </span>
+      </summary>
+      <div className="border-t border-[var(--border)] p-4 space-y-3">
+        {q.declineReason && (
+          <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Decline reason</p>
+            <p className="text-sm text-[var(--text)]">{q.declineReason}</p>
+          </div>
+        )}
+        <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+          <DetailItem label="Excl. VAT" value={formatCurrency(q.amount)} />
+          <DetailItem label="Incl. VAT" value={q.amountInclVat ? formatCurrency(q.amountInclVat) : '—'} />
+          <DetailItem label="Received" value={formatDateTime(q.createdAt)} />
+          <DetailItem label="Declined" value={q.declinedAt ? formatDateTime(q.declinedAt) : '—'} />
+        </div>
+        {q.description && (
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Description</div>
+            <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{q.description}</p>
+          </div>
+        )}
+        {q.fileUrl && <a href={q.fileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View attached quote</a>}
+        {/* Ask the supplier to re-quote — only while the ticket is live and un-awarded. */}
+        {canReQuote && <div className="pt-1"><ReQuoteButton ticketId={ticketId} quoteId={q.id} /></div>}
+      </div>
+    </details>
+  )
+}
+
 // One COC/POC submission card — reused across the under-review, sent-back (snag)
 // and approved blocks so the RM sees the full submission history. A sent-back card
 // shows the reason it was returned (why another COC/POC was needed).
@@ -186,9 +226,6 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   // ticket is un-awarded AND the supplier is still declined. Once a quote is approved,
   // or the supplier is re-assigned (invite flips to 'invited'), it moves to the Archive.
   const isLiveDecline = (supplierId: string) => !awarded && inviteStatusById.get(supplierId) === 'declined'
-  // "Suppliers requested": active invites PLUS currently-declined suppliers (red dot +
-  // reason) while un-awarded; once awarded, declines drop out (→ Archive). 'closed' hidden.
-  const requestedRows = supplierRows.filter(r => r.status !== 'closed' && !(awarded && r.status === 'declined'))
   // Supplier request-declines from the durable log (survive re-invite). Shown live in
   // the Quotes block; superseded ones (re-assigned / awarded) go to the Archive.
   const supplierDeclines = ((declineRows ?? []) as any[])
@@ -205,11 +242,18 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   const reviewQuotes = ((quotes ?? []) as any[]).filter(q => q.status === 'pending').map(mapQuote)
   const acceptedQuotes = ((quotes ?? []) as any[]).filter(q => q.status === 'accepted').map(mapQuote)
   const declinedQuotes = ((quotes ?? []) as any[]).filter(q => q.status === 'declined').map(mapQuote)
-  // Archive = declines that have been superseded (the supplier was re-assigned, or a
-  // quote was approved). Live declines stay in the Quotes block until then.
+  // Live declines (not yet superseded) stay in the Quotes block; the rest go to Archive
+  // (the supplier was re-assigned, or a quote was approved).
+  const liveDeclinedQuotes = declinedQuotes.filter(q => isLiveDecline(q.supplierId))
   const archivedDeclinedQuotes = declinedQuotes.filter(q => !isLiveDecline(q.supplierId))
   const archivedRequestDeclines = supplierDeclines.filter(d => !isLiveDecline(d.supplierId))
+  // A supplier shown as a full live declined-quote card drops out of the red-dot
+  // "Suppliers requested" list, which then holds active invites + pure request-declines.
+  const liveDeclinedQuoteIds = new Set(liveDeclinedQuotes.map(q => q.supplierId))
+  const requestedRows = supplierRows.filter(r => r.status !== 'closed' && !(awarded && r.status === 'declined') && !liveDeclinedQuoteIds.has(r.id))
   const isTerminal = ['completed', 'cancelled', 'declined'].includes(t.status)
+  // "Ask to re-quote" is offered while the ticket is live, un-awarded and not fully declined.
+  const canReQuote = !isTerminal && acceptedQuotes.length === 0 && !allSuppliersDeclined
   // Assigning / adding work / requesting info is available before a supplier is on
   // the ticket — incl. when every invited supplier declined (suppliers_declined).
   const canAssign = ['open', 'info_requested', 'suppliers_declined'].includes(t.status)
@@ -460,6 +504,14 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
               <QuoteReviewCard ticketId={t.id} quotes={reviewQuotes} />
             </div>
           )}
+          {/* Declined quotes still in play — full card + "Ask to re-quote" so the RM can
+              invite that supplier to re-quote before assigning suppliers again. */}
+          {liveDeclinedQuotes.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Declined quotes</h3>
+              {liveDeclinedQuotes.map(q => <RmDeclinedQuoteCard key={q.id} q={q} ticketId={t.id} canReQuote={canReQuote} />)}
+            </div>
+          )}
           {acceptedQuotes.length > 0 && (
             <div className="space-y-2">
               <h3 className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Accepted quote</h3>
@@ -535,41 +587,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
           out of the main Quotes block. Each is a click-to-expand row with its reason. */}
       {(archivedDeclinedQuotes.length > 0 || archivedRequestDeclines.length > 0) && (
         <CollapsibleSection id="ticket-quotes-archive" title="Archive">
-          {archivedDeclinedQuotes.map(q => (
-            <details key={q.id} className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
-              <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
-                <span className="text-sm font-semibold text-[var(--text)] min-w-0 truncate">{q.supplierName}</span>
-                <span className="flex items-center gap-2 shrink-0">
-                  <span className="text-sm text-[var(--text)] tabular-nums">{formatCurrency(q.amount)}</span>
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:text-red-400 bg-red-500/15 rounded-full px-2 py-0.5">Declined</span>
-                </span>
-              </summary>
-              <div className="border-t border-[var(--border)] p-4 space-y-3">
-                {q.declineReason && (
-                  <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3">
-                    <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Decline reason</p>
-                    <p className="text-sm text-[var(--text)]">{q.declineReason}</p>
-                  </div>
-                )}
-                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                  <DetailItem label="Excl. VAT" value={formatCurrency(q.amount)} />
-                  <DetailItem label="Incl. VAT" value={q.amountInclVat ? formatCurrency(q.amountInclVat) : '—'} />
-                  <DetailItem label="Received" value={formatDateTime(q.createdAt)} />
-                  <DetailItem label="Declined" value={q.declinedAt ? formatDateTime(q.declinedAt) : '—'} />
-                </div>
-                {q.description && (
-                  <div>
-                    <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Description</div>
-                    <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{q.description}</p>
-                  </div>
-                )}
-                {q.fileUrl && <a href={q.fileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View attached quote</a>}
-                {/* Re-quote is only offered while the ticket is still live and un-awarded
-                    — hidden once a quote is approved or every supplier has declined. */}
-                {!isTerminal && acceptedQuotes.length === 0 && !allSuppliersDeclined && <div className="pt-1"><ReQuoteButton ticketId={t.id} quoteId={q.id} /></div>}
-              </div>
-            </details>
-          ))}
+          {archivedDeclinedQuotes.map(q => <RmDeclinedQuoteCard key={q.id} q={q} ticketId={t.id} canReQuote={canReQuote} />)}
           {/* Suppliers who declined the quote REQUEST themselves — same card style as a
               declined quote, with the reason and the date it was declined. */}
           {archivedRequestDeclines.map((d, i) => (
