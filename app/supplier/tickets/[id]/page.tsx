@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import { redirect } from 'next/navigation'
-import { ClipboardCheck, FileText, Calendar } from 'lucide-react'
+import { ClipboardCheck, FileText, Calendar, XCircle } from 'lucide-react'
 import { SubmitCompletionForm } from '@/components/supplier/SubmitCompletionForm'
 import { BackLink } from '@/components/ui/BackLink'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
@@ -398,6 +398,31 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
               }
             />
           ))}
+        </CollapsibleSection>
+      )}
+
+      {/* Supplier declined the quote request WITHOUT ever submitting a quote → no
+          quote card exists, so add one for history stating who declined the request. */}
+      {declinedBy === 'supplier' && (myQuotes ?? []).length === 0 && (
+        <CollapsibleSection id="ticket-quotes" title="Quotes" defaultOpen>
+          <div className="rounded-xl ring-1 ring-red-500/40 bg-red-500/5 overflow-hidden">
+            <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b bg-red-500/10 border-red-500/20">
+              <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)] min-w-0">
+                <XCircle size={15} className="text-red-500 shrink-0" />
+                <span className="truncate">Quote request declined</span>
+              </span>
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:text-red-400 bg-red-500/15 rounded-full px-2 py-0.5 shrink-0">Declined</span>
+            </div>
+            <div className="p-4 space-y-2">
+              <p className="text-sm text-[var(--text)]">Quote request declined by {supplierCompanyName ?? 'you'}{(invite as any)?.responded_at ? ` · ${formatDateTime((invite as any).responded_at)}` : ''}</p>
+              {declineReason && (
+                <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Reason</p>
+                  <p className="text-sm text-[var(--text)]">{declineReason}</p>
+                </div>
+              )}
+            </div>
+          </div>
         </CollapsibleSection>
       )}
 
