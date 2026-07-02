@@ -413,6 +413,11 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         {/* Variation order review — dedicated approve (confirm-over-buttons) + decline pop-up. */}
         {t.status === 'variation_review' && <VariationReviewCard ticketId={t.id} />}
 
+        {/* In progress — the supplier has started; reassure the RM the job is being attended to. */}
+        {t.status === 'in_progress' && (
+          <div className="rounded-xl bg-[#C6A35D]/10 ring-1 ring-[#C6A35D]/30 p-3.5 text-sm text-[var(--text-muted)]">Work in progress — the supplier is on site or en route to attend to the job. The completion certificate and proof-of-completion photos will follow once the work is done.</div>
+        )}
+
         {/* Close-out stage — COC/POC approved; the supplier may still raise a variation
             order, or the RM finalises the close-out (button below). */}
         {(t.status === 'approved_closeout' || t.status === 'vo_declined') && (
