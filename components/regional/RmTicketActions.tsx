@@ -607,22 +607,55 @@ export function AcceptScheduleCard({ ticketId, scheduledAt }: { ticketId: string
   )
 }
 
-// ── Approve a supplier's proposed snag-fix date ─────────────────
+// ── Approve / decline a supplier's proposed snag-fix date ───────
+const SNAG_SCHEDULE_DECLINE_REASONS = ['Date is too far out', 'Needs to be done sooner', 'Outside acceptable window', 'Clashes with store operations', 'Other']
 export function AcceptSnagScheduleCard({ ticketId, scheduledAt }: { ticketId: string; scheduledAt: string }) {
   const router = useRouter()
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  const [declineOpen, setDeclineOpen] = useState(false)
+  const [reason, setReason] = useState('')
+  const [other, setOther] = useState('')
+  const input = 'w-full px-3 py-2 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm'
+
   async function approve() {
     setBusy(true); setErr('')
     try { await post(`/api/tickets/${ticketId}/transition`, { action: 'approve_snag' }); router.refresh() }
     catch (e: any) { setErr(e.message); setBusy(false) }
   }
+  async function decline() {
+    if (!reason) { setErr('Choose a reason.'); return }
+    const finalReason = reason === 'Other' ? other.trim() : reason
+    if (!finalReason) { setErr('Tell the supplier why.'); return }
+    setBusy(true); setErr('')
+    try { await post(`/api/tickets/${ticketId}/transition`, { action: 'decline_snag_schedule', reason: finalReason }); setDeclineOpen(false); setBusy(false); router.refresh() }
+    catch (e: any) { setErr(e.message); setBusy(false) }
+  }
+
   return (
     <div className="rounded-xl ring-1 ring-indigo-500/40 bg-indigo-500/5 p-4 space-y-2">
       <p className="text-sm font-semibold text-[var(--text)]">Snag fix schedule</p>
-      <p className="text-sm text-[var(--text-muted)]">The supplier proposed <span className="font-semibold text-[var(--text)]">{formatDateTime(scheduledAt)}</span> to carry out the corrective work. Approve to confirm so they can proceed.</p>
-      {err && <p className="text-xs text-red-500">{err}</p>}
-      <button onClick={approve} disabled={busy} className="w-full py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Approving…' : 'Approve snag schedule'}</button>
+      <p className="text-sm text-[var(--text-muted)]">The supplier proposed <span className="font-semibold text-[var(--text)]">{formatDateTime(scheduledAt)}</span> to carry out the corrective work. Approve to confirm, or decline to ask for a new date.</p>
+      {err && !declineOpen && <p className="text-xs text-red-500">{err}</p>}
+      <div className="flex gap-2">
+        <button onClick={approve} disabled={busy} className="flex-1 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Approving…' : 'Approve snag schedule'}</button>
+        <button onClick={() => { setReason(''); setOther(''); setErr(''); setDeclineOpen(true) }} disabled={busy} className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-semibold disabled:opacity-50">Decline</button>
+      </div>
+      {declineOpen && (
+        <Modal title="Decline snag schedule" onClose={() => { if (!busy) { setDeclineOpen(false); setErr('') } }}>
+          <p className="text-xs text-[var(--text-muted)]">The supplier is notified and asked to propose a new date for the corrective work.</p>
+          <select autoFocus className={input} value={reason} onChange={e => { setReason(e.target.value); setErr('') }}>
+            <option value="">— Choose a reason —</option>
+            {SNAG_SCHEDULE_DECLINE_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
+          </select>
+          {reason === 'Other' && <textarea className={`${input} min-h-[80px]`} placeholder="Tell the supplier why…" value={other} onChange={e => setOther(e.target.value)} />}
+          {err && <p className="text-xs text-red-500">{err}</p>}
+          <div className="flex gap-2">
+            <button onClick={decline} disabled={busy} className="flex-1 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Declining…' : 'Decline schedule'}</button>
+            <button onClick={() => { setDeclineOpen(false); setErr('') }} disabled={busy} className="flex-1 py-2 rounded-xl ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm disabled:opacity-50">Cancel</button>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }

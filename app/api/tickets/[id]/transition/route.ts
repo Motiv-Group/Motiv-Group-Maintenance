@@ -220,6 +220,12 @@ export async function POST(request: Request, { params }: { params: { id: string 
         // RM approves the proposed snag-fix date → the supplier can start the work.
         await admin.from('snags').update({ schedule_status: 'agreed' }).eq('ticket_id', ticketId).eq('schedule_status', 'proposed')
         break
+      case 'decline_snag_schedule':
+        // RM rejects the proposed snag-fix date → send it back so the supplier proposes
+        // a new one. Reset the snag to 'open' (accept_snag re-proposes on 'open' snags)
+        // and clear the date. The reason is relayed to the supplier in the notification.
+        await admin.from('snags').update({ status: 'open', schedule_status: null, scheduled_at: null }).eq('ticket_id', ticketId).in('status', ['assigned', 'in_progress'])
+        break
       case 'start_snag': {
         // Only after the RM has approved the proposed snag-fix date.
         const { data: snag } = await admin.from('snags').select('schedule_status').eq('ticket_id', ticketId).in('status', ['assigned', 'in_progress', 'open']).order('created_at', { ascending: false }).limit(1).maybeSingle()
@@ -246,7 +252,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const { error: upErr } = await admin.from('tickets').update(updates).eq('id', ticketId)
   if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 })
 
-  await notify(admin, action, ticket, prof.full_name ?? null, { scheduleProposed, scheduledAt: (updates.scheduled_at as string | undefined) ?? snagFixAt })
+  await notify(admin, action, ticket, prof.full_name ?? null, { scheduleProposed, scheduledAt: (updates.scheduled_at as string | undefined) ?? snagFixAt, declineReason: body.reason ?? null })
 
   revalidatePath(`/supplier/tickets/${ticketId}`); revalidatePath('/supplier')
   revalidatePath('/regional'); revalidatePath('/regional/tickets'); revalidatePath('/client'); revalidatePath('/client/visits'); revalidatePath(`/client/tickets/${ticketId}`); revalidatePath('/executive')
@@ -298,8 +304,8 @@ async function hasAccess(admin: Admin, role: WorkflowRole, userId: string, ticke
 }
 
 // Targeted notifications for the moves that need someone else to act next.
-async function notify(admin: Admin, action: string, ticket: any, actorName: string | null, opts?: { scheduleProposed?: boolean; scheduledAt?: string }) {
-  const toSupplier = ['validate', 'request_quote', 'require_assessment', 'approve_quote', 'request_evidence', 'raise_snag', 'assign_snag', 'approve_variation', 'reject_variation', 'accept_schedule', 'approve_snag', 'approve', 'close_out']
+async function notify(admin: Admin, action: string, ticket: any, actorName: string | null, opts?: { scheduleProposed?: boolean; scheduledAt?: string; declineReason?: string | null }) {
+  const toSupplier = ['validate', 'request_quote', 'require_assessment', 'approve_quote', 'request_evidence', 'raise_snag', 'assign_snag', 'approve_variation', 'reject_variation', 'accept_schedule', 'approve_snag', 'decline_snag_schedule', 'approve', 'close_out']
   const toRegion   = ['submit_quote', 'submit_completion', 'submit_variation', 'resolve_snag', 'resubmit', 'accept_snag', 'start_snag']
   // The store manager is told whenever a visit is scheduled / agreed so they can
   // expect the supplier on site.
@@ -325,6 +331,7 @@ async function notify(admin: Admin, action: string, ticket: any, actorName: stri
     const ids = (data ?? []).map(r => r.user_id)
     const msg = action === 'accept_schedule' ? `Visit time confirmed${when ? ` for ${when}` : ''}`
       : action === 'approve_snag' ? 'Snag schedule approved — you can start the corrective work'
+      : action === 'decline_snag_schedule' ? `Snag schedule declined${opts?.declineReason ? ` — ${opts.declineReason}` : ''}. Please propose a new date.`
       : action === 'approve_variation' ? 'Variation order approved — you can continue'
       : action === 'reject_variation' ? 'Variation order declined — re-submit a revised VO or message the manager'
       : action === 'approve' ? 'COC & POC approved — raise a variation order if needed, or the job will be closed out'
