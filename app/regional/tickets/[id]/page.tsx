@@ -215,10 +215,6 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   const declineReasonBy = new Map<string, string>()
   for (const inv of (invites ?? []) as any[]) if (inv.decline_reason) declineReasonBy.set(inv.supplier_id, inv.decline_reason)
   const supplierRows = ((invites ?? []) as any[]).map(inv => ({ id: inv.supplier_id as string, name: inv.suppliers?.company_name ?? nameById.get(inv.supplier_id) ?? 'Supplier', status: inv.status as string, invitedAt: inv.invited_at ?? null, declineReason: inv.decline_reason ?? null, declinedBy: (inv.declined_by ?? null) as 'supplier' | 'regional_manager' | null }))
-  // Every invited supplier declined (and none awarded) → the ticket moves to the
-  // real "suppliers_declined" status and reads "Declined (Supplier)"; each decline
-  // is listed in the audit trail. (Kept as an invite-derived fallback too.)
-  const allSuppliersDeclined = t.status === 'suppliers_declined' || (supplierRows.length > 0 && !t.supplier_id && supplierRows.every(r => ['declined', 'closed'].includes(r.status)) && supplierRows.some(r => r.declinedBy === 'supplier'))
   // Suppliers who previously declined/were-declined on this ticket — the assign
   // pop-up warns before re-sending them the quote request.
   const declinedSupplierIds = ((invites ?? []) as any[]).filter(i => ['declined', 'closed'].includes(i.status)).map(i => i.supplier_id)
@@ -259,8 +255,11 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   const liveDeclinedQuoteIds = new Set(liveDeclinedQuotes.map(q => q.supplierId))
   const requestedRows = supplierRows.filter(r => r.status !== 'closed' && !(awarded && r.status === 'declined') && !liveDeclinedQuoteIds.has(r.id))
   const isTerminal = ['completed', 'cancelled', 'declined'].includes(t.status)
-  // "Ask to re-quote" is offered while the ticket is live, un-awarded and not fully declined.
-  const canReQuote = !isTerminal && acceptedQuotes.length === 0 && !allSuppliersDeclined
+  // "Ask to re-quote" re-invites that supplier (same effect as assigning them
+  // again). Offered on a live declined quote whenever the ticket is still in a
+  // re-assignable commercial phase and no quote has been awarded — including when
+  // every supplier declined (the ticket is back to Open). Mirrors the /assign statuses.
+  const canReQuote = acceptedQuotes.length === 0 && ['open', 'info_requested', 'assigned', 'assessment', 'quote_requested', 'quoted', 'quote_revision', 'suppliers_declined'].includes(t.status)
   // Assigning / adding work / requesting info is available before a supplier is on
   // the ticket — incl. when every invited supplier declined (suppliers_declined).
   const canAssign = ['open', 'info_requested', 'suppliers_declined'].includes(t.status)
@@ -594,7 +593,8 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
           out of the main Quotes block. Each is a click-to-expand row with its reason. */}
       {(archivedDeclinedQuotes.length > 0 || archivedRequestDeclines.length > 0) && (
         <CollapsibleSection id="ticket-quotes-archive" title="Archive">
-          {archivedDeclinedQuotes.map(q => <RmDeclinedQuoteCard key={q.id} q={q} ticketId={t.id} canReQuote={canReQuote} />)}
+          {/* Archived declines are already re-invited or superseded — no re-quote here. */}
+          {archivedDeclinedQuotes.map(q => <RmDeclinedQuoteCard key={q.id} q={q} ticketId={t.id} canReQuote={false} />)}
           {/* Suppliers who declined the quote REQUEST themselves — same card style as a
               declined quote, with the reason and the date it was declined. */}
           {archivedRequestDeclines.map((d, i) => (
