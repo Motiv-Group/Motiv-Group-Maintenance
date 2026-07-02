@@ -77,6 +77,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
         updates.quote_required = true; updates.quote_requested_at = now; updates.quote_due_at = addMins(tgt.quote_due_mins)
         // Set-once so the FIRST quote request survives later re-requests in the trail.
         updates.first_quote_requested_at = ticket.first_quote_requested_at ?? now
+        // Durable per-round log → a "Quote requested" audit event for each request.
+        await admin.from('ticket_quote_requests').insert({ company_id: ticket.company_id, ticket_id: ticketId, requested_at: now })
         if (body.supplierId) updates.supplier_id = body.supplierId
         break
       case 'request_evidence':

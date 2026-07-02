@@ -120,11 +120,13 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   const storeName = store ? storeLabel(store.name, store.sub_store) : 'Store'
   const editorName = t.edited_by ? ((await admin.from('user_profiles').select('full_name').eq('id', t.edited_by).single()).data?.full_name ?? null) : null
   // Motiv-curated supplier pool (assign pop-up) + who has viewed this ticket's items.
-  const [{ data: motivSuppliers }, { data: viewRows }, { data: declineRows }] = await Promise.all([
+  const [{ data: motivSuppliers }, { data: viewRows }, { data: declineRows }, { data: requestRows }] = await Promise.all([
     admin.from('suppliers').select('id, company_name').eq('is_motiv', true).eq('active', true).order('company_name'),
     admin.from('ticket_views').select('viewer_role, item_type, item_label, first_viewed_at').eq('ticket_id', t.id),
     // Durable supplier request-declines — kept even after the supplier is re-invited.
     admin.from('ticket_supplier_declines').select('supplier_id, reason, declined_at').eq('ticket_id', t.id).order('declined_at', { ascending: true }),
+    // Durable quote-request rounds — each (re)assignment adds a "Quote requested" event.
+    admin.from('ticket_quote_requests').select('requested_at').eq('ticket_id', t.id).order('requested_at', { ascending: true }),
   ])
   // Full COC/POC history — every submission, split by state (mirrors the supplier
   // view). Each sent-back card carries the reason it was rejected.
@@ -552,7 +554,9 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
 
       <AuditTrail ticket={{
         createdAt: t.created_at, status: t.status, updatedAt: t.updated_at,
-        quoteRequestedAt: t.first_quote_requested_at ?? t.quote_requested_at, quoteSubmittedAt: t.quote_submitted_at,
+        quoteRequestedAt: t.first_quote_requested_at ?? t.quote_requested_at,
+        quoteRequests: ((requestRows ?? []) as any[]).map(r => r.requested_at),
+        quoteSubmittedAt: t.quote_submitted_at,
         quoteApprovedAt: t.quote_decision_status === 'approved' ? t.quote_decided_at : null,
         scheduledAt: t.scheduled_at, completedAt: t.completed_at,
         editedAt: t.edited_at, editedByName: editorName, editNote: t.edit_note, cancellationReason: t.cancellation_reason,

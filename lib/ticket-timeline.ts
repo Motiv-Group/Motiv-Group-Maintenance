@@ -16,6 +16,9 @@ export interface TimelineInput {
   createdAt: string
   status?: string | null
   quoteRequestedAt?: string | null
+  // Every quote-request round (RM assign / re-assign / re-quote) → one "Quote
+  // requested" event each. Overrides quoteRequestedAt when non-empty.
+  quoteRequests?: (string | null)[]
   quoteSubmittedAt?: string | null
   quoteApprovedAt?: string | null
   scheduledAt?: string | null
@@ -64,7 +67,11 @@ export function buildTicketTimeline(t: TimelineInput): TimelineEvent[] {
   // The "more info" loop — RM asked, store manager answered (RM audit trail only).
   push(t.infoRequestedAt, `More information requested${t.infoRequestReason ? ` — ${t.infoRequestReason}` : ''}`, 'info_requested', 'Regional Manager')
   push(t.infoAddedAt, 'Information added', 'info_added', 'Store Manager')
-  push(t.quoteRequestedAt, 'Quote requested', 'quote_requested', 'Regional Manager')
+  // A "Quote requested" event per request round (each RM assign / re-assign /
+  // re-quote). Falls back to the single timestamp on trails without the log.
+  const requestTimes = (t.quoteRequests ?? []).filter(Boolean) as string[]
+  for (const at of new Set(requestTimes.length ? requestTimes : (t.quoteRequestedAt ? [t.quoteRequestedAt] : [])))
+    push(at, 'Quote requested', 'quote_requested', 'Regional Manager')
 
   // Quote events from the quote rows. When the supplier's name is known
   // (competitive quoting) each is named, so the RM trail reads exactly which

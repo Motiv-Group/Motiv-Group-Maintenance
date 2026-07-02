@@ -98,6 +98,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
       current_blocker: 'supplier_action', blocker_owner_type: 'supplier', blocker_started_at: now, sla_paused: false,
       last_internal_update_at: now, updated_at: now,
     }).eq('id', ticket.id)
+    // Durable per-round log → a "Quote requested" audit event for this re-quote.
+    await admin.from('ticket_quote_requests').insert({ company_id: ticket.company_id, ticket_id: ticket.id, requested_at: now })
     await notify('You have been asked to submit a revised quote.', 'Revise your quote')
     revalidatePath('/regional'); revalidatePath(`/regional/tickets/${ticket.id}`); revalidatePath('/supplier')
     return NextResponse.json({ ok: true })
