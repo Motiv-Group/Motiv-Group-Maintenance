@@ -20,7 +20,9 @@ const TONE: Record<QuoteSummaryStatus, { ring: string; bg: string; head: string;
   accepted: { ring: 'ring-emerald-500/40', bg: 'bg-emerald-500/5', head: 'bg-emerald-500/10 border-emerald-500/20', badge: 'bg-emerald-500/15', badgeText: 'text-emerald-700 dark:text-emerald-400', label: 'Approved', icon: CheckCircle2, iconCls: 'text-emerald-500' },
   awarded:  { ring: 'ring-emerald-500/40', bg: 'bg-emerald-500/5', head: 'bg-emerald-500/10 border-emerald-500/20', badge: 'bg-emerald-500/15', badgeText: 'text-emerald-700 dark:text-emerald-400', label: 'Awarded', icon: CheckCircle2, iconCls: 'text-emerald-500' },
   pending:  { ring: 'ring-[#C6A35D]/40', bg: 'bg-[#C6A35D]/5', head: 'bg-[#C6A35D]/10 border-[#C6A35D]/20', badge: 'bg-[#C6A35D]/15', badgeText: 'text-amber-700 dark:text-[#C6A35D]', label: 'Under review', icon: Clock, iconCls: 'text-[#C6A35D]' },
-  declined: { ring: 'ring-red-500/40', bg: 'bg-red-500/5', head: 'bg-red-500/10 border-red-500/20', badge: 'bg-red-500/15', badgeText: 'text-red-700 dark:text-red-400', label: 'Declined', icon: XCircle, iconCls: 'text-red-500' },
+  // Neutral card (not red) — the red "Declined" pill + reason box inside carry the
+  // status, and stand out against the plain card instead of blending into red-on-red.
+  declined: { ring: 'ring-[var(--border)]', bg: '', head: 'border-[var(--border)]', badge: 'bg-red-500/15', badgeText: 'text-red-700 dark:text-red-400', label: 'Declined', icon: XCircle, iconCls: 'text-[var(--text-faint)]' },
 }
 
 function Item({ label, value }: { label: string; value: string }) {
