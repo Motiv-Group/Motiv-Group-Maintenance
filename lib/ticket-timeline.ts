@@ -64,8 +64,9 @@ export interface TimelineInput {
 const VIEW_LABEL: Record<string, string> = { quote: 'the quote', photos: 'the photos', photo: 'a photo', coc: 'the COC & POC', invoice: 'the invoice' }
 
 export function buildTicketTimeline(t: TimelineInput): TimelineEvent[] {
-  const ev: TimelineEvent[] = []
-  const push = (at: string | null | undefined, label: string, tone: TimelineTone, who?: string | null) => { if (at) ev.push({ at, label, tone, who: who ?? null }) }
+  const ev: (TimelineEvent & { seq: number })[] = []
+  let seq = 0
+  const push = (at: string | null | undefined, label: string, tone: TimelineTone, who?: string | null) => { if (at) ev.push({ at, label, tone, who: who ?? null, seq: seq++ }) }
 
   push(t.createdAt, 'Ticket logged', 'logged')
   // The "more info" loop — RM asked, store manager answered (RM audit trail only).
@@ -77,19 +78,18 @@ export function buildTicketTimeline(t: TimelineInput): TimelineEvent[] {
   for (const at of new Set(requestTimes.length ? requestTimes : (t.quoteRequestedAt ? [t.quoteRequestedAt] : [])))
     push(at, 'Quote requested', 'quote_requested', 'Regional Manager')
 
-  // Quote events from the quote rows. When the supplier's name is known
-  // (competitive quoting) each is named, so the RM trail reads exactly which
-  // supplier submitted / was approved / was declined.
-  let namedSubmission = false
+  // Quote events from the quote rows. Each submission is logged BEFORE its outcome
+  // so the trail always reads submitted → approved/declined, never the reverse when
+  // the two share a minute. Named on the RM trail (supplierName present); the
+  // supplier's own trail shows a plain "Quote submitted".
   for (const q of t.quotes ?? []) {
     const who = q.supplierName ? ` — ${q.supplierName}` : ''
-    if (q.supplierName) { push(q.created_at, `Quote submitted by ${q.supplierName}`, 'quote_submitted', 'Supplier'); namedSubmission = true }
+    push(q.created_at, `Quote submitted${q.supplierName ? ` by ${q.supplierName}` : ''}`, 'quote_submitted', 'Supplier')
     if (q.status === 'accepted') push(q.updated_at ?? q.created_at, `Quote approved${who}`, 'quote_approved', 'Regional Manager')
     else if (q.status === 'declined') push(q.updated_at ?? q.created_at, `Quote declined${who}`, 'quote_declined', 'Regional Manager')
   }
-  // No per-supplier names on the rows (supplier's own trail) → one generic event.
-  if (!namedSubmission) push(t.quoteSubmittedAt, 'Quote submitted', 'quote_submitted', 'Supplier')
-  // Fallback if no quote rows were supplied but the ticket records an approval.
+  // Fallback only when there were no quote rows at all (submission, then approval).
+  if (!(t.quotes ?? []).length) push(t.quoteSubmittedAt, 'Quote submitted', 'quote_submitted', 'Supplier')
   if (!(t.quotes ?? []).some(q => q.status === 'accepted')) push(t.quoteApprovedAt, 'Quote approved', 'quote_approved', 'Regional Manager')
 
   // A "Revised quote requested" event per re-quote round (durable), else the single
@@ -127,6 +127,8 @@ export function buildTicketTimeline(t: TimelineInput): TimelineEvent[] {
   for (const u of t.updates ?? []) push(u.created_at, u.body, 'update', ROLE_LABEL[u.author_role ?? ''] ?? (u.author_role ?? 'System'))
   for (const v of t.views ?? []) push(v.first_viewed_at, `Viewed ${v.item_label || VIEW_LABEL[v.item_type] || 'an attachment'}`, 'viewed', ROLE_LABEL[v.viewer_role ?? ''] ?? (v.viewer_role ?? 'System'))
 
-  const sorted = ev.sort((a, b) => +new Date(a.at) - +new Date(b.at))
+  // Order by time, then by insertion order so same-minute events keep their logical
+  // sequence (a quote's submission always precedes its approval/decline).
+  const sorted = ev.sort((a, b) => (+new Date(a.at) - +new Date(b.at)) || (a.seq - b.seq))
   return t.startAt ? sorted.filter(e => +new Date(e.at) >= +new Date(t.startAt!)) : sorted
 }

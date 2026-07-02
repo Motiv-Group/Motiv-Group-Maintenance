@@ -54,7 +54,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
     // Store the reason on the quote itself (durable per-quote) so the supplier's
     // archived declined quote shows why it was declined, even after a re-assign
     // clears the invite's decline_reason.
-    await admin.from('quotes').update({ status: 'declined', decline_reason: reason }).eq('id', quote.id)
+    // Stamp updated_at so the audit trail shows the real decline time (there's no
+    // updated_at trigger on quotes; without this it would read the submission time).
+    await admin.from('quotes').update({ status: 'declined', decline_reason: reason, updated_at: now }).eq('id', quote.id)
     await admin.from('ticket_suppliers').update({ status: 'declined', decline_reason: reason, declined_by: 'regional_manager', responded_at: now }).eq('ticket_id', ticket.id).eq('supplier_id', quote.supplier_id)
     // Decide the ticket's next state from what's left on it:
     //  • another quote still pending      → 'quoted'          (keep reviewing)
@@ -109,9 +111,10 @@ export async function POST(request: Request, { params }: { params: { id: string 
     return NextResponse.json({ ok: true })
   }
 
-  // approve → award this supplier; auto-close the rest.
-  await admin.from('quotes').update({ status: 'accepted' }).eq('id', quote.id)
-  await admin.from('quotes').update({ status: 'declined' }).eq('ticket_id', ticket.id).eq('status', 'pending').neq('id', quote.id)
+  // approve → award this supplier; auto-close the rest. Stamp updated_at so the
+  // audit trail shows the real approve/decline time (no updated_at trigger on quotes).
+  await admin.from('quotes').update({ status: 'accepted', updated_at: now }).eq('id', quote.id)
+  await admin.from('quotes').update({ status: 'declined', updated_at: now }).eq('ticket_id', ticket.id).eq('status', 'pending').neq('id', quote.id)
   await admin.from('ticket_suppliers').update({ status: 'awarded', responded_at: now }).eq('ticket_id', ticket.id).eq('supplier_id', quote.supplier_id)
   await admin.from('ticket_suppliers').update({ status: 'closed', responded_at: now }).eq('ticket_id', ticket.id).neq('supplier_id', quote.supplier_id).in('status', ['invited', 'quoted'])
   // If the supplier proposed a start date on the quote, schedule straight to it

@@ -97,11 +97,12 @@ export async function POST(request: Request, { params }: { params: { id: string 
       }
       case 'approve_quote':
         updates.quote_decision_status = 'approved'; updates.quote_decided_at = now
-        await admin.from('quotes').update({ status: 'accepted' }).eq('ticket_id', ticketId).eq('status', 'pending')
+        // Stamp updated_at so the audit trail shows the real decision time (no trigger on quotes).
+        await admin.from('quotes').update({ status: 'accepted', updated_at: now }).eq('ticket_id', ticketId).eq('status', 'pending')
         break
       case 'reject_quote':
         updates.quote_decision_status = 'rejected'; updates.quote_decided_at = now
-        await admin.from('quotes').update({ status: 'declined' }).eq('ticket_id', ticketId).eq('status', 'pending')
+        await admin.from('quotes').update({ status: 'declined', updated_at: now }).eq('ticket_id', ticketId).eq('status', 'pending')
         break
       case 'schedule': {
         const when = body.scheduledAt ? new Date(body.scheduledAt) : new Date(now)
