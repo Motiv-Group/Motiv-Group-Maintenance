@@ -72,9 +72,16 @@ function RmDeclinedQuoteCard({ q, ticketId, canReQuote, open = false }: { q: any
             <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{q.description}</p>
           </div>
         )}
-        {q.fileUrl && <a href={q.fileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View attached quote</a>}
-        {/* Ask the supplier to re-quote — only while the ticket is live and un-awarded. */}
-        {canReQuote && <div className="pt-1"><ReQuoteButton ticketId={ticketId} quoteId={q.id} /></div>}
+        {/* Last row: the attachment link on the left, the "Ask to re-quote" button
+            inline on the right (only while the ticket is live and un-awarded). */}
+        {(q.fileUrl || canReQuote) && (
+          <div className="flex items-center justify-between gap-2 pt-1">
+            {q.fileUrl
+              ? <a href={q.fileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View attached quote</a>
+              : <span />}
+            {canReQuote && <ReQuoteButton ticketId={ticketId} quoteId={q.id} />}
+          </div>
+        )}
       </div>
     </details>
   )

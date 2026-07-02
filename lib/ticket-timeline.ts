@@ -83,7 +83,7 @@ export function buildTicketTimeline(t: TimelineInput): TimelineEvent[] {
   let namedSubmission = false
   for (const q of t.quotes ?? []) {
     const who = q.supplierName ? ` — ${q.supplierName}` : ''
-    if (q.supplierName) { push(q.created_at, `Quote submitted — ${q.supplierName}`, 'quote_submitted', 'Supplier'); namedSubmission = true }
+    if (q.supplierName) { push(q.created_at, `Quote submitted by ${q.supplierName}`, 'quote_submitted', 'Supplier'); namedSubmission = true }
     if (q.status === 'accepted') push(q.updated_at ?? q.created_at, `Quote approved${who}`, 'quote_approved', 'Regional Manager')
     else if (q.status === 'declined') push(q.updated_at ?? q.created_at, `Quote declined${who}`, 'quote_declined', 'Regional Manager')
   }
