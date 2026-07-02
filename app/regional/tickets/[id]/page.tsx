@@ -550,7 +550,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         quoteRequestedAt: t.quote_requested_at, quoteSubmittedAt: t.quote_submitted_at,
         quoteApprovedAt: t.quote_decision_status === 'approved' ? t.quote_decided_at : null,
         scheduledAt: t.scheduled_at, completedAt: t.completed_at,
-        editedAt: t.edited_at, editedByName: editorName, cancellationReason: t.cancellation_reason,
+        editedAt: t.edited_at, editedByName: editorName, editNote: t.edit_note, cancellationReason: t.cancellation_reason,
         infoRequestedAt: t.info_requested_at, infoAddedAt: t.info_added_at, infoRequestReason: t.info_request_reason,
         snagScheduledAt,
         workStartedAt: t.attended_at ?? null,

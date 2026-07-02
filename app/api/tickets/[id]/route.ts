@@ -52,8 +52,12 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     ? String(body.priority)
     : computePriority({ severity, operational_impact: impact, ...flags })
 
+  // Optional note describing the edit (e.g. "added extra work") — shown on the
+  // audit trail. Cleared on a plain edit so a stale note can't linger.
+  const editNote = typeof body.edit_note === 'string' && body.edit_note.trim() ? body.edit_note.trim() : null
+
   const now = new Date().toISOString()
-  const update: Record<string, unknown> = { title, description, category, operational_impact: impact, severity, priority, ...flags, updated_at: now, edited_at: now, edited_by: user.id }
+  const update: Record<string, unknown> = { title, description, category, operational_impact: impact, severity, priority, ...flags, updated_at: now, edited_at: now, edited_by: user.id, edit_note: editNote }
   if (Array.isArray(photo_urls)) update.photo_urls = photo_urls
 
   const { data, error } = await admin.from('tickets').update(update).eq('id', params.id).select().single()

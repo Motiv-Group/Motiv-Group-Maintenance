@@ -22,6 +22,8 @@ export interface TimelineInput {
   completedAt?: string | null
   editedAt?: string | null
   editedByName?: string | null
+  // Optional note on the edit (e.g. "added extra work") → "Ticket edited — <note>".
+  editNote?: string | null
   cancellationReason?: string | null
   updatedAt?: string | null
   // RM↔Store-Manager "more information" exchange (only passed on the RM view).
@@ -102,7 +104,7 @@ export function buildTicketTimeline(t: TimelineInput): TimelineEvent[] {
   if (t.status === 'completed') push(t.completedAt ?? t.updatedAt, 'Ticket completed', 'completed')
   if (t.status === 'cancelled') push(t.updatedAt, `Ticket cancelled${t.cancellationReason ? ` — ${t.cancellationReason}` : ''}`, 'cancelled')
   push(t.supplierDeclinedAt, 'Declined — no further updates on this ticket', 'cancelled')
-  push(t.editedAt, 'Ticket edited', 'edited', t.editedByName)
+  push(t.editedAt, `Ticket edited${t.editNote ? ` — ${t.editNote}` : ''}`, 'edited', t.editedByName)
 
   for (const u of t.updates ?? []) push(u.created_at, u.body, 'update', ROLE_LABEL[u.author_role ?? ''] ?? (u.author_role ?? 'System'))
   for (const v of t.views ?? []) push(v.first_viewed_at, `Viewed ${v.item_label || VIEW_LABEL[v.item_type] || 'an attachment'}`, 'viewed', ROLE_LABEL[v.viewer_role ?? ''] ?? (v.viewer_role ?? 'System'))

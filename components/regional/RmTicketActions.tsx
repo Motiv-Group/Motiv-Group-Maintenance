@@ -354,7 +354,7 @@ export function RmAddWorkForm({ ticketId, description, photoUrls, title, categor
       }
       const newDescription = `${description}\n\n— Extra Work: ${text.trim()}`
       // The ticket endpoint is PATCH-only — POSTing here was the "something went wrong".
-      const res = await fetch(`/api/tickets/${ticketId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, description: newDescription, category, operational_impact: impact, photo_urls: [...photoUrls, ...newUrls] }) })
+      const res = await fetch(`/api/tickets/${ticketId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, description: newDescription, category, operational_impact: impact, photo_urls: [...photoUrls, ...newUrls], edit_note: 'added extra work' }) })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to add the extra work.')
       setBusy(false); setOpen(false); setText(''); setFiles([]); router.refresh()
     } catch (e: any) { setErr(e.message); setBusy(false) }
