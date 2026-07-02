@@ -172,6 +172,94 @@ export function RequestInfoButton({ ticketId }: { ticketId: string }) {
   )
 }
 
+// ── Request more evidence (amber button → modal) ────────────────
+// Sends the COC/POC back asking for missing evidence, then the supplier resubmits.
+// "Before photos missing" is intentionally NOT a reason here.
+const EVIDENCE_REASONS = ['After photos missing', 'COC missing', 'Photos unclear', 'Work not fully shown', 'Other']
+
+export function RequestEvidenceButton({ ticketId }: { ticketId: string }) {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [preset, setPreset] = useState('')
+  const [other, setOther] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+
+  async function submit() {
+    if (!preset) { setErr('Choose what evidence is needed.'); return }
+    const reason = preset === 'Other' ? other.trim() : preset
+    if (!reason) { setErr('Tell the supplier what evidence you need.'); return }
+    setBusy(true); setErr('')
+    try { await post(`/api/tickets/${ticketId}/transition`, { action: 'request_evidence', reason }); setPreset(''); setOther(''); setOpen(false); setBusy(false); router.refresh() }
+    catch (e: any) { setErr(e.message); setBusy(false) }
+  }
+
+  const input = 'w-full px-3 py-2 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm'
+  return (
+    <>
+      <button onClick={() => setOpen(true)} className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-[#0a0e17] text-sm font-semibold transition">Request more evidence</button>
+      {open && (
+        <Modal title="Request more evidence" onClose={() => setOpen(false)}>
+          <p className="text-xs text-[var(--text-muted)]">The supplier is asked to add the missing evidence and resubmit the COC &amp; POC.</p>
+          <select autoFocus className={input} value={preset} onChange={e => setPreset(e.target.value)}>
+            <option value="">— Choose what&apos;s needed —</option>
+            {EVIDENCE_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
+          </select>
+          {preset === 'Other' && <textarea className={`${input} min-h-[80px]`} placeholder="What evidence do you need?" value={other} onChange={e => setOther(e.target.value)} />}
+          {err && <p className="text-xs text-red-500">{err}</p>}
+          <div className="flex gap-2">
+            <button disabled={busy} onClick={submit} className="flex-1 py-2 rounded-xl bg-green-600 hover:bg-green-500 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Sending…' : 'Send request'}</button>
+            <button onClick={() => setOpen(false)} className="flex-1 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-semibold">Cancel</button>
+          </div>
+        </Modal>
+      )}
+    </>
+  )
+}
+
+// ── Raise snag (red button → modal, mirrors Request more info) ───
+const SNAG_REASONS = ['Work incomplete', 'Quality below standard', 'Wrong materials or spec', 'Safety concern', 'Other']
+
+export function RaiseSnagButton({ ticketId }: { ticketId: string }) {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [preset, setPreset] = useState('')
+  const [other, setOther] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+
+  async function submit() {
+    if (!preset) { setErr('Choose the snag reason.'); return }
+    const description = preset === 'Other' ? other.trim() : preset
+    if (!description) { setErr('Describe the snag.'); return }
+    setBusy(true); setErr('')
+    try { await post(`/api/tickets/${ticketId}/transition`, { action: 'raise_snag', description }); setPreset(''); setOther(''); setOpen(false); setBusy(false); router.refresh() }
+    catch (e: any) { setErr(e.message); setBusy(false) }
+  }
+
+  const input = 'w-full px-3 py-2 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm'
+  return (
+    <>
+      <button onClick={() => setOpen(true)} className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-semibold transition">Raise snag</button>
+      {open && (
+        <Modal title="Raise a snag" onClose={() => setOpen(false)}>
+          <p className="text-xs text-[var(--text-muted)]">The completion is sent back. The supplier accepts the snag, schedules the corrective work and resubmits.</p>
+          <select autoFocus className={input} value={preset} onChange={e => setPreset(e.target.value)}>
+            <option value="">— Choose a reason —</option>
+            {SNAG_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
+          </select>
+          {preset === 'Other' && <textarea className={`${input} min-h-[80px]`} placeholder="Describe the snag…" value={other} onChange={e => setOther(e.target.value)} />}
+          {err && <p className="text-xs text-red-500">{err}</p>}
+          <div className="flex gap-2">
+            <button disabled={busy} onClick={submit} className="flex-1 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Raising…' : 'Raise snag'}</button>
+            <button onClick={() => setOpen(false)} className="flex-1 py-2 rounded-xl ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm">Cancel</button>
+          </div>
+        </Modal>
+      )}
+    </>
+  )
+}
+
 // ── RM edit ticket (before a supplier is assigned) ──────────────
 const CATEGORIES = ['Electrical', 'Plumbing', 'HVAC', 'Refrigeration', 'Gas', 'Structural', 'General', 'Cleaning', 'Other']
 const IMPACTS = [

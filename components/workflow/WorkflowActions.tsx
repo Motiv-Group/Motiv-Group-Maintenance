@@ -25,7 +25,7 @@ const CONFIRM_ACTIONS = new Set(['raise_snag', 'submit_variation', 'approve_vari
 const REASON_PRESETS: Record<string, string[]> = {
   raise_snag:       ['Work incomplete', 'Quality below standard', 'Wrong materials or spec', 'Safety concern', 'Other'],
   request_info:     ['Need more detail', 'Photos unclear', 'Scope unclear', 'Access details needed', 'Other'],
-  request_evidence: ['Before photos missing', 'After photos missing', 'COC missing', 'Photos unclear', 'Other'],
+  request_evidence: ['After photos missing', 'COC missing', 'Photos unclear', 'Other'],
   reject_variation: ['Cost too high', 'Not budgeted', 'Outside agreed scope', 'Needs more detail / justification', 'Obtain another quote', 'Other'],
 }
 // Which field the preset fills for each action.

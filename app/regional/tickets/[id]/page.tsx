@@ -14,7 +14,7 @@ import { BreachReason } from '@/components/workflow/BreachReason'
 import { Card } from '@/components/exec/ui'
 import { WorkflowActions } from '@/components/workflow/WorkflowActions'
 import { RmPipeline } from '@/components/regional/RmPipeline'
-import { AssignSuppliersButton, RequestInfoButton, RmEditTicketForm, SupplierStatusList, QuoteReviewCard, CancelTicketCard, ApproveSignoffCard, ReQuoteButton, AcceptScheduleCard, AcceptSnagScheduleCard, VariationReviewCard, RmAddWorkForm } from '@/components/regional/RmTicketActions'
+import { AssignSuppliersButton, RequestInfoButton, RmEditTicketForm, SupplierStatusList, QuoteReviewCard, CancelTicketCard, ApproveSignoffCard, ReQuoteButton, AcceptScheduleCard, AcceptSnagScheduleCard, VariationReviewCard, RmAddWorkForm, RequestEvidenceButton, RaiseSnagButton } from '@/components/regional/RmTicketActions'
 import { DueDate } from '@/components/workflow/DueDate'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { EditedLine } from '@/components/ui/EditedLine'
@@ -91,7 +91,7 @@ function RmDeclinedQuoteCard({ q, ticketId, canReQuote, open = false }: { q: any
 // One COC/POC submission card — reused across the under-review, sent-back (snag)
 // and approved blocks so the RM sees the full submission history. A sent-back card
 // shows the reason it was returned (why another COC/POC was needed).
-function RmSignoffCard({ s, tone, ticketId }: { s: any; tone: 'review' | 'snag' | 'approved' | 'evidence'; ticketId: string }) {
+function RmSignoffCard({ s, tone, ticketId, collapsible = false, defaultOpen = false, title }: { s: any; tone: 'review' | 'snag' | 'approved' | 'evidence'; ticketId: string; collapsible?: boolean; defaultOpen?: boolean; title?: string }) {
   const meta = tone === 'approved'
     ? { ring: 'ring-emerald-500/40', bg: 'bg-emerald-500/5', head: 'bg-emerald-500/10 border-emerald-500/20', badge: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400', label: 'Approved', Icon: CheckCircle2, iconCls: 'text-emerald-500', title: 'Approved completion' }
     : tone === 'snag'
@@ -101,13 +101,15 @@ function RmSignoffCard({ s, tone, ticketId }: { s: any; tone: 'review' | 'snag' 
     : { ring: 'ring-[#C6A35D]/40', bg: 'bg-[#C6A35D]/5', head: 'bg-[#C6A35D]/10 border-[#C6A35D]/20', badge: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D]', label: 'Under review', Icon: FileText, iconCls: 'text-[#C6A35D]', title: 'Submitted completion' }
   const before = (s.before_urls ?? []) as string[]
   const after = (s.after_urls ?? []) as string[]
-  return (
-    <div className={`rounded-xl ring-1 ${meta.ring} ${meta.bg} overflow-hidden`}>
-      <div className={`flex items-center justify-between gap-2 px-4 py-2.5 border-b ${meta.head}`}>
-        <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)] min-w-0"><meta.Icon size={15} className={`${meta.iconCls} shrink-0`} /><span className="truncate">{meta.title} · {formatDateTime(s.created_at)}</span></span>
-        <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 shrink-0 ${meta.badge}`}>{meta.label}</span>
-      </div>
-      <div className="p-4 space-y-3">
+  // Header doubles as the click-to-expand summary when collapsible.
+  const header = (
+    <>
+      <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)] min-w-0"><meta.Icon size={15} className={`${meta.iconCls} shrink-0`} /><span className="truncate">{title ?? meta.title} · {formatDateTime(s.created_at)}</span></span>
+      <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 shrink-0 ${meta.badge}`}>{meta.label}</span>
+    </>
+  )
+  const body = (
+    <>
         {tone === 'snag' && s.reject_reason && (
           <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3">
             <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Why it was sent back</p>
@@ -143,7 +145,20 @@ function RmSignoffCard({ s, tone, ticketId }: { s: any; tone: 'review' | 'snag' 
             <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{s.notes}</p>
           </div>
         )}
-      </div>
+    </>
+  )
+  if (collapsible) {
+    return (
+      <details open={defaultOpen} className={`rounded-xl ring-1 ${meta.ring} ${meta.bg} overflow-hidden`}>
+        <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">{header}</summary>
+        <div className={`p-4 space-y-3 border-t ${meta.head}`}>{body}</div>
+      </details>
+    )
+  }
+  return (
+    <div className={`rounded-xl ring-1 ${meta.ring} ${meta.bg} overflow-hidden`}>
+      <div className={`flex items-center justify-between gap-2 px-4 py-2.5 border-b ${meta.head}`}>{header}</div>
+      <div className="p-4 space-y-3">{body}</div>
     </div>
   )
 }
@@ -481,7 +496,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
               <p className="text-sm text-[var(--text)]">{t.evidence_request_reason}</p>
             </div>
           )}
-          {pendingSignoffs.map((s: any) => <RmSignoffCard key={s.id} s={s} tone="review" ticketId={t.id} />)}
+          {pendingSignoffs.map((s: any) => <RmSignoffCard key={s.id} s={s} tone="review" ticketId={t.id} collapsible defaultOpen />)}
           {evidenceRequestedSignoffs.map((s: any) => <RmSignoffCard key={s.id} s={s} tone="evidence" ticketId={t.id} />)}
         </CollapsibleSection>
       )}
@@ -539,8 +554,15 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
           </div>
         )}
 
-        {/* Accept sign-off with a required supplier rating */}
+        {/* Accept sign-off with a required supplier rating; send back for more
+            evidence or raise a snag — both as pop-ups (like Request more info). */}
         {t.status === 'submitted_for_signoff' && <ApproveSignoffCard ticketId={t.id} />}
+        {t.status === 'submitted_for_signoff' && (
+          <div className="flex gap-2">
+            <RequestEvidenceButton ticketId={t.id} />
+            <RaiseSnagButton ticketId={t.id} />
+          </div>
+        )}
 
         {/* Accept a supplier's proposed (beyond-window) visit time */}
         {t.status === 'scheduled' && t.schedule_status === 'proposed' && t.scheduled_at && <AcceptScheduleCard ticketId={t.id} scheduledAt={t.scheduled_at} />}
@@ -572,7 +594,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         <WorkflowActions
           ticketId={t.id} status={t.status} role="regional_manager"
           suppliers={supplierList}
-          exclude={['validate', 'reject', 'request_info', 'request_quote', 'require_assessment', 'approve_quote', 'reject_quote', 'request_revision', 'proceed_no_quote', 'schedule', 'approve', 'assign_snag', 'accept_schedule', 'approve_snag', 'approve_variation', 'reject_variation']}
+          exclude={['validate', 'reject', 'request_info', 'request_quote', 'require_assessment', 'approve_quote', 'reject_quote', 'request_revision', 'proceed_no_quote', 'schedule', 'approve', 'assign_snag', 'accept_schedule', 'approve_snag', 'approve_variation', 'reject_variation', 'request_evidence', 'raise_snag']}
         />
       </Card>
 
