@@ -5,7 +5,7 @@
 // the Submit COC & POC form.) Posts to /api/supplier/ticket-action.
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Send, Camera } from 'lucide-react'
+import { Send, Camera, Check } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 const PRESETS = ['On my way', 'On site', 'Parts ordered', 'Delayed']
@@ -15,6 +15,9 @@ export function SupplierAttachments({ ticketId }: { ticketId: string }) {
   const [busy, setBusy] = useState<string | null>(null)
   const [err, setErr] = useState('')
   const [note, setNote] = useState('')
+  // Key of the update just sent — drives the transient "Sent ✓" confirmation so a
+  // quick preset tap doesn't feel like nothing happened. Cleared after a moment.
+  const [sent, setSent] = useState<string | null>(null)
 
   async function addUpdate(text: string, key: string) {
     if (!text.trim()) return
@@ -22,6 +25,7 @@ export function SupplierAttachments({ ticketId }: { ticketId: string }) {
     try {
       const res = await fetch('/api/supplier/ticket-action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticketId, action: 'add_update', body: text }) })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed')
+      setSent(key); setTimeout(() => setSent(s => (s === key ? null : s)), 2500)
       router.refresh()
     } catch (e: any) { setErr(e.message) } finally { setBusy(null) }
   }
@@ -42,14 +46,23 @@ export function SupplierAttachments({ ticketId }: { ticketId: string }) {
   return (
     <div className="space-y-3">
       {err && <div className="text-sm text-red-400 bg-red-500/10 rounded-lg px-3 py-2">{err}</div>}
+      {/* Transient confirmation so a preset/note tap gives visible feedback. */}
+      {sent && (
+        <div className="flex items-center gap-1.5 text-sm font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 ring-1 ring-emerald-500/30 rounded-lg px-3 py-2">
+          <Check size={15} className="shrink-0" /> Update sent
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-2">
-        {PRESETS.map(p => (
-          <button key={p} onClick={() => addUpdate(p, p)} disabled={!!busy}
-            className="px-3 py-1.5 rounded-full text-xs font-medium ring-1 ring-[var(--border)] text-[var(--text)] hover:bg-[var(--hover)] disabled:opacity-50 transition">
-            {busy === p ? '…' : p}
-          </button>
-        ))}
+        {PRESETS.map(p => {
+          const isSent = sent === p
+          return (
+            <button key={p} onClick={() => addUpdate(p, p)} disabled={!!busy}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium ring-1 disabled:opacity-50 transition inline-flex items-center gap-1.5 ${isSent ? 'ring-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'ring-[var(--border)] text-[var(--text)] hover:bg-[var(--hover)]'}`}>
+              {busy === p ? '…' : isSent ? <><Check size={13} className="shrink-0" /> Sent</> : p}
+            </button>
+          )
+        })}
       </div>
 
       <textarea value={note} onChange={e => setNote(e.target.value)} placeholder="Add a progress update…"
