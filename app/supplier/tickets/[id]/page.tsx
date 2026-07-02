@@ -134,7 +134,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
     admin.from('quotes').select('id, amount, amount_incl_vat, description, file_url, status, valid_until, proposed_schedule_at, decline_reason, created_at, updated_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).order('created_at', { ascending: false }),
     admin.from('technicians').select('id, name').in('supplier_id', supplierIds).eq('active', true).order('name'),
     admin.from('signoffs').select('id, before_urls, after_urls, coc_url, invoice_url, status, notes, reject_reason, reviewed_at, created_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).order('created_at', { ascending: false }),
-    admin.from('snags').select('description, required_correction, severity, status, scheduled_at, schedule_status, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
+    admin.from('snags').select('description, required_correction, severity, status, scheduled_at, schedule_status, schedule_decline_reason, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('companies').select('name').eq('id', companyId).maybeSingle(),
     admin.from('ticket_variations').select('description, amount, warranty, status, reject_reason, reviewed_at, created_at, file_urls').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     // Only THIS supplier's own view events — so their trail shows the photos /
@@ -389,7 +389,20 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           {/* After the quote is approved → straight to "Mark in progress" (confirm).
               Variation orders come after the COC/POC is approved (close-out stage). */}
           {awarded && (t.status === 'accepted' || t.status === 'scheduled') && <MarkInProgressButton ticketId={t.id} />}
-          {awarded && t.status === 'snag' && <AcceptSnagCard ticketId={t.id} priority={t.priority} createdAt={t.created_at} />}
+          {awarded && t.status === 'snag' && (
+            <div className="space-y-3">
+              {/* Shown after the RM declined a proposed snag-fix date — why, so the
+                  supplier can pick a better one below. */}
+              {latestSnag?.schedule_decline_reason && (
+                <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3 space-y-0.5">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Snag schedule declined</p>
+                  <p className="text-sm text-[var(--text)]">{latestSnag.schedule_decline_reason}</p>
+                  <p className="text-sm text-[var(--text-muted)]">Please propose a new date below.</p>
+                </div>
+              )}
+              <AcceptSnagCard ticketId={t.id} priority={t.priority} createdAt={t.created_at} />
+            </div>
+          )}
           {awarded && t.status === 'snag_assigned' && (
             latestSnag?.schedule_status === 'agreed'
               ? <StartSnagButton ticketId={t.id} />

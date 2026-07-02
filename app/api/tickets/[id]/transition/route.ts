@@ -223,8 +223,11 @@ export async function POST(request: Request, { params }: { params: { id: string 
       case 'decline_snag_schedule':
         // RM rejects the proposed snag-fix date → send it back so the supplier proposes
         // a new one. Reset the snag to 'open' (accept_snag re-proposes on 'open' snags)
-        // and clear the date. The reason is relayed to the supplier in the notification.
+        // and clear the date.
         await admin.from('snags').update({ status: 'open', schedule_status: null, scheduled_at: null }).eq('ticket_id', ticketId).in('status', ['assigned', 'in_progress'])
+        // Persist the reason (best-effort, separate update) so it shows on the supplier's
+        // ticket, not only in the notification — never blocks the reset if unmigrated.
+        await admin.from('snags').update({ schedule_decline_reason: body.reason ?? null }).eq('ticket_id', ticketId).eq('status', 'open')
         break
       case 'start_snag': {
         // Only after the RM has approved the proposed snag-fix date.
