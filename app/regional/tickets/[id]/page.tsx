@@ -207,7 +207,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   const canEdit = ['open', 'info_requested'].includes(t.status)
   // Gate the main Quotes block on its OWN content (declined quotes now live in the
   // separate Archive block, so they don't keep an otherwise-empty block open).
-  const hasQuoteBlock = activeSupplierRows.length > 0 || reviewQuotes.length > 0 || acceptedQuotes.length > 0 || (variations ?? []).length > 0
+  const hasQuoteBlock = activeSupplierRows.length > 0 || reviewQuotes.length > 0 || acceptedQuotes.length > 0
   // A quote was declined but the ticket is still in the commercial phase → let the
   // RM invite additional suppliers (add to the existing invites) alongside reviewing
   // any remaining quotes. Excludes 'assigned' (the RM has just (re)assigned).
@@ -432,9 +432,10 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         />
       </Card>
 
-      {/* Quotes & Variation Orders — suppliers requested, quotes to review, VOs */}
+      {/* Quotes — suppliers requested, quotes to review, the accepted quote. Open
+          during quoting / before work; collapsed once the job is in progress. */}
       {hasQuoteBlock && (
-        <CollapsibleSection id="ticket-quotes" title="Quotes & Variation Orders" defaultOpen={phase === 'commercial'}>
+        <CollapsibleSection id="ticket-quotes" title="Quotes" defaultOpen={['assigned', 'assessment', 'quote_requested', 'quote_revision', 'quoted', 'accepted', 'scheduled'].includes(t.status)}>
           {activeSupplierRows.length > 0 && (
             <div className="space-y-2">
               <h3 className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Suppliers requested</h3>
@@ -483,36 +484,38 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
               ))}
             </div>
           )}
-          {(variations ?? []).length > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Variation orders</h3>
-              {(variations ?? []).map((v: any, i: number) => (
-                <div key={i} className="py-2 border-b border-[var(--border)] last:border-0 flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-sm text-[var(--text)]">{v.description}</p>
-                    {v.warranty && <p className="text-[11px] text-[var(--text-muted)] mt-0.5"><span className="font-medium text-[var(--text)]">Warranty:</span> {v.warranty}</p>}
-                    <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(v.created_at)}</p>
-                    {Array.isArray(v.file_urls) && v.file_urls.length > 0 && (
-                      <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
-                        {v.file_urls.map((u: string, j: number) => (
-                          <a key={j} href={u} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[11px] font-medium text-[#C6A35D] hover:underline"><FileText size={12} /> Attachment {j + 1}</a>
-                        ))}
-                      </div>
-                    )}
+        </CollapsibleSection>
+      )}
+
+      {/* Variation Orders — their own block (raised at the close-out stage). Opens by
+          default while one is under review. */}
+      {(variations ?? []).length > 0 && (
+        <CollapsibleSection id="ticket-vos" title="Variation Orders" defaultOpen={t.status === 'variation_review' || (variations ?? []).some((v: any) => v.status === 'pending')}>
+          {(variations ?? []).map((v: any, i: number) => (
+            <div key={i} className="py-2 border-b border-[var(--border)] last:border-0 flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-sm text-[var(--text)]">{v.description}</p>
+                {v.warranty && <p className="text-[11px] text-[var(--text-muted)] mt-0.5"><span className="font-medium text-[var(--text)]">Warranty:</span> {v.warranty}</p>}
+                <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(v.created_at)}</p>
+                {Array.isArray(v.file_urls) && v.file_urls.length > 0 && (
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
+                    {v.file_urls.map((u: string, j: number) => (
+                      <a key={j} href={u} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[11px] font-medium text-[#C6A35D] hover:underline"><FileText size={12} /> Attachment {j + 1}</a>
+                    ))}
                   </div>
-                  <div className="flex flex-col items-end gap-1 shrink-0 whitespace-nowrap">
-                    {v.amount != null && <span className="text-xs font-semibold text-[var(--text)]">{formatCurrency(v.amount)}</span>}
-                    {(() => {
-                      const meta = v.status === 'approved' ? { l: 'VO accepted', c: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' }
-                        : v.status === 'rejected' ? { l: 'VO rejected', c: 'bg-red-500/15 text-red-700 dark:text-red-400' }
-                        : { l: 'Pending', c: 'bg-amber-500/15 text-amber-700 dark:text-amber-400' }
-                      return <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 ${meta.c}`}>{meta.l}</span>
-                    })()}
-                  </div>
-                </div>
-              ))}
+                )}
+              </div>
+              <div className="flex flex-col items-end gap-1 shrink-0 whitespace-nowrap">
+                {v.amount != null && <span className="text-xs font-semibold text-[var(--text)]">{formatCurrency(v.amount)}</span>}
+                {(() => {
+                  const meta = v.status === 'approved' ? { l: 'VO accepted', c: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' }
+                    : v.status === 'rejected' ? { l: 'VO rejected', c: 'bg-red-500/15 text-red-700 dark:text-red-400' }
+                    : { l: 'Pending', c: 'bg-amber-500/15 text-amber-700 dark:text-amber-400' }
+                  return <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 ${meta.c}`}>{meta.l}</span>
+                })()}
+              </div>
             </div>
-          )}
+          ))}
         </CollapsibleSection>
       )}
 
