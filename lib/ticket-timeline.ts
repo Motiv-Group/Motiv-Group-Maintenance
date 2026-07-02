@@ -18,7 +18,9 @@ export interface TimelineInput {
   quoteRequestedAt?: string | null
   // Every quote-request round (RM assign / re-assign / re-quote) → one "Quote
   // requested" event each. Overrides quoteRequestedAt when non-empty.
-  quoteRequests?: (string | null)[]
+  // Each quote-request round → one "Quote requested" event, named with the supplier
+  // when known ("Quote requested from X"). Overrides quoteRequestedAt when non-empty.
+  quoteRequests?: { at: string | null; supplierName?: string | null }[]
   quoteSubmittedAt?: string | null
   quoteApprovedAt?: string | null
   scheduledAt?: string | null
@@ -73,10 +75,17 @@ export function buildTicketTimeline(t: TimelineInput): TimelineEvent[] {
   push(t.infoRequestedAt, `More information requested${t.infoRequestReason ? ` — ${t.infoRequestReason}` : ''}`, 'info_requested', 'Regional Manager')
   push(t.infoAddedAt, 'Information added', 'info_added', 'Store Manager')
   // A "Quote requested" event per request round (each RM assign / re-assign /
-  // re-quote). Falls back to the single timestamp on trails without the log.
-  const requestTimes = (t.quoteRequests ?? []).filter(Boolean) as string[]
-  for (const at of new Set(requestTimes.length ? requestTimes : (t.quoteRequestedAt ? [t.quoteRequestedAt] : [])))
-    push(at, 'Quote requested', 'quote_requested', 'Regional Manager')
+  // re-quote), named with the supplier when known ("Quote requested from X").
+  // Falls back to the single timestamp on trails without the durable log.
+  const requestRounds = (t.quoteRequests ?? []).filter(r => r && r.at)
+  const requestList = requestRounds.length ? requestRounds : (t.quoteRequestedAt ? [{ at: t.quoteRequestedAt }] : [])
+  const seenRequest = new Set<string>()
+  for (const r of requestList) {
+    const key = `${r.at}|${r.supplierName ?? ''}`
+    if (seenRequest.has(key)) continue
+    seenRequest.add(key)
+    push(r.at, `Quote requested${r.supplierName ? ` from ${r.supplierName}` : ''}`, 'quote_requested', 'Regional Manager')
+  }
 
   // Quote events from the quote rows. Each submission is logged BEFORE its outcome
   // so the trail always reads submitted → approved/declined, never the reverse when

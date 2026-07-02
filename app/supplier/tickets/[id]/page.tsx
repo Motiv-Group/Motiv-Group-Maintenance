@@ -515,7 +515,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           createdAt: t.created_at,
           startAt: trailStartAt,
           quoteRequestedAt: (invite as any)?.invited_at ?? t.quote_requested_at,
-          quoteRequests: myQuoteRequests,
+          quoteRequests: myQuoteRequests.map(at => ({ at })),
           quoteSubmittedAt: latestQuote?.created_at ?? null,
           quotes: (myQuotes ?? []) as any[],
           supplierDeclines: myDeclines,
@@ -526,7 +526,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
         <AuditTrail ticket={{
           createdAt: t.created_at, status: t.status, updatedAt: t.updated_at,
           startAt: trailStartAt,
-          quoteRequestedAt: t.quote_requested_at, quoteRequests: myQuoteRequests,
+          quoteRequestedAt: t.quote_requested_at, quoteRequests: myQuoteRequests.map(at => ({ at })),
           quoteSubmittedAt: latestQuote?.created_at ?? t.quote_submitted_at,
           quoteApprovedAt: t.quote_decision_status === 'approved' ? t.quote_decided_at : null,
           scheduledAt: t.scheduled_at, completedAt: t.completed_at,

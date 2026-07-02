@@ -66,9 +66,13 @@ export async function POST(request: Request, { params }: { params: { id: string 
     current_blocker: 'supplier_action', blocker_owner_type: 'supplier', blocker_started_at: now, sla_paused: false,
     last_internal_update_at: now, updated_at: now,
   }).eq('id', ticket.id)
-  // Durable log of this request round → its own "Quote requested" audit event (each
-  // re-assignment adds another, kept even after invite rows are reset).
-  await admin.from('ticket_quote_requests').insert({ company_id: ticket.company_id, ticket_id: ticket.id, requested_at: now })
+  // Durable log of this request round — one row PER supplier (re)invited, so the
+  // audit trail reads "Quote requested from <supplier>" for each. Kept even after
+  // invite rows are reset on a later re-assign.
+  const requestedThisRound = [...reinvite, ...fresh]
+  if (requestedThisRound.length) {
+    await admin.from('ticket_quote_requests').insert(requestedThisRound.map(supplier_id => ({ company_id: ticket.company_id, ticket_id: ticket.id, supplier_id, requested_at: now })))
+  }
 
   // Notify the invited suppliers — re-invited ones hear it's a re-quote request.
   const { data: su } = await admin.from('supplier_users').select('user_id, supplier_id').in('supplier_id', supplierIds)

@@ -172,8 +172,9 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
     admin.from('ticket_views').select('viewer_role, item_type, item_label, first_viewed_at').eq('ticket_id', t.id),
     // Durable supplier request-declines — kept even after the supplier is re-invited.
     admin.from('ticket_supplier_declines').select('supplier_id, reason, declined_at').eq('ticket_id', t.id).order('declined_at', { ascending: true }),
-    // Durable quote-request rounds — each (re)assignment adds a "Quote requested" event.
-    admin.from('ticket_quote_requests').select('requested_at').eq('ticket_id', t.id).order('requested_at', { ascending: true }),
+    // Durable quote-request rounds — each (re)assignment adds a "Quote requested"
+    // event, attributed to the supplier so the trail reads "Quote requested from X".
+    admin.from('ticket_quote_requests').select('supplier_id, requested_at').eq('ticket_id', t.id).order('requested_at', { ascending: true }),
   ])
   // Full COC/POC history — every submission, split by state (mirrors the supplier
   // view). Each sent-back card carries the reason it was rejected.
@@ -284,10 +285,10 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   // Gate the main Quotes block on its OWN live content (superseded declines live in
   // the separate Archive block, so they don't keep an otherwise-empty block open).
   const hasQuoteBlock = requestedRows.length > 0 || reviewQuotes.length > 0 || acceptedQuotes.length > 0 || liveDeclinedQuotes.length > 0
-  // A quote was declined but the ticket is still in the commercial phase → let the
-  // RM invite additional suppliers (add to the existing invites) alongside reviewing
-  // any remaining quotes. Excludes 'assigned' (the RM has just (re)assigned).
-  const canAddSuppliers = declinedQuotes.length > 0 && ['open', 'info_requested', 'assessment', 'quote_requested', 'quoted', 'quote_revision'].includes(t.status)
+  // The "Assign supplier" button stays available through the whole commercial phase —
+  // the RM can add / re-assign suppliers at any time until a quote is approved
+  // (awarded). Mirrors the /assign route's allowed statuses.
+  const canAssignSupplier = acceptedQuotes.length === 0 && ['open', 'info_requested', 'assigned', 'assessment', 'quote_requested', 'quoted', 'quote_revision', 'suppliers_declined'].includes(t.status)
   // "Info added" = the SM resubmitted after an info request (back at open, reason kept).
   const rmInfoAdded = t.status === 'open' && !!t.info_request_reason
 
@@ -474,7 +475,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         {/* Primary actions — equal-size, side by side: Assign (green) · Request info (amber) · Cancel (red) */}
         {!isTerminal && (canAssign || canCancel) && (
           <div className="flex gap-2">
-            {(canAssign || canAddSuppliers) && <AssignSuppliersButton ticketId={t.id} suppliers={supplierList} motivSuppliers={motivSupplierList} declinedSupplierIds={declinedSupplierIds} awaitingById={engagedSupplierIds} />}
+            {canAssignSupplier && <AssignSuppliersButton ticketId={t.id} suppliers={supplierList} motivSuppliers={motivSupplierList} declinedSupplierIds={declinedSupplierIds} awaitingById={engagedSupplierIds} />}
             {['open', 'info_requested'].includes(t.status) && <RequestInfoButton ticketId={t.id} />}
             {canCancel && <CancelTicketCard ticketId={t.id} />}
           </div>
@@ -644,7 +645,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
       <AuditTrail ticket={{
         createdAt: t.created_at, status: t.status, updatedAt: t.updated_at,
         quoteRequestedAt: t.first_quote_requested_at ?? t.quote_requested_at,
-        quoteRequests: ((requestRows ?? []) as any[]).map(r => r.requested_at),
+        quoteRequests: ((requestRows ?? []) as any[]).map(r => ({ at: r.requested_at, supplierName: r.supplier_id ? (nameById.get(r.supplier_id) ?? null) : null })),
         quoteSubmittedAt: t.quote_submitted_at,
         quoteApprovedAt: t.quote_decision_status === 'approved' ? t.quote_decided_at : null,
         scheduledAt: t.scheduled_at, completedAt: t.completed_at,
