@@ -219,6 +219,11 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   // pop-up warns before re-sending them the quote request.
   const declinedSupplierIds = ((invites ?? []) as any[]).filter(i => ['declined', 'closed'].includes(i.status)).map(i => i.supplier_id)
   const activeSupplierRows = supplierRows.filter(r => !['declined', 'closed'].includes(r.status))
+  // Suppliers already engaged on this ticket (awaiting their quote, or already
+  // quoted) — the assign pop-up shows them non-selectable so the RM can't re-invite
+  // someone they're already waiting on (a no-op).
+  const engagedSupplierIds: Record<string, 'invited' | 'quoted'> = {}
+  for (const r of activeSupplierRows) if (r.status === 'invited' || r.status === 'quoted') engagedSupplierIds[r.id] = r.status
   // Freshly (re)assigned and awaiting quotes → a clean "new suppliers assigned" note.
   const awaitingSupplierQuotes = ['assigned', 'assessment', 'quote_requested', 'quote_revision'].includes(t.status) && activeSupplierRows.some(r => r.status === 'invited')
   // A quote has been approved → the ticket is awarded and the round is over.
@@ -460,7 +465,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         {/* Primary actions — equal-size, side by side: Assign (green) · Request info (amber) · Cancel (red) */}
         {!isTerminal && (canAssign || canCancel) && (
           <div className="flex gap-2">
-            {(canAssign || canAddSuppliers) && <AssignSuppliersButton ticketId={t.id} suppliers={supplierList} motivSuppliers={motivSupplierList} declinedSupplierIds={declinedSupplierIds} />}
+            {(canAssign || canAddSuppliers) && <AssignSuppliersButton ticketId={t.id} suppliers={supplierList} motivSuppliers={motivSupplierList} declinedSupplierIds={declinedSupplierIds} awaitingById={engagedSupplierIds} />}
             {['open', 'info_requested'].includes(t.status) && <RequestInfoButton ticketId={t.id} />}
             {canCancel && <CancelTicketCard ticketId={t.id} />}
           </div>

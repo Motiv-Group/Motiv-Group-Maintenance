@@ -37,7 +37,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 
 // ── Assign suppliers (button → modal with search + multi-select) ─
 type SupplierChoice = { id: string; name: string; avgRating?: number; ratingCount?: number }
-export function AssignSuppliersButton({ ticketId, suppliers, motivSuppliers = [], declinedSupplierIds = [] }: { ticketId: string; suppliers: SupplierChoice[]; motivSuppliers?: SupplierChoice[]; declinedSupplierIds?: string[] }) {
+export function AssignSuppliersButton({ ticketId, suppliers, motivSuppliers = [], declinedSupplierIds = [], awaitingById = {} }: { ticketId: string; suppliers: SupplierChoice[]; motivSuppliers?: SupplierChoice[]; declinedSupplierIds?: string[]; awaitingById?: Record<string, 'invited' | 'quoted'> }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [tab, setTab] = useState<'mine' | 'motiv'>('mine')
@@ -90,13 +90,27 @@ export function AssignSuppliersButton({ ticketId, suppliers, motivSuppliers = []
               className="w-full pl-9 pr-3 py-2 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)]" />
           </div>
           <div className="space-y-1 max-h-64 overflow-y-auto">
-            {shown.map(s => (
-              <label key={s.id} className={`flex items-center gap-2 text-sm px-2 py-2 rounded-lg cursor-pointer ${sel.has(s.id) ? 'bg-[#C6A35D]/10' : 'hover:bg-[var(--hover)]'}`}>
-                <input type="checkbox" checked={sel.has(s.id)} onChange={() => toggle(s.id)} className="accent-[#C6A35D] w-4 h-4" />
-                <span className="truncate text-[var(--text)] flex-1 min-w-0">{s.name}{declinedSet.has(s.id) && <span className="ml-1.5 text-[10px] font-semibold text-red-500">· declined before</span>}</span>
-                <span className="shrink-0"><Stars value={s.avgRating ?? 5} count={s.ratingCount} size={12} /></span>
-              </label>
-            ))}
+            {shown.map(s => {
+              // Already invited / already quoted on this ticket → not selectable
+              // (re-inviting them is a no-op); show what we're waiting on instead.
+              const awaiting = awaitingById[s.id]
+              if (awaiting) {
+                return (
+                  <div key={s.id} className="flex items-center gap-2 text-sm px-2 py-2 rounded-lg opacity-60 cursor-not-allowed">
+                    <span className="w-4 h-4 shrink-0" aria-hidden />
+                    <span className="truncate text-[var(--text-muted)] flex-1 min-w-0">{s.name}</span>
+                    <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400 bg-amber-500/15 rounded-full px-2 py-0.5">{awaiting === 'quoted' ? 'Quoted' : 'Awaiting quote'}</span>
+                  </div>
+                )
+              }
+              return (
+                <label key={s.id} className={`flex items-center gap-2 text-sm px-2 py-2 rounded-lg cursor-pointer ${sel.has(s.id) ? 'bg-[#C6A35D]/10' : 'hover:bg-[var(--hover)]'}`}>
+                  <input type="checkbox" checked={sel.has(s.id)} onChange={() => toggle(s.id)} className="accent-[#C6A35D] w-4 h-4" />
+                  <span className="truncate text-[var(--text)] flex-1 min-w-0">{s.name}{declinedSet.has(s.id) && <span className="ml-1.5 text-[10px] font-semibold text-red-500">· declined before</span>}</span>
+                  <span className="shrink-0"><Stars value={s.avgRating ?? 5} count={s.ratingCount} size={12} /></span>
+                </label>
+              )
+            })}
             {!shown.length && <p className="text-sm text-[var(--text-faint)] px-2 py-2">{tab === 'motiv' ? 'No Motiv suppliers available.' : 'No matching suppliers.'}</p>}
           </div>
           {confirmReinvite && (
