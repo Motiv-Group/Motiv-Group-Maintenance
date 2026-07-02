@@ -283,12 +283,21 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   const supplierDeclines = ((declineRows ?? []) as any[])
     .map(d => ({ supplierId: d.supplier_id as string, name: nameById.get(d.supplier_id) ?? 'Supplier', reason: (d.reason ?? null) as string | null, at: d.declined_at }))
     .filter(d => d.at)
+  // Courteous "not selected" note for the losing suppliers once the job is awarded —
+  // matches the supplier-side wording. Shown on auto-declined quotes (no explicit
+  // reason) and on still-waiting suppliers that were auto-closed on award.
+  const COURTESY_NOTE = 'Thank you for your submission. Although your quotation was not selected for this request, we value your participation and look forward to inviting you to future opportunities.'
+  // Suppliers auto-closed when the job was awarded to someone else, who never
+  // submitted a quote (they were still waiting). Losing quoters instead surface as
+  // declined quote cards below. 'closed' status only ever happens on award.
+  const quotedSupplierIds = new Set(((quotes ?? []) as any[]).map(q => q.supplier_id))
+  const closedWaitingRows = supplierRows.filter(r => r.status === 'closed' && !quotedSupplierIds.has(r.id))
   const mapQuote = (q: any) => ({
     id: q.id, supplierId: q.supplier_id as string, supplierName: nameById.get(q.supplier_id) ?? 'Supplier', amount: q.amount,
     amountInclVat: q.amount_incl_vat ?? null, description: q.description ?? null, fileUrl: q.file_url ?? null,
-    // Prefer the durable per-quote reason; fall back to the invite's (mutable) reason
-    // for older quotes declined before it was stored on the quote row.
-    validUntil: q.valid_until ?? null, createdAt: q.created_at, declineReason: q.decline_reason ?? declineReasonBy.get(q.supplier_id) ?? null,
+    // Prefer the durable per-quote reason; fall back to the invite's (mutable) reason,
+    // then to the courteous "not selected" note for quotes auto-declined on award.
+    validUntil: q.valid_until ?? null, createdAt: q.created_at, declineReason: q.decline_reason ?? declineReasonBy.get(q.supplier_id) ?? (awarded ? COURTESY_NOTE : null),
     proposedScheduleAt: q.proposed_schedule_at ?? null, declinedAt: q.updated_at ?? null,
   })
   const reviewQuotes = ((quotes ?? []) as any[]).filter(q => q.status === 'pending').map(mapQuote)
@@ -693,12 +702,34 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         </CollapsibleSection>
       )}
 
-      {/* Archive — declined / not-selected quotes (by the RM or the supplier), moved
-          out of the main Quotes block. Each is a click-to-expand row with its reason. */}
-      {(archivedDeclinedQuotes.length > 0 || archivedRequestDeclines.length > 0) && (
+      {/* Archive — declined / not-selected quotes (by the RM or the supplier) plus the
+          suppliers auto-closed when the job was awarded, moved out of the main Quotes
+          block. Each is a click-to-expand row with its reason. */}
+      {(archivedDeclinedQuotes.length > 0 || archivedRequestDeclines.length > 0 || closedWaitingRows.length > 0) && (
         <CollapsibleSection id="ticket-quotes-archive" title="Archive">
-          {/* Archived declines are already re-invited or superseded — no re-quote here. */}
+          {/* Archived declines are already re-invited or superseded — no re-quote here.
+              Losing quoters (quote declined when the job was awarded) show the courteous
+              "not selected" note as their reason. */}
           {archivedDeclinedQuotes.map(q => <RmDeclinedQuoteCard key={q.id} q={q} ticketId={t.id} canReQuote={false} />)}
+          {/* Suppliers still awaiting to quote when the job was awarded → auto-closed. */}
+          {closedWaitingRows.map((r, i) => (
+            <details key={`cw-${i}`} className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
+              <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
+                <span className="text-sm font-semibold text-[var(--text)] min-w-0 truncate">{r.name}</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-faint)] bg-[var(--hover)] rounded-full px-2 py-0.5 shrink-0">Closed</span>
+              </summary>
+              <div className="border-t border-[var(--border)] p-4 space-y-3">
+                <div className="rounded-lg bg-[var(--hover)] ring-1 ring-[var(--border)] p-3">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Note</p>
+                  <p className="text-sm text-[var(--text)]">{COURTESY_NOTE}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                  <DetailItem label="Type" value="Awaiting quote — closed" />
+                  <DetailItem label="Requested" value={r.invitedAt ? formatDateTime(r.invitedAt) : '—'} />
+                </div>
+              </div>
+            </details>
+          ))}
           {/* Suppliers who declined the quote REQUEST themselves — same card style as a
               declined quote, with the reason and the date it was declined. */}
           {archivedRequestDeclines.map((d, i) => (
