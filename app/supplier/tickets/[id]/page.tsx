@@ -48,7 +48,7 @@ function DetailItem({ label, value }: { label: string; value: string }) {
 
 // One COC & POC submission card — reused across the COC/POC, Snag and Completion
 // blocks. `snag` enriches a rejected submission with the "why it was sent back" reason.
-function SignoffCard({ s, snag }: { s: any; snag?: { description?: string | null; required_correction?: string | null; severity?: string | null } | null }) {
+function SignoffCard({ s, snag, ticketId }: { s: any; snag?: { description?: string | null; required_correction?: string | null; severity?: string | null } | null; ticketId: string }) {
   const meta = SIGNOFF_META[s.status] ?? SIGNOFF_META.submitted
   const before = (s.before_urls ?? []) as string[]
   const after = (s.after_urls ?? []) as string[]
@@ -70,8 +70,8 @@ function SignoffCard({ s, snag }: { s: any; snag?: { description?: string | null
         <div>
           <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Proof of completion</div>
           <div className="flex flex-wrap gap-x-4 gap-y-1">
-            {before.map((u, j) => <a key={`b${j}`} href={u} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C6A35D] underline hover:text-amber-500">Before {j + 1}</a>)}
-            {after.map((u, j) => <a key={`a${j}`} href={u} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C6A35D] underline hover:text-amber-500">After {j + 1}</a>)}
+            {before.map((u, j) => <ViewTrackedLink key={`b${j}`} ticketId={ticketId} itemType="photo" itemLabel={`Completion before photo ${j + 1}`} href={u} className="text-sm text-[#C6A35D] underline hover:text-amber-500">Before {j + 1}</ViewTrackedLink>)}
+            {after.map((u, j) => <ViewTrackedLink key={`a${j}`} ticketId={ticketId} itemType="photo" itemLabel={`Completion after photo ${j + 1}`} href={u} className="text-sm text-[#C6A35D] underline hover:text-amber-500">After {j + 1}</ViewTrackedLink>)}
             {!before.length && !after.length && <span className="text-sm text-[var(--text-faint)]">No photos uploaded</span>}
           </div>
         </div>
@@ -79,8 +79,8 @@ function SignoffCard({ s, snag }: { s: any; snag?: { description?: string | null
           <div>
             <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Certificate of Completion</div>
             <div className="flex flex-wrap gap-x-4 gap-y-1">
-              {s.coc_url && <a href={s.coc_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View COC</a>}
-              {s.invoice_url && <a href={s.invoice_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View invoice</a>}
+              {s.coc_url && <ViewTrackedLink ticketId={ticketId} itemType="coc" itemLabel="Completion COC" href={s.coc_url} className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View COC</ViewTrackedLink>}
+              {s.invoice_url && <ViewTrackedLink ticketId={ticketId} itemType="invoice" itemLabel="Completion invoice" href={s.invoice_url} className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View invoice</ViewTrackedLink>}
             </div>
           </div>
         )}
@@ -386,7 +386,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
                   )}
                   {Array.isArray(v.file_urls) && v.file_urls.length > 0 && (
                     <div className="flex flex-wrap gap-x-3 gap-y-1 pt-0.5">
-                      {v.file_urls.map((u: string, j: number) => <a key={j} href={u} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[11px] font-medium text-[#C6A35D] hover:underline"><FileText size={12} /> Attachment {j + 1}</a>)}
+                      {v.file_urls.map((u: string, j: number) => <ViewTrackedLink key={j} ticketId={t.id} itemType="attachment" itemLabel={`${arr.length > 1 ? `Variation #${arr.length - i}` : 'Variation order'} attachment ${j + 1}`} href={u} className="inline-flex items-center gap-1 text-[11px] font-medium text-[#C6A35D] hover:underline"><FileText size={12} /> Attachment {j + 1}</ViewTrackedLink>)}
                     </div>
                   )}
                 </div>
@@ -407,6 +407,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
               key={q.id}
               title={arr.length > 1 ? `Quote #${arr.length - i}` : 'Your submitted quote'}
               status={quoteStatusOf(q.status)}
+              ticketId={t.id}
               // Click-to-expand row (summary shows amount + status); the detail drops
               // down on click.
               collapsible
@@ -432,6 +433,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
               key={q.id}
               title={arr.length > 1 ? `Quote #${arr.length - i}` : 'Your submitted quote'}
               status={quoteStatusOf(q.status)}
+              ticketId={t.id}
               // Each declined quote is a click-to-expand row; the detail shows the
               // RM's decline reason (durable per-quote, falls back to the invite's) in red.
               collapsible
@@ -480,21 +482,21 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
               <p className="text-sm text-[var(--text)]">{t.evidence_request_reason}</p>
             </div>
           )}
-          {pendingSignoffs.map(s => <SignoffCard key={s.id} s={s} />)}
+          {pendingSignoffs.map(s => <SignoffCard key={s.id} s={s} ticketId={t.id} />)}
         </CollapsibleSection>
       )}
 
       {/* Snag — rejected / sent-back completions, kept for traceability */}
       {rejectedSignoffs.length > 0 && (
         <CollapsibleSection id="ticket-snag" title="Snag" defaultOpen={phase === 'snag'}>
-          {rejectedSignoffs.map((s, i) => <SignoffCard key={s.id} s={s} snag={i === 0 ? latestSnag : null} />)}
+          {rejectedSignoffs.map((s, i) => <SignoffCard key={s.id} s={s} snag={i === 0 ? latestSnag : null} ticketId={t.id} />)}
         </CollapsibleSection>
       )}
 
       {/* Completion — the approved COC & POC, created once sign-off is accepted */}
       {acceptedSignoff && (
         <CollapsibleSection id="ticket-completion" title="Completion" defaultOpen={phase === 'completion'}>
-          <SignoffCard s={acceptedSignoff} />
+          <SignoffCard s={acceptedSignoff} ticketId={t.id} />
         </CollapsibleSection>
       )}
 

@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server'
 // POST /api/tickets/[id]/view  { itemType, itemLabel } — record that the current user
 // opened a specific item on a ticket (a photo, quote, COC…), for the audit trail. Only
 // the first open of each distinct item per viewer is kept; repeat opens are no-ops.
-const ITEMS = new Set(['photo', 'photos', 'quote', 'coc', 'invoice'])
+const ITEMS = new Set(['photo', 'photos', 'quote', 'coc', 'invoice', 'attachment'])
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   const supabase = createClient()

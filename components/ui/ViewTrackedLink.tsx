@@ -4,7 +4,7 @@
 // this specific item, so the audit trail can show "viewed Photo 2 / COC / …". The
 // link still opens normally in a new tab.
 export function ViewTrackedLink({ ticketId, itemType, itemLabel, href, className, children }: {
-  ticketId: string; itemType: 'photo' | 'quote' | 'coc' | 'invoice'; itemLabel: string
+  ticketId: string; itemType: 'photo' | 'quote' | 'coc' | 'invoice' | 'attachment'; itemLabel: string
   href: string; className?: string; children: React.ReactNode
 }) {
   return (

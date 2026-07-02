@@ -1,6 +1,7 @@
 // Read-only quote view — the professional "submitted/accepted quote" card shared
 // by the RM and supplier ticket pages. Pure/server-safe (no client hooks).
 import { CheckCircle2, FileText, Clock, XCircle, CalendarClock } from 'lucide-react'
+import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils'
 
 export type QuoteSummaryStatus = 'pending' | 'accepted' | 'declined' | 'awarded'
@@ -36,7 +37,7 @@ function Item({ label, value }: { label: string; value: string }) {
 
 export interface QuoteSchedule { at: string; proposed?: boolean; technician?: string | null; audience?: 'rm' | 'supplier' }
 
-export function QuoteSummary({ quote, status, title, schedule, collapsible = false, declineReason }: { quote: QuoteSummaryData; status: QuoteSummaryStatus; title?: string; schedule?: QuoteSchedule | null; collapsible?: boolean; declineReason?: string | null }) {
+export function QuoteSummary({ quote, status, title, schedule, collapsible = false, declineReason, ticketId }: { quote: QuoteSummaryData; status: QuoteSummaryStatus; title?: string; schedule?: QuoteSchedule | null; collapsible?: boolean; declineReason?: string | null; ticketId?: string }) {
   const tone = TONE[status]
   const Icon = tone.icon
 
@@ -84,9 +85,10 @@ export function QuoteSummary({ quote, status, title, schedule, collapsible = fal
         </div>
       )}
       {quote.fileUrl && (
-        <a href={quote.fileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline">
-          <FileText size={14} /> View attached quote
-        </a>
+        // When a ticketId is supplied the open is recorded for the audit trail.
+        ticketId
+          ? <ViewTrackedLink ticketId={ticketId} itemType="quote" itemLabel={`${title ?? 'Quote'} attachment`} href={quote.fileUrl} className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View attached quote</ViewTrackedLink>
+          : <a href={quote.fileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View attached quote</a>
       )}
     </>
   )
