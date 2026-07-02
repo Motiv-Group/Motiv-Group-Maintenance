@@ -19,7 +19,7 @@ import { RmPipeline } from '@/components/regional/RmPipeline'
 import { SupplierAttachments } from '@/components/workflow/SupplierAttachments'
 import { SendQuoteForm } from '@/components/admin/SendQuoteForm'
 import { QuoteSummary, type QuoteSummaryStatus } from '@/components/workflow/QuoteSummary'
-import { ScheduleJobCard, DeclineWorkButton, AcceptSnagCard, StartSnagButton, AssignTechnicianButton, SupplierVariationGate } from '@/components/supplier/SupplierJobActions'
+import { MarkInProgressButton, DeclineWorkButton, AcceptSnagCard, StartSnagButton, SupplierVariationGate } from '@/components/supplier/SupplierJobActions'
 import { DueDate } from '@/components/workflow/DueDate'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { EditedLine } from '@/components/ui/EditedLine'
@@ -104,7 +104,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
     admin.from('stores').select('name, sub_store').eq('id', t.store_id).single(),
     admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('ticket_suppliers').select('supplier_id, status, invited_at, decline_reason, responded_at, declined_by, requote_requested_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).maybeSingle(),
-    admin.from('quotes').select('id, amount, amount_incl_vat, description, file_url, status, valid_until, proposed_schedule_at, created_at, updated_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).order('created_at', { ascending: false }),
+    admin.from('quotes').select('id, amount, amount_incl_vat, description, file_url, status, valid_until, proposed_schedule_at, decline_reason, created_at, updated_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).order('created_at', { ascending: false }),
     admin.from('technicians').select('id, name').in('supplier_id', supplierIds).eq('active', true).order('name'),
     admin.from('signoffs').select('id, before_urls, after_urls, coc_url, invoice_url, status, notes, reject_reason, reviewed_at, created_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).order('created_at', { ascending: false }),
     admin.from('snags').select('description, required_correction, severity, status, scheduled_at, schedule_status, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
@@ -326,19 +326,14 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
             </div>
           )}
           {canSubmitQuote && <SendQuoteForm ticketId={t.id} competitive priority={t.priority} createdAt={t.created_at} />}
-          {awarded && t.status === 'accepted' && <ScheduleJobCard ticketId={t.id} priority={t.priority} createdAt={t.created_at} technicians={technicians} />}
+          {/* After the quote is approved → straight to "Mark in progress" (confirm).
+              Variation orders come after the COC/POC is approved (close-out stage). */}
+          {awarded && (t.status === 'accepted' || t.status === 'scheduled') && <MarkInProgressButton ticketId={t.id} />}
           {awarded && t.status === 'snag' && <AcceptSnagCard ticketId={t.id} priority={t.priority} createdAt={t.created_at} />}
           {awarded && t.status === 'snag_assigned' && (
             latestSnag?.schedule_status === 'agreed'
               ? <StartSnagButton ticketId={t.id} />
               : <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 text-sm text-[var(--text-muted)]">Snag fix proposed{latestSnag?.scheduled_at ? ` for ${formatDateTime(latestSnag.scheduled_at)}` : ''} — awaiting the manager&apos;s approval before you can start.</div>
-          )}
-          {/* Scheduled → assign a technician, then raise variation orders (or declare
-              none) before marking the job in progress. COC & POC only appear once the
-              job is marked in progress. */}
-          {awarded && t.status === 'scheduled' && <AssignTechnicianButton technicians={technicians} />}
-          {awarded && (t.status === 'scheduled' || t.status === 'vo_declined') && (
-            <SupplierVariationGate ticketId={t.id} priority={t.priority} createdAt={t.created_at} variationCount={variationCount} status={t.status as 'scheduled' | 'vo_declined'} declineReason={latestVoRejectReason} />
           )}
           {awarded && ['in_progress', 'snag_resolved', 'snag_in_progress', 'evidence_requested'].includes(t.status) && (
             <SubmitCompletionForm ticketId={t.id} evidenceRequested={t.status === 'evidence_requested'} requireBoth={t.status !== 'evidence_requested'} />
@@ -348,6 +343,11 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           )}
           {awarded && t.status === 'submitted_for_signoff' && (
             <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 text-sm text-[var(--text-muted)]">COC &amp; POC submitted — awaiting the regional manager&apos;s approval.</div>
+          )}
+          {/* Close-out stage → the supplier may raise a variation order for extra work;
+              otherwise the RM does the final close-out. */}
+          {awarded && (t.status === 'approved_closeout' || t.status === 'vo_declined') && (
+            <SupplierVariationGate ticketId={t.id} priority={t.priority} createdAt={t.created_at} variationCount={variationCount} status={t.status as 'approved_closeout' | 'vo_declined'} declineReason={latestVoRejectReason} />
           )}
           {/* submit_quote is handled by SendQuoteForm above — exclude the duplicate button. */}
           {/* Scoped to this supplier's own state so a non-awarded supplier never sees
@@ -431,9 +431,9 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
               title={arr.length > 1 ? `Quote #${arr.length - i}` : 'Your submitted quote'}
               status={quoteStatusOf(q.status)}
               // Each declined quote is a click-to-expand row; the detail shows the
-              // decline reason (RM's, or the supplier's own) in red.
+              // RM's decline reason (durable per-quote, falls back to the invite's) in red.
               collapsible
-              declineReason={declineReason}
+              declineReason={q.decline_reason ?? declineReason}
               quote={{ id: q.id, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, description: q.description ?? null, fileUrl: q.file_url ?? null, validUntil: q.valid_until ?? null, createdAt: q.created_at }}
             />
           ))}

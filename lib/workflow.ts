@@ -108,33 +108,35 @@ export const TRANSITIONS: Record<TicketStatus, Transition[]> = {
     { action: 'submit_quote', label: 'Resubmit quote', to: 'quoted', roles: ['supplier'] },
   ],
   accepted: [
-    { action: 'schedule', label: 'Schedule job', to: 'scheduled', roles: ['supplier', 'regional_manager'] },
+    // Straight to work after approval — the supplier marks the job in progress
+    // (no separate scheduling step). Variation orders come after sign-off.
+    { action: 'start_work', label: 'Mark as In progress', to: 'in_progress', roles: ['supplier'] },
   ],
   scheduled: [
-    { action: 'accept_schedule',  label: 'Accept proposed time', to: 'scheduled',        roles: ['regional_manager', 'executive'] },
-    // Variation orders are raised in the scheduled phase — before the supplier
-    // marks the job in progress.
-    { action: 'submit_variation', label: 'Raise Variation',      to: 'variation_review', roles: ['supplier'] },
-    { action: 'start_work',       label: 'Mark as In progress',  to: 'in_progress',      roles: ['supplier'] },
+    { action: 'accept_schedule',  label: 'Accept proposed time', to: 'scheduled',   roles: ['regional_manager', 'executive'] },
+    { action: 'start_work',       label: 'Mark as In progress',  to: 'in_progress', roles: ['supplier'] },
   ],
   in_progress: [
     { action: 'submit_completion',  label: 'Submit COC & POC',   to: 'submitted_for_signoff', roles: ['supplier'] },
   ],
   variation_review: [
-    // Approving a VO returns to the scheduled phase (supplier can raise more or
-    // mark in progress); declining moves the ticket to the vo_declined state.
-    { action: 'approve_variation', label: 'Approve variation', to: 'scheduled',    roles: ['regional_manager', 'executive'] },
-    { action: 'reject_variation',  label: 'Reject variation',  to: 'vo_declined',  roles: ['regional_manager', 'executive'] },
+    // A VO is raised AFTER the COC/POC is approved. Approving it returns to the
+    // close-out stage (raise more or the RM closes out); declining → vo_declined.
+    { action: 'approve_variation', label: 'Approve variation', to: 'approved_closeout', roles: ['regional_manager', 'executive'] },
+    { action: 'reject_variation',  label: 'Reject variation',  to: 'vo_declined',       roles: ['regional_manager', 'executive'] },
   ],
   vo_declined: [
-    // Supplier responds to a declined VO: re-submit a revised one, or proceed.
-    { action: 'submit_variation', label: 'Re-submit Variation',  to: 'variation_review', roles: ['supplier'] },
-    { action: 'start_work',       label: 'Mark as In progress',  to: 'in_progress',      roles: ['supplier'] },
+    // Supplier re-submits a revised VO, or the RM finalises the close-out.
+    { action: 'submit_variation', label: 'Re-submit Variation', to: 'variation_review', roles: ['supplier'] },
+    { action: 'close_out',        label: 'Final close-out',     to: 'completed',        roles: ['regional_manager', 'executive'] },
   ],
   submitted_for_signoff: [
-    { action: 'approve',          label: 'Approve & complete', to: 'completed',         roles: ['regional_manager', 'executive'] },
+    // Approving the COC/POC no longer completes the ticket — it moves to the
+    // close-out stage, where the supplier may raise a variation order before the
+    // RM does the final close-out.
+    { action: 'approve',          label: 'Approve COC & POC',     to: 'approved_closeout',  roles: ['regional_manager', 'executive'] },
     { action: 'request_evidence', label: 'Request more evidence', to: 'evidence_requested', roles: ['regional_manager', 'executive'] },
-    { action: 'raise_snag',       label: 'Raise snag',         to: 'snag',              roles: ['regional_manager', 'executive'] },
+    { action: 'raise_snag',       label: 'Raise snag',            to: 'snag',               roles: ['regional_manager', 'executive'] },
   ],
   evidence_requested: [
     { action: 'submit_completion', label: 'Resubmit completion', to: 'submitted_for_signoff', roles: ['supplier'] },
@@ -153,7 +155,10 @@ export const TRANSITIONS: Record<TicketStatus, Transition[]> = {
     { action: 'submit_completion', label: 'Back to sign-off', to: 'submitted_for_signoff', roles: ['supplier'] },
   ],
   approved_closeout: [
-    { action: 'close_out', label: 'Final close-out', to: 'completed', roles: ['regional_manager', 'executive'] },
+    // COC/POC approved. The supplier can raise a variation order for extra work;
+    // the RM does the final close-out.
+    { action: 'submit_variation', label: 'Raise Variation', to: 'variation_review', roles: ['supplier'] },
+    { action: 'close_out',        label: 'Final close-out', to: 'completed',        roles: ['regional_manager', 'executive'] },
   ],
   // Every invited supplier declined — the RM re-assigns (via /assign, not a
   // workflow transition) or cancels the ticket.

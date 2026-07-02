@@ -415,6 +415,12 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         {/* Variation order review — dedicated approve (confirm-over-buttons) + decline pop-up. */}
         {t.status === 'variation_review' && <VariationReviewCard ticketId={t.id} />}
 
+        {/* Close-out stage — COC/POC approved; the supplier may still raise a variation
+            order, or the RM finalises the close-out (button below). */}
+        {(t.status === 'approved_closeout' || t.status === 'vo_declined') && (
+          <div className="rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/30 p-3.5 text-sm text-[var(--text-muted)]">COC &amp; POC approved. The supplier can still raise a variation order for extra work — otherwise finalise the close-out below.</div>
+        )}
+
         {/* Remaining lifecycle actions (request evidence, snag, close) */}
         <WorkflowActions
           ticketId={t.id} status={t.status} role="regional_manager"

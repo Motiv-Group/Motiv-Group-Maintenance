@@ -166,8 +166,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
         // Accepting the sign-off closes any open snag — a snag stays open until the
         // corrective work is completed and the RM accepts it.
         await admin.from('snags').update({ status: 'resolved' }).eq('ticket_id', ticketId).in('status', ['open', 'assigned', 'in_progress'])
-        // Approving the sign-off completes the ticket directly (no separate close-out step).
-        updates.completed_at = now; updates.closed_out_at = now; updates.closed_out_by = user.id
+        // Approving the COC/POC moves to the close-out stage (approved_closeout) — the
+        // supplier may raise a variation order before the RM's final close-out. The
+        // ticket is completed by the separate close_out action below.
         break
       case 'raise_snag':
         await admin.from('snags').insert({ company_id: ticket.company_id, ticket_id: ticketId, store_id: ticket.store_id, supplier_id: ticket.supplier_id, description: body.description ?? null, severity: body.severity ?? null, required_correction: body.required_correction ?? null, status: 'open' })
@@ -273,7 +274,7 @@ async function hasAccess(admin: Admin, role: WorkflowRole, userId: string, ticke
 
 // Targeted notifications for the moves that need someone else to act next.
 async function notify(admin: Admin, action: string, ticket: any, actorName: string | null, opts?: { scheduleProposed?: boolean; scheduledAt?: string }) {
-  const toSupplier = ['validate', 'request_quote', 'require_assessment', 'approve_quote', 'request_evidence', 'raise_snag', 'assign_snag', 'approve_variation', 'reject_variation', 'accept_schedule', 'approve_snag']
+  const toSupplier = ['validate', 'request_quote', 'require_assessment', 'approve_quote', 'request_evidence', 'raise_snag', 'assign_snag', 'approve_variation', 'reject_variation', 'accept_schedule', 'approve_snag', 'approve', 'close_out']
   const toRegion   = ['submit_quote', 'submit_completion', 'submit_variation', 'resolve_snag', 'resubmit', 'accept_snag', 'start_snag']
   // The store manager is told whenever a visit is scheduled / agreed so they can
   // expect the supplier on site.
@@ -301,6 +302,8 @@ async function notify(admin: Admin, action: string, ticket: any, actorName: stri
       : action === 'approve_snag' ? 'Snag schedule approved — you can start the corrective work'
       : action === 'approve_variation' ? 'Variation order approved — you can continue'
       : action === 'reject_variation' ? 'Variation order declined — re-submit a revised VO or message the manager'
+      : action === 'approve' ? 'COC & POC approved — raise a variation order if needed, or the job will be closed out'
+      : action === 'close_out' ? 'Job completed and closed out'
       : `${actorName ?? 'A manager'} → ${action.replace(/_/g, ' ')}`
     await push(admin, ids, ticket.company_id, title, msg, `/supplier/tickets/${ticket.id}`)
   }
