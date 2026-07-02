@@ -21,6 +21,7 @@ import { EditedLine } from '@/components/ui/EditedLine'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { AuditTrail } from '@/components/ui/AuditTrail'
 import { CollapsibleSection } from '@/components/ui/CollapsibleSection'
+import { MarkTicketSeen } from '@/components/ui/MarkTicketSeen'
 import { formatCurrency, formatDateTime, formatDate, rmStatusMeta, storeLabel, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
 
 // Professional "what we're waiting on" copy while a snag works its way through.
@@ -147,8 +148,29 @@ function RmSignoffCard({ s, tone, ticketId }: { s: any; tone: 'review' | 'snag' 
   )
 }
 
+// One supplier progress update — a free-text note, or a "📷 Progress photo: <url>"
+// which renders as a photo link. Shared by the new-updates block (top) and the
+// collapsible history (above the audit trail); `isNew` gives it the gold accent.
+function SupplierUpdateItem({ u, ticketId, isNew = false }: { u: { body: string; created_at: string }; ticketId: string; isNew?: boolean }) {
+  const photo = String(u.body).match(/^📷\s*Progress photo:\s*(\S+)/)
+  return (
+    <li className={`rounded-xl ring-1 p-3 bg-[var(--surface)] ${isNew ? 'ring-[#C6A35D]/40' : 'ring-[var(--border)]'}`}>
+      <div className="flex items-center justify-between gap-2 mb-1">
+        <span className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--text)]">
+          Supplier
+          {isNew && <span className="text-[9px] font-bold uppercase tracking-wide text-amber-700 dark:text-[#C6A35D] bg-[#C6A35D]/15 rounded-full px-1.5 py-0.5">New</span>}
+        </span>
+        <span className="text-[11px] text-[var(--text-faint)]">{formatDateTime(u.created_at)}</span>
+      </div>
+      {photo
+        ? <ViewTrackedLink ticketId={ticketId} itemType="photo" itemLabel="Supplier progress photo" href={photo[1]} className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><Camera size={14} /> View progress photo</ViewTrackedLink>
+        : <p className="text-sm text-[var(--text)] whitespace-pre-line">{u.body}</p>}
+    </li>
+  )
+}
+
 export default async function RegionalTicketDetailPage({ params }: { params: { id: string } }) {
-  const { companyId, regionIds } = await requireRegionalV3()
+  const { companyId, regionIds, userId } = await requireRegionalV3()
   const admin = createAdminClient()
   const { data: t } = await admin.from('tickets').select('*').eq('id', params.id).single()
   if (!t || !t.region_id || !regionIds.includes(t.region_id)) redirect('/regional/tickets')
@@ -167,7 +189,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   const storeName = store ? storeLabel(store.name, store.sub_store) : 'Store'
   const editorName = t.edited_by ? ((await admin.from('user_profiles').select('full_name').eq('id', t.edited_by).single()).data?.full_name ?? null) : null
   // Motiv-curated supplier pool (assign pop-up) + who has viewed this ticket's items.
-  const [{ data: motivSuppliers }, { data: viewRows }, { data: declineRows }, { data: requestRows }] = await Promise.all([
+  const [{ data: motivSuppliers }, { data: viewRows }, { data: declineRows }, { data: requestRows }, { data: readRow }] = await Promise.all([
     admin.from('suppliers').select('id, company_name').eq('is_motiv', true).eq('active', true).order('company_name'),
     admin.from('ticket_views').select('viewer_role, item_type, item_label, first_viewed_at').eq('ticket_id', t.id),
     // Durable supplier request-declines — kept even after the supplier is re-invited.
@@ -175,6 +197,8 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
     // Durable quote-request rounds — each (re)assignment adds a "Quote requested"
     // event, attributed to the supplier so the trail reads "Quote requested from X".
     admin.from('ticket_quote_requests').select('supplier_id, requested_at').eq('ticket_id', t.id).order('requested_at', { ascending: true }),
+    // THIS RM's "last seen this ticket" watermark → which supplier updates are new.
+    admin.from('ticket_reads').select('last_seen_at').eq('user_id', userId).eq('ticket_id', t.id).maybeSingle(),
   ])
   // Full COC/POC history — every submission, split by state (mirrors the supplier
   // view). Each sent-back card carries the reason it was rejected.
@@ -301,13 +325,14 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
     : ['approved_closeout', 'completed'].includes(t.status) ? 'completion'
     : 'commercial'
 
-  // Progress updates the supplier posted (notes / photos) — surfaced in their own
-  // highlighted card so the RM notices activity on the job (not just buried in the
-  // audit trail). "New" = posted since the RM last acted on the ticket
-  // (last_internal_update_at, bumped by every RM transition).
+  // Supplier progress updates (notes / photos). "New" = posted since THIS RM last
+  // OPENED the ticket (the ticket_reads watermark, bumped by MarkTicketSeen on open).
+  // New updates surface prominently just below the ticket detail; once seen, on the
+  // next open they fold into a collapsible history above the audit trail. The full
+  // history is always kept (ticket_updates rows are never deleted).
   const supplierUpdates = ((updates ?? []) as any[]).filter(u => u.author_role === 'supplier')
-  const rmLastActedMs = t.last_internal_update_at ? +new Date(t.last_internal_update_at) : 0
-  const newUpdateCount = supplierUpdates.filter(u => +new Date(u.created_at) > rmLastActedMs).length
+  const lastSeenMs = (readRow as any)?.last_seen_at ? +new Date((readRow as any).last_seen_at) : 0
+  const newSupplierUpdates = supplierUpdates.filter(u => +new Date(u.created_at) > lastSeenMs)
 
   return (
     <div className="space-y-5">
@@ -413,6 +438,31 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         </div>
       </Card>
 
+      {/* Bump this RM's "last seen" watermark on a real open (fires client-side, not on
+          prefetch) so these updates read as seen next visit. */}
+      <MarkTicketSeen ticketId={t.id} latestUpdateAt={supplierUpdates[0]?.created_at ?? null} />
+
+      {/* NEW updates from the supplier — surfaced right below the ticket detail so
+          they're the first thing the RM notices. Shows only the unseen updates; on the
+          next open they fold into the collapsible history above the audit trail. */}
+      {newSupplierUpdates.length > 0 && (
+        <Card className="p-5 space-y-3 bg-[#C6A35D]/5 ring-1 ring-[#C6A35D]/50">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="flex items-center gap-2 text-sm font-bold text-[var(--text)]"><MessageSquare size={15} className="text-[#C6A35D]" /> New updates from the supplier</h2>
+            <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-[#C6A35D] bg-[#C6A35D]/15 rounded-full px-2 py-0.5">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#C6A35D] opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#C6A35D]" />
+              </span>
+              {newSupplierUpdates.length} new
+            </span>
+          </div>
+          <ol className="space-y-2.5">
+            {newSupplierUpdates.map((u, i) => <SupplierUpdateItem key={i} u={u} ticketId={t.id} isNew />)}
+          </ol>
+        </Card>
+      )}
+
       {(t.status === 'cancelled' || t.status === 'declined') && (
         <div className="rounded-2xl bg-red-500/10 ring-1 ring-red-500/40 p-5 space-y-1">
           <p className="text-sm font-bold text-red-700 dark:text-red-400">Ticket {t.status === 'declined' ? 'declined' : 'cancelled'}</p>
@@ -421,48 +471,6 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
       )}
 
       {breached && <BreachReason nextAction={sla.nextAction} dueAt={sla.nextActionDueAt} owner={breachOwner} />}
-
-      {/* Updates from the supplier — progress notes / photos, in a gold-accented card
-          so new activity is noticed at a glance. A pulsing "N new" badge flags updates
-          posted since the RM last acted; the newest sit at the top. */}
-      {supplierUpdates.length > 0 && (
-        <Card className={`p-5 space-y-3 bg-[#C6A35D]/5 ${newUpdateCount > 0 ? 'ring-1 ring-[#C6A35D]/50' : ''}`}>
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="flex items-center gap-2 text-sm font-bold text-[var(--text)]"><MessageSquare size={15} className="text-[#C6A35D]" /> Updates from the supplier</h2>
-            {newUpdateCount > 0 && (
-              <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-[#C6A35D] bg-[#C6A35D]/15 rounded-full px-2 py-0.5">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#C6A35D] opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-[#C6A35D]" />
-                </span>
-                {newUpdateCount} new
-              </span>
-            )}
-          </div>
-          <ol className="space-y-2.5">
-            {supplierUpdates.map((u, i) => {
-              // Progress photos are posted as "📷 Progress photo: <url>" — render the
-              // link/thumbnail; everything else is a free-text note.
-              const photo = String(u.body).match(/^📷\s*Progress photo:\s*(\S+)/)
-              const isNew = +new Date(u.created_at) > rmLastActedMs
-              return (
-                <li key={i} className={`rounded-xl ring-1 p-3 bg-[var(--surface)] ${isNew ? 'ring-[#C6A35D]/40' : 'ring-[var(--border)]'}`}>
-                  <div className="flex items-center justify-between gap-2 mb-1">
-                    <span className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--text)]">
-                      Supplier
-                      {isNew && <span className="text-[9px] font-bold uppercase tracking-wide text-amber-700 dark:text-[#C6A35D] bg-[#C6A35D]/15 rounded-full px-1.5 py-0.5">New</span>}
-                    </span>
-                    <span className="text-[11px] text-[var(--text-faint)]">{formatDateTime(u.created_at)}</span>
-                  </div>
-                  {photo
-                    ? <ViewTrackedLink ticketId={t.id} itemType="photo" itemLabel="Supplier progress photo" href={photo[1]} className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><Camera size={14} /> View progress photo</ViewTrackedLink>
-                    : <p className="text-sm text-[var(--text)] whitespace-pre-line">{u.body}</p>}
-                </li>
-              )
-            })}
-          </ol>
-        </Card>
-      )}
 
       {/* COC & POC — every submission: under review, plus any sent back for more evidence (full history) */}
       {(pendingSignoffs.length > 0 || evidenceRequestedSignoffs.length > 0) && (
@@ -698,6 +706,16 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         <CollapsibleSection id="ticket-snag" title="Snags" defaultOpen={phase === 'snag'}>
           {/* Every snagged / sent-back COC/POC submission, each with the reason it was returned. */}
           {rejectedSignoffs.map((s: any) => <RmSignoffCard key={s.id} s={s} tone="snag" ticketId={t.id} />)}
+        </CollapsibleSection>
+      )}
+
+      {/* Updates from the supplier — full history, collapsed by default. Sits just
+          above the audit trail once there's nothing new (everything here is seen). */}
+      {supplierUpdates.length > 0 && newSupplierUpdates.length === 0 && (
+        <CollapsibleSection id="ticket-updates" title="Updates from the supplier" badge={<span className="text-[11px] text-[var(--text-faint)]">{supplierUpdates.length} update{supplierUpdates.length === 1 ? '' : 's'}</span>}>
+          <ol className="space-y-2.5">
+            {supplierUpdates.map((u, i) => <SupplierUpdateItem key={i} u={u} ticketId={t.id} />)}
+          </ol>
         </CollapsibleSection>
       )}
 
