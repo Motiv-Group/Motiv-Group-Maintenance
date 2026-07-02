@@ -357,6 +357,12 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           {/* Scoped to this supplier's own state so a non-awarded supplier never sees
               actions triggered by another supplier's progress. */}
           <WorkflowActions ticketId={t.id} status={supplierStatus} role="supplier" exclude={['schedule', 'submit_completion', 'require_assessment', 'request_quote', 'submit_variation', 'start_work', 'accept_snag', 'start_snag', 'submit_quote']} />
+          {/* Quote submitted and awaiting the manager's decision — reassure the supplier. */}
+          {!awarded && latestQuote?.status === 'pending' && (
+            <div className="rounded-xl bg-[#C6A35D]/10 ring-1 ring-[#C6A35D]/30 p-3.5 text-sm text-[var(--text-muted)]">
+              Your quote has been submitted and is under review. We&apos;ll notify you as soon as the regional manager has responded — no action is needed from you in the meantime.
+            </div>
+          )}
           {/* Opt out of the job (before award) — separated from the primary actions */}
           {canDecline && <div className="pt-1"><DeclineWorkButton ticketId={t.id} /></div>}
         </Card>
@@ -443,27 +449,27 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
               // RM's decline reason (durable per-quote, falls back to the invite's) in red.
               collapsible
               declineReason={q.decline_reason ?? declineReason}
-              quote={{ id: q.id, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, description: q.description ?? null, fileUrl: q.file_url ?? null, validUntil: q.valid_until ?? null, createdAt: q.created_at }}
+              quote={{ id: q.id, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, description: q.description ?? null, fileUrl: q.file_url ?? null, validUntil: q.valid_until ?? null, createdAt: q.created_at, declinedAt: q.updated_at ?? null }}
             />
           ))}
           {((declineRows ?? []) as any[]).map((d, i) => (
-            <div key={`decline-${i}`} className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
-              <div className="flex items-start justify-between gap-2 px-4 py-2.5 border-b border-[var(--border)]">
+            // Click-to-expand row (same pattern as the declined quotes) — the reason
+            // drops down on click.
+            <details key={`decline-${i}`} className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
+              <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-[var(--text)] truncate">Quote request declined by {supplierCompanyName ?? 'you'}</p>
                   <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(d.declined_at)}</p>
                 </div>
                 <span className="text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:text-red-400 bg-red-500/15 rounded-full px-2 py-0.5 shrink-0">Declined (you)</span>
-              </div>
-              {d.reason && (
-                <div className="p-4">
-                  <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3">
-                    <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Reason</p>
-                    <p className="text-sm font-medium text-red-700 dark:text-red-400">{d.reason}</p>
-                  </div>
+              </summary>
+              <div className="border-t border-[var(--border)] p-4">
+                <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Reason</p>
+                  <p className="text-sm font-medium text-red-700 dark:text-red-400">{d.reason || 'No reason provided.'}</p>
                 </div>
-              )}
-            </div>
+              </div>
+            </details>
           ))}
         </CollapsibleSection>
       )}

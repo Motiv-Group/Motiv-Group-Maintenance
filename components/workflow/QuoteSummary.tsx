@@ -15,6 +15,8 @@ export interface QuoteSummaryData {
   fileUrl?: string | null
   validUntil?: string | null
   createdAt: string
+  /** When the quote was declined — shown on a declined card. */
+  declinedAt?: string | null
 }
 
 const TONE: Record<QuoteSummaryStatus, { ring: string; bg: string; head: string; badge: string; badgeText: string; label: string; icon: typeof CheckCircle2; iconCls: string }> = {
@@ -69,6 +71,7 @@ export function QuoteSummary({ quote, status, title, schedule, collapsible = fal
         <Item label="Incl. VAT" value={quote.amountInclVat ? formatCurrency(quote.amountInclVat) : '—'} />
         <Item label="Submitted" value={formatDateTime(quote.createdAt)} />
         <Item label="Valid until" value={quote.validUntil ? formatDate(quote.validUntil) : 'N/A'} />
+        {status === 'declined' && quote.declinedAt && <Item label="Declined" value={formatDateTime(quote.declinedAt)} />}
       </div>
       {schedule && (
         <div className="flex items-center gap-2 text-sm flex-wrap">
