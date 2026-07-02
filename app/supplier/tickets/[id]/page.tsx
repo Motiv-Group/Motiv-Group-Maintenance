@@ -268,6 +268,11 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   const roundBySignoff = new Map<string, { round_no: number; kind: string; reason: string | null }>()
   for (const r of ((roundRows ?? []) as any[])) if (r.signoff_id) roundBySignoff.set(r.signoff_id, { round_no: r.round_no, kind: r.kind, reason: r.reason ?? null })
   const submissionLabel = (s: any) => `Submission #${roundBySignoff.get(s.id)?.round_no ?? submissionNo.get(s.id) ?? '?'}`
+  // While the ticket is actively snagged, the latest snagged submission is the LIVE
+  // snag — shown in its own block above Quotes so the supplier sees what to fix. Older
+  // superseded rounds (and the snag once resubmitted) stay in the Archived block.
+  const liveSnag = ['snag', 'snag_assigned', 'snag_in_progress', 'snag_resolved'].includes(t.status) ? (rejectedSignoffs[0] ?? null) : null
+  const archivedSuperseded = supersededSubmissions.filter(s => s.id !== liveSnag?.id)
 
   // Variation orders raised on this ticket (drives the scheduled-phase VO gate and
   // the "no more variation orders" label). The most recent decline reason feeds the
@@ -333,8 +338,9 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           </div>
         )}
 
-        {/* Scheduled visit — its own callout in the ticket detail block. */}
-        {!declinedForMe && t.scheduled_at && (
+        {/* Scheduled visit — its own callout in the ticket detail block. Hidden once a
+            snag fix is scheduled: that callout replaces it (no need to show both). */}
+        {!declinedForMe && t.scheduled_at && !(latestSnag?.scheduled_at && ['assigned', 'in_progress'].includes(latestSnag.status)) && (
           <div className="flex items-center gap-2.5 rounded-xl bg-indigo-500/10 ring-1 ring-indigo-500/30 px-3.5 py-3">
             <Calendar size={18} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
             <div className="min-w-0">
@@ -383,18 +389,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           {/* After the quote is approved → straight to "Mark in progress" (confirm).
               Variation orders come after the COC/POC is approved (close-out stage). */}
           {awarded && (t.status === 'accepted' || t.status === 'scheduled') && <MarkInProgressButton ticketId={t.id} />}
-          {awarded && t.status === 'snag' && (
-            <div className="space-y-3">
-              {(latestSnag?.description || latestSnag?.required_correction) && (
-                <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3 space-y-1">
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Why it was sent back</p>
-                  {latestSnag?.description && <p className="text-sm text-[var(--text)]">{latestSnag.description}</p>}
-                  {latestSnag?.required_correction && <p className="text-sm text-[var(--text-muted)]"><span className="font-medium text-[var(--text)]">Required correction:</span> {latestSnag.required_correction}</p>}
-                </div>
-              )}
-              <AcceptSnagCard ticketId={t.id} priority={t.priority} createdAt={t.created_at} />
-            </div>
-          )}
+          {awarded && t.status === 'snag' && <AcceptSnagCard ticketId={t.id} priority={t.priority} createdAt={t.created_at} />}
           {awarded && t.status === 'snag_assigned' && (
             latestSnag?.schedule_status === 'agreed'
               ? <StartSnagButton ticketId={t.id} />
@@ -484,6 +479,14 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
         </CollapsibleSection>
       )}
 
+      {/* Snag — the current, active snag shown above Quotes so the supplier sees what
+          to fix. Previous snag / evidence rounds live in the Archived block below. */}
+      {liveSnag && (
+        <CollapsibleSection id="ticket-snag" title="Snag" defaultOpen>
+          <SignoffCard s={liveSnag} snag={latestSnag} ticketId={t.id} title={submissionLabel(liveSnag)} reason={roundBySignoff.get(liveSnag.id)?.reason ?? liveSnag.reject_reason} />
+        </CollapsibleSection>
+      )}
+
       {/* Quotes — active (pending / accepted) quotes only. Declined ones move to the
           Archived quotes block below. */}
       {activeQuotes.length > 0 && (
@@ -515,11 +518,12 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
       {/* Archived — one block holding both this supplier's declined quotes (by the RM
           or themselves) and every time they declined the quote request. The request
           declines are durable (kept even after the RM re-assigns them). */}
-      {(declinedMyQuotes.length > 0 || ((declineRows ?? []) as any[]).length > 0 || supersededSubmissions.length > 0) && (
+      {(declinedMyQuotes.length > 0 || ((declineRows ?? []) as any[]).length > 0 || archivedSuperseded.length > 0) && (
         <CollapsibleSection id="ticket-archive" title="Archived" defaultOpen={declinedBy === 'supplier'}>
           {/* Superseded COC/POC submissions — sent back for more evidence or snagged.
-              Each a collapsed "Submission #N" round card showing why it was returned. */}
-          {supersededSubmissions.map(s => (
+              Each a collapsed "Submission #N" round card showing why it was returned.
+              (The current live snag, if any, is shown in its own block above.) */}
+          {archivedSuperseded.map(s => (
             <SignoffCard key={s.id} s={s} ticketId={t.id} title={submissionLabel(s)} reason={roundBySignoff.get(s.id)?.reason ?? s.reject_reason} snag={s.status === 'rejected' && s.id === rejectedSignoffs[0]?.id ? latestSnag : null} collapsible />
           ))}
           {declinedMyQuotes.map((q, i, arr) => (
