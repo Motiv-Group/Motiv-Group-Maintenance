@@ -100,7 +100,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   const admin = createAdminClient()
   const { data: t } = await admin.from('tickets').select('*').eq('id', params.id).single()
   if (!t || t.company_id !== companyId) redirect('/supplier/tickets')
-  const [{ data: store }, { data: updates }, { data: invite }, { data: myQuotes }, { data: technicianRows }, { data: signoffRows }, { data: snagRows }, { data: companyRow }, { data: variationRows }, { data: viewRows }] = await Promise.all([
+  const [{ data: store }, { data: updates }, { data: invite }, { data: myQuotes }, { data: technicianRows }, { data: signoffRows }, { data: snagRows }, { data: companyRow }, { data: variationRows }, { data: viewRows }, { data: declineRows }] = await Promise.all([
     admin.from('stores').select('name, sub_store').eq('id', t.store_id).single(),
     admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('ticket_suppliers').select('supplier_id, status, invited_at, decline_reason, responded_at, declined_by, requote_requested_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).maybeSingle(),
@@ -113,6 +113,10 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
     // Only THIS supplier's own view events — so their trail shows the photos /
     // attachments they opened, without ever exposing another supplier's activity.
     admin.from('ticket_views').select('viewer_role, item_type, item_label, first_viewed_at').eq('ticket_id', t.id).eq('viewer_id', userId),
+    // This supplier's OWN durable request-declines — kept even after the RM
+    // re-assigns them (which resets the ticket_suppliers row), so the history block
+    // survives across re-quote rounds.
+    admin.from('ticket_supplier_declines').select('reason, declined_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).order('declined_at', { ascending: true }),
   ])
   // Client organisation that owns the store (shown in the ticket detail).
   const companyName = (companyRow as any)?.name ?? null
@@ -185,6 +189,11 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
       ? ((invite as any)?.responded_at ?? latestQuote?.updated_at ?? null) : null)
   // Map a quote's DB status to the read-only summary tone (accepted shows "Approved").
   const quoteStatusOf = (s: string): QuoteSummaryStatus => s === 'accepted' ? 'accepted' : s === 'declined' ? 'declined' : 'pending'
+  // Active quotes stay in the Quotes block; declined ones (by the RM or the supplier)
+  // move to a collapsed "Archived quotes" block below.
+  const myQuoteRows = (myQuotes ?? []) as any[]
+  const activeQuotes = myQuoteRows.filter(q => q.status !== 'declined')
+  const declinedMyQuotes = myQuoteRows.filter(q => q.status === 'declined')
 
   // COC/POC submissions split across blocks by state: under review → COC & POC,
   // rejected/snagged → Snag (kept for traceability), accepted → Completion.
@@ -374,20 +383,15 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
         </CollapsibleSection>
       )}
 
-      {/* Quotes — the supplier's own quote history (below variation orders) */}
-      {(myQuotes ?? []).length > 0 && (
+      {/* Quotes — active (pending / accepted) quotes only. Declined ones move to the
+          Archived quotes block below. */}
+      {activeQuotes.length > 0 && (
         <CollapsibleSection id="ticket-quotes" title="Quotes" defaultOpen={phase === 'commercial'}>
-          {((myQuotes ?? []) as any[]).map((q, i, arr) => (
+          {activeQuotes.map((q, i, arr) => (
             <QuoteSummary
               key={q.id}
               title={arr.length > 1 ? `Quote #${arr.length - i}` : 'Your submitted quote'}
               status={quoteStatusOf(q.status)}
-              // A superseded/declined quote folds into the RM-style collapsible row;
-              // the current quote stays open as the full card.
-              collapsible={quoteStatusOf(q.status) === 'declined'}
-              // Show why it was declined (RM's reason, or the supplier's own if they
-              // declined the request) right in the quote detail.
-              declineReason={q.status === 'declined' ? declineReason : null}
               quote={{ id: q.id, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, description: q.description ?? null, fileUrl: q.file_url ?? null, validUntil: q.valid_until ?? null, createdAt: q.created_at }}
               schedule={
                 q.status === 'accepted' && t.scheduled_at
@@ -401,27 +405,48 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
         </CollapsibleSection>
       )}
 
-      {/* Supplier declined the quote request WITHOUT ever submitting a quote → no
-          quote card exists, so add one for history stating who declined the request. */}
-      {declinedBy === 'supplier' && (myQuotes ?? []).length === 0 && (
-        <CollapsibleSection id="ticket-quotes" title="Quotes" defaultOpen>
-          <div className="rounded-xl ring-1 ring-red-500/40 bg-red-500/5 overflow-hidden">
-            <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b bg-red-500/10 border-red-500/20">
-              <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)] min-w-0">
-                <XCircle size={15} className="text-red-500 shrink-0" />
-                <span className="truncate">Quote request declined</span>
-              </span>
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:text-red-400 bg-red-500/15 rounded-full px-2 py-0.5 shrink-0">Declined</span>
-            </div>
-            <div className="p-4 space-y-2">
-              <p className="text-sm text-[var(--text)]">Quote request declined by {supplierCompanyName ?? 'you'}{(invite as any)?.responded_at ? ` · ${formatDateTime((invite as any).responded_at)}` : ''}</p>
-              {declineReason && (
-                <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3">
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Reason</p>
-                  <p className="text-sm text-[var(--text)]">{declineReason}</p>
+      {/* Archived quotes — declined quotes (by the RM or the supplier), collapsed by
+          default, each showing the decline reason. */}
+      {declinedMyQuotes.length > 0 && (
+        <CollapsibleSection id="ticket-quotes-archive" title="Archived quotes" badge={<span className="text-[11px] font-semibold text-[var(--text-faint)] bg-[var(--surface-2)] rounded-full px-2 py-0.5">{declinedMyQuotes.length}</span>}>
+          {declinedMyQuotes.map((q, i, arr) => (
+            <QuoteSummary
+              key={q.id}
+              title={arr.length > 1 ? `Quote #${arr.length - i}` : 'Your submitted quote'}
+              status={quoteStatusOf(q.status)}
+              // Reason (RM's, or the supplier's own if they declined) shown in the card.
+              declineReason={declineReason}
+              quote={{ id: q.id, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, description: q.description ?? null, fileUrl: q.file_url ?? null, validUntil: q.valid_until ?? null, createdAt: q.created_at }}
+            />
+          ))}
+        </CollapsibleSection>
+      )}
+
+      {/* Durable history of every time this supplier declined the quote request —
+          kept even after the RM re-assigns them for a fresh quote (the invite row is
+          reset, but these log rows persist). Each shows the reason it was declined. */}
+      {((declineRows ?? []) as any[]).length > 0 && (
+        <CollapsibleSection id="ticket-quote-declines" title="Declined quote requests" defaultOpen={declinedBy === 'supplier'}>
+          <div className="space-y-2">
+            {((declineRows ?? []) as any[]).map((d, i) => (
+              <div key={i} className="rounded-xl ring-1 ring-red-500/40 bg-red-500/5 overflow-hidden">
+                <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b bg-red-500/10 border-red-500/20">
+                  <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)] min-w-0">
+                    <XCircle size={15} className="text-red-500 shrink-0" />
+                    <span className="truncate">Quote request declined by {supplierCompanyName ?? 'you'}</span>
+                  </span>
+                  <span className="text-[11px] text-[var(--text-faint)] shrink-0">{formatDateTime(d.declined_at)}</span>
                 </div>
-              )}
-            </div>
+                {d.reason && (
+                  <div className="p-4">
+                    <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3">
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Reason</p>
+                      <p className="text-sm text-[var(--text)]">{d.reason}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         </CollapsibleSection>
       )}
