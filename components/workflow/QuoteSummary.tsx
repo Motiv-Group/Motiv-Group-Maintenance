@@ -60,7 +60,7 @@ export function QuoteSummary({ quote, status, title, schedule, collapsible = fal
       {status === 'declined' && declineReason && (
         <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3">
           <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Decline reason</p>
-          <p className="text-sm text-[var(--text)]">{declineReason}</p>
+          <p className="text-sm font-medium text-red-700 dark:text-red-400">{declineReason}</p>
         </div>
       )}
       <div className="grid grid-cols-2 gap-x-4 gap-y-3">

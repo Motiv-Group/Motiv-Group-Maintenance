@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import { redirect } from 'next/navigation'
-import { ClipboardCheck, FileText, Calendar, XCircle } from 'lucide-react'
+import { ClipboardCheck, FileText, Calendar } from 'lucide-react'
 import { SubmitCompletionForm } from '@/components/supplier/SubmitCompletionForm'
 import { BackLink } from '@/components/ui/BackLink'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
@@ -408,13 +408,15 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
       {/* Archived quotes — declined quotes (by the RM or the supplier), collapsed by
           default, each showing the decline reason. */}
       {declinedMyQuotes.length > 0 && (
-        <CollapsibleSection id="ticket-quotes-archive" title="Archived quotes" badge={<span className="text-[11px] font-semibold text-[var(--text-faint)] bg-[var(--surface-2)] rounded-full px-2 py-0.5">{declinedMyQuotes.length}</span>}>
+        <CollapsibleSection id="ticket-quotes-archive" title="Archived">
           {declinedMyQuotes.map((q, i, arr) => (
             <QuoteSummary
               key={q.id}
               title={arr.length > 1 ? `Quote #${arr.length - i}` : 'Your submitted quote'}
               status={quoteStatusOf(q.status)}
-              // Reason (RM's, or the supplier's own if they declined) shown in the card.
+              // Each declined quote is a click-to-expand row; the detail shows the
+              // decline reason (RM's, or the supplier's own) in red.
+              collapsible
               declineReason={declineReason}
               quote={{ id: q.id, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, description: q.description ?? null, fileUrl: q.file_url ?? null, validUntil: q.valid_until ?? null, createdAt: q.created_at }}
             />
@@ -426,22 +428,22 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           kept even after the RM re-assigns them for a fresh quote (the invite row is
           reset, but these log rows persist). Each shows the reason it was declined. */}
       {((declineRows ?? []) as any[]).length > 0 && (
-        <CollapsibleSection id="ticket-quote-declines" title="Declined quote requests" defaultOpen={declinedBy === 'supplier'}>
+        <CollapsibleSection id="ticket-quote-declines" title="Archived" defaultOpen={declinedBy === 'supplier'}>
           <div className="space-y-2">
             {((declineRows ?? []) as any[]).map((d, i) => (
-              <div key={i} className="rounded-xl ring-1 ring-red-500/40 bg-red-500/5 overflow-hidden">
-                <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b bg-red-500/10 border-red-500/20">
-                  <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)] min-w-0">
-                    <XCircle size={15} className="text-red-500 shrink-0" />
-                    <span className="truncate">Quote request declined by {supplierCompanyName ?? 'you'}</span>
-                  </span>
-                  <span className="text-[11px] text-[var(--text-faint)] shrink-0">{formatDateTime(d.declined_at)}</span>
+              <div key={i} className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
+                <div className="flex items-start justify-between gap-2 px-4 py-2.5 border-b border-[var(--border)]">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-[var(--text)] truncate">Quote request declined by {supplierCompanyName ?? 'you'}</p>
+                    <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(d.declined_at)}</p>
+                  </div>
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:text-red-400 bg-red-500/15 rounded-full px-2 py-0.5 shrink-0">Declined (you)</span>
                 </div>
                 {d.reason && (
                   <div className="p-4">
                     <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3">
                       <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Reason</p>
-                      <p className="text-sm text-[var(--text)]">{d.reason}</p>
+                      <p className="text-sm font-medium text-red-700 dark:text-red-400">{d.reason}</p>
                     </div>
                   </div>
                 )}
