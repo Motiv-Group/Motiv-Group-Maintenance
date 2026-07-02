@@ -207,7 +207,9 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   // is accepted (status 'accepted' or later), the job is committed.
   const canCancel = ['open', 'info_requested', 'assigned', 'assessment', 'quote_requested', 'quoted', 'quote_revision', 'suppliers_declined'].includes(t.status)
   const canEdit = ['open', 'info_requested'].includes(t.status)
-  const hasQuoteBlock = supplierRows.length > 0 || reviewQuotes.length > 0 || acceptedQuotes.length > 0 || declinedQuotes.length > 0 || (variations ?? []).length > 0
+  // Gate the main Quotes block on its OWN content (declined quotes now live in the
+  // separate Archive block, so they don't keep an otherwise-empty block open).
+  const hasQuoteBlock = requestedSupplierRows.length > 0 || reviewQuotes.length > 0 || acceptedQuotes.length > 0 || (variations ?? []).length > 0
   // A quote was declined but the ticket is still in the commercial phase → let the
   // RM invite additional suppliers (add to the existing invites) alongside reviewing
   // any remaining quotes. Excludes 'assigned' (the RM has just (re)assigned).
@@ -472,46 +474,6 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
               ))}
             </div>
           )}
-          {declinedQuotes.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Declined / not selected quotes</h3>
-              {declinedQuotes.map(q => (
-                <details key={q.id} className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
-                  <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
-                    <span className="text-sm font-semibold text-[var(--text)] min-w-0 truncate">{q.supplierName}</span>
-                    <span className="flex items-center gap-2 shrink-0">
-                      <span className="text-sm text-[var(--text)] tabular-nums">{formatCurrency(q.amount)}</span>
-                      <span className="text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:text-red-400 bg-red-500/15 rounded-full px-2 py-0.5">Declined</span>
-                    </span>
-                  </summary>
-                  <div className="border-t border-[var(--border)] p-4 space-y-3">
-                    {q.declineReason && (
-                      <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3">
-                        <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Decline reason</p>
-                        <p className="text-sm text-[var(--text)]">{q.declineReason}</p>
-                      </div>
-                    )}
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                      <DetailItem label="Excl. VAT" value={formatCurrency(q.amount)} />
-                      <DetailItem label="Incl. VAT" value={q.amountInclVat ? formatCurrency(q.amountInclVat) : '—'} />
-                      <DetailItem label="Received" value={formatDateTime(q.createdAt)} />
-                      <DetailItem label="Valid until" value={q.validUntil ? formatDate(q.validUntil) : 'N/A'} />
-                    </div>
-                    {q.description && (
-                      <div>
-                        <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Description</div>
-                        <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{q.description}</p>
-                      </div>
-                    )}
-                    {q.fileUrl && <a href={q.fileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View attached quote</a>}
-                    {/* Re-quote is only offered while the ticket is still live and un-awarded
-                        — hidden once a quote is approved or every supplier has declined. */}
-                    {!isTerminal && acceptedQuotes.length === 0 && !allSuppliersDeclined && <div className="pt-1"><ReQuoteButton ticketId={t.id} quoteId={q.id} /></div>}
-                  </div>
-                </details>
-              ))}
-            </div>
-          )}
           {(variations ?? []).length > 0 && (
             <div className="space-y-2">
               <h3 className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Variation orders</h3>
@@ -542,6 +504,48 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
               ))}
             </div>
           )}
+        </CollapsibleSection>
+      )}
+
+      {/* Archive — declined / not-selected quotes (by the RM or the supplier), moved
+          out of the main Quotes block. Each is a click-to-expand row with its reason. */}
+      {declinedQuotes.length > 0 && (
+        <CollapsibleSection id="ticket-quotes-archive" title="Archive">
+          {declinedQuotes.map(q => (
+            <details key={q.id} className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
+              <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
+                <span className="text-sm font-semibold text-[var(--text)] min-w-0 truncate">{q.supplierName}</span>
+                <span className="flex items-center gap-2 shrink-0">
+                  <span className="text-sm text-[var(--text)] tabular-nums">{formatCurrency(q.amount)}</span>
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:text-red-400 bg-red-500/15 rounded-full px-2 py-0.5">Declined</span>
+                </span>
+              </summary>
+              <div className="border-t border-[var(--border)] p-4 space-y-3">
+                {q.declineReason && (
+                  <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Decline reason</p>
+                    <p className="text-sm text-[var(--text)]">{q.declineReason}</p>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                  <DetailItem label="Excl. VAT" value={formatCurrency(q.amount)} />
+                  <DetailItem label="Incl. VAT" value={q.amountInclVat ? formatCurrency(q.amountInclVat) : '—'} />
+                  <DetailItem label="Received" value={formatDateTime(q.createdAt)} />
+                  <DetailItem label="Valid until" value={q.validUntil ? formatDate(q.validUntil) : 'N/A'} />
+                </div>
+                {q.description && (
+                  <div>
+                    <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Description</div>
+                    <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{q.description}</p>
+                  </div>
+                )}
+                {q.fileUrl && <a href={q.fileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View attached quote</a>}
+                {/* Re-quote is only offered while the ticket is still live and un-awarded
+                    — hidden once a quote is approved or every supplier has declined. */}
+                {!isTerminal && acceptedQuotes.length === 0 && !allSuppliersDeclined && <div className="pt-1"><ReQuoteButton ticketId={t.id} quoteId={q.id} /></div>}
+              </div>
+            </details>
+          ))}
         </CollapsibleSection>
       )}
 
