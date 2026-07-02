@@ -53,17 +53,28 @@ export async function POST(request: Request, { params }: { params: { id: string 
     // presses "Ask to re-quote" (the 'requote' action below).
     await admin.from('quotes').update({ status: 'declined' }).eq('id', quote.id)
     await admin.from('ticket_suppliers').update({ status: 'declined', decline_reason: reason, declined_by: 'regional_manager', responded_at: now }).eq('ticket_id', ticket.id).eq('supplier_id', quote.supplier_id)
-    // Other quotes still pending → keep reviewing them ('quoted', RM decision
-    // pending); otherwise the ticket awaits the RM's next move (re-quote a declined
-    // one or re-assign) — in both cases the RM now owns the next action.
+    // Decide the ticket's next state from what's left on it:
+    //  • another quote still pending      → 'quoted'          (keep reviewing)
+    //  • every invited supplier now off it → 'open'           (RM must re-assign)
+    //  • otherwise                         → 'quote_requested'(await the remaining invitees)
+    // The 'open' case mirrors the supplier-side decline flow: once ALL suppliers are
+    // off the ticket — whether the RM declined their quote or they declined the
+    // request themselves — it returns to Open (a ticket is open until completed).
     const { data: pend } = await admin.from('quotes').select('id').eq('ticket_id', ticket.id).eq('status', 'pending')
     const hasPending = (pend ?? []).length > 0
+    const { data: allInvites } = await admin.from('ticket_suppliers').select('status').eq('ticket_id', ticket.id)
+    const allDeclined = !hasPending && (allInvites ?? []).length > 0 && (allInvites ?? []).every(i => ['declined', 'closed'].includes(i.status))
+    const stateFields = hasPending
+      ? { status: 'quoted', quote_required: true, quote_decision_required: true, quote_decision_status: 'pending',
+          current_blocker: 'quote_approval', blocker_owner_type: 'regional_manager', blocker_started_at: now,
+          sla_paused: true, pause_reason: 'awaiting_decision', pause_started_at: now }
+      : allDeclined
+      ? { status: 'open', quote_required: false, quote_decision_required: false, quote_decision_status: null,
+          current_blocker: null, blocker_owner_type: null, blocker_started_at: null, sla_paused: false, pause_ended_at: now }
+      : { status: 'quote_requested', quote_required: true, quote_decision_required: false, quote_decision_status: null,
+          current_blocker: 'supplier_action', blocker_owner_type: 'supplier', blocker_started_at: now, sla_paused: false, pause_ended_at: now }
     await admin.from('tickets').update({
-      status: hasPending ? 'quoted' : 'quote_requested', supplier_id: null,
-      quote_decision_required: hasPending, quote_decision_status: hasPending ? 'pending' : null,
-      current_blocker: hasPending ? 'quote_approval' : 'reassignment', blocker_owner_type: 'regional_manager', blocker_started_at: now,
-      sla_paused: hasPending, ...(hasPending ? { pause_reason: 'awaiting_decision', pause_started_at: now } : { pause_ended_at: now }),
-      last_internal_update_at: now, updated_at: now,
+      ...stateFields, supplier_id: null, last_internal_update_at: now, updated_at: now,
     }).eq('id', ticket.id)
     const supplierMsg = reason
       ? `Your quote was declined — ${reason}.`
