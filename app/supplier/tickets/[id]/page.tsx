@@ -405,6 +405,9 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
               key={q.id}
               title={arr.length > 1 ? `Quote #${arr.length - i}` : 'Your submitted quote'}
               status={quoteStatusOf(q.status)}
+              // A pending ("Under review") quote is a click-to-expand row; the accepted
+              // quote stays open so the awarded detail + schedule are visible.
+              collapsible={q.status === 'pending'}
               quote={{ id: q.id, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, description: q.description ?? null, fileUrl: q.file_url ?? null, validUntil: q.valid_until ?? null, createdAt: q.created_at }}
               schedule={
                 q.status === 'accepted' && t.scheduled_at
