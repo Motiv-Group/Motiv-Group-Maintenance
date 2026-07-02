@@ -554,7 +554,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         infoRequestedAt: t.info_requested_at, infoAddedAt: t.info_added_at, infoRequestReason: t.info_request_reason,
         snagScheduledAt,
         workStartedAt: t.attended_at ?? null,
-        quotes: ((quotes ?? []) as any[]).map(q => ({ ...q, supplierName: nameById.get(q.supplier_id) ?? null })),
+        quotes: ((quotes ?? []) as any[]).map(q => ({ ...q, supplierName: nameById.get(q.supplier_id) ?? 'Supplier' })),
         variations: (variations ?? []) as any[],
         signoffs: allSignoffs, updates: (updates ?? []) as any[], views: (viewRows ?? []) as any[],
         supplierDeclines,

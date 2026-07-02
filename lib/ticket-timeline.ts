@@ -65,16 +65,19 @@ export function buildTicketTimeline(t: TimelineInput): TimelineEvent[] {
   push(t.infoRequestedAt, `More information requested${t.infoRequestReason ? ` — ${t.infoRequestReason}` : ''}`, 'info_requested', 'Regional Manager')
   push(t.infoAddedAt, 'Information added', 'info_added', 'Store Manager')
   push(t.quoteRequestedAt, 'Quote requested', 'quote_requested', 'Regional Manager')
-  push(t.quoteSubmittedAt, 'Quote submitted', 'quote_submitted', 'Supplier')
 
-  // Quote outcomes from the quote rows (amount + accept/decline time). When the
-  // supplier's name is known (competitive quoting) it's named, so the RM trail
-  // reads which supplier was approved and which were declined.
+  // Quote events from the quote rows. When the supplier's name is known
+  // (competitive quoting) each is named, so the RM trail reads exactly which
+  // supplier submitted / was approved / was declined.
+  let namedSubmission = false
   for (const q of t.quotes ?? []) {
     const who = q.supplierName ? ` — ${q.supplierName}` : ''
+    if (q.supplierName) { push(q.created_at, `Quote submitted — ${q.supplierName}`, 'quote_submitted', 'Supplier'); namedSubmission = true }
     if (q.status === 'accepted') push(q.updated_at ?? q.created_at, `Quote approved${who}`, 'quote_approved', 'Regional Manager')
     else if (q.status === 'declined') push(q.updated_at ?? q.created_at, `Quote declined${who}`, 'quote_declined', 'Regional Manager')
   }
+  // No per-supplier names on the rows (supplier's own trail) → one generic event.
+  if (!namedSubmission) push(t.quoteSubmittedAt, 'Quote submitted', 'quote_submitted', 'Supplier')
   // Fallback if no quote rows were supplied but the ticket records an approval.
   if (!(t.quotes ?? []).some(q => q.status === 'accepted')) push(t.quoteApprovedAt, 'Quote approved', 'quote_approved', 'Regional Manager')
 
