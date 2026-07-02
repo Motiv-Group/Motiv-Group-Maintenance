@@ -34,6 +34,7 @@ const DEFAULT_DECLINE_REASON = 'Thank you for your submission. Although your quo
 const SIGNOFF_META: Record<string, { label: string; ring: string; bg: string; head: string; badge: string; iconCls: string }> = {
   accepted: { label: 'Approved', ring: 'ring-emerald-500/40', bg: 'bg-emerald-500/5', head: 'bg-emerald-500/10 border-emerald-500/20', badge: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400', iconCls: 'text-emerald-500' },
   rejected: { label: 'Rejected', ring: 'ring-red-500/40', bg: 'bg-red-500/5', head: 'bg-red-500/10 border-red-500/20', badge: 'bg-red-500/15 text-red-700 dark:text-red-400', iconCls: 'text-red-500' },
+  evidence_requested: { label: 'More info requested', ring: 'ring-amber-500/40', bg: 'bg-amber-500/5', head: 'bg-amber-500/10 border-amber-500/20', badge: 'bg-amber-500/15 text-amber-700 dark:text-amber-400', iconCls: 'text-amber-500' },
   submitted: { label: 'Under review', ring: 'ring-[#C6A35D]/40', bg: 'bg-[#C6A35D]/5', head: 'bg-[#C6A35D]/10 border-[#C6A35D]/20', badge: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D]', iconCls: 'text-[#C6A35D]' },
 }
 
@@ -48,26 +49,34 @@ function DetailItem({ label, value }: { label: string; value: string }) {
 
 // One COC & POC submission card — reused across the COC/POC, Snag and Completion
 // blocks. `snag` enriches a rejected submission with the "why it was sent back" reason.
-function SignoffCard({ s, snag, ticketId, collapsible = false }: { s: any; snag?: { description?: string | null; required_correction?: string | null; severity?: string | null } | null; ticketId: string; collapsible?: boolean }) {
+function SignoffCard({ s, snag, ticketId, collapsible = false, title, reason }: { s: any; snag?: { description?: string | null; required_correction?: string | null; severity?: string | null } | null; ticketId: string; collapsible?: boolean; title?: string; reason?: string | null }) {
   const meta = SIGNOFF_META[s.status] ?? SIGNOFF_META.submitted
   const before = (s.before_urls ?? []) as string[]
   const after = (s.after_urls ?? []) as string[]
-  // Header (Completion · date/time + status badge) doubles as the click-to-expand
-  // summary when collapsible; the detail (photos / COC / notes) drops down below.
+  // Prefer the durable round reason; fall back to the reason on the signoff row.
+  const reasonText = reason ?? s.reject_reason
+  // Header ("Submission #N" / Completion · date/time + status badge) doubles as the
+  // click-to-expand summary when collapsible; the detail drops down below.
   const header = (
     <>
-      <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)] min-w-0"><ClipboardCheck size={15} className={`${meta.iconCls} shrink-0`} /><span className="truncate">Completion · {formatDateTime(s.created_at)}</span></span>
+      <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)] min-w-0"><ClipboardCheck size={15} className={`${meta.iconCls} shrink-0`} /><span className="truncate">{title ?? 'Completion'} · {formatDateTime(s.created_at)}</span></span>
       <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 shrink-0 ${meta.badge}`}>{meta.label}</span>
     </>
   )
   const body = (
     <>
-        {s.status === 'rejected' && (s.reject_reason || snag?.description || snag?.required_correction) && (
+        {s.status === 'rejected' && (reasonText || snag?.description || snag?.required_correction) && (
           <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3 space-y-1">
             <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Why it was sent back</p>
-            {(s.reject_reason || snag?.description) && <p className="text-sm text-[var(--text)]">{s.reject_reason || snag?.description}</p>}
+            {(reasonText || snag?.description) && <p className="text-sm text-[var(--text)]">{reasonText || snag?.description}</p>}
             {snag?.required_correction && <p className="text-sm text-[var(--text-muted)]"><span className="font-medium text-[var(--text)]">Required correction:</span> {snag.required_correction}</p>}
             {snag?.severity && <p className="text-[11px] text-[var(--text-muted)] capitalize">Severity: {String(snag.severity).replace(/_/g, ' ')}</p>}
+          </div>
+        )}
+        {s.status === 'evidence_requested' && reasonText && (
+          <div className="rounded-lg bg-amber-500/10 ring-1 ring-amber-500/30 p-3">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400">Why more evidence was requested</p>
+            <p className="text-sm text-[var(--text)]">{reasonText}</p>
           </div>
         )}
         <div>
@@ -118,7 +127,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   const admin = createAdminClient()
   const { data: t } = await admin.from('tickets').select('*').eq('id', params.id).single()
   if (!t || t.company_id !== companyId) redirect('/supplier/tickets')
-  const [{ data: store }, { data: updates }, { data: invite }, { data: myQuotes }, { data: technicianRows }, { data: signoffRows }, { data: snagRows }, { data: companyRow }, { data: variationRows }, { data: viewRows }, { data: declineRows }, { data: requoteRows }] = await Promise.all([
+  const [{ data: store }, { data: updates }, { data: invite }, { data: myQuotes }, { data: technicianRows }, { data: signoffRows }, { data: snagRows }, { data: companyRow }, { data: variationRows }, { data: viewRows }, { data: declineRows }, { data: requoteRows }, { data: roundRows }] = await Promise.all([
     admin.from('stores').select('name, sub_store').eq('id', t.store_id).single(),
     admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('ticket_suppliers').select('supplier_id, status, invited_at, decline_reason, responded_at, declined_by, requote_requested_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).maybeSingle(),
@@ -141,6 +150,9 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
     // NULL (applies to all invited); re-quotes are attributed to a supplier. Load
     // both the NULL initial and this supplier's rounds so the trail shows each one.
     admin.from('ticket_quote_requests').select('supplier_id, requested_at').eq('ticket_id', t.id).order('requested_at', { ascending: true }),
+    // Durable COC/POC review-round log — drives the "Submission #N" number + sent-back
+    // reason on the archived round cards (falls back to the signoff row if unmigrated).
+    admin.from('signoff_rounds').select('signoff_id, round_no, kind, reason').eq('ticket_id', t.id),
   ])
   // Client organisation that owns the store (shown in the ticket detail).
   const companyName = (companyRow as any)?.name ?? null
@@ -244,7 +256,18 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   const allSignoffs = (signoffRows ?? []) as any[]
   const pendingSignoffs = allSignoffs.filter(s => ['submitted', 'awaiting_regional', 'awaiting_store'].includes(s.status))
   const rejectedSignoffs = allSignoffs.filter(s => s.status === 'rejected')
+  const evidenceRequestedSignoffs = allSignoffs.filter(s => s.status === 'evidence_requested')
   const acceptedSignoff = allSignoffs.find(s => s.status === 'accepted') ?? null
+  // Stable "Submission #N" numbers, oldest = #1. Superseded submissions (sent back for
+  // more evidence OR snagged) move to the Archived block as collapsed round cards, so
+  // the full history is kept — mirroring the RM page. The live under-review one stays
+  // in COC & POC; the approved one in Completion.
+  const submissionNo = new Map<string, number>()
+  ;[...allSignoffs].sort((a, b) => +new Date(a.created_at) - +new Date(b.created_at)).forEach((s, i) => submissionNo.set(s.id, i + 1))
+  const supersededSubmissions = [...evidenceRequestedSignoffs, ...rejectedSignoffs].sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at))
+  const roundBySignoff = new Map<string, { round_no: number; kind: string; reason: string | null }>()
+  for (const r of ((roundRows ?? []) as any[])) if (r.signoff_id) roundBySignoff.set(r.signoff_id, { round_no: r.round_no, kind: r.kind, reason: r.reason ?? null })
+  const submissionLabel = (s: any) => `Submission #${roundBySignoff.get(s.id)?.round_no ?? submissionNo.get(s.id) ?? '?'}`
 
   // Variation orders raised on this ticket (drives the scheduled-phase VO gate and
   // the "no more variation orders" label). The most recent decline reason feeds the
@@ -360,14 +383,33 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           {/* After the quote is approved → straight to "Mark in progress" (confirm).
               Variation orders come after the COC/POC is approved (close-out stage). */}
           {awarded && (t.status === 'accepted' || t.status === 'scheduled') && <MarkInProgressButton ticketId={t.id} />}
-          {awarded && t.status === 'snag' && <AcceptSnagCard ticketId={t.id} priority={t.priority} createdAt={t.created_at} />}
+          {awarded && t.status === 'snag' && (
+            <div className="space-y-3">
+              {(latestSnag?.description || latestSnag?.required_correction) && (
+                <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3 space-y-1">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Why it was sent back</p>
+                  {latestSnag?.description && <p className="text-sm text-[var(--text)]">{latestSnag.description}</p>}
+                  {latestSnag?.required_correction && <p className="text-sm text-[var(--text-muted)]"><span className="font-medium text-[var(--text)]">Required correction:</span> {latestSnag.required_correction}</p>}
+                </div>
+              )}
+              <AcceptSnagCard ticketId={t.id} priority={t.priority} createdAt={t.created_at} />
+            </div>
+          )}
           {awarded && t.status === 'snag_assigned' && (
             latestSnag?.schedule_status === 'agreed'
               ? <StartSnagButton ticketId={t.id} />
               : <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 text-sm text-[var(--text-muted)]">Snag fix proposed{latestSnag?.scheduled_at ? ` for ${formatDateTime(latestSnag.scheduled_at)}` : ''} — awaiting the manager&apos;s approval before you can start.</div>
           )}
           {awarded && ['in_progress', 'snag_resolved', 'snag_in_progress', 'evidence_requested'].includes(t.status) && (
-            <SubmitCompletionForm ticketId={t.id} evidenceRequested={t.status === 'evidence_requested'} requireBoth={t.status !== 'evidence_requested'} />
+            <div className="space-y-3">
+              {t.status === 'evidence_requested' && t.evidence_request_reason && (
+                <div className="rounded-lg bg-amber-500/10 ring-1 ring-amber-500/30 p-3 space-y-0.5">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400">More evidence requested</p>
+                  <p className="text-sm text-[var(--text)]">{t.evidence_request_reason}</p>
+                </div>
+              )}
+              <SubmitCompletionForm ticketId={t.id} evidenceRequested={t.status === 'evidence_requested'} requireBoth={t.status !== 'evidence_requested'} />
+            </div>
           )}
           {awarded && t.status === 'variation_review' && (
             <div className="rounded-xl bg-purple-500/10 ring-1 ring-purple-500/30 p-3.5 text-sm text-[var(--text-muted)]">Variation order submitted — awaiting approval from the regional manager.</div>
@@ -438,13 +480,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           Each card is collapsed by default (tap the row to reveal the detail). */}
       {pendingSignoffs.length > 0 && (
         <CollapsibleSection id="ticket-coc" title="COC & POC" defaultOpen={phase === 'coc'}>
-          {t.status === 'evidence_requested' && t.evidence_request_reason && (
-            <div className="rounded-lg bg-amber-500/10 ring-1 ring-amber-500/30 p-3">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400">More evidence requested</p>
-              <p className="text-sm text-[var(--text)]">{t.evidence_request_reason}</p>
-            </div>
-          )}
-          {pendingSignoffs.map(s => <SignoffCard key={s.id} s={s} ticketId={t.id} collapsible />)}
+          {pendingSignoffs.map(s => <SignoffCard key={s.id} s={s} ticketId={t.id} title={submissionLabel(s)} collapsible />)}
         </CollapsibleSection>
       )}
 
@@ -479,8 +515,13 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
       {/* Archived — one block holding both this supplier's declined quotes (by the RM
           or themselves) and every time they declined the quote request. The request
           declines are durable (kept even after the RM re-assigns them). */}
-      {(declinedMyQuotes.length > 0 || ((declineRows ?? []) as any[]).length > 0) && (
+      {(declinedMyQuotes.length > 0 || ((declineRows ?? []) as any[]).length > 0 || supersededSubmissions.length > 0) && (
         <CollapsibleSection id="ticket-archive" title="Archived" defaultOpen={declinedBy === 'supplier'}>
+          {/* Superseded COC/POC submissions — sent back for more evidence or snagged.
+              Each a collapsed "Submission #N" round card showing why it was returned. */}
+          {supersededSubmissions.map(s => (
+            <SignoffCard key={s.id} s={s} ticketId={t.id} title={submissionLabel(s)} reason={roundBySignoff.get(s.id)?.reason ?? s.reject_reason} snag={s.status === 'rejected' && s.id === rejectedSignoffs[0]?.id ? latestSnag : null} collapsible />
+          ))}
           {declinedMyQuotes.map((q, i, arr) => (
             <QuoteSummary
               key={q.id}
@@ -513,13 +554,6 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
               </div>
             </details>
           ))}
-        </CollapsibleSection>
-      )}
-
-      {/* Snag — rejected / sent-back completions, kept for traceability */}
-      {rejectedSignoffs.length > 0 && (
-        <CollapsibleSection id="ticket-snag" title="Snag" defaultOpen={phase === 'snag'}>
-          {rejectedSignoffs.map((s, i) => <SignoffCard key={s.id} s={s} snag={i === 0 ? latestSnag : null} ticketId={t.id} />)}
         </CollapsibleSection>
       )}
 
