@@ -87,9 +87,9 @@ export default async function SupplierOverviewPage() {
     { label: 'SLA Breached', value: k.overdue, icon: <AlertTriangle size={13} />, tone: 'bad', actionable: true, href: '/supplier/tickets?filter=breached' },
     { label: 'Due Today', value: k.dueToday, icon: <Clock size={13} />, tone: 'warn', actionable: true, href: '/supplier/tickets' },
     { label: 'Quote requested', value: quoteRequested, icon: <ClipboardList size={13} />, tone: 'info', actionable: true, href: '/supplier/tickets?filter=to_quote' },
-    { label: 'Pending Quotes', value: pendingDecision, icon: <ReceiptText size={13} />, tone: 'gold', href: '/supplier/quotes?status=pending' },
+    { label: 'Pending Quotes', value: pendingDecision, icon: <ReceiptText size={13} />, tone: 'warn', actionable: true, href: '/supplier/quotes?status=pending' },
     { label: 'Job Scheduled', value: k.scheduled, icon: <Calendar size={13} />, tone: 'info', actionable: true, href: '/supplier/tickets?filter=scheduled' },
-    { label: 'Pending Sign-off', value: k.awaitingSignoff, icon: <ClipboardCheck size={13} />, tone: 'info', href: '/supplier/signoff?status=awaiting' },
+    { label: 'Pending Sign-off', value: k.awaitingSignoff, icon: <ClipboardCheck size={13} />, tone: 'warn', actionable: true, href: '/supplier/signoff?status=awaiting' },
   ]
 
   // Tickets where this supplier was declined (and not re-invited) are out of their
