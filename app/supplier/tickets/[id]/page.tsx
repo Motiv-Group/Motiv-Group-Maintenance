@@ -119,7 +119,10 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
     admin.from('ticket_supplier_declines').select('reason, declined_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).order('declined_at', { ascending: true }),
     // This supplier's OWN re-quote requests (RM asked them to re-quote) — durable per
     // round, so every re-quote stays logged on their trail across re-assignments.
-    admin.from('ticket_quote_requests').select('requested_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).order('requested_at', { ascending: true }),
+    // Every quote-request round on the ticket. The INITIAL request has supplier_id
+    // NULL (applies to all invited); re-quotes are attributed to a supplier. Load
+    // both the NULL initial and this supplier's rounds so the trail shows each one.
+    admin.from('ticket_quote_requests').select('supplier_id, requested_at').eq('ticket_id', t.id).order('requested_at', { ascending: true }),
   ])
   // Client organisation that owns the store (shown in the ticket detail).
   const companyName = (companyRow as any)?.name ?? null
@@ -187,9 +190,6 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   // The RM asked this supplier to (re-)submit a quote — either a soft decline of their
   // quote, or a re-assign after they'd previously declined (requote_requested_at).
   const reQuoteByRm = !!(invite as any)?.requote_requested_at && (invite as any)?.status === 'invited'
-  const requoteRequestedAt = (invite as any)?.requote_requested_at
-    ?? ((latestQuote?.status === 'declined' && (invite as any)?.status === 'invited' && (invite as any)?.decline_reason)
-      ? ((invite as any)?.responded_at ?? latestQuote?.updated_at ?? null) : null)
   // Map a quote's DB status to the read-only summary tone (accepted shows "Approved").
   const quoteStatusOf = (s: string): QuoteSummaryStatus => s === 'accepted' ? 'accepted' : s === 'declined' ? 'declined' : 'pending'
   // Active quotes stay in the Quotes block; declined ones (by the RM or the supplier)
@@ -198,13 +198,17 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   const activeQuotes = myQuoteRows.filter(q => q.status !== 'declined')
   const declinedMyQuotes = myQuoteRows.filter(q => q.status === 'declined')
   // Durable audit events for THIS supplier: every request-decline (survives re-invite)
-  // and every RM re-quote round. RM quote-declines already come from the quote rows.
+  // and every quote-request round. RM quote-declines already come from the quote rows.
   const myDeclines = ((declineRows ?? []) as any[]).map(d => ({ name: supplierCompanyName ?? 'you', at: d.declined_at })).filter(d => d.at)
-  const myRequotes = ((requoteRows ?? []) as any[]).map(r => r.requested_at).filter(Boolean)
-  // Trail starts at this supplier's EARLIEST involvement (first invite / quote /
-  // decline / re-quote) — a re-invite resets invited_at to "now", so anchoring to it
-  // would hide durable events from earlier rounds.
-  const trailStartMs = [(invite as any)?.invited_at, ...myDeclines.map(d => d.at), ...myRequotes, ...myQuoteRows.map(q => q.created_at)]
+  // Each quote-request round shown as a single "Quote requested" (the NULL initial +
+  // any re-quote to this supplier) — no separate "Revised quote requested" duplicate.
+  const myQuoteRequests = ((requoteRows ?? []) as any[])
+    .filter(r => r.supplier_id === null || supplierIds.includes(r.supplier_id))
+    .map(r => r.requested_at).filter(Boolean)
+  // Trail starts at this supplier's EARLIEST involvement (first request / quote /
+  // decline) — a re-invite resets invited_at to "now", so anchoring to it would hide
+  // durable events from earlier rounds; the first quote request is the true start.
+  const trailStartMs = [(invite as any)?.invited_at, ...myDeclines.map(d => d.at), ...myQuoteRequests, ...myQuoteRows.map(q => q.created_at)]
     .filter(Boolean).map(x => +new Date(x as string)).sort((a, b) => a - b)[0]
   const trailStartAt = trailStartMs ? new Date(trailStartMs).toISOString() : ((invite as any)?.invited_at ?? t.quote_requested_at)
 
@@ -520,8 +524,8 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           createdAt: t.created_at,
           startAt: trailStartAt,
           quoteRequestedAt: (invite as any)?.invited_at ?? t.quote_requested_at,
+          quoteRequests: myQuoteRequests,
           quoteSubmittedAt: latestQuote?.created_at ?? null,
-          requoteRequestedAt, requoteRequests: myRequotes,
           quotes: (myQuotes ?? []) as any[],
           supplierDeclines: myDeclines,
           views: (viewRows ?? []) as any[],
@@ -531,11 +535,12 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
         <AuditTrail ticket={{
           createdAt: t.created_at, status: t.status, updatedAt: t.updated_at,
           startAt: trailStartAt,
-          quoteRequestedAt: t.quote_requested_at, quoteSubmittedAt: latestQuote?.created_at ?? t.quote_submitted_at,
+          quoteRequestedAt: t.quote_requested_at, quoteRequests: myQuoteRequests,
+          quoteSubmittedAt: latestQuote?.created_at ?? t.quote_submitted_at,
           quoteApprovedAt: t.quote_decision_status === 'approved' ? t.quote_decided_at : null,
           scheduledAt: t.scheduled_at, completedAt: t.completed_at,
           editedAt: t.edited_at, editedByName: editorName, editNote: t.edit_note, cancellationReason: t.cancellation_reason,
-          snagScheduledAt, requoteRequestedAt, requoteRequests: myRequotes, workStartedAt: t.attended_at ?? null,
+          snagScheduledAt, workStartedAt: t.attended_at ?? null,
           quotes: (myQuotes ?? []) as any[], variations: (variationRows ?? []) as any[],
           supplierDeclines: myDeclines,
           signoffs: (signoffRows ?? []) as any[], updates: (updates ?? []) as any[],
