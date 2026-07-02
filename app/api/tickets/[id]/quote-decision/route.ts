@@ -51,7 +51,10 @@ export async function POST(request: Request, { params }: { params: { id: string 
     // supplier is notified with the reason and taken off the ticket (invite
     // 'declined', by the RM) — they can't re-submit until the RM explicitly
     // presses "Ask to re-quote" (the 'requote' action below).
-    await admin.from('quotes').update({ status: 'declined' }).eq('id', quote.id)
+    // Store the reason on the quote itself (durable per-quote) so the supplier's
+    // archived declined quote shows why it was declined, even after a re-assign
+    // clears the invite's decline_reason.
+    await admin.from('quotes').update({ status: 'declined', decline_reason: reason }).eq('id', quote.id)
     await admin.from('ticket_suppliers').update({ status: 'declined', decline_reason: reason, declined_by: 'regional_manager', responded_at: now }).eq('ticket_id', ticket.id).eq('supplier_id', quote.supplier_id)
     // Decide the ticket's next state from what's left on it:
     //  • another quote still pending      → 'quoted'          (keep reviewing)

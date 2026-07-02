@@ -41,7 +41,7 @@ export async function POST(request: Request) {
 
   const nowIso = new Date().toISOString()
   await admin.from('ticket_suppliers').update({ status: 'declined', decline_reason: reason, declined_by: 'supplier', responded_at: nowIso }).eq('id', invite.id)
-  await admin.from('quotes').update({ status: 'declined' }).eq('ticket_id', ticketId).eq('supplier_id', invite.supplier_id).eq('status', 'pending')
+  await admin.from('quotes').update({ status: 'declined', decline_reason: reason }).eq('ticket_id', ticketId).eq('supplier_id', invite.supplier_id).eq('status', 'pending')
   // Durable audit record — survives a later re-invite of this same supplier (which
   // resets the ticket_suppliers row), so "Quote request declined by {supplier}"
   // stays in the trail permanently.
