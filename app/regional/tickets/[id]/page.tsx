@@ -224,6 +224,14 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   // Submissions sent back for more evidence (not snagged) — kept in the history with
   // the reason the RM asked for more.
   const evidenceRequestedSignoffs = allSignoffs.filter(s => s.status === 'evidence_requested')
+  // Stable "Submission #N" numbers across live + archived, ordered by when each
+  // COC/POC was submitted (oldest = #1). Shown in the card titles.
+  const submissionNo = new Map<string, number>()
+  ;[...allSignoffs].sort((a, b) => +new Date(a.created_at) - +new Date(b.created_at)).forEach((s, i) => submissionNo.set(s.id, i + 1))
+  // Superseded submissions (sent back for more evidence OR snagged) → collapsed round
+  // cards in the Archive, newest first. The live under-review one stays in COC & POC;
+  // the approved one in Completion.
+  const supersededSubmissions = [...evidenceRequestedSignoffs, ...rejectedSignoffs].sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at))
   // Snag scheduling — the supplier's proposed fix date (separate from the original
   // job schedule) and whether it's still awaiting the RM's approval.
   const latestSnag = ((snags ?? []) as any[])[0] ?? null
@@ -496,17 +504,11 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
 
       {breached && <BreachReason nextAction={sla.nextAction} dueAt={sla.nextActionDueAt} owner={breachOwner} />}
 
-      {/* COC & POC — every submission: under review, plus any sent back for more evidence (full history) */}
-      {(pendingSignoffs.length > 0 || evidenceRequestedSignoffs.length > 0) && (
+      {/* COC & POC — only the submission currently under review. Earlier submissions
+          that were sent back (evidence / snag) live in the Archive as round cards. */}
+      {pendingSignoffs.length > 0 && (
         <CollapsibleSection id="ticket-coc" title="COC & POC" defaultOpen={phase === 'coc'}>
-          {t.status === 'evidence_requested' && t.evidence_request_reason && (
-            <div className="rounded-lg bg-amber-500/10 ring-1 ring-amber-500/30 p-3">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400">Waiting on the supplier to provide more evidence</p>
-              <p className="text-sm text-[var(--text)]">{t.evidence_request_reason}</p>
-            </div>
-          )}
-          {pendingSignoffs.map((s: any) => <RmSignoffCard key={s.id} s={s} tone="review" ticketId={t.id} collapsible defaultOpen />)}
-          {evidenceRequestedSignoffs.map((s: any) => <RmSignoffCard key={s.id} s={s} tone="evidence" ticketId={t.id} />)}
+          {pendingSignoffs.map((s: any) => <RmSignoffCard key={s.id} s={s} tone="review" ticketId={t.id} title={`Submission #${submissionNo.get(s.id)}`} collapsible defaultOpen />)}
         </CollapsibleSection>
       )}
 
@@ -525,14 +527,14 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         {SNAG_WAIT_MSG[t.status] && !snagAwaitingApproval && (
           <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 flex items-start gap-2.5">
             <Clock size={16} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
-            <p className="text-sm text-[var(--text-muted)]">{SNAG_WAIT_MSG[t.status]}</p>
+            <p className="text-sm text-[var(--text-muted)]">{SNAG_WAIT_MSG[t.status]}{latestSnag?.description ? ` Snag raised: “${latestSnag.description}”.` : ''} The full submission is in the Archive below.</p>
           </div>
         )}
 
         {t.status === 'evidence_requested' && (
           <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 flex items-start gap-2.5">
             <Clock size={16} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
-            <p className="text-sm text-[var(--text-muted)]">Awaiting the supplier to provide the additional evidence requested on the completion (COC &amp; POC).</p>
+            <p className="text-sm text-[var(--text-muted)]">Awaiting the supplier to provide the additional evidence requested on the completion (COC &amp; POC).{t.evidence_request_reason ? ` Requested: “${t.evidence_request_reason}”.` : ''}</p>
           </div>
         )}
 
@@ -705,8 +707,13 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
       {/* Archive — declined / not-selected quotes (by the RM or the supplier) plus the
           suppliers auto-closed when the job was awarded, moved out of the main Quotes
           block. Each is a click-to-expand row with its reason. */}
-      {(archivedDeclinedQuotes.length > 0 || archivedRequestDeclines.length > 0 || closedWaitingRows.length > 0) && (
+      {(archivedDeclinedQuotes.length > 0 || archivedRequestDeclines.length > 0 || closedWaitingRows.length > 0 || supersededSubmissions.length > 0) && (
         <CollapsibleSection id="ticket-quotes-archive" title="Archive">
+          {/* Superseded COC/POC submissions — sent back for more evidence or snagged.
+              Each is a collapsed "Submission #N" round card showing the RM's reason. */}
+          {supersededSubmissions.map((s: any) => (
+            <RmSignoffCard key={s.id} s={s} tone={s.status === 'rejected' ? 'snag' : 'evidence'} ticketId={t.id} title={`Submission #${submissionNo.get(s.id)}`} collapsible />
+          ))}
           {/* Archived declines are already re-invited or superseded — no re-quote here.
               Losing quoters (quote declined when the job was awarded) show the courteous
               "not selected" note as their reason. */}
@@ -752,13 +759,6 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
               </div>
             </details>
           ))}
-        </CollapsibleSection>
-      )}
-
-      {((snags ?? []).length > 0 || rejectedSignoffs.length > 0) && (
-        <CollapsibleSection id="ticket-snag" title="Snags" defaultOpen={phase === 'snag'}>
-          {/* Every snagged / sent-back COC/POC submission, each with the reason it was returned. */}
-          {rejectedSignoffs.map((s: any) => <RmSignoffCard key={s.id} s={s} tone="snag" ticketId={t.id} />)}
         </CollapsibleSection>
       )}
 

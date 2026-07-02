@@ -9,6 +9,21 @@ import type { SlaTargets } from '@/lib/health/types'
 
 type Admin = ReturnType<typeof createAdminClient>
 
+// Durable log of a COC/POC review round (evidence request / snag), against the
+// submission being sent back. round_no is 1-based per ticket. Mirrors the quote-
+// request rounds log.
+async function logSignoffRound(admin: Admin, ticket: any, signoffId: string | null, kind: 'evidence' | 'snag', reason: string | null, now: string) {
+  const { count } = await admin.from('signoff_rounds').select('id', { count: 'exact', head: true }).eq('ticket_id', ticket.id)
+  await admin.from('signoff_rounds').insert({ company_id: ticket.company_id, ticket_id: ticket.id, signoff_id: signoffId, kind, reason, round_no: (count ?? 0) + 1, created_at: now })
+}
+
+// The COC/POC submission currently under review (the one an evidence-request or snag
+// sends back), so the round is logged against it.
+async function pendingSignoffId(admin: Admin, ticketId: string): Promise<string | null> {
+  const { data } = await admin.from('signoffs').select('id').eq('ticket_id', ticketId).in('status', ['submitted', 'awaiting_regional', 'awaiting_store']).order('created_at', { ascending: false }).limit(1).maybeSingle()
+  return (data as any)?.id ?? null
+}
+
 // POST /api/tickets/:id/transition  { action, ...payload }
 // Single entry point for every lifecycle move. Validates the transition against
 // lib/workflow (status + role), applies the status change + side effects, and
@@ -81,13 +96,16 @@ export async function POST(request: Request, { params }: { params: { id: string 
         await admin.from('ticket_quote_requests').insert({ company_id: ticket.company_id, ticket_id: ticketId, supplier_id: body.supplierId ?? ticket.supplier_id ?? null, requested_at: now })
         if (body.supplierId) updates.supplier_id = body.supplierId
         break
-      case 'request_evidence':
+      case 'request_evidence': {
         updates.evidence_required = true
         updates.evidence_request_reason = body.reason ?? null
         // Record the sent-back submission distinctly so the trail reads "More info
         // requested" (not a snag), and a later snag only rejects the next submission.
+        const supersededId = await pendingSignoffId(admin, ticketId)
         await admin.from('signoffs').update({ status: 'evidence_requested', reject_reason: body.reason ?? null, reviewed_by: user.id, reviewed_at: now }).eq('ticket_id', ticketId).in('status', ['submitted', 'awaiting_regional', 'awaiting_store'])
+        await logSignoffRound(admin, ticket, supersededId, 'evidence', body.reason ?? null, now)
         break
+      }
       case 'submit_quote': {
         const amount = Number(body.amount)
         if (!amount || amount <= 0) return NextResponse.json({ error: 'Valid quote amount required' }, { status: 400 })
@@ -171,11 +189,14 @@ export async function POST(request: Request, { params }: { params: { id: string 
         // supplier may raise a variation order before the RM's final close-out. The
         // ticket is completed by the separate close_out action below.
         break
-      case 'raise_snag':
+      case 'raise_snag': {
+        const supersededId = await pendingSignoffId(admin, ticketId)
         await admin.from('snags').insert({ company_id: ticket.company_id, ticket_id: ticketId, store_id: ticket.store_id, supplier_id: ticket.supplier_id, description: body.description ?? null, severity: body.severity ?? null, required_correction: body.required_correction ?? null, status: 'open' })
         await admin.from('signoffs').update({ status: 'rejected', reject_reason: body.description ?? 'Snag raised', reviewed_by: user.id, reviewed_at: now }).eq('ticket_id', ticketId).in('status', ['submitted', 'awaiting_regional', 'awaiting_store'])
         updates.evidence_required = true
+        await logSignoffRound(admin, ticket, supersededId, 'snag', body.description ?? null, now)
         break
+      }
       case 'assign_snag':
         updates.assigned_user_id = body.supplierId ?? ticket.supplier_id
         if (body.supplierId) updates.supplier_id = body.supplierId
