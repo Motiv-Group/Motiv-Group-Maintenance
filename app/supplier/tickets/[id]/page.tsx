@@ -197,6 +197,11 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   const myQuoteRows = (myQuotes ?? []) as any[]
   const activeQuotes = myQuoteRows.filter(q => q.status !== 'declined')
   const declinedMyQuotes = myQuoteRows.filter(q => q.status === 'declined')
+  // The Quotes block is open through quoting / scheduling, then collapses once the
+  // job is marked in progress (and every stage after). A phase-specific id + key
+  // forces the collapse on the transition even though the section otherwise
+  // remembers its open state across a refresh.
+  const quotesLivePhase = ['assigned', 'assessment', 'quote_requested', 'quote_revision', 'quoted', 'accepted', 'scheduled'].includes(t.status)
   // Durable audit events for THIS supplier: every request-decline (survives re-invite)
   // and every quote-request round. RM quote-declines already come from the quote rows.
   const myDeclines = ((declineRows ?? []) as any[]).map(d => ({ name: supplierCompanyName ?? 'you', at: d.declined_at })).filter(d => d.at)
@@ -415,7 +420,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
       {activeQuotes.length > 0 && (
         // Open during quoting / before work starts; collapsed once the job is marked
         // in progress (and every stage after).
-        <CollapsibleSection id="ticket-quotes" title="Quotes" defaultOpen={['assigned', 'assessment', 'quote_requested', 'quote_revision', 'quoted', 'accepted', 'scheduled'].includes(t.status)}>
+        <CollapsibleSection key={quotesLivePhase ? 'quotes-live' : 'quotes-done'} id={quotesLivePhase ? 'ticket-quotes' : 'ticket-quotes-done'} title="Quotes" defaultOpen={quotesLivePhase}>
           {activeQuotes.map((q, i, arr) => (
             <QuoteSummary
               key={q.id}
