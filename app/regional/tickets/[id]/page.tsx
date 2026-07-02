@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { redirect } from 'next/navigation'
 import { BackLink } from '@/components/ui/BackLink'
-import { CheckCircle2, FileText, Calendar, CalendarClock, Clock } from 'lucide-react'
+import { CheckCircle2, FileText, Calendar, CalendarClock, Clock, MessageSquare, Camera } from 'lucide-react'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireRegionalV3 } from '@/lib/health/guard'
 import { loadSlaResolver } from '@/lib/health/data'
@@ -301,6 +301,14 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
     : ['approved_closeout', 'completed'].includes(t.status) ? 'completion'
     : 'commercial'
 
+  // Progress updates the supplier posted (notes / photos) — surfaced in their own
+  // highlighted card so the RM notices activity on the job (not just buried in the
+  // audit trail). "New" = posted since the RM last acted on the ticket
+  // (last_internal_update_at, bumped by every RM transition).
+  const supplierUpdates = ((updates ?? []) as any[]).filter(u => u.author_role === 'supplier')
+  const rmLastActedMs = t.last_internal_update_at ? +new Date(t.last_internal_update_at) : 0
+  const newUpdateCount = supplierUpdates.filter(u => +new Date(u.created_at) > rmLastActedMs).length
+
   return (
     <div className="space-y-5">
       <BackLink fallbackHref="/regional/tickets" label="Back to tickets" />
@@ -413,6 +421,48 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
       )}
 
       {breached && <BreachReason nextAction={sla.nextAction} dueAt={sla.nextActionDueAt} owner={breachOwner} />}
+
+      {/* Updates from the supplier — progress notes / photos, in a gold-accented card
+          so new activity is noticed at a glance. A pulsing "N new" badge flags updates
+          posted since the RM last acted; the newest sit at the top. */}
+      {supplierUpdates.length > 0 && (
+        <Card className={`p-5 space-y-3 bg-[#C6A35D]/5 ${newUpdateCount > 0 ? 'ring-1 ring-[#C6A35D]/50' : ''}`}>
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="flex items-center gap-2 text-sm font-bold text-[var(--text)]"><MessageSquare size={15} className="text-[#C6A35D]" /> Updates from the supplier</h2>
+            {newUpdateCount > 0 && (
+              <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-[#C6A35D] bg-[#C6A35D]/15 rounded-full px-2 py-0.5">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#C6A35D] opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-[#C6A35D]" />
+                </span>
+                {newUpdateCount} new
+              </span>
+            )}
+          </div>
+          <ol className="space-y-2.5">
+            {supplierUpdates.map((u, i) => {
+              // Progress photos are posted as "📷 Progress photo: <url>" — render the
+              // link/thumbnail; everything else is a free-text note.
+              const photo = String(u.body).match(/^📷\s*Progress photo:\s*(\S+)/)
+              const isNew = +new Date(u.created_at) > rmLastActedMs
+              return (
+                <li key={i} className={`rounded-xl ring-1 p-3 bg-[var(--surface)] ${isNew ? 'ring-[#C6A35D]/40' : 'ring-[var(--border)]'}`}>
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <span className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--text)]">
+                      Supplier
+                      {isNew && <span className="text-[9px] font-bold uppercase tracking-wide text-amber-700 dark:text-[#C6A35D] bg-[#C6A35D]/15 rounded-full px-1.5 py-0.5">New</span>}
+                    </span>
+                    <span className="text-[11px] text-[var(--text-faint)]">{formatDateTime(u.created_at)}</span>
+                  </div>
+                  {photo
+                    ? <ViewTrackedLink ticketId={t.id} itemType="photo" itemLabel="Supplier progress photo" href={photo[1]} className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><Camera size={14} /> View progress photo</ViewTrackedLink>
+                    : <p className="text-sm text-[var(--text)] whitespace-pre-line">{u.body}</p>}
+                </li>
+              )
+            })}
+          </ol>
+        </Card>
+      )}
 
       {/* COC & POC — every submission: under review, plus any sent back for more evidence (full history) */}
       {(pendingSignoffs.length > 0 || evidenceRequestedSignoffs.length > 0) && (

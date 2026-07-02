@@ -48,17 +48,20 @@ function DetailItem({ label, value }: { label: string; value: string }) {
 
 // One COC & POC submission card — reused across the COC/POC, Snag and Completion
 // blocks. `snag` enriches a rejected submission with the "why it was sent back" reason.
-function SignoffCard({ s, snag, ticketId }: { s: any; snag?: { description?: string | null; required_correction?: string | null; severity?: string | null } | null; ticketId: string }) {
+function SignoffCard({ s, snag, ticketId, collapsible = false }: { s: any; snag?: { description?: string | null; required_correction?: string | null; severity?: string | null } | null; ticketId: string; collapsible?: boolean }) {
   const meta = SIGNOFF_META[s.status] ?? SIGNOFF_META.submitted
   const before = (s.before_urls ?? []) as string[]
   const after = (s.after_urls ?? []) as string[]
-  return (
-    <div className={`rounded-xl ring-1 ${meta.ring} ${meta.bg} overflow-hidden`}>
-      <div className={`flex items-center justify-between gap-2 px-4 py-2.5 border-b ${meta.head}`}>
-        <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)] min-w-0"><ClipboardCheck size={15} className={`${meta.iconCls} shrink-0`} /><span className="truncate">Completion · {formatDateTime(s.created_at)}</span></span>
-        <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 shrink-0 ${meta.badge}`}>{meta.label}</span>
-      </div>
-      <div className="p-4 space-y-3">
+  // Header (Completion · date/time + status badge) doubles as the click-to-expand
+  // summary when collapsible; the detail (photos / COC / notes) drops down below.
+  const header = (
+    <>
+      <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)] min-w-0"><ClipboardCheck size={15} className={`${meta.iconCls} shrink-0`} /><span className="truncate">Completion · {formatDateTime(s.created_at)}</span></span>
+      <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 shrink-0 ${meta.badge}`}>{meta.label}</span>
+    </>
+  )
+  const body = (
+    <>
         {s.status === 'rejected' && (s.reject_reason || snag?.description || snag?.required_correction) && (
           <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3 space-y-1">
             <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Why it was sent back</p>
@@ -90,7 +93,22 @@ function SignoffCard({ s, snag, ticketId }: { s: any; snag?: { description?: str
             <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{s.notes}</p>
           </div>
         )}
-      </div>
+    </>
+  )
+  // Collapsed by default — tap the "Completion · … / Under review" row to reveal
+  // the proof-of-completion, COC and notes.
+  if (collapsible) {
+    return (
+      <details className={`rounded-xl ring-1 ${meta.ring} ${meta.bg} overflow-hidden`}>
+        <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">{header}</summary>
+        <div className={`p-4 space-y-3 border-t ${meta.head}`}>{body}</div>
+      </details>
+    )
+  }
+  return (
+    <div className={`rounded-xl ring-1 ${meta.ring} ${meta.bg} overflow-hidden`}>
+      <div className={`flex items-center justify-between gap-2 px-4 py-2.5 border-b ${meta.head}`}>{header}</div>
+      <div className="p-4 space-y-3">{body}</div>
     </div>
   )
 }
@@ -415,6 +433,21 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
         </CollapsibleSection>
       )}
 
+      {/* COC & POC — the submission(s) currently under review. Sits ABOVE the Quotes
+          block: it's the latest thing being worked on once the job reaches sign-off.
+          Each card is collapsed by default (tap the row to reveal the detail). */}
+      {pendingSignoffs.length > 0 && (
+        <CollapsibleSection id="ticket-coc" title="COC & POC" defaultOpen={phase === 'coc'}>
+          {t.status === 'evidence_requested' && t.evidence_request_reason && (
+            <div className="rounded-lg bg-amber-500/10 ring-1 ring-amber-500/30 p-3">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400">More evidence requested</p>
+              <p className="text-sm text-[var(--text)]">{t.evidence_request_reason}</p>
+            </div>
+          )}
+          {pendingSignoffs.map(s => <SignoffCard key={s.id} s={s} ticketId={t.id} collapsible />)}
+        </CollapsibleSection>
+      )}
+
       {/* Quotes — active (pending / accepted) quotes only. Declined ones move to the
           Archived quotes block below. */}
       {activeQuotes.length > 0 && (
@@ -480,19 +513,6 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
               </div>
             </details>
           ))}
-        </CollapsibleSection>
-      )}
-
-      {/* COC & POC — the submission(s) currently under review (pending sign-off) */}
-      {pendingSignoffs.length > 0 && (
-        <CollapsibleSection id="ticket-coc" title="COC & POC" defaultOpen={phase === 'coc'}>
-          {t.status === 'evidence_requested' && t.evidence_request_reason && (
-            <div className="rounded-lg bg-amber-500/10 ring-1 ring-amber-500/30 p-3">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400">More evidence requested</p>
-              <p className="text-sm text-[var(--text)]">{t.evidence_request_reason}</p>
-            </div>
-          )}
-          {pendingSignoffs.map(s => <SignoffCard key={s.id} s={s} ticketId={t.id} />)}
         </CollapsibleSection>
       )}
 

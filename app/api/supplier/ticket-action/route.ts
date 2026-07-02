@@ -2,6 +2,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { rateLimit } from '@/lib/rate-limit'
+import { sendPushToMany } from '@/lib/push'
 
 // POST /api/supplier/ticket-action — supplier-side mutations.
 // Suppliers can acknowledge/update/quote/upload evidence and SUBMIT FOR SIGN-OFF.
@@ -35,6 +36,20 @@ export async function POST(request: Request) {
       if (!text) return NextResponse.json({ error: 'Update text required' }, { status: 400 })
       await admin.from('ticket_updates').insert({ ticket_id: ticketId, author_id: user.id, author_role: 'supplier', body: text })
       await admin.from('tickets').update({ last_supplier_update_at: now, status: ticket.status === 'open' ? 'in_progress' : ticket.status }).eq('id', ticketId)
+      // Tell the region's RMs there's a new update on the ticket (in-app + push), so
+      // it's noticed without them re-opening the ticket. A photo update shows a
+      // friendlier preview than the raw "📷 Progress photo: <url>" body.
+      if (ticket.region_id) {
+        const { data: rms } = await admin.from('regional_users').select('user_id').eq('region_id', ticket.region_id)
+        const ids = (rms ?? []).map(r => r.user_id)
+        if (ids.length) {
+          const preview = /^📷\s*Progress photo:/.test(text) ? '📷 Sent a progress photo' : (text.length > 100 ? `${text.slice(0, 100)}…` : text)
+          const title = `Supplier update: ${ticket.title ?? 'Ticket'}`
+          const link = `/regional/tickets/${ticketId}`
+          await admin.from('notifications').insert(ids.map(id => ({ company_id: ticket.company_id, user_id: id, type: 'ticket_update', title, message: preview, link })))
+          void sendPushToMany(ids, { title, body: preview, url: link })
+        }
+      }
       break
     }
     case 'add_quote': {
@@ -73,6 +88,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
   }
 
-  revalidatePath(`/supplier/tickets/${ticketId}`); revalidatePath('/supplier'); revalidatePath('/regional')
+  revalidatePath(`/supplier/tickets/${ticketId}`); revalidatePath('/supplier'); revalidatePath('/regional'); revalidatePath(`/regional/tickets/${ticketId}`)
   return NextResponse.json({ ok: true })
 }
