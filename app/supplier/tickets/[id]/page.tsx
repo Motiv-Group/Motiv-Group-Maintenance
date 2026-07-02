@@ -399,7 +399,9 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
       {/* Quotes — active (pending / accepted) quotes only. Declined ones move to the
           Archived quotes block below. */}
       {activeQuotes.length > 0 && (
-        <CollapsibleSection id="ticket-quotes" title="Quotes" defaultOpen={phase === 'commercial'}>
+        // Open during quoting / before work starts; collapsed once the job is marked
+        // in progress (and every stage after).
+        <CollapsibleSection id="ticket-quotes" title="Quotes" defaultOpen={['assigned', 'assessment', 'quote_requested', 'quote_revision', 'quoted', 'accepted', 'scheduled'].includes(t.status)}>
           {activeQuotes.map((q, i, arr) => (
             <QuoteSummary
               key={q.id}
