@@ -17,7 +17,7 @@ const STATUS_TONE: Record<string, string> = {
   completed: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
   cancelled: 'bg-gray-500/15 text-gray-600 dark:text-gray-400',
 }
-const STATUS_WORD: Record<string, string> = { open: 'Open', info_requested: 'Info Requested', scheduled: 'Job scheduled', in_progress: 'In Progress', completed: 'Completed', cancelled: 'Cancelled' }
+const STATUS_WORD: Record<string, string> = { open: 'New', info_requested: 'Info Requested', scheduled: 'Job scheduled', in_progress: 'In Progress', completed: 'Completed', cancelled: 'Cancelled' }
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 
 /** Store-manager dashboard "Recent Tickets" — last 7 days only, collapsible. */

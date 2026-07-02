@@ -19,7 +19,7 @@ const TONE: Record<string, string> = {
   completed: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
   cancelled: 'bg-gray-500/15 text-gray-600 dark:text-gray-400',
 }
-const WORD: Record<string, string> = { open: 'Open', info_requested: 'Info Requested', scheduled: 'Job scheduled', in_progress: 'In Progress', completed: 'Completed', cancelled: 'Cancelled' }
+const WORD: Record<string, string> = { open: 'New', info_requested: 'Info Requested', scheduled: 'Job scheduled', in_progress: 'In Progress', completed: 'Completed', cancelled: 'Cancelled' }
 
 // Urgency rank (handles classic low/medium/high/urgent and engine P1–P4).
 const URGENCY: Record<string, number> = { urgent: 0, P1: 0, high: 1, P2: 1, medium: 2, P3: 2, low: 3, P4: 3 }

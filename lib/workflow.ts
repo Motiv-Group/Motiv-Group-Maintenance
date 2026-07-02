@@ -42,7 +42,7 @@ export type StatusTone =
 export interface StatusMeta { label: string; group: StatusGroup; tone: StatusTone }
 
 export const STATUS_META: Record<TicketStatus, StatusMeta> = {
-  open:                  { label: 'Open',                  group: 'intake',     tone: 'blue' },
+  open:                  { label: 'New',                   group: 'intake',     tone: 'blue' },
   info_requested:        { label: 'Info Requested',        group: 'intake',     tone: 'slate' },
   assigned:              { label: 'Assigned',              group: 'intake',     tone: 'teal' },
   assessment:            { label: 'Assessment',            group: 'intake',     tone: 'cyan' },

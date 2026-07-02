@@ -21,7 +21,7 @@ export const PRIORITY_COLORS: Record<Priority, string> = {
 }
 
 export const STATUS_LABELS: Record<TicketStatus, string> = {
-  open:        'Open Tickets',
+  open:        'New',
   info_requested:   'Info Requested',
   assigned:         'Assigned',
   assessment:       'Assessment',
@@ -200,7 +200,7 @@ export function rmStatusMeta(status: string): { label: string; cls: string; text
   const indigoT = 'text-indigo-700 dark:text-indigo-400', purpleT = 'text-purple-700 dark:text-purple-400'
   const cyan = `bg-cyan-500/15 ${cyanT}`, violet = `bg-violet-500/15 ${violetT}`, gold = `bg-[#C6A35D]/15 ${goldT}`, orange = `bg-orange-500/15 ${orangeT}`, indigo = `bg-indigo-500/15 ${indigoT}`, purple = `bg-purple-500/15 ${purpleT}`
   const M: Record<string, { label: string; cls: string; text: string }> = {
-    open:                  { label: 'Open',              cls: `bg-blue-500/15 ${blueT}`, text: blueT },
+    open:                  { label: 'New',               cls: `bg-blue-500/15 ${blueT}`, text: blueT },
     info_requested:        { label: 'Info requested',    cls: 'bg-amber-500/15 text-amber-700 dark:text-amber-400', text: 'text-amber-700 dark:text-amber-400' },
     assigned:              { label: 'Quote requested',   cls: cyan, text: cyanT },
     quote_requested:       { label: 'Quote requested',   cls: cyan, text: cyanT },

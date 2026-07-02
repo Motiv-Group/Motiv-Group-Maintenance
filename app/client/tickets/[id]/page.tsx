@@ -29,7 +29,7 @@ const CV_TONE: Record<string, string> = {
   completed: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
   cancelled: 'bg-gray-500/15 text-gray-600 dark:text-gray-400',
 }
-const CV_WORD: Record<string, string> = { open: 'Open', info_requested: 'Info Requested', scheduled: 'Job scheduled', in_progress: 'In Progress', completed: 'Completed', cancelled: 'Cancelled' }
+const CV_WORD: Record<string, string> = { open: 'New', info_requested: 'Info Requested', scheduled: 'Job scheduled', in_progress: 'In Progress', completed: 'Completed', cancelled: 'Cancelled' }
 
 function DetailItem({ label, value }: { label: string; value: string }) {
   return (
