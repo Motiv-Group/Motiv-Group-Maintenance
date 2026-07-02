@@ -34,7 +34,7 @@ function Item({ label, value }: { label: string; value: string }) {
 
 export interface QuoteSchedule { at: string; proposed?: boolean; technician?: string | null; audience?: 'rm' | 'supplier' }
 
-export function QuoteSummary({ quote, status, title, schedule, collapsible = false }: { quote: QuoteSummaryData; status: QuoteSummaryStatus; title?: string; schedule?: QuoteSchedule | null; collapsible?: boolean }) {
+export function QuoteSummary({ quote, status, title, schedule, collapsible = false, declineReason }: { quote: QuoteSummaryData; status: QuoteSummaryStatus; title?: string; schedule?: QuoteSchedule | null; collapsible?: boolean; declineReason?: string | null }) {
   const tone = TONE[status]
   const Icon = tone.icon
 
@@ -55,6 +55,12 @@ export function QuoteSummary({ quote, status, title, schedule, collapsible = fal
 
   const details = (
     <>
+      {status === 'declined' && declineReason && (
+        <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Decline reason</p>
+          <p className="text-sm text-[var(--text)]">{declineReason}</p>
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-x-4 gap-y-3">
         <Item label="Excl. VAT" value={formatCurrency(quote.amount)} />
         <Item label="Incl. VAT" value={quote.amountInclVat ? formatCurrency(quote.amountInclVat) : '—'} />

@@ -295,13 +295,8 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
       ) : (
         <Card className="p-5 space-y-3">
           <h2 className="text-sm font-bold text-[var(--text)]">Next step</h2>
-          {latestQuote?.status === 'declined' && (
-            <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3 space-y-0.5">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Quote declined{latestQuote?.updated_at ? <span className="font-medium normal-case opacity-80"> · {formatDateTime(latestQuote.updated_at)}</span> : null}</p>
-              <p className="text-sm text-[var(--text)]">{declineReason || DEFAULT_DECLINE_REASON}</p>
-              {canSubmitQuote && <p className="text-sm text-[var(--text-muted)]">Submit a revised quote below.</p>}
-            </div>
-          )}
+          {/* The decline reason now lives in the Quotes block (on the declined quote);
+              the Next step only prompts for the revised quote. */}
           {reQuoteByRm && canSubmitQuote && (
             <div className="rounded-lg bg-[#C6A35D]/10 ring-1 ring-[#C6A35D]/30 p-3 space-y-0.5">
               <p className="text-sm font-bold text-amber-700 dark:text-[#C6A35D]">The regional manager requested a re-quote</p>
@@ -390,6 +385,9 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
               // A superseded/declined quote folds into the RM-style collapsible row;
               // the current quote stays open as the full card.
               collapsible={quoteStatusOf(q.status) === 'declined'}
+              // Show why it was declined (RM's reason, or the supplier's own if they
+              // declined the request) right in the quote detail.
+              declineReason={q.status === 'declined' ? declineReason : null}
               quote={{ id: q.id, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, description: q.description ?? null, fileUrl: q.file_url ?? null, validUntil: q.valid_until ?? null, createdAt: q.created_at }}
               schedule={
                 q.status === 'accepted' && t.scheduled_at
