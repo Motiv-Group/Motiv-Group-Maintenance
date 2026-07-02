@@ -556,7 +556,11 @@ export async function assembleStoreManagerDashboard(companyId: string, storeIds:
     if (t.status === 'info_requested') awaitingInput++
     const v = clientVisible(t.status)
     if (!v) continue
-    if (v === 'open') open++; else if (v === 'scheduled') scheduled++; else if (v === 'in_progress') inProgress++; else if (v === 'cancelled') cancelled++; else if (v === 'completed') completed++
+    // "Open" is an umbrella: every active ticket (not completed/cancelled) counts, so a
+    // ticket stays under Open — alongside its Scheduled / In-progress card — until it's
+    // completed.
+    if (v !== 'completed' && v !== 'cancelled') open++
+    if (v === 'scheduled') scheduled++; else if (v === 'in_progress') inProgress++; else if (v === 'cancelled') cancelled++; else if (v === 'completed') completed++
     // info_requested is tracked via awaitingInput (its own KPI), not the open count
     const { dueAt, overdue } = dueInfo(t, rules, now)
     // "Info added" = the SM resubmitted after the RM requested info (back at open, reason kept).

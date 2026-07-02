@@ -108,7 +108,12 @@ export function StoreTicketsList({ tickets, initialFilter = 'all' }: { tickets: 
     const tokens = q.toLowerCase().split(/[\s+]+/).map(s => s.trim()).filter(Boolean)
     return haystacks
       .filter(({ t, hay }) =>
-        (filter === 'all' || (filter === 'overdue' ? t.overdue : t.status === filter)) &&
+        (filter === 'all'
+          || (filter === 'overdue' ? t.overdue
+            // "Open" is an umbrella of every active ticket (not completed/cancelled),
+            // so a ticket stays under Open until it's completed.
+            : filter === 'open' ? !['completed', 'cancelled'].includes(t.status)
+            : t.status === filter)) &&
         (tokens.length === 0 || tokens.every(tok => hay.includes(tok))))
       .map(x => x.t)
   }, [haystacks, filter, q])
