@@ -199,7 +199,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
     admin.from('signoffs').select('id, status, before_urls, after_urls, coc_url, invoice_url, notes, reject_reason, reviewed_at, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('suppliers').select('id, company_name').eq('company_id', companyId).eq('active', true).order('company_name'),
     admin.from('ticket_variations').select('description, amount, warranty, status, reject_reason, reviewed_at, created_at, file_urls').eq('ticket_id', t.id).order('created_at', { ascending: false }),
-    admin.from('snags').select('description, status, scheduled_at, schedule_status, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
+    admin.from('snags').select('description, status, scheduled_at, schedule_status, assigned_at, schedule_agreed_at, schedule_declined_at, schedule_decline_reason, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('ticket_suppliers').select('supplier_id, status, invited_at, responded_at, decline_reason, declined_by, suppliers(company_name)').eq('ticket_id', t.id),
     admin.from('ratings').select('supplier_id, score').eq('company_id', companyId),
     // Durable COC/POC review-round log — drives the "Submission #N" numbers + the
@@ -250,6 +250,13 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   const latestSnag = ((snags ?? []) as any[])[0] ?? null
   const snagScheduledAt = ((snags ?? []) as any[]).find(s => s.scheduled_at)?.scheduled_at ?? null
   const snagAwaitingApproval = t.status === 'snag_assigned' && latestSnag?.schedule_status === 'proposed' && !!latestSnag?.scheduled_at
+  // Snag-fix callout in the ticket detail shows ONLY once the RM has approved the date;
+  // it then replaces the original "Scheduled" callout. While a snag schedule is in
+  // play (proposed or agreed) the original visit callout is hidden (it's stale).
+  const snagFixApproved = !!latestSnag?.scheduled_at && latestSnag.schedule_status === 'agreed' && ['assigned', 'in_progress'].includes(latestSnag.status)
+  const snagScheduleActive = !!latestSnag?.scheduled_at && ['proposed', 'agreed'].includes(latestSnag.schedule_status) && ['assigned', 'in_progress'].includes(latestSnag.status)
+  // Most recent declined snag-fix date (for the audit trail + Archive note).
+  const declinedSnag = ((snags ?? []) as any[]).find(s => s.schedule_declined_at) ?? null
 
   // SLA due date (final resolution deadline) + overdue state.
   const rules = await loadSlaResolver(admin, t.company_id)
@@ -453,8 +460,8 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         )}
 
         {t.info_request_reason && <p className="text-xs text-amber-600 dark:text-amber-400">Info requested: {t.info_request_reason}</p>}
-        {/* Scheduled visit — its own callout in the ticket detail block. */}
-        {t.scheduled_at && (
+        {/* Scheduled visit — hidden once a snag fix is in play (that callout replaces it). */}
+        {t.scheduled_at && !snagScheduleActive && (
           <div className="flex items-center gap-2.5 rounded-xl bg-indigo-500/10 ring-1 ring-indigo-500/30 px-3.5 py-3">
             <Calendar size={18} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
             <div className="min-w-0">
@@ -464,14 +471,14 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
             </div>
           </div>
         )}
-        {/* Snag fix schedule — the supplier's proposed corrective-work date (separate from the original job). */}
-        {latestSnag?.scheduled_at && ['assigned', 'in_progress'].includes(latestSnag.status) && (
+        {/* Snag fix schedule — only shown once the RM has approved the date (replaces
+            the original Scheduled callout above). */}
+        {snagFixApproved && (
           <div className="flex items-center gap-2.5 rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 px-3.5 py-3">
             <Calendar size={18} className="text-amber-600 dark:text-amber-400 shrink-0" />
             <div className="min-w-0">
-              <p className="text-[11px] uppercase tracking-wide font-semibold text-amber-700 dark:text-amber-400">Snag fix scheduled{latestSnag.schedule_status === 'proposed' ? ' · proposed' : ''}</p>
+              <p className="text-[11px] uppercase tracking-wide font-semibold text-amber-700 dark:text-amber-400">Snag fix scheduled</p>
               <p className="text-sm font-bold text-[var(--text)]">{formatDateTime(latestSnag.scheduled_at)}</p>
-              {latestSnag.schedule_status === 'proposed' && <p className="text-[11px] text-amber-600 dark:text-amber-400">Awaiting your approval.</p>}
             </div>
           </div>
         )}
@@ -720,13 +727,31 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
       {/* Archive — declined / not-selected quotes (by the RM or the supplier) plus the
           suppliers auto-closed when the job was awarded, moved out of the main Quotes
           block. Each is a click-to-expand row with its reason. */}
-      {(archivedDeclinedQuotes.length > 0 || archivedRequestDeclines.length > 0 || closedWaitingRows.length > 0 || supersededSubmissions.length > 0) && (
+      {(archivedDeclinedQuotes.length > 0 || archivedRequestDeclines.length > 0 || closedWaitingRows.length > 0 || supersededSubmissions.length > 0 || !!declinedSnag) && (
         <CollapsibleSection id="ticket-quotes-archive" title="Archive">
           {/* Superseded COC/POC submissions — sent back for more evidence or snagged.
               Each is a collapsed "Submission #N" round card showing the RM's reason. */}
           {supersededSubmissions.map((s: any) => (
             <RmSignoffCard key={s.id} s={s} tone={submissionTone(s)} ticketId={t.id} title={submissionLabel(s)} reason={roundBySignoff.get(s.id)?.reason ?? s.reject_reason} collapsible />
           ))}
+          {/* A declined snag-fix schedule — collapsed row with the reason + when. */}
+          {declinedSnag && (
+            <details className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
+              <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-[var(--text)] truncate">Snag schedule declined</p>
+                  <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(declinedSnag.schedule_declined_at)}</p>
+                </div>
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:text-red-400 bg-red-500/15 rounded-full px-2 py-0.5 shrink-0">Declined</span>
+              </summary>
+              <div className="border-t border-[var(--border)] p-4">
+                <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Reason</p>
+                  <p className="text-sm text-[var(--text)]">{declinedSnag.schedule_decline_reason || 'No reason provided.'}</p>
+                </div>
+              </div>
+            </details>
+          )}
           {/* Archived declines are already re-invited or superseded — no re-quote here.
               Losing quoters (quote declined when the job was awarded) show the courteous
               "not selected" note as their reason. */}
@@ -795,6 +820,8 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         editedAt: t.edited_at, editedByName: editorName, editNote: t.edit_note, cancellationReason: t.cancellation_reason,
         infoRequestedAt: t.info_requested_at, infoAddedAt: t.info_added_at, infoRequestReason: t.info_request_reason,
         snagScheduledAt,
+        snagProposedAt: latestSnag?.assigned_at ?? null, snagApprovedAt: latestSnag?.schedule_agreed_at ?? null,
+        snagDeclinedAt: declinedSnag?.schedule_declined_at ?? null, snagDeclineReason: declinedSnag?.schedule_decline_reason ?? null,
         workStartedAt: t.attended_at ?? null,
         quotes: ((quotes ?? []) as any[]).map(q => ({ ...q, supplierName: nameById.get(q.supplier_id) ?? 'Supplier' })),
         variations: (variations ?? []) as any[],

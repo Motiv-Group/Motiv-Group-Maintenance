@@ -52,6 +52,11 @@ export default async function StoreTicketDetailPage({ params }: { params: { id: 
   const showVisit = !!t.scheduled_at && !['completed', 'cancelled', 'declined'].includes(t.status)
   const visitSupplier = showVisit && t.supplier_id ? ((await admin.from('suppliers').select('company_name').eq('id', t.supplier_id).single()).data?.company_name ?? null) : null
   const visitTech = showVisit && t.technician_id ? ((await admin.from('technicians').select('name').eq('id', t.technician_id).single()).data?.name ?? null) : null
+  // Approved snag-fix date, shown to the store manager as a neutral teal "Follow-up
+  // visit" (no "snag" wording) — only once the regional manager has approved it.
+  const { data: snagRows } = await admin.from('snags').select('scheduled_at, schedule_status, status').eq('ticket_id', t.id).order('created_at', { ascending: false })
+  const followUp = ((snagRows ?? []) as any[]).find(s => s.scheduled_at && s.schedule_status === 'agreed' && ['assigned', 'in_progress'].includes(s.status)) ?? null
+  const showFollowUp = !!followUp && !['completed', 'cancelled', 'declined'].includes(t.status)
   // "Info added" = back at open after the SM resubmitted the requested info.
   const infoAdded = t.status === 'open' && !!t.info_request_reason
   // Edit / delete only while the ticket is genuinely fresh-open — once the RM has
@@ -120,8 +125,9 @@ export default async function StoreTicketDetailPage({ params }: { params: { id: 
         <EditedLine at={t.edited_at} by={editorName} />
       </Card>
 
-      {/* Scheduled supplier visit — who is coming on site and when */}
-      {showVisit && t.scheduled_at && (
+      {/* Scheduled supplier visit — who is coming on site and when. Hidden once a
+          follow-up visit is scheduled (that card replaces it). */}
+      {showVisit && t.scheduled_at && !showFollowUp && (
         <Card className="p-5">
           <div className="flex items-start gap-3">
             <span className="grid place-items-center w-10 h-10 rounded-xl bg-indigo-500/10 ring-1 ring-indigo-500/30 shrink-0">
@@ -132,6 +138,23 @@ export default async function StoreTicketDetailPage({ params }: { params: { id: 
               <p className="text-base font-bold text-[var(--text)]">{formatDateTime(t.scheduled_at)}</p>
               <p className="text-sm text-[var(--text-muted)]">{visitSupplier ?? 'Assigned supplier'}{visitTech ? ` · ${visitTech}` : ''}</p>
               {t.schedule_status === 'proposed' && <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-0.5">Awaiting the regional manager&apos;s confirmation.</p>}
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* Follow-up visit — the approved corrective-work date. Neutral wording + a
+          distinct teal colour (the store manager isn't shown snag internals). */}
+      {showFollowUp && followUp && (
+        <Card className="p-5">
+          <div className="flex items-start gap-3">
+            <span className="grid place-items-center w-10 h-10 rounded-xl bg-teal-500/10 ring-1 ring-teal-500/30 shrink-0">
+              <CalendarClock size={20} className="text-teal-600 dark:text-teal-400" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[11px] uppercase tracking-wide font-semibold text-teal-700 dark:text-teal-400">Follow-up visit scheduled</p>
+              <p className="text-base font-bold text-[var(--text)]">{formatDateTime(followUp.scheduled_at)}</p>
+              <p className="text-sm text-[var(--text-muted)]">{visitSupplier ?? 'Assigned supplier'}</p>
             </div>
           </div>
         </Card>

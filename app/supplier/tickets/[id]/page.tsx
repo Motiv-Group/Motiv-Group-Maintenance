@@ -134,7 +134,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
     admin.from('quotes').select('id, amount, amount_incl_vat, description, file_url, status, valid_until, proposed_schedule_at, decline_reason, created_at, updated_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).order('created_at', { ascending: false }),
     admin.from('technicians').select('id, name').in('supplier_id', supplierIds).eq('active', true).order('name'),
     admin.from('signoffs').select('id, before_urls, after_urls, coc_url, invoice_url, status, notes, reject_reason, reviewed_at, created_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).order('created_at', { ascending: false }),
-    admin.from('snags').select('description, required_correction, severity, status, scheduled_at, schedule_status, schedule_decline_reason, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
+    admin.from('snags').select('description, required_correction, severity, status, scheduled_at, schedule_status, assigned_at, schedule_agreed_at, schedule_declined_at, schedule_decline_reason, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('companies').select('name').eq('id', companyId).maybeSingle(),
     admin.from('ticket_variations').select('description, amount, warranty, status, reject_reason, reviewed_at, created_at, file_urls').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     // Only THIS supplier's own view events — so their trail shows the photos /
@@ -167,6 +167,12 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   // Most recent snag — explains why a completion was rejected / sent back.
   const latestSnag = ((snagRows ?? []) as any[])[0] ?? null
   const snagScheduledAt = ((snagRows ?? []) as any[]).find(s => s.scheduled_at)?.scheduled_at ?? null
+  // Snag-fix callout shows ONLY once the RM has approved the date (then it replaces the
+  // original Scheduled callout). The original visit is hidden while any snag schedule is
+  // in play (proposed or agreed). Latest declined schedule feeds the audit trail + Archive.
+  const snagFixApproved = !!latestSnag?.scheduled_at && latestSnag.schedule_status === 'agreed' && ['assigned', 'in_progress'].includes(latestSnag.status)
+  const snagScheduleActive = !!latestSnag?.scheduled_at && ['proposed', 'agreed'].includes(latestSnag.schedule_status) && ['assigned', 'in_progress'].includes(latestSnag.status)
+  const declinedSnag = ((snagRows ?? []) as any[]).find(s => s.schedule_declined_at) ?? null
   const technicians = (technicianRows ?? []) as { id: string; name: string }[]
   // Access: the awarded supplier OR a supplier invited to quote (competitive model).
   const awarded = !!t.supplier_id && supplierIds.includes(t.supplier_id)
@@ -338,9 +344,8 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           </div>
         )}
 
-        {/* Scheduled visit — its own callout in the ticket detail block. Hidden once a
-            snag fix is scheduled: that callout replaces it (no need to show both). */}
-        {!declinedForMe && t.scheduled_at && !(latestSnag?.scheduled_at && ['assigned', 'in_progress'].includes(latestSnag.status)) && (
+        {/* Scheduled visit — hidden once a snag fix is in play (that callout replaces it). */}
+        {!declinedForMe && t.scheduled_at && !snagScheduleActive && (
           <div className="flex items-center gap-2.5 rounded-xl bg-indigo-500/10 ring-1 ring-indigo-500/30 px-3.5 py-3">
             <Calendar size={18} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
             <div className="min-w-0">
@@ -350,14 +355,14 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
             </div>
           </div>
         )}
-        {/* Snag fix schedule — your proposed corrective-work date (separate from the original job). */}
-        {!declinedForMe && latestSnag?.scheduled_at && ['assigned', 'in_progress'].includes(latestSnag.status) && (
+        {/* Snag fix schedule — only shown once the manager approves the date (replaces
+            the original Scheduled callout above). */}
+        {!declinedForMe && snagFixApproved && (
           <div className="flex items-center gap-2.5 rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 px-3.5 py-3">
             <Calendar size={18} className="text-amber-600 dark:text-amber-400 shrink-0" />
             <div className="min-w-0">
-              <p className="text-[11px] uppercase tracking-wide font-semibold text-amber-700 dark:text-amber-400">Snag fix scheduled{latestSnag.schedule_status === 'proposed' ? ' · proposed' : ''}</p>
+              <p className="text-[11px] uppercase tracking-wide font-semibold text-amber-700 dark:text-amber-400">Snag fix scheduled</p>
               <p className="text-sm font-bold text-[var(--text)]">{formatDateTime(latestSnag.scheduled_at)}</p>
-              {latestSnag.schedule_status === 'proposed' && <p className="text-[11px] text-amber-600 dark:text-amber-400">Awaiting the manager&apos;s approval.</p>}
             </div>
           </div>
         )}
@@ -531,7 +536,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
       {/* Archived — one block holding both this supplier's declined quotes (by the RM
           or themselves) and every time they declined the quote request. The request
           declines are durable (kept even after the RM re-assigns them). */}
-      {(declinedMyQuotes.length > 0 || ((declineRows ?? []) as any[]).length > 0 || archivedSuperseded.length > 0) && (
+      {(declinedMyQuotes.length > 0 || ((declineRows ?? []) as any[]).length > 0 || archivedSuperseded.length > 0 || !!declinedSnag) && (
         <CollapsibleSection id="ticket-archive" title="Archived" defaultOpen={declinedBy === 'supplier'}>
           {/* Superseded COC/POC submissions — sent back for more evidence or snagged.
               Each a collapsed "Submission #N" round card showing why it was returned.
@@ -539,6 +544,24 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           {archivedSuperseded.map(s => (
             <SignoffCard key={s.id} s={s} ticketId={t.id} title={submissionLabel(s)} reason={roundBySignoff.get(s.id)?.reason ?? s.reject_reason} snag={s.status === 'rejected' && s.id === rejectedSignoffs[0]?.id ? latestSnag : null} collapsible />
           ))}
+          {/* A snag-fix date the RM declined — collapsed row with the reason + when. */}
+          {declinedSnag && (
+            <details className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
+              <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-[var(--text)] truncate">Snag schedule declined</p>
+                  <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(declinedSnag.schedule_declined_at)}</p>
+                </div>
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:text-red-400 bg-red-500/15 rounded-full px-2 py-0.5 shrink-0">Declined</span>
+              </summary>
+              <div className="border-t border-[var(--border)] p-4">
+                <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Reason</p>
+                  <p className="text-sm text-[var(--text)]">{declinedSnag.schedule_decline_reason || 'No reason provided.'}</p>
+                </div>
+              </div>
+            </details>
+          )}
           {declinedMyQuotes.map((q, i, arr) => (
             <QuoteSummary
               key={q.id}
@@ -618,6 +641,8 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           scheduledAt: t.scheduled_at, completedAt: t.completed_at,
           editedAt: t.edited_at, editedByName: editorName, editNote: t.edit_note, cancellationReason: t.cancellation_reason,
           snagScheduledAt, workStartedAt: t.attended_at ?? null,
+          snagProposedAt: latestSnag?.assigned_at ?? null, snagApprovedAt: latestSnag?.schedule_agreed_at ?? null,
+          snagDeclinedAt: declinedSnag?.schedule_declined_at ?? null, snagDeclineReason: declinedSnag?.schedule_decline_reason ?? null,
           quotes: (myQuotes ?? []) as any[], variations: (variationRows ?? []) as any[],
           supplierDeclines: myDeclines,
           signoffs: (signoffRows ?? []) as any[], updates: (updates ?? []) as any[],

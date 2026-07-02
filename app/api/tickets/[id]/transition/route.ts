@@ -219,15 +219,17 @@ export async function POST(request: Request, { params }: { params: { id: string 
       case 'approve_snag':
         // RM approves the proposed snag-fix date → the supplier can start the work.
         await admin.from('snags').update({ schedule_status: 'agreed' }).eq('ticket_id', ticketId).eq('schedule_status', 'proposed')
+        // Stamp the approval time for the audit trail (best-effort — never blocks approval).
+        await admin.from('snags').update({ schedule_agreed_at: now }).eq('ticket_id', ticketId).eq('schedule_status', 'agreed')
         break
       case 'decline_snag_schedule':
         // RM rejects the proposed snag-fix date → send it back so the supplier proposes
         // a new one. Reset the snag to 'open' (accept_snag re-proposes on 'open' snags)
         // and clear the date.
         await admin.from('snags').update({ status: 'open', schedule_status: null, scheduled_at: null }).eq('ticket_id', ticketId).in('status', ['assigned', 'in_progress'])
-        // Persist the reason (best-effort, separate update) so it shows on the supplier's
-        // ticket, not only in the notification — never blocks the reset if unmigrated.
-        await admin.from('snags').update({ schedule_decline_reason: body.reason ?? null }).eq('ticket_id', ticketId).eq('status', 'open')
+        // Persist the reason + time (best-effort, separate update) so it shows on the
+        // ticket + audit trail, not only in the notification — never blocks the reset.
+        await admin.from('snags').update({ schedule_decline_reason: body.reason ?? null, schedule_declined_at: now }).eq('ticket_id', ticketId).eq('status', 'open')
         break
       case 'start_snag': {
         // Only after the RM has approved the proposed snag-fix date.
