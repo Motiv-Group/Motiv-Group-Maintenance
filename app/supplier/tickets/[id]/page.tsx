@@ -96,11 +96,11 @@ function SignoffCard({ s, snag }: { s: any; snag?: { description?: string | null
 }
 
 export default async function SupplierTicketDetailPage({ params }: { params: { id: string } }) {
-  const { companyId, supplierIds } = await requireSupplierV3()
+  const { companyId, supplierIds, userId } = await requireSupplierV3()
   const admin = createAdminClient()
   const { data: t } = await admin.from('tickets').select('*').eq('id', params.id).single()
   if (!t || t.company_id !== companyId) redirect('/supplier/tickets')
-  const [{ data: store }, { data: updates }, { data: invite }, { data: myQuotes }, { data: technicianRows }, { data: signoffRows }, { data: snagRows }, { data: companyRow }, { data: variationRows }] = await Promise.all([
+  const [{ data: store }, { data: updates }, { data: invite }, { data: myQuotes }, { data: technicianRows }, { data: signoffRows }, { data: snagRows }, { data: companyRow }, { data: variationRows }, { data: viewRows }] = await Promise.all([
     admin.from('stores').select('name, sub_store').eq('id', t.store_id).single(),
     admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('ticket_suppliers').select('supplier_id, status, invited_at, decline_reason, responded_at, declined_by, requote_requested_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).maybeSingle(),
@@ -110,6 +110,9 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
     admin.from('snags').select('description, required_correction, severity, status, scheduled_at, schedule_status, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('companies').select('name').eq('id', companyId).maybeSingle(),
     admin.from('ticket_variations').select('description, amount, warranty, status, reject_reason, reviewed_at, created_at, file_urls').eq('ticket_id', t.id).order('created_at', { ascending: false }),
+    // Only THIS supplier's own view events — so their trail shows the photos /
+    // attachments they opened, without ever exposing another supplier's activity.
+    admin.from('ticket_views').select('viewer_role, item_type, item_label, first_viewed_at').eq('ticket_id', t.id).eq('viewer_id', userId),
   ])
   // Client organisation that owns the store (shown in the ticket detail).
   const companyName = (companyRow as any)?.name ?? null
@@ -438,8 +441,10 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
 
       {/* Isolation: a supplier only ever sees THEIR OWN involvement. Until they're
           awarded the job, the trail is scoped to their invite + their own quote (no
-          other supplier's progress, and no view events — suppliers must not learn of
-          each other). Once awarded, it's their job and shows the full progression. */}
+          other supplier's progress). View events are always this supplier's own
+          (filtered by viewer_id), so their trail shows the photos / attachments they
+          opened without exposing another supplier's activity. Once awarded, it's their
+          job and shows the full progression. */}
       {!awarded ? (
         <AuditTrail ticket={{
           createdAt: t.created_at,
@@ -448,6 +453,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           quoteSubmittedAt: latestQuote?.created_at ?? null,
           requoteRequestedAt,
           quotes: (myQuotes ?? []) as any[],
+          views: (viewRows ?? []) as any[],
           supplierDeclinedAt: declinedForMe ? ((invite as any)?.responded_at ?? latestQuote?.updated_at ?? t.updated_at) : null,
         }} />
       ) : (
@@ -461,6 +467,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           snagScheduledAt, requoteRequestedAt, workStartedAt: t.attended_at ?? null,
           quotes: (myQuotes ?? []) as any[], variations: (variationRows ?? []) as any[],
           signoffs: (signoffRows ?? []) as any[], updates: (updates ?? []) as any[],
+          views: (viewRows ?? []) as any[],
         }} />
       )}
     </div>
