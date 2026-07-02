@@ -34,45 +34,74 @@ function Item({ label, value }: { label: string; value: string }) {
 
 export interface QuoteSchedule { at: string; proposed?: boolean; technician?: string | null; audience?: 'rm' | 'supplier' }
 
-export function QuoteSummary({ quote, status, title, schedule }: { quote: QuoteSummaryData; status: QuoteSummaryStatus; title?: string; schedule?: QuoteSchedule | null }) {
+export function QuoteSummary({ quote, status, title, schedule, collapsible = false }: { quote: QuoteSummaryData; status: QuoteSummaryStatus; title?: string; schedule?: QuoteSchedule | null; collapsible?: boolean }) {
   const tone = TONE[status]
   const Icon = tone.icon
+
+  const heading = (
+    <>
+      <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)] min-w-0">
+        <Icon size={15} className={`${tone.iconCls} shrink-0`} />
+        <span className="truncate">{title ?? quote.supplierName ?? 'Quote'}</span>
+      </span>
+      <span className="flex items-center gap-2 shrink-0">
+        {/* Show the amount up-front when collapsed so it reads at a glance (matches
+            the RM's collapsible declined-quote row). */}
+        {collapsible && <span className="text-sm text-[var(--text)] tabular-nums">{formatCurrency(quote.amount)}</span>}
+        <span className={`text-[10px] font-semibold uppercase tracking-wide ${tone.badgeText} ${tone.badge} rounded-full px-2 py-0.5`}>{tone.label}</span>
+      </span>
+    </>
+  )
+
+  const details = (
+    <>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+        <Item label="Excl. VAT" value={formatCurrency(quote.amount)} />
+        <Item label="Incl. VAT" value={quote.amountInclVat ? formatCurrency(quote.amountInclVat) : '—'} />
+        <Item label="Submitted" value={formatDateTime(quote.createdAt)} />
+        <Item label="Valid until" value={quote.validUntil ? formatDate(quote.validUntil) : 'N/A'} />
+      </div>
+      {schedule && (
+        <div className="flex items-center gap-2 text-sm flex-wrap">
+          <CalendarClock size={15} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
+          <span className="text-[var(--text-muted)]">Scheduled visit</span>
+          <span className="font-semibold text-[var(--text)]">{formatDateTime(schedule.at)}{schedule.technician ? ` · ${schedule.technician}` : ''}</span>
+          {schedule.proposed && <span className="text-[11px] text-amber-600 dark:text-amber-400">(proposed)</span>}
+        </div>
+      )}
+      {quote.description && (
+        <div>
+          <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Description</div>
+          <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{quote.description}</p>
+        </div>
+      )}
+      {quote.fileUrl && (
+        <a href={quote.fileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline">
+          <FileText size={14} /> View attached quote
+        </a>
+      )}
+    </>
+  )
+
+  // Superseded / declined quotes fold away behind a summary row so the current
+  // quote stays prominent — same pattern the RM page uses for not-selected quotes.
+  if (collapsible) {
+    return (
+      <details className={`rounded-xl ring-1 ${tone.ring} ${tone.bg} overflow-hidden`}>
+        <summary className={`flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition`}>
+          {heading}
+        </summary>
+        <div className={`p-4 space-y-3 border-t ${tone.head}`}>{details}</div>
+      </details>
+    )
+  }
+
   return (
     <div className={`rounded-xl ring-1 ${tone.ring} ${tone.bg} overflow-hidden`}>
       <div className={`flex items-center justify-between gap-2 px-4 py-2.5 border-b ${tone.head}`}>
-        <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)] min-w-0">
-          <Icon size={15} className={`${tone.iconCls} shrink-0`} />
-          <span className="truncate">{title ?? quote.supplierName ?? 'Quote'}</span>
-        </span>
-        <span className={`text-[10px] font-semibold uppercase tracking-wide ${tone.badgeText} ${tone.badge} rounded-full px-2 py-0.5 shrink-0`}>{tone.label}</span>
+        {heading}
       </div>
-      <div className="p-4 space-y-3">
-        <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-          <Item label="Excl. VAT" value={formatCurrency(quote.amount)} />
-          <Item label="Incl. VAT" value={quote.amountInclVat ? formatCurrency(quote.amountInclVat) : '—'} />
-          <Item label="Submitted" value={formatDateTime(quote.createdAt)} />
-          <Item label="Valid until" value={quote.validUntil ? formatDate(quote.validUntil) : 'N/A'} />
-        </div>
-        {schedule && (
-          <div className="flex items-center gap-2 text-sm flex-wrap">
-            <CalendarClock size={15} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
-            <span className="text-[var(--text-muted)]">Scheduled visit</span>
-            <span className="font-semibold text-[var(--text)]">{formatDateTime(schedule.at)}{schedule.technician ? ` · ${schedule.technician}` : ''}</span>
-            {schedule.proposed && <span className="text-[11px] text-amber-600 dark:text-amber-400">(proposed)</span>}
-          </div>
-        )}
-        {quote.description && (
-          <div>
-            <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Description</div>
-            <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{quote.description}</p>
-          </div>
-        )}
-        {quote.fileUrl && (
-          <a href={quote.fileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline">
-            <FileText size={14} /> View attached quote
-          </a>
-        )}
-      </div>
+      <div className="p-4 space-y-3">{details}</div>
     </div>
   )
 }
