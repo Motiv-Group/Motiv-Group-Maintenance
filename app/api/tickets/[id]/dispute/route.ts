@@ -74,6 +74,11 @@ export async function POST(request: Request, { params }: { params: { id: string 
       .insert({ company_id: ticket.company_id, ticket_id: ticketId, origin: ticket.status === 'snag' ? 'snag' : 'evidence_requested', status: 'open', raised_by: user.id, created_at: now })
       .select('id').single()
     if (error || !disp) return NextResponse.json({ error: 'Could not raise the dispute.' }, { status: 500 })
+    // Link the dispute to the submission it concerns (the latest signoff — the one
+    // that was snagged / had more evidence requested). Best-effort, separate update so
+    // raising still works before the signoff_id column is migrated.
+    const { data: latestSignoff } = await admin.from('signoffs').select('id').eq('ticket_id', ticketId).order('created_at', { ascending: false }).limit(1).maybeSingle()
+    if ((latestSignoff as any)?.id) await admin.from('ticket_disputes').update({ signoff_id: (latestSignoff as any).id }).eq('id', disp.id)
     await admin.from('ticket_dispute_messages').insert({ dispute_id: disp.id, ticket_id: ticketId, author_id: user.id, author_role: 'supplier', body: messageBody || null, evidence_urls: evidence, created_at: now })
     await admin.from('tickets').update({ last_supplier_update_at: now, updated_at: now }).eq('id', ticketId)
     await push(admin, await regionIds(admin, ticket.region_id), ticket.company_id, title, 'The supplier has raised a dispute — review and respond.', `/regional/tickets/${ticketId}`)

@@ -248,7 +248,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
     // THIS RM's "last seen this ticket" watermark → which supplier updates are new.
     admin.from('ticket_reads').select('last_seen_at').eq('user_id', userId).eq('ticket_id', t.id).maybeSingle(),
     // Snag / evidence disputes on this ticket + their message threads (chronological).
-    admin.from('ticket_disputes').select('id, origin, status, outcome, resolution_note, created_at, resolved_at').eq('ticket_id', t.id).order('created_at', { ascending: true }),
+    admin.from('ticket_disputes').select('id, origin, status, outcome, resolution_note, signoff_id, created_at, resolved_at').eq('ticket_id', t.id).order('created_at', { ascending: true }),
     admin.from('ticket_dispute_messages').select('id, dispute_id, author_role, body, evidence_urls, created_at').eq('ticket_id', t.id).order('created_at', { ascending: true }),
     // Durable snag-fix schedule rounds → every proposal / approval / decline on the trail.
     admin.from('snag_schedule_events').select('kind, scheduled_for, reason, created_at').eq('ticket_id', t.id).order('created_at', { ascending: true }),
@@ -281,28 +281,6 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   const msgsByDispute = (id: string) => disputeMsgs.filter(m => m.dispute_id === id).map(m => ({ ...m, evidence_urls: Array.isArray(m.evidence_urls) ? m.evidence_urls : [] }))
   const openDispute = disputes.find(d => d.status === 'open') ?? null
   const resolvedDisputes = disputes.filter(d => d.status === 'resolved')
-  // The Dispute block (open live thread + resolved read-only history). Rendered ABOVE
-  // the Actions while a dispute is live (needs the RM's attention), then moved BELOW
-  // the Actions once it's done (history).
-  const disputeBlock = disputes.length > 0 ? (
-    <CollapsibleSection id="ticket-dispute" title="Dispute" defaultOpen={!!openDispute}>
-      {openDispute && <DisputeThread ticketId={t.id} dispute={openDispute} messages={msgsByDispute(openDispute.id)} viewerRole="regional_manager" />}
-      {resolvedDisputes.map(d => (
-        <details key={d.id} className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
-          <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-[var(--text)] truncate">Dispute — {d.origin === 'snag' ? 'snag' : 'evidence request'}</p>
-              <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(d.resolved_at ?? d.created_at)}</p>
-            </div>
-            <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 shrink-0 ${d.outcome === 'withdrawn' ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' : 'bg-amber-500/15 text-amber-700 dark:text-amber-400'}`}>{d.outcome === 'withdrawn' ? 'Withdrawn' : 'Upheld'}</span>
-          </summary>
-          <div className="border-t border-[var(--border)] p-4">
-            <DisputeThread ticketId={t.id} dispute={d} messages={msgsByDispute(d.id)} viewerRole="regional_manager" readOnly />
-          </div>
-        </details>
-      ))}
-    </CollapsibleSection>
-  ) : null
   // Stable "Submission #N" numbers across live + archived, ordered by when each
   // COC/POC was submitted (oldest = #1). Shown in the card titles.
   const submissionNo = new Map<string, number>()
@@ -318,6 +296,34 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   for (const r of ((roundRows ?? []) as any[])) if (r.signoff_id) roundBySignoff.set(r.signoff_id, { round_no: r.round_no, kind: r.kind, reason: r.reason ?? null })
   const submissionLabel = (s: any) => `Submission #${roundBySignoff.get(s.id)?.round_no ?? submissionNo.get(s.id) ?? '?'}`
   const submissionTone = (s: any): 'snag' | 'evidence' => (roundBySignoff.get(s.id)?.kind ?? (s.status === 'rejected' ? 'snag' : 'evidence')) === 'snag' ? 'snag' : 'evidence'
+  // What each dispute is about — the disputed "Submission #N" + snag / evidence request.
+  const disputeSubject = (d: any) => {
+    const n = d.signoff_id ? submissionNo.get(d.signoff_id) : null
+    const what = d.origin === 'snag' ? 'snag' : 'evidence request'
+    return n ? `Submission #${n} · ${what}` : what
+  }
+  // The Dispute block (open live thread + resolved read-only history), each labelled
+  // with the submission it concerns. Rendered ABOVE the Actions while live, then moved
+  // BELOW once resolved (history).
+  const disputeBlock = disputes.length > 0 ? (
+    <CollapsibleSection id="ticket-dispute" title="Dispute" defaultOpen={!!openDispute}>
+      {openDispute && <DisputeThread ticketId={t.id} dispute={openDispute} messages={msgsByDispute(openDispute.id)} viewerRole="regional_manager" subject={disputeSubject(openDispute)} />}
+      {resolvedDisputes.map(d => (
+        <details key={d.id} className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
+          <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-[var(--text)] truncate">Dispute — {disputeSubject(d)}</p>
+              <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(d.resolved_at ?? d.created_at)}</p>
+            </div>
+            <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 shrink-0 ${d.outcome === 'withdrawn' ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' : 'bg-amber-500/15 text-amber-700 dark:text-amber-400'}`}>{d.outcome === 'withdrawn' ? 'Withdrawn' : 'Upheld'}</span>
+          </summary>
+          <div className="border-t border-[var(--border)] p-4">
+            <DisputeThread ticketId={t.id} dispute={d} messages={msgsByDispute(d.id)} viewerRole="regional_manager" readOnly subject={disputeSubject(d)} />
+          </div>
+        </details>
+      ))}
+    </CollapsibleSection>
+  ) : null
   // Snag scheduling — the supplier's proposed fix date (separate from the original
   // job schedule) and whether it's still awaiting the RM's approval.
   const latestSnag = ((snags ?? []) as any[])[0] ?? null

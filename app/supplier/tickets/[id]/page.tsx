@@ -167,7 +167,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
     // reason on the archived round cards (falls back to the signoff row if unmigrated).
     admin.from('signoff_rounds').select('signoff_id, round_no, kind, reason').eq('ticket_id', t.id),
     // Snag / evidence disputes on this ticket + their message threads (chronological).
-    admin.from('ticket_disputes').select('id, origin, status, outcome, resolution_note, created_at, resolved_at').eq('ticket_id', t.id).order('created_at', { ascending: true }),
+    admin.from('ticket_disputes').select('id, origin, status, outcome, resolution_note, signoff_id, created_at, resolved_at').eq('ticket_id', t.id).order('created_at', { ascending: true }),
     admin.from('ticket_dispute_messages').select('id, dispute_id, author_role, body, evidence_urls, created_at').eq('ticket_id', t.id).order('created_at', { ascending: true }),
     // Durable snag-fix schedule rounds → every proposal / approval / decline on the trail.
     admin.from('snag_schedule_events').select('kind, scheduled_for, reason, created_at').eq('ticket_id', t.id).order('created_at', { ascending: true }),
@@ -322,6 +322,12 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   const msgsByDispute = (id: string) => disputeMsgs.filter(m => m.dispute_id === id).map(m => ({ ...m, evidence_urls: Array.isArray(m.evidence_urls) ? m.evidence_urls : [] }))
   const openDispute = disputes.find(d => d.status === 'open') ?? null
   const resolvedDisputes = disputes.filter(d => d.status === 'resolved')
+  // What each dispute is about — the disputed "Submission #N" + snag / evidence request.
+  const disputeSubject = (d: any) => {
+    const n = d.signoff_id ? submissionNo.get(d.signoff_id) : null
+    const what = d.origin === 'snag' ? 'snag' : 'evidence request'
+    return n ? `Submission #${n} · ${what}` : what
+  }
 
   return (
     <div className="space-y-5">
@@ -412,18 +418,18 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           default only while a dispute is live. */}
       {awarded && disputes.length > 0 && (
         <CollapsibleSection id="ticket-dispute" title="Dispute" defaultOpen={!!openDispute}>
-          {openDispute && <DisputeThread ticketId={t.id} dispute={openDispute} messages={msgsByDispute(openDispute.id)} viewerRole="supplier" />}
+          {openDispute && <DisputeThread ticketId={t.id} dispute={openDispute} messages={msgsByDispute(openDispute.id)} viewerRole="supplier" subject={disputeSubject(openDispute)} />}
           {resolvedDisputes.map(d => (
             <details key={d.id} className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
               <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-[var(--text)] truncate">Dispute — {d.origin === 'snag' ? 'snag' : 'evidence request'}</p>
+                  <p className="text-sm font-semibold text-[var(--text)] truncate">Dispute — {disputeSubject(d)}</p>
                   <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(d.resolved_at ?? d.created_at)}</p>
                 </div>
                 <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 shrink-0 ${d.outcome === 'withdrawn' ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' : 'bg-amber-500/15 text-amber-700 dark:text-amber-400'}`}>{d.outcome === 'withdrawn' ? 'Withdrawn' : 'Upheld'}</span>
               </summary>
               <div className="border-t border-[var(--border)] p-4">
-                <DisputeThread ticketId={t.id} dispute={d} messages={msgsByDispute(d.id)} viewerRole="supplier" readOnly />
+                <DisputeThread ticketId={t.id} dispute={d} messages={msgsByDispute(d.id)} viewerRole="supplier" readOnly subject={disputeSubject(d)} />
               </div>
             </details>
           ))}

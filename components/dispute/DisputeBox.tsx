@@ -117,15 +117,20 @@ export function RaiseDisputeButton({ ticketId, origin }: { ticketId: string; ori
 
 // The full thread: numbered messages, a reply composer while open, and the RM's
 // resolve controls. Read-only once resolved (also used for the Archive history).
-export function DisputeThread({ ticketId, dispute, messages, viewerRole, readOnly = false }: {
+export function DisputeThread({ ticketId, dispute, messages, viewerRole, readOnly = false, subject }: {
   ticketId: string; dispute: DisputeRecord; messages: DisputeMessage[]
   viewerRole: 'supplier' | 'regional_manager'; readOnly?: boolean
+  /** What the dispute is about (e.g. "Submission #2 · snag") — shown at the top. */
+  subject?: string | null
 }) {
   const isOpen = dispute.status === 'open' && !readOnly
   const isSnag = dispute.origin === 'snag'
 
   return (
     <div className="space-y-3">
+      {subject && (
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-faint)]">Regarding {subject}</p>
+      )}
       {dispute.status === 'resolved' && (
         <div className={`rounded-lg p-3 ring-1 ${dispute.outcome === 'withdrawn' ? 'bg-emerald-500/10 ring-emerald-500/30' : 'bg-amber-500/10 ring-amber-500/30'}`}>
           <p className={`text-[11px] font-bold uppercase tracking-wide ${dispute.outcome === 'withdrawn' ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}`}>
