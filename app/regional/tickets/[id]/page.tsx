@@ -910,11 +910,13 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         editedAt: t.edited_at, editedByName: editorName, editNote: t.edit_note, cancellationReason: t.cancellation_reason,
         infoRequestedAt: t.info_requested_at, infoAddedAt: t.info_added_at, infoRequestReason: t.info_request_reason,
         snagScheduledAt,
+        snagAcceptedAt: latestSnag?.assigned_at ?? null,
         snagProposedAt: latestSnag?.assigned_at ?? null, snagApprovedAt: latestSnag?.schedule_agreed_at ?? null,
         snagDeclinedAt: declinedSnag?.schedule_declined_at ?? null, snagDeclineReason: declinedSnag?.schedule_decline_reason ?? null,
         workStartedAt: t.attended_at ?? null,
         quotes: ((quotes ?? []) as any[]).map(q => ({ ...q, supplierName: nameById.get(q.supplier_id) ?? 'Supplier' })),
         variations: (variations ?? []) as any[],
+        disputes: disputes.map(d => ({ origin: d.origin, status: d.status, outcome: d.outcome, created_at: d.created_at, resolved_at: d.resolved_at, reason: d.resolution_note })),
         signoffs: allSignoffs, updates: (updates ?? []) as any[], views: (viewRows ?? []) as any[],
         supplierDeclines,
       }} />

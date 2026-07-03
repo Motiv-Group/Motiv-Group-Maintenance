@@ -49,6 +49,10 @@ export interface TimelineInput {
   snagApprovedAt?: string | null
   snagDeclinedAt?: string | null
   snagDeclineReason?: string | null
+  // When the supplier accepted the snag (took on the corrective work).
+  snagAcceptedAt?: string | null
+  // Snag / evidence disputes → "Dispute raised" + "Dispute resolved (outcome)" events.
+  disputes?: { origin: string; status: string; outcome?: string | null; created_at: string; resolved_at?: string | null; reason?: string | null }[]
   // When the RM asked this supplier to submit a revised quote (re-quote) → its own
   // "Revised quote requested" event, distinct from the decline that preceded it.
   requoteRequestedAt?: string | null
@@ -114,7 +118,9 @@ export function buildTicketTimeline(t: TimelineInput): TimelineEvent[] {
     push(at, 'Revised quote requested', 'quote_requested', 'Regional Manager')
   for (const d of t.supplierDeclines ?? []) push(d.at, `Quote request declined by ${d.name}`, 'quote_declined', 'Supplier')
   push(t.scheduledAt, 'Job scheduled', 'scheduled', 'Supplier')
-  // Snag-fix schedule lifecycle: proposed by the supplier → RM approves / declines.
+  // Snag lifecycle: the supplier accepts the snag, then proposes a fix date → RM
+  // approves / declines.
+  push(t.snagAcceptedAt, 'Snag accepted', 'scheduled', 'Supplier')
   push(t.snagProposedAt ?? t.snagScheduledAt, 'Snag fix proposed', 'scheduled', 'Supplier')
   push(t.snagApprovedAt, 'Snag schedule approved', 'scheduled', 'Regional Manager')
   push(t.snagDeclinedAt, `Snag schedule declined${t.snagDeclineReason ? ` — ${t.snagDeclineReason}` : ''}`, 'quote_declined', 'Regional Manager')
@@ -127,6 +133,17 @@ export function buildTicketTimeline(t: TimelineInput): TimelineEvent[] {
   }
   // The supplier marked the job in progress (after clearing the VO stage).
   push(t.workStartedAt, 'Marked job in progress', 'scheduled', 'Supplier')
+
+  // Dispute lifecycle: the supplier raises it (snag / evidence request), the RM
+  // resolves it as upheld (requirement stands) or withdrawn (dropped).
+  for (const d of t.disputes ?? []) {
+    const what = d.origin === 'snag' ? 'snag' : 'evidence request'
+    push(d.created_at, `Dispute raised — ${what}`, 'quote_declined', 'Supplier')
+    if (d.status === 'resolved') {
+      const verb = d.outcome === 'withdrawn' ? 'withdrawn' : 'upheld'
+      push(d.resolved_at ?? d.created_at, `Dispute resolved — ${what} ${verb}${d.reason ? ` — ${d.reason}` : ''}`, d.outcome === 'withdrawn' ? 'completion_approved' : 'info_requested', 'Regional Manager')
+    }
+  }
 
   // Each signoff row is one COC/POC submission: log the submission, then its
   // outcome (approved / snagged / sent back for more evidence) at review time.
