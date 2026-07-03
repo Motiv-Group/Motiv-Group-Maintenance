@@ -55,7 +55,10 @@ function Composer({ ticketId, action, submitLabel, placeholder, onDone }: { tick
       const res = await fetch(`/api/tickets/${ticketId}/dispute`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, body: text.trim() || null, evidenceUrls: urls }) })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed')
       setText(''); setFiles([]); onDone?.(); router.refresh()
-    } catch (e: any) { setErr(e.message); setBusy(false) }
+    } catch (e: any) { setErr(e.message) }
+    // Always clear the busy flag — router.refresh() keeps this client component
+    // mounted, so without this the button stays stuck on "Sending…" after success.
+    finally { setBusy(false) }
   }
 
   return (
@@ -179,7 +182,8 @@ function ResolvePanel({ ticketId, isSnag }: { ticketId: string; isSnag: boolean 
       const res = await fetch(`/api/tickets/${ticketId}/dispute`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'resolve', outcome: choice, note: note.trim() || null }) })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed')
       router.refresh()
-    } catch (e: any) { setErr(e.message); setBusy(false) }
+    } catch (e: any) { setErr(e.message) }
+    finally { setBusy(false) }
   }
 
   return (
