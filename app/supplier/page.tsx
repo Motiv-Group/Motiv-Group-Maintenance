@@ -62,7 +62,7 @@ function TicketRow({ t, company }: { t: SupplierTicketRow; company?: string }) {
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
         <PriorityBadge priority={t.priority} className="w-full text-center" />
-        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${sm.cls}`}>{sm.label}</span>
+        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${t.disputed ? 'bg-red-500/15 text-red-700 dark:text-red-400' : sm.cls}`}>{t.disputed ? 'Dispute' : sm.label}</span>
       </div>
     </Link>
   )
@@ -153,7 +153,7 @@ export default async function SupplierOverviewPage() {
               </div>
               <div className="flex flex-col items-end gap-1 shrink-0">
                 <PriorityBadge priority={t.priority} />
-                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${sm.cls}`}>{sm.label}</span>
+                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${t.disputed ? 'bg-red-500/15 text-red-700 dark:text-red-400' : sm.cls}`}>{t.disputed ? 'Dispute' : sm.label}</span>
               </div>
             </Link>
           ) })}

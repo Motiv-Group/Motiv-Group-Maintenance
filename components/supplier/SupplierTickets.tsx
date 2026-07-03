@@ -105,7 +105,7 @@ function TicketRow({ t, company, showStore }: { t: SupplierTicketRow; company?: 
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
         <PriorityBadge priority={t.priority} className="w-full text-center" />
-        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${t.declinedForMe ? 'bg-red-500/15 text-red-700 dark:text-red-400' : sm.cls}`}>{t.declinedForMe ? (t.declinedBy === 'supplier' ? 'Declined (you)' : t.declinedBy === 'regional_manager' ? 'Declined (Client)' : 'Declined') : sm.label}</span>
+        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${t.declinedForMe || t.disputed ? 'bg-red-500/15 text-red-700 dark:text-red-400' : sm.cls}`}>{t.disputed ? 'Dispute' : t.declinedForMe ? (t.declinedBy === 'supplier' ? 'Declined (you)' : t.declinedBy === 'regional_manager' ? 'Declined (Client)' : 'Declined') : sm.label}</span>
       </div>
     </Link>
   )

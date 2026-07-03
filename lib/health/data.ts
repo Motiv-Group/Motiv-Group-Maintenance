@@ -342,6 +342,8 @@ export interface RegionalTicketRow {
   breached: boolean; supplierBreached: boolean; internalBreached: boolean
   dueAt: string; overdue: boolean; infoAdded: boolean
   supplierAssigned: boolean
+  // An open supplier↔RM dispute (snag / evidence) — the badge reads "Dispute".
+  disputed: boolean
 }
 export interface RegionalDashboardData {
   portfolio: RegionalHealthResult
@@ -386,6 +388,9 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
   // Quote milestones per ticket: first quote received + when one was accepted.
   const ticketIds = tickets.map(t => t.id)
   const { data: quoteRows } = ticketIds.length ? await db.from('quotes').select('ticket_id, status, created_at, amount').in('ticket_id', ticketIds) : { data: [] as any[] }
+  // Tickets with an OPEN dispute → the badge reads "Dispute" everywhere.
+  const { data: openDisputeRows } = ticketIds.length ? await db.from('ticket_disputes').select('ticket_id').eq('status', 'open').in('ticket_id', ticketIds) : { data: [] as any[] }
+  const disputedIds = new Set<string>(((openDisputeRows ?? []) as any[]).map(d => d.ticket_id))
   const firstQuoteAt = new Map<string, string>(); const acceptedQuoteAt = new Map<string, string>()
   // Region-wide quote value totals (R) by status, for the RM "Quote Value" KPI.
   let acceptedQuoteValue = 0, pendingQuoteValue = 0
@@ -420,6 +425,7 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
       ...dueInfo(t, rules, now),
       infoAdded: t.status === 'open' && !!(t as any).info_request_reason,
       supplierAssigned: !!(t as any).supplier_id,
+      disputed: disputedIds.has(t.id),
       }
     })
 
@@ -590,6 +596,8 @@ export interface SupplierTicketRow {
   // Isolation: this supplier's OWN involvement, so the list never leaks another
   // supplier's progress (e.g. "Quoted" because someone else quoted).
   quotedByMe: boolean; awardedToMe: boolean
+  // An open dispute on their awarded job — the badge reads "Dispute".
+  disputed: boolean
 }
 export interface SupplierQuoteRow { id: string; ticketId: string; ticketTitle: string; ticketStatus: string; storeName: string; branchCode: string | null; amount: number; amountInclVat: number | null; status: string; createdAt: string }
 export interface SupplierSignoffRow { id: string; ticketId: string; ticketTitle: string; storeName: string; branchCode: string | null; status: string; createdAt: string }
@@ -666,6 +674,10 @@ export async function assembleSupplierDashboard(companyId: string, supplierIds: 
     const cur = firstQuoteAt.get(q.ticket_id)
     if (!cur || new Date(q.created_at) < new Date(cur)) firstQuoteAt.set(q.ticket_id, q.created_at)
   }
+  // Awarded jobs with an OPEN dispute → the badge reads "Dispute".
+  const ownedIdList = Array.from(ownedIds) as string[]
+  const { data: openDisputeRows } = ownedIdList.length ? await db.from('ticket_disputes').select('ticket_id').eq('status', 'open').in('ticket_id', ownedIdList) : { data: [] as any[] }
+  const disputedIds = new Set<string>(((openDisputeRows ?? []) as any[]).map(d => d.ticket_id))
 
   const todayEnd = new Date(now); todayEnd.setHours(23, 59, 59, 999)
   let open = 0, overdue = 0, dueToday = 0, pendingQuotes = 0, awaitingSignoff = 0, evidenceMissing = 0, scheduled = 0
@@ -714,6 +726,7 @@ export async function assembleSupplierDashboard(companyId: string, supplierIds: 
       declinedForMe,
       declinedBy: declinedForMe ? (declinedByOf.get(t.id) ?? null) : null,
       quotedByMe, awardedToMe,
+      disputed: awardedToMe && disputedIds.has(t.id),
     })
   }
   // Active first, then unacknowledged, then oldest — keeps the dashboard queues useful.
