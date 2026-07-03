@@ -20,6 +20,7 @@ import { SupplierAttachments } from '@/components/workflow/SupplierAttachments'
 import { SendQuoteForm } from '@/components/admin/SendQuoteForm'
 import { QuoteSummary, type QuoteSummaryStatus } from '@/components/workflow/QuoteSummary'
 import { MarkInProgressButton, DeclineWorkButton, AcceptSnagCard, StartSnagButton, SupplierVariationGate } from '@/components/supplier/SupplierJobActions'
+import { RaiseDisputeButton, DisputeThread } from '@/components/dispute/DisputeBox'
 import { DueDate } from '@/components/workflow/DueDate'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { EditedLine } from '@/components/ui/EditedLine'
@@ -139,7 +140,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   const admin = createAdminClient()
   const { data: t } = await admin.from('tickets').select('*').eq('id', params.id).single()
   if (!t || t.company_id !== companyId) redirect('/supplier/tickets')
-  const [{ data: store }, { data: updates }, { data: invite }, { data: myQuotes }, { data: technicianRows }, { data: signoffRows }, { data: snagRows }, { data: companyRow }, { data: variationRows }, { data: viewRows }, { data: declineRows }, { data: requoteRows }, { data: roundRows }] = await Promise.all([
+  const [{ data: store }, { data: updates }, { data: invite }, { data: myQuotes }, { data: technicianRows }, { data: signoffRows }, { data: snagRows }, { data: companyRow }, { data: variationRows }, { data: viewRows }, { data: declineRows }, { data: requoteRows }, { data: roundRows }, { data: disputeRows }, { data: disputeMsgRows }] = await Promise.all([
     admin.from('stores').select('name, sub_store').eq('id', t.store_id).single(),
     admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('ticket_suppliers').select('supplier_id, status, invited_at, decline_reason, responded_at, declined_by, requote_requested_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).maybeSingle(),
@@ -165,6 +166,9 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
     // Durable COC/POC review-round log — drives the "Submission #N" number + sent-back
     // reason on the archived round cards (falls back to the signoff row if unmigrated).
     admin.from('signoff_rounds').select('signoff_id, round_no, kind, reason').eq('ticket_id', t.id),
+    // Snag / evidence disputes on this ticket + their message threads (chronological).
+    admin.from('ticket_disputes').select('id, origin, status, outcome, resolution_note, created_at, resolved_at').eq('ticket_id', t.id).order('created_at', { ascending: true }),
+    admin.from('ticket_dispute_messages').select('id, dispute_id, author_role, body, evidence_urls, created_at').eq('ticket_id', t.id).order('created_at', { ascending: true }),
   ])
   // Client organisation that owns the store (shown in the ticket detail).
   const companyName = (companyRow as any)?.name ?? null
@@ -309,6 +313,14 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   // Decline the work — offered before award only (invite still invited/quoted).
   const canDecline = !awarded && !declinedForMe && !!invite && ['invited', 'quoted'].includes((invite as any).status)
 
+  // Snag / evidence disputes. While one is OPEN the snag/evidence step is paused;
+  // resolved ones live in the Archive. Messages are grouped by their dispute.
+  const disputes = (disputeRows ?? []) as any[]
+  const disputeMsgs = (disputeMsgRows ?? []) as any[]
+  const msgsByDispute = (id: string) => disputeMsgs.filter(m => m.dispute_id === id).map(m => ({ ...m, evidence_urls: Array.isArray(m.evidence_urls) ? m.evidence_urls : [] }))
+  const openDispute = disputes.find(d => d.status === 'open') ?? null
+  const resolvedDisputes = disputes.filter(d => d.status === 'resolved')
+
   return (
     <div className="space-y-5">
       <BackLink fallbackHref="/supplier/tickets" label="Back to tickets" />
@@ -417,7 +429,14 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
                   <p className="text-sm text-[var(--text-muted)]">Please propose a new date below.</p>
                 </div>
               )}
-              <AcceptSnagCard ticketId={t.id} priority={t.priority} createdAt={t.created_at} />
+              {openDispute ? (
+                <div className="rounded-xl bg-red-500/10 ring-1 ring-red-500/30 p-3.5 text-sm text-[var(--text-muted)]">This snag is paused while your dispute is under review — continue the conversation in the Dispute section above.</div>
+              ) : (
+                <>
+                  <AcceptSnagCard ticketId={t.id} priority={t.priority} createdAt={t.created_at} />
+                  <RaiseDisputeButton ticketId={t.id} origin="snag" />
+                </>
+              )}
             </div>
           )}
           {awarded && t.status === 'snag_assigned' && (
@@ -433,7 +452,14 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
                   <p className="text-sm text-[var(--text)]">{t.evidence_request_reason}</p>
                 </div>
               )}
-              <SubmitCompletionForm ticketId={t.id} evidenceRequested={t.status === 'evidence_requested'} requireBoth={t.status !== 'evidence_requested'} />
+              {t.status === 'evidence_requested' && openDispute ? (
+                <div className="rounded-xl bg-red-500/10 ring-1 ring-red-500/30 p-3.5 text-sm text-[var(--text-muted)]">The evidence request is paused while your dispute is under review — continue the conversation in the Dispute section above.</div>
+              ) : (
+                <>
+                  <SubmitCompletionForm ticketId={t.id} evidenceRequested={t.status === 'evidence_requested'} requireBoth={t.status !== 'evidence_requested'} />
+                  {t.status === 'evidence_requested' && <RaiseDisputeButton ticketId={t.id} origin="evidence" />}
+                </>
+              )}
             </div>
           )}
           {awarded && t.status === 'variation_review' && (
@@ -500,6 +526,14 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
         </CollapsibleSection>
       )}
 
+      {/* Dispute — an open dispute pauses the snag / evidence step. Both sides message
+          + attach evidence here until the manager resolves it. */}
+      {awarded && openDispute && (
+        <CollapsibleSection id="ticket-dispute" title="Dispute" defaultOpen>
+          <DisputeThread ticketId={t.id} dispute={openDispute} messages={msgsByDispute(openDispute.id)} viewerRole="supplier" />
+        </CollapsibleSection>
+      )}
+
       {/* COC & POC — the submission(s) currently under review. Sits ABOVE the Quotes
           block: it's the latest thing being worked on once the job reaches sign-off.
           Each card is collapsed by default (tap the row to reveal the detail). */}
@@ -548,7 +582,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
       {/* Archived — one block holding both this supplier's declined quotes (by the RM
           or themselves) and every time they declined the quote request. The request
           declines are durable (kept even after the RM re-assigns them). */}
-      {(declinedMyQuotes.length > 0 || ((declineRows ?? []) as any[]).length > 0 || archivedSuperseded.length > 0 || !!declinedSnag) && (
+      {(declinedMyQuotes.length > 0 || ((declineRows ?? []) as any[]).length > 0 || archivedSuperseded.length > 0 || !!declinedSnag || (awarded && resolvedDisputes.length > 0)) && (
         <CollapsibleSection id="ticket-archive" title="Archived" defaultOpen={declinedBy === 'supplier'}>
           {/* Quotes — this supplier's quotes declined by the RM (or withdrawn). Each is
               a click-to-expand row; the detail shows the RM's decline reason in red. */}
@@ -618,6 +652,26 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
                   </div>
                 </div>
               </details>
+            </ArchiveGroup>
+          )}
+          {/* Disputes — resolved snag / evidence disputes, kept read-only with their
+              full message + evidence history. */}
+          {awarded && resolvedDisputes.length > 0 && (
+            <ArchiveGroup label="Disputes">
+              {resolvedDisputes.map(d => (
+                <details key={d.id} className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
+                  <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-[var(--text)] truncate">Dispute — {d.origin === 'snag' ? 'snag' : 'evidence request'}</p>
+                      <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(d.resolved_at ?? d.created_at)}</p>
+                    </div>
+                    <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 shrink-0 ${d.outcome === 'withdrawn' ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' : 'bg-amber-500/15 text-amber-700 dark:text-amber-400'}`}>{d.outcome === 'withdrawn' ? 'Withdrawn' : 'Upheld'}</span>
+                  </summary>
+                  <div className="border-t border-[var(--border)] p-4">
+                    <DisputeThread ticketId={t.id} dispute={d} messages={msgsByDispute(d.id)} viewerRole="supplier" readOnly />
+                  </div>
+                </details>
+              ))}
             </ArchiveGroup>
           )}
         </CollapsibleSection>

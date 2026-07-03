@@ -22,6 +22,7 @@ import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { AuditTrail } from '@/components/ui/AuditTrail'
 import { CollapsibleSection } from '@/components/ui/CollapsibleSection'
 import { MarkTicketSeen } from '@/components/ui/MarkTicketSeen'
+import { DisputeThread } from '@/components/dispute/DisputeBox'
 import { formatCurrency, formatDateTime, formatDate, rmStatusMeta, storeLabel, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
 
 // Professional "what we're waiting on" copy while a snag works its way through.
@@ -236,7 +237,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   const storeName = store ? storeLabel(store.name, store.sub_store) : 'Store'
   const editorName = t.edited_by ? ((await admin.from('user_profiles').select('full_name').eq('id', t.edited_by).single()).data?.full_name ?? null) : null
   // Motiv-curated supplier pool (assign pop-up) + who has viewed this ticket's items.
-  const [{ data: motivSuppliers }, { data: viewRows }, { data: declineRows }, { data: requestRows }, { data: readRow }] = await Promise.all([
+  const [{ data: motivSuppliers }, { data: viewRows }, { data: declineRows }, { data: requestRows }, { data: readRow }, { data: disputeRows }, { data: disputeMsgRows }] = await Promise.all([
     admin.from('suppliers').select('id, company_name').eq('is_motiv', true).eq('active', true).order('company_name'),
     admin.from('ticket_views').select('viewer_role, item_type, item_label, first_viewed_at').eq('ticket_id', t.id),
     // Durable supplier request-declines — kept even after the supplier is re-invited.
@@ -246,6 +247,9 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
     admin.from('ticket_quote_requests').select('supplier_id, requested_at').eq('ticket_id', t.id).order('requested_at', { ascending: true }),
     // THIS RM's "last seen this ticket" watermark → which supplier updates are new.
     admin.from('ticket_reads').select('last_seen_at').eq('user_id', userId).eq('ticket_id', t.id).maybeSingle(),
+    // Snag / evidence disputes on this ticket + their message threads (chronological).
+    admin.from('ticket_disputes').select('id, origin, status, outcome, resolution_note, created_at, resolved_at').eq('ticket_id', t.id).order('created_at', { ascending: true }),
+    admin.from('ticket_dispute_messages').select('id, dispute_id, author_role, body, evidence_urls, created_at').eq('ticket_id', t.id).order('created_at', { ascending: true }),
   ])
   // Full COC/POC history — every submission, split by state (mirrors the supplier
   // view). Each sent-back card carries the reason it was rejected.
@@ -267,6 +271,14 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
     if (s.coc_url) priorEvidenceUrls.add(s.coc_url)
     if (s.invoice_url) priorEvidenceUrls.add(s.invoice_url)
   }
+
+  // Snag / evidence disputes. An OPEN one shows a live thread the RM resolves;
+  // resolved ones live in the Archive (read-only). Messages grouped by dispute.
+  const disputes = (disputeRows ?? []) as any[]
+  const disputeMsgs = (disputeMsgRows ?? []) as any[]
+  const msgsByDispute = (id: string) => disputeMsgs.filter(m => m.dispute_id === id).map(m => ({ ...m, evidence_urls: Array.isArray(m.evidence_urls) ? m.evidence_urls : [] }))
+  const openDispute = disputes.find(d => d.status === 'open') ?? null
+  const resolvedDisputes = disputes.filter(d => d.status === 'resolved')
   // Stable "Submission #N" numbers across live + archived, ordered by when each
   // COC/POC was submitted (oldest = #1). Shown in the card titles.
   const submissionNo = new Map<string, number>()
@@ -561,6 +573,14 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
 
       {breached && <BreachReason nextAction={sla.nextAction} dueAt={sla.nextActionDueAt} owner={breachOwner} />}
 
+      {/* Dispute — an open dispute pauses the supplier's snag / evidence step. The RM
+          reads the thread, replies with evidence, and resolves it (uphold / withdraw). */}
+      {openDispute && (
+        <CollapsibleSection id="ticket-dispute" title="Dispute" defaultOpen>
+          <DisputeThread ticketId={t.id} dispute={openDispute} messages={msgsByDispute(openDispute.id)} viewerRole="regional_manager" />
+        </CollapsibleSection>
+      )}
+
       {/* COC & POC — only the submission currently under review. Earlier submissions
           that were sent back (evidence / snag) live in the Archive as round cards. */}
       {pendingSignoffs.length > 0 && (
@@ -581,14 +601,14 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
 
         {snagAwaitingApproval && latestSnag?.scheduled_at && <AcceptSnagScheduleCard ticketId={t.id} scheduledAt={latestSnag.scheduled_at} />}
 
-        {SNAG_WAIT_MSG[t.status] && !snagAwaitingApproval && (
+        {SNAG_WAIT_MSG[t.status] && !snagAwaitingApproval && !openDispute && (
           <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 flex items-start gap-2.5">
             <Clock size={16} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
             <p className="text-sm text-[var(--text-muted)]">{SNAG_WAIT_MSG[t.status]}{latestSnag?.description ? ` Snag raised: “${latestSnag.description}”.` : ''} The full submission is in the Archive below.</p>
           </div>
         )}
 
-        {t.status === 'evidence_requested' && (
+        {t.status === 'evidence_requested' && !openDispute && (
           <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 flex items-start gap-2.5">
             <Clock size={16} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
             <p className="text-sm text-[var(--text-muted)]">Awaiting the supplier to provide the additional evidence requested on the completion (COC &amp; POC).{t.evidence_request_reason ? ` Requested: “${t.evidence_request_reason}”.` : ''}</p>
@@ -764,7 +784,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
       {/* Archive — declined / not-selected quotes (by the RM or the supplier) plus the
           suppliers auto-closed when the job was awarded, moved out of the main Quotes
           block. Each is a click-to-expand row with its reason. */}
-      {(archivedDeclinedQuotes.length > 0 || archivedRequestDeclines.length > 0 || closedWaitingRows.length > 0 || supersededSubmissions.length > 0 || !!declinedSnag) && (
+      {(archivedDeclinedQuotes.length > 0 || archivedRequestDeclines.length > 0 || closedWaitingRows.length > 0 || supersededSubmissions.length > 0 || !!declinedSnag || resolvedDisputes.length > 0) && (
         <CollapsibleSection id="ticket-quotes-archive" title="Archive">
           {/* Quotes — declined / not-selected quotes (by the RM or the supplier).
               Already re-invited or superseded, so no re-quote here; losing quoters
@@ -845,6 +865,26 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
                   </div>
                 </div>
               </details>
+            </ArchiveGroup>
+          )}
+          {/* Disputes — resolved snag / evidence disputes, kept read-only with their
+              full message + evidence history. */}
+          {resolvedDisputes.length > 0 && (
+            <ArchiveGroup label="Disputes">
+              {resolvedDisputes.map(d => (
+                <details key={d.id} className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
+                  <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-[var(--text)] truncate">Dispute — {d.origin === 'snag' ? 'snag' : 'evidence request'}</p>
+                      <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(d.resolved_at ?? d.created_at)}</p>
+                    </div>
+                    <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 shrink-0 ${d.outcome === 'withdrawn' ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' : 'bg-amber-500/15 text-amber-700 dark:text-amber-400'}`}>{d.outcome === 'withdrawn' ? 'Withdrawn' : 'Upheld'}</span>
+                  </summary>
+                  <div className="border-t border-[var(--border)] p-4">
+                    <DisputeThread ticketId={t.id} dispute={d} messages={msgsByDispute(d.id)} viewerRole="regional_manager" readOnly />
+                  </div>
+                </details>
+              ))}
             </ArchiveGroup>
           )}
         </CollapsibleSection>
