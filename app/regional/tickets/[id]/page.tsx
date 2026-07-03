@@ -91,7 +91,7 @@ function RmDeclinedQuoteCard({ q, ticketId, canReQuote, open = false }: { q: any
 // One COC/POC submission card — reused across the under-review, sent-back (snag)
 // and approved blocks so the RM sees the full submission history. A sent-back card
 // shows the reason it was returned (why another COC/POC was needed).
-function RmSignoffCard({ s, tone, ticketId, collapsible = false, defaultOpen = false, title, reason }: { s: any; tone: 'review' | 'snag' | 'approved' | 'evidence'; ticketId: string; collapsible?: boolean; defaultOpen?: boolean; title?: string; reason?: string | null }) {
+function RmSignoffCard({ s, tone, ticketId, collapsible = false, defaultOpen = false, title, reason, freshEvidence = false }: { s: any; tone: 'review' | 'snag' | 'approved' | 'evidence'; ticketId: string; collapsible?: boolean; defaultOpen?: boolean; title?: string; reason?: string | null; freshEvidence?: boolean }) {
   // Prefer the durable round reason; fall back to the reason stored on the signoff.
   const reasonText = reason ?? s.reject_reason
   const meta = tone === 'approved'
@@ -107,7 +107,10 @@ function RmSignoffCard({ s, tone, ticketId, collapsible = false, defaultOpen = f
   const header = (
     <>
       <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)] min-w-0"><meta.Icon size={15} className={`${meta.iconCls} shrink-0`} /><span className="truncate">{title ?? meta.title} · {formatDateTime(s.created_at)}</span></span>
-      <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 shrink-0 ${meta.badge}`}>{meta.label}</span>
+      <span className="flex items-center gap-1.5 shrink-0">
+        {freshEvidence && <span className="text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 bg-emerald-500/15 text-emerald-700 dark:text-emerald-400">New evidence</span>}
+        <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 ${meta.badge}`}>{meta.label}</span>
+      </span>
     </>
   )
   const body = (
@@ -124,11 +127,19 @@ function RmSignoffCard({ s, tone, ticketId, collapsible = false, defaultOpen = f
             <p className="text-sm text-[var(--text)]">{reasonText}</p>
           </div>
         )}
+        {/* Resubmission after a "more evidence" request — the new after photos, COC
+            and notes are highlighted in green so the RM can spot what's new. */}
+        {freshEvidence && (
+          <div className="rounded-lg bg-emerald-500/10 ring-1 ring-emerald-500/30 p-3">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">New evidence submitted</p>
+            <p className="text-sm text-[var(--text)]">The supplier uploaded the additional evidence you requested — the new after photos, COC and notes are shown in green below.</p>
+          </div>
+        )}
         <div>
           <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Proof of completion</div>
           <div className="flex flex-wrap gap-x-4 gap-y-1">
             {before.map((u, i) => <ViewTrackedLink key={`b${i}`} ticketId={ticketId} itemType="photo" itemLabel={`Before photo ${i + 1}`} href={u} className="text-sm text-[#C6A35D] underline hover:text-amber-500">Before {i + 1}</ViewTrackedLink>)}
-            {after.map((u, i) => <ViewTrackedLink key={`a${i}`} ticketId={ticketId} itemType="photo" itemLabel={`Completion photo ${i + 1}`} href={u} className="text-sm text-[#C6A35D] underline hover:text-amber-500">After {i + 1}</ViewTrackedLink>)}
+            {after.map((u, i) => <ViewTrackedLink key={`a${i}`} ticketId={ticketId} itemType="photo" itemLabel={`Completion photo ${i + 1}`} href={u} className={`text-sm underline ${freshEvidence ? 'text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 font-medium' : 'text-[#C6A35D] hover:text-amber-500'}`}>After {i + 1}</ViewTrackedLink>)}
             {!before.length && !after.length && <span className="text-sm text-[var(--text-faint)]">No photos</span>}
           </div>
         </div>
@@ -136,15 +147,15 @@ function RmSignoffCard({ s, tone, ticketId, collapsible = false, defaultOpen = f
           <div>
             <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Certificate of Completion</div>
             <div className="flex flex-wrap gap-x-4 gap-y-1">
-              {s.coc_url && <ViewTrackedLink ticketId={ticketId} itemType="coc" itemLabel="COC" href={s.coc_url} className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View COC</ViewTrackedLink>}
-              {s.invoice_url && <ViewTrackedLink ticketId={ticketId} itemType="invoice" itemLabel="Invoice" href={s.invoice_url} className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View invoice</ViewTrackedLink>}
+              {s.coc_url && <ViewTrackedLink ticketId={ticketId} itemType="coc" itemLabel="COC" href={s.coc_url} className={`inline-flex items-center gap-1.5 text-sm font-medium hover:underline ${freshEvidence ? 'text-emerald-600 dark:text-emerald-400' : 'text-[#C6A35D]'}`}><FileText size={14} /> View COC</ViewTrackedLink>}
+              {s.invoice_url && <ViewTrackedLink ticketId={ticketId} itemType="invoice" itemLabel="Invoice" href={s.invoice_url} className={`inline-flex items-center gap-1.5 text-sm font-medium hover:underline ${freshEvidence ? 'text-emerald-600 dark:text-emerald-400' : 'text-[#C6A35D]'}`}><FileText size={14} /> View invoice</ViewTrackedLink>}
             </div>
           </div>
         )}
         {s.notes && (
           <div>
             <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Notes</div>
-            <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{s.notes}</p>
+            <p className={`text-sm whitespace-pre-line ${freshEvidence ? 'text-emerald-700 dark:text-emerald-400 font-medium' : 'text-[var(--text-muted)]'}`}>{s.notes}</p>
           </div>
         )}
     </>
@@ -230,6 +241,9 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   // Submissions sent back for more evidence (not snagged) — kept in the history with
   // the reason the RM asked for more.
   const evidenceRequestedSignoffs = allSignoffs.filter(s => s.status === 'evidence_requested')
+  // A pending submission that follows an earlier "more evidence" request is the
+  // supplier's resubmission — flag it so the new COC/POC/notes highlight in green.
+  const isEvidenceResubmission = pendingSignoffs.length > 0 && evidenceRequestedSignoffs.length > 0
   // Stable "Submission #N" numbers across live + archived, ordered by when each
   // COC/POC was submitted (oldest = #1). Shown in the card titles.
   const submissionNo = new Map<string, number>()
@@ -528,7 +542,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
           that were sent back (evidence / snag) live in the Archive as round cards. */}
       {pendingSignoffs.length > 0 && (
         <CollapsibleSection id="ticket-coc" title="COC & POC" defaultOpen={phase === 'coc'}>
-          {pendingSignoffs.map((s: any) => <RmSignoffCard key={s.id} s={s} tone="review" ticketId={t.id} title={submissionLabel(s)} collapsible defaultOpen />)}
+          {pendingSignoffs.map((s: any) => <RmSignoffCard key={s.id} s={s} tone="review" ticketId={t.id} title={submissionLabel(s)} collapsible defaultOpen freshEvidence={isEvidenceResubmission} />)}
         </CollapsibleSection>
       )}
 
