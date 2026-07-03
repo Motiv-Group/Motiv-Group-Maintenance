@@ -57,7 +57,7 @@ export const STATUS_META: Record<TicketStatus, StatusMeta> = {
   submitted_for_signoff: { label: 'Pending Sign-off',      group: 'closeout',   tone: 'orange' },
   evidence_requested:    { label: 'Evidence Requested',    group: 'closeout',   tone: 'amber' },
   snag:                  { label: 'Snag Raised',           group: 'closeout',   tone: 'red' },
-  snag_assigned:         { label: 'Snag Accepted',         group: 'closeout',   tone: 'pink' },
+  snag_assigned:         { label: 'Snag Scheduled',        group: 'closeout',   tone: 'indigo' },
   snag_in_progress:      { label: 'Snag In Progress',      group: 'closeout',   tone: 'amber' },
   snag_resolved:         { label: 'Snag Resolved',         group: 'closeout',   tone: 'teal' },
   approved_closeout:     { label: 'Approved for Close-Out',group: 'closeout',   tone: 'green' },
