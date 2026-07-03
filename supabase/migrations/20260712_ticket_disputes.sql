@@ -13,8 +13,8 @@ create table if not exists public.ticket_disputes (
   origin          text not null,                       -- 'snag' | 'evidence_requested'
   status          text not null default 'open',        -- 'open' | 'resolved'
   outcome         text,                                -- 'upheld' | 'withdrawn' (set on resolve)
-  raised_by       uuid references public.profiles(id) on delete set null,
-  resolved_by     uuid references public.profiles(id) on delete set null,
+  raised_by       uuid references public.user_profiles(id) on delete set null,
+  resolved_by     uuid references public.user_profiles(id) on delete set null,
   resolution_note text,
   created_at      timestamptz not null default now(),
   resolved_at     timestamptz
@@ -25,7 +25,7 @@ create table if not exists public.ticket_dispute_messages (
   id            uuid primary key default uuid_generate_v4(),
   dispute_id    uuid not null references public.ticket_disputes(id) on delete cascade,
   ticket_id     uuid not null references public.tickets(id) on delete cascade,
-  author_id     uuid references public.profiles(id) on delete set null,
+  author_id     uuid references public.user_profiles(id) on delete set null,
   author_role   text not null,                          -- 'supplier' | 'regional_manager'
   body          text,
   evidence_urls jsonb not null default '[]'::jsonb,
