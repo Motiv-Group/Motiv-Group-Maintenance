@@ -454,12 +454,13 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
               <PriorityBadge priority={t.priority} className="w-full text-center" />
               {(() => {
                 const sm = rmStatusMeta(t.status)
-                // A ticket where every supplier declined is back at 'open' and simply
-                // reads "Open". "Info added" reads like an "Info requested" badge
-                // (amber); the fresh answer is highlighted red in the description until
-                // the RM acts.
-                const label = rmInfoAdded ? 'Info added' : sm.label
-                const cls = rmInfoAdded ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : sm.cls
+                // An open dispute overrides the badge with "Dispute" (the snag/evidence
+                // step is paused). Otherwise: a ticket where every supplier declined is
+                // back at 'open' and reads "New"; "Info added" reads like an "Info
+                // requested" badge (amber); the fresh answer is highlighted red in the
+                // description until the RM acts.
+                const label = openDispute ? 'Dispute' : rmInfoAdded ? 'Info added' : sm.label
+                const cls = openDispute ? 'bg-red-500/15 text-red-700 dark:text-red-400' : rmInfoAdded ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : sm.cls
                 return <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${cls}`}>{label}</span>
               })()}
             </div>
