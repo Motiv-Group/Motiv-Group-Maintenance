@@ -34,32 +34,9 @@ create table if not exists public.ticket_dispute_messages (
 create index if not exists tdm_dispute_idx on public.ticket_dispute_messages (dispute_id);
 create index if not exists tdm_ticket_idx  on public.ticket_dispute_messages (ticket_id);
 
+-- RLS is enabled with no policies: every read/write for these tables goes through
+-- the service-role dispute API + server pages (createAdminClient bypasses RLS), so
+-- no user-client access is granted. This matches how the app touches them and avoids
+-- depending on the get_my_role() helper (absent in some environments).
 alter table public.ticket_disputes         enable row level security;
 alter table public.ticket_dispute_messages enable row level security;
-
--- Reads mirror ticket_evidence: executives/suppliers, plus the store manager who
--- logged the ticket and the RM of the ticket's region. All writes go through the
--- service-role dispute API, so no write policies are needed here.
-drop policy if exists "Ticket-scoped read disputes" on public.ticket_disputes;
-create policy "Ticket-scoped read disputes" on public.ticket_disputes for select
-  using (
-    public.get_my_role() in ('executive','supplier')
-    or exists (
-      select 1 from public.tickets t
-      where t.id = ticket_disputes.ticket_id
-        and (t.client_id = auth.uid()
-             or t.region_id in (select id from public.regions where regional_manager_id = auth.uid()))
-    )
-  );
-
-drop policy if exists "Ticket-scoped read dispute messages" on public.ticket_dispute_messages;
-create policy "Ticket-scoped read dispute messages" on public.ticket_dispute_messages for select
-  using (
-    public.get_my_role() in ('executive','supplier')
-    or exists (
-      select 1 from public.tickets t
-      where t.id = ticket_dispute_messages.ticket_id
-        and (t.client_id = auth.uid()
-             or t.region_id in (select id from public.regions where regional_manager_id = auth.uid()))
-    )
-  );
