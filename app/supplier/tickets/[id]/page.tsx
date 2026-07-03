@@ -404,6 +404,14 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
 
       {!declinedForMe && breached && <BreachReason nextAction={sla.nextAction} dueAt={sla.nextActionDueAt} owner="Supplier" />}
 
+      {/* Dispute — sits above Next step: an open dispute pauses the snag / evidence
+          step. Both sides message + attach evidence here until the manager resolves it. */}
+      {awarded && openDispute && (
+        <CollapsibleSection id="ticket-dispute" title="Dispute" defaultOpen>
+          <DisputeThread ticketId={t.id} dispute={openDispute} messages={msgsByDispute(openDispute.id)} viewerRole="supplier" />
+        </CollapsibleSection>
+      )}
+
       {/* Off the ticket → no "Next step", just why this quote request was declined. */}
       {declinedForMe ? (
         <div className="rounded-2xl bg-red-500/10 ring-1 ring-red-500/40 p-5 space-y-1">
@@ -531,14 +539,6 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
               </div>
             )
           })}
-        </CollapsibleSection>
-      )}
-
-      {/* Dispute — an open dispute pauses the snag / evidence step. Both sides message
-          + attach evidence here until the manager resolves it. */}
-      {awarded && openDispute && (
-        <CollapsibleSection id="ticket-dispute" title="Dispute" defaultOpen>
-          <DisputeThread ticketId={t.id} dispute={openDispute} messages={msgsByDispute(openDispute.id)} viewerRole="supplier" />
         </CollapsibleSection>
       )}
 
