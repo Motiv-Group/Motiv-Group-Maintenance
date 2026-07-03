@@ -91,7 +91,10 @@ function RmDeclinedQuoteCard({ q, ticketId, canReQuote, open = false }: { q: any
 // One COC/POC submission card — reused across the under-review, sent-back (snag)
 // and approved blocks so the RM sees the full submission history. A sent-back card
 // shows the reason it was returned (why another COC/POC was needed).
-function RmSignoffCard({ s, tone, ticketId, collapsible = false, defaultOpen = false, title, reason, freshEvidence = false }: { s: any; tone: 'review' | 'snag' | 'approved' | 'evidence'; ticketId: string; collapsible?: boolean; defaultOpen?: boolean; title?: string; reason?: string | null; freshEvidence?: boolean }) {
+function RmSignoffCard({ s, tone, ticketId, collapsible = false, defaultOpen = false, title, reason, freshEvidence = false, priorUrls }: { s: any; tone: 'review' | 'snag' | 'approved' | 'evidence'; ticketId: string; collapsible?: boolean; defaultOpen?: boolean; title?: string; reason?: string | null; freshEvidence?: boolean; priorUrls?: Set<string> }) {
+  // On a resubmission the signoff's after_urls carry over the previous round's
+  // photos, so only URLs NOT seen in an earlier round count as "new" (green).
+  const isNew = (u?: string | null): boolean => freshEvidence && !!u && !(priorUrls?.has(u) ?? false)
   // Prefer the durable round reason; fall back to the reason stored on the signoff.
   const reasonText = reason ?? s.reject_reason
   const meta = tone === 'approved'
@@ -139,7 +142,7 @@ function RmSignoffCard({ s, tone, ticketId, collapsible = false, defaultOpen = f
           <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Proof of completion</div>
           <div className="flex flex-wrap gap-x-4 gap-y-1">
             {before.map((u, i) => <ViewTrackedLink key={`b${i}`} ticketId={ticketId} itemType="photo" itemLabel={`Before photo ${i + 1}`} href={u} className="text-sm text-[#C6A35D] underline hover:text-amber-500">Before {i + 1}</ViewTrackedLink>)}
-            {after.map((u, i) => <ViewTrackedLink key={`a${i}`} ticketId={ticketId} itemType="photo" itemLabel={`Completion photo ${i + 1}`} href={u} className={`text-sm underline ${freshEvidence ? 'text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 font-medium' : 'text-[#C6A35D] hover:text-amber-500'}`}>After {i + 1}</ViewTrackedLink>)}
+            {after.map((u, i) => <ViewTrackedLink key={`a${i}`} ticketId={ticketId} itemType="photo" itemLabel={`Completion photo ${i + 1}`} href={u} className={`text-sm underline ${isNew(u) ? 'text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 font-medium' : 'text-[#C6A35D] hover:text-amber-500'}`}>After {i + 1}</ViewTrackedLink>)}
             {!before.length && !after.length && <span className="text-sm text-[var(--text-faint)]">No photos</span>}
           </div>
         </div>
@@ -147,8 +150,8 @@ function RmSignoffCard({ s, tone, ticketId, collapsible = false, defaultOpen = f
           <div>
             <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Certificate of Completion</div>
             <div className="flex flex-wrap gap-x-4 gap-y-1">
-              {s.coc_url && <ViewTrackedLink ticketId={ticketId} itemType="coc" itemLabel="COC" href={s.coc_url} className={`inline-flex items-center gap-1.5 text-sm font-medium hover:underline ${freshEvidence ? 'text-emerald-600 dark:text-emerald-400' : 'text-[#C6A35D]'}`}><FileText size={14} /> View COC</ViewTrackedLink>}
-              {s.invoice_url && <ViewTrackedLink ticketId={ticketId} itemType="invoice" itemLabel="Invoice" href={s.invoice_url} className={`inline-flex items-center gap-1.5 text-sm font-medium hover:underline ${freshEvidence ? 'text-emerald-600 dark:text-emerald-400' : 'text-[#C6A35D]'}`}><FileText size={14} /> View invoice</ViewTrackedLink>}
+              {s.coc_url && <ViewTrackedLink ticketId={ticketId} itemType="coc" itemLabel="COC" href={s.coc_url} className={`inline-flex items-center gap-1.5 text-sm font-medium hover:underline ${isNew(s.coc_url) ? 'text-emerald-600 dark:text-emerald-400' : 'text-[#C6A35D]'}`}><FileText size={14} /> View COC</ViewTrackedLink>}
+              {s.invoice_url && <ViewTrackedLink ticketId={ticketId} itemType="invoice" itemLabel="Invoice" href={s.invoice_url} className={`inline-flex items-center gap-1.5 text-sm font-medium hover:underline ${isNew(s.invoice_url) ? 'text-emerald-600 dark:text-emerald-400' : 'text-[#C6A35D]'}`}><FileText size={14} /> View invoice</ViewTrackedLink>}
             </div>
           </div>
         )}
@@ -256,6 +259,14 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   // A pending submission that follows an earlier "more evidence" request is the
   // supplier's resubmission — flag it so the new COC/POC/notes highlight in green.
   const isEvidenceResubmission = pendingSignoffs.length > 0 && evidenceRequestedSignoffs.length > 0
+  // URLs already submitted in an earlier (superseded) round. after_urls accumulate
+  // across rounds, so these are subtracted to green ONLY the newly added evidence.
+  const priorEvidenceUrls = new Set<string>()
+  for (const s of [...evidenceRequestedSignoffs, ...rejectedSignoffs]) {
+    for (const u of ((s.after_urls ?? []) as string[])) priorEvidenceUrls.add(u)
+    if (s.coc_url) priorEvidenceUrls.add(s.coc_url)
+    if (s.invoice_url) priorEvidenceUrls.add(s.invoice_url)
+  }
   // Stable "Submission #N" numbers across live + archived, ordered by when each
   // COC/POC was submitted (oldest = #1). Shown in the card titles.
   const submissionNo = new Map<string, number>()
@@ -554,7 +565,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
           that were sent back (evidence / snag) live in the Archive as round cards. */}
       {pendingSignoffs.length > 0 && (
         <CollapsibleSection id="ticket-coc" title="COC & POC" defaultOpen={phase === 'coc'}>
-          {pendingSignoffs.map((s: any) => <RmSignoffCard key={s.id} s={s} tone="review" ticketId={t.id} title={submissionLabel(s)} collapsible defaultOpen freshEvidence={isEvidenceResubmission} />)}
+          {pendingSignoffs.map((s: any) => <RmSignoffCard key={s.id} s={s} tone="review" ticketId={t.id} title={submissionLabel(s)} collapsible defaultOpen freshEvidence={isEvidenceResubmission} priorUrls={priorEvidenceUrls} />)}
         </CollapsibleSection>
       )}
 
