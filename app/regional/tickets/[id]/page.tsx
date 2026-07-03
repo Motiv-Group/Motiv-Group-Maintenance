@@ -574,11 +574,27 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
 
       {breached && <BreachReason nextAction={sla.nextAction} dueAt={sla.nextActionDueAt} owner={breachOwner} />}
 
-      {/* Dispute — an open dispute pauses the supplier's snag / evidence step. The RM
-          reads the thread, replies with evidence, and resolves it (uphold / withdraw). */}
-      {openDispute && (
-        <CollapsibleSection id="ticket-dispute" title="Dispute" defaultOpen>
-          <DisputeThread ticketId={t.id} dispute={openDispute} messages={msgsByDispute(openDispute.id)} viewerRole="regional_manager" />
+      {/* Dispute — the full dispute history for this ticket. An open dispute (live
+          thread the RM resolves) sits at the top and pauses the supplier's snag /
+          evidence step; resolved ones are kept read-only below with their outcome +
+          message/evidence history. Opens by default only while a dispute is live. */}
+      {disputes.length > 0 && (
+        <CollapsibleSection id="ticket-dispute" title="Dispute" defaultOpen={!!openDispute}>
+          {openDispute && <DisputeThread ticketId={t.id} dispute={openDispute} messages={msgsByDispute(openDispute.id)} viewerRole="regional_manager" />}
+          {resolvedDisputes.map(d => (
+            <details key={d.id} className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
+              <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-[var(--text)] truncate">Dispute — {d.origin === 'snag' ? 'snag' : 'evidence request'}</p>
+                  <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(d.resolved_at ?? d.created_at)}</p>
+                </div>
+                <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 shrink-0 ${d.outcome === 'withdrawn' ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' : 'bg-amber-500/15 text-amber-700 dark:text-amber-400'}`}>{d.outcome === 'withdrawn' ? 'Withdrawn' : 'Upheld'}</span>
+              </summary>
+              <div className="border-t border-[var(--border)] p-4">
+                <DisputeThread ticketId={t.id} dispute={d} messages={msgsByDispute(d.id)} viewerRole="regional_manager" readOnly />
+              </div>
+            </details>
+          ))}
         </CollapsibleSection>
       )}
 
@@ -785,7 +801,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
       {/* Archive — declined / not-selected quotes (by the RM or the supplier) plus the
           suppliers auto-closed when the job was awarded, moved out of the main Quotes
           block. Each is a click-to-expand row with its reason. */}
-      {(archivedDeclinedQuotes.length > 0 || archivedRequestDeclines.length > 0 || closedWaitingRows.length > 0 || supersededSubmissions.length > 0 || !!declinedSnag || resolvedDisputes.length > 0) && (
+      {(archivedDeclinedQuotes.length > 0 || archivedRequestDeclines.length > 0 || closedWaitingRows.length > 0 || supersededSubmissions.length > 0 || !!declinedSnag) && (
         <CollapsibleSection id="ticket-quotes-archive" title="Archive">
           {/* Quotes — declined / not-selected quotes (by the RM or the supplier).
               Already re-invited or superseded, so no re-quote here; losing quoters
@@ -866,26 +882,6 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
                   </div>
                 </div>
               </details>
-            </ArchiveGroup>
-          )}
-          {/* Disputes — resolved snag / evidence disputes, kept read-only with their
-              full message + evidence history. */}
-          {resolvedDisputes.length > 0 && (
-            <ArchiveGroup label="Disputes">
-              {resolvedDisputes.map(d => (
-                <details key={d.id} className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
-                  <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-[var(--text)] truncate">Dispute — {d.origin === 'snag' ? 'snag' : 'evidence request'}</p>
-                      <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(d.resolved_at ?? d.created_at)}</p>
-                    </div>
-                    <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 shrink-0 ${d.outcome === 'withdrawn' ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' : 'bg-amber-500/15 text-amber-700 dark:text-amber-400'}`}>{d.outcome === 'withdrawn' ? 'Withdrawn' : 'Upheld'}</span>
-                  </summary>
-                  <div className="border-t border-[var(--border)] p-4">
-                    <DisputeThread ticketId={t.id} dispute={d} messages={msgsByDispute(d.id)} viewerRole="regional_manager" readOnly />
-                  </div>
-                </details>
-              ))}
             </ArchiveGroup>
           )}
         </CollapsibleSection>
