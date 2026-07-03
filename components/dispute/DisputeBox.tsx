@@ -94,7 +94,7 @@ export function RaiseDisputeButton({ ticketId, origin }: { ticketId: string; ori
   const [open, setOpen] = useState(false)
   return (
     <>
-      <button onClick={() => setOpen(true)} className="w-full py-2.5 rounded-xl ring-1 ring-red-500/40 text-red-600 dark:text-red-400 text-sm font-semibold hover:bg-red-500/10 transition flex items-center justify-center gap-1.5">
+      <button onClick={() => setOpen(true)} className="w-full py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-semibold transition flex items-center justify-center gap-1.5">
         <MessageSquareWarning size={15} /> Raise dispute
       </button>
       {open && (

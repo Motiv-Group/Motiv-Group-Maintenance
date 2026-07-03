@@ -27,6 +27,13 @@ async function pendingSignoffId(admin: Admin, ticketId: string): Promise<string 
   return (data as any)?.id ?? null
 }
 
+// Durable snag-fix schedule event — keeps EVERY round (proposed / approved / declined)
+// for the audit trail, since the snag row only holds the latest state. Best-effort:
+// a supabase error (e.g. table not migrated yet) never blocks the transition.
+async function logSnagScheduleEvent(admin: Admin, ticket: any, kind: 'proposed' | 'approved' | 'declined', actorRole: string, opts: { scheduledFor?: string | null; reason?: string | null } = {}) {
+  await admin.from('snag_schedule_events').insert({ company_id: ticket.company_id, ticket_id: ticket.id, kind, actor_role: actorRole, scheduled_for: opts.scheduledFor ?? null, reason: opts.reason ?? null })
+}
+
 // POST /api/tickets/:id/transition  { action, ...payload }
 // Single entry point for every lifecycle move. Validates the transition against
 // lib/workflow (status + role), applies the status change + side effects, and
@@ -225,6 +232,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
         if (when.getTime() < Date.now() - 5 * 60_000) return NextResponse.json({ error: 'Cannot schedule in the past.' }, { status: 400 })
         snagFixAt = when.toISOString()
         await admin.from('snags').update({ status: 'assigned', assigned_at: now, supplier_id: ticket.supplier_id, scheduled_at: snagFixAt, schedule_status: 'proposed' }).eq('ticket_id', ticketId).in('status', ['open'])
+        // Durable "proposed" event (keeps every round for the audit trail).
+        await logSnagScheduleEvent(admin, ticket, 'proposed', 'supplier', { scheduledFor: snagFixAt })
         break
       }
       case 'approve_snag':
@@ -232,6 +241,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
         await admin.from('snags').update({ schedule_status: 'agreed' }).eq('ticket_id', ticketId).eq('schedule_status', 'proposed')
         // Stamp the approval time for the audit trail (best-effort — never blocks approval).
         await admin.from('snags').update({ schedule_agreed_at: now }).eq('ticket_id', ticketId).eq('schedule_status', 'agreed')
+        await logSnagScheduleEvent(admin, ticket, 'approved', 'regional_manager')
         break
       case 'decline_snag_schedule':
         // RM rejects the proposed snag-fix date → send it back so the supplier proposes
@@ -241,6 +251,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
         // Persist the reason + time (best-effort, separate update) so it shows on the
         // ticket + audit trail, not only in the notification — never blocks the reset.
         await admin.from('snags').update({ schedule_decline_reason: body.reason ?? null, schedule_declined_at: now }).eq('ticket_id', ticketId).eq('status', 'open')
+        await logSnagScheduleEvent(admin, ticket, 'declined', 'regional_manager', { reason: body.reason ?? null })
         break
       case 'start_snag': {
         // Only after the RM has approved the proposed snag-fix date.

@@ -49,6 +49,10 @@ export interface TimelineInput {
   snagApprovedAt?: string | null
   snagDeclinedAt?: string | null
   snagDeclineReason?: string | null
+  // Durable per-round snag-fix schedule log → one event per proposal / approval /
+  // decline, so the trail keeps EVERY round. Overrides the single fields above when
+  // present (they remain the fallback for tickets predating the log).
+  snagScheduleEvents?: { kind: string; scheduled_for?: string | null; reason?: string | null; created_at: string }[]
   // When the supplier accepted the snag (took on the corrective work).
   snagAcceptedAt?: string | null
   // Snag / evidence disputes → "Dispute raised" + "Dispute resolved (outcome)" events.
@@ -119,11 +123,21 @@ export function buildTicketTimeline(t: TimelineInput): TimelineEvent[] {
   for (const d of t.supplierDeclines ?? []) push(d.at, `Quote request declined by ${d.name}`, 'quote_declined', 'Supplier')
   push(t.scheduledAt, 'Job scheduled', 'scheduled', 'Supplier')
   // Snag lifecycle: the supplier accepts the snag, then proposes a fix date → RM
-  // approves / declines.
+  // approves / declines. The durable log keeps every round; without it, fall back to
+  // the single latest-round fields.
   push(t.snagAcceptedAt, 'Snag accepted', 'scheduled', 'Supplier')
-  push(t.snagProposedAt ?? t.snagScheduledAt, 'Snag fix proposed', 'scheduled', 'Supplier')
-  push(t.snagApprovedAt, 'Snag schedule approved', 'scheduled', 'Regional Manager')
-  push(t.snagDeclinedAt, `Snag schedule declined${t.snagDeclineReason ? ` — ${t.snagDeclineReason}` : ''}`, 'quote_declined', 'Regional Manager')
+  const snagEvents = t.snagScheduleEvents ?? []
+  if (snagEvents.length) {
+    for (const e of snagEvents) {
+      if (e.kind === 'proposed') push(e.created_at, 'Snag fix proposed', 'scheduled', 'Supplier')
+      else if (e.kind === 'approved') push(e.created_at, 'Snag schedule approved', 'scheduled', 'Regional Manager')
+      else if (e.kind === 'declined') push(e.created_at, `Snag schedule declined${e.reason ? ` — ${e.reason}` : ''}`, 'quote_declined', 'Regional Manager')
+    }
+  } else {
+    push(t.snagProposedAt ?? t.snagScheduledAt, 'Snag fix proposed', 'scheduled', 'Supplier')
+    push(t.snagApprovedAt, 'Snag schedule approved', 'scheduled', 'Regional Manager')
+    push(t.snagDeclinedAt, `Snag schedule declined${t.snagDeclineReason ? ` — ${t.snagDeclineReason}` : ''}`, 'quote_declined', 'Regional Manager')
+  }
 
   // Variation-order lifecycle: raised by the supplier, then the RM's decision.
   for (const v of t.variations ?? []) {
