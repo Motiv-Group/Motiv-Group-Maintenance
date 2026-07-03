@@ -281,6 +281,28 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   const msgsByDispute = (id: string) => disputeMsgs.filter(m => m.dispute_id === id).map(m => ({ ...m, evidence_urls: Array.isArray(m.evidence_urls) ? m.evidence_urls : [] }))
   const openDispute = disputes.find(d => d.status === 'open') ?? null
   const resolvedDisputes = disputes.filter(d => d.status === 'resolved')
+  // The Dispute block (open live thread + resolved read-only history). Rendered ABOVE
+  // the Actions while a dispute is live (needs the RM's attention), then moved BELOW
+  // the Actions once it's done (history).
+  const disputeBlock = disputes.length > 0 ? (
+    <CollapsibleSection id="ticket-dispute" title="Dispute" defaultOpen={!!openDispute}>
+      {openDispute && <DisputeThread ticketId={t.id} dispute={openDispute} messages={msgsByDispute(openDispute.id)} viewerRole="regional_manager" />}
+      {resolvedDisputes.map(d => (
+        <details key={d.id} className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
+          <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-[var(--text)] truncate">Dispute — {d.origin === 'snag' ? 'snag' : 'evidence request'}</p>
+              <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(d.resolved_at ?? d.created_at)}</p>
+            </div>
+            <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 shrink-0 ${d.outcome === 'withdrawn' ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' : 'bg-amber-500/15 text-amber-700 dark:text-amber-400'}`}>{d.outcome === 'withdrawn' ? 'Withdrawn' : 'Upheld'}</span>
+          </summary>
+          <div className="border-t border-[var(--border)] p-4">
+            <DisputeThread ticketId={t.id} dispute={d} messages={msgsByDispute(d.id)} viewerRole="regional_manager" readOnly />
+          </div>
+        </details>
+      ))}
+    </CollapsibleSection>
+  ) : null
   // Stable "Submission #N" numbers across live + archived, ordered by when each
   // COC/POC was submitted (oldest = #1). Shown in the card titles.
   const submissionNo = new Map<string, number>()
@@ -576,29 +598,10 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
 
       {breached && <BreachReason nextAction={sla.nextAction} dueAt={sla.nextActionDueAt} owner={breachOwner} />}
 
-      {/* Dispute — the full dispute history for this ticket. An open dispute (live
-          thread the RM resolves) sits at the top and pauses the supplier's snag /
-          evidence step; resolved ones are kept read-only below with their outcome +
-          message/evidence history. Opens by default only while a dispute is live. */}
-      {disputes.length > 0 && (
-        <CollapsibleSection id="ticket-dispute" title="Dispute" defaultOpen={!!openDispute}>
-          {openDispute && <DisputeThread ticketId={t.id} dispute={openDispute} messages={msgsByDispute(openDispute.id)} viewerRole="regional_manager" />}
-          {resolvedDisputes.map(d => (
-            <details key={d.id} className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
-              <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-[var(--text)] truncate">Dispute — {d.origin === 'snag' ? 'snag' : 'evidence request'}</p>
-                  <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(d.resolved_at ?? d.created_at)}</p>
-                </div>
-                <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 shrink-0 ${d.outcome === 'withdrawn' ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' : 'bg-amber-500/15 text-amber-700 dark:text-amber-400'}`}>{d.outcome === 'withdrawn' ? 'Withdrawn' : 'Upheld'}</span>
-              </summary>
-              <div className="border-t border-[var(--border)] p-4">
-                <DisputeThread ticketId={t.id} dispute={d} messages={msgsByDispute(d.id)} viewerRole="regional_manager" readOnly />
-              </div>
-            </details>
-          ))}
-        </CollapsibleSection>
-      )}
+      {/* Dispute — while a dispute is live it sits ABOVE the Actions (needs the RM's
+          attention); once done it moves below the Actions as history (see after the
+          Actions card). */}
+      {openDispute && disputeBlock}
 
       {/* COC & POC — only the submission currently under review. Earlier submissions
           that were sent back (evidence / snag) live in the Archive as round cards. */}
@@ -620,7 +623,9 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
 
         {snagAwaitingApproval && latestSnag?.scheduled_at && <AcceptSnagScheduleCard ticketId={t.id} scheduledAt={latestSnag.scheduled_at} />}
 
-        {SNAG_WAIT_MSG[t.status] && !snagAwaitingApproval && !openDispute && (
+        {/* The "snag schedule is approved" copy must only show once the RM has actually
+            approved it (schedule_status 'agreed') — not while it's still proposed. */}
+        {SNAG_WAIT_MSG[t.status] && !snagAwaitingApproval && !openDispute && (t.status !== 'snag_assigned' || latestSnag?.schedule_status === 'agreed') && (
           <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 flex items-start gap-2.5">
             <Clock size={16} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
             <p className="text-sm text-[var(--text-muted)]">{SNAG_WAIT_MSG[t.status]}{latestSnag?.description ? ` Snag raised: “${latestSnag.description}”.` : ''} The full submission is in the Archive below.</p>
@@ -704,6 +709,9 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
           exclude={['validate', 'reject', 'request_info', 'request_quote', 'require_assessment', 'approve_quote', 'reject_quote', 'request_revision', 'proceed_no_quote', 'schedule', 'approve', 'assign_snag', 'accept_schedule', 'approve_snag', 'decline_snag_schedule', 'approve_variation', 'reject_variation', 'request_evidence', 'raise_snag']}
         />
       </Card>
+
+      {/* Resolved dispute(s) → history below the Actions once nothing is live. */}
+      {!openDispute && disputeBlock}
 
       {/* Quotes — suppliers requested, quotes to review, the accepted quote. Open
           during quoting / before work; collapsed once the job is in progress. */}
