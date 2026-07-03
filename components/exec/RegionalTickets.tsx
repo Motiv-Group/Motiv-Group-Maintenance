@@ -11,7 +11,7 @@ import { Card } from '@/components/exec/ui'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { SlideOver } from '@/components/ui/SlideOver'
 import { readCollapse, writeCollapse, readCollapseSet, writeCollapseSet } from '@/lib/collapse-state'
-import { rmStatusMeta, formatDateTime, humanizeDuration } from '@/lib/utils'
+import { rmStatusMeta, formatDateTime, humanizeDuration, urgencyCountCls } from '@/lib/utils'
 
 type Bucket = 'open' | 'quote_requested' | 'quoted' | 'approved' | 'scheduled' | 'in_progress' | 'awaiting_signoff' | 'completed' | 'cancelled'
 // A ticket counts as "Open" only while it's still open/info-requested AND has no
@@ -27,7 +27,7 @@ function bucketOf(s: string, supplierAssigned = false): Bucket {
   if (s === 'completed') return 'completed'
   return 'cancelled'
 }
-const BUCKET_LABEL: Record<Bucket, string> = { open: 'Open', quote_requested: 'Quote requested', quoted: 'Quoted', approved: 'Approved', scheduled: 'Job scheduled', in_progress: 'In progress', awaiting_signoff: 'Sign-off', completed: 'Completed', cancelled: 'Cancelled' }
+const BUCKET_LABEL: Record<Bucket, string> = { open: 'New', quote_requested: 'Quote requested', quoted: 'Quoted', approved: 'Approved', scheduled: 'Job scheduled', in_progress: 'In progress', awaiting_signoff: 'Sign-off', completed: 'Completed', cancelled: 'Cancelled' }
 const BUCKET_BAR: Record<Bucket, string> = { open: 'bg-blue-500', quote_requested: 'bg-cyan-500', quoted: 'bg-violet-500', approved: 'bg-teal-500', scheduled: 'bg-indigo-500', in_progress: 'bg-[#C6A35D]', awaiting_signoff: 'bg-orange-500', completed: 'bg-emerald-500', cancelled: 'bg-red-500' }
 const BAR_ORDER: Bucket[] = ['open', 'quote_requested', 'quoted', 'approved', 'scheduled', 'in_progress', 'awaiting_signoff', 'completed']
 
@@ -37,14 +37,11 @@ const urgency = (p: string) => URGENCY[p] ?? 5
 const byDateThenUrgency = (a: RegionalTicketRow, b: RegionalTicketRow) =>
   (+new Date(b.createdAt) - +new Date(a.createdAt)) || (urgency(a.priority) - urgency(b.priority))
 
-// Tint a store group's count badge by its most urgent active ticket — red for an
-// urgent (P1) ticket, orange for a high (P2) one — so pressing stores stand out.
-// Cancelled tickets don't count. Falls back to the neutral grey badge.
+// Tint a store group's count badge by its most urgent active ticket (cancelled
+// tickets don't count) — shared with the SM/supplier tabs via urgencyCountCls.
 function groupCountCls(rows: RegionalTicketRow[]): string {
   const active = rows.filter(t => bucketOf(t.status, t.supplierAssigned) !== 'cancelled')
-  if (active.some(t => urgency(t.priority) === 0)) return 'bg-red-500 text-white'       // urgent (P1)
-  if (active.some(t => urgency(t.priority) === 1)) return 'bg-orange-500 text-white'    // high (P2)
-  return 'text-[var(--text-muted)] bg-black/5 dark:bg-white/10'
+  return urgencyCountCls(active.map(t => t.priority))
 }
 
 // No "All" pill: a null filter means all tickets, and clicking an active pill
@@ -53,7 +50,7 @@ function groupCountCls(rows: RegionalTicketRow[]): string {
 // and shows only under Overdue.
 type RmFilter = 'internal_breach' | 'supplier_breach' | 'overdue' | Bucket
 const PILLS: { key: RmFilter; label: string; active: string; inactive: string }[] = [
-  { key: 'open', label: 'Open', active: 'bg-blue-500 text-white border-blue-500', inactive: 'text-blue-600 dark:text-blue-400 border-blue-500/40 hover:border-blue-400' },
+  { key: 'open', label: 'New', active: 'bg-blue-500 text-white border-blue-500', inactive: 'text-blue-600 dark:text-blue-400 border-blue-500/40 hover:border-blue-400' },
   { key: 'quote_requested', label: 'Quote requested', active: 'bg-cyan-500 text-white border-cyan-500', inactive: 'text-cyan-600 dark:text-cyan-400 border-cyan-500/40 hover:border-cyan-400' },
   { key: 'quoted', label: 'Quoted', active: 'bg-violet-500 text-white border-violet-500', inactive: 'text-violet-600 dark:text-violet-400 border-violet-500/40 hover:border-violet-400' },
   { key: 'approved', label: 'Approved', active: 'bg-teal-500 text-white border-teal-500', inactive: 'text-teal-600 dark:text-teal-400 border-teal-500/40 hover:border-teal-400' },
@@ -177,7 +174,8 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
     const names = groups.map(([s]) => s)
     setExpanded(new Set(names)); writeCollapseSet('rm-tickets-expanded', names)
     setBreachedOpen(true); writeCollapse('rm-tickets-breached', true)
-    setArchiveOpen(true); writeCollapse('rm-tickets-archive', true)
+    // The Archive (completed) stays collapsed on a KPI deep-link — only the live
+    // lists open, so the tickets the KPI points at are what's visible.
   }, [filter, groups])
 
   return (

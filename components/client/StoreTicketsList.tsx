@@ -7,7 +7,7 @@ import type { StoreManagerTicket } from '@/lib/health/data'
 import { Card } from '@/components/exec/ui'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { readCollapse, writeCollapse } from '@/lib/collapse-state'
-import { formatDate, formatDateTime, humanizeDuration, OPERATIONAL_IMPACT_LABELS, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
+import { formatDate, formatDateTime, humanizeDuration, urgencyCountCls, OPERATIONAL_IMPACT_LABELS, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
 
 type Filter = 'all' | 'open' | 'info_requested' | 'scheduled' | 'in_progress' | 'completed' | 'cancelled' | 'overdue'
 
@@ -31,7 +31,7 @@ const byDateThenUrgency = (a: StoreManagerTicket, b: StoreManagerTicket) =>
 // No "All" pill — the default (unselected) view is the collapsible status groups.
 // Open leads; Overdue sits last. Clicking the active pill returns to the groups.
 const PILLS: { key: Filter; label: string; active: string; inactive: string }[] = [
-  { key: 'open',        label: 'Open',        active: 'bg-blue-500 text-white border-blue-500',              inactive: 'text-blue-600 dark:text-blue-400 border-blue-500/40 hover:border-blue-400' },
+  { key: 'open',        label: 'New',         active: 'bg-blue-500 text-white border-blue-500',              inactive: 'text-blue-600 dark:text-blue-400 border-blue-500/40 hover:border-blue-400' },
   { key: 'info_requested', label: 'Info Requested', active: 'bg-amber-500 text-white border-amber-500',     inactive: 'text-amber-600 dark:text-amber-400 border-amber-500/40 hover:border-amber-400' },
   { key: 'scheduled',   label: 'Job scheduled', active: 'bg-indigo-500 text-white border-indigo-500',       inactive: 'text-indigo-600 dark:text-indigo-400 border-indigo-500/40 hover:border-indigo-400' },
   { key: 'in_progress', label: 'In Progress', active: 'bg-[#C6A35D] text-[#0a0e17] border-[#C6A35D]',        inactive: 'text-amber-600 dark:text-[#C6A35D] border-[#C6A35D]/40 hover:border-[#C6A35D]' },
@@ -69,7 +69,7 @@ function Group({ title, tickets, defaultOpen = false }: { title: string; tickets
       <div className="w-full flex items-center gap-2 px-2 py-2">
         <ChevronDown size={16} className={`shrink-0 text-[var(--text-muted)] transition-transform ${open ? 'rotate-180' : ''}`} />
         <span className="text-sm font-bold text-[var(--text)]">{title}</span>
-        <span className="text-[11px] font-medium text-[var(--text-muted)] bg-black/5 dark:bg-white/10 rounded-full px-2 py-0.5">{tickets.length}</span>
+        <span className={`text-[11px] font-medium rounded-full px-2 py-0.5 ${urgencyCountCls(tickets.filter(t => !['completed', 'cancelled'].includes(t.status)).map(t => t.priority))}`}>{tickets.length}</span>
       </div>
       {open && <div onClick={e => e.stopPropagation()}>{tickets.map(t => <Row key={t.id} t={t} />)}</div>}
     </Card>

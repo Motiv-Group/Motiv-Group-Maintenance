@@ -20,6 +20,23 @@ export const PRIORITY_COLORS: Record<Priority, string> = {
   urgent: 'bg-red-100    text-red-700    dark:bg-red-950    dark:text-red-400',
 }
 
+// Urgency rank shared by the tickets tabs (handles classic low/medium/high/urgent
+// and the health-engine P1–P4 codes). 0 = most urgent.
+const URGENCY_RANK: Record<string, number> = { urgent: 0, P1: 0, high: 1, P2: 1, medium: 2, P3: 2, low: 3, P4: 3 }
+
+// Solid colour for a ticket-group's count circle, tinted by its most urgent ticket
+// so the busiest groups stand out. Urgent → red, High → orange, Medium/Low → yellow
+// (low folds into the medium band, so every live group still shows a colour). No
+// live tickets → the neutral grey badge. Used by every role's Tickets tab.
+export function urgencyCountCls(priorities: (string | null | undefined)[]): string {
+  let best = 99
+  for (const p of priorities) { const r = URGENCY_RANK[p ?? ''] ?? 99; if (r < best) best = r }
+  if (best === 0) return 'bg-red-500 text-white'
+  if (best === 1) return 'bg-orange-500 text-white'
+  if (best <= 3) return 'bg-yellow-500 text-[#0a0e17]'
+  return 'text-[var(--text-muted)] bg-black/5 dark:bg-white/10'
+}
+
 export const STATUS_LABELS: Record<TicketStatus, string> = {
   open:        'New',
   info_requested:   'Info Requested',

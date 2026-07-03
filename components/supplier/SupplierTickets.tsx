@@ -11,7 +11,7 @@ import { Card, Donut } from '@/components/exec/ui'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { SlideOver } from '@/components/ui/SlideOver'
 import { readCollapse, writeCollapse, readCollapseSet, writeCollapseSet } from '@/lib/collapse-state'
-import { rmStatusMeta, formatDateTime, humanizeDuration } from '@/lib/utils'
+import { rmStatusMeta, formatDateTime, humanizeDuration, urgencyCountCls } from '@/lib/utils'
 
 type Bucket = 'to_quote' | 'quoted' | 'approved' | 'scheduled' | 'in_progress' | 'signoff' | 'completed' | 'closed'
 function bucketOf(s: string): Bucket {
@@ -47,14 +47,11 @@ const byDateThenUrgency = (a: SupplierTicketRow, b: SupplierTicketRow) =>
 // after photos + COC (before photos come from ticket logging, not the supplier).
 const missingEvidence = (t: SupplierTicketRow) => t.active && t.evidenceRequired && !(t.afterUploaded && t.cocUploaded)
 
-// Tint a store group's count badge by its most urgent active job — red for urgent
-// (P1), orange for high (P2) — so pressing stores stand out. Closed/declined jobs
-// don't count. Falls back to the neutral grey badge.
+// Tint a store group's count badge by its most urgent active job (closed/declined
+// jobs don't count) — shared with the RM/SM tabs via urgencyCountCls.
 function groupCountCls(rows: SupplierTicketRow[]): string {
   const active = rows.filter(t => t.active && !t.declinedForMe)
-  if (active.some(t => urgency(t.priority) === 0)) return 'bg-red-500 text-white'       // urgent (P1)
-  if (active.some(t => urgency(t.priority) === 1)) return 'bg-orange-500 text-white'    // high (P2)
-  return 'text-[var(--text-muted)] bg-black/5 dark:bg-white/10'
+  return urgencyCountCls(active.map(t => t.priority))
 }
 
 type FilterKey = 'all' | 'breached' | 'overdue' | 'evidence' | 'declined' | 'cancelled' | Bucket
@@ -194,7 +191,8 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
     const names = groups.map(([s]) => s)
     setExpanded(new Set(names)); writeCollapseSet('supplier-tickets-expanded', names)
     setBreachedOpen(true); writeCollapse('supplier-tickets-breached', true)
-    setArchiveOpen(true); writeCollapse('supplier-tickets-archive', true)
+    // The Archive (completed) stays collapsed on a KPI deep-link — only the live
+    // lists open, so the tickets the KPI points at are what's visible.
   }, [filter, groups])
 
   const toggle = (s: string) => setExpanded(c => { const n = new Set(c); n.has(s) ? n.delete(s) : n.add(s); writeCollapseSet('supplier-tickets-expanded', [...n]); return n })
