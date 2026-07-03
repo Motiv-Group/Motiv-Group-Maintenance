@@ -154,8 +154,11 @@ export function buildTicketTimeline(t: TimelineInput): TimelineEvent[] {
     const what = d.origin === 'snag' ? 'snag' : 'evidence request'
     push(d.created_at, `Dispute raised — ${what}`, 'quote_declined', 'Supplier')
     if (d.status === 'resolved') {
-      const verb = d.outcome === 'withdrawn' ? 'withdrawn' : 'upheld'
-      push(d.resolved_at ?? d.created_at, `Dispute resolved — ${what} ${verb}${d.reason ? ` — ${d.reason}` : ''}`, d.outcome === 'withdrawn' ? 'completion_approved' : 'info_requested', 'Regional Manager')
+      const reason = d.reason ? ` — ${d.reason}` : ''
+      // 'withdrawn' = the RM retracted the snag/evidence (dropped); 'upheld' = the
+      // supplier withdrew their dispute (the requirement stands).
+      if (d.outcome === 'withdrawn') push(d.resolved_at ?? d.created_at, `${what === 'snag' ? 'Snag' : 'Evidence request'} retracted by the manager${reason}`, 'completion_approved', 'Regional Manager')
+      else push(d.resolved_at ?? d.created_at, `Dispute withdrawn — ${what} stands${reason}`, 'info_requested', 'Supplier')
     }
   }
 

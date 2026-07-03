@@ -134,7 +134,9 @@ export function DisputeThread({ ticketId, dispute, messages, viewerRole, readOnl
       {dispute.status === 'resolved' && (
         <div className={`rounded-lg p-3 ring-1 ${dispute.outcome === 'withdrawn' ? 'bg-emerald-500/10 ring-emerald-500/30' : 'bg-amber-500/10 ring-amber-500/30'}`}>
           <p className={`text-[11px] font-bold uppercase tracking-wide ${dispute.outcome === 'withdrawn' ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}`}>
-            {dispute.outcome === 'withdrawn' ? (isSnag ? 'Snag withdrawn' : 'Evidence request withdrawn') : (isSnag ? 'Snag upheld' : 'Evidence request upheld')}
+            {dispute.outcome === 'withdrawn'
+              ? (isSnag ? 'Snag retracted by the manager' : 'Evidence request retracted by the manager')
+              : (isSnag ? 'Dispute withdrawn — snag stands' : 'Dispute withdrawn — evidence request stands')}
           </p>
           {dispute.resolution_note && <p className="text-sm text-[var(--text)]">{dispute.resolution_note}</p>}
         </div>
@@ -172,24 +174,26 @@ export function DisputeThread({ ticketId, dispute, messages, viewerRole, readOnl
       {/* Reply while open */}
       {isOpen && <Composer ticketId={ticketId} action="reply" submitLabel="Send reply" placeholder="Add a message or evidence…" />}
 
-      {/* RM resolve controls */}
-      {isOpen && viewerRole === 'regional_manager' && <ResolvePanel ticketId={ticketId} isSnag={isSnag} />}
+      {/* Resolve controls: the RM can RETRACT (drop) the snag / evidence request; the
+          supplier can WITHDRAW their dispute (accepting it, so it stands). */}
+      {isOpen && viewerRole === 'regional_manager' && <RetractPanel ticketId={ticketId} isSnag={isSnag} />}
+      {isOpen && viewerRole === 'supplier' && <WithdrawPanel ticketId={ticketId} isSnag={isSnag} />}
     </div>
   )
 }
 
-function ResolvePanel({ ticketId, isSnag }: { ticketId: string; isSnag: boolean }) {
+// RM: retract the snag / evidence request when it was wrong → the requirement is
+// dropped, the latest submission is accepted and the job moves to close-out.
+function RetractPanel({ ticketId, isSnag }: { ticketId: string; isSnag: boolean }) {
   const router = useRouter()
-  const [choice, setChoice] = useState<'upheld' | 'withdrawn' | null>(null)
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
 
-  async function resolve() {
-    if (!choice) return
+  async function retract() {
     setBusy(true); setErr('')
     try {
-      const res = await fetch(`/api/tickets/${ticketId}/dispute`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'resolve', outcome: choice, note: note.trim() || null }) })
+      const res = await fetch(`/api/tickets/${ticketId}/dispute`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'resolve', outcome: 'withdrawn', note: note.trim() || null }) })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed')
       router.refresh()
     } catch (e: any) { setErr(e.message) }
@@ -198,28 +202,53 @@ function ResolvePanel({ ticketId, isSnag }: { ticketId: string; isSnag: boolean 
 
   return (
     <div className="rounded-xl ring-1 ring-[var(--border)] bg-[var(--input-bg)] p-3 space-y-2.5">
-      <p className="text-sm font-semibold text-[var(--text)]">Resolve the dispute</p>
-      <div className="grid grid-cols-2 gap-2">
-        <button onClick={() => setChoice('upheld')} className={`py-2 rounded-lg text-xs font-semibold border transition flex items-center justify-center gap-1.5 ${choice === 'upheld' ? 'bg-amber-500 text-white border-amber-500' : 'text-amber-600 dark:text-amber-400 border-amber-500/40 hover:border-amber-500'}`}>
-          <ShieldCheck size={14} /> {isSnag ? 'Uphold snag' : 'Uphold request'}
-        </button>
-        <button onClick={() => setChoice('withdrawn')} className={`py-2 rounded-lg text-xs font-semibold border transition flex items-center justify-center gap-1.5 ${choice === 'withdrawn' ? 'bg-emerald-600 text-white border-emerald-600' : 'text-emerald-600 dark:text-emerald-400 border-emerald-500/40 hover:border-emerald-500'}`}>
-          <ShieldX size={14} /> {isSnag ? 'Withdraw snag' : 'Withdraw request'}
-        </button>
-      </div>
-      {choice && (
-        <p className="text-xs text-[var(--text-muted)]">
-          {choice === 'upheld'
-            ? (isSnag ? 'The snag stands — the supplier resumes accepting & scheduling the fix.' : 'The request stands — the supplier resumes uploading the evidence.')
-            : 'The requirement is dropped and the job moves to close-out for your final sign-off.'}
-        </p>
-      )}
-      <textarea value={note} onChange={e => setNote(e.target.value)} placeholder="Add a note explaining your decision (optional)…" rows={2}
+      <p className="text-sm font-semibold text-[var(--text)]">Was this {isSnag ? 'snag' : 'evidence request'} wrong?</p>
+      <p className="text-xs text-[var(--text-muted)]">Retract it to drop the requirement — the latest submission is accepted and the job moves to close-out. Otherwise keep discussing; the supplier can withdraw the dispute to accept it.</p>
+      <textarea value={note} onChange={e => setNote(e.target.value)} placeholder="Add a note explaining why you're retracting (optional)…" rows={2}
         className="w-full px-3 py-2 rounded-lg bg-[var(--surface)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)] outline-none focus:ring-[#C6A35D]/40" />
       {err && <p className="text-xs text-red-500">{err}</p>}
-      <button onClick={resolve} disabled={!choice || busy} className="w-full py-2 rounded-lg bg-[#C6A35D] hover:brightness-95 text-[#0a0e17] text-sm font-semibold transition disabled:opacity-50">
-        {busy ? 'Resolving…' : 'Confirm resolution'}
+      <button onClick={retract} disabled={busy} className="w-full py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition disabled:opacity-50 flex items-center justify-center gap-1.5">
+        <ShieldX size={14} /> {busy ? 'Retracting…' : `Retract ${isSnag ? 'snag' : 'evidence request'}`}
       </button>
     </div>
+  )
+}
+
+// Supplier: withdraw the dispute — accept the snag / evidence request, so it stands
+// and they resume the paused step.
+function WithdrawPanel({ ticketId, isSnag }: { ticketId: string; isSnag: boolean }) {
+  const router = useRouter()
+  const [confirm, setConfirm] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+
+  async function withdraw() {
+    setBusy(true); setErr('')
+    try {
+      const res = await fetch(`/api/tickets/${ticketId}/dispute`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'resolve', outcome: 'upheld' }) })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed')
+      router.refresh()
+    } catch (e: any) { setErr(e.message); setBusy(false) }
+  }
+
+  if (confirm) {
+    return (
+      <div className="rounded-xl ring-1 ring-[var(--border)] bg-[var(--input-bg)] p-3 space-y-2">
+        <p className="text-sm text-[var(--text)]">Withdraw the dispute? You accept the {isSnag ? 'snag' : 'evidence request'} and will {isSnag ? 'accept & schedule the fix' : 'upload the evidence'}.</p>
+        {err && <p className="text-xs text-red-500">{err}</p>}
+        <div className="flex gap-2">
+          <button onClick={withdraw} disabled={busy} className="flex-1 py-2 rounded-lg bg-[#C6A35D] hover:brightness-95 text-[#0a0e17] text-sm font-semibold disabled:opacity-50">{busy ? 'Withdrawing…' : 'Yes, withdraw'}</button>
+          <button onClick={() => { setConfirm(false); setErr('') }} disabled={busy} className="flex-1 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm disabled:opacity-50">Cancel</button>
+        </div>
+      </div>
+    )
+  }
+  return (
+    <>
+      <button onClick={() => setConfirm(true)} className="w-full py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text)] text-sm font-semibold hover:bg-[var(--hover)] transition flex items-center justify-center gap-1.5">
+        <ShieldCheck size={14} /> Withdraw dispute — accept the {isSnag ? 'snag' : 'evidence request'}
+      </button>
+      {err && <p className="text-xs text-red-500 mt-1">{err}</p>}
+    </>
   )
 }

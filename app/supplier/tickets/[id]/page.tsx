@@ -426,7 +426,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
                   <p className="text-sm font-semibold text-[var(--text)] truncate">Dispute — {disputeSubject(d)}</p>
                   <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(d.resolved_at ?? d.created_at)}</p>
                 </div>
-                <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 shrink-0 ${d.outcome === 'withdrawn' ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' : 'bg-amber-500/15 text-amber-700 dark:text-amber-400'}`}>{d.outcome === 'withdrawn' ? 'Withdrawn' : 'Upheld'}</span>
+                <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 shrink-0 ${d.outcome === 'withdrawn' ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' : 'bg-amber-500/15 text-amber-700 dark:text-amber-400'}`}>{d.outcome === 'withdrawn' ? 'Retracted' : 'Withdrawn'}</span>
               </summary>
               <div className="border-t border-[var(--border)] p-4">
                 <DisputeThread ticketId={t.id} dispute={d} messages={msgsByDispute(d.id)} viewerRole="supplier" readOnly subject={disputeSubject(d)} />
