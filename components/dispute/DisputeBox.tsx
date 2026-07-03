@@ -140,9 +140,14 @@ export function DisputeThread({ ticketId, dispute, messages, viewerRole, readOnl
         </div>
       )}
 
-      {/* Numbered message thread */}
+      {/* Numbered message thread. Attachments carry a running count PER SIDE across the
+          whole thread — "Evidence Supplier 1/2…", "Evidence RM 1/2…" — so each piece of
+          evidence has a stable reference. */}
       <ol className="space-y-2">
-        {messages.map((m, i) => (
+        {(() => { let supplierEv = 0, rmEv = 0; return messages.map((m, i) => {
+          const evLabels = (m.evidence_urls ?? []).map(() =>
+            m.author_role === 'supplier' ? `Evidence Supplier ${++supplierEv}` : `Evidence RM ${++rmEv}`)
+          return (
           <li key={m.id} className="rounded-xl ring-1 ring-[var(--border)] bg-[var(--surface)] p-3">
             <div className="flex items-center justify-between gap-2 mb-1">
               <span className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--text)]">
@@ -156,12 +161,12 @@ export function DisputeThread({ ticketId, dispute, messages, viewerRole, readOnl
             {m.evidence_urls?.length > 0 && (
               <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5">
                 {m.evidence_urls.map((u, j) => (
-                  <a key={j} href={u} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[11px] font-medium text-[#C6A35D] hover:underline"><Paperclip size={12} /> Evidence {j + 1}</a>
+                  <a key={j} href={u} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[11px] font-medium text-[#C6A35D] hover:underline"><Paperclip size={12} /> {evLabels[j]}</a>
                 ))}
               </div>
             )}
           </li>
-        ))}
+        )}) })()}
       </ol>
 
       {/* Reply while open */}
