@@ -586,7 +586,7 @@ export function SendQuoteForm({
                 <button
                   key={p.label}
                   type="button"
-                  onClick={() => { setValue('valid_until', val); setValidNA(false); setWarrantyNA(false) }}
+                  onClick={() => { setValue('valid_until', val); setValidNA(false) }}
                   className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
                     isActive
                       ? 'bg-[#C6A35D] text-white border-[#C6A35D]'

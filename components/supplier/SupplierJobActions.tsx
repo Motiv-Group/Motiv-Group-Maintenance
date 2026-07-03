@@ -167,9 +167,14 @@ export function MarkInProgressButton({ ticketId }: { ticketId: string }) {
     )
   }
   return (
-    <button onClick={() => setConfirm(true)} className="w-full py-2.5 rounded-xl bg-[#C6A35D] hover:brightness-95 text-[#0a0e17] text-sm font-semibold transition flex items-center justify-center gap-1.5">
-      <PlayCircle size={15} /> Mark in progress
-    </button>
+    <div className="space-y-2">
+      <p className="text-sm text-[var(--text-muted)]">
+        Mark the ticket in progress when you&apos;re ready to start the job, or once the scheduled time has arrived. This lets the store know you&apos;re on your way or busy with the work.
+      </p>
+      <button onClick={() => setConfirm(true)} className="w-full py-2.5 rounded-xl bg-[#C6A35D] hover:brightness-95 text-[#0a0e17] text-sm font-semibold transition flex items-center justify-center gap-1.5">
+        <PlayCircle size={15} /> Mark in progress
+      </button>
+    </div>
   )
 }
 

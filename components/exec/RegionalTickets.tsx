@@ -163,13 +163,15 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
   const toggleArchive = () => setArchiveOpen(o => { const v = !o; writeCollapse('rm-tickets-archive', v); return v })
   const panelRows = useMemo(() => panelStore ? tickets.filter(t => t.storeName === panelStore) : [], [tickets, panelStore])
 
-  // Arriving from a dashboard KPI (?filter=…) auto-expands every list so the
-  // tickets are visible immediately — runs once, only for the deep-link (not for
-  // manual pill clicks). The expanded state is persisted like any other.
+  // Arriving from a dashboard KPI auto-expands the live lists so the tickets are
+  // visible immediately — runs once for the deep-link (not manual pill clicks).
+  // Two entry points: a filtered KPI (?filter=…) or the umbrella "Open Tickets"
+  // card (?expand=1, no filter = all live work). The expanded state is persisted.
   const didAutoExpand = useRef(false)
   useEffect(() => {
-    if (didAutoExpand.current || !filter) return
-    if (!new URLSearchParams(window.location.search).get('filter')) return
+    if (didAutoExpand.current) return
+    const params = new URLSearchParams(window.location.search)
+    if (!params.get('filter') && !params.get('expand')) return
     didAutoExpand.current = true
     const names = groups.map(([s]) => s)
     setExpanded(new Set(names)); writeCollapseSet('rm-tickets-expanded', names)

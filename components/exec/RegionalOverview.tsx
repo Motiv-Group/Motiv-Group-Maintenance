@@ -26,8 +26,9 @@ export function RegionalOverview({ data, name, briefing, briefingScopeId }: { da
   // Variation orders submitted and waiting on the RM to approve/reject.
   const voAwaiting = data.tickets.filter(t => t.status === 'variation_review').length
   // "Open" is an umbrella: every active ticket (not completed/cancelled/declined), so a
-  // ticket stays counted until it's completed. Deep-links to the default Tickets view,
-  // which already lists all live work (the phase pills give the per-stage breakdown).
+  // ticket stays counted until it's completed. Deep-links to the default Tickets view
+  // (all live work) with ?expand=1 so the store groups open on arrival — the phase
+  // pills still give the per-stage breakdown.
   const openCount = data.tickets.filter(t => !['completed', 'cancelled', 'declined'].includes(t.status)).length
   // "Overdue" = active tickets past their final resolution deadline — same rule as
   // the Tickets-tab Overdue pill. (Distinct from a mid-SLA breach, which the
@@ -43,7 +44,7 @@ export function RegionalOverview({ data, name, briefing, briefingScopeId }: { da
     { label: 'Active Stores', value: p.activeStores, hint: `avg ${p.averageStoreHealth}%`, icon: <Building2 size={13} />, tone: 'info', href: '/regional/stores' },
     { label: 'Stores Need Attention', value: data.attentionStores.length, hint: 'need action', icon: <ShieldAlert size={13} />, tone: 'warn', actionable: true, href: '/regional/stores' },
     { label: 'Tickets Overdue', value: overdueCount, hint: 'past deadline', icon: <Clock size={13} />, tone: 'bad', actionable: true, href: '/regional/tickets?filter=overdue' },
-    { label: 'Open Tickets', value: openCount, hint: 'active', icon: <ClipboardList size={13} />, tone: 'orange', actionable: true, href: '/regional/tickets' },
+    { label: 'Open Tickets', value: openCount, hint: 'active', icon: <ClipboardList size={13} />, tone: 'orange', actionable: true, href: '/regional/tickets?expand=1' },
     { label: 'Quotes Awaiting Approval', value: quotesAwaiting, hint: 'to review', icon: <ReceiptText size={13} />, tone: 'warn', actionable: true, href: '/regional/tickets?filter=quoted' },
     { label: 'VOs Awaiting Approval', value: voAwaiting, hint: 'to review', icon: <FileText size={13} />, tone: 'warn', actionable: true, href: '/regional/tickets?filter=quoted' },
     { label: 'Pending Signoffs', value: data.signoffsPending, hint: 'awaiting you', icon: <ClipboardCheck size={13} />, tone: 'warn', actionable: true, href: '/regional/signoff' },
