@@ -69,11 +69,15 @@ export async function POST(request: Request) {
       break
     }
     case 'submit_signoff': {
-      const { data: ev } = await admin.from('ticket_evidence').select('kind, url').eq('ticket_id', ticketId)
+      const { data: ev } = await admin.from('ticket_evidence').select('kind, url').eq('ticket_id', ticketId).order('created_at', { ascending: true })
       const before = (ev ?? []).filter(e => e.kind === 'before_photo').map(e => e.url)
       const after = (ev ?? []).filter(e => e.kind === 'after_photo').map(e => e.url)
-      const coc = (ev ?? []).find(e => e.kind === 'coc')?.url ?? null
-      const invoice = (ev ?? []).find(e => e.kind === 'invoice')?.url ?? null
+      // COC/invoice are single-valued. The evidence log accumulates across resubmission
+      // rounds, so take the LATEST upload — an early .find() kept showing round 1's COC.
+      const cocRows = (ev ?? []).filter(e => e.kind === 'coc')
+      const coc = cocRows.length ? cocRows[cocRows.length - 1].url : null
+      const invoiceRows = (ev ?? []).filter(e => e.kind === 'invoice')
+      const invoice = invoiceRows.length ? invoiceRows[invoiceRows.length - 1].url : null
       await admin.from('signoffs').insert({ company_id: ticket.company_id, ticket_id: ticketId, supplier_id: ticket.supplier_id, before_urls: before, after_urls: after, coc_url: coc, invoice_url: invoice, status: 'submitted', notes: body.notes ?? null })
       await admin.from('tickets').update({ status: 'submitted_for_signoff', submitted_for_signoff_at: now, signoff_status: 'submitted', last_supplier_update_at: now }).eq('id', ticketId)
       // notify region RMs
