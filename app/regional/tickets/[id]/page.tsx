@@ -176,6 +176,18 @@ function RmSignoffCard({ s, tone, ticketId, collapsible = false, defaultOpen = f
   )
 }
 
+// A labelled sub-group inside the Archive — a small uppercase heading over its
+// cards so mixed archived items (quotes, requests, submissions…) stay separated
+// and scannable without cluttering the section.
+function ArchiveGroup({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-2">
+      <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-faint)]">{label}</p>
+      {children}
+    </div>
+  )
+}
+
 // One supplier progress update — a free-text note, or a "📷 Progress photo: <url>"
 // which renders as a photo link. Shared by the new-updates block (top) and the
 // collapsible history (above the audit trail); `isNew` gives it the gold accent.
@@ -743,74 +755,87 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
           block. Each is a click-to-expand row with its reason. */}
       {(archivedDeclinedQuotes.length > 0 || archivedRequestDeclines.length > 0 || closedWaitingRows.length > 0 || supersededSubmissions.length > 0 || !!declinedSnag) && (
         <CollapsibleSection id="ticket-quotes-archive" title="Archive">
-          {/* Superseded COC/POC submissions — sent back for more evidence or snagged.
-              Each is a collapsed "Submission #N" round card showing the RM's reason. */}
-          {supersededSubmissions.map((s: any) => (
-            <RmSignoffCard key={s.id} s={s} tone={submissionTone(s)} ticketId={t.id} title={submissionLabel(s)} reason={roundBySignoff.get(s.id)?.reason ?? s.reject_reason} collapsible />
-          ))}
-          {/* A declined snag-fix schedule — collapsed row with the reason + when. */}
-          {declinedSnag && (
-            <details className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
-              <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-[var(--text)] truncate">Snag schedule declined</p>
-                  <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(declinedSnag.schedule_declined_at)}</p>
-                </div>
-                <span className="text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:text-red-400 bg-red-500/15 rounded-full px-2 py-0.5 shrink-0">Declined</span>
-              </summary>
-              <div className="border-t border-[var(--border)] p-4">
-                <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3">
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Reason</p>
-                  <p className="text-sm text-[var(--text)]">{declinedSnag.schedule_decline_reason || 'No reason provided.'}</p>
-                </div>
-              </div>
-            </details>
+          {/* Quotes — declined / not-selected quotes (by the RM or the supplier).
+              Already re-invited or superseded, so no re-quote here; losing quoters
+              carry the courteous "not selected" note as their reason. */}
+          {archivedDeclinedQuotes.length > 0 && (
+            <ArchiveGroup label="Quotes">
+              {archivedDeclinedQuotes.map(q => <RmDeclinedQuoteCard key={q.id} q={q} ticketId={t.id} canReQuote={false} />)}
+            </ArchiveGroup>
           )}
-          {/* Archived declines are already re-invited or superseded — no re-quote here.
-              Losing quoters (quote declined when the job was awarded) show the courteous
-              "not selected" note as their reason. */}
-          {archivedDeclinedQuotes.map(q => <RmDeclinedQuoteCard key={q.id} q={q} ticketId={t.id} canReQuote={false} />)}
-          {/* Suppliers still awaiting to quote when the job was awarded → auto-closed. */}
-          {closedWaitingRows.map((r, i) => (
-            <details key={`cw-${i}`} className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
-              <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
-                <span className="text-sm font-semibold text-[var(--text)] min-w-0 truncate">{r.name}</span>
-                <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-faint)] bg-[var(--hover)] rounded-full px-2 py-0.5 shrink-0">Closed</span>
-              </summary>
-              <div className="border-t border-[var(--border)] p-4 space-y-3">
-                <div className="rounded-lg bg-[var(--hover)] ring-1 ring-[var(--border)] p-3">
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Note</p>
-                  <p className="text-sm text-[var(--text)]">{COURTESY_NOTE}</p>
-                </div>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                  <DetailItem label="Type" value="Awaiting quote — closed" />
-                  <DetailItem label="Requested" value={r.invitedAt ? formatDateTime(r.invitedAt) : '—'} />
-                </div>
-              </div>
-            </details>
-          ))}
-          {/* Suppliers who declined the quote REQUEST themselves — same card style as a
-              declined quote, with the reason and the date it was declined. */}
-          {archivedRequestDeclines.map((d, i) => (
-            <details key={`rd-${i}`} className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
-              <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
-                <span className="text-sm font-semibold text-[var(--text)] min-w-0 truncate">{d.name}</span>
-                <span className="text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:text-red-400 bg-red-500/15 rounded-full px-2 py-0.5 shrink-0">Declined</span>
-              </summary>
-              <div className="border-t border-[var(--border)] p-4 space-y-3">
-                {d.reason && (
-                  <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3">
-                    <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Decline reason</p>
-                    <p className="text-sm text-[var(--text)]">{d.reason}</p>
+          {/* Quote requests — suppliers who declined the request themselves, or were
+              auto-closed (still awaiting) when the job was awarded elsewhere. */}
+          {(archivedRequestDeclines.length > 0 || closedWaitingRows.length > 0) && (
+            <ArchiveGroup label="Quote requests">
+              {archivedRequestDeclines.map((d, i) => (
+                <details key={`rd-${i}`} className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
+                  <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
+                    <span className="text-sm font-semibold text-[var(--text)] min-w-0 truncate">{d.name}</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:text-red-400 bg-red-500/15 rounded-full px-2 py-0.5 shrink-0">Declined</span>
+                  </summary>
+                  <div className="border-t border-[var(--border)] p-4 space-y-3">
+                    {d.reason && (
+                      <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3">
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Decline reason</p>
+                        <p className="text-sm text-[var(--text)]">{d.reason}</p>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                      <DetailItem label="Type" value="Declined quote request" />
+                      <DetailItem label="Declined" value={formatDateTime(d.at)} />
+                    </div>
                   </div>
-                )}
-                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                  <DetailItem label="Type" value="Declined quote request" />
-                  <DetailItem label="Declined" value={formatDateTime(d.at)} />
+                </details>
+              ))}
+              {closedWaitingRows.map((r, i) => (
+                <details key={`cw-${i}`} className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
+                  <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
+                    <span className="text-sm font-semibold text-[var(--text)] min-w-0 truncate">{r.name}</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-faint)] bg-[var(--hover)] rounded-full px-2 py-0.5 shrink-0">Closed</span>
+                  </summary>
+                  <div className="border-t border-[var(--border)] p-4 space-y-3">
+                    <div className="rounded-lg bg-[var(--hover)] ring-1 ring-[var(--border)] p-3">
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Note</p>
+                      <p className="text-sm text-[var(--text)]">{COURTESY_NOTE}</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                      <DetailItem label="Type" value="Awaiting quote — closed" />
+                      <DetailItem label="Requested" value={r.invitedAt ? formatDateTime(r.invitedAt) : '—'} />
+                    </div>
+                  </div>
+                </details>
+              ))}
+            </ArchiveGroup>
+          )}
+          {/* Submissions — superseded COC/POC sent back for more evidence or snagged.
+              Each is a collapsed "Submission #N" round card showing the RM's reason. */}
+          {supersededSubmissions.length > 0 && (
+            <ArchiveGroup label="Submissions">
+              {supersededSubmissions.map((s: any) => (
+                <RmSignoffCard key={s.id} s={s} tone={submissionTone(s)} ticketId={t.id} title={submissionLabel(s)} reason={roundBySignoff.get(s.id)?.reason ?? s.reject_reason} collapsible />
+              ))}
+            </ArchiveGroup>
+          )}
+          {/* Snag schedule — a declined snag-fix date with its reason. */}
+          {declinedSnag && (
+            <ArchiveGroup label="Snag schedule">
+              <details className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
+                <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-[var(--text)] truncate">Snag schedule declined</p>
+                    <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(declinedSnag.schedule_declined_at)}</p>
+                  </div>
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:text-red-400 bg-red-500/15 rounded-full px-2 py-0.5 shrink-0">Declined</span>
+                </summary>
+                <div className="border-t border-[var(--border)] p-4">
+                  <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Reason</p>
+                    <p className="text-sm text-[var(--text)]">{declinedSnag.schedule_decline_reason || 'No reason provided.'}</p>
+                  </div>
                 </div>
-              </div>
-            </details>
-          ))}
+              </details>
+            </ArchiveGroup>
+          )}
         </CollapsibleSection>
       )}
 

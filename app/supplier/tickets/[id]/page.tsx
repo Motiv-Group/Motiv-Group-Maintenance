@@ -47,6 +47,18 @@ function DetailItem({ label, value }: { label: string; value: string }) {
   )
 }
 
+// A labelled sub-group inside the Archived block — a small uppercase heading over
+// its cards so mixed archived items (quotes, requests, submissions…) stay separated
+// and scannable without cluttering the section.
+function ArchiveGroup({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-2">
+      <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-faint)]">{label}</p>
+      {children}
+    </div>
+  )
+}
+
 // One COC & POC submission card — reused across the COC/POC, Snag and Completion
 // blocks. `snag` enriches a rejected submission with the "why it was sent back" reason.
 function SignoffCard({ s, snag, ticketId, collapsible = false, title, reason }: { s: any; snag?: { description?: string | null; required_correction?: string | null; severity?: string | null } | null; ticketId: string; collapsible?: boolean; title?: string; reason?: string | null }) {
@@ -538,62 +550,76 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           declines are durable (kept even after the RM re-assigns them). */}
       {(declinedMyQuotes.length > 0 || ((declineRows ?? []) as any[]).length > 0 || archivedSuperseded.length > 0 || !!declinedSnag) && (
         <CollapsibleSection id="ticket-archive" title="Archived" defaultOpen={declinedBy === 'supplier'}>
-          {/* Superseded COC/POC submissions — sent back for more evidence or snagged.
+          {/* Quotes — this supplier's quotes declined by the RM (or withdrawn). Each is
+              a click-to-expand row; the detail shows the RM's decline reason in red. */}
+          {declinedMyQuotes.length > 0 && (
+            <ArchiveGroup label="Quotes">
+              {declinedMyQuotes.map((q, i, arr) => (
+                <QuoteSummary
+                  key={q.id}
+                  title={arr.length > 1 ? `Quote #${arr.length - i}` : 'Your submitted quote'}
+                  status={quoteStatusOf(q.status)}
+                  ticketId={t.id}
+                  collapsible
+                  declineReason={q.decline_reason ?? declineReason}
+                  quote={{ id: q.id, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, description: q.description ?? null, fileUrl: q.file_url ?? null, validUntil: q.valid_until ?? null, createdAt: q.created_at, declinedAt: q.updated_at ?? null }}
+                />
+              ))}
+            </ArchiveGroup>
+          )}
+          {/* Quote requests — every time this supplier declined the quote request
+              (durable, kept even after the RM re-assigns them). */}
+          {((declineRows ?? []) as any[]).length > 0 && (
+            <ArchiveGroup label="Quote requests">
+              {((declineRows ?? []) as any[]).map((d, i) => (
+                <details key={`decline-${i}`} className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
+                  <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-[var(--text)] truncate">Quote request declined by {supplierCompanyName ?? 'you'}</p>
+                      <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(d.declined_at)}</p>
+                    </div>
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:text-red-400 bg-red-500/15 rounded-full px-2 py-0.5 shrink-0">Declined (you)</span>
+                  </summary>
+                  <div className="border-t border-[var(--border)] p-4">
+                    <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3">
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Reason</p>
+                      <p className="text-sm font-medium text-red-700 dark:text-red-400">{d.reason || 'No reason provided.'}</p>
+                    </div>
+                  </div>
+                </details>
+              ))}
+            </ArchiveGroup>
+          )}
+          {/* Submissions — superseded COC/POC sent back for more evidence or snagged.
               Each a collapsed "Submission #N" round card showing why it was returned.
               (The current live snag, if any, is shown in its own block above.) */}
-          {archivedSuperseded.map(s => (
-            <SignoffCard key={s.id} s={s} ticketId={t.id} title={submissionLabel(s)} reason={roundBySignoff.get(s.id)?.reason ?? s.reject_reason} snag={s.status === 'rejected' && s.id === rejectedSignoffs[0]?.id ? latestSnag : null} collapsible />
-          ))}
-          {/* A snag-fix date the RM declined — collapsed row with the reason + when. */}
-          {declinedSnag && (
-            <details className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
-              <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-[var(--text)] truncate">Snag schedule declined</p>
-                  <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(declinedSnag.schedule_declined_at)}</p>
-                </div>
-                <span className="text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:text-red-400 bg-red-500/15 rounded-full px-2 py-0.5 shrink-0">Declined</span>
-              </summary>
-              <div className="border-t border-[var(--border)] p-4">
-                <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3">
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Reason</p>
-                  <p className="text-sm text-[var(--text)]">{declinedSnag.schedule_decline_reason || 'No reason provided.'}</p>
-                </div>
-              </div>
-            </details>
+          {archivedSuperseded.length > 0 && (
+            <ArchiveGroup label="Submissions">
+              {archivedSuperseded.map(s => (
+                <SignoffCard key={s.id} s={s} ticketId={t.id} title={submissionLabel(s)} reason={roundBySignoff.get(s.id)?.reason ?? s.reject_reason} snag={s.status === 'rejected' && s.id === rejectedSignoffs[0]?.id ? latestSnag : null} collapsible />
+              ))}
+            </ArchiveGroup>
           )}
-          {declinedMyQuotes.map((q, i, arr) => (
-            <QuoteSummary
-              key={q.id}
-              title={arr.length > 1 ? `Quote #${arr.length - i}` : 'Your submitted quote'}
-              status={quoteStatusOf(q.status)}
-              ticketId={t.id}
-              // Each declined quote is a click-to-expand row; the detail shows the
-              // RM's decline reason (durable per-quote, falls back to the invite's) in red.
-              collapsible
-              declineReason={q.decline_reason ?? declineReason}
-              quote={{ id: q.id, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, description: q.description ?? null, fileUrl: q.file_url ?? null, validUntil: q.valid_until ?? null, createdAt: q.created_at, declinedAt: q.updated_at ?? null }}
-            />
-          ))}
-          {((declineRows ?? []) as any[]).map((d, i) => (
-            // Click-to-expand row (same pattern as the declined quotes) — the reason
-            // drops down on click.
-            <details key={`decline-${i}`} className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
-              <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-[var(--text)] truncate">Quote request declined by {supplierCompanyName ?? 'you'}</p>
-                  <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(d.declined_at)}</p>
+          {/* Snag schedule — a snag-fix date the RM declined, with the reason + when. */}
+          {declinedSnag && (
+            <ArchiveGroup label="Snag schedule">
+              <details className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
+                <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-[var(--text)] truncate">Snag schedule declined</p>
+                    <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(declinedSnag.schedule_declined_at)}</p>
+                  </div>
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:text-red-400 bg-red-500/15 rounded-full px-2 py-0.5 shrink-0">Declined</span>
+                </summary>
+                <div className="border-t border-[var(--border)] p-4">
+                  <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Reason</p>
+                    <p className="text-sm text-[var(--text)]">{declinedSnag.schedule_decline_reason || 'No reason provided.'}</p>
+                  </div>
                 </div>
-                <span className="text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:text-red-400 bg-red-500/15 rounded-full px-2 py-0.5 shrink-0">Declined (you)</span>
-              </summary>
-              <div className="border-t border-[var(--border)] p-4">
-                <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3">
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Reason</p>
-                  <p className="text-sm font-medium text-red-700 dark:text-red-400">{d.reason || 'No reason provided.'}</p>
-                </div>
-              </div>
-            </details>
-          ))}
+              </details>
+            </ArchiveGroup>
+          )}
         </CollapsibleSection>
       )}
 
