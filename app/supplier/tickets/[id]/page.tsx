@@ -752,6 +752,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           snagScheduleEvents: (snagEventRows ?? []) as any[],
           quotes: (myQuotes ?? []) as any[], variations: (variationRows ?? []) as any[],
           disputes: disputes.map(d => ({ origin: d.origin, status: d.status, outcome: d.outcome, created_at: d.created_at, resolved_at: d.resolved_at, reason: d.resolution_note })),
+          disputeMessages: disputeMsgs.map((m: any) => ({ author_role: m.author_role, body: m.body, created_at: m.created_at })),
           supplierDeclines: myDeclines,
           signoffs: (signoffRows ?? []) as any[], updates: (updates ?? []) as any[],
           views: (viewRows ?? []) as any[],

@@ -57,6 +57,9 @@ export interface TimelineInput {
   snagAcceptedAt?: string | null
   // Snag / evidence disputes → "Dispute raised" + "Dispute resolved (outcome)" events.
   disputes?: { origin: string; status: string; outcome?: string | null; created_at: string; resolved_at?: string | null; reason?: string | null }[]
+  // Dispute thread messages — the propose / cancel negotiation steps are surfaced as
+  // their own audit events (the resolution is already logged from the dispute row).
+  disputeMessages?: { author_role: string | null; body: string | null; created_at: string }[]
   // When the RM asked this supplier to submit a revised quote (re-quote) → its own
   // "Revised quote requested" event, distinct from the decline that preceded it.
   requoteRequestedAt?: string | null
@@ -161,6 +164,14 @@ export function buildTicketTimeline(t: TimelineInput): TimelineEvent[] {
       if (d.outcome === 'withdrawn') push(d.resolved_at ?? d.created_at, d.origin === 'variation' ? `Variation-order decline retracted — reopened for review${reason}` : `${Cap} retracted by the manager${reason}`, 'completion_approved', 'Regional Manager')
       else push(d.resolved_at ?? d.created_at, `Dispute withdrawn — ${what} stands${reason}`, 'info_requested', 'Supplier')
     }
+  }
+  // Negotiation steps (propose / cancel) from the dispute thread's system messages —
+  // the resolution itself is already logged above from the dispute row.
+  for (const m of t.disputeMessages ?? []) {
+    const b = m.body ?? ''
+    const who = ROLE_LABEL[m.author_role ?? ''] ?? (m.author_role ?? 'System')
+    if (/proposed to /.test(b)) push(m.created_at, /proposed to resolve/.test(b) ? 'Proposed to resolve the dispute — drop the request' : 'Proposed to uphold the request — it stands', 'info_requested', who)
+    else if (/cancelled their proposal/.test(b)) push(m.created_at, 'Dispute proposal cancelled', 'edited', who)
   }
 
   // Each signoff row is one COC/POC submission: log the submission, then its

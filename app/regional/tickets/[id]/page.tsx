@@ -936,6 +936,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         quotes: ((quotes ?? []) as any[]).map(q => ({ ...q, supplierName: nameById.get(q.supplier_id) ?? 'Supplier' })),
         variations: (variations ?? []) as any[],
         disputes: disputes.map(d => ({ origin: d.origin, status: d.status, outcome: d.outcome, created_at: d.created_at, resolved_at: d.resolved_at, reason: d.resolution_note })),
+        disputeMessages: disputeMsgs.map((m: any) => ({ author_role: m.author_role, body: m.body, created_at: m.created_at })),
         signoffs: allSignoffs, updates: (updates ?? []) as any[], views: (viewRows ?? []) as any[],
         supplierDeclines,
       }} />
