@@ -1248,8 +1248,9 @@ create policy "approvals read" on public.approvals for select
 
 drop policy if exists "approvals write" on public.approvals;
 create policy "approvals write" on public.approvals for all
-  using (((company_id = app_company_id()) AND (app_is_company_wide() OR (app_role() = 'regional_manager'::text))))
-  with check ((company_id = app_company_id()));
+  using ((company_id = app_company_id()) AND (app_is_company_wide() OR (app_role() = 'regional_manager'::text
+    AND exists (select 1 from public.tickets t where t.id = approvals.ticket_id and t.region_id in (select app_region_ids())))))
+  with check (company_id = app_company_id());
 
 drop policy if exists "audit read" on public.audit_logs;
 create policy "audit read" on public.audit_logs for select
