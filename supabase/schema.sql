@@ -991,6 +991,38 @@ alter table public.user_profiles add foreign key (company_id) references public.
 -- FUNCTIONS (RLS helpers + triggers)
 -- ---------------------------------------------------------------------------
 
+-- admin_db_stats() — one-call snapshot of database + storage size and per-table
+-- row/size estimates for the platform-admin infra dashboard (/admin/supabase).
+-- Called via the service-role client only; EXECUTE granted to service_role only.
+CREATE OR REPLACE FUNCTION public.admin_db_stats()
+ RETURNS jsonb
+ LANGUAGE sql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_catalog'
+AS $function$
+  select jsonb_build_object(
+    'db_size_bytes', pg_database_size(current_database()),
+    'tables', coalesce((
+      select jsonb_agg(
+               jsonb_build_object(
+                 'table', relname,
+                 'rows',  n_live_tup,
+                 'bytes', pg_total_relation_size(relid)
+               )
+               order by n_live_tup desc
+             )
+      from pg_stat_user_tables
+      where schemaname = 'public'
+    ), '[]'::jsonb),
+    'storage_bytes',   coalesce((select sum((metadata->>'size')::bigint) from storage.objects), 0),
+    'storage_objects', (select count(*) from storage.objects),
+    'auth_users',      (select count(*) from auth.users)
+  );
+$function$;
+revoke all on function public.admin_db_stats() from public;
+revoke all on function public.admin_db_stats() from anon, authenticated;
+grant execute on function public.admin_db_stats() to service_role;
+
 CREATE OR REPLACE FUNCTION public.app_can_see_ticket(t_id uuid)
  RETURNS boolean
  LANGUAGE sql

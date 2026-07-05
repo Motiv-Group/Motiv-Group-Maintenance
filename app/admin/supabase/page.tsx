@@ -68,7 +68,7 @@ export default async function SupabaseAdminPage() {
 
           {!d.rpcInstalled && (
             <Notice variant="warn">
-              Database + storage sizes are hidden because the <code className="font-mono">admin_db_stats()</code> function isn&apos;t installed yet. Apply <code className="font-mono">supabase/migrations/20260705_admin_db_stats.sql</code> in the Supabase SQL Editor to unlock the size gauges above and the full table list.
+              Database + storage sizes are hidden because the <code className="font-mono">admin_db_stats()</code> function isn&apos;t installed on this database yet. It ships in <code className="font-mono">supabase/schema.sql</code> — re-run that definition in the Supabase SQL Editor to unlock the size gauges above and the full table list.
             </Notice>
           )}
 
