@@ -208,7 +208,10 @@ function DisputeControls({ ticketId, origin, viewerRole, pendingOutcome, pending
       const res = await fetch(`/api/tickets/${ticketId}/dispute`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed')
       router.refresh()
-    } catch (e: any) { setErr(e.message); setBusy('') }
+    } catch (e: any) { setErr(e.message) }
+    // Always clear busy — router.refresh() keeps this client component mounted, so
+    // without this the buttons stay disabled after a successful action (e.g. cancel).
+    finally { setBusy('') }
   }
 
   const pending = !!pendingOutcome && !!pendingBy
