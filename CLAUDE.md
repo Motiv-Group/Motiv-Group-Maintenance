@@ -6,6 +6,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Motiv** — a mobile-first maintenance ticketing and quoting platform for the South African market. Next.js 14 (App Router) + TypeScript + Tailwind CSS + Supabase (Postgres, Auth, Storage, Realtime). A Capacitor Android wrapper points at the deployed Vercel site (`capacitor.config.ts`'s `server.url`), so it is not a normal offline-bundled native app.
 
+## Ways of working (standing instructions — apply every session)
+
+1. **Confirm understanding before implementing.** When a task is unclear/ambiguous, or you see a better approach than what was asked, **stop and ask first** — don't start coding on an assumption. Surface the ambiguity or the better idea and get agreement before implementation.
+2. **Security & safety first.** When adding or changing any feature, keep the app's security and safety in mind by default — multi-tenant isolation (every API route checks `company_id` + role before acting; the admin/service-role client bypasses RLS so route-level authZ is the real guard), RLS on new tables, no secrets client-side, signed URLs for private storage, input/amount validation, rate limits on write/expensive routes. Flag security implications of a change even when not asked.
+3. **Free-tier awareness + deferred backlog.** Dev runs on free/hobby tiers (see `docs/INFRASTRUCTURE_TIERS.md`). Respect the limits (e.g. Vercel Hobby = 2 crons, daily-only; non-commercial license). When a wanted feature is blocked by a tier limit, **add it to the "DEFERRED FEATURES BACKLOG" table in `docs/INFRASTRUCTURE_TIERS.md`** rather than silently skipping it, and check/update that list each session.
+
 ## Commands
 
 - `npm run dev` — start the dev server (http://localhost:3000; use your LAN IP to test on mobile)

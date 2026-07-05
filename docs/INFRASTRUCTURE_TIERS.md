@@ -11,6 +11,21 @@
 launch requires **Vercel Pro** (per Vercel's ToS) — this is a licensing requirement, not
 just a limits one. Budget for Pro before charging customers or marketing publicly.
 
+## 📌 DEFERRED FEATURES BACKLOG (tier-blocked) — living list, APPEND HERE
+> Any feature we can't build because of a free-tier limit goes here. Add a new row
+> whenever you hit one; move it to "done" (with the date) when the tier is upgraded and
+> the feature is shipped. Claude: check + update this list each session.
+
+| # | Feature / need | Blocked by | Interim workaround | Unblocks on |
+|---|---|---|---|---|
+| 1 | **Hourly SLA / health recompute cron** (`/api/cron/v3-recompute` exists but is NOT scheduled) | Vercel Hobby crons are **daily-granularity only** — can't run hourly | Health/SLA is computed **live per request** from tickets; trend snapshots run once daily in `v3-snapshots` | Vercel **Pro** (sub-daily + more crons) |
+| 2 | **WhatsApp technician dispatch + arrival tracking** | Needs a Meta-approved template + paid WhatsApp messaging beyond the free conversation cap | Roster shipped; dispatch not wired | WhatsApp paid + approved template |
+| 3 | **Automated DB backups / point-in-time recovery** | Supabase Free has no backups/PITR | None — manual export only | Supabase **Pro** |
+| 4 | *(add the next tier-blocked item here)* | | | |
+
+_Note: after deleting the legacy `/api/cron/snapshots`, there is now **one free Hobby cron
+slot** — but Hobby is still daily-only, so item #1 (hourly) stays blocked until Pro._
+
 ## Per-provider limits (free tier) + what's deferred
 
 ### Vercel — Hobby
