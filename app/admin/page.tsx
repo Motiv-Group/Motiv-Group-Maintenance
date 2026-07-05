@@ -1,9 +1,10 @@
 export const dynamic = 'force-dynamic'
 
-import { redirect } from 'next/navigation'
 import { Banknote, Wallet, Receipt, Building2, Users, Truck, Store, Briefcase, Crown } from 'lucide-react'
-import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
+import { requireMasterAdmin } from '@/lib/health/guard'
 import { Card } from '@/components/exec/ui'
+import { InfoTip } from '@/components/ui/InfoTip'
 import { formatCurrency } from '@/lib/utils'
 
 const APP_FEE_RATE = 0.005   // 0.5% of completed quote value
@@ -21,12 +22,8 @@ function Kpi({ label, value, hint, icon, tone = 'text-[var(--text)]' }: { label:
 
 export default async function AdminOverviewPage() {
   // Defence in depth — middleware already gates /admin to system_admin.
-  const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/auth/login')
+  await requireMasterAdmin()
   const db = createAdminClient()
-  const { data: me } = await db.from('user_profiles').select('role').eq('id', user.id).single()
-  if (me?.role !== 'system_admin') redirect('/auth/login')
 
   // App-wide (all tenants) via service role.
   const [{ data: suppliers }, { data: subscribers }, { data: completed }, { count: companyCount }] = await Promise.all([
@@ -61,8 +58,11 @@ export default async function AdminOverviewPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><Crown className="text-[#C6A35D]" size={22} /> Platform Admin</h1>
-        <p className="text-sm text-[var(--text-muted)] mt-0.5">App-wide overview across {companyCount ?? 0} compan{companyCount === 1 ? 'y' : 'ies'} — revenue, suppliers and subscribers.</p>
+        <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2">
+          <Crown className="text-[#C6A35D]" size={22} /> Platform Admin
+          <InfoTip title="Platform Admin" align="left">Master-admin-only area. This tab is the business view (revenue, subscribers, suppliers). The tabs above — Supabase, Vercel, Resend, Upstash, Sentry — are the live infrastructure panels: database size, deployments, email, rate limiting and errors.</InfoTip>
+        </h1>
+        <p className="text-sm text-[var(--text-muted)] mt-0.5">App-wide overview across {companyCount ?? 0} compan{companyCount === 1 ? 'y' : 'ies'} — revenue, suppliers and subscribers. Infra provider health is in the tabs above.</p>
       </div>
 
       {/* Revenue summary */}

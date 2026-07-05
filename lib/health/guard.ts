@@ -73,6 +73,30 @@ export async function requireRegionalUser(): Promise<RegionalUser> {
   }
 }
 
+export interface MasterAdminContext { userId: string; email: string }
+
+// Optional email allowlist layered on top of the system_admin role. If
+// NEXT_PUBLIC_ADMIN_EMAILS is set, the signed-in account's email must also be
+// in it to reach the infra/ops area — so a stray system_admin can't see
+// provider secrets/analytics. Left empty (unset) → role check alone applies.
+const MASTER_ADMIN_EMAILS = (process.env.NEXT_PUBLIC_ADMIN_EMAILS ?? '')
+  .split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
+
+/** Gate the platform-admin (infra/ops) area to the master admin only.
+ *  "Master admin" = the `system_admin` role — the app owner. Middleware already
+ *  restricts /admin/* to that role and login redirects them here; this is the
+ *  page-level defence-in-depth check, plus the optional email allowlist above. */
+export async function requireMasterAdmin(): Promise<MasterAdminContext> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/auth/login')
+  const { data: profile } = await supabase.from('user_profiles').select('role').eq('id', user.id).single()
+  if (profile?.role !== 'system_admin') redirect('/auth/login')
+  const email = (user.email ?? '').toLowerCase()
+  if (MASTER_ADMIN_EMAILS.length && !MASTER_ADMIN_EMAILS.includes(email)) redirect('/auth/login')
+  return { userId: user.id, email: user.email ?? '' }
+}
+
 /** Gate a v3 executive page + return their company scope. */
 export async function requireExecutiveV3(): Promise<ExecContext> {
   const supabase = createClient()

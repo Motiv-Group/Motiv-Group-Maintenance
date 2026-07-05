@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { LogOut } from 'lucide-react'
 import { MotivLogo } from '@/components/ui/MotivLogo'
+import { AdminNav } from '@/components/admin/AdminNav'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,6 +21,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           </form>
         </div>
       </header>
+      <AdminNav />
       <main className="flex-1 max-w-[1500px] w-full mx-auto px-4 py-6">{children}</main>
     </div>
   )

@@ -39,7 +39,11 @@ just a limits one. Budget for Pro before charging customers or marketing publicl
 | 2 | **WhatsApp technician dispatch + arrival tracking** | Needs a Meta-approved template + paid WhatsApp messaging beyond the free conversation cap | Roster shipped; dispatch not wired | WhatsApp paid + approved template |
 | 3 | **Automated DB backups / point-in-time recovery** | Supabase Free has no backups/PITR | None — manual export only | Supabase **Pro** |
 | 4 | **Leaked-password protection** (HaveIBeenPwned check on signup) | **Not available on Supabase Free** — Pro feature | Min-password-length rule only | Supabase **Pro** |
-| 5 | *(add the next tier-blocked item here)* | | | |
+| 5 | **In-app Vercel traffic/bandwidth analytics** (on `/admin/vercel`) | Vercel Web Analytics + usage data are **not in the Hobby REST API** (Analytics is a Pro add-on) | `/admin/vercel` shows deployments/build-state/domains and links out to the Vercel dashboard for traffic | Vercel **Pro** + Web Analytics |
+| 6 | **In-app Upstash command/bandwidth graphs** (on `/admin/upstash`) | Redis REST API has no usage stats — needs the separate **Upstash Management API + a new credential** | Show DBSIZE + live `motiv-rl` key count; link to the Upstash console for graphs | Wire Upstash Management API (or paid) |
+| 7 | **In-app Resend send/delivery analytics** (on `/admin/resend`) | Free Resend API exposes **domains/keys, not send/open/bounce metrics** | Show domains + `EMAIL_FROM` config; link to the Resend dashboard for volume | Resend paid / analytics API |
+| 8 | **In-app Supabase egress/MAU/usage metrics** (on `/admin/supabase`) | Supabase usage/egress needs the **Management API + a PAT**; free usage reports are dashboard-only | Show DB size, storage size and row counts via `admin_db_stats()`; link to Supabase reports | Supabase Management API / **Pro** |
+| 9 | *(add the next tier-blocked item here)* | | | |
 
 _Note: after deleting the legacy `/api/cron/snapshots`, there is now **one free Hobby cron
 slot** — but Hobby is still daily-only, so item #1 (hourly) stays blocked until Pro._
