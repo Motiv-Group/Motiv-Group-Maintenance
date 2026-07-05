@@ -61,9 +61,10 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const tr = resolveTransition(ticket.status, action, role)
   if (!tr) return NextResponse.json({ error: `You can't ${action} a ticket that is "${statusLabel(ticket.status)}".` }, { status: 400 })
 
-  // An OPEN dispute pauses the snag / evidence step — the supplier can't accept &
-  // schedule or upload evidence until the RM resolves it (see /dispute).
-  if (['accept_snag', 'submit_completion', 'start_snag'].includes(action)) {
+  // An OPEN dispute pauses the disputed step — the supplier can't accept & schedule,
+  // upload evidence or re-submit the VO, and the RM can't close out, until the dispute
+  // is resolved (see /dispute).
+  if (['accept_snag', 'submit_completion', 'start_snag', 'submit_variation', 'close_out'].includes(action)) {
     const { data: openDispute } = await admin.from('ticket_disputes').select('id').eq('ticket_id', ticketId).eq('status', 'open').maybeSingle()
     if (openDispute) return NextResponse.json({ error: 'This ticket has an open dispute — resolve it before continuing.' }, { status: 409 })
   }

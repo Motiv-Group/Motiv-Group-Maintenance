@@ -24,6 +24,48 @@ async function supplierIds(admin: Admin, supplierId: string | null): Promise<str
 function cleanUrls(v: unknown): string[] {
   return Array.isArray(v) ? v.filter((u): u is string => typeof u === 'string' && u.length > 0).slice(0, 10) : []
 }
+const originWord = (o: string) => o === 'snag' ? 'snag' : o === 'variation' ? 'variation order' : 'evidence request'
+const roleName = (r: string) => r === 'supplier' ? 'Supplier' : 'Regional Manager'
+
+// Resolve a dispute. outcome 'withdrawn' = the RM's request is DROPPED/retracted;
+// 'upheld' = it STANDS. Applies the origin-specific effect (snag/evidence → accept the
+// latest submission and move to close-out; variation → reopen the declined VO for
+// review), clears any pending proposal, records a closing message and notifies the
+// other side. `actorRole` is who triggered the resolution.
+async function resolveDispute(admin: Admin, ticket: any, dispute: any, outcome: 'withdrawn' | 'upheld', note: string | null, actorId: string, actorRole: 'supplier' | 'regional_manager', now: string) {
+  const ticketId = ticket.id as string
+  const what = originWord(dispute.origin)
+  const isVariation = dispute.origin === 'variation'
+  const title = `Ticket: ${ticket.title ?? 'Untitled'}`
+  await admin.from('ticket_disputes').update({ status: 'resolved', outcome, resolved_by: actorId, resolved_at: now, resolution_note: note, pending_outcome: null, pending_by: null, pending_at: null }).eq('id', dispute.id)
+  const label = outcome === 'withdrawn'
+    ? (isVariation ? 'Variation-order decline retracted — reopened for review' : `${what[0].toUpperCase()}${what.slice(1)} retracted — dropped`)
+    : (isVariation ? 'Variation-order decline upheld — stays declined' : `${what[0].toUpperCase()}${what.slice(1)} upheld — stands`)
+  await admin.from('ticket_dispute_messages').insert({ dispute_id: dispute.id, ticket_id: ticketId, author_id: actorId, author_role: actorRole, body: `Dispute resolved — ${label}${note ? `: ${note}` : '.'}`, evidence_urls: [], created_at: now })
+  if (outcome === 'withdrawn') {
+    if (isVariation) {
+      // Reopen the latest declined variation for the RM to re-decide.
+      const { data: v } = await admin.from('ticket_variations').select('id').eq('ticket_id', ticketId).eq('status', 'rejected').order('created_at', { ascending: false }).limit(1).maybeSingle()
+      if ((v as any)?.id) await admin.from('ticket_variations').update({ status: 'pending', reject_reason: null, reviewed_at: null, reviewed_by: null }).eq('id', (v as any).id)
+      await admin.from('tickets').update({ status: 'variation_review', updated_at: now, last_internal_update_at: now }).eq('id', ticketId)
+    } else {
+      // Accept the latest submission and move the job to close-out.
+      const { data: latest } = await admin.from('signoffs').select('id').eq('ticket_id', ticketId).order('created_at', { ascending: false }).limit(1).maybeSingle()
+      if ((latest as any)?.id) await admin.from('signoffs').update({ status: 'accepted', reviewed_by: actorId, reviewed_at: now }).eq('id', (latest as any).id)
+      await admin.from('snags').update({ status: 'resolved' }).eq('ticket_id', ticketId).in('status', ['open', 'assigned', 'in_progress'])
+      await admin.from('tickets').update({ status: 'approved_closeout', signoff_status: 'accepted', updated_at: now, last_internal_update_at: now }).eq('id', ticketId)
+    }
+  } else {
+    // Upheld — the request stands; the ticket keeps its state so the supplier resumes.
+    await admin.from('tickets').update({ updated_at: now, ...(actorRole === 'supplier' ? { last_supplier_update_at: now } : { last_internal_update_at: now }) }).eq('id', ticketId)
+  }
+  // Notify the party who didn't trigger this.
+  const summary = outcome === 'withdrawn'
+    ? (isVariation ? 'the variation order reopens for review' : `the ${what} was retracted — the job moves to close-out`)
+    : (isVariation ? 'the variation-order decline stands' : `the ${what} stands`)
+  if (actorRole === 'regional_manager') await push(admin, await supplierIds(admin, ticket.supplier_id), ticket.company_id, title, `Dispute resolved — ${summary}.`, `/supplier/tickets/${ticketId}`)
+  else await push(admin, await regionIds(admin, ticket.region_id), ticket.company_id, title, `Dispute resolved — ${summary}.`, `/regional/tickets/${ticketId}`)
+}
 
 // POST /api/tickets/:id/dispute  { action: 'raise' | 'reply' | 'resolve', ... }
 // Supplier↔RM dispute thread over a snag or a "more evidence" request. A dispute
@@ -65,20 +107,22 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   if (action === 'raise') {
     if (actingRole !== 'supplier') return NextResponse.json({ error: 'Only the supplier can raise a dispute.' }, { status: 403 })
-    if (!['snag', 'evidence_requested'].includes(ticket.status)) return NextResponse.json({ error: 'A dispute can only be raised on a snag or an evidence request.' }, { status: 400 })
+    if (!['snag', 'evidence_requested', 'vo_declined'].includes(ticket.status)) return NextResponse.json({ error: 'A dispute can only be raised on a snag, an evidence request, or a declined variation order.' }, { status: 400 })
     if (openDispute) return NextResponse.json({ error: 'A dispute is already open on this ticket.' }, { status: 409 })
     const messageBody = String(body.body ?? '').trim()
     const evidence = cleanUrls(body.evidenceUrls)
     if (!messageBody && !evidence.length) return NextResponse.json({ error: 'Add a message or attach evidence.' }, { status: 400 })
+    const origin = ticket.status === 'snag' ? 'snag' : ticket.status === 'vo_declined' ? 'variation' : 'evidence_requested'
     const { data: disp, error } = await admin.from('ticket_disputes')
-      .insert({ company_id: ticket.company_id, ticket_id: ticketId, origin: ticket.status === 'snag' ? 'snag' : 'evidence_requested', status: 'open', raised_by: user.id, created_at: now })
+      .insert({ company_id: ticket.company_id, ticket_id: ticketId, origin, status: 'open', raised_by: user.id, created_at: now })
       .select('id').single()
     if (error || !disp) return NextResponse.json({ error: 'Could not raise the dispute.' }, { status: 500 })
-    // Link the dispute to the submission it concerns (the latest signoff — the one
-    // that was snagged / had more evidence requested). Best-effort, separate update so
-    // raising still works before the signoff_id column is migrated.
-    const { data: latestSignoff } = await admin.from('signoffs').select('id').eq('ticket_id', ticketId).order('created_at', { ascending: false }).limit(1).maybeSingle()
-    if ((latestSignoff as any)?.id) await admin.from('ticket_disputes').update({ signoff_id: (latestSignoff as any).id }).eq('id', disp.id)
+    // Link a snag/evidence dispute to the submission it concerns (the latest signoff).
+    // Best-effort, separate update so raising works before the signoff_id column exists.
+    if (origin !== 'variation') {
+      const { data: latestSignoff } = await admin.from('signoffs').select('id').eq('ticket_id', ticketId).order('created_at', { ascending: false }).limit(1).maybeSingle()
+      if ((latestSignoff as any)?.id) await admin.from('ticket_disputes').update({ signoff_id: (latestSignoff as any).id }).eq('id', disp.id)
+    }
     await admin.from('ticket_dispute_messages').insert({ dispute_id: disp.id, ticket_id: ticketId, author_id: user.id, author_role: 'supplier', body: messageBody || null, evidence_urls: evidence, created_at: now })
     await admin.from('tickets').update({ last_supplier_update_at: now, updated_at: now }).eq('id', ticketId)
     await push(admin, await regionIds(admin, ticket.region_id), ticket.company_id, title, 'The supplier has raised a dispute — review and respond.', `/regional/tickets/${ticketId}`)
@@ -94,36 +138,41 @@ export async function POST(request: Request, { params }: { params: { id: string 
     } else {
       await push(admin, await supplierIds(admin, ticket.supplier_id), ticket.company_id, title, 'The manager replied on your dispute.', `/supplier/tickets/${ticketId}`)
     }
-  } else if (action === 'resolve') {
+  } else if (action === 'withdraw') {
+    // Supplier concedes → the request STANDS (outcome 'upheld').
+    if (actingRole !== 'supplier') return NextResponse.json({ error: 'Only the supplier can withdraw the dispute.' }, { status: 403 })
     if (!openDispute) return NextResponse.json({ error: 'No open dispute on this ticket.' }, { status: 409 })
-    const outcome = body.outcome === 'withdrawn' ? 'withdrawn' : body.outcome === 'upheld' ? 'upheld' : null
-    if (!outcome) return NextResponse.json({ error: 'Choose an action.' }, { status: 400 })
-    // Two unilateral resolutions:
-    //  • the SUPPLIER withdraws the dispute → the requirement STANDS (outcome 'upheld').
-    //  • the RM retracts the snag / evidence request → DROPPED (outcome 'withdrawn').
-    if (outcome === 'upheld' && actingRole !== 'supplier') return NextResponse.json({ error: 'Only the supplier can withdraw the dispute.' }, { status: 403 })
-    if (outcome === 'withdrawn' && actingRole !== 'regional_manager') return NextResponse.json({ error: 'Only the manager can retract the snag / evidence request.' }, { status: 403 })
+    await resolveDispute(admin, ticket, openDispute, 'upheld', String(body.note ?? '').trim() || null, user.id, 'supplier', now)
+  } else if (action === 'retract') {
+    // RM concedes → the request is DROPPED (outcome 'withdrawn').
+    if (actingRole !== 'regional_manager') return NextResponse.json({ error: 'Only the manager can retract the request.' }, { status: 403 })
+    if (!openDispute) return NextResponse.json({ error: 'No open dispute on this ticket.' }, { status: 409 })
+    await resolveDispute(admin, ticket, openDispute, 'withdrawn', String(body.note ?? '').trim() || null, user.id, 'regional_manager', now)
+  } else if (action === 'propose') {
+    // Supplier proposes to RESOLVE (drop → 'withdrawn'); RM proposes to UPHOLD (keep →
+    // 'upheld'). The other party must confirm. A new proposal replaces any pending one.
+    if (!openDispute) return NextResponse.json({ error: 'No open dispute on this ticket.' }, { status: 409 })
+    const proposed = actingRole === 'supplier' ? 'withdrawn' : 'upheld'
     const note = String(body.note ?? '').trim() || null
-    const isSnag = openDispute.origin === 'snag'
-    await admin.from('ticket_disputes').update({ status: 'resolved', outcome, resolved_by: user.id, resolved_at: now, resolution_note: note }).eq('id', openDispute.id)
-    // Closing summary message so the outcome is captured in the thread history.
-    const outcomeLabel = outcome === 'withdrawn'
-      ? (isSnag ? 'Snag retracted by the manager' : 'Evidence request retracted by the manager')
-      : (isSnag ? 'Dispute withdrawn — snag stands' : 'Dispute withdrawn — evidence request stands')
-    await admin.from('ticket_dispute_messages').insert({ dispute_id: openDispute.id, ticket_id: ticketId, author_id: user.id, author_role: actingRole, body: `Dispute resolved — ${outcomeLabel}${note ? `: ${note}` : '.'}`, evidence_urls: [], created_at: now })
-    if (outcome === 'withdrawn') {
-      // RM retracted — drop the requirement: accept the latest submission and move the
-      // job to close-out (the RM still does the final close-out).
-      const { data: latest } = await admin.from('signoffs').select('id').eq('ticket_id', ticketId).order('created_at', { ascending: false }).limit(1).maybeSingle()
-      if ((latest as any)?.id) await admin.from('signoffs').update({ status: 'accepted', reviewed_by: user.id, reviewed_at: now }).eq('id', (latest as any).id)
-      await admin.from('snags').update({ status: 'resolved' }).eq('ticket_id', ticketId).in('status', ['open', 'assigned', 'in_progress'])
-      await admin.from('tickets').update({ status: 'approved_closeout', signoff_status: 'accepted', updated_at: now, last_internal_update_at: now }).eq('id', ticketId)
-      await push(admin, await supplierIds(admin, ticket.supplier_id), ticket.company_id, title, `Dispute resolved — the ${isSnag ? 'snag' : 'evidence request'} was retracted. The job moves to close-out.`, `/supplier/tickets/${ticketId}`)
-    } else {
-      // Supplier withdrew — the requirement stands; they resume the paused step.
-      await admin.from('tickets').update({ updated_at: now, last_supplier_update_at: now }).eq('id', ticketId)
-      await push(admin, await regionIds(admin, ticket.region_id), ticket.company_id, title, `The supplier withdrew the dispute — the ${isSnag ? 'snag stands' : 'evidence request stands'}.`, `/regional/tickets/${ticketId}`)
-    }
+    const what = originWord(openDispute.origin)
+    await admin.from('ticket_disputes').update({ pending_outcome: proposed, pending_by: actingRole, pending_at: now }).eq('id', openDispute.id)
+    const label = proposed === 'withdrawn' ? `proposed to resolve the dispute — drop the ${what}` : `proposed to uphold the ${what} — it stands`
+    await admin.from('ticket_dispute_messages').insert({ dispute_id: openDispute.id, ticket_id: ticketId, author_id: user.id, author_role: actingRole, body: `${roleName(actingRole)} ${label}. Awaiting the other party's agreement.${note ? ` — ${note}` : ''}`, evidence_urls: [], created_at: now })
+    await admin.from('tickets').update({ updated_at: now, ...(actingRole === 'supplier' ? { last_supplier_update_at: now } : { last_internal_update_at: now }) }).eq('id', ticketId)
+    if (actingRole === 'supplier') await push(admin, await regionIds(admin, ticket.region_id), ticket.company_id, title, 'The supplier proposed to resolve the dispute — confirm to drop the request.', `/regional/tickets/${ticketId}`)
+    else await push(admin, await supplierIds(admin, ticket.supplier_id), ticket.company_id, title, 'The manager proposed to uphold the request — confirm to agree.', `/supplier/tickets/${ticketId}`)
+  } else if (action === 'confirm') {
+    // The OTHER party agrees to the pending proposal → resolve with its outcome.
+    if (!openDispute) return NextResponse.json({ error: 'No open dispute on this ticket.' }, { status: 409 })
+    if (!openDispute.pending_outcome || !openDispute.pending_by) return NextResponse.json({ error: 'There is no proposal to confirm.' }, { status: 400 })
+    if (openDispute.pending_by === actingRole) return NextResponse.json({ error: 'The other party needs to confirm your proposal.' }, { status: 403 })
+    await resolveDispute(admin, ticket, openDispute, openDispute.pending_outcome === 'withdrawn' ? 'withdrawn' : 'upheld', null, user.id, actingRole, now)
+  } else if (action === 'cancel') {
+    // The proposer withdraws their pending proposal.
+    if (!openDispute) return NextResponse.json({ error: 'No open dispute on this ticket.' }, { status: 409 })
+    if (openDispute.pending_by !== actingRole) return NextResponse.json({ error: 'Only the party who proposed can cancel it.' }, { status: 403 })
+    await admin.from('ticket_disputes').update({ pending_outcome: null, pending_by: null, pending_at: null }).eq('id', openDispute.id)
+    await admin.from('ticket_dispute_messages').insert({ dispute_id: openDispute.id, ticket_id: ticketId, author_id: user.id, author_role: actingRole, body: `${roleName(actingRole)} cancelled their proposal.`, evidence_urls: [], created_at: now })
   } else {
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
   }

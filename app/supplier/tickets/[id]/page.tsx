@@ -167,7 +167,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
     // reason on the archived round cards (falls back to the signoff row if unmigrated).
     admin.from('signoff_rounds').select('signoff_id, round_no, kind, reason').eq('ticket_id', t.id),
     // Snag / evidence disputes on this ticket + their message threads (chronological).
-    admin.from('ticket_disputes').select('id, origin, status, outcome, resolution_note, signoff_id, created_at, resolved_at').eq('ticket_id', t.id).order('created_at', { ascending: true }),
+    admin.from('ticket_disputes').select('id, origin, status, outcome, resolution_note, signoff_id, pending_outcome, pending_by, created_at, resolved_at').eq('ticket_id', t.id).order('created_at', { ascending: true }),
     admin.from('ticket_dispute_messages').select('id, dispute_id, author_role, body, evidence_urls, created_at').eq('ticket_id', t.id).order('created_at', { ascending: true }),
     // Durable snag-fix schedule rounds → every proposal / approval / decline on the trail.
     admin.from('snag_schedule_events').select('kind, scheduled_for, reason, created_at').eq('ticket_id', t.id).order('created_at', { ascending: true }),
@@ -324,6 +324,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   const resolvedDisputes = disputes.filter(d => d.status === 'resolved')
   // What each dispute is about — the disputed "Submission #N" + snag / evidence request.
   const disputeSubject = (d: any) => {
+    if (d.origin === 'variation') return 'Variation order · declined'
     const n = d.signoff_id ? submissionNo.get(d.signoff_id) : null
     const what = d.origin === 'snag' ? 'snag' : 'evidence request'
     return n ? `Submission #${n} · ${what}` : what
@@ -509,9 +510,17 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
             <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 text-sm text-[var(--text-muted)]">COC &amp; POC submitted — awaiting the regional manager&apos;s approval.</div>
           )}
           {/* Close-out stage → the supplier may raise a variation order for extra work;
-              otherwise the RM does the final close-out. */}
+              otherwise the RM does the final close-out. On a declined VO the supplier
+              can also dispute the decline (paused while the dispute is open). */}
           {awarded && (t.status === 'approved_closeout' || t.status === 'vo_declined') && (
-            <SupplierVariationGate ticketId={t.id} priority={t.priority} createdAt={t.created_at} variationCount={variationCount} status={t.status as 'approved_closeout' | 'vo_declined'} declineReason={latestVoRejectReason} />
+            openDispute && t.status === 'vo_declined' ? (
+              <div className="rounded-xl bg-red-500/10 ring-1 ring-red-500/30 p-3.5 text-sm text-[var(--text-muted)]">The variation-order decline is paused while your dispute is under review — continue the conversation in the Dispute section above.</div>
+            ) : (
+              <div className="space-y-3">
+                <SupplierVariationGate ticketId={t.id} priority={t.priority} createdAt={t.created_at} variationCount={variationCount} status={t.status as 'approved_closeout' | 'vo_declined'} declineReason={latestVoRejectReason} />
+                {t.status === 'vo_declined' && !openDispute && <RaiseDisputeButton ticketId={t.id} origin="variation" />}
+              </div>
+            )
           )}
           {/* submit_quote is handled by SendQuoteForm above — exclude the duplicate button. */}
           {/* Scoped to this supplier's own state so a non-awarded supplier never sees

@@ -151,13 +151,14 @@ export function buildTicketTimeline(t: TimelineInput): TimelineEvent[] {
   // Dispute lifecycle: the supplier raises it (snag / evidence request), the RM
   // resolves it as upheld (requirement stands) or withdrawn (dropped).
   for (const d of t.disputes ?? []) {
-    const what = d.origin === 'snag' ? 'snag' : 'evidence request'
+    const what = d.origin === 'snag' ? 'snag' : d.origin === 'variation' ? 'variation order' : 'evidence request'
     push(d.created_at, `Dispute raised — ${what}`, 'quote_declined', 'Supplier')
     if (d.status === 'resolved') {
       const reason = d.reason ? ` — ${d.reason}` : ''
-      // 'withdrawn' = the RM retracted the snag/evidence (dropped); 'upheld' = the
-      // supplier withdrew their dispute (the requirement stands).
-      if (d.outcome === 'withdrawn') push(d.resolved_at ?? d.created_at, `${what === 'snag' ? 'Snag' : 'Evidence request'} retracted by the manager${reason}`, 'completion_approved', 'Regional Manager')
+      const Cap = `${what[0].toUpperCase()}${what.slice(1)}`
+      // 'withdrawn' = the RM's request was dropped/retracted; 'upheld' = the supplier
+      // withdrew their dispute so the request stands.
+      if (d.outcome === 'withdrawn') push(d.resolved_at ?? d.created_at, d.origin === 'variation' ? `Variation-order decline retracted — reopened for review${reason}` : `${Cap} retracted by the manager${reason}`, 'completion_approved', 'Regional Manager')
       else push(d.resolved_at ?? d.created_at, `Dispute withdrawn — ${what} stands${reason}`, 'info_requested', 'Supplier')
     }
   }

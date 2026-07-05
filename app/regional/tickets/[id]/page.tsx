@@ -248,7 +248,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
     // THIS RM's "last seen this ticket" watermark → which supplier updates are new.
     admin.from('ticket_reads').select('last_seen_at').eq('user_id', userId).eq('ticket_id', t.id).maybeSingle(),
     // Snag / evidence disputes on this ticket + their message threads (chronological).
-    admin.from('ticket_disputes').select('id, origin, status, outcome, resolution_note, signoff_id, created_at, resolved_at').eq('ticket_id', t.id).order('created_at', { ascending: true }),
+    admin.from('ticket_disputes').select('id, origin, status, outcome, resolution_note, signoff_id, pending_outcome, pending_by, created_at, resolved_at').eq('ticket_id', t.id).order('created_at', { ascending: true }),
     admin.from('ticket_dispute_messages').select('id, dispute_id, author_role, body, evidence_urls, created_at').eq('ticket_id', t.id).order('created_at', { ascending: true }),
     // Durable snag-fix schedule rounds → every proposal / approval / decline on the trail.
     admin.from('snag_schedule_events').select('kind, scheduled_for, reason, created_at').eq('ticket_id', t.id).order('created_at', { ascending: true }),
@@ -298,6 +298,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   const submissionTone = (s: any): 'snag' | 'evidence' => (roundBySignoff.get(s.id)?.kind ?? (s.status === 'rejected' ? 'snag' : 'evidence')) === 'snag' ? 'snag' : 'evidence'
   // What each dispute is about — the disputed "Submission #N" + snag / evidence request.
   const disputeSubject = (d: any) => {
+    if (d.origin === 'variation') return 'Variation order · declined'
     const n = d.signoff_id ? submissionNo.get(d.signoff_id) : null
     const what = d.origin === 'snag' ? 'snag' : 'evidence request'
     return n ? `Submission #${n} · ${what}` : what

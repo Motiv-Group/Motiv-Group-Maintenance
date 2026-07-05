@@ -18,13 +18,20 @@ export interface DisputeMessage {
 }
 export interface DisputeRecord {
   id: string
-  origin: 'snag' | 'evidence_requested' | string
+  origin: 'snag' | 'evidence_requested' | 'variation' | string
   status: 'open' | 'resolved' | string
   outcome: 'upheld' | 'withdrawn' | string | null
   resolution_note: string | null
+  // Current pending proposal (propose → the other side confirms). 'withdrawn' = a
+  // proposal to drop the request; 'upheld' = a proposal to keep it (stands).
+  pending_outcome?: 'withdrawn' | 'upheld' | string | null
+  pending_by?: 'supplier' | 'regional_manager' | string | null
   created_at: string
   resolved_at: string | null
 }
+
+// Origin → the word used for the disputed request across the UI.
+const originWord = (o: string) => o === 'snag' ? 'snag' : o === 'variation' ? 'variation order' : 'evidence request'
 
 const ROLE_LABEL: Record<string, string> = { supplier: 'Supplier', regional_manager: 'Regional Manager' }
 
@@ -90,8 +97,9 @@ function Composer({ ticketId, action, submitLabel, placeholder, onDone }: { tick
 }
 
 // Supplier-only button that opens the raise-dispute pop-up (composer + intro).
-export function RaiseDisputeButton({ ticketId, origin }: { ticketId: string; origin: 'snag' | 'evidence' }) {
+export function RaiseDisputeButton({ ticketId, origin }: { ticketId: string; origin: 'snag' | 'evidence' | 'variation' }) {
   const [open, setOpen] = useState(false)
+  const what = origin === 'snag' ? 'snag' : origin === 'variation' ? 'variation-order decline' : 'evidence request'
   return (
     <>
       <button onClick={() => setOpen(true)} className="w-full py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-semibold transition flex items-center justify-center gap-1.5">
@@ -105,7 +113,7 @@ export function RaiseDisputeButton({ ticketId, origin }: { ticketId: string; ori
               <button onClick={() => setOpen(false)} className="p-1 -m-1 text-[var(--text-faint)] hover:text-[var(--text)]"><X size={18} /></button>
             </div>
             <p className="text-xs text-[var(--text-muted)]">
-              This pauses the {origin === 'snag' ? 'snag' : 'evidence request'} until the manager resolves it. Explain your case and attach any evidence — you and the manager can keep exchanging messages here.
+              This pauses the {what} until the dispute is resolved. Explain your case and attach any evidence — you and the client can keep exchanging messages here to keep an audit trail for the dispute.
             </p>
             <Composer ticketId={ticketId} action="raise" submitLabel="Raise dispute" placeholder="Explain why you disagree…" onDone={() => setOpen(false)} />
           </div>
@@ -124,7 +132,8 @@ export function DisputeThread({ ticketId, dispute, messages, viewerRole, readOnl
   subject?: string | null
 }) {
   const isOpen = dispute.status === 'open' && !readOnly
-  const isSnag = dispute.origin === 'snag'
+  const what = originWord(dispute.origin)
+  const What = `${what[0].toUpperCase()}${what.slice(1)}`
 
   return (
     <div className="space-y-3">
@@ -135,8 +144,8 @@ export function DisputeThread({ ticketId, dispute, messages, viewerRole, readOnl
         <div className={`rounded-lg p-3 ring-1 ${dispute.outcome === 'withdrawn' ? 'bg-emerald-500/10 ring-emerald-500/30' : 'bg-amber-500/10 ring-amber-500/30'}`}>
           <p className={`text-[11px] font-bold uppercase tracking-wide ${dispute.outcome === 'withdrawn' ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}`}>
             {dispute.outcome === 'withdrawn'
-              ? (isSnag ? 'Snag retracted by the manager' : 'Evidence request retracted by the manager')
-              : (isSnag ? 'Dispute withdrawn — snag stands' : 'Dispute withdrawn — evidence request stands')}
+              ? (dispute.origin === 'variation' ? 'Variation-order decline retracted — reopened for review' : `${What} retracted — dropped`)
+              : (dispute.origin === 'variation' ? 'Variation-order decline upheld — stays declined' : `${What} upheld — stands`)}
           </p>
           {dispute.resolution_note && <p className="text-sm text-[var(--text)]">{dispute.resolution_note}</p>}
         </div>
@@ -174,81 +183,76 @@ export function DisputeThread({ ticketId, dispute, messages, viewerRole, readOnl
       {/* Reply while open */}
       {isOpen && <Composer ticketId={ticketId} action="reply" submitLabel="Send reply" placeholder="Add a message or evidence…" />}
 
-      {/* Resolve controls: the RM can RETRACT (drop) the snag / evidence request; the
-          supplier can WITHDRAW their dispute (accepting it, so it stands). */}
-      {isOpen && viewerRole === 'regional_manager' && <RetractPanel ticketId={ticketId} isSnag={isSnag} />}
-      {isOpen && viewerRole === 'supplier' && <WithdrawPanel ticketId={ticketId} isSnag={isSnag} />}
+      {/* Negotiation controls: either side can concede unilaterally, or propose an
+          outcome the other must confirm (propose → confirm). */}
+      {isOpen && <DisputeControls ticketId={ticketId} origin={dispute.origin} viewerRole={viewerRole} pendingOutcome={dispute.pending_outcome ?? null} pendingBy={dispute.pending_by ?? null} />}
     </div>
   )
 }
 
-// RM: retract the snag / evidence request when it was wrong → the requirement is
-// dropped, the latest submission is accepted and the job moves to close-out.
-function RetractPanel({ ticketId, isSnag }: { ticketId: string; isSnag: boolean }) {
+// Dispute resolution. Each side can CONCEDE unilaterally (supplier withdraws → the
+// request stands; RM retracts → it's dropped), or PROPOSE an outcome the OTHER side
+// must confirm (supplier proposes to resolve/drop; RM proposes to uphold/keep).
+function DisputeControls({ ticketId, origin, viewerRole, pendingOutcome, pendingBy }: {
+  ticketId: string; origin: string; viewerRole: 'supplier' | 'regional_manager'
+  pendingOutcome: string | null; pendingBy: string | null
+}) {
   const router = useRouter()
-  const [note, setNote] = useState('')
-  const [busy, setBusy] = useState(false)
+  const [busy, setBusy] = useState('')
   const [err, setErr] = useState('')
+  const what = originWord(origin)
 
-  async function retract() {
-    setBusy(true); setErr('')
+  async function act(action: string) {
+    setBusy(action); setErr('')
     try {
-      const res = await fetch(`/api/tickets/${ticketId}/dispute`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'resolve', outcome: 'withdrawn', note: note.trim() || null }) })
+      const res = await fetch(`/api/tickets/${ticketId}/dispute`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed')
       router.refresh()
-    } catch (e: any) { setErr(e.message) }
-    finally { setBusy(false) }
+    } catch (e: any) { setErr(e.message); setBusy('') }
   }
+
+  const pending = !!pendingOutcome && !!pendingBy
+  const iAmProposer = pending && pendingBy === viewerRole
+  // 'withdrawn' = a proposal to DROP the request; 'upheld' = keep it (stands).
+  const proposalText = pendingOutcome === 'withdrawn' ? `drop the ${what}` : `keep the ${what} — it stands`
+  const otherLabel = (r: string) => r === 'supplier' ? 'supplier' : 'client'
+
+  // Role action set (propose + solo concede). Hidden for the proposer while waiting.
+  const actions = viewerRole === 'supplier' ? (
+    <>
+      <button onClick={() => act('propose')} disabled={!!busy} className="w-full py-2 rounded-lg bg-[#C6A35D] hover:brightness-95 text-[#0a0e17] text-sm font-semibold disabled:opacity-50">{busy === 'propose' ? 'Proposing…' : `Propose to resolve — drop the ${what}`}</button>
+      <button onClick={() => act('withdraw')} disabled={!!busy} className="w-full py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text)] text-sm font-semibold hover:bg-[var(--hover)] transition disabled:opacity-50 flex items-center justify-center gap-1.5"><ShieldCheck size={14} /> {busy === 'withdraw' ? 'Withdrawing…' : `Withdraw dispute — accept the ${what}`}</button>
+    </>
+  ) : (
+    <>
+      <button onClick={() => act('propose')} disabled={!!busy} className="w-full py-2 rounded-lg bg-[#C6A35D] hover:brightness-95 text-[#0a0e17] text-sm font-semibold disabled:opacity-50">{busy === 'propose' ? 'Proposing…' : `Propose to uphold the ${what}`}</button>
+      <button onClick={() => act('retract')} disabled={!!busy} className="w-full py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition disabled:opacity-50 flex items-center justify-center gap-1.5"><ShieldX size={14} /> {busy === 'retract' ? 'Retracting…' : `Retract the ${what}`}</button>
+    </>
+  )
 
   return (
     <div className="rounded-xl ring-1 ring-[var(--border)] bg-[var(--input-bg)] p-3 space-y-2.5">
-      <p className="text-sm font-semibold text-[var(--text)]">Was this {isSnag ? 'snag' : 'evidence request'} wrong?</p>
-      <p className="text-xs text-[var(--text-muted)]">Retract it to drop the requirement — the latest submission is accepted and the job moves to close-out. Otherwise keep discussing; the supplier can withdraw the dispute to accept it.</p>
-      <textarea value={note} onChange={e => setNote(e.target.value)} placeholder="Add a note explaining why you're retracting (optional)…" rows={2}
-        className="w-full px-3 py-2 rounded-lg bg-[var(--surface)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)] outline-none focus:ring-[#C6A35D]/40" />
-      {err && <p className="text-xs text-red-500">{err}</p>}
-      <button onClick={retract} disabled={busy} className="w-full py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition disabled:opacity-50 flex items-center justify-center gap-1.5">
-        <ShieldX size={14} /> {busy ? 'Retracting…' : `Retract ${isSnag ? 'snag' : 'evidence request'}`}
-      </button>
-    </div>
-  )
-}
-
-// Supplier: withdraw the dispute — accept the snag / evidence request, so it stands
-// and they resume the paused step.
-function WithdrawPanel({ ticketId, isSnag }: { ticketId: string; isSnag: boolean }) {
-  const router = useRouter()
-  const [confirm, setConfirm] = useState(false)
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState('')
-
-  async function withdraw() {
-    setBusy(true); setErr('')
-    try {
-      const res = await fetch(`/api/tickets/${ticketId}/dispute`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'resolve', outcome: 'upheld' }) })
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed')
-      router.refresh()
-    } catch (e: any) { setErr(e.message); setBusy(false) }
-  }
-
-  if (confirm) {
-    return (
-      <div className="rounded-xl ring-1 ring-[var(--border)] bg-[var(--input-bg)] p-3 space-y-2">
-        <p className="text-sm text-[var(--text)]">Withdraw the dispute? You accept the {isSnag ? 'snag' : 'evidence request'} and will {isSnag ? 'accept & schedule the fix' : 'upload the evidence'}.</p>
-        {err && <p className="text-xs text-red-500">{err}</p>}
-        <div className="flex gap-2">
-          <button onClick={withdraw} disabled={busy} className="flex-1 py-2 rounded-lg bg-[#C6A35D] hover:brightness-95 text-[#0a0e17] text-sm font-semibold disabled:opacity-50">{busy ? 'Withdrawing…' : 'Yes, withdraw'}</button>
-          <button onClick={() => { setConfirm(false); setErr('') }} disabled={busy} className="flex-1 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm disabled:opacity-50">Cancel</button>
+      {pending && iAmProposer && (
+        <div className="rounded-lg ring-1 ring-[#C6A35D]/30 bg-[#C6A35D]/10 p-2.5 space-y-2">
+          <p className="text-sm text-[var(--text)]">Waiting for the {otherLabel(viewerRole === 'supplier' ? 'regional_manager' : 'supplier')} to confirm your proposal to <span className="font-semibold">{proposalText}</span>.</p>
+          <button onClick={() => act('cancel')} disabled={!!busy} className="w-full py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm font-semibold disabled:opacity-50">{busy === 'cancel' ? 'Cancelling…' : 'Cancel proposal'}</button>
         </div>
-      </div>
-    )
-  }
-  return (
-    <>
-      <button onClick={() => setConfirm(true)} className="w-full py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text)] text-sm font-semibold hover:bg-[var(--hover)] transition flex items-center justify-center gap-1.5">
-        <ShieldCheck size={14} /> Withdraw dispute — accept the {isSnag ? 'snag' : 'evidence request'}
-      </button>
-      {err && <p className="text-xs text-red-500 mt-1">{err}</p>}
-    </>
+      )}
+      {pending && !iAmProposer && (
+        <div className="rounded-lg ring-1 ring-[#C6A35D]/30 bg-[#C6A35D]/10 p-2.5 space-y-2">
+          <p className="text-sm text-[var(--text)]">The {otherLabel(pendingBy!)} proposed to <span className="font-semibold">{proposalText}</span>. Both sides must agree.</p>
+          <button onClick={() => act('confirm')} disabled={!!busy} className="w-full py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold disabled:opacity-50">{busy === 'confirm' ? 'Agreeing…' : 'Agree'}</button>
+        </div>
+      )}
+      {/* The proposer just waits; everyone else gets the action set (which counter-
+          proposes / concedes). */}
+      {!(pending && iAmProposer) && (
+        <>
+          <p className="text-sm font-semibold text-[var(--text)]">{pending ? 'Or resolve it another way' : 'Resolve the dispute'}</p>
+          {actions}
+        </>
+      )}
+      {err && <p className="text-xs text-red-500">{err}</p>}
+    </div>
   )
 }
