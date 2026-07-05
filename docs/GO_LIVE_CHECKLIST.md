@@ -17,7 +17,7 @@ Tier-blocked items live in `docs/INFRASTRUCTURE_TIERS.md`. Security architecture
 - [ ] **Supabase Pro** — automated backups / PITR (no backup story today).
 - [x] **Enforce CSP** — ✅ done 2026-07-07 (Report-Only → enforcing; verified in-browser, no violations). Remaining: **CSP Step 2 (nonces)** to drop `'unsafe-inline'` for real XSS defence — see below.
 - [ ] **CSP Step 2 — nonce-based** (remove `'unsafe-inline'`/`'unsafe-eval'` from script-src). Bigger, tested change.
-- [ ] `/api/files/sign` — currently **unused** by the app (all display signs server-side). Either **remove it** (kills the attack surface) or add per-file ownership auth if a client ever needs it.
+- [x] `/api/files/sign` — ✅ **removed** 2026-07-07 (was unused; all display signs server-side). Kills the "any logged-in user signs any path" surface. Re-add with per-file auth only if a client ever needs on-demand signing.
 - [ ] Account-delete session revoke (JWT ~1h window), `<img>`→`next/image`, Android `minifyEnabled=true`.
 
 **⏸️ Parked (come back to):**
