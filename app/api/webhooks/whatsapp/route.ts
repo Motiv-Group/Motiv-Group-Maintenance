@@ -503,8 +503,8 @@ async function sendBriefingViaWhatsApp(from: string, normalisedPhone: string, ad
 
 async function handleWebhook(payload: WaPayload) {
   try {
-    console.log('[WhatsApp] Raw payload:', JSON.stringify(payload, null, 2));
-
+    // Do NOT log the full payload — it contains the sender's phone number and
+    // message text (PII). Log only non-identifying shape for debugging.
     const change  = payload.entry?.[0]?.changes?.[0]?.value;
     const message = change?.messages?.[0];
 

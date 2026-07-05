@@ -1,6 +1,6 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { serverError } from '@/lib/api-error'
+import { serverError, parseAmount } from '@/lib/api-error'
 import { revalidatePath } from 'next/cache'
 import { rateLimit } from '@/lib/rate-limit'
 import { sendPushToMany } from '@/lib/push'
@@ -15,8 +15,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
   if (!(await rateLimit(`submit-quote:${user.id}`, 30, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
   const body = await request.json().catch(() => ({}))
-  const amount = Number(body.amount)
-  if (!amount || amount <= 0) return NextResponse.json({ error: 'Enter a valid quote amount.' }, { status: 400 })
+  const amount = parseAmount(body.amount)
+  if (amount === null) return NextResponse.json({ error: 'Enter a valid quote amount.' }, { status: 400 })
 
   const admin = createAdminClient()
   const { data: prof } = await admin.from('user_profiles').select('role, company_id, full_name').eq('id', user.id).single()

@@ -3,9 +3,12 @@ import { createClient } from '@/lib/supabase/server'
 import { extractText } from 'unpdf'
 import * as XLSX from 'xlsx'
 import { extractTotalsFromText, extractValidUntil, type ExtractedTotals } from '@/lib/quote-extract'
+import { rateLimit } from '@/lib/rate-limit'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
+
+const MAX_FILE_BYTES = 15 * 1024 * 1024 // 15 MB/file — caps DoS + Groq spend
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY!
 const GROQ_BASE    = 'https://api.groq.com/openai/v1'
@@ -41,9 +44,16 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
+  // Expensive (Groq LLM) — cap per user so it can't be hammered.
+  if (!(await rateLimit(`parse-pdf:${user.id}`, 15, 60_000)))
+    return NextResponse.json({ error: 'Too many requests — please wait a minute.' }, { status: 429 })
+
   const formData = await req.formData()
   const files = formData.getAll('file').filter((f): f is File => f instanceof File)
   if (files.length === 0) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
+  if (files.length > 5) return NextResponse.json({ error: 'Too many files (max 5).' }, { status: 400 })
+  const oversize = files.find(f => f.size > MAX_FILE_BYTES)
+  if (oversize) return NextResponse.json({ error: 'File too large (max 15 MB).' }, { status: 413 })
 
   const today = new Date().toISOString().split('T')[0]
   const first = files[0]

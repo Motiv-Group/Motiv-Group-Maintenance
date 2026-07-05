@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { normalisePhone } from '@/lib/csv'
+import { rateLimit } from '@/lib/rate-limit'
 
 // Custom-token supplier onboarding (no Supabase OTP). The link stays valid
 // until accepted_at is set. GET validates the token; POST creates the auth user
@@ -23,6 +24,9 @@ async function loadInvite(token: string | null): Promise<{ inv?: Invite; error?:
 
 // GET /api/supplier/onboard?token=... — validate + return prefill data
 export async function GET(request: Request) {
+  // Unauthenticated + token-gated → coarse global limit to slow token enumeration.
+  if (!(await rateLimit('onboard-validate', 60, 60_000)))
+    return NextResponse.json({ error: 'Too many requests — please wait a minute.' }, { status: 429 })
   const token = new URL(request.url).searchParams.get('token')
   const { inv, error, status } = await loadInvite(token)
   if (!inv) return NextResponse.json({ error }, { status })
@@ -33,6 +37,8 @@ export async function GET(request: Request) {
 
 // POST /api/supplier/onboard — create the supplier account + link + consume token
 export async function POST(request: Request) {
+  if (!(await rateLimit('onboard-create', 30, 60_000)))
+    return NextResponse.json({ error: 'Too many requests — please wait a minute.' }, { status: 429 })
   const b = await request.json()
   const { inv, error, status } = await loadInvite(b.token)
   if (!inv) return NextResponse.json({ error }, { status })

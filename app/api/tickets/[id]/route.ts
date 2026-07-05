@@ -11,10 +11,14 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
   const admin = createAdminClient()
-  const { data: prof } = await admin.from('user_profiles').select('role').eq('id', user.id).single()
+  const { data: prof } = await admin.from('user_profiles').select('role, company_id').eq('id', user.id).single()
   const role = prof?.role
-  const { data: ticket } = await admin.from('tickets').select('created_by, store_id, region_id, status').eq('id', params.id).single()
+  const { data: ticket } = await admin.from('tickets').select('created_by, store_id, region_id, status, company_id').eq('id', params.id).single()
   if (!ticket) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  // Tenant guard first — the ticket must be in the caller's company (the admin
+  // client bypasses RLS). Prevents cross-company edits if a user is ever enrolled
+  // in more than one company's link tables.
+  if (!prof?.company_id || ticket.company_id !== prof.company_id) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   // Access: SM owner (creator or store-linked), the ticket's RM, or an executive.
   let allowed = role === 'executive' || role === 'system_admin'
@@ -77,8 +81,10 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
   const admin = createAdminClient()
-  const { data: ticket } = await admin.from('tickets').select('created_by, store_id, status').eq('id', params.id).single()
+  const { data: prof } = await admin.from('user_profiles').select('company_id').eq('id', user.id).single()
+  const { data: ticket } = await admin.from('tickets').select('created_by, store_id, status, company_id').eq('id', params.id).single()
   if (!ticket) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (!prof?.company_id || ticket.company_id !== prof.company_id) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   let owns = ticket.created_by === user.id
   if (!owns) {

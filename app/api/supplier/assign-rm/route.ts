@@ -7,8 +7,8 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
-  const { data: profile } = await supabase.from('user_profiles').select('role').eq('id', user.id).single()
-  if (profile?.role !== 'supplier') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const { data: profile } = await supabase.from('user_profiles').select('role, company_id').eq('id', user.id).single()
+  if (profile?.role !== 'supplier' || !profile.company_id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { storeId, regionalManagerId } = await request.json()
   if (!storeId) return NextResponse.json({ error: 'Missing store' }, { status: 400 })
@@ -21,10 +21,19 @@ export async function POST(request: Request) {
   // link is region-scoped, assigning/removing here applies to the whole region
   // that this store belongs to, not just this single store.
   const { data: store } = await adminClient
-    .from('stores').select('id, region_id').eq('id', storeId).single()
-  if (!store?.region_id) return NextResponse.json({ error: 'Store has no region' }, { status: 400 })
+    .from('stores').select('id, region_id, company_id').eq('id', storeId).single()
+  // Tenant guard — the store must belong to the caller's company (admin client
+  // bypasses RLS, so this check is the only thing stopping cross-company writes).
+  if (!store || store.company_id !== profile.company_id) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (!store.region_id) return NextResponse.json({ error: 'Store has no region' }, { status: 400 })
 
   if (regionalManagerId) {
+    // The RM being assigned must also be in the caller's company.
+    const { data: rm } = await adminClient
+      .from('user_profiles').select('id, company_id, role').eq('id', regionalManagerId).single()
+    if (!rm || rm.company_id !== profile.company_id || rm.role !== 'regional_manager') {
+      return NextResponse.json({ error: 'Invalid regional manager' }, { status: 400 })
+    }
     const { error } = await adminClient
       .from('regional_users')
       .upsert({ user_id: regionalManagerId, region_id: store.region_id })

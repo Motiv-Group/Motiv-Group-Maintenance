@@ -1,7 +1,7 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { NextResponse } from 'next/server'
-import { serverError } from '@/lib/api-error'
+import { serverError, parseAmount } from '@/lib/api-error'
 import { rateLimit } from '@/lib/rate-limit'
 import { sendPushToUser, sendPushToMany } from '@/lib/push'
 
@@ -23,6 +23,9 @@ export async function POST(request: Request) {
   const body = await request.json()
   const { ticket_id, amount, amount_incl_vat, description, valid_until, file_url } = body
   const isVariation = body.type === 'variation'
+
+  const validAmount = parseAmount(amount)
+  if (validAmount === null) return NextResponse.json({ error: 'Enter a valid quote amount.' }, { status: 400 })
 
   // valid_until may be null when admin explicitly selects N/A (no expiry)
   // amount_incl_vat is null when supplier is not VAT-registered
@@ -47,7 +50,7 @@ export async function POST(request: Request) {
       ticket_id,
       admin_id: user.id,
       type: isVariation ? 'variation' : 'quote',
-      amount,
+      amount: validAmount,
       ...(amount_incl_vat != null ? { amount_incl_vat } : {}),
       description,
       valid_until,

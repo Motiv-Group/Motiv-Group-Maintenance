@@ -52,6 +52,10 @@ export async function POST(request: Request) {
     }
     case 'approve_quote': {
       const quoteId = body.quoteId
+      // The quote must belong to THIS (already region-verified) ticket — stops an
+      // RM approving another company's quote by passing a foreign quoteId.
+      const { data: q } = await admin.from('quotes').select('id, ticket_id').eq('id', quoteId).single()
+      if (!q || q.ticket_id !== ticketId) return NextResponse.json({ error: 'Invalid quote' }, { status: 400 })
       await admin.from('quotes').update({ status: 'accepted', updated_at: now }).eq('id', quoteId)
       await admin.from('tickets').update({ quote_decision_status: 'approved', quote_decided_at: now, status: 'in_progress', last_internal_update_at: now }).eq('id', ticketId)
       await notifySupplier('Quote approved', `Your quote on "${ticket.title}" was approved — proceed.`)
@@ -59,6 +63,8 @@ export async function POST(request: Request) {
     }
     case 'decline_quote': {
       const quoteId = body.quoteId
+      const { data: q } = await admin.from('quotes').select('id, ticket_id').eq('id', quoteId).single()
+      if (!q || q.ticket_id !== ticketId) return NextResponse.json({ error: 'Invalid quote' }, { status: 400 })
       await admin.from('quotes').update({ status: 'declined', decline_reason: body.reason ?? null, updated_at: now }).eq('id', quoteId)
       await admin.from('tickets').update({ quote_decision_status: 'rejected', quote_decided_at: now, last_internal_update_at: now }).eq('id', ticketId)
       await notifySupplier('Quote declined', `Your quote on "${ticket.title}" was declined.`)

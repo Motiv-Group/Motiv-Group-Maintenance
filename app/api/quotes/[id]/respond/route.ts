@@ -12,9 +12,10 @@ export async function PATCH(
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
   const { data: profile } = await supabase
-    .from('user_profiles').select('role').eq('id', user.id).single()
+    .from('user_profiles').select('role, company_id').eq('id', user.id).single()
 
   const role = profile?.role ?? ''
+  const callerCompanyId = profile?.company_id ?? null
   const isStoreManager = role === 'store_manager' || role === 'client'
   const isRM            = role === 'regional_manager'
   const isAdmin         = role === 'supplier'
@@ -38,7 +39,7 @@ export async function PATCH(
 
   const { data: quote } = await adminClient
     .from('quotes')
-    .select('ticket_id, amount, type, tickets(client_id, title)')
+    .select('ticket_id, amount, type, tickets(client_id, company_id, region_id, title)')
     .eq('id', params.id)
     .single()
 
@@ -47,13 +48,31 @@ export async function PATCH(
   const isVariation = (quote as any).type === 'variation'
   const ticket = quote.tickets as any
 
+  // Tenant guard — the quote's ticket must belong to the caller's company. The
+  // admin client bypasses RLS, so without this an RM/supplier could act on any
+  // company's quote by id.
+  if (!ticket || !callerCompanyId || ticket.company_id !== callerCompanyId) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
+
   // Variation orders are approved by the regional manager only — never the client/store.
   if (isVariation && !isRM && !isAdmin) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
+  // Store managers may only respond to their own store's ticket.
   if (isStoreManager && ticket?.client_id !== user.id) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  // Regional managers may only act on tickets in a region they manage.
+  if (isRM) {
+    const { data: links } = await adminClient
+      .from('regional_users').select('region_id').eq('user_id', user.id)
+    const regionIds = (links ?? []).map(l => l.region_id)
+    if (!ticket.region_id || !regionIds.includes(ticket.region_id)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
   }
 
   const quoteUpdate: Record<string, unknown> = { status }
