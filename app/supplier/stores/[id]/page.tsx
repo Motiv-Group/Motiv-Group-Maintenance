@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { BackButton } from '@/components/ui/BackButton'
@@ -15,40 +15,54 @@ import type { Ticket } from '@/lib/types'
 
 export default async function AdminStoreDetailPage({ params }: { params: { id: string } }) {
   const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  // Use the admin client scoped to the caller's company: a supplier has no RLS
+  // grant to read `stores`, so the user client would 404 the page. Tenant safety
+  // is enforced by the company_id check below (admin bypasses RLS).
+  const admin = createAdminClient()
+  const { data: prof } = user
+    ? await admin.from('user_profiles').select('company_id').eq('id', user.id).single()
+    : { data: null }
+  const companyId = prof?.company_id ?? null
 
   // v3: the store lives on `stores`; regional managers are user_profiles rows.
   const [{ data: storeRow }, { data: tickets }, { data: regionalManagers }] = await Promise.all([
-    supabase
+    admin
       .from('stores')
-      .select('id, name, sub_store, branch_code, address, region_id')
+      .select('id, name, sub_store, branch_code, address, region_id, company_id')
       .eq('id', params.id)
       .single(),
-    supabase
+    admin
       .from('tickets')
       .select('*, quotes(id, amount, status)')
       .eq('store_id', params.id)
       .order('created_at', { ascending: false }),
-    supabase
-      .from('user_profiles')
-      .select('id, full_name, company_name')
-      .eq('role', 'regional_manager')
-      .order('full_name'),
+    companyId
+      ? admin
+          .from('user_profiles')
+          .select('id, full_name, company_name')
+          .eq('role', 'regional_manager')
+          .eq('company_id', companyId)
+          .order('full_name')
+      : Promise.resolve({ data: [] as any[] }),
   ])
 
-  if (!storeRow) notFound()
+  // Tenant guard — the store must belong to the caller's company.
+  if (!storeRow || !companyId || storeRow.company_id !== companyId) notFound()
 
   // v3: a store links to its RM through its region (regional_users). Resolve the
   // current RM (if any) for this store's region.
   const { data: regionRms } = storeRow.region_id
-    ? await supabase.from('regional_users').select('user_id').eq('region_id', storeRow.region_id)
+    ? await admin.from('regional_users').select('user_id').eq('region_id', storeRow.region_id)
     : { data: [] as { user_id: string }[] }
   const currentRmId = (regionRms ?? [])[0]?.user_id ?? null
 
   // Store-manager contact details live on user_profiles via the store_users link.
-  const { data: smLink } = await supabase
+  const { data: smLink } = await admin
     .from('store_users').select('user_id').eq('store_id', params.id).limit(1).maybeSingle()
   const { data: sm } = smLink?.user_id
-    ? await supabase.from('user_profiles').select('full_name, email, phone').eq('id', smLink.user_id).single()
+    ? await admin.from('user_profiles').select('full_name, email, phone').eq('id', smLink.user_id).single()
     : { data: null as { full_name?: string | null; email?: string | null; phone?: string | null } | null }
 
   const store = {

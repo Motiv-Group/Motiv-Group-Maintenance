@@ -1,27 +1,43 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { Store, ArrowRight, Users } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 
 export default async function AdminStoresPage() {
   const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
 
   // v3: stores live on `stores`; RMs are user_profiles rows; a store's RM is
   // derived via its region (regional_users), not a per-store column.
-  const { data: stores } = await supabase
-    .from('stores')
-    .select('id, name, sub_store, branch_code, region_id')
-    .order('name')
+  // Use the admin client scoped to the caller's company: a supplier has no RLS
+  // grant to read `stores` (they're not region/store-linked), so the user client
+  // returns nothing — scope explicitly by company_id instead.
+  const admin = createAdminClient()
+  const { data: prof } = user
+    ? await admin.from('user_profiles').select('company_id').eq('id', user.id).single()
+    : { data: null }
+  const companyId = prof?.company_id ?? null
 
-  const { data: regionalManagers } = await supabase
-    .from('user_profiles')
-    .select('id, full_name, company_name')
-    .eq('role', 'regional_manager')
-    .order('full_name')
+  const { data: stores } = companyId
+    ? await admin
+        .from('stores')
+        .select('id, name, sub_store, branch_code, region_id')
+        .eq('company_id', companyId)
+        .order('name')
+    : { data: [] as any[] }
 
-  const { data: regionalUsers } = await supabase
-    .from('regional_users')
-    .select('user_id, region_id')
+  const { data: regionalManagers } = companyId
+    ? await admin
+        .from('user_profiles')
+        .select('id, full_name, company_name')
+        .eq('role', 'regional_manager')
+        .eq('company_id', companyId)
+        .order('full_name')
+    : { data: [] as any[] }
+
+  const { data: regionalUsers } = companyId
+    ? await admin.from('regional_users').select('user_id, region_id')
+    : { data: [] as any[] }
 
   const rmMap = Object.fromEntries((regionalManagers ?? []).map(rm => [rm.id, rm]))
   // region_id → RM (first RM linked to that region)
