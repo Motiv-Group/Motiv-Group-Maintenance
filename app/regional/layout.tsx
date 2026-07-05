@@ -10,7 +10,7 @@ export default async function RegionalLayout({ children }: { children: React.Rea
   const unreadCount = await getUnreadCount()
   return (
     <ExecChrome userName={fullName} variant="regional" unreadCount={unreadCount}>
-      <RealtimeRefresh tables={['tickets', 'quotes', 'signoffs', 'snags', 'notifications', 'ticket_updates']} />
+      <RealtimeRefresh tables={['tickets', 'quotes', 'signoffs', 'snags', 'notifications', 'ticket_updates', 'ticket_disputes', 'ticket_dispute_messages']} />
       {children}
     </ExecChrome>
   )

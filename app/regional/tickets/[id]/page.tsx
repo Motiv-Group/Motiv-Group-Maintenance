@@ -237,7 +237,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   const storeName = store ? storeLabel(store.name, store.sub_store) : 'Store'
   const editorName = t.edited_by ? ((await admin.from('user_profiles').select('full_name').eq('id', t.edited_by).single()).data?.full_name ?? null) : null
   // Motiv-curated supplier pool (assign pop-up) + who has viewed this ticket's items.
-  const [{ data: motivSuppliers }, { data: viewRows }, { data: declineRows }, { data: requestRows }, { data: readRow }, { data: disputeRows }, { data: disputeMsgRows }, { data: snagEventRows }] = await Promise.all([
+  const [{ data: motivSuppliers }, { data: viewRows }, { data: declineRows }, { data: requestRows }, { data: readRow }, { data: disputeRows }, { data: disputeMsgRows }, { data: snagEventRows }, { data: disputeExtra }] = await Promise.all([
     admin.from('suppliers').select('id, company_name').eq('is_motiv', true).eq('active', true).order('company_name'),
     admin.from('ticket_views').select('viewer_role, item_type, item_label, first_viewed_at').eq('ticket_id', t.id),
     // Durable supplier request-declines — kept even after the supplier is re-invited.
@@ -248,10 +248,13 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
     // THIS RM's "last seen this ticket" watermark → which supplier updates are new.
     admin.from('ticket_reads').select('last_seen_at').eq('user_id', userId).eq('ticket_id', t.id).maybeSingle(),
     // Snag / evidence disputes on this ticket + their message threads (chronological).
-    admin.from('ticket_disputes').select('id, origin, status, outcome, resolution_note, signoff_id, pending_outcome, pending_by, created_at, resolved_at').eq('ticket_id', t.id).order('created_at', { ascending: true }),
+    admin.from('ticket_disputes').select('id, origin, status, outcome, resolution_note, created_at, resolved_at').eq('ticket_id', t.id).order('created_at', { ascending: true }),
     admin.from('ticket_dispute_messages').select('id, dispute_id, author_role, body, evidence_urls, created_at').eq('ticket_id', t.id).order('created_at', { ascending: true }),
     // Durable snag-fix schedule rounds → every proposal / approval / decline on the trail.
     admin.from('snag_schedule_events').select('kind, scheduled_for, reason, created_at').eq('ticket_id', t.id).order('created_at', { ascending: true }),
+    // Newer per-dispute columns (signoff link + pending proposal) fetched separately so
+    // the dispute block still works if those columns aren't migrated yet (query fails → null).
+    admin.from('ticket_disputes').select('id, signoff_id, pending_outcome, pending_by').eq('ticket_id', t.id),
   ])
   // Full COC/POC history — every submission, split by state (mirrors the supplier
   // view). Each sent-back card carries the reason it was rejected.
@@ -276,7 +279,8 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
 
   // Snag / evidence disputes. An OPEN one shows a live thread the RM resolves;
   // resolved ones live in the Archive (read-only). Messages grouped by dispute.
-  const disputes = (disputeRows ?? []) as any[]
+  const disputeExtraById = new Map(((disputeExtra ?? []) as any[]).map(x => [x.id, x]))
+  const disputes = ((disputeRows ?? []) as any[]).map(d => ({ ...d, ...(disputeExtraById.get(d.id) ?? {}) }))
   const disputeMsgs = (disputeMsgRows ?? []) as any[]
   const msgsByDispute = (id: string) => disputeMsgs.filter(m => m.dispute_id === id).map(m => ({ ...m, evidence_urls: Array.isArray(m.evidence_urls) ? m.evidence_urls : [] }))
   const openDispute = disputes.find(d => d.status === 'open') ?? null

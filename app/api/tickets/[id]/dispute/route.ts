@@ -155,7 +155,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
     const proposed = actingRole === 'supplier' ? 'withdrawn' : 'upheld'
     const note = String(body.note ?? '').trim() || null
     const what = originWord(openDispute.origin)
-    await admin.from('ticket_disputes').update({ pending_outcome: proposed, pending_by: actingRole, pending_at: now }).eq('id', openDispute.id)
+    const { error: pErr } = await admin.from('ticket_disputes').update({ pending_outcome: proposed, pending_by: actingRole, pending_at: now }).eq('id', openDispute.id)
+    if (pErr) return NextResponse.json({ error: 'Proposals are not available yet — the latest database migration needs to be applied.' }, { status: 503 })
     const label = proposed === 'withdrawn' ? `proposed to resolve the dispute — drop the ${what}` : `proposed to uphold the ${what} — it stands`
     await admin.from('ticket_dispute_messages').insert({ dispute_id: openDispute.id, ticket_id: ticketId, author_id: user.id, author_role: actingRole, body: `${roleName(actingRole)} ${label}. Awaiting the other party's agreement.${note ? ` — ${note}` : ''}`, evidence_urls: [], created_at: now })
     await admin.from('tickets').update({ updated_at: now, ...(actingRole === 'supplier' ? { last_supplier_update_at: now } : { last_internal_update_at: now }) }).eq('id', ticketId)
