@@ -59,8 +59,11 @@ export async function POST(request: Request) {
     // 3. Remove push subscriptions so we stop contacting the device.
     await admin.from('push_subscriptions').delete().eq('user_id', user.id)
 
-    // 4. End the current session.
-    await supabase.auth.signOut()
+    // 4. Revoke ALL of the user's sessions (every device), not just this one, so no
+    //    refresh token survives. NOTE: a stateless access token (JWT) already issued
+    //    stays valid until it expires (~1h) — that window is inherent to JWTs; the ban
+    //    above + global sign-out prevent any new/refreshed token after it.
+    await supabase.auth.signOut({ scope: 'global' })
 
     return NextResponse.json({ ok: true })
   } catch (e) {

@@ -125,6 +125,7 @@ export default function LogTicketPage() {
       {/* Tap-to-view lightbox */}
       {preview && (
         <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onClick={() => setPreview(null)}>
+          {/* eslint-disable-next-line @next/next/no-img-element -- ephemeral blob: preview URL; next/image can't optimize it */}
           <img src={preview} alt="Photo preview" className="max-h-full max-w-full rounded-lg" />
           <button type="button" onClick={() => setPreview(null)} className="absolute top-4 right-4 p-2 rounded-full bg-white/10 text-white hover:bg-white/20" title="Close"><X size={22} /></button>
         </div>

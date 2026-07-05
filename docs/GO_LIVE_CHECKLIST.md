@@ -18,21 +18,23 @@ Tier-blocked items live in `docs/INFRASTRUCTURE_TIERS.md`. Security architecture
 - [x] **Enforce CSP** — ✅ done 2026-07-07 (Report-Only → enforcing).
 - [x] **CSP Step 2 — nonce-based** — ✅ done 2026-07-07. Per-request nonce in `middleware.ts` + `strict-dynamic`; `'unsafe-inline'` removed from script-src (`'unsafe-eval'` dev-only). Verified in prod mode: all scripts nonce'd, theme script + React hydration work, auth gate intact, 0 CSP violations.
 - [x] `/api/files/sign` — ✅ **removed** 2026-07-07 (was unused; all display signs server-side). Kills the "any logged-in user signs any path" surface. Re-add with per-file auth only if a client ever needs on-demand signing.
-- [ ] Account-delete session revoke (JWT ~1h window), `<img>`→`next/image`, Android `minifyEnabled=true`.
+- [x] **Minor polish** — ✅ done 2026-07-07: account-delete now global sign-out (revokes all sessions; ~1h stateless-JWT window is inherent + documented); the 2 blob-preview `<img>` lint warnings resolved (lint now clean); Android `minifyEnabled=true` + Capacitor ProGuard keep-rules. **⚠️ Android: build a release APK and test on a device before shipping** (minify + keep-rules aren't testable headless).
 
 **⏸️ Parked (come back to):**
+- **Legal copy** — `/privacy` + `/terms` are complete POPIA/SA **templates**; parked until real legal text + `[bracketed]` details + lawyer review.
 - **Leaked-password protection** — Supabase **Pro** only (tier backlog #4).
 - **`WHATSAPP_APP_SECRET`** — waiting on WhatsApp Business registration.
+- **Vercel Pro + Supabase Pro** — purchases (~$45/mo) for commercial license + DB backups.
 
 ---
 
 ## Supabase advisor findings (triaged 2026-07-07)
 
-**Fix (SQL) — `supabase/migrations/20260709_advisor_fixes.sql`:**
-- [ ] Run it: revokes public/authenticated EXECUTE on `append_session_photo`, `handle_new_user`, `assign_store_job_ref` (service-role/trigger only).
+**Fix (SQL) — advisor revokes:**
+- [x] ✅ Applied + folded into `supabase/schema.sql` (revoked public/authenticated EXECUTE on `append_session_photo`, `handle_new_user`, `assign_store_job_ref`).
 
 **Fix (Supabase dashboard → Authentication):**
-- [ ] **OTP long expiry** → lower email OTP expiry to ≤ 3600s (1h) (Authentication → Sign In / Providers → Email → "Email OTP Expiration"). Available on free tier.
+- [x] ✅ **OTP expiry** lowered to ≤ 3600s.
 - ⏸️ **Leaked Password Protection** → **Supabase Pro only** — not on the free tier. Deferred to the tier backlog (`INFRASTRUCTURE_TIERS.md` #4); enable when on Pro.
 
 **Safe by design — no change needed (documented so we don't "fix" them into a hole):**

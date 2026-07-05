@@ -41,7 +41,12 @@ android {
             if (keystorePropertiesFile.exists()) {
                 signingConfig signingConfigs.release
             }
-            minifyEnabled false
+            // R8 code shrinking + obfuscation on the release APK. Capacitor/WebView
+            // keep-rules live in proguard-rules.pro. ⚠️ BUILD A RELEASE APK AND TEST
+            // IT ON A DEVICE before shipping — minify can strip reflection/plugin code
+            // if a keep-rule is missing. (shrinkResources left OFF to avoid stripping
+            // needed assets; enable only after a clean tested build.)
+            minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
