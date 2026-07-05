@@ -21,6 +21,19 @@ Tier-blocked items live in `docs/INFRASTRUCTURE_TIERS.md`. Security architecture
 
 ---
 
+## Supabase advisor findings (triaged 2026-07-07)
+
+**Fix (SQL) — `supabase/migrations/20260709_advisor_fixes.sql`:**
+- [ ] Run it: revokes public/authenticated EXECUTE on `append_session_photo`, `handle_new_user`, `assign_store_job_ref` (service-role/trigger only).
+
+**Fix (Supabase dashboard → Authentication):**
+- [ ] **Leaked Password Protection** → enable (Authentication → Policies / Password settings). Checks new passwords against HaveIBeenPwned — real win, addresses our weak password-policy note too.
+- [ ] **OTP long expiry** → lower email OTP expiry to ≤ 3600s (1h) (Authentication → Email/Providers → OTP expiry).
+
+**Safe by design — no change needed (documented so we don't "fix" them into a hole):**
+- *"Public / Signed-in can execute SECURITY DEFINER function"* on the **`app_*` helpers** (`app_company_id`, `app_role`, `app_can_see_ticket`, `app_region_ids`, `app_store_ids`, `app_supplier_ids`, `app_is_company_wide`): these are **required** — RLS policies call them per query as the querying role, so they must stay executable. Each returns only the **caller's own** scoping data (keyed on `auth.uid()`), never another user's. Standard Supabase RLS pattern; leave as-is.
+- *"RLS enabled, no policy"* on `whatsapp_sessions`, `store_ticket_counters`, `ticket_disputes`, `ticket_dispute_messages`, `ticket_suppliers`, `daily_briefings`, `ratings`, `technicians`: **no policy = deny-all to every user = the most restrictive/secure state.** All are accessed via the service-role admin client (which bypasses RLS by design). Adding a permissive policy here would *reduce* security. Leave deny-by-default. (One caveat: if the client-facing **ratings display** ever renders empty, add a *precise* scoped read policy for `ratings` only — don't blanket-add.)
+
 ## How to do the CSP (Content-Security-Policy)
 
 **Where:** `next.config.mjs` → `async headers()`. Today it ships a **`Content-Security-Policy-Report-Only`** header — the browser *reports* violations but does **not** block them, so nothing breaks while we tune it.
