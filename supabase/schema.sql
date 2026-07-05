@@ -996,13 +996,13 @@ CREATE OR REPLACE FUNCTION public.app_can_see_ticket(t_id uuid)
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
-AS $function$
-  select exists (select 1 from public.tickets t where t.id = t_id
-    and t.company_id = public.app_company_id()
-    and (public.app_is_company_wide()
-      or t.region_id in (select public.app_region_ids())
-      or t.store_id  in (select public.app_store_ids())
-      or t.supplier_id in (select public.app_supplier_ids())));
+AS $function$
+  select exists (select 1 from public.tickets t where t.id = t_id
+    and t.company_id = public.app_company_id()
+    and (public.app_is_company_wide()
+      or t.region_id in (select public.app_region_ids())
+      or t.store_id  in (select public.app_store_ids())
+      or t.supplier_id in (select public.app_supplier_ids())));
 $function$
 ;
 
@@ -1011,8 +1011,8 @@ CREATE OR REPLACE FUNCTION public.app_company_id()
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
-AS $function$
-  select company_id from public.user_profiles where id = auth.uid();
+AS $function$
+  select company_id from public.user_profiles where id = auth.uid();
 $function$
 ;
 
@@ -1021,8 +1021,8 @@ CREATE OR REPLACE FUNCTION public.app_is_company_wide()
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
-AS $function$
-  select coalesce((select role in ('executive','system_admin') from public.user_profiles where id = auth.uid()), false);
+AS $function$
+  select coalesce((select role in ('executive','system_admin') from public.user_profiles where id = auth.uid()), false);
 $function$
 ;
 
@@ -1031,8 +1031,8 @@ CREATE OR REPLACE FUNCTION public.app_region_ids()
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
-AS $function$
-  select region_id from public.regional_users where user_id = auth.uid();
+AS $function$
+  select region_id from public.regional_users where user_id = auth.uid();
 $function$
 ;
 
@@ -1041,8 +1041,8 @@ CREATE OR REPLACE FUNCTION public.app_role()
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
-AS $function$
-  select role from public.user_profiles where id = auth.uid();
+AS $function$
+  select role from public.user_profiles where id = auth.uid();
 $function$
 ;
 
@@ -1051,8 +1051,8 @@ CREATE OR REPLACE FUNCTION public.app_store_ids()
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
-AS $function$
-  select store_id from public.store_users where user_id = auth.uid();
+AS $function$
+  select store_id from public.store_users where user_id = auth.uid();
 $function$
 ;
 
@@ -1061,8 +1061,8 @@ CREATE OR REPLACE FUNCTION public.app_supplier_ids()
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
-AS $function$
-  select supplier_id from public.supplier_users where user_id = auth.uid();
+AS $function$
+  select supplier_id from public.supplier_users where user_id = auth.uid();
 $function$
 ;
 
@@ -1071,41 +1071,43 @@ CREATE OR REPLACE FUNCTION public.append_session_photo(session_id uuid, photo_ur
  LANGUAGE sql
  SECURITY DEFINER
  SET search_path TO 'public'
-AS $function$
-  update public.whatsapp_sessions
-  set photo_urls = array_append(photo_urls, photo_url)
-  where id = session_id
-  returning photo_urls;
+AS $function$
+  update public.whatsapp_sessions
+  set photo_urls = array_append(photo_urls, photo_url)
+  where id = session_id
+  returning photo_urls;
 $function$
 ;
 
 CREATE OR REPLACE FUNCTION public.assign_store_job_ref()
  RETURNS trigger
  LANGUAGE plpgsql
-AS $function$
-DECLARE
-  v_year   integer := EXTRACT(year FROM COALESCE(NEW.created_at, now()))::integer;
-  v_prefix text    := COALESCE(NULLIF(NEW.branch_code, ''), 'JOB');
-  v_seq    integer;
-BEGIN
-  IF NEW.store_job_number IS NOT NULL THEN
-    RETURN NEW;
-  END IF;
-  IF NEW.store_id IS NULL THEN
-    RETURN NEW;
-  END IF;
-
-  INSERT INTO public.store_ticket_counters (store_id, year, last_number)
-    VALUES (NEW.store_id, v_year, 1)
-    ON CONFLICT (store_id, year)
-    DO UPDATE SET last_number = public.store_ticket_counters.last_number + 1
-    RETURNING last_number INTO v_seq;
-
-  NEW.store_job_number := v_seq;
-  NEW.store_job_year   := v_year;
-  NEW.job_ref          := v_prefix || '-' || v_year::text || '-' || lpad(v_seq::text, 4, '0');
-  RETURN NEW;
-END;
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_year   integer := EXTRACT(year FROM COALESCE(NEW.created_at, now()))::integer;
+  v_prefix text    := COALESCE(NULLIF(NEW.branch_code, ''), 'JOB');
+  v_seq    integer;
+BEGIN
+  IF NEW.store_job_number IS NOT NULL THEN
+    RETURN NEW;
+  END IF;
+  IF NEW.store_id IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  INSERT INTO public.store_ticket_counters (store_id, year, last_number)
+    VALUES (NEW.store_id, v_year, 1)
+    ON CONFLICT (store_id, year)
+    DO UPDATE SET last_number = public.store_ticket_counters.last_number + 1
+    RETURNING last_number INTO v_seq;
+
+  NEW.store_job_number := v_seq;
+  NEW.store_job_year   := v_year;
+  NEW.job_ref          := v_prefix || '-' || v_year::text || '-' || lpad(v_seq::text, 4, '0');
+  RETURN NEW;
+END;
 $function$
 ;
 
@@ -1114,25 +1116,25 @@ CREATE OR REPLACE FUNCTION public.handle_new_user()
  LANGUAGE plpgsql
  SECURITY DEFINER
  SET search_path TO 'public'
-AS $function$
-declare v_role text; v_company uuid; v_code text;
-begin
-  v_role := coalesce(new.raw_user_meta_data->>'role','store_manager');
-  if v_role not in ('executive','regional_manager','store_manager','supplier','system_admin') then v_role := 'store_manager'; end if;
-  begin v_company := nullif(new.raw_user_meta_data->>'company_id','')::uuid; exception when others then v_company := null; end;
-  v_code := nullif(trim(new.raw_user_meta_data->>'requested_region_code'),'');
-
-  insert into public.user_profiles (id, email, role, full_name, phone, company_id, requested_region_code)
-  values (
-    new.id, new.email, v_role,
-    new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'phone', v_company,
-    case when v_role = 'regional_manager' then upper(v_code) else null end
-  )
-  on conflict (id) do update set
-    role=excluded.role, full_name=excluded.full_name, phone=excluded.phone,
-    company_id=coalesce(excluded.company_id, public.user_profiles.company_id),
-    requested_region_code=coalesce(excluded.requested_region_code, public.user_profiles.requested_region_code);
-  return new;
+AS $function$
+declare v_role text; v_company uuid; v_code text;
+begin
+  v_role := coalesce(new.raw_user_meta_data->>'role','store_manager');
+  if v_role not in ('executive','regional_manager','store_manager','supplier','system_admin') then v_role := 'store_manager'; end if;
+  begin v_company := nullif(new.raw_user_meta_data->>'company_id','')::uuid; exception when others then v_company := null; end;
+  v_code := nullif(trim(new.raw_user_meta_data->>'requested_region_code'),'');
+
+  insert into public.user_profiles (id, email, role, full_name, phone, company_id, requested_region_code)
+  values (
+    new.id, new.email, v_role,
+    new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'phone', v_company,
+    case when v_role = 'regional_manager' then upper(v_code) else null end
+  )
+  on conflict (id) do update set
+    role=excluded.role, full_name=excluded.full_name, phone=excluded.phone,
+    company_id=coalesce(excluded.company_id, public.user_profiles.company_id),
+    requested_region_code=coalesce(excluded.requested_region_code, public.user_profiles.requested_region_code);
+  return new;
 end $function$
 ;
 
@@ -1140,7 +1142,7 @@ CREATE OR REPLACE FUNCTION public.set_updated_at()
  RETURNS trigger
  LANGUAGE plpgsql
  SET search_path TO 'public'
-AS $function$
+AS $function$
 begin new.updated_at = now(); return new; end; $function$
 ;
 
@@ -1154,6 +1156,33 @@ create trigger trg_assign_store_job_ref BEFORE INSERT on public.tickets for each
 -- ---------------------------------------------------------------------------
 -- ROW-LEVEL SECURITY
 -- ---------------------------------------------------------------------------
+
+-- RLS gaps closed 2026-07-07 (migration 20260707_rls_gaps): these 7 shipped with
+-- RLS off. assign_store_job_ref() was made SECURITY DEFINER (above) so the counter
+-- table can stay locked without breaking ticket inserts.
+alter table public.assets enable row level security;
+alter table public.asset_categories enable row level security;
+alter table public.asset_health_scores enable row level security;
+alter table public.asset_service_history enable row level security;
+alter table public.preventative_maintenance_plans enable row level security;
+alter table public.preventative_maintenance_tasks enable row level security;
+alter table public.store_ticket_counters enable row level security;  -- no policy: service-role/trigger only
+
+drop policy if exists "assets read" on public.assets;
+create policy "assets read" on public.assets for select using (company_id = public.app_company_id());
+drop policy if exists "asset_categories read" on public.asset_categories;
+create policy "asset_categories read" on public.asset_categories for select using (company_id = public.app_company_id());
+drop policy if exists "pm_plans read" on public.preventative_maintenance_plans;
+create policy "pm_plans read" on public.preventative_maintenance_plans for select using (company_id = public.app_company_id());
+drop policy if exists "asset_health read" on public.asset_health_scores;
+create policy "asset_health read" on public.asset_health_scores for select
+  using (exists (select 1 from public.assets a where a.id = asset_health_scores.asset_id and a.company_id = public.app_company_id()));
+drop policy if exists "asset_service read" on public.asset_service_history;
+create policy "asset_service read" on public.asset_service_history for select
+  using (exists (select 1 from public.assets a where a.id = asset_service_history.asset_id and a.company_id = public.app_company_id()));
+drop policy if exists "pm_tasks read" on public.preventative_maintenance_tasks;
+create policy "pm_tasks read" on public.preventative_maintenance_tasks for select
+  using (exists (select 1 from public.preventative_maintenance_plans p where p.id = preventative_maintenance_tasks.plan_id and p.company_id = public.app_company_id()));
 
 alter table public.approvals enable row level security;
 alter table public.audit_logs enable row level security;
@@ -1482,29 +1511,22 @@ create policy "own profile update" on public.user_profiles for update
 -- ---------------------------------------------------------------------------
 -- STORAGE (buckets + object policies)
 -- ---------------------------------------------------------------------------
--- NOTE: buckets are currently public=true (a known security gap being migrated
--- to private + signed URLs). See the storage migrations.
-insert into storage.buckets (id, name, public) values
-  ('ticket-photos','ticket-photos',true),
-  ('completion-docs','completion-docs',true),
-  ('quote-attachments','quote-attachments',true)
-on conflict (id) do nothing;
+-- Buckets are PRIVATE (migration 20260708). Reads go through short-lived signed
+-- URLs (lib/storage.ts + /api/files/sign); no public read policy. Uploads are
+-- gated to authenticated. Size/MIME limits from 20260706. See docs/STORAGE.md.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types) values
+  ('ticket-photos','ticket-photos',false, 15728640, array['image/jpeg','image/jpg','image/png','image/webp']),
+  ('completion-docs','completion-docs',false, 15728640, array['image/jpeg','image/jpg','image/png','image/webp','application/pdf']),
+  ('quote-attachments','quote-attachments',false, 15728640, array['application/pdf','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','application/vnd.ms-excel','image/jpeg','image/jpg','image/png','image/webp'])
+on conflict (id) do update set public = excluded.public, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
 
-drop policy if exists "completion-docs read" on storage.objects;
-create policy "completion-docs read" on storage.objects for select
-  using ((bucket_id = 'completion-docs'::text));
+-- Upload policies only (no public read — private buckets read via signed URLs).
 drop policy if exists "completion-docs upload" on storage.objects;
 create policy "completion-docs upload" on storage.objects for insert
   with check (((bucket_id = 'completion-docs'::text) AND (auth.role() = 'authenticated'::text)));
-drop policy if exists "quote-attachments read" on storage.objects;
-create policy "quote-attachments read" on storage.objects for select
-  using ((bucket_id = 'quote-attachments'::text));
 drop policy if exists "quote-attachments upload" on storage.objects;
 create policy "quote-attachments upload" on storage.objects for insert
   with check (((bucket_id = 'quote-attachments'::text) AND (auth.role() = 'authenticated'::text)));
-drop policy if exists "ticket-photos read" on storage.objects;
-create policy "ticket-photos read" on storage.objects for select
-  using ((bucket_id = 'ticket-photos'::text));
 drop policy if exists "ticket-photos upload" on storage.objects;
 create policy "ticket-photos upload" on storage.objects for insert
   with check (((bucket_id = 'ticket-photos'::text) AND (auth.role() = 'authenticated'::text)));
