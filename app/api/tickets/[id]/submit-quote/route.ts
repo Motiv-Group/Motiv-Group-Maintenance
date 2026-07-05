@@ -1,5 +1,6 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { serverError } from '@/lib/api-error'
 import { revalidatePath } from 'next/cache'
 import { rateLimit } from '@/lib/rate-limit'
 import { sendPushToMany } from '@/lib/push'
@@ -11,7 +12,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-  if (!rateLimit(`submit-quote:${user.id}`, 30, 60_000)) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  if (!(await rateLimit(`submit-quote:${user.id}`, 30, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
   const body = await request.json().catch(() => ({}))
   const amount = Number(body.amount)
@@ -40,7 +41,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     amount, amount_incl_vat: body.amount_incl_vat ?? null, file_url: body.file_url ?? null, status: 'pending',
     description: body.description ?? null, valid_until: body.valid_until ?? null, warranty: body.warranty ?? null, proposed_schedule_at,
   }).select('id').single()
-  if (qErr) return NextResponse.json({ error: qErr.message }, { status: 500 })
+  if (qErr) return serverError(qErr)
 
   await admin.from('ticket_suppliers').update({ status: 'quoted', quote_id: quote.id, responded_at: now }).eq('id', invite.id)
   await admin.from('tickets').update({

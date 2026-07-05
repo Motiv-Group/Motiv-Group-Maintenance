@@ -16,12 +16,12 @@ import type { Ticket } from '@/lib/types'
 export default async function AdminStoreDetailPage({ params }: { params: { id: string } }) {
   const supabase = createClient()
 
-  const [{ data: store }, { data: tickets }, { data: regionalManagers }] = await Promise.all([
+  // v3: the store lives on `stores`; regional managers are user_profiles rows.
+  const [{ data: storeRow }, { data: tickets }, { data: regionalManagers }] = await Promise.all([
     supabase
-      .from('profiles')
-      .select('*')
+      .from('stores')
+      .select('id, name, sub_store, branch_code, address, region_id')
       .eq('id', params.id)
-      .in('role', ['store_manager', 'client'])
       .single(),
     supabase
       .from('tickets')
@@ -29,16 +29,39 @@ export default async function AdminStoreDetailPage({ params }: { params: { id: s
       .eq('client_id', params.id)
       .order('created_at', { ascending: false }),
     supabase
-      .from('profiles')
+      .from('user_profiles')
       .select('id, full_name, company_name')
       .eq('role', 'regional_manager')
       .order('full_name'),
   ])
 
-  if (!store) notFound()
+  if (!storeRow) notFound()
 
-  const currentRm = store.regional_manager_id
-    ? (regionalManagers ?? []).find((rm: any) => rm.id === store.regional_manager_id)
+  // v3: a store links to its RM through its region (regional_users). Resolve the
+  // current RM (if any) for this store's region.
+  const { data: regionRms } = storeRow.region_id
+    ? await supabase.from('regional_users').select('user_id').eq('region_id', storeRow.region_id)
+    : { data: [] as { user_id: string }[] }
+  const currentRmId = (regionRms ?? [])[0]?.user_id ?? null
+
+  // Store-manager contact details live on user_profiles via the store_users link.
+  const { data: smLink } = await supabase
+    .from('store_users').select('user_id').eq('store_id', params.id).limit(1).maybeSingle()
+  const { data: sm } = smLink?.user_id
+    ? await supabase.from('user_profiles').select('full_name, email, phone').eq('id', smLink.user_id).single()
+    : { data: null as { full_name?: string | null; email?: string | null; phone?: string | null } | null }
+
+  const store = {
+    ...storeRow,
+    company_name: storeRow.name,
+    regional_manager_id: currentRmId,
+    full_name: sm?.full_name ?? null,
+    email: sm?.email ?? null,
+    phone: sm?.phone ?? null,
+  }
+
+  const currentRm = currentRmId
+    ? (regionalManagers ?? []).find((rm: any) => rm.id === currentRmId)
     : null
 
   return (

@@ -76,7 +76,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-  if (!rateLimit(`dispute:${user.id}`, 40, 60_000)) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  if (!(await rateLimit(`dispute:${user.id}`, 40, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
   const ticketId = params.id
   const body = await request.json().catch(() => ({}))

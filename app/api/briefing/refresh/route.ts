@@ -1,5 +1,6 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { serverError } from '@/lib/api-error'
 import { rateLimit } from '@/lib/rate-limit'
 
 // POST /api/briefing/refresh — bust today's cached briefing for the caller's
@@ -12,7 +13,7 @@ export async function POST(request: Request) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-  if (!rateLimit(`briefing-refresh:${user.id}`, 5, 60_000)) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  if (!(await rateLimit(`briefing-refresh:${user.id}`, 5, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
   const { scope, scopeId } = await request.json().catch(() => ({}))
   if (!SCOPES.has(scope) || typeof scopeId !== 'string' || !scopeId) return NextResponse.json({ error: 'Bad request' }, { status: 400 })
@@ -24,7 +25,7 @@ export async function POST(request: Request) {
   const date = new Date().toISOString().slice(0, 10)
   const { error } = await admin.from('daily_briefings').delete()
     .eq('company_id', profile.company_id).eq('scope', scope).eq('scope_id', scopeId).eq('briefing_date', date)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(error)
 
   return NextResponse.json({ ok: true })
 }

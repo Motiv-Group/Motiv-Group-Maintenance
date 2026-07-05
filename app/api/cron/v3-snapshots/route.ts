@@ -22,8 +22,9 @@ export async function GET(request: Request) {
     try { briefings = await runMorningBriefingPush() }
     catch (e: any) { briefings = { error: e?.message ?? 'briefing push failed' } }
     return NextResponse.json({ ok: true, repeat, summary, briefings })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? 'Snapshot failed' }, { status: 500 })
+  } catch (e) {
+    console.error('[cron]', e)
+    return NextResponse.json({ ok: false, error: 'Snapshot failed' }, { status: 500 })
   }
 }
 

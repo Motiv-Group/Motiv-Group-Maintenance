@@ -13,7 +13,7 @@ export async function POST(request: Request) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-  if (!rateLimit(`briefing-wa:${user.id}`, 5, 60_000)) return NextResponse.json({ error: 'Too many requests — try again shortly.' }, { status: 429 })
+  if (!(await rateLimit(`briefing-wa:${user.id}`, 5, 60_000))) return NextResponse.json({ error: 'Too many requests — try again shortly.' }, { status: 429 })
 
   const { text } = await request.json().catch(() => ({}))
   if (typeof text !== 'string' || !text.trim()) return NextResponse.json({ error: 'No briefing text.' }, { status: 400 })

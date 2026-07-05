@@ -14,23 +14,31 @@ export default async function AdminRegionalPage({
   const adminClient = createAdminClient()
   const q = (searchParams.q ?? '').toLowerCase().trim()
 
-  const [{ data: regionalManagers }, { data: stores }] = await Promise.all([
+  // v3: RMs are user_profiles rows; branches (stores) link to an RM through their
+  // region (regional_users → stores.region_id), not a per-store column.
+  const [{ data: regionalManagers }, { data: stores }, { data: regionalUsers }] = await Promise.all([
     adminClient
-      .from('profiles')
+      .from('user_profiles')
       .select('id, full_name, company_name, email, phone')
       .eq('role', 'regional_manager')
       .order('full_name'),
     adminClient
-      .from('profiles')
-      .select('id, regional_manager_id')
-      .in('role', ['store_manager', 'client']),
+      .from('stores')
+      .select('id, region_id'),
+    adminClient
+      .from('regional_users')
+      .select('user_id, region_id'),
   ])
 
-  // Count branches per RM
-  const branchCounts: Record<string, number> = {}
+  // Count stores per region, then attribute each region's stores to its RM(s).
+  const storesPerRegion: Record<string, number> = {}
   for (const s of stores ?? []) {
-    if (s.regional_manager_id) {
-      branchCounts[s.regional_manager_id] = (branchCounts[s.regional_manager_id] ?? 0) + 1
+    if (s.region_id) storesPerRegion[s.region_id] = (storesPerRegion[s.region_id] ?? 0) + 1
+  }
+  const branchCounts: Record<string, number> = {}
+  for (const link of regionalUsers ?? []) {
+    if (link.user_id && link.region_id) {
+      branchCounts[link.user_id] = (branchCounts[link.user_id] ?? 0) + (storesPerRegion[link.region_id] ?? 0)
     }
   }
 

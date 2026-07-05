@@ -12,7 +12,7 @@ export async function PATCH(
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
   const { data: profile } = await supabase
-    .from('profiles').select('role').eq('id', user.id).single()
+    .from('user_profiles').select('role').eq('id', user.id).single()
 
   const role = profile?.role ?? ''
   const isStoreManager = role === 'store_manager' || role === 'client'
@@ -81,7 +81,7 @@ export async function PATCH(
   const [, , { data: admins }] = await Promise.all([
     adminClient.from('quotes').update(quoteUpdate).eq('id', params.id),
     adminClient.from('tickets').update({ status: ticketStatus }).eq('id', quote.ticket_id),
-    adminClient.from('profiles').select('id').eq('role', 'supplier'),
+    adminClient.from('user_profiles').select('id').eq('role', 'supplier'),
   ])
 
   const titleNoun = isVariation ? 'Variation Order' : 'Quote'

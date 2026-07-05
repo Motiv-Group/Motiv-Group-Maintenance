@@ -91,13 +91,16 @@ export default async function RegionalStoreDetailPage({ params }: { params: { id
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 
-  const [{ data: store }, { data: tickets }] = await Promise.all([
+  // v3: store lives on `stores`; RM ownership is via region (regional_users).
+  const { data: regions } = await adminClient
+    .from('regional_users').select('region_id').eq('user_id', user.id)
+  const regionIds = (regions ?? []).map(r => r.region_id)
+
+  const [{ data: storeRow }, { data: tickets }] = await Promise.all([
     adminClient
-      .from('profiles')
-      .select('*')
+      .from('stores')
+      .select('id, name, sub_store, branch_code, address, capex_budget, region_id')
       .eq('id', params.id)
-      .eq('regional_manager_id', user.id)
-      .in('role', ['store_manager', 'client'])
       .single(),
     adminClient
       .from('tickets')
@@ -106,7 +109,23 @@ export default async function RegionalStoreDetailPage({ params }: { params: { id
       .order('created_at', { ascending: false }),
   ])
 
-  if (!store) notFound()
+  if (!storeRow || !storeRow.region_id || !regionIds.includes(storeRow.region_id)) notFound()
+
+  // Store-manager contact details live on user_profiles via the store_users link.
+  const { data: smLink } = await adminClient
+    .from('store_users').select('user_id').eq('store_id', params.id).limit(1).maybeSingle()
+  const { data: sm } = smLink?.user_id
+    ? await adminClient.from('user_profiles').select('full_name, email, phone').eq('id', smLink.user_id).single()
+    : { data: null as { full_name?: string | null; email?: string | null; phone?: string | null } | null }
+
+  // Shape a `store` object matching the fields the JSX below reads.
+  const store = {
+    ...storeRow,
+    company_name: storeRow.name,
+    full_name: sm?.full_name ?? null,
+    email: sm?.email ?? null,
+    phone: sm?.phone ?? null,
+  }
 
   const ticketList = (tickets ?? []) as (Ticket & { quotes: Quote[] })[]
   const allQuotes  = ticketList.flatMap(t => t.quotes ?? [])

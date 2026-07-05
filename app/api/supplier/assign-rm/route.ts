@@ -1,22 +1,42 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
+import { serverError } from '@/lib/api-error'
 export async function POST(request: Request) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  const { data: profile } = await supabase.from('user_profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'supplier') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { storeId, regionalManagerId } = await request.json()
+  if (!storeId) return NextResponse.json({ error: 'Missing store' }, { status: 400 })
 
   const adminClient = createAdminClient()
-  const { error } = await adminClient
-    .from('profiles')
-    .update({ regional_manager_id: regionalManagerId ?? null })
-    .eq('id', storeId)
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  // v3: a store no longer carries a direct `regional_manager_id`. Stores link to
+  // an RM THROUGH their region (regional_users: user_id ↔ region_id). So resolve
+  // the store's region first, then map the RM onto that region. NOTE: because the
+  // link is region-scoped, assigning/removing here applies to the whole region
+  // that this store belongs to, not just this single store.
+  const { data: store } = await adminClient
+    .from('stores').select('id, region_id').eq('id', storeId).single()
+  if (!store?.region_id) return NextResponse.json({ error: 'Store has no region' }, { status: 400 })
+
+  if (regionalManagerId) {
+    const { error } = await adminClient
+      .from('regional_users')
+      .upsert({ user_id: regionalManagerId, region_id: store.region_id })
+    if (error) return serverError(error)
+  } else {
+    // Clearing the assignment → drop the RM link(s) for this store's region.
+    const { error } = await adminClient
+      .from('regional_users')
+      .delete()
+      .eq('region_id', store.region_id)
+    if (error) return serverError(error)
+  }
+
   return NextResponse.json({ success: true })
 }

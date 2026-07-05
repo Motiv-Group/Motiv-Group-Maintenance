@@ -1,5 +1,6 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { serverError } from '@/lib/api-error'
 import { revalidatePath } from 'next/cache'
 import { computePriority } from '@/lib/health/priority'
 
@@ -61,7 +62,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   if (Array.isArray(photo_urls)) update.photo_urls = photo_urls
 
   const { data, error } = await admin.from('tickets').update(update).eq('id', params.id).select().single()
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(error)
 
   revalidatePath('/client'); revalidatePath('/client/tickets'); revalidatePath(`/client/tickets/${params.id}`)
   revalidatePath('/regional'); revalidatePath('/regional/tickets'); revalidatePath(`/regional/tickets/${params.id}`)
@@ -88,7 +89,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
   if (ticket.status !== 'open') return NextResponse.json({ error: 'Only open tickets can be deleted' }, { status: 400 })
 
   const { error } = await admin.from('tickets').delete().eq('id', params.id)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(error)
   revalidatePath('/client'); revalidatePath('/client/tickets')
   return NextResponse.json({ success: true })
 }

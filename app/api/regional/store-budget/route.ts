@@ -1,5 +1,6 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { serverError } from '@/lib/api-error'
 import { revalidatePath } from 'next/cache'
 import { rateLimit } from '@/lib/rate-limit'
 
@@ -10,10 +11,10 @@ export async function PATCH(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
-  if (!rateLimit(`budget:${user.id}`, 30, 60_000))
+  if (!(await rateLimit(`budget:${user.id}`, 30, 60_000)))
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  const { data: profile } = await supabase.from('user_profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'regional_manager') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { storeId, capex_budget } = await request.json()
@@ -30,15 +31,22 @@ export async function PATCH(request: Request) {
   }
 
   const admin = createAdminClient()
-  // Verify the RM owns this store before writing.
-  const { data: store } = await admin
-    .from('profiles').select('id')
-    .eq('id', storeId).eq('regional_manager_id', user.id)
-    .in('role', ['store_manager', 'client']).single()
-  if (!store) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  // v3: capex_budget lives on the `stores` table, and RM ownership is via region
+  // (regional_users). Verify the store's region is one this RM manages before writing.
+  const { data: regions } = await admin
+    .from('regional_users').select('region_id').eq('user_id', user.id)
+  const regionIds = (regions ?? []).map(r => r.region_id)
+  if (!regionIds.length) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { error } = await admin.from('profiles').update({ capex_budget: value }).eq('id', storeId)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  const { data: store } = await admin
+    .from('stores').select('id, region_id')
+    .eq('id', storeId).single()
+  if (!store || !store.region_id || !regionIds.includes(store.region_id)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const { error } = await admin.from('stores').update({ capex_budget: value }).eq('id', storeId)
+  if (error) return serverError(error)
 
   revalidatePath(`/regional/stores/${storeId}`)
   revalidatePath(`/regional/stores/${storeId}/budget`)

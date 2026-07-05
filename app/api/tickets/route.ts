@@ -1,5 +1,6 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { serverError } from '@/lib/api-error'
 import { revalidatePath } from 'next/cache'
 import { rateLimit } from '@/lib/rate-limit'
 import { sendPushToMany } from '@/lib/push'
@@ -11,7 +12,7 @@ export async function POST(request: Request) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-  if (!rateLimit(`tickets:${user.id}`, 10, 60_000)) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  if (!(await rateLimit(`tickets:${user.id}`, 10, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
   const body = await request.json()
   const { title, description, category, operational_impact = 'none', photo_urls = [] } = body
@@ -43,7 +44,7 @@ export async function POST(request: Request) {
     operational_impact: impact, severity, priority, ...flags, photo_urls, status: 'open',
     last_store_update_at: new Date().toISOString(),
   }).select().single()
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(error)
 
   // notify the region's manager(s)
   if (store.region_id) {

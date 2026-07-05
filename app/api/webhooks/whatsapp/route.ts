@@ -7,10 +7,13 @@ import type { Priority } from '@/lib/types';
 import { getBriefingForUser } from '@/lib/briefing/generate';
 import { briefingToText } from '@/lib/briefing/facts';
 import https from 'https';
+import crypto from 'crypto';
 
 // ─── ENV ────────────────────────────────────────────────────────────────────
 const WA_TOKEN       = process.env.WHATSAPP_ACCESS_TOKEN!;
 const WA_PHONE_ID    = process.env.WHATSAPP_PHONE_NUMBER_ID!;
+const WA_APP_SECRET  = process.env.WHATSAPP_APP_SECRET;      // Meta App Secret — signs x-hub-signature-256
+const WA_VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN;
 const GROQ_API_KEY  = process.env.GROQ_API_KEY!;
 const GROQ_BASE     = 'https://api.groq.com/openai/v1';
 const SUPABASE_URL   = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -388,13 +391,37 @@ async function notifyRegion(
 }
 
 // ─── GET — Meta webhook verification ────────────────────────────────────────
+/** Constant-time string compare (avoids leaking length/content via timing). */
+function safeEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+/**
+ * Verify Meta's `x-hub-signature-256` HMAC over the RAW request body.
+ * Fail-closed when WHATSAPP_APP_SECRET is configured; fail-open (with a loud
+ * warning) only when it is unset, so an existing deployment keeps working until
+ * the secret is added — it MUST be set before a public launch.
+ */
+function verifyWebhookSignature(rawBody: string, header: string | null): boolean {
+  if (!WA_APP_SECRET) {
+    console.warn('[WhatsApp] WHATSAPP_APP_SECRET not set — skipping signature verification (INSECURE; set it before production).');
+    return true;
+  }
+  if (!header) return false;
+  const expected = 'sha256=' + crypto.createHmac('sha256', WA_APP_SECRET).update(rawBody).digest('hex');
+  return safeEqual(header, expected);
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const mode      = searchParams.get('hub.mode');
   const token     = searchParams.get('hub.verify_token');
   const challenge = searchParams.get('hub.challenge');
 
-  if (mode === 'subscribe' && token === process.env.WHATSAPP_VERIFY_TOKEN) {
+  if (mode === 'subscribe' && WA_VERIFY_TOKEN && token && safeEqual(token, WA_VERIFY_TOKEN)) {
     console.log('[WhatsApp] Webhook verified');
     return new NextResponse(challenge, { status: 200 });
   }
@@ -405,7 +432,21 @@ export async function GET(req: NextRequest) {
 
 // ─── POST — Incoming messages ─────────────────────────────────────────────
 export async function POST(req: NextRequest) {
-  const payload = await req.json() as WaPayload;
+  // Read the RAW body first — HMAC must be computed over the exact bytes Meta signed.
+  const rawBody = await req.text();
+
+  if (!verifyWebhookSignature(rawBody, req.headers.get('x-hub-signature-256'))) {
+    console.warn('[WhatsApp] Rejected webhook — invalid or missing x-hub-signature-256');
+    return new NextResponse('Forbidden', { status: 403 });
+  }
+
+  let payload: WaPayload;
+  try {
+    payload = JSON.parse(rawBody) as WaPayload;
+  } catch {
+    return new NextResponse('Bad Request', { status: 400 });
+  }
+
   await handleWebhook(payload);
   return NextResponse.json({ status: 'ok' });
 }

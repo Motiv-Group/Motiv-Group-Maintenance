@@ -14,18 +14,24 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
   const { data: profile } = await supabase
-    .from('profiles').select('role, full_name').eq('id', user.id).single()
+    .from('user_profiles').select('role, full_name').eq('id', user.id).single()
   if (profile?.role !== 'regional_manager') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { period = 'month', from, to, storeIds = [] } = await request.json()
   const range = resolveRange(period, from, to)
 
   const admin = createAdminClient()
-  // Only the RM's own stores — ignore any others passed in.
-  const { data: stores } = await admin
-    .from('profiles').select('id, company_name, sub_store')
-    .eq('regional_manager_id', user.id).in('role', ['store_manager', 'client'])
-  const ownStores = (stores ?? []) as { id: string; company_name?: string; sub_store?: string }[]
+  // v3: the RM's stores are those in the region(s) they manage (regional_users).
+  // buildRegionalModel expects each store keyed as { company_name?, sub_store? },
+  // so we map the stores.`name` column onto `company_name`.
+  const { data: regions } = await admin
+    .from('regional_users').select('region_id').eq('user_id', user.id)
+  const regionIds = (regions ?? []).map(r => r.region_id)
+  const { data: stores } = regionIds.length
+    ? await admin.from('stores').select('id, name, sub_store, branch_code').in('region_id', regionIds)
+    : { data: [] as any[] }
+  const ownStores = ((stores ?? []) as { id: string; name?: string; sub_store?: string }[])
+    .map(s => ({ id: s.id, company_name: s.name, sub_store: s.sub_store }))
   const ownIds = new Set(ownStores.map(s => s.id))
   const selected = (Array.isArray(storeIds) && storeIds.length
     ? storeIds.filter((id: string) => ownIds.has(id))

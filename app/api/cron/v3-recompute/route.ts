@@ -12,8 +12,9 @@ export async function GET(request: Request) {
   try {
     const summary = await runRepeatDefectRecompute()
     return NextResponse.json({ ok: true, summary })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? 'Recompute failed' }, { status: 500 })
+  } catch (e) {
+    console.error('[cron]', e)
+    return NextResponse.json({ ok: false, error: 'Recompute failed' }, { status: 500 })
   }
 }
 

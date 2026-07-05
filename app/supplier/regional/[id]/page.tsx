@@ -11,24 +11,33 @@ import {
 export default async function RMDetailPage({ params }: { params: { id: string } }) {
   const adminClient = createAdminClient()
 
-  const [{ data: rm }, { data: branches }] = await Promise.all([
-    adminClient
-      .from('profiles')
-      .select('*')
-      .eq('id', params.id)
-      .eq('role', 'regional_manager')
-      .single(),
-    adminClient
-      .from('profiles')
-      .select('id, full_name, company_name, sub_store, email, phone, address, branch_code')
-      .eq('regional_manager_id', params.id)
-      .in('role', ['store_manager', 'client'])
-      .order('company_name'),
-  ])
+  // v3: the RM is a user_profiles row; their branches are the stores in the
+  // region(s) they manage (regional_users → stores).
+  const { data: rm } = await adminClient
+    .from('user_profiles')
+    .select('id, full_name, company_name, email, phone, address')
+    .eq('id', params.id)
+    .eq('role', 'regional_manager')
+    .single()
 
   if (!rm) notFound()
 
-  const branchList = branches ?? []
+  const { data: rmRegions } = await adminClient
+    .from('regional_users').select('region_id').eq('user_id', params.id)
+  const regionIds = (rmRegions ?? []).map(r => r.region_id)
+
+  const { data: branches } = regionIds.length
+    ? await adminClient
+        .from('stores')
+        .select('id, name, sub_store, address, branch_code')
+        .in('region_id', regionIds)
+        .order('name')
+    : { data: [] as any[] }
+
+  // Map stores.`name` → company_name so the branch JSX below reads cleanly. Store-
+  // manager contact fields (full_name/email/phone) are not on `stores`; the JSX
+  // guards each with `value ? … : null`, so absent fields simply don't render.
+  const branchList = ((branches ?? []) as any[]).map(b => ({ ...b, company_name: b.name }))
 
   return (
     <div className="space-y-6">

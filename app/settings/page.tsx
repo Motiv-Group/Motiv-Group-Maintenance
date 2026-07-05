@@ -9,6 +9,7 @@ import { useTheme } from '@/components/providers/ThemeProvider'
 import { UserCircle2, Building2, CheckCircle2, Sun, Moon } from 'lucide-react'
 import { BackButton } from '@/components/ui/BackButton'
 import { PushNotificationToggle } from '@/components/ui/PushNotificationToggle'
+import { DataPrivacySection } from '@/components/settings/DataPrivacySection'
 
 interface ProfileForm {
   full_name: string
@@ -235,6 +236,9 @@ const { register, handleSubmit, reset, formState: { errors } } = useForm<Profile
           </button>
         </div>
       </div>
+
+      {/* Privacy & data (POPIA) */}
+      <DataPrivacySection />
 
     </div>
   )

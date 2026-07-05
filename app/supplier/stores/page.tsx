@@ -6,26 +6,53 @@ import { formatDate } from '@/lib/utils'
 export default async function AdminStoresPage() {
   const supabase = createClient()
 
+  // v3: stores live on `stores`; RMs are user_profiles rows; a store's RM is
+  // derived via its region (regional_users), not a per-store column.
   const { data: stores } = await supabase
-    .from('profiles')
-    .select('*, tickets(id, status)')
-    .in('role', ['store_manager', 'client'])
-    .order('company_name')
+    .from('stores')
+    .select('id, name, sub_store, branch_code, region_id')
+    .order('name')
 
   const { data: regionalManagers } = await supabase
-    .from('profiles')
+    .from('user_profiles')
     .select('id, full_name, company_name')
     .eq('role', 'regional_manager')
     .order('full_name')
 
-  const rmMap = Object.fromEntries((regionalManagers ?? []).map(rm => [rm.id, rm]))
+  const { data: regionalUsers } = await supabase
+    .from('regional_users')
+    .select('user_id, region_id')
 
-  const storeList = (stores ?? []).map((s: any) => ({
-    ...s,
-    openCount:  (s.tickets ?? []).filter((t: any) => !['completed','cancelled'].includes(t.status)).length,
-    totalTickets: (s.tickets ?? []).length,
-    rm: s.regional_manager_id ? rmMap[s.regional_manager_id] : null,
-  }))
+  const rmMap = Object.fromEntries((regionalManagers ?? []).map(rm => [rm.id, rm]))
+  // region_id → RM (first RM linked to that region)
+  const regionRmMap: Record<string, any> = {}
+  for (const link of regionalUsers ?? []) {
+    if (link.region_id && !regionRmMap[link.region_id] && rmMap[link.user_id]) {
+      regionRmMap[link.region_id] = rmMap[link.user_id]
+    }
+  }
+
+  // Tickets don't reliably embed off `stores` (client_id is a legacy, un-FK'd
+  // column), so fetch them separately and count per store in JS.
+  const storeIds = (stores ?? []).map((s: any) => s.id)
+  const { data: tickets } = storeIds.length
+    ? await supabase.from('tickets').select('id, status, client_id').in('client_id', storeIds)
+    : { data: [] as any[] }
+  const ticketsByStore: Record<string, any[]> = {}
+  for (const t of tickets ?? []) {
+    (ticketsByStore[t.client_id] ??= []).push(t)
+  }
+
+  const storeList = (stores ?? []).map((s: any) => {
+    const storeTickets = ticketsByStore[s.id] ?? []
+    return {
+      ...s,
+      company_name: s.name,
+      openCount:  storeTickets.filter((t: any) => !['completed','cancelled'].includes(t.status)).length,
+      totalTickets: storeTickets.length,
+      rm: s.region_id ? (regionRmMap[s.region_id] ?? null) : null,
+    }
+  })
 
   return (
     <div className="space-y-5">

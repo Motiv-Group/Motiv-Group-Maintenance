@@ -1,5 +1,6 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { serverError } from '@/lib/api-error'
 import { rateLimit } from '@/lib/rate-limit'
 
 // POST /api/ratings — RM rates the awarded supplier for a ticket (1–5 + comment).
@@ -8,7 +9,7 @@ export async function POST(request: Request) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-  if (!rateLimit(`rating:${user.id}`, 30, 60_000)) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  if (!(await rateLimit(`rating:${user.id}`, 30, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
   const body = await request.json().catch(() => ({}))
   const score = Number(body.score)
@@ -38,6 +39,6 @@ export async function POST(request: Request) {
   const { error } = existingId
     ? await admin.from('ratings').update(fields).eq('id', existingId)
     : await admin.from('ratings').insert(fields)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(error)
   return NextResponse.json({ ok: true })
 }

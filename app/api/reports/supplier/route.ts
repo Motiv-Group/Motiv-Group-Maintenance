@@ -14,7 +14,7 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
   const { data: profile } = await supabase
-    .from('profiles').select('role, full_name, company_name').eq('id', user.id).single()
+    .from('user_profiles').select('role, full_name, company_name').eq('id', user.id).single()
   if (profile?.role !== 'supplier') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { period = 'month', from, to } = await request.json()

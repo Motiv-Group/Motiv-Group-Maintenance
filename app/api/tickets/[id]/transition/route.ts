@@ -1,5 +1,6 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { serverError } from '@/lib/api-error'
 import { revalidatePath } from 'next/cache'
 import { rateLimit } from '@/lib/rate-limit'
 import { sendPushToMany } from '@/lib/push'
@@ -42,7 +43,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-  if (!rateLimit(`transition:${user.id}`, 40, 60_000)) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  if (!(await rateLimit(`transition:${user.id}`, 40, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
   const ticketId = params.id
   const body = await request.json().catch(() => ({}))
@@ -280,7 +281,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   Object.assign(updates, lifecycleFields(tr.to, now, tgt))
 
   const { error: upErr } = await admin.from('tickets').update(updates).eq('id', ticketId)
-  if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 })
+  if (upErr) return serverError(upErr)
 
   await notify(admin, action, ticket, prof.full_name ?? null, { scheduleProposed, scheduledAt: (updates.scheduled_at as string | undefined) ?? snagFixAt, declineReason: body.reason ?? null })
 

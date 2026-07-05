@@ -28,9 +28,9 @@ export default async function ContractorReviewsPage({ params }: { params: { id: 
   if (!user) redirect('/auth/login')
 
   const [{ data: rmProfile }, { data: contractor }, { data: ratings }] = await Promise.all([
-    supabase.from('profiles').select('role').eq('id', user.id).single(),
+    supabase.from('user_profiles').select('role').eq('id', user.id).single(),
     adminDb
-      .from('profiles')
+      .from('user_profiles')
       .select('full_name, email, phone, role')
       .eq('id', params.id)
       .single(),

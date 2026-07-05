@@ -10,16 +10,20 @@ export default async function StoreBudgetPage({ params }: { params: { id: string
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  const { data: profile } = await supabase.from('user_profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'regional_manager') redirect('/auth/login')
 
   const admin = createAdminClient()
-  const { data: store } = await admin
-    .from('profiles').select('id, company_name, sub_store, capex_budget')
-    .eq('id', params.id).eq('regional_manager_id', user.id)
-    .in('role', ['store_manager', 'client']).single()
+  // v3: store lives on `stores`; RM ownership is via region (regional_users).
+  const { data: regions } = await admin
+    .from('regional_users').select('region_id').eq('user_id', user.id)
+  const regionIds = (regions ?? []).map(r => r.region_id)
 
-  if (!store) notFound()
+  const { data: store } = await admin
+    .from('stores').select('id, name, sub_store, capex_budget, region_id')
+    .eq('id', params.id).single()
+
+  if (!store || !store.region_id || !regionIds.includes(store.region_id)) notFound()
 
   return (
     <div className="space-y-5">
@@ -28,7 +32,7 @@ export default async function StoreBudgetPage({ params }: { params: { id: string
         <div>
           <h1 className="text-xl font-bold text-gray-900 dark:text-white">Capex Budget</h1>
           <p className="text-sm text-brand-600 dark:text-brand-400">
-            {store.company_name}{store.sub_store ? ` — ${store.sub_store}` : ''}
+            {store.name}{store.sub_store ? ` — ${store.sub_store}` : ''}
           </p>
         </div>
       </div>

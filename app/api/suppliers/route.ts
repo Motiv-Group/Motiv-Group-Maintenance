@@ -1,12 +1,13 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { serverError } from '@/lib/api-error'
 import { rateLimit } from '@/lib/rate-limit'
 
 async function requireAdmin() {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  const { data: profile } = await supabase.from('user_profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'supplier') return null
   return user
 }
@@ -21,7 +22,7 @@ export async function GET() {
     .select('*')
     .order('company_name')
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(error)
   return NextResponse.json({ suppliers: data ?? [] })
 }
 
@@ -29,7 +30,7 @@ export async function POST(request: Request) {
   const user = await requireAdmin()
   if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  if (!rateLimit(`suppliers:${user.id}`, 30, 60_000))
+  if (!(await rateLimit(`suppliers:${user.id}`, 30, 60_000)))
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
   const body = await request.json()
@@ -61,6 +62,6 @@ export async function POST(request: Request) {
     .select()
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(error)
   return NextResponse.json({ supplier: data }, { status: 201 })
 }

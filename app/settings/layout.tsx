@@ -8,7 +8,7 @@ export default async function SettingsLayout({ children }: { children: React.Rea
   if (!user) redirect('/auth/login')
 
   const { data: profile } = await supabase
-    .from('profiles')
+    .from('user_profiles')
     .select('role')
     .eq('id', user.id)
     .single()

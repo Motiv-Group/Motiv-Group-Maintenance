@@ -16,14 +16,21 @@ export default async function RegionalReportView({
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 
-  const { data: profile } = await supabase.from('profiles').select('role, full_name').eq('id', user.id).single()
+  const { data: profile } = await supabase.from('user_profiles').select('role, full_name').eq('id', user.id).single()
   if (profile?.role !== 'regional_manager') redirect('/auth/login')
 
   const admin = createAdminClient()
-  const { data: stores } = await admin
-    .from('profiles').select('id, company_name, sub_store')
-    .eq('regional_manager_id', user.id).in('role', ['store_manager', 'client'])
-  const ownStores = (stores ?? []) as { id: string; company_name?: string; sub_store?: string }[]
+  // v3: the RM's stores are those in the region(s) they manage (regional_users).
+  // buildRegionalModel expects each store keyed as { company_name?, sub_store? },
+  // so we map the stores.`name` column onto `company_name`.
+  const { data: regions } = await admin
+    .from('regional_users').select('region_id').eq('user_id', user.id)
+  const regionIds = (regions ?? []).map(r => r.region_id)
+  const { data: stores } = regionIds.length
+    ? await admin.from('stores').select('id, name, sub_store').in('region_id', regionIds)
+    : { data: [] as any[] }
+  const ownStores = ((stores ?? []) as { id: string; name?: string; sub_store?: string }[])
+    .map(s => ({ id: s.id, company_name: s.name, sub_store: s.sub_store }))
   const ownIds = new Set(ownStores.map(s => s.id))
 
   const requested = (searchParams.stores ?? '').split(',').map(s => s.trim()).filter(Boolean).filter(id => ownIds.has(id))

@@ -1,6 +1,7 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
+import { serverError } from '@/lib/api-error'
 function normalisePhone(raw: string | null | undefined): string | null {
   if (!raw) return null
   const digits = raw.replace(/\D/g, '')
@@ -42,6 +43,6 @@ export async function PATCH(request: Request) {
 
   const admin = createAdminClient()
   const { data: profile, error } = await admin.from('user_profiles').update(updateData).eq('id', user.id).select().single()
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(error)
   return NextResponse.json({ profile })
 }

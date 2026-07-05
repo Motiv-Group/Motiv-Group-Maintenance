@@ -17,7 +17,7 @@ export default async function SupplierReportView({
   if (!user) redirect('/auth/login')
 
   const { data: profile } = await supabase
-    .from('profiles').select('role, full_name, company_name').eq('id', user.id).single()
+    .from('user_profiles').select('role, full_name, company_name').eq('id', user.id).single()
   if (profile?.role !== 'supplier') redirect('/auth/login')
 
   const range = resolveRange(searchParams.period ?? 'month', searchParams.from, searchParams.to)

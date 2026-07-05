@@ -1,5 +1,6 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { serverError } from '@/lib/api-error'
 import { revalidatePath } from 'next/cache'
 import { rateLimit } from '@/lib/rate-limit'
 import { sendPushToMany } from '@/lib/push'
@@ -12,7 +13,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-  if (!rateLimit(`assign:${user.id}`, 30, 60_000)) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  if (!(await rateLimit(`assign:${user.id}`, 30, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
   const body = await request.json().catch(() => ({}))
   const supplierIds: string[] = Array.isArray(body.supplierIds) ? body.supplierIds.filter((s: unknown) => typeof s === 'string') : []
@@ -51,12 +52,12 @@ export async function POST(request: Request, { params }: { params: { id: string 
     const { error } = await admin.from('ticket_suppliers')
       .update({ status: 'invited', invited_at: now, responded_at: null, decline_reason: null, declined_by: null, requote_requested_at: now })
       .eq('ticket_id', ticket.id).in('supplier_id', reinvite)
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return serverError(error)
   }
   if (fresh.length) {
     const { error } = await admin.from('ticket_suppliers')
       .insert(fresh.map(supplier_id => ({ company_id: ticket.company_id, ticket_id: ticket.id, supplier_id, status: 'invited', invited_at: now })))
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return serverError(error)
   }
 
   await admin.from('tickets').update({
