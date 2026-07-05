@@ -182,13 +182,30 @@ export function MarkInProgressButton({ ticketId }: { ticketId: string }) {
 // AFTER the COC/POC is approved, the supplier can raise a variation order for extra
 // work — otherwise the RM does the final close-out. On vo_declined it leads with the
 // RM's decline reason and lets the supplier re-submit a revised VO.
-export function SupplierVariationGate({ ticketId, priority, createdAt, variationCount, status, declineReason }: {
+export function SupplierVariationGate({ ticketId, priority, createdAt, variationCount, status, declineReason, noVosConfirmed = false }: {
   ticketId: string; priority: string; createdAt: string; variationCount: number
-  status: 'approved_closeout' | 'vo_declined'; declineReason?: string | null
+  status: 'approved_closeout' | 'vo_declined'; declineReason?: string | null; noVosConfirmed?: boolean
 }) {
+  const router = useRouter()
   const [showForm, setShowForm] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
   const hasVOs = variationCount > 0 || status === 'vo_declined'
   const raiseLabel = status === 'vo_declined' ? 'Re-submit variation order' : hasVOs ? 'Raise another variation order' : 'Raise variation order'
+
+  async function confirmNoVos() {
+    setBusy(true); setErr('')
+    try {
+      const res = await fetch('/api/supplier/ticket-action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticketId, action: 'confirm_no_vos' }) })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed')
+      router.refresh()
+    } catch (e: any) { setErr(e.message); setBusy(false) }
+  }
+
+  // Once confirmed, the VO options are locked and the RM can close out.
+  if (noVosConfirmed) {
+    return <div className="rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/30 p-3.5 text-sm text-[var(--text-muted)]">You confirmed there are no further variation orders. Awaiting the manager&apos;s final close-out.</div>
+  }
 
   return (
     <div className="space-y-3">
@@ -196,15 +213,18 @@ export function SupplierVariationGate({ ticketId, priority, createdAt, variation
         <div className="rounded-xl bg-red-500/10 ring-1 ring-red-500/30 p-3.5 space-y-1">
           <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Variation order declined</p>
           <p className="text-sm text-[var(--text)]">{declineReason || 'The regional manager declined your variation order.'}</p>
-          <p className="text-sm text-[var(--text-muted)]">Submit a revised variation order, or the manager will finalise the close-out.</p>
+          <p className="text-sm text-[var(--text-muted)]">Submit a revised variation order, or confirm there are none so the manager can close out.</p>
         </div>
       ) : (
-        <p className="text-sm text-[var(--text-muted)]">Your COC &amp; POC were approved. Raise a variation order for any extra work, or the manager will close out the job.</p>
+        <p className="text-sm text-[var(--text-muted)]">Your COC &amp; POC were approved. Raise a variation order for any extra work, or confirm there are none so the manager can close out.</p>
       )}
       <button onClick={() => setShowForm(v => !v)} className="w-full py-2.5 rounded-xl bg-[#C6A35D] hover:brightness-95 text-white text-sm font-semibold transition flex items-center justify-center gap-1.5">
         <Plus size={15} /> {raiseLabel}
       </button>
       {showForm && <SendQuoteForm ticketId={ticketId} variant="variation" competitive priority={priority} createdAt={createdAt} defaultOpen onClose={() => setShowForm(false)} />}
+      {/* Confirm no further VOs → un-greys the RM's Final close-out (locked after). */}
+      <button onClick={confirmNoVos} disabled={busy} className="w-full py-2.5 rounded-xl ring-1 ring-emerald-500/40 text-emerald-600 dark:text-emerald-400 text-sm font-semibold hover:bg-emerald-500/10 transition disabled:opacity-50">{busy ? 'Confirming…' : 'No further variation orders — ready for close-out'}</button>
+      {err && <p className="text-xs text-red-500">{err}</p>}
     </div>
   )
 }

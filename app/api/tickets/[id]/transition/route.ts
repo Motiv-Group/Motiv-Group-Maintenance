@@ -265,6 +265,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
         await admin.from('snags').update({ status: 'resolved' }).eq('ticket_id', ticketId).in('status', ['assigned', 'in_progress', 'open'])
         break
       case 'close_out':
+        // Blocked until the supplier has confirmed there are no further variation orders.
+        if (!ticket.vo_none_confirmed_at) return NextResponse.json({ error: 'The supplier must confirm there are no further variation orders before close-out.' }, { status: 409 })
         updates.completed_at = now; updates.closed_out_at = now; updates.closed_out_by = user.id
         break
       // validate / reject / proceed_no_quote / request_evidence: status-only

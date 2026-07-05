@@ -88,6 +88,22 @@ export async function POST(request: Request) {
       }
       break
     }
+    case 'confirm_no_vos': {
+      // At close-out the supplier confirms there are no further variation orders — this
+      // un-blocks the RM's "Final close-out".
+      if (!['approved_closeout', 'vo_declined'].includes(ticket.status)) return NextResponse.json({ error: 'Not at the close-out stage.' }, { status: 400 })
+      const { error } = await admin.from('tickets').update({ vo_none_confirmed_at: now, last_supplier_update_at: now }).eq('id', ticketId)
+      if (error) return NextResponse.json({ error: 'Could not confirm — the latest database migration may need to be applied.' }, { status: 503 })
+      if (ticket.region_id) {
+        const { data: rms } = await admin.from('regional_users').select('user_id').eq('region_id', ticket.region_id)
+        const ids = (rms ?? []).map(r => r.user_id)
+        if (ids.length) {
+          await admin.from('notifications').insert(ids.map(id => ({ company_id: ticket.company_id, user_id: id, type: 'ticket_update', title: `Ticket: ${ticket.title ?? 'Ticket'}`, message: 'The supplier confirmed no further variation orders — ready for close-out.', link: `/regional/tickets/${ticketId}` })))
+          void sendPushToMany(ids, { title: 'Ready for close-out', body: ticket.title ?? '', url: `/regional/tickets/${ticketId}` })
+        }
+      }
+      break
+    }
     default:
       return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
   }

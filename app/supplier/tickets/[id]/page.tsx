@@ -521,7 +521,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
               <div className="rounded-xl bg-red-500/10 ring-1 ring-red-500/30 p-3.5 text-sm text-[var(--text-muted)]">The variation-order decline is paused while your dispute is under review — continue the conversation in the Dispute section above.</div>
             ) : (
               <div className="space-y-3">
-                <SupplierVariationGate ticketId={t.id} priority={t.priority} createdAt={t.created_at} variationCount={variationCount} status={t.status as 'approved_closeout' | 'vo_declined'} declineReason={latestVoRejectReason} />
+                <SupplierVariationGate ticketId={t.id} priority={t.priority} createdAt={t.created_at} variationCount={variationCount} status={t.status as 'approved_closeout' | 'vo_declined'} declineReason={latestVoRejectReason} noVosConfirmed={!!t.vo_none_confirmed_at} />
                 {t.status === 'vo_declined' && !openDispute && <RaiseDisputeButton ticketId={t.id} origin="variation" />}
               </div>
             )

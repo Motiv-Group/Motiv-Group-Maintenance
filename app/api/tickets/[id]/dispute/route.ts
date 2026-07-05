@@ -39,7 +39,7 @@ async function resolveDispute(admin: Admin, ticket: any, dispute: any, outcome: 
   const title = `Ticket: ${ticket.title ?? 'Untitled'}`
   await admin.from('ticket_disputes').update({ status: 'resolved', outcome, resolved_by: actorId, resolved_at: now, resolution_note: note, pending_outcome: null, pending_by: null, pending_at: null }).eq('id', dispute.id)
   const label = outcome === 'withdrawn'
-    ? (isVariation ? 'Variation-order decline retracted — reopened for review' : `${what[0].toUpperCase()}${what.slice(1)} retracted — dropped`)
+    ? (isVariation ? 'Variation-order decline retracted — reopened for review' : `${what[0].toUpperCase()}${what.slice(1)} dropped — the submission is back under review for approval`)
     : (isVariation ? 'Variation-order decline upheld — stays declined' : `${what[0].toUpperCase()}${what.slice(1)} upheld — stands`)
   await admin.from('ticket_dispute_messages').insert({ dispute_id: dispute.id, ticket_id: ticketId, author_id: actorId, author_role: actorRole, body: `Dispute resolved — ${label}${note ? `: ${note}` : '.'}`, evidence_urls: [], created_at: now })
   if (outcome === 'withdrawn') {
@@ -49,11 +49,12 @@ async function resolveDispute(admin: Admin, ticket: any, dispute: any, outcome: 
       if ((v as any)?.id) await admin.from('ticket_variations').update({ status: 'pending', reject_reason: null, reviewed_at: null, reviewed_by: null }).eq('id', (v as any).id)
       await admin.from('tickets').update({ status: 'variation_review', updated_at: now, last_internal_update_at: now }).eq('id', ticketId)
     } else {
-      // Accept the latest submission and move the job to close-out.
+      // Drop the snag / evidence request → put the submission back UNDER REVIEW so the
+      // RM approves it manually (do NOT auto-accept the COC/POC).
       const { data: latest } = await admin.from('signoffs').select('id').eq('ticket_id', ticketId).order('created_at', { ascending: false }).limit(1).maybeSingle()
-      if ((latest as any)?.id) await admin.from('signoffs').update({ status: 'accepted', reviewed_by: actorId, reviewed_at: now }).eq('id', (latest as any).id)
+      if ((latest as any)?.id) await admin.from('signoffs').update({ status: 'submitted', reject_reason: null, reviewed_by: null, reviewed_at: null }).eq('id', (latest as any).id)
       await admin.from('snags').update({ status: 'resolved' }).eq('ticket_id', ticketId).in('status', ['open', 'assigned', 'in_progress'])
-      await admin.from('tickets').update({ status: 'approved_closeout', signoff_status: 'accepted', updated_at: now, last_internal_update_at: now }).eq('id', ticketId)
+      await admin.from('tickets').update({ status: 'submitted_for_signoff', signoff_status: 'submitted', evidence_request_reason: null, updated_at: now, last_internal_update_at: now }).eq('id', ticketId)
     }
   } else {
     // Upheld — the request stands; the ticket keeps its state so the supplier resumes.
@@ -61,7 +62,7 @@ async function resolveDispute(admin: Admin, ticket: any, dispute: any, outcome: 
   }
   // Notify the party who didn't trigger this.
   const summary = outcome === 'withdrawn'
-    ? (isVariation ? 'the variation order reopens for review' : `the ${what} was retracted — the job moves to close-out`)
+    ? (isVariation ? 'the variation order reopens for review' : `the ${what} was dropped — the submission is back under review for the manager's approval`)
     : (isVariation ? 'the variation-order decline stands' : `the ${what} stands`)
   if (actorRole === 'regional_manager') await push(admin, await supplierIds(admin, ticket.supplier_id), ticket.company_id, title, `Dispute resolved — ${summary}.`, `/supplier/tickets/${ticketId}`)
   else await push(admin, await regionIds(admin, ticket.region_id), ticket.company_id, title, `Dispute resolved — ${summary}.`, `/regional/tickets/${ticketId}`)

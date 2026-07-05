@@ -14,7 +14,7 @@ import { BreachReason } from '@/components/workflow/BreachReason'
 import { Card } from '@/components/exec/ui'
 import { WorkflowActions } from '@/components/workflow/WorkflowActions'
 import { RmPipeline } from '@/components/regional/RmPipeline'
-import { AssignSuppliersButton, RequestInfoButton, RmEditTicketForm, SupplierStatusList, QuoteReviewCard, CancelTicketCard, ApproveSignoffCard, ReQuoteButton, AcceptScheduleCard, AcceptSnagScheduleCard, VariationReviewCard, RmAddWorkForm, RequestEvidenceButton, RaiseSnagButton } from '@/components/regional/RmTicketActions'
+import { AssignSuppliersButton, RequestInfoButton, RmEditTicketForm, SupplierStatusList, QuoteReviewCard, CancelTicketCard, ApproveSignoffCard, ReQuoteButton, AcceptScheduleCard, AcceptSnagScheduleCard, VariationReviewCard, RmAddWorkForm, RequestEvidenceButton, RaiseSnagButton, CloseOutButton } from '@/components/regional/RmTicketActions'
 import { DueDate } from '@/components/workflow/DueDate'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { EditedLine } from '@/components/ui/EditedLine'
@@ -710,14 +710,19 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         {/* Close-out stage — COC/POC approved; the supplier may still raise a variation
             order, or the RM finalises the close-out (button below). */}
         {(t.status === 'approved_closeout' || t.status === 'vo_declined') && (
-          <div className="rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/30 p-3.5 text-sm text-[var(--text-muted)]">COC &amp; POC approved. The supplier can still raise a variation order for extra work — otherwise finalise the close-out below.</div>
+          <>
+            <div className="rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/30 p-3.5 text-sm text-[var(--text-muted)]">COC &amp; POC approved. The supplier can still raise a variation order for extra work — otherwise finalise the close-out below once they confirm there are none.</div>
+            {/* Final close-out — greyed until the supplier confirms no further VOs. */}
+            <CloseOutButton ticketId={t.id} voConfirmed={!!t.vo_none_confirmed_at} />
+          </>
         )}
 
-        {/* Remaining lifecycle actions (request evidence, snag, close) */}
+        {/* Remaining lifecycle actions (request evidence, snag, close). close_out is
+            handled by the gated CloseOutButton above. */}
         <WorkflowActions
           ticketId={t.id} status={t.status} role="regional_manager"
           suppliers={supplierList}
-          exclude={['validate', 'reject', 'request_info', 'request_quote', 'require_assessment', 'approve_quote', 'reject_quote', 'request_revision', 'proceed_no_quote', 'schedule', 'approve', 'assign_snag', 'accept_schedule', 'approve_snag', 'decline_snag_schedule', 'approve_variation', 'reject_variation', 'request_evidence', 'raise_snag']}
+          exclude={['validate', 'reject', 'request_info', 'request_quote', 'require_assessment', 'approve_quote', 'reject_quote', 'request_revision', 'proceed_no_quote', 'schedule', 'approve', 'assign_snag', 'accept_schedule', 'approve_snag', 'decline_snag_schedule', 'approve_variation', 'reject_variation', 'request_evidence', 'raise_snag', 'close_out']}
         />
       </Card>
 

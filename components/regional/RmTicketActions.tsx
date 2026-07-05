@@ -697,6 +697,25 @@ export function CancelTicketCard({ ticketId }: { ticketId: string }) {
   )
 }
 
+// ── Final close-out — greyed until the supplier confirms no more VOs ─
+export function CloseOutButton({ ticketId, voConfirmed }: { ticketId: string; voConfirmed: boolean }) {
+  const router = useRouter()
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  async function closeOut() {
+    setBusy(true); setErr('')
+    try { await post(`/api/tickets/${ticketId}/transition`, { action: 'close_out' }); router.refresh() }
+    catch (e: any) { setErr(e.message); setBusy(false) }
+  }
+  return (
+    <div className="space-y-1.5">
+      {!voConfirmed && <p className="text-xs text-[var(--text-muted)]">Waiting for the supplier to confirm there are no further variation orders before you can close out.</p>}
+      <button onClick={closeOut} disabled={busy || !voConfirmed} className="w-full py-2.5 rounded-xl bg-[#C6A35D] hover:brightness-95 text-[#0a0e17] text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed">{busy ? 'Closing out…' : 'Final close-out'}</button>
+      {err && <p className="text-xs text-red-500">{err}</p>}
+    </div>
+  )
+}
+
 // ── Ask a declined supplier to submit a revised quote ───────────
 export function ReQuoteButton({ ticketId, quoteId }: { ticketId: string; quoteId: string }) {
   const router = useRouter()
