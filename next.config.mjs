@@ -24,27 +24,9 @@ const nextConfig = {
     ],
   },
   async headers() {
-    // ENFORCED CSP. Verified no external resources are loaded (no CDN/fonts/scripts),
-    // so the allowlist below (self + Supabase REST/realtime + Sentry + blob workers)
-    // covers everything the app does. `'unsafe-inline'`/`'unsafe-eval'` on script-src
-    // are still required by the inline theme/splash scripts (app/layout.tsx) + Next —
-    // the nonce-based hardening to remove them is a documented follow-up (docs/GO_LIVE
-    // _CHECKLIST.md). This still enforces frame-ancestors (clickjacking), object/base-
-    // uri/form-action, and source allowlisting for connect/img/worker.
-    const csp = [
-      "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-      "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob: https://*.supabase.co",
-      "font-src 'self' data:",
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.ingest.sentry.io",
-      "worker-src 'self' blob:",
-      "object-src 'none'",
-      "frame-ancestors 'none'",
-      "base-uri 'self'",
-      "form-action 'self'",
-    ].join('; ')
-
+    // Static security headers. The CSP is set PER-REQUEST in middleware.ts (it needs
+    // a per-request nonce for the strict, no-'unsafe-inline' script policy), so it is
+    // intentionally NOT here — two CSP headers would conflict.
     return [
       {
         source: '/:path*',
@@ -54,7 +36,6 @@ const nextConfig = {
           { key: 'X-Frame-Options', value: 'DENY' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           { key: 'Permissions-Policy', value: 'camera=(self), microphone=(), geolocation=()' },
-          { key: 'Content-Security-Policy', value: csp },
         ],
       },
     ]

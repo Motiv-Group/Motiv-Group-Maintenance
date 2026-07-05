@@ -1,9 +1,49 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+// Strict, nonce-based CSP (no 'unsafe-inline' on scripts). The nonce is generated
+// per request here and set on the REQUEST header so Next applies it to its own
+// scripts; the root layout reads it (x-nonce) for the inline theme script.
+function buildCsp(nonce: string): string {
+  const isDev = process.env.NODE_ENV !== 'production'
+  return [
+    "default-src 'self'",
+    // 'strict-dynamic' + nonce: only nonce'd scripts (and what they load) run.
+    // 'unsafe-eval' is dev-only (react-refresh); prod has neither unsafe-*.
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ''}`,
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob: https://*.supabase.co",
+    "font-src 'self' data:",
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.ingest.sentry.io",
+    "worker-src 'self' blob:",
+    "object-src 'none'",
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+  ].join('; ')
+}
+
 // v3 cutover: roles live in user_profiles (company-scoped identity).
 export async function middleware(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request })
+  const nonce = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))))
+  const csp = buildCsp(nonce)
+
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-nonce', nonce)
+  requestHeaders.set('content-security-policy', csp)
+
+  const applyCsp = (res: NextResponse) => { res.headers.set('content-security-policy', csp); return res }
+
+  const path = request.nextUrl.pathname
+  const authPrefixes = ['/client', '/regional', '/supplier', '/executive', '/admin', '/settings', '/auth']
+  const needsAuth = authPrefixes.some(p => path.startsWith(p))
+
+  // Public pages (/, /privacy, /terms, …): apply CSP, skip the auth round-trip.
+  if (!needsAuth) {
+    return applyCsp(NextResponse.next({ request: { headers: requestHeaders } }))
+  }
+
+  let supabaseResponse = NextResponse.next({ request: { headers: requestHeaders } })
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -13,7 +53,7 @@ export async function middleware(request: NextRequest) {
         getAll() { return request.cookies.getAll() },
         setAll(cookiesToSet: { name: string; value: string; options?: Record<string, unknown> }[]) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          supabaseResponse = NextResponse.next({ request })
+          supabaseResponse = NextResponse.next({ request: { headers: requestHeaders } })
           cookiesToSet.forEach(({ name, value, options }) => supabaseResponse.cookies.set(name, value, options))
         },
       },
@@ -21,7 +61,6 @@ export async function middleware(request: NextRequest) {
   )
 
   const { data: { user } } = await supabase.auth.getUser()
-  const path = request.nextUrl.pathname
 
   async function getRole(): Promise<string | null> {
     if (!user) return null
@@ -53,9 +92,10 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL(dest, request.url))
   }
 
-  return supabaseResponse
+  return applyCsp(supabaseResponse)
 }
 
 export const config = {
-  matcher: ['/client/:path*', '/supplier/:path*', '/regional/:path*', '/executive/:path*', '/admin/:path*', '/settings', '/settings/:path*', '/auth/:path*'],
+  // Run on every route EXCEPT api, next internals, and static files (anything with a dot).
+  matcher: ['/((?!api|_next|.*\\..*).*)'],
 }

@@ -15,8 +15,8 @@ Tier-blocked items live in `docs/INFRASTRUCTURE_TIERS.md`. Security architecture
 - [ ] Replace legal template copy in `/privacy` + `/terms` (lawyer review).
 - [ ] **Vercel Pro** — Hobby is non-commercial license; also unblocks the hourly SLA cron.
 - [ ] **Supabase Pro** — automated backups / PITR (no backup story today).
-- [x] **Enforce CSP** — ✅ done 2026-07-07 (Report-Only → enforcing; verified in-browser, no violations). Remaining: **CSP Step 2 (nonces)** to drop `'unsafe-inline'` for real XSS defence — see below.
-- [ ] **CSP Step 2 — nonce-based** (remove `'unsafe-inline'`/`'unsafe-eval'` from script-src). Bigger, tested change.
+- [x] **Enforce CSP** — ✅ done 2026-07-07 (Report-Only → enforcing).
+- [x] **CSP Step 2 — nonce-based** — ✅ done 2026-07-07. Per-request nonce in `middleware.ts` + `strict-dynamic`; `'unsafe-inline'` removed from script-src (`'unsafe-eval'` dev-only). Verified in prod mode: all scripts nonce'd, theme script + React hydration work, auth gate intact, 0 CSP violations.
 - [x] `/api/files/sign` — ✅ **removed** 2026-07-07 (was unused; all display signs server-side). Kills the "any logged-in user signs any path" surface. Re-add with per-file auth only if a client ever needs on-demand signing.
 - [ ] Account-delete session revoke (JWT ~1h window), `<img>`→`next/image`, Android `minifyEnabled=true`.
 
