@@ -3,7 +3,7 @@ import { revalidatePath } from 'next/cache'
 import { NextResponse } from 'next/server'
 import { serverError } from '@/lib/api-error'
 import { rateLimit } from '@/lib/rate-limit'
-import { sendPushToUser, sendPushToMany } from '@/lib/push'
+import { sendPushToMany } from '@/lib/push'
 
 // PATCH /api/quotes/[id] — supplier edits their own MAIN quote.
 // Allowed only while the quote is 'pending' or 'declined'; editing re-opens it
@@ -53,7 +53,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   // Re-open for approval: ticket → quoted, re-notify client + RM.
   const [, { data: ticket }] = await Promise.all([
     adminClient.from('tickets').update({ status: 'quoted' }).eq('id', quote.ticket_id),
-    adminClient.from('tickets').select('client_id, region_id, title').eq('id', quote.ticket_id).single(),
+    adminClient.from('tickets').select('store_id, company_id, region_id, title').eq('id', quote.ticket_id).single(),
   ])
 
   if (ticket) {
@@ -64,14 +64,21 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       : { data: [] as { user_id: string }[] }
     const rmIds = (rms ?? []).map(r => r.user_id)
 
+    // v3: the ticket is for a STORE; notify its manager user(s) via store_users.
+    const { data: sm } = await adminClient.from('store_users').select('user_id').eq('store_id', ticket.store_id)
+    const smIds = (sm ?? []).map(r => r.user_id)
+
     await Promise.all([
-      adminClient.from('notifications').insert({
-        user_id: ticket.client_id,
-        type: 'quote_updated',
-        title: 'Quote Updated',
-        message: `The quote for "${ticket.title}" was updated. Please await regional manager approval.`,
-        link: `/client/tickets/${quote.ticket_id}`,
-      }),
+      smIds.length
+        ? adminClient.from('notifications').insert(smIds.map(smId => ({
+            company_id: ticket.company_id,
+            user_id: smId,
+            type: 'quote_updated',
+            title: 'Quote Updated',
+            message: `The quote for "${ticket.title}" was updated. Please await regional manager approval.`,
+            link: `/client/tickets/${quote.ticket_id}`,
+          })))
+        : Promise.resolve(),
       rmIds.length
         ? adminClient.from('notifications').insert(rmIds.map(rmId => ({
             user_id: rmId,
@@ -83,6 +90,13 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         : Promise.resolve(),
     ])
 
+    if (smIds.length) {
+      void sendPushToMany(smIds, {
+        title: 'Quote Updated',
+        body: `The quote for "${ticket.title}" was updated.`,
+        url: `/client/tickets/${quote.ticket_id}`,
+      })
+    }
     if (rmIds.length) {
       void sendPushToMany(rmIds, {
         title: 'Updated Quote Awaiting Approval',

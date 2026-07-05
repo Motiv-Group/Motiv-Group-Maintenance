@@ -25,8 +25,8 @@ export async function GET() {
     const [profile, notifications, tickets, ratings] = await Promise.all([
       admin.from('user_profiles').select('*').eq('id', user.id).maybeSingle(),
       admin.from('notifications').select('*').eq('user_id', user.id),
-      admin.from('tickets').select('*').eq('client_id', user.id),
-      admin.from('ratings').select('*').eq('client_id', user.id),
+      admin.from('tickets').select('*').eq('created_by', user.id),
+      admin.from('ratings').select('*').eq('rated_by', user.id),
     ])
 
     const payload = {

@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { signedUrl } from '@/lib/storage'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { BackButton } from '@/components/ui/BackButton'
@@ -105,7 +106,7 @@ export default async function RegionalStoreDetailPage({ params }: { params: { id
     adminClient
       .from('tickets')
       .select('*, quotes(*)')
-      .eq('client_id', params.id)
+      .eq('store_id', params.id)
       .order('created_at', { ascending: false }),
   ])
 
@@ -149,6 +150,8 @@ export default async function RegionalStoreDetailPage({ params }: { params: { id
   const pendingQuotes = ticketList
     .flatMap(t => (t.quotes ?? []).map((q: any) => ({ ...q, ticketTitle: t.title, ticketId: t.id })))
     .filter((q: any) => q.status === 'pending')
+  // Sign each pending quote's stored attachment for display (private bucket).
+  await Promise.all(pendingQuotes.map(async (q: any) => { q.file_url = await signedUrl(q.file_url) }))
 
   // Stats
   const acceptedQ   = allQuotes.filter((q: any) => q.status === 'accepted').length

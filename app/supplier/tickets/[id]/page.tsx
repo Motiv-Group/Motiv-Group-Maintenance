@@ -6,6 +6,7 @@ import { SubmitCompletionForm } from '@/components/supplier/SubmitCompletionForm
 import { BackLink } from '@/components/ui/BackLink'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { createAdminClient } from '@/lib/supabase/server'
+import { signedUrl, signManyUrls } from '@/lib/storage'
 import { requireSupplierV3 } from '@/lib/health/guard'
 import { loadSlaResolver } from '@/lib/health/data'
 import { deriveDueDates } from '@/lib/health/priority'
@@ -174,6 +175,21 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
     // Newer per-dispute columns (signoff link + pending proposal) fetched separately so
     // the dispute block still works if those columns aren't migrated yet (query fails → null).
     admin.from('ticket_disputes').select('id, signoff_id, pending_outcome, pending_by').eq('ticket_id', t.id),
+  ])
+  // Private-bucket signing: rewrite every stored ticket-photo / COC / attachment /
+  // evidence URL to a short-lived signed URL in place, so all the render sites below
+  // (ticket photos, signoff cards, quotes, variations, disputes) get readable links.
+  if (Array.isArray(t.photo_urls)) t.photo_urls = await signManyUrls(t.photo_urls as string[])
+  await Promise.all([
+    ...((signoffRows ?? []) as any[]).map(async s => {
+      if (Array.isArray(s.before_urls)) s.before_urls = await signManyUrls(s.before_urls)
+      if (Array.isArray(s.after_urls)) s.after_urls = await signManyUrls(s.after_urls)
+      s.coc_url = await signedUrl(s.coc_url)
+      s.invoice_url = await signedUrl(s.invoice_url)
+    }),
+    ...((myQuotes ?? []) as any[]).map(async q => { q.file_url = await signedUrl(q.file_url) }),
+    ...((variationRows ?? []) as any[]).map(async v => { if (Array.isArray(v.file_urls)) v.file_urls = await signManyUrls(v.file_urls) }),
+    ...((disputeMsgRows ?? []) as any[]).map(async m => { if (Array.isArray(m.evidence_urls)) m.evidence_urls = await signManyUrls(m.evidence_urls) }),
   ])
   // Client organisation that owns the store (shown in the ticket detail).
   const companyName = (companyRow as any)?.name ?? null

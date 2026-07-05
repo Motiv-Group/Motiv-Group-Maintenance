@@ -45,7 +45,7 @@ export interface Ticket {
   store_job_year?: number | null
   job_ref?: string | null      // per-store reference, e.g. WBP-2026-0007
   branch_code?: string | null
-  client_id: string            // the store profile (store_id)
+  store_id: string             // the store (stores.id)
   region_id?: string | null
   supplier_id?: string | null  // sub-supplier (trade directory) assigned
   assigned_user_id?: string | null

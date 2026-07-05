@@ -96,7 +96,7 @@ export async function buildSupplierModel(
   range: DateRange,
 ): Promise<ReportModel> {
   const [{ data: tickets }, { data: quotes }, { data: completions }, { data: subs }] = await Promise.all([
-    admin.from('tickets').select('id, status, priority, created_at, client_id, profiles(company_name, sub_store)')
+    admin.from('tickets').select('id, status, priority, created_at, store_id, profiles(company_name, sub_store)')
       .gte('created_at', range.fromISO).lte('created_at', range.toISO),
     admin.from('quotes').select('status, type, amount, amount_incl_vat, created_at')
       .eq('admin_id', supplierId).gte('created_at', range.fromISO).lte('created_at', range.toISO),
@@ -239,8 +239,8 @@ export async function buildRegionalModel(
   range: DateRange,
 ): Promise<ReportModel> {
   const { data: tickets } = storeIds.length
-    ? await admin.from('tickets').select('id, status, client_id, created_at, quotes(status, type, amount)')
-        .in('client_id', storeIds).gte('created_at', range.fromISO).lte('created_at', range.toISO)
+    ? await admin.from('tickets').select('id, status, store_id, created_at, quotes(status, type, amount)')
+        .in('store_id', storeIds).gte('created_at', range.fromISO).lte('created_at', range.toISO)
     : { data: [] }
 
   const T = (tickets ?? []) as Row[]
@@ -256,7 +256,7 @@ export async function buildRegionalModel(
 
   // per-store breakdown
   const perStore = storeIds.map(id => {
-    const ts = T.filter(t => t.client_id === id)
+    const ts = T.filter(t => t.store_id === id)
     const qs = ts.flatMap(t => (t.quotes ?? []) as Row[])
     return {
       name:        storeName(id),

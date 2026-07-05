@@ -3,7 +3,7 @@ import { revalidatePath } from 'next/cache'
 import { NextResponse } from 'next/server'
 import { serverError, parseAmount } from '@/lib/api-error'
 import { rateLimit } from '@/lib/rate-limit'
-import { sendPushToUser, sendPushToMany } from '@/lib/push'
+import { sendPushToMany } from '@/lib/push'
 
 // POST /api/quotes — admin (contractor) only.
 // Handles both normal quotes (type 'quote') and mid-job variation orders
@@ -17,8 +17,9 @@ export async function POST(request: Request) {
   if (!(await rateLimit(`quotes:${user.id}`, 30, 60_000)))
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
-  const { data: profile } = await supabase.from('user_profiles').select('role').eq('id', user.id).single()
+  const { data: profile } = await supabase.from('user_profiles').select('role, company_id').eq('id', user.id).single()
   if (profile?.role !== 'supplier') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const callerCompanyId = profile?.company_id ?? null
 
   const body = await request.json()
   const { ticket_id, amount, amount_incl_vat, description, valid_until, file_url } = body
@@ -66,7 +67,7 @@ export async function POST(request: Request) {
 
   const [, { data: ticket }] = await Promise.all([
     adminClient.from('tickets').update({ status: newTicketStatus }).eq('id', ticket_id),
-    adminClient.from('tickets').select('client_id, region_id, title').eq('id', ticket_id).single(),
+    adminClient.from('tickets').select('store_id, company_id, region_id, title').eq('id', ticket_id).single(),
   ])
 
   if (ticket) {
@@ -94,15 +95,22 @@ export async function POST(request: Request) {
         })
       }
     } else {
-      // Normal quote → notify client + regional manager(s)
+      // Normal quote → notify the store's manager(s) + regional manager(s).
+      // v3: the ticket is for a STORE; its manager users are found via store_users.
+      const { data: sm } = await adminClient.from('store_users').select('user_id').eq('store_id', ticket.store_id)
+      const smIds = (sm ?? []).map(r => r.user_id)
+
       await Promise.all([
-        adminClient.from('notifications').insert({
-          user_id: ticket.client_id,
-          type: 'new_quote',
-          title: 'Quote Received',
-          message: `A quote has been submitted for your ticket: "${ticket.title}". Please await regional manager approval.`,
-          link: `/client/tickets/${ticket_id}`,
-        }),
+        smIds.length
+          ? adminClient.from('notifications').insert(smIds.map(smId => ({
+              company_id: ticket.company_id ?? callerCompanyId,
+              user_id: smId,
+              type: 'new_quote',
+              title: 'Quote Received',
+              message: `A quote has been submitted for your ticket: "${ticket.title}". Please await regional manager approval.`,
+              link: `/client/tickets/${ticket_id}`,
+            })))
+          : Promise.resolve(),
         rmIds.length
           ? adminClient.from('notifications').insert(rmIds.map(rmId => ({
               user_id: rmId,
@@ -114,11 +122,13 @@ export async function POST(request: Request) {
           : Promise.resolve(),
       ])
 
-      void sendPushToUser(ticket.client_id, {
-        title: 'Quote Received',
-        body: `A quote has been submitted for your ticket: "${ticket.title}"`,
-        url: `/client/tickets/${ticket_id}`,
-      })
+      if (smIds.length) {
+        void sendPushToMany(smIds, {
+          title: 'Quote Received',
+          body: `A quote has been submitted for your ticket: "${ticket.title}"`,
+          url: `/client/tickets/${ticket_id}`,
+        })
+      }
       if (rmIds.length) {
         void sendPushToMany(rmIds, {
           title: 'Quote Awaiting Your Approval',

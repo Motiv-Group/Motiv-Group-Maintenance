@@ -1,8 +1,8 @@
 # Motiv — production readiness (security & policies)
 
-Run `supabase/clean_install.sql` first (full schema + RLS + buckets + the SLA seed). Then work this checklist.
+> **Note (2026-07-06):** `clean_install.sql` and `schema_v3.sql` were removed — they did **not** match the live database (they built the old v1 `profiles` schema). The single source of truth is now **`supabase/schema.sql`** (reconstructed from the live prod dump). Fresh installs apply the numbered `supabase/migrations/*.sql` in order; use `schema.sql` as the reference for what the live DB looks like.
 
-## What `clean_install.sql` already does
+## What the base schema provides
 - **RLS enabled on every table.** Tables with no policy (`suppliers`, `push_subscriptions`, `whatsapp_sessions`, and analytics *writes*) are reachable **only by the service-role key** (server-side) — clients get deny-by-default. The app already uses the admin client for those.
 - **`whatsapp_sessions` RLS turned ON** (the original migration left it OFF — that was a hole: a public table with no RLS is world read/write via the API).
 - **`security definer` functions pinned** with `set search_path = public` (prevents search-path hijack — a Supabase linter warning).

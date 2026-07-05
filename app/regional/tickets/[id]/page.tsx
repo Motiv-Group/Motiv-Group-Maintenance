@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { BackLink } from '@/components/ui/BackLink'
 import { CheckCircle2, FileText, Calendar, CalendarClock, Clock, MessageSquare, Camera } from 'lucide-react'
 import { createAdminClient } from '@/lib/supabase/server'
+import { signedUrl } from '@/lib/storage'
 import { requireRegionalV3 } from '@/lib/health/guard'
 import { loadSlaResolver } from '@/lib/health/data'
 import { deriveDueDates } from '@/lib/health/priority'
@@ -255,6 +256,36 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
     // Newer per-dispute columns (signoff link + pending proposal) fetched separately so
     // the dispute block still works if those columns aren't migrated yet (query fails → null).
     admin.from('ticket_disputes').select('id, signoff_id, pending_outcome, pending_by').eq('ticket_id', t.id),
+  ])
+  // Private-bucket signing. The "new evidence" green-highlight compares URLs across
+  // signoff rounds by equality, so each DISTINCT stored URL is signed exactly once
+  // (shared map) → identical stored URLs still map to identical signed URLs. Every
+  // render site below reads the rewritten rows.
+  const _signCache = new Map<string, Promise<string | null>>()
+  const signOne = (u: string | null | undefined): Promise<string | null> => {
+    if (!u) return Promise.resolve(null)
+    let p = _signCache.get(u)
+    if (!p) { p = signedUrl(u); _signCache.set(u, p) }
+    return p
+  }
+  const signList = async (list: any): Promise<string[]> =>
+    Array.isArray(list) ? (await Promise.all(list.map(signOne))).filter((x): x is string => !!x) : list
+  if (Array.isArray(t.photo_urls)) t.photo_urls = await signList(t.photo_urls)
+  await Promise.all([
+    ...((signoffs ?? []) as any[]).map(async s => {
+      s.before_urls = await signList(s.before_urls)
+      s.after_urls = await signList(s.after_urls)
+      s.coc_url = await signOne(s.coc_url)
+      s.invoice_url = await signOne(s.invoice_url)
+    }),
+    ...((quotes ?? []) as any[]).map(async q => { q.file_url = await signOne(q.file_url) }),
+    ...((variations ?? []) as any[]).map(async v => { v.file_urls = await signList(v.file_urls) }),
+    ...((disputeMsgRows ?? []) as any[]).map(async m => { m.evidence_urls = await signList(m.evidence_urls) }),
+    // Supplier progress-photo updates embed the URL in the body ("📷 Progress photo: <url>").
+    ...((updates ?? []) as any[]).map(async u => {
+      const match = String(u.body).match(/^(📷\s*Progress photo:\s*)(\S+)([\s\S]*)$/)
+      if (match) u.body = `${match[1]}${await signOne(match[2])}${match[3]}`
+    }),
   ])
   // Full COC/POC history — every submission, split by state (mirrors the supplier
   // view). Each sent-back card carries the reason it was rejected.

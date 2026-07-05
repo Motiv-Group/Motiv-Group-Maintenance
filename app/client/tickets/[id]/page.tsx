@@ -5,6 +5,7 @@ import { CalendarClock } from 'lucide-react'
 import { BackLink } from '@/components/ui/BackLink'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { createAdminClient } from '@/lib/supabase/server'
+import { signManyUrls } from '@/lib/storage'
 import { requireStoreManagerV3 } from '@/lib/health/guard'
 import { loadSlaResolver } from '@/lib/health/data'
 import { deriveDueDates } from '@/lib/health/priority'
@@ -69,6 +70,11 @@ export default async function StoreTicketDetailPage({ params }: { params: { id: 
   const dueAt = deriveDueDates(t as HealthTicket, rules(t.priority as Priority)).resolutionDue
   const overdue = isActive(t.status) && now.getTime() > new Date(dueAt).getTime()
 
+  // Sign the stored ticket photos for display (private bucket). AddInfoForm keeps the
+  // RAW stored URLs — it re-submits them on PATCH, so it must not receive signed ones.
+  const photoUrls = Array.isArray(t.photo_urls) ? (t.photo_urls as string[]) : []
+  const signedPhotoUrls = await signManyUrls(photoUrls)
+
   return (
     <div className="space-y-5">
       <BackLink fallbackHref="/client/tickets" label="Back to tickets" />
@@ -111,11 +117,11 @@ export default async function StoreTicketDetailPage({ params }: { params: { id: 
           <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{t.description}</p>
         </div>
 
-        {Array.isArray(t.photo_urls) && t.photo_urls.length > 0 && (
+        {signedPhotoUrls.length > 0 && (
           <div>
             <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Photos</div>
             <div className="flex flex-wrap gap-x-4 gap-y-1">
-              {t.photo_urls.map((u: string, i: number) => (
+              {signedPhotoUrls.map((u: string, i: number) => (
                 <ViewTrackedLink key={i} ticketId={t.id} itemType="photo" itemLabel={`Photo ${i + 1}`} href={u} className="text-sm text-[#C6A35D] underline hover:text-amber-500">Photo {i + 1}</ViewTrackedLink>
               ))}
             </div>

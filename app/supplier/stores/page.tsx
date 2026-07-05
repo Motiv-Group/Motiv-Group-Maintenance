@@ -32,15 +32,15 @@ export default async function AdminStoresPage() {
     }
   }
 
-  // Tickets don't reliably embed off `stores` (client_id is a legacy, un-FK'd
-  // column), so fetch them separately and count per store in JS.
+  // Tickets don't reliably embed off `stores`, so fetch them separately and
+  // count per store in JS (tickets link to the store via store_id).
   const storeIds = (stores ?? []).map((s: any) => s.id)
   const { data: tickets } = storeIds.length
-    ? await supabase.from('tickets').select('id, status, client_id').in('client_id', storeIds)
+    ? await supabase.from('tickets').select('id, status, store_id').in('store_id', storeIds)
     : { data: [] as any[] }
   const ticketsByStore: Record<string, any[]> = {}
   for (const t of tickets ?? []) {
-    (ticketsByStore[t.client_id] ??= []).push(t)
+    (ticketsByStore[t.store_id] ??= []).push(t)
   }
 
   const storeList = (stores ?? []).map((s: any) => {

@@ -26,7 +26,7 @@ export default async function AdminStoreDetailPage({ params }: { params: { id: s
     supabase
       .from('tickets')
       .select('*, quotes(id, amount, status)')
-      .eq('client_id', params.id)
+      .eq('store_id', params.id)
       .order('created_at', { ascending: false }),
     supabase
       .from('user_profiles')

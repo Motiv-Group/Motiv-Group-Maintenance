@@ -1,7 +1,7 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
-import { sendPushToUser, sendPushToMany } from '@/lib/push'
+import { sendPushToMany } from '@/lib/push'
 
 export async function PATCH(
   request: Request,
@@ -39,7 +39,7 @@ export async function PATCH(
 
   const { data: quote } = await adminClient
     .from('quotes')
-    .select('ticket_id, amount, type, tickets(client_id, company_id, region_id, title)')
+    .select('ticket_id, amount, type, tickets(store_id, company_id, region_id, title)')
     .eq('id', params.id)
     .single()
 
@@ -60,9 +60,12 @@ export async function PATCH(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  // Store managers may only respond to their own store's ticket.
-  if (isStoreManager && ticket?.client_id !== user.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  // Store managers may only respond to their own store's ticket. v3: the store's
+  // manager users are linked via store_users(user_id, store_id).
+  if (isStoreManager) {
+    const { data: link } = await adminClient
+      .from('store_users').select('user_id').eq('store_id', ticket.store_id).eq('user_id', user.id).maybeSingle()
+    if (!link) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
   // Regional managers may only act on tickets in a region they manage.
@@ -105,19 +108,27 @@ export async function PATCH(
 
   const titleNoun = isVariation ? 'Variation Order' : 'Quote'
 
+  // v3: the ticket is for a STORE; its manager user(s) are found via store_users.
+  // Notified for normal quotes only — variations are an RM↔contractor matter.
+  const notifyStoreManagers = !isStoreManager && !isVariation
+  const { data: sm } = notifyStoreManagers
+    ? await adminClient.from('store_users').select('user_id').eq('store_id', ticket.store_id)
+    : { data: [] as { user_id: string }[] }
+  const smIds = (sm ?? []).map(r => r.user_id)
+
   // Fire all notifications in parallel.
-  // Client is notified for normal quotes only — variations are an RM↔contractor matter.
   await Promise.all([
-    ticket?.client_id && !isStoreManager && !isVariation
-      ? adminClient.from('notifications').insert({
-          user_id: ticket.client_id,
+    smIds.length
+      ? adminClient.from('notifications').insert(smIds.map(smId => ({
+          company_id: ticket.company_id,
+          user_id: smId,
           type:    status === 'accepted' ? 'quote_accepted' : 'quote_declined',
           title:   status === 'accepted' ? 'Quote Approved' : 'Quote Declined',
           message: status === 'accepted'
             ? `Your quote for "${ticket.title}" has been approved and work will proceed.`
             : `The quote for "${ticket.title}" was declined.${reasonNote} A new quote will follow.`,
           link: `/client/tickets/${quote.ticket_id}`,
-        })
+        })))
       : Promise.resolve(),
     admins?.length
       ? adminClient.from('notifications').insert(
@@ -135,8 +146,8 @@ export async function PATCH(
   ])
 
   // Fire push — non-blocking
-  if (ticket?.client_id && !isStoreManager && !isVariation) {
-    void sendPushToUser(ticket.client_id, {
+  if (smIds.length) {
+    void sendPushToMany(smIds, {
       title: status === 'accepted' ? 'Quote Approved' : 'Quote Declined',
       body: status === 'accepted'
         ? `Your quote for "${ticket.title}" has been approved.`
