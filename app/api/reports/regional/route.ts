@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { resolveRange, buildRegionalModel } from '@/lib/report-data'
 import { addNarrative } from '@/lib/report-groq'
 import { buildReportDocx } from '@/lib/report-docx'
+import { rateLimit } from '@/lib/rate-limit'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -12,6 +13,7 @@ export async function POST(request: Request) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+  if (!(await rateLimit(`report-regional:${user.id}`, 20, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
   const { data: profile } = await supabase
     .from('user_profiles').select('role, full_name').eq('id', user.id).single()

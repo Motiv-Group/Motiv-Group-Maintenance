@@ -1,10 +1,12 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { rateLimit } from '@/lib/rate-limit'
 
 export async function POST(request: Request) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+  if (!(await rateLimit(`push-sub:${user.id}`, 30, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
   const { endpoint, p256dh, auth } = await request.json()
   if (!endpoint || !p256dh || !auth)
@@ -23,6 +25,7 @@ export async function DELETE(request: Request) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+  if (!(await rateLimit(`push-sub:${user.id}`, 30, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
   const { endpoint } = await request.json()
   if (!endpoint) return NextResponse.json({ error: 'Missing endpoint' }, { status: 400 })

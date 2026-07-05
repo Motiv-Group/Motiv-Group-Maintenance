@@ -35,6 +35,13 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const { data: quote } = await admin.from('quotes').select('id, supplier_id, status, proposed_schedule_at').eq('id', quoteId).eq('ticket_id', ticket.id).single()
   if (!quote) return NextResponse.json({ error: 'Quote not found' }, { status: 404 })
 
+  // Idempotency: approve/decline only act on a still-pending quote, so a double-
+  // submit (double-click / retry) can't re-award, re-decline others, or fire
+  // duplicate notifications. ('requote' intentionally acts on a declined quote.)
+  if ((action === 'approve' || action === 'decline') && quote.status !== 'pending') {
+    return NextResponse.json({ error: 'This quote has already been decided.' }, { status: 409 })
+  }
+
   const now = new Date().toISOString()
 
   const reason = body.reason ?? null

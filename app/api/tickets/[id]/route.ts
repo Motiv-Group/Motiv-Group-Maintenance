@@ -3,12 +3,14 @@ import { NextResponse } from 'next/server'
 import { serverError } from '@/lib/api-error'
 import { revalidatePath } from 'next/cache'
 import { computePriority } from '@/lib/health/priority'
+import { rateLimit } from '@/lib/rate-limit'
 
 // PATCH /api/tickets/[id] — store manager edits their own ticket while it's still open.
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+  if (!(await rateLimit(`ticket-edit:${user.id}`, 40, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
   const admin = createAdminClient()
   const { data: prof } = await admin.from('user_profiles').select('role, company_id').eq('id', user.id).single()
@@ -79,6 +81,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+  if (!(await rateLimit(`ticket-edit:${user.id}`, 40, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
   const admin = createAdminClient()
   const { data: prof } = await admin.from('user_profiles').select('company_id').eq('id', user.id).single()

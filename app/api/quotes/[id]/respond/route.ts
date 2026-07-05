@@ -2,6 +2,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { sendPushToMany } from '@/lib/push'
+import { rateLimit } from '@/lib/rate-limit'
 
 export async function PATCH(
   request: Request,
@@ -10,6 +11,7 @@ export async function PATCH(
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+  if (!(await rateLimit(`quote-respond:${user.id}`, 40, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
   const { data: profile } = await supabase
     .from('user_profiles').select('role, company_id').eq('id', user.id).single()

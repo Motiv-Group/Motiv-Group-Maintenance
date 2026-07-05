@@ -2,10 +2,12 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
 import { serverError } from '@/lib/api-error'
+import { rateLimit } from '@/lib/rate-limit'
 export async function POST(request: Request) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+  if (!(await rateLimit(`assign-rm:${user.id}`, 30, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
   const { data: profile } = await supabase.from('user_profiles').select('role, company_id').eq('id', user.id).single()
   if (profile?.role !== 'supplier' || !profile.company_id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })

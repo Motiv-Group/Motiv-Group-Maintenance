@@ -2,6 +2,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
 import { serverError } from '@/lib/api-error'
+import { rateLimit } from '@/lib/rate-limit'
 // Returns the caller's company_id when they are a supplier-role user, else null.
 // company_id is required so mutations can be scoped to the caller's own company
 // (the admin client bypasses RLS, so this is the only tenant guard).
@@ -17,6 +18,7 @@ async function requireAdmin() {
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   const ctx = await requireAdmin()
   if (!ctx) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!(await rateLimit(`supplier-edit:${ctx.user.id}`, 30, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
   const body = await request.json()
   const {
@@ -57,6 +59,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
   const ctx = await requireAdmin()
   if (!ctx) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!(await rateLimit(`supplier-edit:${ctx.user.id}`, 30, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
   const adminClient = createAdminClient()
   const { data, error } = await adminClient
