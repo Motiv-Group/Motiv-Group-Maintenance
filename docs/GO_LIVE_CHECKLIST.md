@@ -15,9 +15,14 @@ Tier-blocked items live in `docs/INFRASTRUCTURE_TIERS.md`. Security architecture
 - [ ] Replace legal template copy in `/privacy` + `/terms` (lawyer review).
 - [ ] **Vercel Pro** — Hobby is non-commercial license; also unblocks the hourly SLA cron.
 - [ ] **Supabase Pro** — automated backups / PITR (no backup story today).
-- [ ] **Enforce CSP** (currently Report-Only — see below).
-- [ ] Per-file storage authorization (`/api/files/sign` currently gates "logged-in", not "owns this file").
-- [ ] Password policy (min-8 only today), account-delete session revoke, `<img>`→`next/image`, Android `minifyEnabled=true`.
+- [x] **Enforce CSP** — ✅ done 2026-07-07 (Report-Only → enforcing; verified in-browser, no violations). Remaining: **CSP Step 2 (nonces)** to drop `'unsafe-inline'` for real XSS defence — see below.
+- [ ] **CSP Step 2 — nonce-based** (remove `'unsafe-inline'`/`'unsafe-eval'` from script-src). Bigger, tested change.
+- [ ] `/api/files/sign` — currently **unused** by the app (all display signs server-side). Either **remove it** (kills the attack surface) or add per-file ownership auth if a client ever needs it.
+- [ ] Account-delete session revoke (JWT ~1h window), `<img>`→`next/image`, Android `minifyEnabled=true`.
+
+**⏸️ Parked (come back to):**
+- **Leaked-password protection** — Supabase **Pro** only (tier backlog #4).
+- **`WHATSAPP_APP_SECRET`** — waiting on WhatsApp Business registration.
 
 ---
 
