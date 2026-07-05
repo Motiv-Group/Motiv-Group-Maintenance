@@ -24,11 +24,13 @@ const nextConfig = {
     ],
   },
   async headers() {
-    // CSP is shipped Report-Only for now: the app relies on inline theme/splash
-    // scripts (app/layout.tsx), Supabase REST + realtime (wss), and pdfjs blob
-    // workers, so an *enforced* policy needs live testing against the browser AND
-    // the Capacitor WebView first. Report-Only surfaces violations without breaking
-    // anything — tighten to `Content-Security-Policy` once the report is clean.
+    // ENFORCED CSP. Verified no external resources are loaded (no CDN/fonts/scripts),
+    // so the allowlist below (self + Supabase REST/realtime + Sentry + blob workers)
+    // covers everything the app does. `'unsafe-inline'`/`'unsafe-eval'` on script-src
+    // are still required by the inline theme/splash scripts (app/layout.tsx) + Next —
+    // the nonce-based hardening to remove them is a documented follow-up (docs/GO_LIVE
+    // _CHECKLIST.md). This still enforces frame-ancestors (clickjacking), object/base-
+    // uri/form-action, and source allowlisting for connect/img/worker.
     const csp = [
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
@@ -37,6 +39,7 @@ const nextConfig = {
       "font-src 'self' data:",
       "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.ingest.sentry.io",
       "worker-src 'self' blob:",
+      "object-src 'none'",
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
@@ -51,7 +54,7 @@ const nextConfig = {
           { key: 'X-Frame-Options', value: 'DENY' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           { key: 'Permissions-Policy', value: 'camera=(self), microphone=(), geolocation=()' },
-          { key: 'Content-Security-Policy-Report-Only', value: csp },
+          { key: 'Content-Security-Policy', value: csp },
         ],
       },
     ]
