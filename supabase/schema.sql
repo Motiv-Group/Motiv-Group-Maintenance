@@ -1146,6 +1146,13 @@ AS $function$
 begin new.updated_at = now(); return new; end; $function$
 ;
 
+-- Function EXECUTE grants (advisor lockdown 20260709): these SECURITY DEFINER
+-- functions are service-role/trigger only, not public RPC. The app_* helpers are
+-- intentionally left executable (RLS policies call them per query as the caller).
+revoke execute on function public.append_session_photo(uuid, text) from anon, authenticated;
+revoke execute on function public.handle_new_user()                 from anon, authenticated;
+revoke execute on function public.assign_store_job_ref()            from anon, authenticated;
+
 -- ---------------------------------------------------------------------------
 -- TRIGGERS
 -- ---------------------------------------------------------------------------

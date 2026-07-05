@@ -7,7 +7,7 @@ Tier-blocked items live in `docs/INFRASTRUCTURE_TIERS.md`. Security architecture
 - [ ] **Merge `go-public-hardening` → `main`** (Vercel auto-deploys) — ships the signed-URL code so private-bucket images work again.
 - [ ] After deploy, **smoke-test**: open one ticket's photo gallery + a COC doc + a quote PDF (confirm images render); confirm a raw `…/object/public/…` URL 403s.
 - [ ] **Set Vercel env vars** then redeploy (see "Where to get the env vars" below):
-  - [ ] `WHATSAPP_APP_SECRET` — webhook is fail-open without it
+  - [ ] `WHATSAPP_APP_SECRET` — webhook is fail-open without it. **Waiting on WhatsApp Business registration** to obtain the App Secret. Low-risk for now (no WhatsApp traffic until registered); set it the moment you have it.
   - [ ] `NEXT_PUBLIC_SENTRY_DSN` — error monitoring
   - [ ] `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` — effective rate limiting
 

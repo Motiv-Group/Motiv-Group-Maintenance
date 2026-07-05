@@ -11,6 +11,23 @@
 launch requires **Vercel Pro** (per Vercel's ToS) — this is a licensing requirement, not
 just a limits one. Budget for Pro before charging customers or marketing publicly.
 
+## 💰 Cost & necessity — what you actually must pay for
+| Service | Needed to run? | Why | Free tier OK? | When you must pay (approx) |
+|---|---|---|---|---|
+| **Vercel** | **YES** — hosting | Runs the whole app, API routes, crons | Dev only | Public/commercial launch → **Pro ~$20/mo** (license, not just limits) |
+| **Supabase** | **YES** — backend | DB + Auth + Storage + Realtime = all app data & security | Dev only | Before real customer data → **Pro ~$25/mo** (backups/PITR, no auto-pause) |
+| **Upstash** | No (falls back) | Distributed rate limiting (abuse/DoS). Without it, rate limiting degrades to weak per-instance | **Yes**, generous | Only as traffic grows |
+| **Sentry** | No | Error monitoring — catch prod bugs/attacks fast | **Yes** (~5k events/mo) | Only at higher volume; keep, but free is fine to start |
+| **Resend** | Only if emailing | Invites / onboarding / password emails | **Yes** (3k/mo, 100/day) | High email volume |
+| **Groq** | Only for AI features | WhatsApp voice/text intake + quote-PDF auto-parse | **Yes** (dev limits) | High AI volume |
+| **WhatsApp Cloud API** | Only for WhatsApp intake | Log tickets via WhatsApp | Free low volume | Business messaging / templates |
+
+**Bottom line:**
+- **Truly required to function: Vercel + Supabase.** Nothing else is load-bearing.
+- **Real must-pay for a serious public launch: Vercel Pro (~$20) + Supabase Pro (~$25) ≈ $45/mo.** Those two only — Pro for the commercial license, Supabase Pro for backups before you hold real customer data.
+- **Everything else stays free** for a pilot / small launch and only costs as you scale. Upstash + Sentry are worth keeping on free tiers (security + ops). Resend / Groq / WhatsApp cost nothing unless/until you lean on those features heavily.
+- So realistic minimum for launch ≈ **$45/mo**; the rest ≈ **$0** until growth.
+
 ## 📌 DEFERRED FEATURES BACKLOG (tier-blocked) — living list, APPEND HERE
 > Any feature we can't build because of a free-tier limit goes here. Add a new row
 > whenever you hit one; move it to "done" (with the date) when the tier is upgraded and
