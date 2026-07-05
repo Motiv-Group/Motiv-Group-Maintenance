@@ -27,8 +27,8 @@ Tier-blocked items live in `docs/INFRASTRUCTURE_TIERS.md`. Security architecture
 - [ ] Run it: revokes public/authenticated EXECUTE on `append_session_photo`, `handle_new_user`, `assign_store_job_ref` (service-role/trigger only).
 
 **Fix (Supabase dashboard → Authentication):**
-- [ ] **Leaked Password Protection** → enable (Authentication → Policies / Password settings). Checks new passwords against HaveIBeenPwned — real win, addresses our weak password-policy note too.
-- [ ] **OTP long expiry** → lower email OTP expiry to ≤ 3600s (1h) (Authentication → Email/Providers → OTP expiry).
+- [ ] **OTP long expiry** → lower email OTP expiry to ≤ 3600s (1h) (Authentication → Sign In / Providers → Email → "Email OTP Expiration"). Available on free tier.
+- ⏸️ **Leaked Password Protection** → **Supabase Pro only** — not on the free tier. Deferred to the tier backlog (`INFRASTRUCTURE_TIERS.md` #4); enable when on Pro.
 
 **Safe by design — no change needed (documented so we don't "fix" them into a hole):**
 - *"Public / Signed-in can execute SECURITY DEFINER function"* on the **`app_*` helpers** (`app_company_id`, `app_role`, `app_can_see_ticket`, `app_region_ids`, `app_store_ids`, `app_supplier_ids`, `app_is_company_wide`): these are **required** — RLS policies call them per query as the querying role, so they must stay executable. Each returns only the **caller's own** scoping data (keyed on `auth.uid()`), never another user's. Standard Supabase RLS pattern; leave as-is.
