@@ -51,7 +51,7 @@
 
 | # | Item | Section | Owner | Status |
 |---|---|---|---|---|
-| B1 | **MEDIUM 4** — transition-matrix test suite for `lib/workflow` `resolveTransition()` (every status × action × role incl. `individual`) | Tests | Code | 🔲 |
+| B1 | **MEDIUM 4** — transition-matrix test suite for `lib/workflow` `resolveTransition()` (every status × action × role incl. `individual`) | Tests | Code | ✅ 2026-07-06 (`lib/workflow.test.ts`, +277 tests, 295 total green) |
 | B2 | CI pipeline (GitHub Actions): tsc + lint + vitest + build on every PR; nothing merges red; `npm audit --omit=dev` fail-on-high | Tests/Deps | Code | 🔲 |
 | B3 | Integration tests for the 3 handlers fixed in cdc7dec (mock Supabase, assert authZ per role) | Tests | Code | 🔲 |
 | B4 | **MEDIUM 1** — Individual realtime: add owner-scoped RLS read policy (`created_by = auth.uid() AND company_id IS NULL`) **or** drop the subscription | DB/Individual | Code | 🔲 decision + code |
@@ -92,3 +92,4 @@ _None yet. Add rows here as they surface, with file + severity + status._
 
 ## Done log
 - **2026-07-06 A1** — migration 20260722 (supplier onboarding wizard) folded into `supabase/schema.sql`, file deleted. Register #1 cleared.
+- **2026-07-06 B1** — `lib/workflow.test.ts`: exhaustive status × action × role matrix for `resolveTransition()`, explicit `individual` allow/deny pins (the BLOCKER-1 regression class), supplier-exclusive actions, terminal/unknown-input guards, and table invariants. +277 tests → **295 passing**.
