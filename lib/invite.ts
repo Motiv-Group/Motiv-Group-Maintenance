@@ -1,7 +1,7 @@
 import 'server-only'
 import { createAdminClient } from '@/lib/supabase/server'
 
-export type InviteRole = 'regional_manager' | 'store_manager' | 'supplier'
+export type InviteRole = 'regional_manager' | 'store_manager' | 'supplier' | 'executive'
 
 interface InviteOpts {
   email: string
@@ -10,6 +10,9 @@ interface InviteOpts {
   roleLabel: string
   baseUrl?: string
   link: { regionId?: string; storeId?: string; supplierId?: string }
+  // Optional profile fields captured by the inviter (admin) → stored immediately so
+  // the account is complete before the invitee even sets their password.
+  profile?: { fullName?: string; phone?: string | null; address?: string; subStore?: string; branchCode?: string }
 }
 
 /**
@@ -29,17 +32,26 @@ export async function inviteUser(opts: InviteOpts): Promise<{ userId: string; ac
   const path = opts.role === 'supplier' ? '/auth/supplier-onboard' : '/auth/reset-password'
   const redirectTo = `${base}${path}`
 
+  const p = opts.profile ?? {}
   const { data, error } = await admin.auth.admin.generateLink({
     type: 'invite', email: opts.email.trim().toLowerCase(),
-    options: { data: { role: opts.role, company_id: opts.companyId }, redirectTo },
+    options: { data: { role: opts.role, company_id: opts.companyId, full_name: p.fullName, phone: p.phone }, redirectTo },
   } as any)
   if (error || !data?.user) {
     throw new Error(error?.message?.includes('already') ? 'That email already has an account.' : (error?.message ?? 'Invite failed'))
   }
   const uid = data.user.id
 
-  // Ensure profile carries company + role (trigger sets from metadata; enforce here).
-  await admin.from('user_profiles').upsert({ id: uid, role: opts.role, company_id: opts.companyId }, { onConflict: 'id' })
+  // Ensure profile carries company + role + any admin-entered details (the trigger
+  // seeds from metadata; enforce here so the account is complete on creation).
+  await admin.from('user_profiles').upsert({
+    id: uid, role: opts.role, company_id: opts.companyId,
+    ...(p.fullName !== undefined ? { full_name: p.fullName } : {}),
+    ...(p.phone !== undefined && p.phone !== null ? { phone: p.phone } : {}),
+    ...(p.address !== undefined ? { address: p.address } : {}),
+    ...(p.subStore !== undefined ? { sub_store: p.subStore } : {}),
+    ...(p.branchCode !== undefined ? { branch_code: p.branchCode } : {}),
+  }, { onConflict: 'id' })
 
   if (opts.link.regionId) await admin.from('regional_users').upsert({ user_id: uid, region_id: opts.link.regionId })
   if (opts.link.storeId) await admin.from('store_users').upsert({ user_id: uid, store_id: opts.link.storeId })
