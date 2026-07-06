@@ -97,7 +97,7 @@ function TicketRow({ t, company, showStore }: { t: SupplierTicketRow; company?: 
   return (
     <Link href={`/supplier/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2.5 -mx-2 px-2 rounded-lg border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition">
       <div className="min-w-0">
-        {showStore && <p className="text-[10px] text-[var(--text-faint)] truncate">{[company, t.storeName].filter(Boolean).join(' · ')}</p>}
+        {showStore && <p className="text-[10px] text-[var(--text-faint)] truncate">{t.isIndividual ? 'Individual' : [company, t.storeName].filter(Boolean).join(' · ')}</p>}
         <p className="text-sm text-[var(--text)] truncate">{t.title}</p>
         <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(t.createdAt)}</p>
         {t.overdue && <p className="text-[11px] font-semibold text-red-600 dark:text-red-400">Overdue by {humanizeDuration(Date.now() - new Date(t.dueAt).getTime())}</p>}
@@ -250,12 +250,13 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
       {/* Store groups */}
       {groups.map(([store, g]) => {
         const isCollapsed = !expanded.has(store)
+        const groupIndividual = g.rows[0]?.isIndividual ?? false
         return (
           <Card key={store} className="p-3 cursor-pointer hover:ring-[#C6A35D]/30 transition" onClick={() => toggle(store)} role="button" tabIndex={0} aria-expanded={!isCollapsed} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(store) } }}>
             <div className="flex items-center justify-between gap-2 mb-1">
               <span className="flex items-center gap-2 min-w-0">
                 <ChevronDown size={16} className={`shrink-0 text-[var(--text-muted)] transition-transform ${isCollapsed ? '' : 'rotate-180'}`} />
-                <span className="text-sm font-bold text-[var(--text)] truncate">{[company, store].filter(Boolean).join(' · ')}{g.branchCode ? ` · ${g.branchCode}` : ''}</span>
+                <span className="text-sm font-bold text-[var(--text)] truncate">{groupIndividual ? 'Individual' : <>{[company, store].filter(Boolean).join(' · ')}{g.branchCode ? ` · ${g.branchCode}` : ''}</>}</span>
                 <span className={`text-[11px] font-medium rounded-full px-2 py-0.5 shrink-0 ${groupCountCls(g.rows)}`}>{g.rows.length}</span>
               </span>
               <button onClick={e => { e.stopPropagation(); setPanelStore(store) }} title="Store overview" className="shrink-0 -m-1 p-1.5 rounded-lg text-[var(--text-faint)] hover:text-[#C6A35D] hover:bg-[#C6A35D]/10 transition"><BarChart3 size={16} /></button>
@@ -281,7 +282,7 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
                 return (
                   <Link key={t.id} href={`/supplier/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2.5 -mx-2 px-2 rounded-lg border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition">
                     <div className="min-w-0">
-                      <p className="text-[10px] text-[var(--text-faint)] truncate">{[company, t.storeName].filter(Boolean).join(' · ')}</p>
+                      <p className="text-[10px] text-[var(--text-faint)] truncate">{t.isIndividual ? 'Individual' : [company, t.storeName].filter(Boolean).join(' · ')}</p>
                       <p className="text-sm text-[var(--text)] truncate">{t.title}</p>
                       <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(t.createdAt)}</p>
                     </div>
@@ -306,6 +307,7 @@ function StorePanel({ store, company, rows, quotes, onClose }: { store: string; 
   const c: Record<Bucket, number> = { to_quote: 0, quoted: 0, approved: 0, scheduled: 0, in_progress: 0, signoff: 0, completed: 0, closed: 0 }
   for (const t of rows) c[bucketOfRow(t)]++
   const total = rows.length
+  const panelIndividual = rows[0]?.isIndividual ?? false
   const barTotal = BAR_ORDER.reduce((s, b) => s + c[b], 0) || 1
   const active = rows.filter(t => t.active)
   const overdue = active.filter(t => t.breached).length
@@ -331,7 +333,7 @@ function StorePanel({ store, company, rows, quotes, onClose }: { store: string; 
       {close => (
         <>
         <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">{company && <p className="text-[10px] text-[var(--text-faint)] truncate">{company}</p>}<h2 className="text-lg font-bold text-[var(--text)] truncate">{store}</h2><p className="text-xs text-[var(--text-muted)]">{total} ticket{total === 1 ? '' : 's'}</p></div>
+          <div className="min-w-0">{company && !panelIndividual && <p className="text-[10px] text-[var(--text-faint)] truncate">{company}</p>}<h2 className="text-lg font-bold text-[var(--text)] truncate">{store}</h2><p className="text-xs text-[var(--text-muted)]">{total} ticket{total === 1 ? '' : 's'}</p></div>
           <button onClick={close} className="shrink-0 -m-1 p-1.5 rounded-lg text-[var(--text-faint)] hover:text-[var(--text)] hover:bg-[var(--hover)]"><X size={18} /></button>
         </div>
 

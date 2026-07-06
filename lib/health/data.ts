@@ -591,6 +591,9 @@ export interface SupplierTicketRow {
   ageDays: number; createdAt: string; slaLabel: string; nextActionDueAt: string | null
   acknowledged: boolean; evidenceRequired: boolean; beforeUploaded: boolean; afterUploaded: boolean; cocUploaded: boolean
   active: boolean; breached: boolean
+  // Standalone Individual (home) job — no client company/store. Drives the
+  // supplier UI to label it "Individual" instead of a company · store.
+  isIndividual: boolean
   assignedAt: string | null; quoteRequestedAt: string | null; quoteSubmittedAt: string | null; quoteApprovedAt: string | null; declinedAt: string | null
   dueAt: string; overdue: boolean; declinedForMe: boolean; declinedBy: 'supplier' | 'regional_manager' | null
   // Isolation: this supplier's OWN involvement, so the list never leaks another
@@ -713,11 +716,11 @@ export async function assembleSupplierDashboard(companyId: string, supplierIds: 
       : sla.supplierBreached ? 'Breached' : sla.supplierStatus === 'paused' ? 'Paused (internal)' : sla.atRisk ? 'At risk' : sla.supplierStatus === 'not_started' ? 'Not started' : 'Running'
     const approvedAt = (raw.quote_decision_status === 'approved' ? raw.quote_decided_at : null) ?? acceptedQuoteAt.get(t.id) ?? null
     rows.push({
-      id: t.id, storeName: storeName.get(t.store_id) ?? 'Store', branchCode: storeBranch.get(t.store_id) ?? null, title: t.title ?? 'Ticket', priority: t.priority, status: t.status,
+      id: t.id, storeName: storeName.get(t.store_id) ?? (raw.company_id ? 'Store' : 'Individual'), branchCode: storeBranch.get(t.store_id) ?? null, title: t.title ?? 'Ticket', priority: t.priority, status: t.status,
       ageDays: Math.floor((now.getTime() - new Date(t.created_at).getTime()) / DAY), createdAt: t.created_at, slaLabel: lbl, nextActionDueAt: sla.nextActionDueAt,
       acknowledged: !!t.first_response_at, evidenceRequired: !!t.evidence_required,
       beforeUploaded: !!t.before_photo_uploaded, afterUploaded: !!t.after_photo_uploaded, cocUploaded: !!t.completion_certificate_uploaded,
-      active, breached: active ? sla.supplierBreached : false,
+      active, breached: active ? sla.supplierBreached : false, isIndividual: !raw.company_id,
       assignedAt: raw.quote_requested_at ?? t.created_at ?? null,
       quoteRequestedAt: raw.quote_requested_at ?? null,
       // Scope the quote milestones to their own quote so the list can't leak another's.
@@ -740,8 +743,8 @@ export async function assembleSupplierDashboard(companyId: string, supplierIds: 
     company: (companyRow as any)?.name ?? '',
     kpis: { open, overdue, dueToday, pendingQuotes, awaitingSignoff, evidenceMissing, scheduled },
     tickets: rows,
-    quotes: (quotesRaw ?? []).map((q: any) => ({ id: q.id, ticketId: q.ticket_id, ticketTitle: titleOf.get(q.ticket_id) ?? 'Ticket', ticketStatus: rawById.get(q.ticket_id)?.status ?? '', storeName: storeName.get(storeOf(q.ticket_id)) ?? 'Store', branchCode: storeBranch.get(storeOf(q.ticket_id)) ?? null, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, status: q.status, createdAt: q.created_at })),
-    signoffs: (signoffsRaw ?? []).map((s: any) => ({ id: s.id, ticketId: s.ticket_id, ticketTitle: titleOf.get(s.ticket_id) ?? 'Ticket', storeName: storeName.get(storeOf(s.ticket_id)) ?? 'Store', branchCode: storeBranch.get(storeOf(s.ticket_id)) ?? null, status: s.status, createdAt: s.created_at })),
+    quotes: (quotesRaw ?? []).map((q: any) => ({ id: q.id, ticketId: q.ticket_id, ticketTitle: titleOf.get(q.ticket_id) ?? 'Ticket', ticketStatus: rawById.get(q.ticket_id)?.status ?? '', storeName: storeName.get(storeOf(q.ticket_id)) ?? (rawById.get(q.ticket_id)?.company_id ? 'Store' : 'Individual'), branchCode: storeBranch.get(storeOf(q.ticket_id)) ?? null, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, status: q.status, createdAt: q.created_at })),
+    signoffs: (signoffsRaw ?? []).map((s: any) => ({ id: s.id, ticketId: s.ticket_id, ticketTitle: titleOf.get(s.ticket_id) ?? 'Ticket', storeName: storeName.get(storeOf(s.ticket_id)) ?? (rawById.get(s.ticket_id)?.company_id ? 'Store' : 'Individual'), branchCode: storeBranch.get(storeOf(s.ticket_id)) ?? null, status: s.status, createdAt: s.created_at })),
     rating,
     generatedAt: now.toISOString(),
   }

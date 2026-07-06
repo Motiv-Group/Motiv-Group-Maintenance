@@ -56,7 +56,7 @@ function TicketRow({ t, company }: { t: SupplierTicketRow; company?: string }) {
   return (
     <Link href={`/supplier/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] -mx-2 px-2 rounded transition">
       <div className="min-w-0">
-        <p className="text-sm font-medium text-[var(--text)] truncate">{[company, t.storeName].filter(Boolean).join(' · ')}</p>
+        <p className="text-sm font-medium text-[var(--text)] truncate">{t.isIndividual ? 'Individual' : [company, t.storeName].filter(Boolean).join(' · ')}</p>
         <p className="text-[11px] text-[var(--text-muted)] truncate">{t.title}</p>
         <p className="text-[11px] text-[var(--text-faint)]">Logged {formatDateTime(t.createdAt)}</p>
         {m && <p className={`text-[11px] font-medium ${sm.text}`}>{m.label} · {formatDateTime(m.at)}</p>}
@@ -179,7 +179,7 @@ export default async function SupplierOverviewPage() {
             return (
             <Link key={t.id} href={`/supplier/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] -mx-2 px-2 rounded">
               <div className="min-w-0">
-                <p className="text-sm font-medium text-[var(--text)] truncate">{[company, t.storeName].filter(Boolean).join(' · ')}</p>
+                <p className="text-sm font-medium text-[var(--text)] truncate">{t.isIndividual ? 'Individual' : [company, t.storeName].filter(Boolean).join(' · ')}</p>
                 <p className="text-[11px] text-[var(--text-muted)] truncate">{t.title}</p>
                 <p className="text-[11px] text-[var(--text-faint)]">Logged {formatDateTime(t.createdAt)}</p>
                 {m && <p className={`text-[11px] font-medium ${sm.text}`}>{m.label} · {formatDateTime(m.at)}</p>}
@@ -209,7 +209,7 @@ export default async function SupplierOverviewPage() {
           {evidenceTodo.map(t => (
             <Link key={t.id} href={`/supplier/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] -mx-2 px-2 rounded">
               <div className="min-w-0">
-                <p className="text-sm font-medium text-[var(--text)] truncate">{[company, t.storeName].filter(Boolean).join(' · ')}</p>
+                <p className="text-sm font-medium text-[var(--text)] truncate">{t.isIndividual ? 'Individual' : [company, t.storeName].filter(Boolean).join(' · ')}</p>
                 <p className="text-[11px] text-[var(--text-muted)] truncate">{t.title}</p>
                 <p className="text-[11px] text-[var(--text-faint)]">Logged {formatDateTime(t.createdAt)}</p>
               </div>
