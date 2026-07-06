@@ -27,3 +27,19 @@ android/keystore.properties
 
 # TypeScript incremental build cache
 *.tsbuildinfo
+
+# Vercel CLI linking metadata (project/org ids) — not source
+.vercel/
+
+# IDE / editor project config
+.idea/
+.vscode/
+
+# Android build outputs / local machine config (never share)
+android/build/
+android/app/build/
+android/.gradle/
+android/local.properties
+android/app/release/
+*.apk
+*.aab
