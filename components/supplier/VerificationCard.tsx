@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { uploadOne } from '@/lib/upload'
 import { Card } from '@/components/exec/ui'
 import { ShieldCheck, Upload, CheckCircle2, FileText } from 'lucide-react'
 
@@ -18,7 +18,7 @@ const DOC_TYPES = [
 
 interface Doc { id: string; kind: string; url: string; uploadedAt: string }
 
-export function VerificationCard({ userId }: { userId: string }) {
+export function VerificationCard() {
   const [docs, setDocs] = useState<Doc[]>([])
   const [busyKind, setBusyKind] = useState<string | null>(null)
   const [error, setError] = useState('')
@@ -30,11 +30,7 @@ export function VerificationCard({ userId }: { userId: string }) {
   async function upload(kind: string, file: File) {
     setBusyKind(kind); setError('')
     try {
-      const supabase = createClient()
-      const path = `${userId}/${Date.now()}-${file.name.replace(/[^\w.\-]/g, '_')}`
-      const { error: upErr } = await supabase.storage.from('supplier-docs').upload(path, file, { upsert: true })
-      if (upErr) throw new Error(upErr.message)
-      const url = supabase.storage.from('supplier-docs').getPublicUrl(path).data.publicUrl
+      const url = await uploadOne(file, 'supplier-docs')
       const res = await fetch('/api/supplier/verification-docs', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ kind, url }),

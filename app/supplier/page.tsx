@@ -71,7 +71,7 @@ function TicketRow({ t, company }: { t: SupplierTicketRow; company?: string }) {
 }
 
 export default async function SupplierOverviewPage() {
-  const { companyId, supplierIds, fullName, userId } = await requireSupplierV3()
+  const { companyId, supplierIds, fullName } = await requireSupplierV3()
 
   // Standalone (self-signup) suppliers have no client company. Pending ones see
   // the under-review + verification-docs card; verified ones a "you're live"
@@ -90,7 +90,7 @@ export default async function SupplierOverviewPage() {
           </p>
         </div>
         {pending
-          ? <VerificationCard userId={userId} />
+          ? <VerificationCard />
           : (
             <Card className="p-5">
               <p className="text-sm text-[var(--text-muted)]">

@@ -6,7 +6,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Send, Camera, Check } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { uploadOne } from '@/lib/upload'
 
 const PRESETS = ['On my way', 'On site', 'Parts ordered', 'Delayed']
 
@@ -33,12 +33,7 @@ export function SupplierAttachments({ ticketId }: { ticketId: string }) {
   async function uploadPhoto(file: File) {
     setBusy('photo'); setErr('')
     try {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      const path = `${user?.id}/${ticketId}/${Date.now()}-${file.name.replace(/[^\w.\-]/g, '_')}`
-      const { error } = await supabase.storage.from('ticket-photos').upload(path, file, { upsert: true })
-      if (error) throw error
-      const url = supabase.storage.from('ticket-photos').getPublicUrl(path).data.publicUrl
+      const url = await uploadOne(file, 'ticket-photos')
       await addUpdate(`📷 Progress photo: ${url}`, 'photo')
     } catch (e: any) { setErr(e.message); setBusy(null) }
   }

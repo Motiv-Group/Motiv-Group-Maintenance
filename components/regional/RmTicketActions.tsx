@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { Search, Pencil, CalendarClock, Plus, ImagePlus, X, FileText } from 'lucide-react'
 import { StarInput, Stars } from '@/components/ui/Stars'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
-import { createClient } from '@/lib/supabase/client'
+import { uploadFiles } from '@/lib/upload'
 import { formatCurrency, formatDateTime } from '@/lib/utils'
 
 async function post(url: string, body: unknown): Promise<void> {
@@ -446,14 +446,7 @@ export function RmAddWorkForm({ ticketId, description, photoUrls, title, categor
     if (!text.trim()) { setErr('Describe the extra work.'); return }
     setBusy(true); setErr('')
     try {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      const newUrls: string[] = []
-      for (const f of files.filter(f => f.type.startsWith('image/'))) {
-        const path = `${user?.id ?? 'rm'}/${ticketId}/${Date.now()}-${Math.random().toString(36).slice(2)}-${f.name.replace(/[^\w.\-]/g, '_')}`
-        const { error } = await supabase.storage.from('ticket-photos').upload(path, f, { upsert: true })
-        if (!error) newUrls.push(supabase.storage.from('ticket-photos').getPublicUrl(path).data.publicUrl)
-      }
+      const { urls: newUrls } = await uploadFiles(files.filter(f => f.type.startsWith('image/')), 'ticket-photos')
       const newDescription = `${description}\n\n— Extra Work: ${text.trim()}`
       // The ticket endpoint is PATCH-only — POSTing here was the "something went wrong".
       const res = await fetch(`/api/tickets/${ticketId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, description: newDescription, category, operational_impact: impact, photo_urls: [...photoUrls, ...newUrls], edit_note: 'added extra work' }) })

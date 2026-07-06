@@ -8,7 +8,7 @@ import { UploadCloud, X, FileText, Loader2, Calendar, Sparkles } from 'lucide-re
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { SchedulePicker } from '@/components/ui/SchedulePicker'
-import { createClient } from '@/lib/supabase/client'
+import { uploadFiles } from '@/lib/upload'
 import { formatDateTime } from '@/lib/utils'
 
 /**
@@ -255,13 +255,8 @@ export function SendQuoteForm({
   })
 
   async function uploadFile(f: File): Promise<string | null> {
-    const supabase = createClient()
-    const ext  = f.name.split('.').pop()
-    const path = `${ticketId}/${Date.now()}.${ext}`
-    const { error } = await supabase.storage.from('quote-attachments').upload(path, f, { upsert: true })
-    if (error) return null
-    const { data } = supabase.storage.from('quote-attachments').getPublicUrl(path)
-    return data.publicUrl
+    const { urls } = await uploadFiles([f], 'quote-attachments')
+    return urls[0] ?? null
   }
 
   async function onSubmit(values: QuoteForm) {

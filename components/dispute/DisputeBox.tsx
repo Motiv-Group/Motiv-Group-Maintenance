@@ -5,7 +5,7 @@
 // a free-flowing numbered thread until the RM resolves it as upheld or withdrawn.
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { uploadOne } from '@/lib/upload'
 import { MessageSquareWarning, Paperclip, X, Send, ShieldCheck, ShieldX, FileText, Image as ImageIcon, Loader2 } from 'lucide-react'
 import { formatDateTime } from '@/lib/utils'
 
@@ -35,14 +35,9 @@ const originWord = (o: string) => o === 'snag' ? 'snag' : o === 'variation' ? 'v
 
 const ROLE_LABEL: Record<string, string> = { supplier: 'Supplier', regional_manager: 'Regional Manager' }
 
-async function uploadEvidence(ticketId: string, file: File): Promise<string> {
-  const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+async function uploadEvidence(_ticketId: string, file: File): Promise<string> {
   const bucket = file.type.startsWith('image/') ? 'ticket-photos' : 'completion-docs'
-  const path = `${user?.id}/${ticketId}/dispute-${Date.now()}-${Math.random().toString(36).slice(2)}-${file.name.replace(/[^\w.\-]/g, '_')}`
-  const { error } = await supabase.storage.from(bucket).upload(path, file, { upsert: true })
-  if (error) throw error
-  return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl
+  return uploadOne(file, bucket)
 }
 
 // Message + evidence composer, shared by the initial raise and each reply.

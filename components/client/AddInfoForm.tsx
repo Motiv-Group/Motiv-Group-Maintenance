@@ -7,7 +7,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Send } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { uploadFiles } from '@/lib/upload'
 import { PhotoUploader } from '@/components/ui/PhotoUploader'
 
 const MAX_NEW_PHOTOS = 5
@@ -48,14 +48,7 @@ export function AddInfoForm({ ticketId, title, description, category, impact, ph
     if (!info.trim()) { setErr('Please describe the requested information before submitting.'); return }
     setBusy(true); setErr('')
     try {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      const newUrls: string[] = []
-      for (const f of files) {
-        const path = `${user?.id ?? 'anon'}/${ticketId}/${Date.now()}-${Math.random().toString(36).slice(2)}-${f.name.replace(/[^\w.\-]/g, '_')}`
-        const { error: upErr } = await supabase.storage.from('ticket-photos').upload(path, f, { upsert: true })
-        if (!upErr) newUrls.push(supabase.storage.from('ticket-photos').getPublicUrl(path).data.publicUrl)
-      }
+      const { urls: newUrls } = await uploadFiles(files, 'ticket-photos')
       const newDescription = `${description}\n\n— Added info: ${info.trim()}`
       // Preserve title/category/impact so priority isn't reset; append note + photos.
       const patch = await fetch(`/api/tickets/${ticketId}`, {

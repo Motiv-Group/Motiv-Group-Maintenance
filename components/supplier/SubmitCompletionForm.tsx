@@ -7,21 +7,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { UploadCloud, ImagePlus, Camera, X, CheckCircle2, FileText } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { uploadOne } from '@/lib/upload'
 
 const MAX_PHOTOS = 10
 const MIN_PHOTOS = 2
 const COC_MAX_MB = 20
 const COC_ACCEPT = '.pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/*,.png,.jpg,.jpeg,.webp,.heic'
 
-async function uploadTo(bucket: string, ticketId: string, file: File): Promise<string> {
-  const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  const path = `${user?.id}/${ticketId}/${Date.now()}-${Math.random().toString(36).slice(2)}-${file.name.replace(/[^\w.\-]/g, '_')}`
-  const { error } = await supabase.storage.from(bucket).upload(path, file, { upsert: true })
-  if (error) throw error
-  return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl
-}
 async function addEvidence(ticketId: string, kind: string, url: string) {
   const res = await fetch('/api/supplier/ticket-action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticketId, action: 'add_evidence', kind, url }) })
   if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Upload failed')
@@ -65,8 +57,8 @@ export function SubmitCompletionForm({ ticketId, evidenceRequested = false, requ
     }
     setBusy(true); setErr('')
     try {
-      if (coc) await addEvidence(ticketId, 'coc', await uploadTo('completion-docs', ticketId, coc))
-      for (const f of photos) await addEvidence(ticketId, 'after_photo', await uploadTo('ticket-photos', ticketId, f))
+      if (coc) await addEvidence(ticketId, 'coc', await uploadOne(coc, 'completion-docs'))
+      for (const f of photos) await addEvidence(ticketId, 'after_photo', await uploadOne(f, 'ticket-photos'))
       const res = await fetch(`/api/tickets/${ticketId}/transition`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'submit_completion', notes: notes || null }) })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Submit failed')
       router.push(`/supplier/tickets/${ticketId}`); router.refresh()
