@@ -21,6 +21,15 @@ async function supplierIds(admin: Admin, supplierId: string | null): Promise<str
   const { data } = await admin.from('supplier_users').select('user_id').eq('supplier_id', supplierId)
   return (data ?? []).map(r => r.user_id)
 }
+// Notify the "resolver / client" side of a dispute: the region's RM(s), or — on a
+// standalone Individual (company-null) ticket — the owner, who plays the resolver.
+async function notifyResolver(admin: Admin, ticket: any, title: string, message: string) {
+  if (ticket.region_id) {
+    await push(admin, await regionIds(admin, ticket.region_id), ticket.company_id, title, message, `/regional/tickets/${ticket.id}`)
+  } else if (ticket.created_by) {
+    await push(admin, [ticket.created_by], ticket.company_id, title, message, `/individual/tickets/${ticket.id}`)
+  }
+}
 function cleanUrls(v: unknown): string[] {
   return Array.isArray(v) ? v.filter((u): u is string => typeof u === 'string' && u.length > 0).slice(0, 10) : []
 }
@@ -65,7 +74,7 @@ async function resolveDispute(admin: Admin, ticket: any, dispute: any, outcome: 
     ? (isVariation ? 'the variation order reopens for review' : `the ${what} was dropped — the submission is back under review for the manager's approval`)
     : (isVariation ? 'the variation-order decline stands' : `the ${what} stands`)
   if (actorRole === 'regional_manager') await push(admin, await supplierIds(admin, ticket.supplier_id), ticket.company_id, title, `Dispute resolved — ${summary}.`, `/supplier/tickets/${ticketId}`)
-  else await push(admin, await regionIds(admin, ticket.region_id), ticket.company_id, title, `Dispute resolved — ${summary}.`, `/regional/tickets/${ticketId}`)
+  else await notifyResolver(admin, ticket, title, `Dispute resolved — ${summary}.`)
 }
 
 // POST /api/tickets/:id/dispute  { action: 'raise' | 'reply' | 'resolve', ... }
@@ -85,18 +94,33 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const admin = createAdminClient()
   const { data: prof } = await admin.from('user_profiles').select('role, company_id').eq('id', user.id).single()
   const role = prof?.role
-  if (!role || !prof?.company_id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!role) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const isIndividual = role === 'individual'
+  // Everyone but an Individual must belong to a company.
+  if (!isIndividual && !prof?.company_id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  // The dispute has two sides: the supplier, and the "resolver / client". The
+  // resolver is the RM/executive — or, on a standalone Individual ticket, the
+  // owner themselves (they play the resolver role).
   const actingRole: 'supplier' | 'regional_manager' | null =
-    role === 'supplier' ? 'supplier' : (role === 'regional_manager' || role === 'executive') ? 'regional_manager' : null
+    role === 'supplier' ? 'supplier'
+    : (role === 'regional_manager' || role === 'executive' || isIndividual) ? 'regional_manager'
+    : null
   if (!actingRole) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { data: ticket } = await admin.from('tickets').select('*').eq('id', ticketId).single()
-  if (!ticket || ticket.company_id !== prof.company_id) return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
+  if (!ticket) return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
+  // Company isolation only for a REAL RM/executive; suppliers work across companies,
+  // and an Individual owns their (company-null) ticket via created_by (checked below).
+  if (actingRole === 'regional_manager' && !isIndividual && ticket.company_id !== prof.company_id) {
+    return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
+  }
 
-  // Access: the awarded supplier's users, or an RM of the ticket's region.
+  // Access: the awarded supplier's users, the Individual owner, or an RM of the region.
   if (actingRole === 'supplier') {
     const mine = await supplierIds(admin, ticket.supplier_id)
     if (!mine.includes(user.id)) return NextResponse.json({ error: 'Not your ticket' }, { status: 403 })
+  } else if (isIndividual) {
+    if (ticket.created_by !== user.id) return NextResponse.json({ error: 'Not your ticket' }, { status: 403 })
   } else {
     const rms = await regionIds(admin, ticket.region_id)
     if (!rms.includes(user.id)) return NextResponse.json({ error: 'Not your ticket' }, { status: 403 })
@@ -126,7 +150,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     }
     await admin.from('ticket_dispute_messages').insert({ dispute_id: disp.id, ticket_id: ticketId, author_id: user.id, author_role: 'supplier', body: messageBody || null, evidence_urls: evidence, created_at: now })
     await admin.from('tickets').update({ last_supplier_update_at: now, updated_at: now }).eq('id', ticketId)
-    await push(admin, await regionIds(admin, ticket.region_id), ticket.company_id, title, 'The supplier has raised a dispute — review and respond.', `/regional/tickets/${ticketId}`)
+    await notifyResolver(admin, ticket, title, 'The supplier has raised a dispute — review and respond.')
   } else if (action === 'reply') {
     if (!openDispute) return NextResponse.json({ error: 'No open dispute on this ticket.' }, { status: 409 })
     const messageBody = String(body.body ?? '').trim()
@@ -135,7 +159,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     await admin.from('ticket_dispute_messages').insert({ dispute_id: openDispute.id, ticket_id: ticketId, author_id: user.id, author_role: actingRole, body: messageBody || null, evidence_urls: evidence, created_at: now })
     if (actingRole === 'supplier') {
       await admin.from('tickets').update({ last_supplier_update_at: now }).eq('id', ticketId)
-      await push(admin, await regionIds(admin, ticket.region_id), ticket.company_id, title, 'New reply on the dispute.', `/regional/tickets/${ticketId}`)
+      await notifyResolver(admin, ticket, title, 'New reply on the dispute.')
     } else {
       await push(admin, await supplierIds(admin, ticket.supplier_id), ticket.company_id, title, 'The manager replied on your dispute.', `/supplier/tickets/${ticketId}`)
     }
@@ -161,7 +185,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     const label = proposed === 'withdrawn' ? `proposed to resolve the dispute — drop the ${what}` : `proposed to uphold the ${what} — it stands`
     await admin.from('ticket_dispute_messages').insert({ dispute_id: openDispute.id, ticket_id: ticketId, author_id: user.id, author_role: actingRole, body: `${roleName(actingRole)} ${label}. Awaiting the other party's agreement.${note ? ` — ${note}` : ''}`, evidence_urls: [], created_at: now })
     await admin.from('tickets').update({ updated_at: now, ...(actingRole === 'supplier' ? { last_supplier_update_at: now } : { last_internal_update_at: now }) }).eq('id', ticketId)
-    if (actingRole === 'supplier') await push(admin, await regionIds(admin, ticket.region_id), ticket.company_id, title, 'The supplier proposed to resolve the dispute — confirm to drop the request.', `/regional/tickets/${ticketId}`)
+    if (actingRole === 'supplier') await notifyResolver(admin, ticket, title, 'The supplier proposed to resolve the dispute — confirm to drop the request.')
     else await push(admin, await supplierIds(admin, ticket.supplier_id), ticket.company_id, title, 'The manager proposed to uphold the request — confirm to agree.', `/supplier/tickets/${ticketId}`)
   } else if (action === 'confirm') {
     // The OTHER party agrees to the pending proposal → resolve with its outcome.

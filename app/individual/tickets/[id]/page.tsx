@@ -12,6 +12,7 @@ import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { QuoteSummary, type QuoteSummaryStatus } from '@/components/workflow/QuoteSummary'
 import { AssignSuppliersButton, SupplierStatusList, QuoteReviewCard, ApproveSignoffCard, RequestEvidenceButton, RaiseSnagButton, VariationReviewCard, CloseOutButton, CancelTicketCard, AcceptSnagScheduleCard, type ReviewQuote } from '@/components/regional/RmTicketActions'
 import { isTerminalStatus } from '@/lib/workflow'
+import { DisputeThread } from '@/components/dispute/DisputeBox'
 import { rmStatusMeta, formatDateTime, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
 
 const ASSIGNABLE = ['open', 'info_requested', 'assigned', 'assessment', 'quote_requested', 'quoted', 'quote_revision', 'suppliers_declined']
@@ -19,7 +20,7 @@ const ASSIGNABLE = ['open', 'info_requested', 'assigned', 'assessment', 'quote_r
 export default async function IndividualTicketDetailPage({ params }: { params: { id: string } }) {
   // One parallel wave: auth gate ∥ ticket ∥ child rows (all key on params.id).
   const admin = createAdminClient()
-  const [{ userId }, { data: t }, { data: quotes }, { data: signoffs }, { data: invites }, { data: motiv }, { data: snags }] = await Promise.all([
+  const [{ userId }, { data: t }, { data: quotes }, { data: signoffs }, { data: invites }, { data: motiv }, { data: snags }, { data: disputeRows }, { data: disputeMsgRows }, { data: disputeExtra }] = await Promise.all([
     requireIndividual(),
     admin.from('tickets').select('*').eq('id', params.id).single(),
     admin.from('quotes').select('id, supplier_id, amount, amount_incl_vat, description, file_url, status, valid_until, proposed_schedule_at, created_at, updated_at').eq('ticket_id', params.id).order('created_at', { ascending: false }),
@@ -27,8 +28,23 @@ export default async function IndividualTicketDetailPage({ params }: { params: {
     admin.from('ticket_suppliers').select('supplier_id, status, invited_at, decline_reason').eq('ticket_id', params.id),
     admin.from('suppliers').select('id, company_name').eq('is_motiv', true).eq('active', true).order('company_name'),
     admin.from('snags').select('scheduled_at, schedule_status, status, created_at').eq('ticket_id', params.id).order('created_at', { ascending: false }),
+    admin.from('ticket_disputes').select('id, origin, status, outcome, resolution_note, created_at, resolved_at').eq('ticket_id', params.id).order('created_at', { ascending: true }),
+    admin.from('ticket_dispute_messages').select('id, dispute_id, author_role, body, evidence_urls, created_at').eq('ticket_id', params.id).order('created_at', { ascending: true }),
+    admin.from('ticket_disputes').select('id, signoff_id, pending_outcome, pending_by').eq('ticket_id', params.id),
   ])
   if (!t || t.created_by !== userId) redirect('/individual/tickets')
+
+  // Disputes — the Individual owner is the resolver (the "client" side). Sign
+  // message evidence for the private buckets. Newer per-dispute columns are
+  // merged separately so the block still works before that migration.
+  const disputeExtraById = new Map(((disputeExtra ?? []) as any[]).map(x => [x.id, x]))
+  const disputes = ((disputeRows ?? []) as any[]).map(d => ({ ...d, ...(disputeExtraById.get(d.id) ?? {}) }))
+  const disputeMsgs = (disputeMsgRows ?? []) as any[]
+  await Promise.all(disputeMsgs.map(async (m) => { m.evidence_urls = await signManyUrls(Array.isArray(m.evidence_urls) ? m.evidence_urls : []) }))
+  const msgsByDispute = (id: string) => disputeMsgs.filter(m => m.dispute_id === id)
+  const openDispute = disputes.find(d => d.status === 'open') ?? null
+  const resolvedDisputes = disputes.filter(d => d.status === 'resolved')
+  const disputeSubject = (d: any) => d.origin === 'variation' ? 'Variation order · declined' : d.origin === 'snag' ? 'Snag' : 'Evidence request'
   const latestSnag = ((snags ?? []) as any[])[0] ?? null
   const snagAwaitingApproval = t.status === 'snag_assigned' && latestSnag?.schedule_status === 'proposed' && !!latestSnag?.scheduled_at
 
@@ -120,6 +136,19 @@ export default async function IndividualTicketDetailPage({ params }: { params: {
             {(acceptedSignoff.after_urls ?? []).map((u: string, i: number) => <a key={`c${i}`} href={u} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C6A35D] underline hover:text-amber-500">After {i + 1}</a>)}
             {acceptedSignoff.coc_url && <a href={acceptedSignoff.coc_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View COC</a>}
           </div>
+        </Card>
+      )}
+
+      {/* Dispute — the supplier disputed a snag / evidence request; you (the client) resolve it */}
+      {disputes.length > 0 && (
+        <Card className="p-5 space-y-3">
+          <h2 className="text-sm font-bold text-[var(--text)]">Dispute</h2>
+          {openDispute && <DisputeThread ticketId={t.id} dispute={openDispute} messages={msgsByDispute(openDispute.id)} viewerRole="regional_manager" subject={disputeSubject(openDispute)} />}
+          {resolvedDisputes.map(d => (
+            <div key={d.id} className="pt-3 border-t border-[var(--border)] first:border-0 first:pt-0">
+              <DisputeThread ticketId={t.id} dispute={d} messages={msgsByDispute(d.id)} viewerRole="regional_manager" readOnly subject={disputeSubject(d)} />
+            </div>
+          ))}
         </Card>
       )}
 

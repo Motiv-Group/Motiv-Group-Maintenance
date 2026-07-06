@@ -225,6 +225,11 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   const declinedForMe = !awarded && !!invite && ['declined', 'closed'].includes((invite as any).status)
   const storeName = storeLabel(store?.name, store?.sub_store)
   const editorName = t.edited_by ? ((await admin.from('user_profiles').select('full_name').eq('id', t.edited_by).single()).data?.full_name ?? null) : null
+  // Standalone Individual (home) job — no company/store. Load the customer's name +
+  // contact so the supplier can arrange the home visit.
+  const customer = (!t.company_id && t.created_by)
+    ? ((await admin.from('user_profiles').select('full_name, phone, address').eq('id', t.created_by).maybeSingle()).data as { full_name: string | null; phone: string | null; address: string | null } | null)
+    : null
 
   // SLA due date (final resolution deadline) + overdue state.
   const rules = await loadSlaResolver(admin, t.company_id)
@@ -389,6 +394,9 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
         <div className="grid grid-cols-2 gap-x-4 gap-y-3">
           {companyName && <DetailItem label="Company" value={companyName} />}
           {store?.name && <DetailItem label="Store" value={storeName} />}
+          {customer && <DetailItem label="Customer" value={customer.full_name || 'Individual'} />}
+          {customer?.phone && <DetailItem label="Phone" value={customer.phone} />}
+          {customer?.address && <DetailItem label="Address" value={customer.address} />}
           <DetailItem label="Category" value={t.category ?? 'General'} />
           <DetailItem label="Operational Impact" value={OPERATIONAL_IMPACT_LABELS[t.operational_impact ?? 'none'] ?? 'No operational impact'} />
           <DetailItem label="Logged" value={formatDateTime(t.created_at)} />
