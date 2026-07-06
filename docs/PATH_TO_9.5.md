@@ -39,7 +39,7 @@
 | # | Item | Section | Owner | Status |
 |---|---|---|---|---|
 | A1 | Apply migration 20260722 (supplier wizard) to live, fold into schema.sql, delete file | DB | Code | ✅ 2026-07-06 (folded + deleted this session) |
-| A2 | Verify Individual lifecycle end-to-end on deployed app (log job → assign supplier → approve quote → sign-off → close-out) | Individual | You | 🔲 next deploy |
+| A2 | Verify Individual lifecycle end-to-end on deployed app (log job → assign supplier → approve quote → sign-off → close-out) | Individual | You | ✅ 2026-07-06 — full lifecycle completed on deployed app after the N2 (supplier transition on company-null tickets) + N3 (labels) + N1 (uploads) fixes. Ticket reached **completed**. |
 | A3 | Complete + lawyer-review legal content: `/privacy`, `/terms`, `/sla` (all bracketed templates) | Legal | ⛔ You | 🔲 |
 | A4 | Decide SLA priority timings (P1 res 4h→24h + make-safe; P2 24h→48h or re-baseline; business-hours windows), then align `sla_rules` + `FALLBACK_SLA` + `/sla`, bump `SLA_VERSION` | SLA/Legal | Both | 🔲 needs your decision → then Code |
 | A5 | Buy Vercel Pro + Supabase Pro; enable PITR/daily backups; leaked-password protection; add hourly SLA cron | Infra | ⛔ You (~$45/mo) | 🔲 |
