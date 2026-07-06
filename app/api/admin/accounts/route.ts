@@ -5,6 +5,26 @@ import { rateLimit } from '@/lib/rate-limit'
 import { inviteUser } from '@/lib/invite'
 import { normalisePhone, isValidEmail, isValidPhone } from '@/lib/csv'
 
+type Admin = ReturnType<typeof createAdminClient>
+
+// Bulk import resolves company/region by NAME (find-or-create), so a flat CSV can
+// define the whole tree in one go.
+async function findOrCreateCompany(admin: Admin, name: string): Promise<string | null> {
+  const clean = name.trim(); if (!clean) return null
+  const { data: existing } = await admin.from('companies').select('id').ilike('name', clean).maybeSingle()
+  if ((existing as any)?.id) return (existing as any).id
+  const { data: c } = await admin.from('companies').insert({ name: clean }).select('id').single()
+  return (c as any)?.id ?? null
+}
+async function findOrCreateRegion(admin: Admin, companyId: string, name: string, code: string): Promise<string | null> {
+  const clean = name.trim(); if (!clean) return null
+  const c = String(code || name).toUpperCase().replace(/\s+/g, '').slice(0, 12)
+  const { data: existing } = await admin.from('regions').select('id').eq('company_id', companyId).or(`region_code.eq.${c},name.ilike.${clean}`).maybeSingle()
+  if ((existing as any)?.id) return (existing as any).id
+  const { data: r } = await admin.from('regions').insert({ company_id: companyId, name: clean, region_code: c }).select('id').single()
+  return (r as any)?.id ?? null
+}
+
 // POST /api/admin/accounts — system-admin provisions the SM/RM/Executive hierarchy.
 //  create_executive: new company + Executive (top of the tree)
 //  invite_rm:        Regional Manager linked to a company region (created if new)
@@ -80,6 +100,74 @@ export async function POST(request: Request) {
         const inv = await inviteUser({ email: body.email, role: 'store_manager', companyId, roleLabel: 'Store Manager', baseUrl: origin, link: { storeId: store.id }, profile: { fullName, phone: normalisePhone(body.phone), address: str(body.address), subStore, branchCode: bcode } })
         return done({ actionLink: inv.actionLink, emailed: inv.emailed, message: inv.emailed ? 'Store Manager invited — activation link emailed.' : 'Created. Email not sent — copy the activation link below.' })
       } catch (e: any) { await admin.from('stores').delete().eq('id', store.id); return bad(e?.message ?? 'Invite failed.') }
+    }
+
+    // Bulk import: one CSV of the chosen role. Company/region resolved by name.
+    if (action === 'bulk') {
+      const role = str(body.role)
+      const rows = Array.isArray(body.rows) ? (body.rows as Record<string, string>[]) : []
+      if (!['executive', 'regional_manager', 'store_manager'].includes(role)) return bad('Choose a role for the import.')
+      if (!rows.length) return bad('No rows found — check the CSV.')
+      const results: { label: string; ok: boolean; error?: string }[] = []
+      for (const [i, row] of rows.entries()) {
+        const email = str(row.email), fullName = str(row.full_name)
+        const label = email || `Row ${i + 1}`
+        try {
+          if (!fullName || !email) throw new Error('Full name and email required')
+          const ce = contactError(email, row.phone); if (ce) throw new Error(ce)
+          const prof = { fullName, phone: normalisePhone(row.phone), address: str(row.address) }
+          if (role === 'executive') {
+            const companyId = await findOrCreateCompany(admin, str(row.company_name))
+            if (!companyId) throw new Error('Company name required')
+            await inviteUser({ email, role: 'executive', companyId, roleLabel: 'Executive', baseUrl: origin, link: {}, profile: prof })
+          } else if (role === 'regional_manager') {
+            const companyId = await findOrCreateCompany(admin, str(row.company_name)); if (!companyId) throw new Error('Company name required')
+            const regionId = await findOrCreateRegion(admin, companyId, str(row.region_name || row.region_code), str(row.region_code)); if (!regionId) throw new Error('Region required')
+            await inviteUser({ email, role: 'regional_manager', companyId, roleLabel: 'Regional Manager', baseUrl: origin, link: { regionId }, profile: prof })
+          } else {
+            const companyId = await findOrCreateCompany(admin, str(row.company_name)); if (!companyId) throw new Error('Company name required')
+            const regionId = await findOrCreateRegion(admin, companyId, str(row.region_name || row.region_code), str(row.region_code)); if (!regionId) throw new Error('Region required')
+            const storeName = str(row.store_name), branchCode = str(row.branch_code)
+            if (!storeName || !branchCode) throw new Error('Store name and branch code required')
+            const { data: region } = await admin.from('regions').select('region_code').eq('id', regionId).single()
+            const bcode = branchCode.toUpperCase(), subStore = str(row.branch_name) || storeName
+            const { data: store, error: sErr } = await admin.from('stores').insert({ company_id: companyId, region_id: regionId, region_code: (region as any)?.region_code, branch_code: bcode, name: storeName, sub_store: subStore }).select('id').single()
+            if (sErr || !store) throw new Error(/duplicate/i.test(sErr?.message ?? '') ? 'Branch code already exists' : (sErr?.message ?? 'Could not create store'))
+            try { await inviteUser({ email, role: 'store_manager', companyId, roleLabel: 'Store Manager', baseUrl: origin, link: { storeId: (store as any).id }, profile: { ...prof, subStore, branchCode: bcode } }) }
+            catch (e) { await admin.from('stores').delete().eq('id', (store as any).id); throw e }
+          }
+          results.push({ label, ok: true })
+        } catch (e: any) { results.push({ label, ok: false, error: e?.message ?? 'Failed' }) }
+      }
+      revalidatePath('/admin/accounts'); revalidatePath('/admin/hierarchy')
+      return NextResponse.json({ ok: true, results })
+    }
+
+    // Move a store to another region within the SAME company (re-links its SM under
+    // that region's RM).
+    if (action === 'move_store') {
+      const storeId = str(body.storeId), regionId = str(body.regionId)
+      if (!storeId || !regionId) return bad('Store and region are required.')
+      const { data: store } = await admin.from('stores').select('id, company_id').eq('id', storeId).single()
+      const { data: region } = await admin.from('regions').select('id, company_id, region_code').eq('id', regionId).single()
+      if (!store || !region) return bad('Store or region not found.')
+      if (store.company_id !== region.company_id) return bad('A store can only move between regions of its own company.')
+      await admin.from('stores').update({ region_id: regionId, region_code: region.region_code }).eq('id', storeId)
+      revalidatePath('/admin/hierarchy')
+      return NextResponse.json({ ok: true, message: 'Store moved.' })
+    }
+
+    // Re-link a Regional Manager to a region (sets their company + sole region).
+    if (action === 'relink_rm') {
+      const userId = str(body.userId), regionId = str(body.regionId)
+      if (!userId || !regionId) return bad('Manager and region are required.')
+      const { data: region } = await admin.from('regions').select('id, company_id').eq('id', regionId).single()
+      if (!region) return bad('Region not found.')
+      await admin.from('user_profiles').update({ company_id: region.company_id, requested_region_code: null }).eq('id', userId).eq('role', 'regional_manager')
+      await admin.from('regional_users').delete().eq('user_id', userId)
+      await admin.from('regional_users').insert({ user_id: userId, region_id: regionId })
+      revalidatePath('/admin/hierarchy')
+      return NextResponse.json({ ok: true, message: 'Regional manager re-linked.' })
     }
 
     return bad('Unknown action')

@@ -6,6 +6,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { Card } from '@/components/exec/ui'
 import { InfoTip } from '@/components/ui/InfoTip'
 import { AddAccountForm, type CompanyOpt, type RegionOpt } from '@/components/admin/AddAccountForm'
+import { BulkImportForm } from '@/components/admin/BulkImportForm'
 
 const roleLabel = (r: string) => r === 'executive' ? 'Executive' : r === 'regional_manager' ? 'Regional Manager' : 'Store Manager'
 const roleRank = (r: string) => r === 'executive' ? 0 : r === 'regional_manager' ? 1 : 2
@@ -34,6 +35,8 @@ export default async function AdminAccountsPage() {
       </div>
 
       <AddAccountForm companies={companyOpts} regions={regionOpts} />
+
+      <BulkImportForm />
 
       <Card className="p-5 space-y-4">
         <div className="flex items-center justify-between gap-2">

@@ -2,14 +2,16 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Database, Triangle, Mail, Zap, ShieldAlert, UsersRound } from 'lucide-react'
+import { LayoutDashboard, Database, Triangle, Mail, Zap, ShieldAlert, UsersRound, Network } from 'lucide-react'
 
 // Tabs for the platform-admin area. Overview = existing revenue page; Accounts =
-// invite the store hierarchy; the rest are the live infra/provider panels.
+// invite the store hierarchy; Hierarchy = the company/region/store tree; the rest
+// are the live infra/provider panels.
 const TABS = [
-  { href: '/admin',          label: 'Overview', icon: LayoutDashboard },
-  { href: '/admin/accounts', label: 'Accounts', icon: UsersRound },
-  { href: '/admin/supabase', label: 'Supabase', icon: Database },
+  { href: '/admin',          label: 'Overview',  icon: LayoutDashboard },
+  { href: '/admin/accounts', label: 'Accounts',  icon: UsersRound },
+  { href: '/admin/hierarchy',label: 'Hierarchy', icon: Network },
+  { href: '/admin/supabase', label: 'Supabase',  icon: Database },
   { href: '/admin/vercel',   label: 'Vercel',   icon: Triangle },
   { href: '/admin/resend',   label: 'Resend',   icon: Mail },
   { href: '/admin/upstash',  label: 'Upstash',  icon: Zap },
