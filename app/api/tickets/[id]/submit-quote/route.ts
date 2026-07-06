@@ -23,7 +23,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
   if (prof?.role !== 'supplier') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { data: ticket } = await admin.from('tickets').select('*').eq('id', params.id).single()
-  if (!ticket || ticket.company_id !== prof.company_id) return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
+  // Same-company tickets OR individual (company-null) standalone tickets; the invite
+  // check below confirms this supplier is actually invited to quote.
+  if (!ticket || (ticket.company_id != null && ticket.company_id !== prof.company_id)) return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
 
   // Which of the caller's supplier companies is invited on this ticket?
   const { data: myLinks } = await admin.from('supplier_users').select('supplier_id').eq('user_id', user.id)
@@ -50,7 +52,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     last_supplier_update_at: now, updated_at: now,
   }).eq('id', ticket.id)
 
-  // Notify the region's managers.
+  // Notify the region's managers — or, for a standalone individual ticket, the owner.
   if (ticket.region_id) {
     const { data: rms } = await admin.from('regional_users').select('user_id').eq('region_id', ticket.region_id)
     const ids = (rms ?? []).map(r => r.user_id)
@@ -58,8 +60,11 @@ export async function POST(request: Request, { params }: { params: { id: string 
       await admin.from('notifications').insert(ids.map(id => ({ company_id: ticket.company_id, user_id: id, type: 'ticket_update', title: `Ticket: ${ticket.title ?? 'Untitled'}`, message: 'A quote was submitted for review.', link: `/regional/tickets/${ticket.id}` })))
       void sendPushToMany(ids, { title: 'Quote submitted', body: ticket.title ?? 'A quote needs review', url: `/regional/tickets/${ticket.id}` })
     }
+  } else if (ticket.created_by) {
+    await admin.from('notifications').insert([{ company_id: ticket.company_id, user_id: ticket.created_by, type: 'ticket_update', title: `Ticket: ${ticket.title ?? 'Untitled'}`, message: 'A quote was submitted — review and approve it.', link: `/individual/tickets/${ticket.id}` }])
+    void sendPushToMany([ticket.created_by], { title: 'Quote submitted', body: ticket.title ?? 'A quote needs review', url: `/individual/tickets/${ticket.id}` })
   }
 
-  revalidatePath('/supplier'); revalidatePath(`/supplier/tickets/${ticket.id}`); revalidatePath('/regional'); revalidatePath(`/regional/tickets/${ticket.id}`)
+  revalidatePath('/supplier'); revalidatePath(`/supplier/tickets/${ticket.id}`); revalidatePath('/regional'); revalidatePath(`/regional/tickets/${ticket.id}`); revalidatePath('/individual'); revalidatePath(`/individual/tickets/${ticket.id}`)
   return NextResponse.json({ ok: true })
 }

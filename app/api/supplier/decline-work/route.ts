@@ -28,8 +28,10 @@ export async function POST(request: Request) {
   const supplierIds = (links ?? []).map(l => l.supplier_id)
   if (!supplierIds.length) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { data: ticket } = await admin.from('tickets').select('id, company_id, region_id, title, supplier_id, status').eq('id', ticketId).single()
-  if (!ticket || ticket.company_id !== prof.company_id) return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
+  const { data: ticket } = await admin.from('tickets').select('id, company_id, region_id, title, supplier_id, status, created_by').eq('id', ticketId).single()
+  // Same-company OR individual (company-null) standalone tickets; the invite check
+  // below confirms this supplier was actually invited.
+  if (!ticket || (ticket.company_id != null && ticket.company_id !== prof.company_id)) return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
 
   // The supplier's invite — decline is only offered before award (invited/quoted).
   const { data: invite } = await admin.from('ticket_suppliers').select('id, supplier_id, status').eq('ticket_id', ticketId).in('supplier_id', supplierIds).maybeSingle()
@@ -69,9 +71,15 @@ export async function POST(request: Request) {
       await admin.from('notifications').insert(ids.map(id => ({ company_id: ticket.company_id, user_id: id, type: 'ticket_update', title: `Supplier declined: ${ticket.title ?? 'Untitled'}`, message: msg, link: `/regional/tickets/${ticketId}` })))
       void sendPushToMany(ids, { title: allDeclined ? 'All suppliers declined' : 'A supplier declined the work', body: reason, url: `/regional/tickets/${ticketId}` })
     }
+  } else if (ticket.created_by) {
+    // Standalone individual ticket — tell the owner so they can pick another supplier.
+    const msg = allDeclined ? `All invited suppliers have declined — assign another. Last reason: ${reason}` : `A supplier declined the work — ${reason}`
+    await admin.from('notifications').insert([{ company_id: ticket.company_id, user_id: ticket.created_by, type: 'ticket_update', title: `Supplier declined: ${ticket.title ?? 'Untitled'}`, message: msg, link: `/individual/tickets/${ticketId}` }])
+    void sendPushToMany([ticket.created_by], { title: 'A supplier declined the work', body: reason, url: `/individual/tickets/${ticketId}` })
   }
 
   revalidatePath(`/supplier/tickets/${ticketId}`); revalidatePath('/supplier')
   revalidatePath('/regional'); revalidatePath('/regional/tickets'); revalidatePath(`/regional/tickets/${ticketId}`)
+  revalidatePath('/individual'); revalidatePath(`/individual/tickets/${ticketId}`)
   return NextResponse.json({ ok: true })
 }

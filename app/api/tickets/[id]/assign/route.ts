@@ -21,13 +21,20 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   const admin = createAdminClient()
   const { data: prof } = await admin.from('user_profiles').select('role, company_id, full_name').eq('id', user.id).single()
-  if (!prof?.company_id || (prof.role !== 'regional_manager' && prof.role !== 'executive')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const isIndividual = prof?.role === 'individual'
+  if (!prof || (!isIndividual && (!prof.company_id || (prof.role !== 'regional_manager' && prof.role !== 'executive')))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { data: ticket } = await admin.from('tickets').select('*').eq('id', params.id).single()
-  if (!ticket || ticket.company_id !== prof.company_id) return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
-  if (prof.role === 'regional_manager') {
-    const { data: links } = await admin.from('regional_users').select('region_id').eq('user_id', user.id)
-    if (!ticket.region_id || !(links ?? []).some(l => l.region_id === ticket.region_id)) return NextResponse.json({ error: 'Not your ticket' }, { status: 403 })
+  if (!ticket) return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
+  if (isIndividual) {
+    // Individuals assign from the Motiv pool on their own standalone tickets.
+    if (ticket.created_by !== user.id) return NextResponse.json({ error: 'Not your ticket' }, { status: 403 })
+  } else {
+    if (ticket.company_id !== prof.company_id) return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
+    if (prof.role === 'regional_manager') {
+      const { data: links } = await admin.from('regional_users').select('region_id').eq('user_id', user.id)
+      if (!ticket.region_id || !(links ?? []).some(l => l.region_id === ticket.region_id)) return NextResponse.json({ error: 'Not your ticket' }, { status: 403 })
+    }
   }
   // Allowed before a quote is approved — incl. re-opened tickets (a quote was
   // declined) and tickets where every invited supplier declined (suppliers_declined).
@@ -36,9 +43,15 @@ export async function POST(request: Request, { params }: { params: { id: string 
   }
 
   const now = new Date().toISOString()
-  const rules = await loadSlaResolver(admin, ticket.company_id)
-  const tgt = rules(ticket.priority as 'P1' | 'P2' | 'P3' | 'P4')
-  const quoteDueAt = new Date(Date.now() + tgt.quote_due_mins * 60_000).toISOString()
+  // Individual tickets have no company SLA config — use a default quote window.
+  let quoteDueAt: string
+  if (isIndividual) {
+    quoteDueAt = new Date(Date.now() + 48 * 60 * 60_000).toISOString()
+  } else {
+    const rules = await loadSlaResolver(admin, ticket.company_id)
+    const tgt = rules(ticket.priority as 'P1' | 'P2' | 'P3' | 'P4')
+    quoteDueAt = new Date(Date.now() + tgt.quote_due_mins * 60_000).toISOString()
+  }
 
   // Split the selection: suppliers previously declined/closed on this ticket are
   // RE-INVITED (reset to 'invited', stamped as a re-quote request); never-involved
@@ -90,5 +103,6 @@ export async function POST(request: Request, { params }: { params: { id: string 
   }
 
   revalidatePath('/regional'); revalidatePath('/regional/tickets'); revalidatePath(`/regional/tickets/${ticket.id}`); revalidatePath('/supplier')
+  revalidatePath('/individual'); revalidatePath(`/individual/tickets/${ticket.id}`)
   return NextResponse.json({ ok: true })
 }

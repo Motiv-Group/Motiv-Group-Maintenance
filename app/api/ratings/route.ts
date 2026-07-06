@@ -18,15 +18,21 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient()
   const { data: prof } = await admin.from('user_profiles').select('role, company_id').eq('id', user.id).single()
-  if (!prof?.company_id || (prof.role !== 'regional_manager' && prof.role !== 'executive')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const isIndividual = prof?.role === 'individual'
+  if (!prof || (!isIndividual && (!prof.company_id || (prof.role !== 'regional_manager' && prof.role !== 'executive')))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { data: ticket } = await admin.from('tickets').select('id, company_id, region_id, supplier_id').eq('id', body.ticketId).single()
-  if (!ticket || ticket.company_id !== prof.company_id) return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
-  if (!ticket.supplier_id) return NextResponse.json({ error: 'No supplier assigned to rate.' }, { status: 400 })
-  if (prof.role === 'regional_manager') {
-    const { data: links } = await admin.from('regional_users').select('region_id').eq('user_id', user.id)
-    if (!ticket.region_id || !(links ?? []).some(l => l.region_id === ticket.region_id)) return NextResponse.json({ error: 'Not your ticket' }, { status: 403 })
+  const { data: ticket } = await admin.from('tickets').select('id, company_id, region_id, supplier_id, created_by').eq('id', body.ticketId).single()
+  if (!ticket) return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
+  if (isIndividual) {
+    if (ticket.created_by !== user.id) return NextResponse.json({ error: 'Not your ticket' }, { status: 403 })
+  } else {
+    if (ticket.company_id !== prof.company_id) return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
+    if (prof.role === 'regional_manager') {
+      const { data: links } = await admin.from('regional_users').select('region_id').eq('user_id', user.id)
+      if (!ticket.region_id || !(links ?? []).some(l => l.region_id === ticket.region_id)) return NextResponse.json({ error: 'Not your ticket' }, { status: 403 })
+    }
   }
+  if (!ticket.supplier_id) return NextResponse.json({ error: 'No supplier assigned to rate.' }, { status: 400 })
 
   // One rating per supplier per ticket: re-rating (e.g. accepting again after a
   // snag fix) updates the existing row instead of stacking a duplicate.

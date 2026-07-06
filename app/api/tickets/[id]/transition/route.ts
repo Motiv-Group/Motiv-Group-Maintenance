@@ -331,6 +331,8 @@ async function hasAccess(admin: Admin, role: WorkflowRole, userId: string, ticke
     const { data } = await admin.from('store_users').select('store_id').eq('user_id', userId)
     return (data ?? []).some(l => l.store_id === ticket.store_id)
   }
+  // An individual owns their standalone tickets outright (created_by).
+  if (role === 'individual') return ticket.created_by === userId
   return false
 }
 
@@ -379,8 +381,18 @@ async function notify(admin: Admin, action: string, ticket: any, actorName: stri
       : `Update: ${action.replace(/_/g, ' ')}`
     await push(admin, ids, ticket.company_id, title, regionMsg, `/regional/tickets/${ticket.id}`)
   }
-  if (toStore.includes(action) && ticket.created_by) {
+  if (toStore.includes(action) && ticket.created_by && ticket.store_id) {
     await push(admin, [ticket.created_by], ticket.company_id, title, storeMsg, `/client/tickets/${ticket.id}`)
+  }
+  // Individual-owned standalone ticket (no region/store): the owner plays the RM +
+  // store role, so supplier-side actions notify them on their own area.
+  if (!ticket.region_id && !ticket.store_id && ticket.created_by && (toRegion.includes(action) || toStore.includes(action))) {
+    const owMsg = action === 'submit_quote' ? 'A supplier submitted a quote — review it'
+      : action === 'submit_completion' ? 'Completion submitted — review & sign off'
+      : action === 'submit_variation' ? 'A variation order was submitted — review it'
+      : action === 'accept_snag' ? `Snag fix proposed${when ? ` for ${when}` : ''} — approve to confirm`
+      : `Update: ${action.replace(/_/g, ' ')}`
+    await push(admin, [ticket.created_by], ticket.company_id, title, owMsg, `/individual/tickets/${ticket.id}`)
   }
 }
 

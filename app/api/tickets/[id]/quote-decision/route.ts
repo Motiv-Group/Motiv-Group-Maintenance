@@ -23,13 +23,19 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   const admin = createAdminClient()
   const { data: prof } = await admin.from('user_profiles').select('role, company_id, full_name').eq('id', user.id).single()
-  if (!prof?.company_id || (prof.role !== 'regional_manager' && prof.role !== 'executive')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const isIndividual = prof?.role === 'individual'
+  if (!prof || (!isIndividual && (!prof.company_id || (prof.role !== 'regional_manager' && prof.role !== 'executive')))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { data: ticket } = await admin.from('tickets').select('*').eq('id', params.id).single()
-  if (!ticket || ticket.company_id !== prof.company_id) return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
-  if (prof.role === 'regional_manager') {
-    const { data: links } = await admin.from('regional_users').select('region_id').eq('user_id', user.id)
-    if (!ticket.region_id || !(links ?? []).some(l => l.region_id === ticket.region_id)) return NextResponse.json({ error: 'Not your ticket' }, { status: 403 })
+  if (!ticket) return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
+  if (isIndividual) {
+    if (ticket.created_by !== user.id) return NextResponse.json({ error: 'Not your ticket' }, { status: 403 })
+  } else {
+    if (ticket.company_id !== prof.company_id) return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
+    if (prof.role === 'regional_manager') {
+      const { data: links } = await admin.from('regional_users').select('region_id').eq('user_id', user.id)
+      if (!ticket.region_id || !(links ?? []).some(l => l.region_id === ticket.region_id)) return NextResponse.json({ error: 'Not your ticket' }, { status: 403 })
+    }
   }
 
   const { data: quote } = await admin.from('quotes').select('id, supplier_id, status, proposed_schedule_at').eq('id', quoteId).eq('ticket_id', ticket.id).single()
@@ -99,8 +105,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
   if (action === 'requote') {
     // Ask the (previously declined) supplier to submit a revised quote — re-invite
     // them and stamp requote_requested_at so their page shows the re-quote prompt.
-    const rules = await loadSlaResolver(admin, ticket.company_id)
-    const quoteDueAt = new Date(Date.now() + rules(ticket.priority as 'P1' | 'P2' | 'P3' | 'P4').quote_due_mins * 60_000).toISOString()
+    const quoteDueAt = isIndividual
+      ? new Date(Date.now() + 48 * 60 * 60_000).toISOString()
+      : new Date(Date.now() + (await loadSlaResolver(admin, ticket.company_id))(ticket.priority as 'P1' | 'P2' | 'P3' | 'P4').quote_due_mins * 60_000).toISOString()
     await admin.from('ticket_suppliers').update({ status: 'invited', declined_by: null, requote_requested_at: now, responded_at: now }).eq('ticket_id', ticket.id).eq('supplier_id', quote.supplier_id)
     await admin.from('tickets').update({
       status: 'quote_requested', supplier_id: null, quote_required: true, quote_requested_at: now, quote_due_at: quoteDueAt,
@@ -138,11 +145,11 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   // Notify the winning supplier (su/ids already resolved for this quote's supplier) + the store.
   await notify('Your quote was approved — you can proceed.', 'Quote approved')
-  if (ticket.created_by) {
+  if (!isIndividual && ticket.created_by) {
     await admin.from('notifications').insert([{ company_id: ticket.company_id, user_id: ticket.created_by, type: 'ticket_update', title: `Ticket: ${ticket.title ?? 'Untitled'}`, message: 'Work approved — a supplier has been assigned.', link: `/client/tickets/${ticket.id}` }])
     void sendPushToMany([ticket.created_by], { title: 'Work approved', body: ticket.title ?? '', url: `/client/tickets/${ticket.id}` })
   }
 
-  revalidatePath('/regional'); revalidatePath(`/regional/tickets/${ticket.id}`); revalidatePath('/supplier'); revalidatePath('/client')
+  revalidatePath('/regional'); revalidatePath(`/regional/tickets/${ticket.id}`); revalidatePath('/supplier'); revalidatePath('/client'); revalidatePath('/individual'); revalidatePath(`/individual/tickets/${ticket.id}`)
   return NextResponse.json({ ok: true })
 }

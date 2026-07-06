@@ -140,7 +140,9 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   const { companyId, supplierIds, userId } = await requireSupplierV3()
   const admin = createAdminClient()
   const { data: t } = await admin.from('tickets').select('*').eq('id', params.id).single()
-  if (!t || t.company_id !== companyId) redirect('/supplier/tickets')
+  // Allow same-company tickets AND individual (company-null) standalone tickets; the
+  // awarded/invite check below confirms this supplier is actually on the ticket.
+  if (!t || (t.company_id != null && t.company_id !== companyId)) redirect('/supplier/tickets')
   const [{ data: store }, { data: updates }, { data: invite }, { data: myQuotes }, { data: technicianRows }, { data: signoffRows }, { data: snagRows }, { data: companyRow }, { data: variationRows }, { data: viewRows }, { data: declineRows }, { data: requoteRows }, { data: roundRows }, { data: disputeRows }, { data: disputeMsgRows }, { data: snagEventRows }, { data: disputeExtra }] = await Promise.all([
     admin.from('stores').select('name, sub_store').eq('id', t.store_id).single(),
     admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),

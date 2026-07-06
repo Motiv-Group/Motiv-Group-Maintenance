@@ -1,30 +1,59 @@
 export const dynamic = 'force-dynamic'
 
 import { redirect } from 'next/navigation'
-import { FileText, Image as ImageIcon, Info } from 'lucide-react'
+import { FileText, Image as ImageIcon, Clock, CheckCircle2 } from 'lucide-react'
 import { requireIndividual } from '@/lib/health/guard'
 import { createAdminClient } from '@/lib/supabase/server'
 import { BackLink } from '@/components/ui/BackLink'
 import { Card } from '@/components/exec/ui'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { QuoteSummary, type QuoteSummaryStatus } from '@/components/workflow/QuoteSummary'
+import { AssignSuppliersButton, SupplierStatusList, QuoteReviewCard, ApproveSignoffCard, RequestEvidenceButton, RaiseSnagButton, VariationReviewCard, CloseOutButton, CancelTicketCard, AcceptSnagScheduleCard, type ReviewQuote } from '@/components/regional/RmTicketActions'
+import { isTerminalStatus } from '@/lib/workflow'
 import { rmStatusMeta, formatDateTime, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
+
+const ASSIGNABLE = ['open', 'info_requested', 'assigned', 'assessment', 'quote_requested', 'quoted', 'quote_revision', 'suppliers_declined']
 
 export default async function IndividualTicketDetailPage({ params }: { params: { id: string } }) {
   const { userId } = await requireIndividual()
   const admin = createAdminClient()
   const { data: t } = await admin.from('tickets').select('*').eq('id', params.id).single()
-  // Individuals only ever see their own standalone jobs.
   if (!t || t.created_by !== userId) redirect('/individual/tickets')
 
-  const [{ data: quotes }, { data: signoffs }] = await Promise.all([
-    admin.from('quotes').select('id, amount, amount_incl_vat, description, file_url, status, valid_until, created_at, updated_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
+  const [{ data: quotes }, { data: signoffs }, { data: invites }, { data: motiv }, { data: snags }] = await Promise.all([
+    admin.from('quotes').select('id, supplier_id, amount, amount_incl_vat, description, file_url, status, valid_until, proposed_schedule_at, created_at, updated_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('signoffs').select('id, before_urls, after_urls, coc_url, invoice_url, status, notes, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
+    admin.from('ticket_suppliers').select('supplier_id, status, invited_at, decline_reason').eq('ticket_id', t.id),
+    admin.from('suppliers').select('id, company_name').eq('is_motiv', true).eq('active', true).order('company_name'),
+    admin.from('snags').select('scheduled_at, schedule_status, status, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
   ])
+  const latestSnag = ((snags ?? []) as any[])[0] ?? null
+  const snagAwaitingApproval = t.status === 'snag_assigned' && latestSnag?.schedule_status === 'proposed' && !!latestSnag?.scheduled_at
+
+  const inviteRows = (invites ?? []) as any[]
+  const quoteRows = (quotes ?? []) as any[]
+  const supplierIds = Array.from(new Set([...inviteRows.map(r => r.supplier_id), ...quoteRows.map(q => q.supplier_id)].filter(Boolean)))
+  const { data: supRows } = supplierIds.length ? await admin.from('suppliers').select('id, company_name').in('id', supplierIds) : { data: [] as any[] }
+  const nameById = new Map(((supRows ?? []) as any[]).map(s => [s.id, s.company_name]))
+
   const sm = rmStatusMeta(t.status)
   const photos = Array.isArray(t.photo_urls) ? t.photo_urls as string[] : []
   const quoteStatusOf = (s: string): QuoteSummaryStatus => s === 'accepted' ? 'accepted' : s === 'declined' ? 'declined' : 'pending'
+  const acceptedQuote = quoteRows.find(q => q.status === 'accepted') ?? null
+  const pendingSignoff = ((signoffs ?? []) as any[]).find(s => ['submitted', 'awaiting_regional', 'awaiting_store'].includes(s.status)) ?? null
   const acceptedSignoff = ((signoffs ?? []) as any[]).find(s => s.status === 'accepted') ?? null
+  const isTerminal = isTerminalStatus(t.status)
+
+  const motivSuppliers = ((motiv ?? []) as any[]).map(s => ({ id: s.id, name: s.company_name as string }))
+  const declinedSupplierIds = inviteRows.filter(r => ['declined', 'closed'].includes(r.status)).map(r => r.supplier_id)
+  const awaitingById: Record<string, 'invited' | 'quoted'> = {}
+  for (const r of inviteRows) if (r.status === 'invited' || r.status === 'quoted') awaitingById[r.supplier_id] = r.status
+  const supplierStatusRows = inviteRows.map(r => ({ name: nameById.get(r.supplier_id) ?? 'Supplier', status: r.status, invitedAt: r.invited_at, declineReason: r.decline_reason }))
+  const reviewQuotes: ReviewQuote[] = quoteRows.filter(q => q.status === 'pending').map(q => ({
+    id: q.id, supplierName: nameById.get(q.supplier_id) ?? 'Supplier', amount: q.amount, amountInclVat: q.amount_incl_vat ?? null,
+    description: q.description ?? null, fileUrl: q.file_url ?? null, createdAt: q.created_at, proposedScheduleAt: q.proposed_schedule_at ?? null,
+  }))
+  const canAssign = ASSIGNABLE.includes(t.status)
 
   return (
     <div className="space-y-5">
@@ -53,33 +82,96 @@ export default async function IndividualTicketDetailPage({ params }: { params: {
         )}
       </Card>
 
-      {/* Quotes (read-only in phase 1) */}
-      {((quotes ?? []) as any[]).length > 0 && (
-        <Card className="p-5 space-y-3">
+      {/* Suppliers requested + quotes to review */}
+      {(supplierStatusRows.length > 0 || reviewQuotes.length > 0 || acceptedQuote) && (
+        <Card className="p-5 space-y-4">
           <h2 className="text-sm font-bold text-[var(--text)]">Quotes</h2>
-          {((quotes ?? []) as any[]).map((q, i, arr) => (
-            <QuoteSummary key={q.id} title={arr.length > 1 ? `Quote #${arr.length - i}` : 'Quote'} status={quoteStatusOf(q.status)} collapsible
-              quote={{ id: q.id, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, description: q.description ?? null, fileUrl: q.file_url ?? null, validUntil: q.valid_until ?? null, createdAt: q.created_at, declinedAt: q.updated_at ?? null }} />
-          ))}
+          {supplierStatusRows.length > 0 && <SupplierStatusList rows={supplierStatusRows} />}
+          {reviewQuotes.length > 0 && <QuoteReviewCard ticketId={t.id} quotes={reviewQuotes} />}
+          {acceptedQuote && (
+            <QuoteSummary title={`Approved · ${nameById.get(acceptedQuote.supplier_id) ?? 'Supplier'}`} status="accepted"
+              quote={{ id: acceptedQuote.id, amount: acceptedQuote.amount, amountInclVat: acceptedQuote.amount_incl_vat ?? null, description: acceptedQuote.description ?? null, fileUrl: acceptedQuote.file_url ?? null, validUntil: acceptedQuote.valid_until ?? null, createdAt: acceptedQuote.created_at }} />
+          )}
         </Card>
       )}
 
-      {/* Completion (approved COC & POC) */}
-      {acceptedSignoff && (
+      {/* COC & POC to review */}
+      {pendingSignoff && (
+        <Card className="p-5 space-y-3">
+          <h2 className="text-sm font-bold text-[var(--text)]">COC &amp; POC — review &amp; sign off</h2>
+          <div className="flex flex-wrap gap-x-4 gap-y-1">
+            {(pendingSignoff.after_urls ?? []).map((u: string, i: number) => <a key={`a${i}`} href={u} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C6A35D] underline hover:text-amber-500">After {i + 1}</a>)}
+            {pendingSignoff.coc_url && <a href={pendingSignoff.coc_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View COC</a>}
+            {pendingSignoff.invoice_url && <a href={pendingSignoff.invoice_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View invoice</a>}
+          </div>
+          {pendingSignoff.notes && <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{pendingSignoff.notes}</p>}
+          <ApproveSignoffCard ticketId={t.id} />
+          <div className="flex gap-2"><RequestEvidenceButton ticketId={t.id} /><RaiseSnagButton ticketId={t.id} /></div>
+        </Card>
+      )}
+
+      {/* Completed COC & POC */}
+      {acceptedSignoff && !pendingSignoff && (
         <Card className="p-5 space-y-3">
           <h2 className="text-sm font-bold text-[var(--text)]">Completion</h2>
           <div className="flex flex-wrap gap-x-4 gap-y-1">
-            {(acceptedSignoff.after_urls ?? []).map((u: string, i: number) => <a key={`a${i}`} href={u} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C6A35D] underline hover:text-amber-500">After {i + 1}</a>)}
+            {(acceptedSignoff.after_urls ?? []).map((u: string, i: number) => <a key={`c${i}`} href={u} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C6A35D] underline hover:text-amber-500">After {i + 1}</a>)}
             {acceptedSignoff.coc_url && <a href={acceptedSignoff.coc_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View COC</a>}
           </div>
-          {acceptedSignoff.notes && <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{acceptedSignoff.notes}</p>}
         </Card>
       )}
 
-      <div className="rounded-xl bg-[#C6A35D]/10 ring-1 ring-[#C6A35D]/30 p-3.5 flex items-start gap-2.5">
-        <Info size={16} className="text-[#C6A35D] shrink-0 mt-0.5" />
-        <p className="text-sm text-[var(--text-muted)]">Assigning a supplier, approving quotes and signing off completion are coming to your account shortly.</p>
-      </div>
+      {/* Actions */}
+      <Card className="p-5 space-y-4">
+        <h2 className="text-sm font-bold text-[var(--text)]">Actions</h2>
+
+        {canAssign && <AssignSuppliersButton ticketId={t.id} suppliers={[]} motivSuppliers={motivSuppliers} declinedSupplierIds={declinedSupplierIds} awaitingById={awaitingById} />}
+
+        {['accepted', 'scheduled'].includes(t.status) && (
+          <div className="rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/30 p-3.5 flex items-start gap-2.5">
+            <CheckCircle2 size={16} className="text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+            <p className="text-sm text-[var(--text-muted)]">Quote approved — the supplier will start the work and upload the completion certificate &amp; photos when done.</p>
+          </div>
+        )}
+        {t.status === 'in_progress' && (
+          <div className="rounded-xl bg-[#C6A35D]/10 ring-1 ring-[#C6A35D]/30 p-3.5 flex items-start gap-2.5">
+            <Clock size={16} className="text-[#C6A35D] shrink-0 mt-0.5" />
+            <p className="text-sm text-[var(--text-muted)]">Work in progress — the supplier is on site or on their way.</p>
+          </div>
+        )}
+
+        {t.status === 'variation_review' && <VariationReviewCard ticketId={t.id} />}
+
+        {snagAwaitingApproval && latestSnag?.scheduled_at && <AcceptSnagScheduleCard ticketId={t.id} scheduledAt={latestSnag.scheduled_at} />}
+        {['snag', 'snag_in_progress', 'snag_resolved'].includes(t.status) && (
+          <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 flex items-start gap-2.5">
+            <Clock size={16} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
+            <p className="text-sm text-[var(--text-muted)]">Snag raised — the supplier will schedule and carry out the corrective work, then resubmit for your sign-off.</p>
+          </div>
+        )}
+        {t.status === 'snag_assigned' && !snagAwaitingApproval && (
+          <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 flex items-start gap-2.5">
+            <Clock size={16} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
+            <p className="text-sm text-[var(--text-muted)]">Snag schedule approved — the supplier will carry out the fix and resubmit for sign-off.</p>
+          </div>
+        )}
+
+        {(t.status === 'approved_closeout' || t.status === 'vo_declined') && (
+          <div className="space-y-2">
+            <p className="text-sm text-[var(--text-muted)]">The work is approved. Once the supplier confirms there are no further variation orders, you can close the job out.</p>
+            <CloseOutButton ticketId={t.id} voConfirmed={!!t.vo_none_confirmed_at} />
+          </div>
+        )}
+
+        {t.status === 'completed' && (
+          <div className="rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/30 p-3.5 flex items-start gap-2.5">
+            <CheckCircle2 size={16} className="text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+            <p className="text-sm text-[var(--text-muted)]">This job is completed and closed out.</p>
+          </div>
+        )}
+
+        {!isTerminal && <CancelTicketCard ticketId={t.id} />}
+      </Card>
     </div>
   )
 }
