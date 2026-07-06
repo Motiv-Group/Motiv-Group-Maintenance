@@ -17,7 +17,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
   if (prof?.role !== 'supplier') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { data: ticket } = await admin.from('tickets').select('id, company_id, region_id, title').eq('id', params.id).single()
-  if (!ticket || ticket.company_id !== prof.company_id) return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
+  // Suppliers work across companies (incl. Motiv-pool / individual company-null
+  // tickets); the invite check below is the real access gate.
+  if (!ticket) return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
 
   const { data: myLinks } = await admin.from('supplier_users').select('supplier_id').eq('user_id', user.id)
   const mySupplierIds = (myLinks ?? []).map(l => l.supplier_id)

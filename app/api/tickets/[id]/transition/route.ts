@@ -59,7 +59,15 @@ export async function POST(request: Request, { params }: { params: { id: string 
   if (!prof || !role || (role !== 'individual' && !prof.company_id)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { data: ticket } = await admin.from('tickets').select('*').eq('id', ticketId).single()
-  if (!ticket || ticket.company_id !== (prof.company_id ?? null)) return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
+  if (!ticket) return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
+  // Company isolation for tenant roles (store/regional/executive/system_admin) and
+  // individuals (their standalone tickets are company-null). Suppliers work ACROSS
+  // companies — including Motiv-pool / individual (company-null) tickets — so their
+  // own profile company_id is irrelevant; they're gated only by their
+  // supplier_users / ticket_suppliers link in hasAccess() below.
+  if (role !== 'supplier' && ticket.company_id !== (prof.company_id ?? null)) {
+    return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
+  }
   if (!(await hasAccess(admin, role, user.id, ticket))) return NextResponse.json({ error: 'Not your ticket' }, { status: 403 })
 
   const tr = resolveTransition(ticket.status, action, role)

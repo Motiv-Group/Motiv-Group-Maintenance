@@ -156,7 +156,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
     admin.from('technicians').select('id, name').in('supplier_id', supplierIds).eq('active', true).order('name'),
     admin.from('signoffs').select('id, before_urls, after_urls, coc_url, invoice_url, status, notes, reject_reason, reviewed_at, created_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).order('created_at', { ascending: false }),
     admin.from('snags').select('description, required_correction, severity, status, scheduled_at, schedule_status, assigned_at, schedule_agreed_at, schedule_declined_at, schedule_decline_reason, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
-    admin.from('companies').select('name').eq('id', companyId).maybeSingle(),
+    admin.from('companies').select('name').eq('id', t.company_id ?? '00000000-0000-0000-0000-000000000000').maybeSingle(),
     admin.from('ticket_variations').select('description, amount, warranty, status, reject_reason, reviewed_at, created_at, file_urls').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     // Only THIS supplier's own view events — so their trail shows the photos /
     // attachments they opened, without ever exposing another supplier's activity.
@@ -388,7 +388,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
 
         <div className="grid grid-cols-2 gap-x-4 gap-y-3">
           {companyName && <DetailItem label="Company" value={companyName} />}
-          <DetailItem label="Store" value={storeName} />
+          {store?.name && <DetailItem label="Store" value={storeName} />}
           <DetailItem label="Category" value={t.category ?? 'General'} />
           <DetailItem label="Operational Impact" value={OPERATIONAL_IMPACT_LABELS[t.operational_impact ?? 'none'] ?? 'No operational impact'} />
           <DetailItem label="Logged" value={formatDateTime(t.created_at)} />
