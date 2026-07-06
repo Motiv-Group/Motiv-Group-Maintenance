@@ -16,8 +16,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Job id "build" IS the status-check context you require in branch protection.
+  # Keep this id stable — renaming it breaks the required-check rule.
   build:
-    name: Type-check · Lint · Test · Build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
