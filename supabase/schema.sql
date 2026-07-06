@@ -1666,3 +1666,17 @@ create policy "supplier-docs upload" on storage.objects for insert
 drop policy if exists "ticket-photos upload" on storage.objects;
 create policy "ticket-photos upload" on storage.objects for insert
   with check (((bucket_id = 'ticket-photos'::text) AND (auth.uid() IS NOT NULL)));
+
+-- ---------------------------------------------------------------------------
+-- REALTIME (postgres_changes)
+-- ---------------------------------------------------------------------------
+-- Tables are in the supabase_realtime publication (Database → Publications).
+-- REPLICA IDENTITY FULL is required so RLS can be evaluated on UPDATE/DELETE
+-- events (default replica identity only carries the PK → RLS drops the event).
+-- The browser must also authenticate the socket with the user JWT
+-- (components/ui/RealtimeRefresh.tsx calls realtime.setAuth) or RLS hides every
+-- row from the connection.
+alter table public.tickets       replica identity full;
+alter table public.quotes        replica identity full;
+alter table public.signoffs      replica identity full;
+alter table public.notifications replica identity full;

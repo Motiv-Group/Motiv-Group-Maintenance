@@ -19,25 +19,38 @@ export function RealtimeRefresh({ tables = ['tickets', 'quotes', 'notifications'
 
   useEffect(() => {
     const supabase = createClient()
+    let channel: ReturnType<typeof supabase.channel> | null = null
 
     const scheduleRefresh = () => {
       if (timer.current) clearTimeout(timer.current)
       timer.current = setTimeout(() => router.refresh(), 250)
     }
 
-    let channel = supabase.channel(`realtime-refresh-${tablesKey}`)
-    for (const table of tablesKey.split(',')) {
-      channel = channel.on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table },
-        scheduleRefresh
-      )
+    const subscribe = () => {
+      let ch = supabase.channel(`realtime-refresh-${tablesKey}`)
+      for (const table of tablesKey.split(',')) {
+        ch = ch.on('postgres_changes', { event: '*', schema: 'public', table }, scheduleRefresh)
+      }
+      ch.subscribe()
+      channel = ch
     }
-    channel.subscribe()
+
+    // Authenticate the Realtime connection with the user's JWT BEFORE subscribing.
+    // Without this, Realtime connects as `anon`, so RLS on the subscribed tables
+    // hides every row from the socket and NO change events are delivered (the app
+    // then only appears to update on a manual refresh). Re-set the token on refresh.
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.access_token) supabase.realtime.setAuth(session.access_token)
+      subscribe()
+    })
+    const { data: authSub } = supabase.auth.onAuthStateChange((_e, session) => {
+      if (session?.access_token) supabase.realtime.setAuth(session.access_token)
+    })
 
     return () => {
       if (timer.current) clearTimeout(timer.current)
-      supabase.removeChannel(channel)
+      authSub.subscription.unsubscribe()
+      if (channel) supabase.removeChannel(channel)
     }
   }, [router, tablesKey])
 
