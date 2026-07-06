@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { rateLimit } from '@/lib/rate-limit'
 import { sendPushToMany } from '@/lib/push'
 import { loadSlaResolver } from '@/lib/health/data'
+import { isCommercialPhase } from '@/lib/workflow'
 
 // POST /api/tickets/[id]/assign — RM invites one or more suppliers to quote.
 // Creates ticket_suppliers rows (invited), moves the ticket to "assigned", and
@@ -36,9 +37,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
       if (!ticket.region_id || !(links ?? []).some(l => l.region_id === ticket.region_id)) return NextResponse.json({ error: 'Not your ticket' }, { status: 403 })
     }
   }
-  // Allowed before a quote is approved — incl. re-opened tickets (a quote was
-  // declined) and tickets where every invited supplier declined (suppliers_declined).
-  if (!['open', 'info_requested', 'assigned', 'assessment', 'quote_requested', 'quoted', 'quote_revision', 'suppliers_declined'].includes(ticket.status)) {
+  // Allowed only during the competitive commercial phase (shared with lib/workflow):
+  // before a quote is approved, incl. re-opened tickets and suppliers_declined.
+  if (!isCommercialPhase(ticket.status)) {
     return NextResponse.json({ error: 'Suppliers can only be assigned before a quote is approved.' }, { status: 400 })
   }
 

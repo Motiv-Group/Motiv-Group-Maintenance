@@ -319,9 +319,10 @@ export function SendQuoteForm({
       return
     }
 
-    const url = isEdit ? `/api/quotes/${existingQuote!.id}` : competitive ? `/api/tickets/${ticketId}/submit-quote` : '/api/quotes'
-    const res = await fetch(url, {
-      method: isEdit ? 'PATCH' : 'POST',
+    // Quotes always post through the competitive supplier route (submit-quote); the
+    // legacy /api/quotes create + edit paths were removed to keep one workflow.
+    const res = await fetch(`/api/tickets/${ticketId}/submit-quote`, {
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ...values,

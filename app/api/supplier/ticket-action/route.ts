@@ -4,9 +4,11 @@ import { revalidatePath } from 'next/cache'
 import { rateLimit } from '@/lib/rate-limit'
 import { sendPushToMany } from '@/lib/push'
 
-// POST /api/supplier/ticket-action — supplier-side mutations.
-// Suppliers can acknowledge/update/quote/upload evidence and SUBMIT FOR SIGN-OFF.
-// They can NOT mark a job completed — the company confirms via sign-off.
+// POST /api/supplier/ticket-action — supplier-side side effects that do NOT move the
+// ticket through its lifecycle: post an update (add_update), upload evidence
+// (add_evidence), confirm no further VOs (confirm_no_vos). All lifecycle STATUS
+// changes go through /api/tickets/[id]/transition (lib/workflow) or the competitive
+// commercial routes (submit-quote) — never here.
 export async function POST(request: Request) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -27,10 +29,6 @@ export async function POST(request: Request) {
   const now = new Date().toISOString()
 
   switch (action) {
-    case 'acknowledge': {
-      await admin.from('tickets').update({ first_response_at: ticket.first_response_at ?? now, attended_at: ticket.attended_at ?? now, status: ticket.status === 'open' ? 'in_progress' : ticket.status, last_supplier_update_at: now }).eq('id', ticketId)
-      break
-    }
     case 'add_update': {
       const text = String(body.body ?? '').trim()
       if (!text) return NextResponse.json({ error: 'Update text required' }, { status: 400 })
@@ -52,13 +50,6 @@ export async function POST(request: Request) {
       }
       break
     }
-    case 'add_quote': {
-      const amount = Number(body.amount)
-      if (!amount || amount <= 0) return NextResponse.json({ error: 'Valid amount required' }, { status: 400 })
-      await admin.from('quotes').insert({ company_id: ticket.company_id, ticket_id: ticketId, supplier_id: ticket.supplier_id, submitted_by: user.id, amount, amount_incl_vat: body.amount_incl_vat ?? null, file_url: body.file_url ?? null, status: 'pending', description: body.description ?? null })
-      await admin.from('tickets').update({ quote_submitted_at: now, quote_value: amount, quote_decision_required: true, quote_decision_status: 'pending', status: 'quoted', last_supplier_update_at: now }).eq('id', ticketId)
-      break
-    }
     case 'add_evidence': {
       const kind = String(body.kind) // before_photo | after_photo | coc | invoice
       const url = String(body.url ?? '')
@@ -66,26 +57,6 @@ export async function POST(request: Request) {
       await admin.from('ticket_evidence').insert({ ticket_id: ticketId, kind, url, uploaded_by: user.id })
       const flag = kind === 'before_photo' ? { before_photo_uploaded: true } : kind === 'after_photo' ? { after_photo_uploaded: true } : kind === 'coc' ? { completion_certificate_uploaded: true } : kind === 'invoice' ? { invoice_uploaded: true } : {}
       await admin.from('tickets').update({ ...flag, last_supplier_update_at: now }).eq('id', ticketId)
-      break
-    }
-    case 'submit_signoff': {
-      const { data: ev } = await admin.from('ticket_evidence').select('kind, url').eq('ticket_id', ticketId).order('created_at', { ascending: true })
-      const before = (ev ?? []).filter(e => e.kind === 'before_photo').map(e => e.url)
-      const after = (ev ?? []).filter(e => e.kind === 'after_photo').map(e => e.url)
-      // COC/invoice are single-valued. The evidence log accumulates across resubmission
-      // rounds, so take the LATEST upload — an early .find() kept showing round 1's COC.
-      const cocRows = (ev ?? []).filter(e => e.kind === 'coc')
-      const coc = cocRows.length ? cocRows[cocRows.length - 1].url : null
-      const invoiceRows = (ev ?? []).filter(e => e.kind === 'invoice')
-      const invoice = invoiceRows.length ? invoiceRows[invoiceRows.length - 1].url : null
-      await admin.from('signoffs').insert({ company_id: ticket.company_id, ticket_id: ticketId, supplier_id: ticket.supplier_id, before_urls: before, after_urls: after, coc_url: coc, invoice_url: invoice, status: 'submitted', notes: body.notes ?? null })
-      await admin.from('tickets').update({ status: 'submitted_for_signoff', submitted_for_signoff_at: now, signoff_status: 'submitted', last_supplier_update_at: now }).eq('id', ticketId)
-      // notify region RMs
-      if (ticket.region_id) {
-        const { data: rms } = await admin.from('regional_users').select('user_id').eq('region_id', ticket.region_id)
-        const ids = (rms ?? []).map(r => r.user_id)
-        if (ids.length) await admin.from('notifications').insert(ids.map(id => ({ company_id: ticket.company_id, user_id: id, type: 'signoff_request', title: 'Job submitted for sign-off', message: `"${ticket.title}" is ready for your sign-off.`, link: `/regional/tickets/${ticketId}` })))
-      }
       break
     }
     case 'confirm_no_vos': {

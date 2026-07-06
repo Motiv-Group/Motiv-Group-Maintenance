@@ -35,6 +35,14 @@ export type TicketStatus =
 export const TERMINAL_STATUSES: TicketStatus[] = ['completed', 'cancelled', 'declined']
 export function isTerminalStatus(s: string): boolean { return (TERMINAL_STATUSES as string[]).includes(s) }
 
+// The competitive commercial phase — while suppliers are still being invited /
+// quoting, before a quote is approved. The assign / (re)quote routes fan out across
+// many ticket_suppliers + quotes rows (not a single state-machine move), so they
+// live outside /transition, but they validate their source status against THIS one
+// shared list rather than each hard-coding their own.
+export const COMMERCIAL_SOURCE_STATUSES: TicketStatus[] = ['open', 'info_requested', 'assigned', 'assessment', 'quote_requested', 'quoted', 'quote_revision', 'suppliers_declined']
+export function isCommercialPhase(s: string): boolean { return (COMMERCIAL_SOURCE_STATUSES as string[]).includes(s) }
+
 export type StatusGroup = 'intake' | 'commercial' | 'execution' | 'closeout' | 'closed'
 export type StatusTone =
   | 'blue' | 'cyan' | 'teal' | 'amber' | 'purple' | 'indigo' | 'orange' | 'red' | 'pink' | 'green' | 'gray' | 'slate'

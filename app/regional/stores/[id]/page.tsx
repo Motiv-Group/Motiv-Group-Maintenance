@@ -1,17 +1,15 @@
 export const dynamic = 'force-dynamic'
 
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { signedUrl } from '@/lib/storage'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { BackButton } from '@/components/ui/BackButton'
 import {
   Phone, Mail, MapPin, Building2,
-  FileText, Clock, Archive, AlertCircle, AlertTriangle,
+  Clock, Archive, AlertCircle, AlertTriangle,
   ChevronDown, ChevronUp,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
-import { QuoteApprovalCard } from '@/components/regional/QuoteApprovalCard'
 import { RecentTicketsStack } from '@/components/regional/RecentTicketsStack'
 import {
   STATUS_COLORS, STATUS_LABELS,
@@ -145,13 +143,6 @@ export default async function RegionalStoreDetailPage({ params }: { params: { id
   // Archived tickets = completed + declined, newest first (by last update)
   const archivedTickets = [...completedTickets, ...declinedTickets]
     .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
-
-  // Quote groups
-  const pendingQuotes = ticketList
-    .flatMap(t => (t.quotes ?? []).map((q: any) => ({ ...q, ticketTitle: t.title, ticketId: t.id })))
-    .filter((q: any) => q.status === 'pending')
-  // Sign each pending quote's stored attachment for display (private bucket).
-  await Promise.all(pendingQuotes.map(async (q: any) => { q.file_url = await signedUrl(q.file_url) }))
 
   // Stats
   const acceptedQ   = allQuotes.filter((q: any) => q.status === 'accepted').length
@@ -365,26 +356,6 @@ export default async function RegionalStoreDetailPage({ params }: { params: { id
       {ticketList.length === 0 && (
         <div className="bg-slate-50 dark:bg-gray-800 border border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-8 text-center">
           <p className="text-sm text-gray-400">No tickets from this store yet.</p>
-        </div>
-      )}
-
-      {/* ── QUOTES AWAITING APPROVAL ── */}
-      {pendingQuotes.length > 0 && (
-        <div>
-          <h2 className="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-            <FileText size={16} className="text-yellow-500" />
-            Quotes Awaiting Your Approval ({pendingQuotes.length})
-          </h2>
-          <div className="space-y-3">
-            {(pendingQuotes as any[]).map((q: any) => (
-              <QuoteApprovalCard
-                key={q.id}
-                quote={q as Quote}
-                ticketTitle={q.ticketTitle}
-                ticketId={q.ticketId}
-              />
-            ))}
-          </div>
         </div>
       )}
 
