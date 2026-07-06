@@ -500,9 +500,28 @@ create table if not exists public.supplier_performance_scores (
   created_at                   timestamptz not null default now()
 );
 
+create table if not exists public.supplier_sla_acceptances (
+  id           uuid not null default gen_random_uuid() primary key,
+  supplier_id  uuid references public.suppliers(id) on delete cascade,
+  user_id      uuid not null,
+  sla_version  text not null,
+  signed_name  text not null,
+  ip           text,
+  accepted_at  timestamptz not null default now()
+);
+
 create table if not exists public.supplier_users (
   user_id                      uuid not null,
   supplier_id                  uuid not null
+);
+
+create table if not exists public.supplier_verification_docs (
+  id           uuid not null default gen_random_uuid() primary key,
+  supplier_id  uuid not null references public.suppliers(id) on delete cascade,
+  uploaded_by  uuid not null,
+  kind         text not null,   -- cipc | vat_cert | insurance | qualification | other
+  url          text not null,   -- stored bucket path/URL; served via signed URLs
+  uploaded_at  timestamptz not null default now()
 );
 
 create table if not exists public.suppliers (
@@ -514,6 +533,7 @@ create table if not exists public.suppliers (
   phone                        text,
   address                      text,
   trade                        text,
+  trades                       text[],
   qualified                    boolean not null default false,
   qualification_number         text,
   qualification_expiry         date,
@@ -522,7 +542,9 @@ create table if not exists public.suppliers (
   active                       boolean not null default true,
   created_at                   timestamptz not null default now(),
   updated_at                   timestamptz not null default now(),
-  is_motiv                     boolean not null default false
+  is_motiv                     boolean not null default false,
+  verification_status          text not null default 'unverified',   -- unverified | pending_review | verified
+  source                       text not null default 'invited'       -- invited | self_signup
 );
 
 create table if not exists public.technicians (
@@ -1212,6 +1234,11 @@ revoke execute on function public.assign_store_job_ref()            from anon, a
 -- Individual dashboards/lists scope standalone tickets by owner (20260717).
 create index if not exists tickets_created_by_idx on public.tickets (created_by);
 
+-- Supplier onboarding wizard (20260722).
+create index if not exists sla_acceptances_user_idx on public.supplier_sla_acceptances (user_id);
+create index if not exists sla_acceptances_supplier_idx on public.supplier_sla_acceptances (supplier_id);
+create index if not exists verification_docs_supplier_idx on public.supplier_verification_docs (supplier_id);
+
 -- ---------------------------------------------------------------------------
 -- TRIGGERS
 -- ---------------------------------------------------------------------------
@@ -1280,7 +1307,9 @@ alter table public.stores enable row level security;
 alter table public.supplier_escalations enable row level security;
 alter table public.supplier_invites enable row level security;
 alter table public.supplier_performance_scores enable row level security;
+alter table public.supplier_sla_acceptances enable row level security;   -- no policy: service-role only
 alter table public.supplier_users enable row level security;
+alter table public.supplier_verification_docs enable row level security; -- no policy: service-role only
 alter table public.suppliers enable row level security;
 alter table public.technicians enable row level security;
 alter table public.ticket_blockers enable row level security;
@@ -1584,7 +1613,8 @@ create policy "own profile update" on public.user_profiles for update
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types) values
   ('ticket-photos','ticket-photos',false, 15728640, array['image/jpeg','image/jpg','image/png','image/webp']),
   ('completion-docs','completion-docs',false, 15728640, array['image/jpeg','image/jpg','image/png','image/webp','application/pdf']),
-  ('quote-attachments','quote-attachments',false, 15728640, array['application/pdf','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','application/vnd.ms-excel','image/jpeg','image/jpg','image/png','image/webp'])
+  ('quote-attachments','quote-attachments',false, 15728640, array['application/pdf','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','application/vnd.ms-excel','image/jpeg','image/jpg','image/png','image/webp']),
+  ('supplier-docs','supplier-docs',false, 15728640, array['application/pdf','image/jpeg','image/jpg','image/png','image/webp'])
 on conflict (id) do update set public = excluded.public, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
 
 -- Upload policies only (no public read — private buckets read via signed URLs).
@@ -1594,6 +1624,9 @@ create policy "completion-docs upload" on storage.objects for insert
 drop policy if exists "quote-attachments upload" on storage.objects;
 create policy "quote-attachments upload" on storage.objects for insert
   with check (((bucket_id = 'quote-attachments'::text) AND (auth.role() = 'authenticated'::text)));
+drop policy if exists "supplier-docs upload" on storage.objects;
+create policy "supplier-docs upload" on storage.objects for insert
+  with check (((bucket_id = 'supplier-docs'::text) AND (auth.role() = 'authenticated'::text)));
 drop policy if exists "ticket-photos upload" on storage.objects;
 create policy "ticket-photos upload" on storage.objects for insert
   with check (((bucket_id = 'ticket-photos'::text) AND (auth.role() = 'authenticated'::text)));

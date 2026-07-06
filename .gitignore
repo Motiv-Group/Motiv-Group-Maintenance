@@ -43,3 +43,7 @@ android/local.properties
 android/app/release/
 *.apk
 *.aab
+
+# Local source archives (never commit — too large for GitHub)
+Motiv Source New.zip
+*.zip
