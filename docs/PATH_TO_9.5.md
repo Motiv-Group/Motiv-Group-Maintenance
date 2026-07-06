@@ -44,7 +44,7 @@
 | A4 | Decide SLA priority timings (P1 res 4h→24h + make-safe; P2 24h→48h or re-baseline; business-hours windows), then align `sla_rules` + `FALLBACK_SLA` + `/sla`, bump `SLA_VERSION` | SLA/Legal | Both | 🔲 needs your decision → then Code |
 | A5 | Buy Vercel Pro + Supabase Pro; enable PITR/daily backups; leaked-password protection; add hourly SLA cron | Infra | ⛔ You (~$45/mo) | 🔲 |
 | A6 | Set prod env vars: `UPSTASH_REDIS_*`, `NEXT_PUBLIC_SENTRY_DSN`, `CRON_SECRET`, `WHATSAPP_APP_SECRET` (when Meta lands) | Infra | You | 🔲 |
-| A7 | **HIGH 3** — make WhatsApp webhook **fail-closed** in production (`NODE_ENV==='production' && !WA_APP_SECRET → reject`) | API | Code | 🔲 |
+| A7 | **HIGH 3** — make WhatsApp webhook **fail-closed** in production (`NODE_ENV==='production' && !WA_APP_SECRET → reject`) | API | Code | ✅ 2026-07-06 (`verifyWebhookSignature` rejects in prod when secret unset; fail-open dev-only) |
 | A8 | Launch smoke test: signed-URL images render, raw storage URL → 403, signup creates Individual only, each role dashboard loads, WhatsApp intake e2e | All | Both | 🔲 launch day |
 
 ## Phase B — hardening (weeks 1–3 after launch)
@@ -54,7 +54,7 @@
 | B1 | **MEDIUM 4** — transition-matrix test suite for `lib/workflow` `resolveTransition()` (every status × action × role incl. `individual`) | Tests | Code | ✅ 2026-07-06 (`lib/workflow.test.ts`, +277 tests, 295 total green) |
 | B2 | CI pipeline (GitHub Actions): tsc + lint + vitest + build on every PR; nothing merges red; `npm audit --omit=dev` fail-on-high | Tests/Deps | Code | 🔲 |
 | B3 | Integration tests for the 3 handlers fixed in cdc7dec (mock Supabase, assert authZ per role) | Tests | Code | 🔲 |
-| B4 | **MEDIUM 1** — Individual realtime: add owner-scoped RLS read policy (`created_by = auth.uid() AND company_id IS NULL`) **or** drop the subscription | DB/Individual | Code | 🟡 migration `20260706_individual_owner_rls.sql` written (tickets+quotes+signoffs owner-read) — **awaiting apply to live**, then fold+delete + verify realtime on `/individual` |
+| B4 | **MEDIUM 1** — Individual realtime: add owner-scoped RLS read policy (`created_by = auth.uid() AND company_id IS NULL`) **or** drop the subscription | DB/Individual | Code | ✅ 2026-07-06 (applied to live, folded into schema.sql, file deleted). ⏳ still verify realtime on deployed `/individual` |
 | B5 | **MEDIUM 2** — storage per-user path prefix in upload policies (object name starts with `auth.uid()`) + per-user upload quotas | Storage | Code | 🔲 |
 | B6 | **HIGH 1** — Next.js 15/16 upgrade PR (clears advisory list incl. nonce-CSP XSS); retest CSP, Capacitor WebView, auth cookies | Deps | Code | 🔲 big; standalone PR |
 | B7 | **MEDIUM 5** — ESLint 9 migration (fold into B6) | Deps | Code | 🔲 |
@@ -93,3 +93,5 @@ _None yet. Add rows here as they surface, with file + severity + status._
 ## Done log
 - **2026-07-06 A1** — migration 20260722 (supplier onboarding wizard) folded into `supabase/schema.sql`, file deleted. Register #1 cleared.
 - **2026-07-06 B1** — `lib/workflow.test.ts`: exhaustive status × action × role matrix for `resolveTransition()`, explicit `individual` allow/deny pins (the BLOCKER-1 regression class), supplier-exclusive actions, terminal/unknown-input guards, and table invariants. +277 tests → **295 passing**.
+- **2026-07-06 B4** — migration `20260706_individual_owner_rls.sql` applied to live + folded into `schema.sql` (helper `app_owns_standalone_ticket()` + owner-read policies on tickets/quotes/signoffs), file deleted. Individual browser reads/realtime unblocked. Register #10 (realtime half) cleared.
+- **2026-07-06 A7** — WhatsApp webhook `verifyWebhookSignature()` now fails **closed** in production when `WHATSAPP_APP_SECRET` is unset (was fail-open everywhere); dev keeps fail-open. Audit HIGH 3 closed.

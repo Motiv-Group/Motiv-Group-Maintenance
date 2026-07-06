@@ -1072,6 +1072,22 @@ AS $function$
 $function$
 ;
 
+-- True iff the caller owns t_id AND it is a standalone/company-less ticket
+-- (Individual users). Lets owner-scoped read policies on quotes/signoffs check
+-- ownership without recursing through tickets RLS. (migration 20260706)
+CREATE OR REPLACE FUNCTION public.app_owns_standalone_ticket(t_id uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select exists (
+    select 1 from public.tickets t
+    where t.id = t_id and t.created_by = auth.uid() and t.company_id is null
+  );
+$function$
+;
+
 CREATE OR REPLACE FUNCTION public.app_company_id()
  RETURNS uuid
  LANGUAGE sql
@@ -1393,6 +1409,10 @@ drop policy if exists "quotes read" on public.quotes;
 create policy "quotes read" on public.quotes for select
   using (app_can_see_ticket(ticket_id));
 
+drop policy if exists "quotes owner read" on public.quotes;
+create policy "quotes owner read" on public.quotes for select
+  using (public.app_owns_standalone_ticket(ticket_id));
+
 drop policy if exists "quotes update" on public.quotes;
 create policy "quotes update" on public.quotes for update
   using (((company_id = app_company_id()) AND app_can_see_ticket(ticket_id)));
@@ -1449,6 +1469,10 @@ create policy "signoff_rounds read" on public.signoff_rounds for select
 drop policy if exists "signoffs read" on public.signoffs;
 create policy "signoffs read" on public.signoffs for select
   using (((company_id = app_company_id()) AND app_can_see_ticket(ticket_id)));
+
+drop policy if exists "signoffs owner read" on public.signoffs;
+create policy "signoffs owner read" on public.signoffs for select
+  using (public.app_owns_standalone_ticket(ticket_id));
 
 drop policy if exists "signoffs write" on public.signoffs;
 create policy "signoffs write" on public.signoffs for all
@@ -1587,6 +1611,11 @@ create policy "tickets insert" on public.tickets for insert
 drop policy if exists "tickets read" on public.tickets;
 create policy "tickets read" on public.tickets for select
   using (((company_id = app_company_id()) AND (app_is_company_wide() OR (region_id IN ( SELECT app_region_ids() AS app_region_ids)) OR (store_id IN ( SELECT app_store_ids() AS app_store_ids)) OR (supplier_id IN ( SELECT app_supplier_ids() AS app_supplier_ids)))));
+
+-- Individual owner-scoped read (standalone tickets); enables browser reads + realtime (migration 20260706).
+drop policy if exists "tickets owner read" on public.tickets;
+create policy "tickets owner read" on public.tickets for select
+  using (((created_by = auth.uid()) AND (company_id IS NULL)));
 
 drop policy if exists "tickets update" on public.tickets;
 create policy "tickets update" on public.tickets for update

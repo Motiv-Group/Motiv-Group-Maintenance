@@ -401,13 +401,19 @@ function safeEqual(a: string, b: string): boolean {
 
 /**
  * Verify Meta's `x-hub-signature-256` HMAC over the RAW request body.
- * Fail-closed when WHATSAPP_APP_SECRET is configured; fail-open (with a loud
- * warning) only when it is unset, so an existing deployment keeps working until
- * the secret is added — it MUST be set before a public launch.
+ * Fail-CLOSED whenever WHATSAPP_APP_SECRET is set, and always in production: a
+ * missing secret must never silently disable signature verification once the
+ * endpoint is public (audit HIGH 3). Fail-open (with a loud warning) is allowed
+ * only OUTSIDE production, so local/dev keeps working until the Meta secret is
+ * added — it MUST be set before a public launch.
  */
 function verifyWebhookSignature(rawBody: string, header: string | null): boolean {
   if (!WA_APP_SECRET) {
-    console.warn('[WhatsApp] WHATSAPP_APP_SECRET not set — skipping signature verification (INSECURE; set it before production).');
+    if (process.env.NODE_ENV === 'production') {
+      console.error('[WhatsApp] WHATSAPP_APP_SECRET not set in production — rejecting webhook (fail-closed).');
+      return false;
+    }
+    console.warn('[WhatsApp] WHATSAPP_APP_SECRET not set — skipping signature verification (dev only; set it before production).');
     return true;
   }
   if (!header) return false;
