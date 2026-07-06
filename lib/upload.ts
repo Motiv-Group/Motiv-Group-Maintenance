@@ -17,7 +17,12 @@ export async function uploadTicketPhotos(
   const results = await Promise.all(files.map(async (f) => {
     const path = `${userId ?? 'anon'}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${f.name.replace(/[^\w.\-]/g, '_')}`
     const { error } = await supabase.storage.from(bucket).upload(path, f, { upsert: true })
-    if (error) return { ok: false as const, name: f.name }
+    if (error) {
+      // Surface the real reason (RLS 403, mime 415, size 413, network…) instead of
+      // swallowing it — a silent "check your connection" hid a storage-RLS bug.
+      console.error(`[upload] ${bucket}/${f.name} failed:`, error.message)
+      return { ok: false as const, name: f.name }
+    }
     return { ok: true as const, url: supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl }
   }))
   return {

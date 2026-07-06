@@ -88,7 +88,9 @@
 ---
 
 ## New issues found after the audit (🆕)
-_None yet. Add rows here as they surface, with file + severity + status._
+| # | Issue | Severity | Status |
+|---|---|---|---|
+| N1 | **All photo/doc uploads 403'd** — storage upload policies gated on `auth.role() = 'authenticated'`, which no longer resolves in Supabase storage RLS → every role's log-a-job/completion/quote/supplier-doc upload failed with "new row violates row-level security policy". Reproduced directly. Fix: `auth.uid() IS NOT NULL` on all 4 upload buckets (`20260706_fix_storage_upload_rls.sql`). Also surfaced the real error in `lib/upload.ts` (was swallowed as "check your connection"). | **BLOCKER** (uploads broken) | 🟡 migration written — **awaiting apply**, then re-verify + fold |
 
 ## Done log
 - **2026-07-06 A1** — migration 20260722 (supplier onboarding wizard) folded into `supabase/schema.sql`, file deleted. Register #1 cleared.
