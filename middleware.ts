@@ -35,7 +35,7 @@ export async function middleware(request: NextRequest) {
   const applyCsp = (res: NextResponse) => { res.headers.set('content-security-policy', csp); return res }
 
   const path = request.nextUrl.pathname
-  const authPrefixes = ['/client', '/regional', '/supplier', '/executive', '/admin', '/settings', '/auth']
+  const authPrefixes = ['/client', '/regional', '/supplier', '/executive', '/individual', '/admin', '/settings', '/auth']
   const needsAuth = authPrefixes.some(p => path.startsWith(p))
 
   // Public pages (/, /privacy, /terms, …): apply CSP, skip the auth round-trip.
@@ -75,11 +75,12 @@ export async function middleware(request: NextRequest) {
     return null
   }
 
-  if (path.startsWith('/client'))    { const r = await gate(['store_manager']); if (r) return r }
-  if (path.startsWith('/regional'))  { const r = await gate(['regional_manager']); if (r) return r }
-  if (path.startsWith('/supplier'))  { const r = await gate(['supplier']); if (r) return r }
-  if (path.startsWith('/executive')) { const r = await gate(['executive', 'system_admin']); if (r) return r }
-  if (path.startsWith('/admin'))     { const r = await gate(['system_admin']); if (r) return r }
+  if (path.startsWith('/client'))     { const r = await gate(['store_manager']); if (r) return r }
+  if (path.startsWith('/regional'))   { const r = await gate(['regional_manager']); if (r) return r }
+  if (path.startsWith('/supplier'))   { const r = await gate(['supplier']); if (r) return r }
+  if (path.startsWith('/executive'))  { const r = await gate(['executive', 'system_admin']); if (r) return r }
+  if (path.startsWith('/individual')) { const r = await gate(['individual']); if (r) return r }
+  if (path.startsWith('/admin'))      { const r = await gate(['system_admin']); if (r) return r }
   if (path.startsWith('/settings'))  { if (!user) return NextResponse.redirect(new URL('/auth/login', request.url)) }
 
   if (user && (path === '/auth/login' || path === '/auth/signup')) {
@@ -88,6 +89,7 @@ export async function middleware(request: NextRequest) {
       : role === 'regional_manager' ? '/regional'
       : role === 'system_admin' ? '/admin'
       : role === 'executive' ? '/executive'
+      : role === 'individual' ? '/individual'
       : '/client'
     return NextResponse.redirect(new URL(dest, request.url))
   }

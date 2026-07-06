@@ -19,7 +19,32 @@ export async function POST(request: Request) {
   if (!title || !description) return NextResponse.json({ error: 'Title and description are required' }, { status: 400 })
 
   const admin = createAdminClient()
-  const { data: profile } = await admin.from('user_profiles').select('company_id').eq('id', user.id).single()
+  const { data: profile } = await admin.from('user_profiles').select('company_id, role').eq('id', user.id).single()
+
+  // Individuals (general public) own standalone tickets — no company / store / region.
+  // Same tables + priority logic as a store ticket; just no hierarchy or RM notify.
+  if (profile?.role === 'individual') {
+    const impact = String(operational_impact)
+    const severity = impact === 'cannot_trade' || impact === 'safety_risk' ? 'critical'
+      : impact === 'trading_affected' ? 'high'
+      : impact === 'customer_visible' || impact === 'staff_inconvenience' ? 'medium' : 'low'
+    const flags = {
+      safety_risk_flag: impact === 'safety_risk',
+      trading_impact_flag: impact === 'trading_affected' || impact === 'cannot_trade',
+      customer_visible_flag: impact === 'customer_visible',
+      staff_impact_flag: impact === 'staff_inconvenience',
+    }
+    const priority = computePriority({ severity, operational_impact: impact, ...flags })
+    const { data: ticket, error } = await admin.from('tickets').insert({
+      created_by: user.id, title, description, category,
+      operational_impact: impact, severity, priority, ...flags, photo_urls, status: 'open',
+      last_store_update_at: new Date().toISOString(),
+    }).select().single()
+    if (error) return serverError(error)
+    revalidatePath('/individual')
+    return NextResponse.json({ ticket }, { status: 201 })
+  }
+
   const { data: link } = await admin.from('store_users').select('store_id').eq('user_id', user.id).limit(1).single()
   if (!profile?.company_id || !link?.store_id) return NextResponse.json({ error: 'Your account is not linked to a store yet.' }, { status: 403 })
   const { data: store } = await admin.from('stores').select('id, region_id, region_code, branch_code, name, closed_at').eq('id', link.store_id).single()

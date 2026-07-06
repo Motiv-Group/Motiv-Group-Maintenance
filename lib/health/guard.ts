@@ -73,6 +73,19 @@ export async function requireRegionalUser(): Promise<RegionalUser> {
   }
 }
 
+export interface IndividualContext { userId: string; fullName: string | null }
+
+/** Gate an Individual (general-public) page. Individuals are standalone — no company
+ *  / store / region — so this only checks the role; their tickets scope by created_by. */
+export async function requireIndividual(): Promise<IndividualContext> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/auth/login')
+  const { data: profile } = await supabase.from('user_profiles').select('role, full_name').eq('id', user.id).single()
+  if (profile?.role !== 'individual') redirect('/auth/login')
+  return { userId: user.id, fullName: profile.full_name ?? null }
+}
+
 export interface MasterAdminContext { userId: string; email: string }
 
 /** Gate the platform-admin (infra/ops) area to the master admin only.

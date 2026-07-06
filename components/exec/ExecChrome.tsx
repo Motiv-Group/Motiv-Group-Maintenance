@@ -38,11 +38,16 @@ const SUPPLIER_TABS: ChromeTab[] = [
   { href: '/supplier/technicians', label: 'Technicians', icon: Users },
   { href: '/supplier/stats',   label: 'Performance', icon: BarChart2 },
 ]
+const INDIVIDUAL_TABS: ChromeTab[] = [
+  { href: '/individual',         label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/individual/tickets', label: 'Tickets',   icon: Ticket },
+]
 const VARIANTS = {
   exec:     { tabs: EXEC_TABS, roleLabel: 'Executive', base: '/executive', reports: true },
   regional: { tabs: REGIONAL_TABS, roleLabel: 'Regional Manager', base: '/regional', reports: true },
   store:    { tabs: STORE_TABS, roleLabel: 'Store Manager', base: '/client', reports: false },
   supplier: { tabs: SUPPLIER_TABS, roleLabel: 'Supplier', base: '/supplier', reports: false },
+  individual: { tabs: INDIVIDUAL_TABS, roleLabel: 'Individual', base: '/individual', reports: false },
 } as const
 
 export function ExecChrome({

@@ -13,7 +13,7 @@ function normalisePhone(raw: string | null | undefined): string | null {
   return `+${digits}`
 }
 
-const ROLES = ['store_manager', 'regional_manager', 'supplier', 'executive', 'system_admin']
+const ROLES = ['store_manager', 'regional_manager', 'supplier', 'executive', 'system_admin', 'individual']
 
 export async function GET() {
   const supabase = createClient()

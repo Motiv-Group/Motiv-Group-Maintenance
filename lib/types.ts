@@ -12,7 +12,7 @@ export type TicketStatus =
   | 'pending_sign_off' | 'snag_in_progress' | 'variation_pending' | 'variation_accepted'
 export type QuoteStatus = 'pending' | 'accepted' | 'declined'
 export type QuoteType = 'quote' | 'variation'
-export type UserRole = 'client' | 'store_manager' | 'regional_manager' | 'supplier' | 'executive'
+export type UserRole = 'client' | 'store_manager' | 'regional_manager' | 'supplier' | 'executive' | 'individual'
 
 /** Four-band health classification used for stores, regions and the estate. */
 export type RagStatus = 'green' | 'amber' | 'red' | 'critical'
