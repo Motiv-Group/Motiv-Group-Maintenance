@@ -105,8 +105,9 @@ app/
 
 components/
   ui/               → Shared: Button, Input, Badge, Navbar
-  client/           → QuoteCard (accept/decline)
-  admin/            → SendQuoteForm, UpdateStatusForm
+  client/           → Store-manager ticket views
+  admin/            → SendQuoteForm (+ platform-admin: AddAccountForm, HierarchyView)
+  workflow/         → WorkflowActions (drives /api/tickets/[id]/transition)
 
 lib/
   supabase/         → Browser + server Supabase clients

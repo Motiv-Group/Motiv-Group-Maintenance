@@ -53,7 +53,7 @@
   <!-- ===== Step 2: Send quote ===== -->
   <rect x="460" y="322" width="320" height="50" rx="8" fill="#fff" stroke="#9a7b34"/>
   <text x="474" y="344" font-size="13" font-weight="600" fill="#7c5e1e">2 · Send Quote (excl/incl VAT, PDF auto-fill)</text>
-  <text x="474" y="362" font-size="11" fill="#92703a">SendQuoteForm → POST /api/quotes</text>
+  <text x="474" y="362" font-size="11" fill="#92703a">SendQuoteForm → POST /api/tickets/[id]/submit-quote</text>
   <line x1="620" y1="372" x2="1020" y2="385" stroke="#475569" stroke-width="1.6" marker-end="url(#arr)"/>
   <line x1="460" y1="360" x2="220" y2="372" stroke="#475569" stroke-width="1.2" stroke-dasharray="3 3" marker-end="url(#arr)"/>
   <text x="700" y="372" font-size="11" fill="#475569">notify client + RM</text>
@@ -61,7 +61,7 @@
   <!-- ===== Step 3: RM approves quote ===== -->
   <rect x="860" y="408" width="320" height="50" rx="8" fill="#fff" stroke="#059669"/>
   <text x="874" y="430" font-size="13" font-weight="600" fill="#065f46">3 · Approve / Decline quote</text>
-  <text x="874" y="448" font-size="11" fill="#047857">QuoteApprovalCard → /api/quotes/[id]/respond</text>
+  <text x="874" y="448" font-size="11" fill="#047857">QuoteReviewCard → /api/tickets/[id]/quote-decision</text>
   <line x1="860" y1="445" x2="620" y2="458" stroke="#475569" stroke-width="1.6" marker-end="url(#arr)"/>
   <line x1="860" y1="455" x2="220" y2="470" stroke="#475569" stroke-width="1.2" stroke-dasharray="3 3" marker-end="url(#arr)"/>
   <text x="430" y="450" font-size="11" fill="#475569">accepted → work proceeds · notify both</text>
@@ -71,12 +71,12 @@
   <!-- ===== Step 4: in progress ===== -->
   <rect x="460" y="498" width="320" height="44" rx="8" fill="#fff" stroke="#9a7b34"/>
   <text x="474" y="518" font-size="13" font-weight="600" fill="#7c5e1e">4 · Mark In Progress</text>
-  <text x="474" y="534" font-size="11" fill="#92703a">UpdateStatusForm → PATCH /api/tickets/[id]</text>
+  <text x="474" y="534" font-size="11" fill="#92703a">MarkInProgressButton → /api/tickets/[id]/transition (start_work)</text>
 
   <!-- ===== Step 5: Variation order ===== -->
   <rect x="460" y="572" width="320" height="50" rx="8" fill="#eef2ff" stroke="#4f46e5"/>
   <text x="474" y="594" font-size="13" font-weight="600" fill="#3730a3">5 · Raise Variation Order (extra work)</text>
-  <text x="474" y="612" font-size="11" fill="#4338ca">/api/quotes (type=variation) — RM only</text>
+  <text x="474" y="612" font-size="11" fill="#4338ca">SendQuoteForm → /api/tickets/[id]/transition (submit_variation)</text>
   <line x1="780" y1="597" x2="1020" y2="597" stroke="#475569" stroke-width="1.6" marker-end="url(#arr)"/>
   <text x="824" y="590" font-size="11" fill="#475569">notify RM</text>
 
