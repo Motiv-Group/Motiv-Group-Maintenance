@@ -3,6 +3,13 @@ import { NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { rateLimit } from '@/lib/rate-limit'
 import { sendPushToMany } from '@/lib/push'
+import { z } from 'zod'
+import { parseJsonBody } from '@/lib/validate'
+
+const BodySchema = z.object({
+  ticketId: z.string(),
+  reason: z.string(),
+})
 
 // POST /api/supplier/decline-work  { ticketId, reason }
 // A supplier opts out of a job they were invited to quote. Allowed only BEFORE
@@ -15,7 +22,9 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   if (!(await rateLimit(`supplier-decline:${user.id}`, 20, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
-  const body = await request.json().catch(() => ({}))
+  const parsed = await parseJsonBody(request, BodySchema)
+  if (!parsed.ok) return parsed.error
+  const body = parsed.data
   const ticketId = String(body.ticketId ?? '')
   const reason = String(body.reason ?? '').trim()
   if (!ticketId) return NextResponse.json({ error: 'ticketId required' }, { status: 400 })

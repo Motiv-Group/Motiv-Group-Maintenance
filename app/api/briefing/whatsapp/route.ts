@@ -2,6 +2,10 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { rateLimit } from '@/lib/rate-limit'
 import { sendWhatsAppText } from '@/lib/whatsapp'
+import { z } from 'zod'
+import { parseJsonBody } from '@/lib/validate'
+
+const BodySchema = z.object({ text: z.string().optional() })
 
 // POST /api/briefing/whatsapp — send the current briefing text to the
 // signed-in user's own WhatsApp number. Recipient is resolved server-side from
@@ -15,7 +19,10 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   if (!(await rateLimit(`briefing-wa:${user.id}`, 5, 60_000))) return NextResponse.json({ error: 'Too many requests — try again shortly.' }, { status: 429 })
 
-  const { text } = await request.json().catch(() => ({}))
+  const parsed = await parseJsonBody(request, BodySchema)
+  if (!parsed.ok) return parsed.error
+  const body = parsed.data
+  const { text } = body
   if (typeof text !== 'string' || !text.trim()) return NextResponse.json({ error: 'No briefing text.' }, { status: 400 })
 
   const admin = createAdminClient()

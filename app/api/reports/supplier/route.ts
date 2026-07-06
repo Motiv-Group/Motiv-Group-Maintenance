@@ -4,9 +4,17 @@ import { resolveRange, buildSupplierModel } from '@/lib/report-data'
 import { addNarrative } from '@/lib/report-groq'
 import { buildReportDocx } from '@/lib/report-docx'
 import { rateLimit } from '@/lib/rate-limit'
+import { z } from 'zod'
+import { parseJsonBody } from '@/lib/validate'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
+
+const BodySchema = z.object({
+  period: z.string().optional(),
+  from: z.any().optional(),
+  to: z.any().optional(),
+})
 
 // POST /api/reports/supplier — returns a .docx report for the supplier.
 export async function POST(request: Request) {
@@ -19,7 +27,10 @@ export async function POST(request: Request) {
     .from('user_profiles').select('role, full_name, company_name').eq('id', user.id).single()
   if (profile?.role !== 'supplier') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { period = 'month', from, to } = await request.json()
+  const parsed = await parseJsonBody(request, BodySchema)
+  if (!parsed.ok) return parsed.error
+  const body = parsed.data
+  const { period = 'month', from, to } = body
   const range = resolveRange(period, from, to)
   const name  = profile.company_name || profile.full_name || 'Supplier'
 

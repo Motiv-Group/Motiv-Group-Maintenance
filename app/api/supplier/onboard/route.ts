@@ -4,6 +4,24 @@ import { normalisePhone, isValidEmail } from '@/lib/csv'
 import { rateLimit } from '@/lib/rate-limit'
 import { sanitiseTrades } from '@/lib/trades'
 import { SLA_VERSION } from '@/lib/sla'
+import { z } from 'zod'
+import { parseJsonBody } from '@/lib/validate'
+import { logAudit } from '@/lib/audit'
+
+const BodySchema = z.object({
+  password: z.string().optional(),
+  company_name: z.string().optional(),
+  contact_name: z.string().optional(),
+  trades: z.any().optional(),
+  vat_registered: z.boolean().optional(),
+  vat_number: z.string().optional().nullable(),
+  sla_agreed: z.boolean().optional(),
+  sla_signed_name: z.string().optional(),
+  phone: z.string().optional().nullable(),
+  token: z.string().optional().nullable(),
+  address: z.string().optional().nullable(),
+  email: z.string().optional(),
+})
 
 // Supplier onboarding — TWO entry paths, one wizard:
 //
@@ -56,7 +74,9 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   if (!(await rateLimit('onboard-create', 20, 60_000)))
     return NextResponse.json({ error: 'Too many requests — please wait a minute.' }, { status: 429 })
-  const b = await request.json().catch(() => ({}))
+  const parsed = await parseJsonBody(request, BodySchema)
+  if (!parsed.ok) return parsed.error
+  const b = parsed.data
   const admin = createAdminClient()
   const bad = (error: string, status = 400) => NextResponse.json({ error }, { status })
 
@@ -109,6 +129,7 @@ export async function POST(request: Request) {
     })
     await admin.from('supplier_invites').update({ accepted_at: new Date().toISOString() }).eq('id', inv.id)
 
+    await logAudit(admin, { actorId: uid, companyId: inv.company_id, action: 'supplier.onboard_invited', entityType: 'user', entityId: uid, metadata: { supplierId: inv.supplier_id, email } })
     return NextResponse.json({ ok: true, email, pending: false })
   }
 
@@ -161,10 +182,11 @@ export async function POST(request: Request) {
     await admin.from('notifications').insert(adminIds.map(id => ({
       company_id: null, user_id: id, type: 'supplier_review',
       title: 'New supplier awaiting review',
-      message: `${b.company_name.trim()} (${trades.join(', ')}) signed up and needs verification.`,
+      message: `${(b.company_name ?? '').trim()} (${trades.join(', ')}) signed up and needs verification.`,
       link: '/admin/suppliers',
     })))
   }
 
+  await logAudit(admin, { actorId: uid, action: 'supplier.onboard_self_signup', entityType: 'user', entityId: uid, metadata: { supplierId: sup.id, email, companyName: b.company_name?.trim() } })
   return NextResponse.json({ ok: true, email, pending: true })
 }

@@ -7,6 +7,18 @@ import { sendPushToMany } from '@/lib/push'
 import { computePriority } from '@/lib/health/priority'
 import { loadSlaResolver } from '@/lib/health/data'
 import { composeTicketTitle } from '@/lib/utils'
+import { z } from 'zod'
+import { parseJsonBody } from '@/lib/validate'
+
+const BodySchema = z.object({
+  storeId: z.string().optional(),
+  description: z.string().optional(),
+  category: z.string().optional(),
+  operational_impact: z.string().optional(),
+  photo_urls: z.array(z.string()).optional(),
+  title: z.string().optional(),
+  supplierIds: z.array(z.any()).optional(),
+})
 
 // POST /api/regional/tickets — an RM logs a ticket on behalf of a store in their
 // region (same intake as the SM, plus a store selector + optional supplier invite).
@@ -16,7 +28,9 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   if (!(await rateLimit(`rm-tickets:${user.id}`, 20, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
-  const body = await request.json()
+  const parsed = await parseJsonBody(request, BodySchema)
+  if (!parsed.ok) return parsed.error
+  const body = parsed.data
   const { storeId, description, category, operational_impact = 'none', photo_urls = [] } = body
   if (!storeId || !description) return NextResponse.json({ error: 'Store and description are required' }, { status: 400 })
   // Auto-composed title ("Category — first words of description") — see /api/tickets.

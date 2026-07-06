@@ -2,6 +2,14 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { serverError } from '@/lib/api-error'
 import { rateLimit } from '@/lib/rate-limit'
+import { z } from 'zod'
+import { parseJsonBody } from '@/lib/validate'
+
+const BodySchema = z.object({
+  score: z.any().optional(),
+  ticketId: z.string().optional(),
+  comment: z.string().optional(),
+})
 
 // POST /api/ratings — RM rates the awarded supplier for a ticket (1–5 + comment).
 // Used as a required step when accepting the COC/POC sign-off.
@@ -11,7 +19,9 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   if (!(await rateLimit(`rating:${user.id}`, 30, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
-  const body = await request.json().catch(() => ({}))
+  const parsed = await parseJsonBody(request, BodySchema)
+  if (!parsed.ok) return parsed.error
+  const body = parsed.data
   const score = Number(body.score)
   if (!Number.isInteger(score) || score < 1 || score > 5) return NextResponse.json({ error: 'Give a score from 1 to 5.' }, { status: 400 })
   if (typeof body.ticketId !== 'string') return NextResponse.json({ error: 'Bad request' }, { status: 400 })

@@ -4,6 +4,18 @@ import { serverError } from '@/lib/api-error'
 import { revalidatePath } from 'next/cache'
 import { computePriority } from '@/lib/health/priority'
 import { rateLimit } from '@/lib/rate-limit'
+import { z } from 'zod'
+import { parseJsonBody } from '@/lib/validate'
+
+const PatchSchema = z.object({
+  title: z.string(),
+  description: z.string(),
+  category: z.string().optional().nullable(),
+  operational_impact: z.string().optional().nullable(),
+  photo_urls: z.array(z.string()).optional(),
+  priority: z.string().optional(),
+  edit_note: z.string().optional().nullable(),
+})
 
 // PATCH /api/tickets/[id] — store manager edits their own ticket while it's still open.
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
@@ -44,7 +56,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   if (!allowed) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   if (ticket.status !== 'open' && ticket.status !== 'info_requested') return NextResponse.json({ error: 'This ticket can no longer be edited' }, { status: 400 })
 
-  const body = await request.json()
+  const parsed = await parseJsonBody(request, PatchSchema)
+  if (!parsed.ok) return parsed.error
+  const body = parsed.data
   const { title, description, category, operational_impact, photo_urls } = body
   if (!title || !description) return NextResponse.json({ error: 'Title and description are required' }, { status: 400 })
 

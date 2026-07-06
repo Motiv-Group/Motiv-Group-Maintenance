@@ -3,6 +3,13 @@ import { NextResponse } from 'next/server'
 import { serverError } from '@/lib/api-error'
 import { revalidatePath } from 'next/cache'
 import { rateLimit } from '@/lib/rate-limit'
+import { z } from 'zod'
+import { parseJsonBody } from '@/lib/validate'
+
+const BodySchema = z.object({
+  storeId: z.string(),
+  capex_budget: z.any().optional().nullable(),
+})
 
 // PATCH /api/regional/store-budget — set a store's monthly Capex budget.
 // Regional managers only, and only for stores they own.
@@ -17,7 +24,10 @@ export async function PATCH(request: Request) {
   const { data: profile } = await supabase.from('user_profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'regional_manager') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { storeId, capex_budget } = await request.json()
+  const parsed = await parseJsonBody(request, BodySchema)
+  if (!parsed.ok) return parsed.error
+  const body = parsed.data
+  const { storeId, capex_budget } = body
   if (!storeId) return NextResponse.json({ error: 'Missing store' }, { status: 400 })
 
   // null/empty clears the budget; otherwise must be a non-negative number

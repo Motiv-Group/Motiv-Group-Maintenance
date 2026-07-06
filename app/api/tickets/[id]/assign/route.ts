@@ -6,6 +6,12 @@ import { rateLimit } from '@/lib/rate-limit'
 import { sendPushToMany } from '@/lib/push'
 import { loadSlaResolver } from '@/lib/health/data'
 import { isCommercialPhase } from '@/lib/workflow'
+import { z } from 'zod'
+import { parseJsonBody } from '@/lib/validate'
+
+const BodySchema = z.object({
+  supplierIds: z.array(z.any()).optional(),
+})
 
 // POST /api/tickets/[id]/assign — RM invites one or more suppliers to quote.
 // Creates ticket_suppliers rows (invited), moves the ticket to "assigned", and
@@ -16,7 +22,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   if (!(await rateLimit(`assign:${user.id}`, 30, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
-  const body = await request.json().catch(() => ({}))
+  const parsed = await parseJsonBody(request, BodySchema)
+  if (!parsed.ok) return parsed.error
+  const body = parsed.data
   const supplierIds: string[] = Array.isArray(body.supplierIds) ? body.supplierIds.filter((s: unknown) => typeof s === 'string') : []
   if (!supplierIds.length) return NextResponse.json({ error: 'Select at least one supplier.' }, { status: 400 })
 

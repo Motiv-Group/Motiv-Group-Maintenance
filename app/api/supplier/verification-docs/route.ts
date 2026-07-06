@@ -1,9 +1,16 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
+import { parseJsonBody } from '@/lib/validate'
 import { rateLimit } from '@/lib/rate-limit'
 import { supplierCtx } from '@/lib/supplier/ctx'
 import { signManyUrls } from '@/lib/storage'
 
 const KINDS = ['cipc', 'vat_cert', 'insurance', 'qualification', 'other'] as const
+
+const BodySchema = z.object({
+  kind: z.string().optional(),
+  url: z.string().optional(),
+})
 
 // GET /api/supplier/verification-docs — the caller's own uploaded docs (signed URLs).
 export async function GET() {
@@ -24,7 +31,9 @@ export async function POST(request: Request) {
   if (!ctx) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   if (!(await rateLimit(`verification-docs:${ctx.userId}`, 20, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
-  const b = await request.json().catch(() => ({}))
+  const parsed = await parseJsonBody(request, BodySchema)
+  if (!parsed.ok) return parsed.error
+  const b = parsed.data
   const kind = String(b.kind ?? '')
   const url = String(b.url ?? '')
   if (!(KINDS as readonly string[]).includes(kind)) return NextResponse.json({ error: 'Invalid document type' }, { status: 400 })

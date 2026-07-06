@@ -3,6 +3,15 @@ import { NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { rateLimit } from '@/lib/rate-limit'
 import { sendPushToMany } from '@/lib/push'
+import { z } from 'zod'
+import { parseJsonBody } from '@/lib/validate'
+
+const BodySchema = z.object({
+  action: z.string().optional(),
+  body: z.any().optional(),
+  evidenceUrls: z.array(z.any()).optional(),
+  note: z.any().optional(),
+})
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -88,7 +97,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
   if (!(await rateLimit(`dispute:${user.id}`, 40, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
   const ticketId = params.id
-  const body = await request.json().catch(() => ({}))
+  const parsed = await parseJsonBody(request, BodySchema)
+  if (!parsed.ok) return parsed.error
+  const body = parsed.data
   const action = String(body.action ?? '')
 
   const admin = createAdminClient()

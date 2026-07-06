@@ -2,6 +2,22 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { serverError } from '@/lib/api-error'
 import { rateLimit } from '@/lib/rate-limit'
+import { z } from 'zod'
+import { parseJsonBody } from '@/lib/validate'
+
+const BodySchema = z.object({
+  company_name: z.string(),
+  contact_name: z.string().optional().nullable(),
+  email: z.string().optional().nullable(),
+  phone: z.string().optional().nullable(),
+  address: z.string().optional().nullable(),
+  trade: z.string().optional().nullable(),
+  qualified: z.boolean().optional().nullable(),
+  qualification_number: z.string().optional().nullable(),
+  qualification_expiry: z.string().optional().nullable(),
+  vat_number: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
+})
 
 async function requireAdmin() {
   const supabase = createClient()
@@ -33,7 +49,9 @@ export async function POST(request: Request) {
   if (!(await rateLimit(`suppliers:${user.id}`, 30, 60_000)))
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
-  const body = await request.json()
+  const parsed = await parseJsonBody(request, BodySchema)
+  if (!parsed.ok) return parsed.error
+  const body = parsed.data
   const {
     company_name, contact_name, email, phone, address,
     trade, qualified, qualification_number, qualification_expiry,

@@ -2,8 +2,13 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { rateLimit } from '@/lib/rate-limit'
 import { serverError } from '@/lib/api-error'
+import { logAudit } from '@/lib/audit'
+import { z } from 'zod'
+import { parseJsonBody } from '@/lib/validate'
 
 export const dynamic = 'force-dynamic'
+
+const BodySchema = z.object({ confirm: z.string().optional() })
 
 /**
  * POPIA — account deletion / right to erasure.
@@ -24,12 +29,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Too many requests — please wait a minute.' }, { status: 429 })
   }
 
-  let body: { confirm?: string }
-  try {
-    body = await request.json()
-  } catch {
-    return NextResponse.json({ error: 'Invalid request body.' }, { status: 400 })
-  }
+  const parsed = await parseJsonBody(request, BodySchema)
+  if (!parsed.ok) return parsed.error
+  const body = parsed.data
   if (body.confirm !== 'DELETE') {
     return NextResponse.json({ error: 'Confirmation phrase required.' }, { status: 400 })
   }
@@ -43,6 +45,7 @@ export async function POST(request: Request) {
       .update({ full_name: 'Deleted user', email: null, phone: null, active: false })
       .eq('id', user.id)
     if (profileErr) return serverError(profileErr, 'Could not delete your account.')
+    await logAudit(admin, { actorId: user.id, action: 'account.self_delete', entityType: 'user', entityId: user.id })
 
     // 2. Scramble the auth login email + ban the user so they can no longer sign in.
     //    Best-effort — a failure here still leaves the profile anonymised above.

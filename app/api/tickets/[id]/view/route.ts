@@ -1,17 +1,26 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
+import { parseJsonBody } from '@/lib/validate'
 
 // POST /api/tickets/[id]/view  { itemType, itemLabel } — record that the current user
 // opened a specific item on a ticket (a photo, quote, COC…), for the audit trail. Only
 // the first open of each distinct item per viewer is kept; repeat opens are no-ops.
 const ITEMS = new Set(['photo', 'photos', 'quote', 'coc', 'invoice', 'attachment'])
 
+const BodySchema = z.object({
+  itemType: z.string().optional(),
+  itemLabel: z.string().optional(),
+})
+
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
-  const body = await request.json().catch(() => ({}))
+  const parsed = await parseJsonBody(request, BodySchema)
+  if (!parsed.ok) return parsed.error
+  const body = parsed.data
   const itemType = typeof body.itemType === 'string' && ITEMS.has(body.itemType) ? body.itemType : null
   const itemLabel = typeof body.itemLabel === 'string' ? body.itemLabel.slice(0, 120) : ''
   if (!itemType) return NextResponse.json({ ok: true })

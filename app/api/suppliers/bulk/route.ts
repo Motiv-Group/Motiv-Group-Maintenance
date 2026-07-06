@@ -2,6 +2,12 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { serverError } from '@/lib/api-error'
 import { rateLimit } from '@/lib/rate-limit'
+import { z } from 'zod'
+import { parseJsonBody } from '@/lib/validate'
+
+const BodySchema = z.object({
+  suppliers: z.array(z.any()).optional(),
+})
 
 export async function POST(request: Request) {
   const supabase = createClient()
@@ -14,7 +20,10 @@ export async function POST(request: Request) {
   if (!(await rateLimit(`suppliers-bulk:${user.id}`, 5, 60_000)))
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
-  const { suppliers } = await request.json()
+  const parsed = await parseJsonBody(request, BodySchema)
+  if (!parsed.ok) return parsed.error
+  const body = parsed.data
+  const { suppliers } = body
   if (!Array.isArray(suppliers) || suppliers.length === 0)
     return NextResponse.json({ error: 'No suppliers provided' }, { status: 400 })
   if (suppliers.length > 500)

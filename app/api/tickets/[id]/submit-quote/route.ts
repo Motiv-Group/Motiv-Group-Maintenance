@@ -4,6 +4,18 @@ import { serverError, parseAmount } from '@/lib/api-error'
 import { revalidatePath } from 'next/cache'
 import { rateLimit } from '@/lib/rate-limit'
 import { sendPushToMany } from '@/lib/push'
+import { z } from 'zod'
+import { parseJsonBody } from '@/lib/validate'
+
+const BodySchema = z.object({
+  amount: z.any().optional(),
+  amount_incl_vat: z.any().optional().nullable(),
+  file_url: z.string().optional().nullable(),
+  description: z.string().optional().nullable(),
+  valid_until: z.string().optional().nullable(),
+  warranty: z.string().optional().nullable(),
+  proposed_schedule_at: z.string().optional().nullable(),
+})
 
 // POST /api/tickets/[id]/submit-quote — an invited supplier submits (or resubmits)
 // their quote. Records the quote, marks their ticket_suppliers row 'quoted', and
@@ -14,7 +26,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   if (!(await rateLimit(`submit-quote:${user.id}`, 30, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
-  const body = await request.json().catch(() => ({}))
+  const parsed = await parseJsonBody(request, BodySchema)
+  if (!parsed.ok) return parsed.error
+  const body = parsed.data
   const amount = parseAmount(body.amount)
   if (amount === null) return NextResponse.json({ error: 'Enter a valid quote amount.' }, { status: 400 })
 

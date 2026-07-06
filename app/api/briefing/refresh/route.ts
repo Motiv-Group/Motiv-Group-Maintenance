@@ -2,6 +2,13 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { serverError } from '@/lib/api-error'
 import { rateLimit } from '@/lib/rate-limit'
+import { z } from 'zod'
+import { parseJsonBody } from '@/lib/validate'
+
+const BodySchema = z.object({
+  scope: z.string().optional(),
+  scopeId: z.string().optional(),
+})
 
 // POST /api/briefing/refresh — bust today's cached briefing for the caller's
 // scope so the next dashboard render regenerates a fresh one (one Groq call).
@@ -15,8 +22,11 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   if (!(await rateLimit(`briefing-refresh:${user.id}`, 5, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
-  const { scope, scopeId } = await request.json().catch(() => ({}))
-  if (!SCOPES.has(scope) || typeof scopeId !== 'string' || !scopeId) return NextResponse.json({ error: 'Bad request' }, { status: 400 })
+  const parsed = await parseJsonBody(request, BodySchema)
+  if (!parsed.ok) return parsed.error
+  const body = parsed.data
+  const { scope, scopeId } = body
+  if (!SCOPES.has(scope as string) || typeof scopeId !== 'string' || !scopeId) return NextResponse.json({ error: 'Bad request' }, { status: 400 })
 
   const admin = createAdminClient()
   const { data: profile } = await admin.from('user_profiles').select('company_id').eq('id', user.id).single()

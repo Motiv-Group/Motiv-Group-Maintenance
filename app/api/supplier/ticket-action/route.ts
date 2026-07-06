@@ -3,6 +3,16 @@ import { NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { rateLimit } from '@/lib/rate-limit'
 import { sendPushToMany } from '@/lib/push'
+import { z } from 'zod'
+import { parseJsonBody } from '@/lib/validate'
+
+const BodySchema = z.object({
+  ticketId: z.string(),
+  action: z.string(),
+  body: z.string().optional().nullable(),
+  kind: z.string().optional().nullable(),
+  url: z.string().optional().nullable(),
+})
 
 // POST /api/supplier/ticket-action — supplier-side side effects that do NOT move the
 // ticket through its lifecycle: post an update (add_update), upload evidence
@@ -15,7 +25,9 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   if (!(await rateLimit(`supplier-action:${user.id}`, 30, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
-  const body = await request.json()
+  const parsed = await parseJsonBody(request, BodySchema)
+  if (!parsed.ok) return parsed.error
+  const body = parsed.data
   const { ticketId, action } = body
   if (!ticketId || !action) return NextResponse.json({ error: 'ticketId and action required' }, { status: 400 })
 

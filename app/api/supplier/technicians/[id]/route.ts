@@ -1,8 +1,15 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
+import { parseJsonBody } from '@/lib/validate'
 import { serverError } from '@/lib/api-error'
 import { revalidatePath } from 'next/cache'
 import { rateLimit } from '@/lib/rate-limit'
 import { supplierCtx } from '@/lib/supplier/ctx'
+
+const BodySchema = z.object({
+  name: z.any().optional(),
+  phone: z.any().optional(),
+})
 
 // PATCH /api/supplier/technicians/[id] — edit a technician's name/phone.
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
@@ -14,7 +21,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const { data: tech } = await ctx.admin.from('technicians').select('id, supplier_id').eq('id', params.id).single()
   if (!tech || !ctx.supplierIds.includes(tech.supplier_id)) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  const body = await request.json().catch(() => ({}))
+  const parsed = await parseJsonBody(request, BodySchema)
+  if (!parsed.ok) return parsed.error
+  const body = parsed.data
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() }
   if (body.name !== undefined) { const n = String(body.name).trim(); if (!n) return NextResponse.json({ error: 'Name cannot be empty.' }, { status: 400 }); patch.name = n }
   if (body.phone !== undefined) { const p = String(body.phone).trim(); if (!p) return NextResponse.json({ error: 'Phone cannot be empty.' }, { status: 400 }); patch.phone = p }

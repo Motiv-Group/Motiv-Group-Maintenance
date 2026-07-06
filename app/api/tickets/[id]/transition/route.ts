@@ -1,3 +1,5 @@
+import { z } from 'zod'
+import { parseJsonBody } from '@/lib/validate'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { serverError } from '@/lib/api-error'
@@ -35,6 +37,25 @@ async function logSnagScheduleEvent(admin: Admin, ticket: any, kind: 'proposed' 
   await admin.from('snag_schedule_events').insert({ company_id: ticket.company_id, ticket_id: ticket.id, kind, actor_role: actorRole, scheduled_for: opts.scheduledFor ?? null, reason: opts.reason ?? null })
 }
 
+// Action discriminator + all per-action payload fields kept optional (non-strict) —
+// each action reads only the subset it needs and the switch already validates values.
+const BodySchema = z.object({
+  action: z.string().optional(),
+  supplierId: z.string().optional().nullable(),
+  reason: z.string().optional().nullable(),
+  amount: z.any().optional(),
+  amount_incl_vat: z.any().optional(),
+  file_url: z.string().optional().nullable(),
+  description: z.string().optional().nullable(),
+  scheduledAt: z.any().optional(),
+  technicianId: z.string().optional().nullable(),
+  fileUrls: z.array(z.string()).optional(),
+  warranty: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
+  severity: z.string().optional().nullable(),
+  required_correction: z.string().optional().nullable(),
+})
+
 // POST /api/tickets/:id/transition  { action, ...payload }
 // Single entry point for every lifecycle move. Validates the transition against
 // lib/workflow (status + role), applies the status change + side effects, and
@@ -46,7 +67,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
   if (!(await rateLimit(`transition:${user.id}`, 40, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
   const ticketId = params.id
-  const body = await request.json().catch(() => ({}))
+  const parsed = await parseJsonBody(request, BodySchema)
+  if (!parsed.ok) return parsed.error
+  const body = parsed.data
   const action = String(body.action ?? '')
   if (!action) return NextResponse.json({ error: 'action required' }, { status: 400 })
 

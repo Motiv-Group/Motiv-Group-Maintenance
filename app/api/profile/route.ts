@@ -1,7 +1,9 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 
 import { serverError } from '@/lib/api-error'
+import { parseJsonBody } from '@/lib/validate'
 import { rateLimit } from '@/lib/rate-limit'
 function normalisePhone(raw: string | null | undefined): string | null {
   if (!raw) return null
@@ -23,13 +25,25 @@ export async function GET() {
   return NextResponse.json({ profile })
 }
 
+const PatchSchema = z.object({
+  full_name: z.string().optional().nullable(),
+  phone: z.string().optional().nullable(),
+  address: z.string().optional().nullable(),
+  company_name: z.string().optional().nullable(),
+  sub_store: z.string().optional().nullable(),
+  branch_code: z.string().optional().nullable(),
+  requested_region_code: z.string().optional().nullable(),
+})
+
 export async function PATCH(request: Request) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   if (!(await rateLimit(`profile:${user.id}`, 30, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
-  const body = await request.json()
+  const parsed = await parseJsonBody(request, PatchSchema)
+  if (!parsed.ok) return parsed.error
+  const body = parsed.data
   // SECURITY: `role` is NOT accepted here. Letting a user set their own role via
   // this service-role update was a privilege-escalation hole (anyone could PATCH
   // {role:'system_admin'}). Role is owned by the signup trigger ('individual' only)

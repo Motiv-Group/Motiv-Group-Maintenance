@@ -1,8 +1,24 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 
 import { serverError } from '@/lib/api-error'
 import { rateLimit } from '@/lib/rate-limit'
+import { parseJsonBody } from '@/lib/validate'
+
+const BodySchema = z.object({
+  company_name: z.string().optional(),
+  contact_name: z.string().optional().nullable(),
+  email: z.string().optional().nullable(),
+  phone: z.string().optional().nullable(),
+  address: z.string().optional().nullable(),
+  trade: z.string().optional().nullable(),
+  qualified: z.any().optional(),
+  qualification_number: z.string().optional().nullable(),
+  qualification_expiry: z.any().optional().nullable(),
+  vat_number: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
+})
 // Returns the caller's company_id when they are a supplier-role user, else null.
 // company_id is required so mutations can be scoped to the caller's own company
 // (the admin client bypasses RLS, so this is the only tenant guard).
@@ -20,7 +36,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   if (!ctx) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   if (!(await rateLimit(`supplier-edit:${ctx.user.id}`, 30, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
-  const body = await request.json()
+  const parsed = await parseJsonBody(request, BodySchema)
+  if (!parsed.ok) return parsed.error
+  const body = parsed.data
   const {
     company_name, contact_name, email, phone, address,
     trade, qualified, qualification_number, qualification_expiry,

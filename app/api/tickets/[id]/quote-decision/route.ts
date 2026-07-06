@@ -4,6 +4,14 @@ import { revalidatePath } from 'next/cache'
 import { rateLimit } from '@/lib/rate-limit'
 import { sendPushToMany } from '@/lib/push'
 import { loadSlaResolver } from '@/lib/health/data'
+import { z } from 'zod'
+import { parseJsonBody } from '@/lib/validate'
+
+const BodySchema = z.object({
+  action: z.string().optional(),
+  quoteId: z.string().optional(),
+  reason: z.string().nullable().optional(),
+})
 
 // POST /api/tickets/[id]/quote-decision — RM approves or declines a supplier's quote.
 //  approve: award that supplier (others auto-close), ticket → accepted.
@@ -16,8 +24,10 @@ export async function POST(request: Request, { params }: { params: { id: string 
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   if (!(await rateLimit(`quote-decision:${user.id}`, 40, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
-  const body = await request.json().catch(() => ({}))
-  const action = ['approve', 'decline', 'requote'].includes(body.action) ? body.action as 'approve' | 'decline' | 'requote' : null
+  const parsed = await parseJsonBody(request, BodySchema)
+  if (!parsed.ok) return parsed.error
+  const body = parsed.data
+  const action = ['approve', 'decline', 'requote'].includes(body.action ?? '') ? body.action as 'approve' | 'decline' | 'requote' : null
   const quoteId = typeof body.quoteId === 'string' ? body.quoteId : null
   if (!action || !quoteId) return NextResponse.json({ error: 'Bad request' }, { status: 400 })
 

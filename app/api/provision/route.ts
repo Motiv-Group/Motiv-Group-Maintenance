@@ -3,9 +3,30 @@ import { NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { rateLimit } from '@/lib/rate-limit'
 import { inviteUser } from '@/lib/invite'
+import { logAudit } from '@/lib/audit'
 import { normalisePhone, isValidEmail, isValidPhone, generatePassword } from '@/lib/csv'
 import { sendEmail, storeInviteEmail, supplierInviteEmail, supplierAddedNoticeEmail } from '@/lib/email'
 import { randomBytes } from 'crypto'
+import { z } from 'zod'
+import { parseJsonBody } from '@/lib/validate'
+
+const BodySchema = z.object({
+  action: z.string().optional(),
+  name: z.string().optional(),
+  code: z.string().optional(),
+  regionId: z.string().optional(),
+  email: z.any().optional(),
+  userId: z.string().optional(),
+  storeId: z.string().optional(),
+  branch_code: z.string().optional(),
+  store_name: z.string().optional(),
+  sub_store: z.string().optional(),
+  full_name: z.string().optional(),
+  password: z.string().optional(),
+  phone: z.string().optional(),
+  companyName: z.string().optional(),
+  trade: z.string().optional(),
+})
 
 // POST /api/provision — delegated provisioning.
 //  Exec: add_region, invite_rm, add_supplier
@@ -23,7 +44,9 @@ export async function POST(request: Request) {
   const isExec = role === 'executive' || role === 'system_admin'
   const isRM = role === 'regional_manager'
 
-  const body = await request.json()
+  const parsed = await parseJsonBody(request, BodySchema)
+  if (!parsed.ok) return parsed.error
+  const body = parsed.data
   const { action } = body
   const origin = process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin
   const myRegions = async () => ((await admin.from('regional_users').select('region_id').eq('user_id', user.id)).data ?? []).map(r => r.region_id)
@@ -35,6 +58,7 @@ export async function POST(request: Request) {
         if (!body.name) return NextResponse.json({ error: 'Region name required' }, { status: 400 })
         const { error } = await admin.from('regions').insert({ company_id: companyId, name: body.name, region_code: (body.code ?? body.name).toString().toUpperCase().slice(0, 12) })
         if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+        await logAudit(admin, { actorId: user.id, companyId, action: 'provision.add_region', entityType: 'region', metadata: { name: body.name } })
         break
       }
       case 'invite_rm': {
@@ -42,6 +66,7 @@ export async function POST(request: Request) {
         const { data: region } = await admin.from('regions').select('id, company_id').eq('id', body.regionId).single()
         if (!region || region.company_id !== companyId) return NextResponse.json({ error: 'Invalid region' }, { status: 400 })
         const rm = await inviteUser({ email: body.email, role: 'regional_manager', companyId, roleLabel: 'Regional Manager', baseUrl: origin, link: { regionId: body.regionId } })
+        await logAudit(admin, { actorId: user.id, companyId, action: 'provision.invite_rm', entityType: 'user', entityId: rm.userId, metadata: { email: body.email, regionId: body.regionId } })
         return NextResponse.json({ ok: true, actionLink: rm.actionLink, emailed: rm.emailed })
       }
       case 'list_pending_rms': {
@@ -68,12 +93,14 @@ export async function POST(request: Request) {
         const { error: upErr } = await admin.from('user_profiles').update({ company_id: companyId, requested_region_code: null }).eq('id', body.userId)
         if (upErr) return NextResponse.json({ error: upErr.message }, { status: 400 })
         await admin.from('regional_users').upsert({ user_id: body.userId, region_id: region.id })
+        await logAudit(admin, { actorId: user.id, companyId, action: 'provision.approve_rm', entityType: 'user', entityId: body.userId, metadata: { regionId: region.id } })
         return NextResponse.json({ ok: true })
       }
       case 'reject_rm': {
         if (!isExec) return forbid()
         if (!body.userId) return NextResponse.json({ error: 'Missing user' }, { status: 400 })
         await admin.from('user_profiles').update({ requested_region_code: null }).eq('id', body.userId).is('company_id', null)
+        await logAudit(admin, { actorId: user.id, companyId, action: 'provision.reject_rm', entityType: 'user', entityId: body.userId })
         return NextResponse.json({ ok: true })
       }
       case 'add_store': {
@@ -85,6 +112,7 @@ export async function POST(request: Request) {
         if (!body.branch_code || !body.name) return NextResponse.json({ error: 'Branch code and name required' }, { status: 400 })
         const { error } = await admin.from('stores').insert({ company_id: companyId, region_id: regionId, region_code: region?.region_code, branch_code: String(body.branch_code).toUpperCase(), name: body.name })
         if (error) return NextResponse.json({ error: error.message.includes('duplicate') ? 'Branch code already exists' : error.message }, { status: 400 })
+        await logAudit(admin, { actorId: user.id, companyId, action: 'provision.add_store', entityType: 'store', metadata: { branch_code: String(body.branch_code).toUpperCase(), name: body.name, regionId } })
         break
       }
       case 'invite_store_manager': {
@@ -93,6 +121,7 @@ export async function POST(request: Request) {
         const { data: store } = await admin.from('stores').select('id, region_id, company_id').eq('id', body.storeId).single()
         if (!store || store.company_id !== companyId || !regions.includes(store.region_id)) return NextResponse.json({ error: 'Store not in your region' }, { status: 400 })
         const sm = await inviteUser({ email: body.email, role: 'store_manager', companyId, roleLabel: 'Store Manager', baseUrl: origin, link: { storeId: body.storeId } })
+        await logAudit(admin, { actorId: user.id, companyId, action: 'provision.invite_store_manager', entityType: 'user', entityId: sm.userId, metadata: { email: body.email, storeId: body.storeId } })
         return NextResponse.json({ ok: true, actionLink: sm.actionLink, emailed: sm.emailed })
       }
       case 'create_store_manager': {
@@ -141,6 +170,7 @@ export async function POST(request: Request) {
           rmName: me?.full_name ?? null, company: company?.name ?? store_name, subStore,
         })
         const emailed = await sendEmail({ to: cleanEmail, subject, html, text })
+        await logAudit(admin, { actorId: user.id, companyId, action: 'provision.create_store_manager', entityType: 'user', entityId: uid, metadata: { email: cleanEmail, storeId: store.id, branch_code: bcode } })
         revalidatePath('/regional/stores')
         return NextResponse.json({ ok: true, emailed, message: emailed ? 'Store manager created — login details emailed.' : `Created. Email not sent — share these: ${cleanEmail} / ${password}` })
       }
@@ -151,6 +181,7 @@ export async function POST(request: Request) {
         if (supEmail && !isValidEmail(supEmail)) return NextResponse.json({ error: 'Please enter a valid email address' }, { status: 400 })
         const { data: sup, error } = await admin.from('suppliers').insert({ company_id: companyId, company_name: body.companyName, trade: body.trade ?? null, email: supEmail }).select('id').single()
         if (error || !sup) return NextResponse.json({ error: error?.message ?? 'Failed' }, { status: 400 })
+        await logAudit(admin, { actorId: user.id, companyId, action: 'provision.add_supplier', entityType: 'supplier', entityId: sup.id, metadata: { companyName: body.companyName, email: supEmail } })
         if (supEmail) {
           // If the email already has a Motiv login, they don't need an onboarding
           // link — send a notice that they've been added as a supplier instead.
@@ -239,6 +270,7 @@ export async function POST(request: Request) {
             await admin.from('user_profiles').update(profPatch).eq('id', smId)
           }
         }
+        await logAudit(admin, { actorId: user.id, companyId, action: 'provision.update_store', entityType: 'store', entityId: store.id, metadata: { storeId: store.id, contactChanged: !!(newEmail || newPhoneRaw) } })
         revalidatePath('/regional/stores')
         return NextResponse.json({ ok: true, emailed, message: emailed === undefined ? 'Store updated.' : emailed ? 'Store updated — new login details emailed.' : 'Store updated. Email not sent — share the new password manually.' })
       }
@@ -249,6 +281,7 @@ export async function POST(request: Request) {
         if (!store || store.company_id !== companyId || !regions.includes(store.region_id)) return NextResponse.json({ error: 'Store not in your region' }, { status: 400 })
         const { error } = await admin.from('stores').update({ active: false, closed_at: new Date().toISOString() }).eq('id', store.id)
         if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+        await logAudit(admin, { actorId: user.id, companyId, action: 'provision.deactivate_store', entityType: 'store', entityId: store.id })
         revalidatePath('/regional/stores')
         return NextResponse.json({ ok: true, message: 'Store deactivated.' })
       }
@@ -259,6 +292,7 @@ export async function POST(request: Request) {
         if (!store || store.company_id !== companyId || !regions.includes(store.region_id)) return NextResponse.json({ error: 'Store not in your region' }, { status: 400 })
         const { error } = await admin.from('stores').update({ active: true, closed_at: null }).eq('id', store.id)
         if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+        await logAudit(admin, { actorId: user.id, companyId, action: 'provision.reactivate_store', entityType: 'store', entityId: store.id })
         revalidatePath('/regional/stores')
         return NextResponse.json({ ok: true, message: 'Store reactivated.' })
       }
@@ -284,6 +318,7 @@ export async function POST(request: Request) {
         }
         const { error } = await admin.from('stores').delete().eq('id', store.id)
         if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+        await logAudit(admin, { actorId: user.id, companyId, action: 'provision.delete_store', entityType: 'store', entityId: store.id, metadata: { removedManagers: (links ?? []).length } })
         revalidatePath('/regional/stores')
         return NextResponse.json({ ok: true, message: 'Store deleted.' })
       }

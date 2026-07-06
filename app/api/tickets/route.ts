@@ -6,6 +6,16 @@ import { rateLimit } from '@/lib/rate-limit'
 import { sendPushToMany } from '@/lib/push'
 import { computePriority } from '@/lib/health/priority'
 import { priorityWord, composeTicketTitle } from '@/lib/utils'
+import { z } from 'zod'
+import { parseJsonBody } from '@/lib/validate'
+
+const BodySchema = z.object({
+  description: z.string(),
+  category: z.any().optional(),
+  operational_impact: z.string().optional(),
+  photo_urls: z.array(z.string()).optional(),
+  title: z.any().optional(),
+})
 
 // POST /api/tickets — store manager logs a ticket (v3 model).
 export async function POST(request: Request) {
@@ -14,7 +24,9 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   if (!(await rateLimit(`tickets:${user.id}`, 10, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
-  const body = await request.json()
+  const parsed = await parseJsonBody(request, BodySchema)
+  if (!parsed.ok) return parsed.error
+  const body = parsed.data
   const { description, category, operational_impact = 'none', photo_urls = [] } = body
   if (!description) return NextResponse.json({ error: 'Description is required' }, { status: 400 })
   // Title is NOT typed by store staff (free text invites nonsense) — it is

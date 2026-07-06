@@ -3,6 +3,14 @@ import { NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { rateLimit } from '@/lib/rate-limit'
 import { sendPushToMany } from '@/lib/push'
+import { logAudit } from '@/lib/audit'
+import { z } from 'zod'
+import { parseJsonBody } from '@/lib/validate'
+
+const BodySchema = z.object({
+  action: z.string().optional(),
+  supplierId: z.string().optional(),
+})
 
 // POST /api/admin/suppliers — system_admin reviews self-signup suppliers.
 //   approve: verification_status 'verified' + is_motiv → enters the Motiv pool
@@ -19,9 +27,11 @@ export async function POST(request: Request) {
   const { data: me } = await admin.from('user_profiles').select('role').eq('id', user.id).single()
   if (me?.role !== 'system_admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const b = await request.json().catch(() => ({}))
-  const action = String(b.action ?? '')
-  const supplierId = String(b.supplierId ?? '')
+  const parsed = await parseJsonBody(request, BodySchema)
+  if (!parsed.ok) return parsed.error
+  const body = parsed.data
+  const action = String(body.action ?? '')
+  const supplierId = String(body.supplierId ?? '')
   if (!supplierId) return NextResponse.json({ error: 'Supplier required' }, { status: 400 })
 
   const { data: sup } = await admin.from('suppliers').select('id, company_name, verification_status, source').eq('id', supplierId).single()
@@ -34,6 +44,7 @@ export async function POST(request: Request) {
     : { verification_status: 'rejected', is_motiv: false, active: false }
   const { error } = await admin.from('suppliers').update(patch).eq('id', supplierId)
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+  await logAudit(admin, { actorId: user.id, action: `supplier.${action}`, entityType: 'supplier', entityId: supplierId, metadata: { companyName: sup.company_name, to: patch.verification_status } })
 
   // Tell the supplier's users the outcome.
   const { data: links } = await admin.from('supplier_users').select('user_id').eq('supplier_id', supplierId)

@@ -1,8 +1,17 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 
 import { serverError } from '@/lib/api-error'
+import { parseJsonBody } from '@/lib/validate'
 import { rateLimit } from '@/lib/rate-limit'
+import { logAudit } from '@/lib/audit'
+
+const BodySchema = z.object({
+  storeId: z.string().optional(),
+  regionalManagerId: z.string().optional().nullable(),
+})
+
 export async function POST(request: Request) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -12,7 +21,10 @@ export async function POST(request: Request) {
   const { data: profile } = await supabase.from('user_profiles').select('role, company_id').eq('id', user.id).single()
   if (profile?.role !== 'supplier' || !profile.company_id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { storeId, regionalManagerId } = await request.json()
+  const parsed = await parseJsonBody(request, BodySchema)
+  if (!parsed.ok) return parsed.error
+  const body = parsed.data
+  const { storeId, regionalManagerId } = body
   if (!storeId) return NextResponse.json({ error: 'Missing store' }, { status: 400 })
 
   const adminClient = createAdminClient()
@@ -40,6 +52,7 @@ export async function POST(request: Request) {
       .from('regional_users')
       .upsert({ user_id: regionalManagerId, region_id: store.region_id })
     if (error) return serverError(error)
+    await logAudit(adminClient, { actorId: user.id, companyId: profile.company_id, action: 'supplier.assign_rm', entityType: 'user', entityId: regionalManagerId, metadata: { storeId: store.id, regionId: store.region_id } })
   } else {
     // Clearing the assignment → drop the RM link(s) for this store's region.
     const { error } = await adminClient
@@ -47,6 +60,7 @@ export async function POST(request: Request) {
       .delete()
       .eq('region_id', store.region_id)
     if (error) return serverError(error)
+    await logAudit(adminClient, { actorId: user.id, companyId: profile.company_id, action: 'supplier.unassign_rm', entityType: 'region', entityId: store.region_id, metadata: { storeId: store.id } })
   }
 
   return NextResponse.json({ success: true })
