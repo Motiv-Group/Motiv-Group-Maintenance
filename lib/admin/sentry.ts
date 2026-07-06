@@ -20,11 +20,15 @@ export interface SentryStats {
 }
 
 export async function getSentryStats(): Promise<ProviderResult<SentryStats>> {
-  const token = process.env.SENTRY_AUTH_TOKEN
+  // Reads need project:read + event:read. Sentry ORG auth tokens (`sntrys_`) only
+  // carry `org:ci` (source-map upload) and can never read issues, so this endpoint
+  // uses a dedicated SENTRY_API_TOKEN — a User Auth Token or Internal Integration
+  // token with the read scopes. Falls back to SENTRY_AUTH_TOKEN for back-compat.
+  const token = process.env.SENTRY_API_TOKEN || process.env.SENTRY_AUTH_TOKEN
   const org = process.env.SENTRY_ORG
   const project = process.env.SENTRY_PROJECT
   if (!token || !org || !project) {
-    return unconfigured('Set SENTRY_AUTH_TOKEN, SENTRY_ORG and SENTRY_PROJECT to show unresolved errors and event volume here.')
+    return unconfigured('Set SENTRY_API_TOKEN (read scopes), SENTRY_ORG and SENTRY_PROJECT to show unresolved errors and event volume here.')
   }
   const headers = { Authorization: `Bearer ${token}` }
   const base = `${sentryApiHost()}/api/0/projects/${encodeURIComponent(org)}/${encodeURIComponent(project)}`
@@ -35,7 +39,7 @@ export async function getSentryStats(): Promise<ProviderResult<SentryStats>> {
   ])
 
   if (!issuesRes.ok && (issuesRes.status === 401 || issuesRes.status === 403)) {
-    return errored('Sentry rejected the token (auth failed). The token needs project:read on this org/project.')
+    return errored('Sentry rejected the token (auth failed). SENTRY_API_TOKEN needs project:read + event:read — an ORG auth token (org:ci only) can\'t read issues; use a User Auth Token or Internal Integration token.')
   }
   if (!issuesRes.ok) {
     return errored(`Couldn't reach Sentry: ${issuesRes.error ?? 'unknown error'}. Check SENTRY_ORG/SENTRY_PROJECT slugs.`)

@@ -1,5 +1,6 @@
 import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
+import * as Sentry from '@sentry/nextjs'
 
 // ─── Distributed limiter (Upstash Redis) ─────────────────────────────────────
 // In-memory limiting is per-instance, so on Vercel's serverless fleet each cold
@@ -60,6 +61,33 @@ function rateLimitMemory(key: string, limit: number, windowMs: number): boolean 
   return true
 }
 
+// ─── Fallback alerting (B9) ──────────────────────────────────────────────────
+// When we drop to the per-instance in-memory limiter in production the global
+// limit is silently weaker, so we surface it to Sentry. Sentry.captureException
+// no-ops when NEXT_PUBLIC_SENTRY_DSN is unset, so this is safe in dev/local.
+// Throttled per-process: a sustained Upstash outage would otherwise fire on every
+// request and burn the free-tier event budget (spike protection is also on).
+const ALERT_THROTTLE_MS = 5 * 60_000
+let lastAlertAt = 0
+
+function alertFallback(reason: 'upstash_outage' | 'upstash_unconfigured', err?: unknown) {
+  const now = Date.now()
+  if (now - lastAlertAt < ALERT_THROTTLE_MS) return
+  lastAlertAt = now
+  const ctx = {
+    level: 'error' as const,
+    tags: { subsystem: 'rate-limit', fallback: 'in-memory', reason },
+  }
+  if (err !== undefined) {
+    Sentry.captureException(err, ctx)
+  } else {
+    Sentry.captureMessage(
+      '[rate-limit] Upstash not configured in production — using per-instance in-memory limiter (global limit is weaker)',
+      ctx,
+    )
+  }
+}
+
 /**
  * Rate limit `key` to `limit` requests per `windowMs`.
  * Returns true if the request is allowed, false if it should be blocked.
@@ -75,7 +103,12 @@ export async function rateLimit(key: string, limit: number, windowMs: number): P
     } catch (e) {
       // Never let a Redis outage take down writes — degrade to in-memory.
       console.error('[rate-limit] Upstash error, falling back to in-memory', e)
+      alertFallback('upstash_outage', e)
     }
+  } else if (process.env.NODE_ENV === 'production') {
+    // Redis unconfigured in prod → per-instance limiter. Should never happen once
+    // UPSTASH_REDIS_* is set; alert so the weaker limit isn't silent.
+    alertFallback('upstash_unconfigured')
   }
   return rateLimitMemory(key, limit, windowMs)
 }
