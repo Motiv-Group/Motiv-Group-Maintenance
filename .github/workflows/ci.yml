@@ -1,0 +1,63 @@
+name: CI
+
+# Runs on every PR into main and on direct pushes to main. Pair this with a
+# branch-protection rule that REQUIRES the "build" job to pass before merging
+# (Settings → Branches → Add rule → require status checks → "build") — the
+# workflow reports status, but only branch protection actually blocks a red merge.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# A newer push to the same branch/PR cancels the older in-flight run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Type-check · Lint · Test · Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # npm ci = clean, lockfile-exact install (fails if package.json and
+      # package-lock.json disagree). xlsx installs from the SheetJS CDN tarball
+      # pinned in package.json.
+      - name: Install dependencies
+        run: npm ci
+
+      # Cheap checks first so a red PR fails fast before the slow build.
+      - name: Type-check
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+        # next build touches modules that read these at import time; real secrets
+        # aren't needed to compile, so CI uses inert placeholders. All data access
+        # is force-dynamic (runtime only), so nothing hits a real Supabase here.
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+          SUPABASE_SERVICE_ROLE_KEY: ci-placeholder-service-role-key
+          NEXT_PUBLIC_APP_URL: https://example.com
+
+      # Fail-on-high for production dependencies. NON-BLOCKING for now: there is a
+      # known HIGH Next.js advisory that only clears by upgrading to Next 15/16
+      # (tracker item B6, a breaking change). Once B6 lands and this is clean,
+      # delete `continue-on-error` so a new high vuln blocks the merge.
+      - name: Audit (prod deps, high)
+        run: npm audit --omit=dev --audit-level=high
+        continue-on-error: true
