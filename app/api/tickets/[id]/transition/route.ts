@@ -53,10 +53,13 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const admin = createAdminClient()
   const { data: prof } = await admin.from('user_profiles').select('role, company_id, full_name').eq('id', user.id).single()
   const role = prof?.role as WorkflowRole | undefined
-  if (!role || !prof?.company_id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  // Individuals own standalone tickets with NO company — they pass on created_by
+  // (checked in hasAccess below + the company match, null === null). Everyone else
+  // must belong to a company.
+  if (!prof || !role || (role !== 'individual' && !prof.company_id)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { data: ticket } = await admin.from('tickets').select('*').eq('id', ticketId).single()
-  if (!ticket || ticket.company_id !== prof.company_id) return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
+  if (!ticket || ticket.company_id !== (prof.company_id ?? null)) return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
   if (!(await hasAccess(admin, role, user.id, ticket))) return NextResponse.json({ error: 'Not your ticket' }, { status: 403 })
 
   const tr = resolveTransition(ticket.status, action, role)

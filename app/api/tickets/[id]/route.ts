@@ -19,8 +19,13 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   if (!ticket) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   // Tenant guard first — the ticket must be in the caller's company (the admin
   // client bypasses RLS). Prevents cross-company edits if a user is ever enrolled
-  // in more than one company's link tables.
-  if (!prof?.company_id || ticket.company_id !== prof.company_id) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  // in more than one company's link tables. Individuals have NO company — they own
+  // standalone tickets outright via created_by.
+  if (role === 'individual') {
+    if (ticket.created_by !== user.id) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  } else if (!prof?.company_id || ticket.company_id !== prof.company_id) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
 
   // Access: SM owner (creator or store-linked), the ticket's RM, or an executive.
   let allowed = role === 'executive' || role === 'system_admin'
@@ -84,10 +89,16 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
   if (!(await rateLimit(`ticket-edit:${user.id}`, 40, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
   const admin = createAdminClient()
-  const { data: prof } = await admin.from('user_profiles').select('company_id').eq('id', user.id).single()
+  const { data: prof } = await admin.from('user_profiles').select('role, company_id').eq('id', user.id).single()
   const { data: ticket } = await admin.from('tickets').select('created_by, store_id, status, company_id').eq('id', params.id).single()
   if (!ticket) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  if (!prof?.company_id || ticket.company_id !== prof.company_id) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  // Individuals (no company) own standalone tickets via created_by; company users
+  // must match the ticket's tenant.
+  if (prof?.role === 'individual') {
+    if (ticket.created_by !== user.id) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  } else if (!prof?.company_id || ticket.company_id !== prof.company_id) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
 
   let owns = ticket.created_by === user.id
   if (!owns) {

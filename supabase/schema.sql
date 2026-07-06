@@ -212,7 +212,8 @@ create table if not exists public.quote_line_items (
 
 create table if not exists public.quotes (
   id                           uuid not null default gen_random_uuid(),
-  company_id                   uuid not null,
+  company_id                   uuid, -- nullable (20260718): individual tickets carry no company
+
   ticket_id                    uuid not null,
   supplier_id                  uuid,
   submitted_by                 uuid,
@@ -336,7 +337,8 @@ create table if not exists public.signoff_rounds (
 
 create table if not exists public.signoffs (
   id                           uuid not null default gen_random_uuid(),
-  company_id                   uuid not null,
+  company_id                   uuid, -- nullable (20260718): individual tickets carry no company
+
   ticket_id                    uuid not null,
   supplier_id                  uuid,
   coc_url                      text,
@@ -380,7 +382,8 @@ create table if not exists public.snag_schedule_events (
 
 create table if not exists public.snags (
   id                           uuid not null default gen_random_uuid(),
-  company_id                   uuid not null,
+  company_id                   uuid, -- nullable (20260718): individual tickets carry no company
+
   ticket_id                    uuid,
   store_id                     uuid,
   supplier_id                  uuid,
@@ -558,7 +561,8 @@ create table if not exists public.ticket_dispute_messages (
 
 create table if not exists public.ticket_disputes (
   id                           uuid not null default uuid_generate_v4(),
-  company_id                   uuid not null,
+  company_id                   uuid, -- nullable (20260718): individual tickets carry no company
+
   ticket_id                    uuid not null,
   origin                       text not null,
   status                       text not null default 'open'::text,
@@ -620,7 +624,8 @@ create table if not exists public.ticket_supplier_declines (
 
 create table if not exists public.ticket_suppliers (
   id                           uuid not null default gen_random_uuid(),
-  company_id                   uuid not null,
+  company_id                   uuid, -- nullable (20260718): individual tickets carry no company
+
   ticket_id                    uuid not null,
   supplier_id                  uuid not null,
   status                       text not null default 'invited'::text,
@@ -643,7 +648,8 @@ create table if not exists public.ticket_updates (
 
 create table if not exists public.ticket_variations (
   id                           uuid not null default gen_random_uuid(),
-  company_id                   uuid not null,
+  company_id                   uuid, -- nullable (20260718): individual tickets carry no company
+
   ticket_id                    uuid not null,
   supplier_id                  uuid,
   description                  text not null,
@@ -672,8 +678,10 @@ create table if not exists public.ticket_views (
 create table if not exists public.tickets (
   id                           uuid not null default gen_random_uuid(),
   job_number                   bigint,
-  company_id                   uuid not null,
-  store_id                     uuid not null,
+  -- company_id/store_id nullable (20260717): an Individual's standalone ticket has
+  -- no company/store hierarchy — ownership is via created_by.
+  company_id                   uuid,
+  store_id                     uuid,
   branch_code                  text,
   region_id                    uuid,
   region_code                  text,
@@ -827,6 +835,10 @@ alter table public.repeat_defect_groups add primary key (id);
 alter table public.report_exports add primary key (id);
 alter table public.reports add primary key (id);
 alter table public.roles add primary key (key);
+-- Lookup rows referenced by user_profiles.role FK. 'individual' seeded 20260720
+-- (general-public self-signup role).
+insert into public.roles (key, label) values ('individual', 'Individual')
+on conflict (key) do nothing;
 alter table public.signoff_rounds add primary key (id);
 alter table public.signoffs add primary key (id);
 alter table public.sla_rules add primary key (id);
@@ -1143,29 +1155,37 @@ END;
 $function$
 ;
 
+-- SECURITY (20260721): the signup trigger may only ever produce the 'individual'
+-- role from client metadata — public signUp() data becomes raw_user_meta_data, so
+-- honouring its role was a self-service privilege escalation. Privileged roles are
+-- set AFTER creation by trusted service-role paths (lib/invite, supplier onboard,
+-- create_store_manager), which upsert user_profiles.role in the same request.
 CREATE OR REPLACE FUNCTION public.handle_new_user()
  RETURNS trigger
  LANGUAGE plpgsql
  SECURITY DEFINER
  SET search_path TO 'public'
 AS $function$
-declare v_role text; v_company uuid; v_code text;
+declare v_role text; v_company uuid;
 begin
-  v_role := coalesce(new.raw_user_meta_data->>'role','store_manager');
-  if v_role not in ('executive','regional_manager','store_manager','supplier','system_admin') then v_role := 'store_manager'; end if;
+  -- Public self-signup can ONLY create an Individual. Anything else in the client
+  -- metadata is ignored (privileged roles are set post-creation by a service-role
+  -- path). This is the authoritative guard — the UI only offers Individual anyway.
+  v_role := coalesce(new.raw_user_meta_data->>'role','individual');
+  if v_role <> 'individual' then v_role := 'individual'; end if;
+
+  -- company_id is only meaningful for the trusted paths (which pass it AND re-upsert
+  -- the role); for a self-service individual it's simply null.
   begin v_company := nullif(new.raw_user_meta_data->>'company_id','')::uuid; exception when others then v_company := null; end;
-  v_code := nullif(trim(new.raw_user_meta_data->>'requested_region_code'),'');
 
   insert into public.user_profiles (id, email, role, full_name, phone, company_id, requested_region_code)
   values (
     new.id, new.email, v_role,
-    new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'phone', v_company,
-    case when v_role = 'regional_manager' then upper(v_code) else null end
+    new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'phone', v_company, null
   )
   on conflict (id) do update set
     role=excluded.role, full_name=excluded.full_name, phone=excluded.phone,
-    company_id=coalesce(excluded.company_id, public.user_profiles.company_id),
-    requested_region_code=coalesce(excluded.requested_region_code, public.user_profiles.requested_region_code);
+    company_id=coalesce(excluded.company_id, public.user_profiles.company_id);
   return new;
 end $function$
 ;
@@ -1184,6 +1204,13 @@ begin new.updated_at = now(); return new; end; $function$
 revoke execute on function public.append_session_photo(uuid, text) from anon, authenticated;
 revoke execute on function public.handle_new_user()                 from anon, authenticated;
 revoke execute on function public.assign_store_job_ref()            from anon, authenticated;
+
+-- ---------------------------------------------------------------------------
+-- INDEXES (beyond PK/FK — only explicitly-created ones are listed)
+-- ---------------------------------------------------------------------------
+
+-- Individual dashboards/lists scope standalone tickets by owner (20260717).
+create index if not exists tickets_created_by_idx on public.tickets (created_by);
 
 -- ---------------------------------------------------------------------------
 -- TRIGGERS
