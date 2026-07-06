@@ -19,15 +19,13 @@ All 3 buckets are **public**: anyone with a file URL can open it, no login. That
 - [ ] **Site URL** = production URL; **Redirect URLs** = exact allowlist (prod + `http://localhost:3000`), no wildcards.
 - [ ] **Confirm email** ON (so signups verify ownership).
 - [ ] **Leaked password protection** ON; **minimum password length** ≥ 8 (the app enforces 8 client-side — enforce server-side too).
-- [ ] **Bot/abuse:** enable **CAPTCHA (hCaptcha/Turnstile)** on signup. Especially important because **executive self-signup is OPEN** (see below).
+- [ ] **Bot/abuse:** enable **CAPTCHA (hCaptcha/Turnstile)** on signup (still worth it to throttle account/email abuse).
 - [ ] Custom **SMTP** sender (the built-in mailer is rate-limited / not for production volume).
 - [ ] Only the **Email** provider enabled unless you intend others.
 
-## ⚠ Open executive signup
-`handle_new_user` currently lets anyone register as **executive** → full estate-wide read of every store, ticket and financial figure. You chose to keep this. For production strongly consider one of:
-- Lock the trigger to `('store_manager','regional_manager')` and set executives via SQL, **or**
-- Gate the Executive option in the signup UI behind an invite code (`EXEC_SIGNUP_CODE`).
-Say the word and I'll implement either.
+## ✅ Signup role escalation — CLOSED (migration 20260721)
+`handle_new_user` now **clamps any client-supplied role to `individual`** — self-signup can only ever create an Individual. Every privileged role (store_manager / regional_manager / executive / supplier / system_admin) is assigned only by a trusted service-role path (admin invite via `lib/invite`, token-gated supplier onboard, `create_store_manager`) that upserts the role after creation. A browser calling `auth.signUp({ data: { role: 'system_admin' } })` gets a plain Individual account.
+- Optional further hardening: carry the privileged role in `raw_app_meta_data` (server-only, unsettable by the client) instead of relying on the post-create upsert.
 
 ## Secrets & keys
 - [ ] `SUPABASE_SERVICE_ROLE_KEY` is **server-only** (never `NEXT_PUBLIC_*`). Confirm it's only in Vercel server env. It bypasses RLS — treat as root.

@@ -13,7 +13,6 @@ function normalisePhone(raw: string | null | undefined): string | null {
   return `+${digits}`
 }
 
-const ROLES = ['store_manager', 'regional_manager', 'supplier', 'executive', 'system_admin', 'individual']
 
 export async function GET() {
   const supabase = createClient()
@@ -31,7 +30,11 @@ export async function PATCH(request: Request) {
   if (!(await rateLimit(`profile:${user.id}`, 30, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
   const body = await request.json()
-  const { full_name, phone, role, address, company_name, sub_store, branch_code, requested_region_code } = body
+  // SECURITY: `role` is NOT accepted here. Letting a user set their own role via
+  // this service-role update was a privilege-escalation hole (anyone could PATCH
+  // {role:'system_admin'}). Role is owned by the signup trigger ('individual' only)
+  // and the trusted admin invite / onboard paths — never by self-service.
+  const { full_name, phone, address, company_name, sub_store, branch_code, requested_region_code } = body
   const updateData: Record<string, unknown> = { full_name, phone: normalisePhone(phone) }
   // optional profile fields — only set when provided so partial saves don't blank them
   if (typeof address === 'string') updateData.address = address
@@ -40,8 +43,6 @@ export async function PATCH(request: Request) {
   if (typeof branch_code === 'string') updateData.branch_code = branch_code
   // RM can correct the region code they used at signup, while still pending
   if (typeof requested_region_code === 'string') updateData.requested_region_code = requested_region_code.trim().toUpperCase()
-  // role self-selectable on first signup (company assigned by an admin)
-  if (typeof role === 'string' && ROLES.includes(role)) updateData.role = role
 
   const admin = createAdminClient()
   const { data: profile, error } = await admin.from('user_profiles').update(updateData).eq('id', user.id).select().single()

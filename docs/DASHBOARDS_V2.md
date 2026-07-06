@@ -212,7 +212,7 @@ by constructing `Ticket` fixtures and asserting the returned scores/labels.
 **Create an executive user:**
 2. Create the auth user (Supabase Auth or signup), then in SQL:
    `update public.profiles set role = 'executive' where email = '<exec email>';`
-   (The signup trigger only self-assigns store_manager/regional_manager; executive is set by an admin.)
+   (The signup trigger only ever self-assigns `individual`; executive/RM/SM/supplier are set by a trusted server path — admin invite / onboard — see migration 20260721. Preferred: create execs from the platform-admin Accounts page.)
 
 **Configure:**
 3. Set `CRON_SECRET` in Vercel env so the cron routes authorise.
