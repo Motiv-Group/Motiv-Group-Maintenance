@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { CalendarClock } from 'lucide-react'
 import { BackLink } from '@/components/ui/BackLink'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
+import { PhotoThumbs } from '@/components/ui/PhotoThumbs'
 import { createAdminClient } from '@/lib/supabase/server'
 import { signManyUrls } from '@/lib/storage'
 import { requireStoreManagerV3 } from '@/lib/health/guard'
@@ -42,20 +43,27 @@ function DetailItem({ label, value }: { label: string; value: string }) {
 }
 
 export default async function StoreTicketDetailPage({ params }: { params: { id: string } }) {
-  const { storeIds } = await requireStoreManagerV3()
+  // Wave 1: auth gate ∥ ticket ∥ per-ticket child rows (all key on params.id).
+  // The old version ran SIX serial awaits — the main reason this page felt slow.
   const admin = createAdminClient()
-  const { data: t } = await admin.from('tickets').select('*').eq('id', params.id).single()
+  const [{ storeIds }, { data: t }, { data: updates }, { data: snagRows }] = await Promise.all([
+    requireStoreManagerV3(),
+    admin.from('tickets').select('*').eq('id', params.id).single(),
+    admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', params.id).order('created_at', { ascending: false }),
+    admin.from('snags').select('scheduled_at, schedule_status, status').eq('ticket_id', params.id).order('created_at', { ascending: false }),
+  ])
   if (!t || !storeIds.includes(t.store_id)) redirect('/client/tickets')
 
-  const { data: updates } = await admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false })
-  const editorName = t.edited_by ? ((await admin.from('user_profiles').select('full_name').eq('id', t.edited_by).single()).data?.full_name ?? null) : null
-  // Scheduled supplier visit — who is coming and when (shown to the store manager).
+  // Wave 2: lookups that need ticket columns (editor, visit names, SLA rules, signing).
   const showVisit = !!t.scheduled_at && !['completed', 'cancelled', 'declined'].includes(t.status)
-  const visitSupplier = showVisit && t.supplier_id ? ((await admin.from('suppliers').select('company_name').eq('id', t.supplier_id).single()).data?.company_name ?? null) : null
-  const visitTech = showVisit && t.technician_id ? ((await admin.from('technicians').select('name').eq('id', t.technician_id).single()).data?.name ?? null) : null
-  // Approved snag-fix date, shown to the store manager as a neutral teal "Follow-up
-  // visit" (no "snag" wording) — only once the regional manager has approved it.
-  const { data: snagRows } = await admin.from('snags').select('scheduled_at, schedule_status, status').eq('ticket_id', t.id).order('created_at', { ascending: false })
+  const photoUrlsRaw = Array.isArray(t.photo_urls) ? (t.photo_urls as string[]) : []
+  const [editorName, visitSupplier, visitTech, rules, signedPhotoUrls] = await Promise.all([
+    t.edited_by ? admin.from('user_profiles').select('full_name').eq('id', t.edited_by).single().then(r => r.data?.full_name ?? null) : null,
+    showVisit && t.supplier_id ? admin.from('suppliers').select('company_name').eq('id', t.supplier_id).single().then(r => r.data?.company_name ?? null) : null,
+    showVisit && t.technician_id ? admin.from('technicians').select('name').eq('id', t.technician_id).single().then(r => r.data?.name ?? null) : null,
+    loadSlaResolver(admin, t.company_id),
+    signManyUrls(photoUrlsRaw),
+  ])
   const followUp = ((snagRows ?? []) as any[]).find(s => s.scheduled_at && s.schedule_status === 'agreed' && ['assigned', 'in_progress'].includes(s.status)) ?? null
   const showFollowUp = !!followUp && !['completed', 'cancelled', 'declined'].includes(t.status)
   // "Info added" = back at open after the SM resubmitted the requested info.
@@ -65,15 +73,13 @@ export default async function StoreTicketDetailPage({ params }: { params: { id: 
   const canEdit = t.status === 'open' && !t.info_request_reason
 
   // SLA due date (final resolution deadline) + overdue state.
-  const rules = await loadSlaResolver(admin, t.company_id)
   const now = new Date()
   const dueAt = deriveDueDates(t as HealthTicket, rules(t.priority as Priority)).resolutionDue
   const overdue = isActive(t.status) && now.getTime() > new Date(dueAt).getTime()
 
-  // Sign the stored ticket photos for display (private bucket). AddInfoForm keeps the
-  // RAW stored URLs — it re-submits them on PATCH, so it must not receive signed ones.
-  const photoUrls = Array.isArray(t.photo_urls) ? (t.photo_urls as string[]) : []
-  const signedPhotoUrls = await signManyUrls(photoUrls)
+  // AddInfoForm keeps the RAW stored URLs — it re-submits them on PATCH, so it
+  // must not receive the signed ones (signedPhotoUrls are display-only).
+  const photoUrls = photoUrlsRaw
 
   return (
     <div className="space-y-5">
@@ -120,11 +126,7 @@ export default async function StoreTicketDetailPage({ params }: { params: { id: 
         {signedPhotoUrls.length > 0 && (
           <div>
             <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Photos</div>
-            <div className="flex flex-wrap gap-x-4 gap-y-1">
-              {signedPhotoUrls.map((u: string, i: number) => (
-                <ViewTrackedLink key={i} ticketId={t.id} itemType="photo" itemLabel={`Photo ${i + 1}`} href={u} className="text-sm text-[#C6A35D] underline hover:text-amber-500">Photo {i + 1}</ViewTrackedLink>
-              ))}
-            </div>
+            <PhotoThumbs urls={signedPhotoUrls} ticketId={t.id} />
           </div>
         )}
 

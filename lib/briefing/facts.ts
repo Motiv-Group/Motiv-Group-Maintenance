@@ -71,6 +71,9 @@ export function estateFacts(d: EstateDashboardData): BriefingFacts {
 // ── deterministic fallback (no LLM) ─────────────────────────────
 const greet = (now: Date) => { const h = now.getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening' }
 const plural = (n: number, s: string) => `${n} ${s}${n === 1 ? '' : 's'}`
+// Status/band enums are snake_case internals ('at_risk') — never show them raw
+// in user-facing copy.
+const human = (s: unknown) => String(s ?? '').replace(/_/g, ' ')
 
 export function fallbackBriefing(role: BriefingRole, f: BriefingFacts, now: Date = new Date()): Briefing {
   const g = greet(now)
@@ -82,18 +85,18 @@ export function fallbackBriefing(role: BriefingRole, f: BriefingFacts, now: Date
     return { headline: 'Your store today', body: `${g}. ${parts.join(' ')}`, source: 'fallback' }
   }
   if (role === 'regional_manager') {
-    const parts = [`Portfolio health ${f.portfolioHealthScore}% (${f.portfolioStatus}).`, `${plural(Number(f.storesNeedingAttention) || 0, 'store')} need attention.`]
+    const parts = [`Portfolio health ${f.portfolioHealthScore}% (${human(f.portfolioStatus)}).`, `${plural(Number(f.storesNeedingAttention) || 0, 'store')} need attention.`]
     if (Number(f.signoffsPending) > 0) parts.push(`${plural(Number(f.signoffsPending), 'job')} awaiting your sign-off.`)
     if (Number(f.openSnags) > 0) parts.push(`${plural(Number(f.openSnags), 'open snag')} to resolve.`)
     return { headline: 'Regional snapshot', body: `${g}. ${parts.join(' ')}`, source: 'fallback' }
   }
   if (role === 'supplier') {
-    const parts = [`Performance ${f.performanceScore}% (${f.performanceBand}).`, `${plural(Number(f.openWork) || 0, 'job')} open.`]
+    const parts = [`Performance ${f.performanceScore}% (${human(f.performanceBand)}).`, `${plural(Number(f.openWork) || 0, 'job')} open.`]
     if (Number(f.overdue) > 0) parts.push(`${plural(Number(f.overdue), 'job')} overdue.`)
     if (Number(f.evidenceMissing) > 0) parts.push(`${plural(Number(f.evidenceMissing), 'job')} missing evidence.`)
     return { headline: 'Your work today', body: `${g}. ${parts.join(' ')}`, source: 'fallback' }
   }
-  const parts = [`Estate health ${f.estateHealthScore}% (${f.estateStatus}); main driver ${f.mainRiskDriver}.`, `${plural(Number(f.openWork) || 0, 'open job')} across ${plural(Number(f.regions) || 0, 'region')}.`]
+  const parts = [`Estate health ${f.estateHealthScore}% (${human(f.estateStatus)}); main driver ${f.mainRiskDriver}.`, `${plural(Number(f.openWork) || 0, 'open job')} across ${plural(Number(f.regions) || 0, 'region')}.`]
   if (Number(f.pendingApprovals) > 0) parts.push(`${plural(Number(f.pendingApprovals), 'approval')} pending (${r(Number(f.pendingApprovalValue) || 0)}).`)
   if (Number(f.supplierSlaBreaches) > 0) parts.push(`${plural(Number(f.supplierSlaBreaches), 'supplier SLA breach')}.`)
   return { headline: 'Estate snapshot', body: `${g}. ${parts.join(' ')}`, source: 'fallback' }

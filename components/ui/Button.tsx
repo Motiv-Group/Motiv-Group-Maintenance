@@ -2,7 +2,7 @@ import { cn } from '@/lib/utils'
 import { type ButtonHTMLAttributes, forwardRef } from 'react'
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'danger' | 'ghost'
+  variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'gold'
   size?: 'sm' | 'md' | 'lg'
   loading?: boolean
 }
@@ -16,6 +16,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       secondary: 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 focus:ring-brand-500',
       danger:    'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
       ghost:     'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 focus:ring-gray-400',
+      // Brand-gold CTA — the auth screens' primary action (navy 'primary' is
+      // near-invisible on the dark auth background; gold matches the signup links).
+      gold:      'bg-[#C6A35D] text-[#0a0e17] hover:opacity-90 focus:ring-[#C6A35D]',
     }
 
     const sizes = {

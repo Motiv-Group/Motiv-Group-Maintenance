@@ -5,6 +5,7 @@ import { ClipboardCheck, FileText, Calendar } from 'lucide-react'
 import { SubmitCompletionForm } from '@/components/supplier/SubmitCompletionForm'
 import { BackLink } from '@/components/ui/BackLink'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
+import { PhotoThumbs } from '@/components/ui/PhotoThumbs'
 import { createAdminClient } from '@/lib/supabase/server'
 import { signedUrl, signManyUrls } from '@/lib/storage'
 import { requireSupplierV3 } from '@/lib/health/guard'
@@ -137,9 +138,13 @@ function SignoffCard({ s, snag, ticketId, collapsible = false, title, reason }: 
 }
 
 export default async function SupplierTicketDetailPage({ params }: { params: { id: string } }) {
-  const { companyId, supplierIds, userId } = await requireSupplierV3()
+  // Overlap the auth gate with the ticket fetch (admin client needs no user ctx)
+  // — one round-trip wave instead of two on every detail-page load.
   const admin = createAdminClient()
-  const { data: t } = await admin.from('tickets').select('*').eq('id', params.id).single()
+  const [{ companyId, supplierIds, userId }, { data: t }] = await Promise.all([
+    requireSupplierV3(),
+    admin.from('tickets').select('*').eq('id', params.id).single(),
+  ])
   // Allow same-company tickets AND individual (company-null) standalone tickets; the
   // awarded/invite check below confirms this supplier is actually on the ticket.
   if (!t || (t.company_id != null && t.company_id !== companyId)) redirect('/supplier/tickets')
@@ -401,9 +406,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
         {Array.isArray(t.photo_urls) && t.photo_urls.length > 0 && (
           <div>
             <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Photos</div>
-            <div className="flex flex-wrap gap-x-4 gap-y-1">
-              {t.photo_urls.map((u: string, i: number) => <ViewTrackedLink key={i} ticketId={t.id} itemType="photo" itemLabel={`Photo ${i + 1}`} href={u} className="text-sm text-[#C6A35D] underline hover:text-amber-500">Photo {i + 1}</ViewTrackedLink>)}
-            </div>
+            <PhotoThumbs urls={t.photo_urls as string[]} ticketId={t.id} />
           </div>
         )}
 

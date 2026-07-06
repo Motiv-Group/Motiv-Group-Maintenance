@@ -41,8 +41,40 @@ export async function signedUrl(stored: string | null | undefined, ttlSeconds = 
   }
 }
 
-/** Batch variant — signs a list, preserving order, dropping nulls. */
+/** Batch variant — signs a list, preserving order, dropping nulls.
+ *  Uses ONE createSignedUrls storage API call per bucket (instead of one round
+ *  trip per file), which matters on detail pages signing 10-20 URLs. Falls back
+ *  to the original string per item on any failure, matching signedUrl(). */
 export async function signManyUrls(list: (string | null | undefined)[], ttlSeconds = 3600): Promise<string[]> {
-  const out = await Promise.all(list.map(u => signedUrl(u, ttlSeconds)))
-  return out.filter((u): u is string => !!u)
+  const items = list.filter((u): u is string => !!u)
+  if (!items.length) return []
+
+  // Group parseable items by bucket; unparseable strings pass through untouched.
+  const byBucket = new Map<string, string[]>()
+  const parsed = items.map(u => {
+    const bp = bucketAndPath(u)
+    if (bp) {
+      const paths = byBucket.get(bp.bucket) ?? []
+      if (!paths.includes(bp.path)) paths.push(bp.path)
+      byBucket.set(bp.bucket, paths)
+    }
+    return { stored: u, bp }
+  })
+
+  // One API call per bucket; map path → signedUrl.
+  const signedByBucketPath = new Map<string, string>()
+  try {
+    const admin = createAdminClient()
+    await Promise.all([...byBucket.entries()].map(async ([bucket, paths]) => {
+      const { data } = await admin.storage.from(bucket).createSignedUrls(paths, ttlSeconds)
+      for (const row of data ?? []) {
+        if (row.signedUrl && row.path) signedByBucketPath.set(`${bucket}/${row.path}`, row.signedUrl)
+      }
+    }))
+  } catch {
+    // Storage outage → fall through; every item returns its original string below.
+  }
+
+  return parsed.map(({ stored, bp }) =>
+    bp ? (signedByBucketPath.get(`${bp.bucket}/${bp.path}`) ?? stored) : stored)
 }

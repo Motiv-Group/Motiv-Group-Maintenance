@@ -10,6 +10,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Search, Check, ChevronDown, ImagePlus, Camera, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { uploadTicketPhotos } from '@/lib/upload'
 import { OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
 
 const CATEGORIES = ['Electrical', 'Plumbing', 'HVAC', 'Refrigeration', 'Gas', 'Structural', 'Shopfront', 'General', 'Cleaning', 'Other']
@@ -19,6 +20,7 @@ const MAX_PHOTOS = 5
 export function RmNewTicketForm({ stores, suppliers }: { stores: { id: string; name: string }[]; suppliers: { id: string; name: string }[] }) {
   const router = useRouter()
   const [storeId, setStoreId] = useState('')
+  const [title, setTitle] = useState('')
   const [category, setCategory] = useState('')
   const [impact, setImpact] = useState('')
   const [description, setDescription] = useState('')
@@ -46,22 +48,19 @@ export function RmNewTicketForm({ stores, suppliers }: { stores: { id: string; n
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     if (!storeId) { setErr('Please select a store.'); return }
-    if (!category || !impact || !description.trim()) { setErr('Please complete every field.'); return }
+    if (!title.trim() || !category || !impact || !description.trim()) { setErr('Please complete every field.'); return }
     if (sel.size < 1) { setErr('Please select at least one supplier.'); return }
     if (files.length < 2) { setErr('Please add at least 2 photos of the issue.'); return }
     setBusy(true); setErr('')
     try {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
-      const photo_urls: string[] = []
-      for (const f of files) {
-        const path = `${user?.id ?? 'anon'}/new/${Date.now()}-${f.name.replace(/[^\w.\-]/g, '_')}`
-        const { error } = await supabase.storage.from('ticket-photos').upload(path, f, { upsert: true })
-        if (!error) photo_urls.push(supabase.storage.from('ticket-photos').getPublicUrl(path).data.publicUrl)
-      }
+      // Parallel upload; a failed photo BLOCKS submit instead of being silently dropped.
+      const { urls: photo_urls, failed } = await uploadTicketPhotos(files, user?.id)
+      if (failed.length) { setErr(`${failed.length} photo${failed.length === 1 ? '' : 's'} failed to upload (${failed.join(', ')}) — check your connection and try again.`); setBusy(false); return }
       const res = await fetch('/api/regional/tickets', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ storeId, title: category, description, category, operational_impact: impact, photo_urls, supplierIds: [...sel] }),
+        body: JSON.stringify({ storeId, title: title.trim(), description, category, operational_impact: impact, photo_urls, supplierIds: [...sel] }),
       })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to create ticket')
       router.push('/regional/tickets'); router.refresh()
@@ -82,7 +81,11 @@ export function RmNewTicketForm({ stores, suppliers }: { stores: { id: string; n
         />
       </Field>
 
-      {/* Category — drives the ticket title */}
+      <Field label="Title" required>
+        <input className={input} value={title} onChange={e => setTitle(e.target.value)} maxLength={80}
+          placeholder="e.g. Aircon unit 2 not cooling — front of house" required />
+      </Field>
+
       <Field label="Category" required>
         <select className={input} value={category} onChange={e => setCategory(e.target.value)} required>
           <option value="" disabled>Select a category…</option>

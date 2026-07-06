@@ -575,7 +575,7 @@ export async function assembleStoreManagerDashboard(companyId: string, storeIds:
   }
   visible.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
   return {
-    storeName: stores.map(s => [s.name, s.sub_store].filter(Boolean).join(' — '))[0] ?? 'Store',
+    storeName: stores.length ? storeLabel(stores[0].name, stores[0].sub_store) : 'Store',
     company: (companyRow as any)?.name ?? '',
     branch: primary?.sub_store || primary?.name || 'Store',
     branchCode: primary?.branch_code ?? '',

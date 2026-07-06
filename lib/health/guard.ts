@@ -11,10 +11,13 @@ export async function requireSupplierV3(): Promise<SupplierContext> {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
-  const { data: profile } = await supabase.from('user_profiles').select('role, company_id, full_name').eq('id', user.id).single()
+  // Profile + scope links both key on user.id only — fetch in parallel (one RTT, not two).
+  const [{ data: profile }, { data: links }] = await Promise.all([
+    supabase.from('user_profiles').select('role, company_id, full_name').eq('id', user.id).single(),
+    supabase.from('supplier_users').select('supplier_id').eq('user_id', user.id),
+  ])
   if (profile?.role !== 'supplier') redirect('/auth/login')
   if (!profile?.company_id) redirect('/auth/login')
-  const { data: links } = await supabase.from('supplier_users').select('supplier_id').eq('user_id', user.id)
   return { userId: user.id, companyId: profile.company_id, supplierIds: (links ?? []).map(l => l.supplier_id), fullName: profile.full_name ?? null }
 }
 
@@ -25,10 +28,12 @@ export async function requireStoreManagerV3(): Promise<StoreContext> {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
-  const { data: profile } = await supabase.from('user_profiles').select('role, company_id, full_name').eq('id', user.id).single()
+  const [{ data: profile }, { data: links }] = await Promise.all([
+    supabase.from('user_profiles').select('role, company_id, full_name').eq('id', user.id).single(),
+    supabase.from('store_users').select('store_id').eq('user_id', user.id),
+  ])
   if (profile?.role !== 'store_manager') redirect('/auth/login')
   if (!profile?.company_id) redirect('/auth/login')
-  const { data: links } = await supabase.from('store_users').select('store_id').eq('user_id', user.id)
   return { userId: user.id, companyId: profile.company_id, storeIds: (links ?? []).map(l => l.store_id), fullName: profile.full_name ?? null }
 }
 
@@ -42,10 +47,12 @@ export async function requireRegionalV3(): Promise<RegionalContext> {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
-  const { data: profile } = await supabase.from('user_profiles').select('role, company_id, full_name').eq('id', user.id).single()
+  const [{ data: profile }, { data: links }] = await Promise.all([
+    supabase.from('user_profiles').select('role, company_id, full_name').eq('id', user.id).single(),
+    supabase.from('regional_users').select('region_id').eq('user_id', user.id),
+  ])
   if (profile?.role !== 'regional_manager') redirect('/auth/login')
   if (!profile?.company_id) redirect('/regional')
-  const { data: links } = await supabase.from('regional_users').select('region_id').eq('user_id', user.id)
   if (!links?.length) redirect('/regional')
   return { userId: user.id, companyId: profile.company_id, regionIds: links.map(l => l.region_id), fullName: profile.full_name ?? null }
 }
@@ -62,10 +69,11 @@ export async function requireRegionalUser(): Promise<RegionalUser> {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
-  const { data: profile } = await supabase
-    .from('user_profiles').select('role, company_id, full_name, requested_region_code').eq('id', user.id).single()
+  const [{ data: profile }, { data: links }] = await Promise.all([
+    supabase.from('user_profiles').select('role, company_id, full_name, requested_region_code').eq('id', user.id).single(),
+    supabase.from('regional_users').select('region_id').eq('user_id', user.id),
+  ])
   if (profile?.role !== 'regional_manager') redirect('/auth/login')
-  const { data: links } = await supabase.from('regional_users').select('region_id').eq('user_id', user.id)
   return {
     userId: user.id, role: profile.role, companyId: profile.company_id ?? null,
     regionIds: (links ?? []).map(l => l.region_id), fullName: profile.full_name ?? null,

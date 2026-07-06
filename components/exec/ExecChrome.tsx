@@ -40,7 +40,9 @@ const SUPPLIER_TABS: ChromeTab[] = [
 ]
 const INDIVIDUAL_TABS: ChromeTab[] = [
   { href: '/individual',         label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/individual/tickets', label: 'Tickets',   icon: Ticket },
+  // Individuals see "Jobs" everywhere (their pages say Log a Job / Recent Jobs) —
+  // the tab label must match, not the internal "tickets" term.
+  { href: '/individual/tickets', label: 'Jobs',      icon: Ticket },
 ]
 const VARIANTS = {
   exec:     { tabs: EXEC_TABS, roleLabel: 'Executive', base: '/executive', reports: true },

@@ -133,7 +133,7 @@ export default function LoginPage() {
                 </div>
               )}
 
-              <Button type="submit" loading={loading} className="w-full" size="lg">
+              <Button type="submit" variant="gold" loading={loading} className="w-full" size="lg">
                 Log In
               </Button>
             </form>

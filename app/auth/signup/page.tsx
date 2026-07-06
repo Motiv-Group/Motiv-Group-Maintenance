@@ -133,7 +133,7 @@ export default function SignupPage() {
 
               {error && <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm rounded-lg px-4 py-3">{error}</div>}
 
-              <Button type="submit" loading={loading} className="w-full" size="lg">Create Account</Button>
+              <Button type="submit" variant="gold" loading={loading} className="w-full" size="lg">Create Account</Button>
             </form>
           )}
 

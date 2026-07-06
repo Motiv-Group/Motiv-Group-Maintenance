@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { BackLink } from '@/components/ui/BackLink'
 import { PlusCircle, ImagePlus, Camera, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { uploadTicketPhotos } from '@/lib/upload'
 import { Card } from '@/components/exec/ui'
 import { OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
 
@@ -14,6 +15,7 @@ const MAX_PHOTOS = 5
 
 export default function LogTicketPage() {
   const router = useRouter()
+  const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState('')
   const [impact, setImpact] = useState('')
@@ -37,21 +39,18 @@ export default function LogTicketPage() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
-    if (!category || !impact || !description.trim()) { setError('Please complete every field.'); return }
+    if (!title.trim() || !category || !impact || !description.trim()) { setError('Please complete every field.'); return }
     if (files.length < 2) { setError('Please add at least 2 photos of the issue.'); return }
     setLoading(true); setError('')
     try {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
-      const photo_urls: string[] = []
-      for (const f of files) {
-        const path = `${user?.id ?? 'anon'}/${Date.now()}-${f.name.replace(/[^\w.\-]/g, '_')}`
-        const { error: upErr } = await supabase.storage.from('ticket-photos').upload(path, f, { upsert: true })
-        if (!upErr) photo_urls.push(supabase.storage.from('ticket-photos').getPublicUrl(path).data.publicUrl)
-      }
+      // Parallel upload; a failed photo BLOCKS submit instead of being silently dropped.
+      const { urls: photo_urls, failed } = await uploadTicketPhotos(files, user?.id)
+      if (failed.length) { setError(`${failed.length} photo${failed.length === 1 ? '' : 's'} failed to upload (${failed.join(', ')}) — check your connection and try again.`); setLoading(false); return }
       const res = await fetch('/api/tickets', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: category, description, category, operational_impact: impact, photo_urls }),
+        body: JSON.stringify({ title: title.trim(), description, category, operational_impact: impact, photo_urls }),
       })
       if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error ?? 'Failed to log ticket') }
       router.push('/client/tickets'); router.refresh()
@@ -67,6 +66,11 @@ export default function LogTicketPage() {
 
       <Card className="p-5 sm:p-6">
         <form onSubmit={submit} className="space-y-4">
+          <Field label="Title" required hint="(a short summary — shows in ticket lists)">
+            <input className={input} value={title} onChange={e => setTitle(e.target.value)} maxLength={80}
+              placeholder="e.g. Fridge 3 leaking at bakery" required />
+          </Field>
+
           <Field label="Category" required>
             <select className={input} value={category} onChange={e => setCategory(e.target.value)} required>
               <option value="" disabled>Select a category…</option>

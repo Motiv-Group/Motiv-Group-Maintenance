@@ -5,6 +5,8 @@ import { FileText, Image as ImageIcon, Clock, CheckCircle2 } from 'lucide-react'
 import { requireIndividual } from '@/lib/health/guard'
 import { createAdminClient } from '@/lib/supabase/server'
 import { BackLink } from '@/components/ui/BackLink'
+import { PhotoThumbs } from '@/components/ui/PhotoThumbs'
+import { signManyUrls } from '@/lib/storage'
 import { Card } from '@/components/exec/ui'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { QuoteSummary, type QuoteSummaryStatus } from '@/components/workflow/QuoteSummary'
@@ -15,18 +17,18 @@ import { rmStatusMeta, formatDateTime, OPERATIONAL_IMPACT_LABELS } from '@/lib/u
 const ASSIGNABLE = ['open', 'info_requested', 'assigned', 'assessment', 'quote_requested', 'quoted', 'quote_revision', 'suppliers_declined']
 
 export default async function IndividualTicketDetailPage({ params }: { params: { id: string } }) {
-  const { userId } = await requireIndividual()
+  // One parallel wave: auth gate ∥ ticket ∥ child rows (all key on params.id).
   const admin = createAdminClient()
-  const { data: t } = await admin.from('tickets').select('*').eq('id', params.id).single()
-  if (!t || t.created_by !== userId) redirect('/individual/tickets')
-
-  const [{ data: quotes }, { data: signoffs }, { data: invites }, { data: motiv }, { data: snags }] = await Promise.all([
-    admin.from('quotes').select('id, supplier_id, amount, amount_incl_vat, description, file_url, status, valid_until, proposed_schedule_at, created_at, updated_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
-    admin.from('signoffs').select('id, before_urls, after_urls, coc_url, invoice_url, status, notes, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
-    admin.from('ticket_suppliers').select('supplier_id, status, invited_at, decline_reason').eq('ticket_id', t.id),
+  const [{ userId }, { data: t }, { data: quotes }, { data: signoffs }, { data: invites }, { data: motiv }, { data: snags }] = await Promise.all([
+    requireIndividual(),
+    admin.from('tickets').select('*').eq('id', params.id).single(),
+    admin.from('quotes').select('id, supplier_id, amount, amount_incl_vat, description, file_url, status, valid_until, proposed_schedule_at, created_at, updated_at').eq('ticket_id', params.id).order('created_at', { ascending: false }),
+    admin.from('signoffs').select('id, before_urls, after_urls, coc_url, invoice_url, status, notes, created_at').eq('ticket_id', params.id).order('created_at', { ascending: false }),
+    admin.from('ticket_suppliers').select('supplier_id, status, invited_at, decline_reason').eq('ticket_id', params.id),
     admin.from('suppliers').select('id, company_name').eq('is_motiv', true).eq('active', true).order('company_name'),
-    admin.from('snags').select('scheduled_at, schedule_status, status, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
+    admin.from('snags').select('scheduled_at, schedule_status, status, created_at').eq('ticket_id', params.id).order('created_at', { ascending: false }),
   ])
+  if (!t || t.created_by !== userId) redirect('/individual/tickets')
   const latestSnag = ((snags ?? []) as any[])[0] ?? null
   const snagAwaitingApproval = t.status === 'snag_assigned' && latestSnag?.schedule_status === 'proposed' && !!latestSnag?.scheduled_at
 
@@ -37,7 +39,9 @@ export default async function IndividualTicketDetailPage({ params }: { params: {
   const nameById = new Map(((supRows ?? []) as any[]).map(s => [s.id, s.company_name]))
 
   const sm = rmStatusMeta(t.status)
-  const photos = Array.isArray(t.photo_urls) ? t.photo_urls as string[] : []
+  // Buckets are private — stored URLs must be signed or they 403 (every other
+  // role's detail page already signs; this one was missed).
+  const photos = Array.isArray(t.photo_urls) ? await signManyUrls(t.photo_urls as string[]) : []
   const quoteStatusOf = (s: string): QuoteSummaryStatus => s === 'accepted' ? 'accepted' : s === 'declined' ? 'declined' : 'pending'
   const acceptedQuote = quoteRows.find(q => q.status === 'accepted') ?? null
   const pendingSignoff = ((signoffs ?? []) as any[]).find(s => ['submitted', 'awaiting_regional', 'awaiting_store'].includes(s.status)) ?? null
@@ -75,9 +79,7 @@ export default async function IndividualTicketDetailPage({ params }: { params: {
         {photos.length > 0 && (
           <div>
             <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5 flex items-center gap-1.5"><ImageIcon size={12} /> Photos</div>
-            <div className="flex flex-wrap gap-x-4 gap-y-1">
-              {photos.map((u, i) => <a key={i} href={u} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C6A35D] underline hover:text-amber-500">Photo {i + 1}</a>)}
-            </div>
+            <PhotoThumbs urls={photos} ticketId={t.id} />
           </div>
         )}
       </Card>

@@ -4,6 +4,7 @@ import { AlertTriangle } from 'lucide-react'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireRegionalV3 } from '@/lib/health/guard'
 import { RegionalSnagList, type SnagRow } from '@/components/exec/RegionalSnagList'
+import { storeLabel } from '@/lib/utils'
 
 export default async function RegionalSnagPage() {
   const { companyId, regionIds } = await requireRegionalV3()
@@ -13,7 +14,8 @@ export default async function RegionalSnagPage() {
   if (regionIds.length) {
     const { data: stores } = await admin.from('stores').select('id, name, sub_store').eq('company_id', companyId).in('region_id', regionIds)
     const storeIds = (stores ?? []).map(s => s.id)
-    const storeName = new Map((stores ?? []).map((s: any) => [s.id, [s.name, s.sub_store].filter(Boolean).join(' — ')]))
+    // storeLabel dedupes name === sub_store (the old join rendered "Joburg Mall — Joburg Mall").
+    const storeName = new Map((stores ?? []).map((s: any) => [s.id, storeLabel(s.name, s.sub_store)]))
     if (storeIds.length) {
       const { data: snags } = await admin.from('snags').select('id, ticket_id, store_id, description, severity, status, created_at').eq('company_id', companyId).in('store_id', storeIds).in('status', ['open', 'assigned', 'in_progress']).order('created_at', { ascending: false })
       const ticketIds = Array.from(new Set((snags ?? []).map(s => s.ticket_id).filter(Boolean)))

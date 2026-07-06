@@ -70,7 +70,9 @@ function factsToPrompt(facts: BriefingFacts): string {
       else if (percent.test(k)) lines.push(`${labelOf(k)}: ${Math.round(v)}%`)
       else lines.push(`${labelOf(k)}: ${v}`)
     } else {
-      lines.push(`${labelOf(k)}: ${v}`)
+      // Humanize snake_case enum values (status/band: 'at_risk' → 'at risk') so
+      // the model never echoes raw internals into user-facing copy.
+      lines.push(`${labelOf(k)}: ${typeof v === 'string' ? v.replace(/_/g, ' ') : v}`)
     }
   }
   return lines.join('\n')

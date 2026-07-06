@@ -20,6 +20,7 @@ import { DueDate } from '@/components/workflow/DueDate'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { EditedLine } from '@/components/ui/EditedLine'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
+import { PhotoThumbs } from '@/components/ui/PhotoThumbs'
 import { AuditTrail } from '@/components/ui/AuditTrail'
 import { CollapsibleSection } from '@/components/ui/CollapsibleSection'
 import { MarkTicketSeen } from '@/components/ui/MarkTicketSeen'
@@ -215,9 +216,13 @@ function SupplierUpdateItem({ u, ticketId, isNew = false }: { u: { body: string;
 }
 
 export default async function RegionalTicketDetailPage({ params }: { params: { id: string } }) {
-  const { companyId, regionIds, userId } = await requireRegionalV3()
+  // Overlap the auth gate with the ticket fetch (admin client needs no user ctx)
+  // — one round-trip wave instead of two on every detail-page load.
   const admin = createAdminClient()
-  const { data: t } = await admin.from('tickets').select('*').eq('id', params.id).single()
+  const [{ companyId, regionIds, userId }, { data: t }] = await Promise.all([
+    requireRegionalV3(),
+    admin.from('tickets').select('*').eq('id', params.id).single(),
+  ])
   if (!t || !t.region_id || !regionIds.includes(t.region_id)) redirect('/regional/tickets')
 
   const [{ data: store }, { data: quotes }, { data: updates }, { data: signoffs }, { data: suppliers }, { data: variations }, { data: snags }, { data: invites }, { data: ratingRows }, { data: roundRows }] = await Promise.all([
@@ -567,11 +572,7 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         {Array.isArray(t.photo_urls) && t.photo_urls.length > 0 && (
           <div>
             <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Photos</div>
-            <div className="flex flex-wrap gap-x-4 gap-y-1">
-              {t.photo_urls.map((u: string, i: number) => (
-                <ViewTrackedLink key={i} ticketId={t.id} itemType="photo" itemLabel={`Photo ${i + 1}`} href={u} className="text-sm text-[#C6A35D] underline hover:text-amber-500">Photo {i + 1}</ViewTrackedLink>
-              ))}
-            </div>
+            <PhotoThumbs urls={t.photo_urls as string[]} ticketId={t.id} />
           </div>
         )}
 
