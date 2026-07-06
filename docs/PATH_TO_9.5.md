@@ -54,7 +54,7 @@
 | B1 | **MEDIUM 4** — transition-matrix test suite for `lib/workflow` `resolveTransition()` (every status × action × role incl. `individual`) | Tests | Code | ✅ 2026-07-06 (`lib/workflow.test.ts`, +277 tests, 295 total green) |
 | B2 | CI pipeline (GitHub Actions): tsc + lint + vitest + build on every PR; nothing merges red; `npm audit --omit=dev` fail-on-high | Tests/Deps | Code | 🔲 |
 | B3 | Integration tests for the 3 handlers fixed in cdc7dec (mock Supabase, assert authZ per role) | Tests | Code | 🔲 |
-| B4 | **MEDIUM 1** — Individual realtime: add owner-scoped RLS read policy (`created_by = auth.uid() AND company_id IS NULL`) **or** drop the subscription | DB/Individual | Code | 🔲 decision + code |
+| B4 | **MEDIUM 1** — Individual realtime: add owner-scoped RLS read policy (`created_by = auth.uid() AND company_id IS NULL`) **or** drop the subscription | DB/Individual | Code | 🟡 migration `20260706_individual_owner_rls.sql` written (tickets+quotes+signoffs owner-read) — **awaiting apply to live**, then fold+delete + verify realtime on `/individual` |
 | B5 | **MEDIUM 2** — storage per-user path prefix in upload policies (object name starts with `auth.uid()`) + per-user upload quotas | Storage | Code | 🔲 |
 | B6 | **HIGH 1** — Next.js 15/16 upgrade PR (clears advisory list incl. nonce-CSP XSS); retest CSP, Capacitor WebView, auth cookies | Deps | Code | 🔲 big; standalone PR |
 | B7 | **MEDIUM 5** — ESLint 9 migration (fold into B6) | Deps | Code | 🔲 |
