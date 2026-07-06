@@ -4,9 +4,12 @@ import { redirect } from 'next/navigation'
 
 export interface ExecContext { userId: string; companyId: string; fullName: string | null }
 
-export interface SupplierContext { userId: string; companyId: string; supplierIds: string[]; fullName: string | null }
+export interface SupplierContext { userId: string; companyId: string | null; supplierIds: string[]; fullName: string | null }
 
-/** Gate a v3 supplier page + return their supplier scope. */
+/** Gate a v3 supplier page + return their supplier scope.
+ *  companyId is NULL for standalone self-signup suppliers (Motiv-pool applicants,
+ *  pending or approved) — they have no client company; queries keyed on companyId
+ *  simply return nothing for them. */
 export async function requireSupplierV3(): Promise<SupplierContext> {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -17,8 +20,7 @@ export async function requireSupplierV3(): Promise<SupplierContext> {
     supabase.from('supplier_users').select('supplier_id').eq('user_id', user.id),
   ])
   if (profile?.role !== 'supplier') redirect('/auth/login')
-  if (!profile?.company_id) redirect('/auth/login')
-  return { userId: user.id, companyId: profile.company_id, supplierIds: (links ?? []).map(l => l.supplier_id), fullName: profile.full_name ?? null }
+  return { userId: user.id, companyId: profile.company_id ?? null, supplierIds: (links ?? []).map(l => l.supplier_id), fullName: profile.full_name ?? null }
 }
 
 export interface StoreContext { userId: string; companyId: string; storeIds: string[]; fullName: string | null }

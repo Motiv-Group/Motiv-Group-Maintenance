@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
 import { AlertTriangle, Building2, ChevronDown, ChevronUp } from 'lucide-react'
+import { redirect } from 'next/navigation'
 import { requireSupplierV3 } from '@/lib/health/guard'
 import { assembleSupplierDashboard, type SupplierTicketRow } from '@/lib/health/data'
 import { PersistentDetails } from '@/components/ui/PersistentDetails'
@@ -12,6 +13,7 @@ const SNAG_STATUSES = ['snag', 'snag_assigned', 'snag_resolved', 'snag_in_progre
 
 export default async function SupplierSnagPage() {
   const { companyId, supplierIds } = await requireSupplierV3()
+  if (!companyId) redirect('/supplier') // standalone self-signup supplier — see dashboard
   const d = await assembleSupplierDashboard(companyId, supplierIds)
   const snags = d.tickets.filter(t => SNAG_STATUSES.includes(t.status))
 

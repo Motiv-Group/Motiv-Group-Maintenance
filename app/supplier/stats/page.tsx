@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import { BarChart2 } from 'lucide-react'
+import { redirect } from 'next/navigation'
 import { requireSupplierV3 } from '@/lib/health/guard'
 import { assembleSupplierDashboard } from '@/lib/health/data'
 import { Card, Donut, Pill, BreakdownList } from '@/components/exec/ui'
@@ -9,6 +10,7 @@ const clamp = (n: number) => Math.max(0, Math.min(20, Math.round(n)))
 
 export default async function SupplierPerformancePage() {
   const { companyId, supplierIds } = await requireSupplierV3()
+  if (!companyId) redirect('/supplier') // standalone self-signup supplier — see dashboard
   const { perf } = await assembleSupplierDashboard(companyId, supplierIds)
   const axes = {
     response: perf.avgResponseMins == null ? 14 : clamp(20 - perf.avgResponseMins / 60),

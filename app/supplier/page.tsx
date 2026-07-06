@@ -8,6 +8,8 @@ import { Card, SectionCard, KpiRow, Donut, Pill, type Kpi } from '@/components/e
 import { CollapsibleCard } from '@/components/ui/CollapsibleCard'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { BriefingRefresh } from '@/components/briefing/BriefingRefresh'
+import { VerificationCard } from '@/components/supplier/VerificationCard'
+import { createAdminClient } from '@/lib/supabase/server'
 import { getDailyBriefing } from '@/lib/briefing/generate'
 import { supplierFacts } from '@/lib/briefing/facts'
 import { formatCurrency, formatDateTime, humanizeDuration, rmStatusMeta } from '@/lib/utils'
@@ -69,7 +71,38 @@ function TicketRow({ t, company }: { t: SupplierTicketRow; company?: string }) {
 }
 
 export default async function SupplierOverviewPage() {
-  const { companyId, supplierIds, fullName } = await requireSupplierV3()
+  const { companyId, supplierIds, fullName, userId } = await requireSupplierV3()
+
+  // Standalone (self-signup) suppliers have no client company. Pending ones see
+  // the under-review + verification-docs card; verified ones a "you're live"
+  // state until Motiv-pool work reaches them via the normal ticket pages.
+  if (!companyId) {
+    const admin = createAdminClient()
+    const { data: supRow } = await admin.from('suppliers')
+      .select('company_name, verification_status, is_motiv').in('id', supplierIds).limit(1).maybeSingle()
+    const pending = (supRow as any)?.verification_status !== 'verified' && !(supRow as any)?.is_motiv
+    return (
+      <div className="space-y-5">
+        <div>
+          <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><Truck className="text-[#C6A35D]" size={22} /> {(supRow as any)?.company_name ?? fullName ?? 'Supplier'}</h1>
+          <p className="text-sm text-[var(--text-muted)] mt-0.5">
+            {pending ? 'Welcome to Motiv — your registration is being reviewed.' : 'You are live in the Motiv supplier pool.'}
+          </p>
+        </div>
+        {pending
+          ? <VerificationCard userId={userId} />
+          : (
+            <Card className="p-5">
+              <p className="text-sm text-[var(--text-muted)]">
+                You&apos;re verified ✅ — job invitations will appear under <Link href="/supplier/tickets" className="text-[#C6A35D] underline">Tickets</Link> and
+                you&apos;ll be notified the moment a client assigns you work.
+              </p>
+            </Card>
+          )}
+      </div>
+    )
+  }
+
   const d = await assembleSupplierDashboard(companyId, supplierIds)
   const k = d.kpis
   const perf = d.perf
