@@ -1637,7 +1637,7 @@ create policy "own profile update" on public.user_profiles for update
 -- STORAGE (buckets + object policies)
 -- ---------------------------------------------------------------------------
 -- Buckets are PRIVATE (migration 20260708). Reads go through short-lived signed
--- URLs (lib/storage.ts + /api/files/sign); no public read policy. Uploads are
+-- URLs (lib/storage.ts, signed server-side); no public read policy. Uploads are
 -- gated to authenticated. Size/MIME limits from 20260706. See docs/STORAGE.md.
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types) values
   ('ticket-photos','ticket-photos',false, 15728640, array['image/jpeg','image/jpg','image/png','image/webp']),

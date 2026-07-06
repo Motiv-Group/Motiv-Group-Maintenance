@@ -31,14 +31,16 @@ Migrations live in `supabase/migrations/` but are **not** applied via Supabase C
 
 ### Roles & route protection
 
-Five roles drive everything: `client` / `store_manager` (treated identically — see `isStoreManager()` in `lib/types.ts`), `regional_manager`, `supplier` (the contractor/maintenance-company side; this role was formerly named `admin`), and `executive` (estate-wide read-only dashboards; set by an admin, not self-signup). `middleware.ts` is the single gate for route access:
+Six roles drive everything: `store_manager` (the store/client side — the legacy `client` role is treated identically, see `isStoreManager()` in `lib/types.ts`), `regional_manager`, `supplier` (the contractor/maintenance-company side; formerly named `admin`), `executive` (estate-wide read-only dashboards; set by an admin, not self-signup), `individual` (general-public self-signup — standalone jobs, no company/store/region; the **only** role self-signup can create, clamped by the `handle_new_user` trigger), and `system_admin` (platform/master admin — the app owner). `middleware.ts` is the single gate for route access:
 
-- `/client/*` → `client` or `store_manager`
+- `/client/*` → `store_manager`
 - `/regional/*` → `regional_manager`
 - `/supplier/*` → `supplier`
-- `/executive/*` → `executive`
+- `/executive/*` → `executive` or `system_admin`
+- `/individual/*` → `individual`
+- `/admin/*` → `system_admin` (platform-admin: business overview + the Supabase/Vercel/Resend/Upstash/Sentry infra dashboard)
 - `/settings*` → any authenticated user
-- Logged-in users hitting `/auth/login` or `/auth/signup` are redirected to their role's home (`/client`, `/supplier`, `/regional`, or `/executive`)
+- Logged-in users hitting `/auth/login` or `/auth/signup` are redirected to their role's home (`/client`, `/supplier`, `/regional`, `/executive`, `/individual`, or `/admin`)
 
 > Note: the service-role Supabase client is still `createAdminClient()`/`adminClient` — that's infrastructure (RLS bypass), unrelated to the `supplier` role. The DB FK columns `quotes.admin_id` / `completions.admin_id` keep their names too and reference the supplier. The `supplier` role manages a directory of trade companies shown in the UI as **"Sub Suppliers"** (the `suppliers` table) — distinct from the role itself.
 
@@ -104,7 +106,7 @@ Two layers, distinct images in `public/splash/` (web) and `android/.../res/drawa
 
 ### Required environment variables
 
-`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_ADMIN_EMAILS`, `NEXT_PUBLIC_APP_URL`; optionally `NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` for push; and `WHATSAPP_ACCESS_TOKEN` / `WHATSAPP_PHONE_NUMBER_ID` / `WHATSAPP_VERIFY_TOKEN` / `GROQ_API_KEY` for the WhatsApp intake.
+`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_APP_URL`; optionally `NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` for push; and `WHATSAPP_ACCESS_TOKEN` / `WHATSAPP_PHONE_NUMBER_ID` / `WHATSAPP_VERIFY_TOKEN` / `WHATSAPP_APP_SECRET` / `GROQ_API_KEY` for the WhatsApp intake. (`NEXT_PUBLIC_ADMIN_EMAILS` is **no longer read by code** — `system_admin` is a DB role now — but still lingers in `.env.example`/README.)
 
 > `NEXT_PUBLIC_APP_URL` + the Capacitor `server.url` (`capacitor.config.ts`) + Supabase Auth Site/redirect URLs must all point at the live domain — changing the domain means updating all three (and rebuilding the Android wrapper).
 

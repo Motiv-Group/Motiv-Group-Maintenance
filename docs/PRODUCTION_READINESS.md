@@ -6,14 +6,11 @@
 - **RLS enabled on every table.** Tables with no policy (`suppliers`, `push_subscriptions`, `whatsapp_sessions`, and analytics *writes*) are reachable **only by the service-role key** (server-side) — clients get deny-by-default. The app already uses the admin client for those.
 - **`whatsapp_sessions` RLS turned ON** (the original migration left it OFF — that was a hole: a public table with no RLS is world read/write via the API).
 - **`security definer` functions pinned** with `set search_path = public` (prevents search-path hijack — a Supabase linter warning).
-- Role-scoped read policies for client / supplier / regional_manager / executive.
+- Role-scoped read policies per role (`store_manager` / `regional_manager` / `supplier` / `executive` / `system_admin`), plus owner-scoped read for `individual` standalone tickets (migration 20260706).
 
-## Storage — IMPORTANT (you chose public buckets)
-All 3 buckets are **public**: anyone with a file URL can open it, no login. That includes **COCs, invoices and completion photos** in `completion-docs` / `quote-attachments`.
-- **Recommended hardening:** make `completion-docs` + `quote-attachments` **private** and serve via short-lived signed URLs.
-  - SQL: `update storage.buckets set public = false where id in ('completion-docs','quote-attachments');`
-  - Code change: replace `getPublicUrl(...)` with `createSignedUrl(path, 3600)` in `SubmitCompletionForm`, `SendQuoteForm`, and wherever those docs are displayed (completion review, ticket detail).
-- Tell me to do this and I'll refactor the uploads/displays.
+## Storage — private buckets + signed URLs ✅
+All buckets (`ticket-photos`, `completion-docs`, `quote-attachments`, `supplier-docs`) are **private** (migration 20260708). No public read — files, including **COCs, invoices and completion photos**, are served only via short-lived **signed URLs** generated server-side (`lib/storage.ts` `signManyUrls` → batched `createSignedUrls`). Uploads are gated to authenticated users with per-bucket MIME allow-lists + 15 MB caps. There is **no client-side signing endpoint** (the old `/api/files/sign` was removed 2026-07-07).
+- **Follow-up (audit MEDIUM 2 / tracker B5):** enforce a per-user path prefix in the upload policies (object name starts with `auth.uid()`) and add per-user upload quotas.
 
 ## Auth (Supabase dashboard → Authentication)
 - [ ] **Site URL** = production URL; **Redirect URLs** = exact allowlist (prod + `http://localhost:3000`), no wildcards.
@@ -34,7 +31,7 @@ All 3 buckets are **public**: anyone with a file URL can open it, no login. That
 - [ ] Rotate keys if the old project's keys ever leaked.
 
 ## App-level
-- [ ] **Rate limiting** (`lib/rate-limit.ts`) is in-memory **per serverless instance** — it resets on cold start and isn't shared across instances. For real abuse protection move it to a shared store (Upstash Redis / Supabase table). Fine for low volume; note the limitation.
+- [x] **Rate limiting** (`lib/rate-limit.ts`) uses **Upstash Redis** — a distributed sliding window shared across the serverless fleet — when `UPSTASH_REDIS_REST_URL`/`_TOKEN` are set, with a graceful **in-memory fallback** (per-instance) on outage or when unset. Applied to every write/expensive route. (Audit follow-up B9: alert when it falls back so an Upstash outage isn't silent.)
 - [ ] Validate/escape all user input on write routes (already mutate via RLS-bound client).
 
 ## Database & ops
@@ -47,4 +44,4 @@ All 3 buckets are **public**: anyone with a file URL can open it, no login. That
 ## Verify
 - [ ] Advisor shows no "RLS disabled" / "function search_path mutable" warnings.
 - [ ] As an anon user, hitting the REST API for `tickets`/`profiles` returns only permitted rows.
-- [ ] A non-logged-in request for a `completion-docs` file URL — decide if that's acceptable (it is allowed today).
+- [x] A non-logged-in request for a raw `completion-docs` file URL returns **403** (buckets are private; access is via short-lived signed URLs only).

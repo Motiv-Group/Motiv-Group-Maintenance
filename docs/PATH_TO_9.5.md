@@ -63,7 +63,7 @@
 | B10 | API §6.4 — audit-log rows for privileged actions (provisioning, admin account ops, role changes) | API | Code | 🔲 |
 | B11 | **Register #6** — standalone-supplier list views (Tickets/Quotes/Signoff/Snags/Performance) keyed on `supplier_id` not `company_id` (Motiv-pool suppliers) | Individual/Supplier | Code | 🔲 |
 | B12 | **Register #7** — SLA re-acceptance gate on `SLA_VERSION` bump (login-time prompt before new work); capture signatures for pre-wizard invited suppliers | Supplier | Code | 🔲 |
-| B13 | **MEDIUM 3** — docs refresh: `PRODUCTION_READINESS.md` (buckets private, Redis rate-limit), `CLAUDE.md` role/env sections, stale `schema.sql` comment (`/api/files/sign`) | Docs | Code | 🔲 |
+| B13 | **MEDIUM 3** — docs refresh: `PRODUCTION_READINESS.md` (buckets private, Redis rate-limit), `CLAUDE.md` role/env sections, stale `schema.sql` comment (`/api/files/sign`) | Docs | Code | ✅ 2026-07-06 (CLAUDE.md 6 roles + routes + env; PRODUCTION_READINESS storage/rate-limit/verify; schema comment; `.env.example` ADMIN_EMAILS deprecated) |
 | B14 | UI Phase 2 — RM "Needs my decision" work queue; status-chip diet; zero-KPI tile cleanup; supplier tabs 7→5; destructive-button demotion; session-expiry re-login; pull-to-refresh | UI | Code | 🔲 |
 | B15 | Renovate/Dependabot for weekly dependency PRs | Deps | Code | 🔲 |
 
@@ -95,3 +95,4 @@ _None yet. Add rows here as they surface, with file + severity + status._
 - **2026-07-06 B1** — `lib/workflow.test.ts`: exhaustive status × action × role matrix for `resolveTransition()`, explicit `individual` allow/deny pins (the BLOCKER-1 regression class), supplier-exclusive actions, terminal/unknown-input guards, and table invariants. +277 tests → **295 passing**.
 - **2026-07-06 B4** — migration `20260706_individual_owner_rls.sql` applied to live + folded into `schema.sql` (helper `app_owns_standalone_ticket()` + owner-read policies on tickets/quotes/signoffs), file deleted. Individual browser reads/realtime unblocked. Register #10 (realtime half) cleared.
 - **2026-07-06 A7** — WhatsApp webhook `verifyWebhookSignature()` now fails **closed** in production when `WHATSAPP_APP_SECRET` is unset (was fail-open everywhere); dev keeps fail-open. Audit HIGH 3 closed.
+- **2026-07-06 B13** — doc drift fixed: `CLAUDE.md` now lists all 6 roles (+`individual`, +`system_admin`) with correct `/individual` + `/admin` routes and a corrected env list; `PRODUCTION_READINESS.md` storage section rewritten (private buckets + signed URLs), rate-limiting marked Upstash-Redis, verify item corrected to 403; stale `/api/files/sign` reference removed from `schema.sql`; `NEXT_PUBLIC_ADMIN_EMAILS` marked deprecated in `.env.example`. Audit MEDIUM 3 closed.
