@@ -65,7 +65,7 @@
 | B12 | **Register #7** — SLA re-acceptance gate on `SLA_VERSION` bump (login-time prompt before new work); capture signatures for pre-wizard invited suppliers | Supplier | Code | 🔲 |
 | B13 | **MEDIUM 3** — docs refresh: `PRODUCTION_READINESS.md` (buckets private, Redis rate-limit), `CLAUDE.md` role/env sections, stale `schema.sql` comment (`/api/files/sign`) | Docs | Code | ✅ 2026-07-06 (CLAUDE.md 6 roles + routes + env; PRODUCTION_READINESS storage/rate-limit/verify; schema comment; `.env.example` ADMIN_EMAILS deprecated) |
 | B14 | UI Phase 2 — RM "Needs my decision" work queue; status-chip diet; zero-KPI tile cleanup; supplier tabs 7→5; destructive-button demotion; session-expiry re-login; pull-to-refresh | UI | Code | 🔲 |
-| B15 | Renovate/Dependabot for weekly dependency PRs | Deps | Code | 🔲 |
+| B15 | Renovate/Dependabot for weekly dependency PRs | Deps | Code | ✅ 2026-07-06 (`.github/dependabot.yml`: weekly npm + github-actions PRs; minor/patch grouped into one PR, majors individual, limit 5. Each PR is gated by B2's CI. `next` major will surface here = the B6 workstream; `xlsx` CDN tarball can't be auto-bumped → stays manual per C10.) |
 
 ## Phase C — validation (month 2)
 

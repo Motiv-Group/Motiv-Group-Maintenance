@@ -1,0 +1,34 @@
+version: 2
+updates:
+  # ── npm dependencies ───────────────────────────────────────────────────────
+  # Weekly PRs to keep deps patched. Every PR is validated by ci.yml before it can
+  # be merged, so a bump that breaks tsc/lint/test/build shows up red on the PR.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+    groups:
+      # Fold all minor + patch bumps into ONE PR to cut noise and CI minutes.
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+    # Majors (breaking) come as their own PRs so each is reviewed alone. NOTE: this
+    # is how the Next.js 15/16 upgrade (B6) will first surface — expect a major-bump
+    # PR for `next`; treat it as the B6 workstream, not a quick merge.
+    # (`xlsx` is pinned to a SheetJS CDN tarball, not the npm registry, so Dependabot
+    #  can't bump it — that stays a manual quarterly check per C10.)
+
+  # ── GitHub Actions ─────────────────────────────────────────────────────────
+  # Keep the actions in ci.yml (checkout, setup-node) current + patched.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    labels:
+      - dependencies
