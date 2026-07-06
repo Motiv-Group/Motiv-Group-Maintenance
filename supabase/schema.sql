@@ -1637,8 +1637,15 @@ create policy "own profile update" on public.user_profiles for update
 -- STORAGE (buckets + object policies)
 -- ---------------------------------------------------------------------------
 -- Buckets are PRIVATE (migration 20260708). Reads go through short-lived signed
--- URLs (lib/storage.ts, signed server-side); no public read policy. Uploads are
--- gated to authenticated. Size/MIME limits from 20260706. See docs/STORAGE.md.
+-- URLs (lib/storage.ts, signed server-side); no public read policy. Size/MIME
+-- limits from 20260706. See docs/STORAGE.md.
+-- NOTE: on this (migrated) project the storage RLS context does NOT receive the
+-- user's JWT claims — auth.uid()/auth.role() are null in storage.objects policies
+-- — so browser→storage uploads always 403. Uploads therefore go through the
+-- server route POST /api/uploads (authenticates via cookie, writes with the
+-- service-role client, forces a per-user path). These upload policies are kept as
+-- correct-in-principle defence (auth.uid() IS NOT NULL, updated 20260706) but are
+-- not the live write path.
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types) values
   ('ticket-photos','ticket-photos',false, 15728640, array['image/jpeg','image/jpg','image/png','image/webp']),
   ('completion-docs','completion-docs',false, 15728640, array['image/jpeg','image/jpg','image/png','image/webp','application/pdf']),
@@ -1649,13 +1656,13 @@ on conflict (id) do update set public = excluded.public, file_size_limit = exclu
 -- Upload policies only (no public read — private buckets read via signed URLs).
 drop policy if exists "completion-docs upload" on storage.objects;
 create policy "completion-docs upload" on storage.objects for insert
-  with check (((bucket_id = 'completion-docs'::text) AND (auth.role() = 'authenticated'::text)));
+  with check (((bucket_id = 'completion-docs'::text) AND (auth.uid() IS NOT NULL)));
 drop policy if exists "quote-attachments upload" on storage.objects;
 create policy "quote-attachments upload" on storage.objects for insert
-  with check (((bucket_id = 'quote-attachments'::text) AND (auth.role() = 'authenticated'::text)));
+  with check (((bucket_id = 'quote-attachments'::text) AND (auth.uid() IS NOT NULL)));
 drop policy if exists "supplier-docs upload" on storage.objects;
 create policy "supplier-docs upload" on storage.objects for insert
-  with check (((bucket_id = 'supplier-docs'::text) AND (auth.role() = 'authenticated'::text)));
+  with check (((bucket_id = 'supplier-docs'::text) AND (auth.uid() IS NOT NULL)));
 drop policy if exists "ticket-photos upload" on storage.objects;
 create policy "ticket-photos upload" on storage.objects for insert
-  with check (((bucket_id = 'ticket-photos'::text) AND (auth.role() = 'authenticated'::text)));
+  with check (((bucket_id = 'ticket-photos'::text) AND (auth.uid() IS NOT NULL)));
