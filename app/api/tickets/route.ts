@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { rateLimit } from '@/lib/rate-limit'
 import { sendPushToMany } from '@/lib/push'
 import { computePriority } from '@/lib/health/priority'
-import { priorityWord } from '@/lib/utils'
+import { priorityWord, composeTicketTitle } from '@/lib/utils'
 
 // POST /api/tickets — store manager logs a ticket (v3 model).
 export async function POST(request: Request) {
@@ -15,8 +15,15 @@ export async function POST(request: Request) {
   if (!(await rateLimit(`tickets:${user.id}`, 10, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
   const body = await request.json()
-  const { title, description, category, operational_impact = 'none', photo_urls = [] } = body
-  if (!title || !description) return NextResponse.json({ error: 'Title and description are required' }, { status: 400 })
+  const { description, category, operational_impact = 'none', photo_urls = [] } = body
+  if (!description) return NextResponse.json({ error: 'Description is required' }, { status: 400 })
+  // Title is NOT typed by store staff (free text invites nonsense) — it is
+  // auto-composed as "Category — first words of description" so lists stay
+  // scannable. Callers that DO send a curated title (WhatsApp intake's LLM
+  // title) keep it.
+  const title = (typeof body.title === 'string' && body.title.trim() && body.title.trim() !== String(category ?? '').trim())
+    ? body.title.trim()
+    : composeTicketTitle(category, description)
 
   const admin = createAdminClient()
   const { data: profile } = await admin.from('user_profiles').select('company_id, role').eq('id', user.id).single()

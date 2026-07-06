@@ -205,6 +205,26 @@ export function storeLabel(name?: string | null, subStore?: string | null): stri
 }
 
 /**
+ * Auto-compose a ticket title from category + the description's opening words:
+ * "Refrigeration — fridge by bakery leaking wat…". Store staff never type a
+ * title (free text invites nonsense from rushed/low-literacy users — that's why
+ * title used to just BE the category), but bare categories made lists
+ * unscannable. The description is already required, so its first words carry
+ * the distinguishing signal for free. Word-boundary trimmed to ~maxLen.
+ */
+export function composeTicketTitle(category: string | null | undefined, description: string | null | undefined, maxLen = 64): string {
+  const cat = (category ?? 'General').trim() || 'General'
+  const desc = (description ?? '').replace(/\s+/g, ' ').trim()
+  if (!desc) return cat
+  const budget = maxLen - cat.length - 3 // " — "
+  if (budget < 8) return cat
+  if (desc.length <= budget) return `${cat} — ${desc}`
+  const cut = desc.slice(0, budget)
+  const atWord = cut.includes(' ') ? cut.slice(0, cut.lastIndexOf(' ')) : cut
+  return `${cat} — ${atWord}…`
+}
+
+/**
  * Condensed-but-accurate ticket status for RM views (recent card, tickets tab,
  * ticket page). Unlike clientVisibleStatus (3-state, for the SM), this reflects
  * the commercial/execution phase so the overview updates as the ticket moves.
