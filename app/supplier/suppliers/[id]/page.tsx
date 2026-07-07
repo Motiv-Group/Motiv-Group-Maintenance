@@ -41,6 +41,7 @@ export default async function SupplierDetailPage(props: { params: Promise<{ id: 
     : null
 
   const isExpiringSoon = supplier.qualification_expiry
+    // eslint-disable-next-line react-hooks/purity -- Date.now in a server-component render runs once server-side — no hydration
     ? new Date(supplier.qualification_expiry) <= new Date(Date.now() + 60 * 24 * 60 * 60 * 1000)
     : false
 

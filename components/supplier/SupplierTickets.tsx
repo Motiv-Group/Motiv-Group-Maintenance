@@ -100,6 +100,7 @@ function TicketRow({ t, company, showStore }: { t: SupplierTicketRow; company?: 
         {showStore && <p className="text-[10px] text-[var(--text-faint)] truncate">{t.isIndividual ? 'Individual' : [company, t.storeName].filter(Boolean).join(' · ')}</p>}
         <p className="text-sm text-[var(--text)] truncate">{t.title}</p>
         <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(t.createdAt)}</p>
+        {/* eslint-disable-next-line react-hooks/purity -- Date.now() drives a relative "overdue by" display; cosmetic elapsed-time readout, not a hydration-correctness concern */}
         {t.overdue && <p className="text-[11px] font-semibold text-red-600 dark:text-red-400">Overdue by {humanizeDuration(Date.now() - new Date(t.dueAt).getTime())}</p>}
         {m && <p className={`text-[11px] font-medium ${m.label.startsWith('Declined') ? 'text-red-600 dark:text-red-400' : sm.text}`}>{m.label} · {formatDateTime(m.at)}</p>}
       </div>
@@ -121,6 +122,7 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const s = params.get('store')
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reads window.location (client-only) after mount to apply deep-linked ?store=; cannot run during SSR render
     if (s) setPanelStore(s)
     const f = params.get('filter')
     if (f && PILLS.some(p => p.key === f)) setFilter(f as FilterKey)
@@ -170,6 +172,7 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
   // Restore the expand/collapse state the user left (per-session; wiped on sign-in)
   // so navigating into a ticket and back keeps the lists exactly as they were.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- restores persisted expand/collapse state from localStorage (client-only) after mount; cannot run during SSR render
     setExpanded(new Set(readCollapseSet('supplier-tickets-expanded')))
     setBreachedOpen(readCollapse('supplier-tickets-breached') ?? false)
     setArchiveOpen(readCollapse('supplier-tickets-archive') ?? false)
@@ -189,6 +192,7 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
     if (!new URLSearchParams(window.location.search).get('filter')) return
     didAutoExpand.current = true
     const names = groups.map(([s]) => s)
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot auto-expand driven by a client-only URL query param (?filter); cannot run during SSR render
     setExpanded(new Set(names)); writeCollapseSet('supplier-tickets-expanded', names)
     setBreachedOpen(true); writeCollapse('supplier-tickets-breached', true)
     // The Archive (completed) stays collapsed on a KPI deep-link — only the live

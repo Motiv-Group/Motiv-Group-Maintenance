@@ -17,6 +17,7 @@ export function SearchInput({ placeholder = 'Search…', paramName = 'q' }: Prop
   const [localValue, setLocalValue] = useState(searchParams.get(paramName) ?? '')
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs local input to the URL searchParams (external store) whenever the query string changes; deliberate effect-driven sync
     setLocalValue(searchParams.get(paramName) ?? '')
   }, [searchParams, paramName])
 

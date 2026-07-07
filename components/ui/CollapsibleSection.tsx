@@ -30,6 +30,7 @@ export function CollapsibleSection({
   // After mount, apply the remembered choice (if any) — overrides the default.
   useEffect(() => {
     const stored = readCollapse(id)
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only init from localStorage (readCollapse); cannot run during SSR render, overrides the server-decided default after mount
     if (stored !== null && stored !== open) setOpen(stored)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])

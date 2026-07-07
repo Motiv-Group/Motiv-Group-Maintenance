@@ -80,6 +80,7 @@ function TicketRow({ t }: { t: RegionalTicketRow }) {
         {t.jobRef && <p className="text-[10px] font-mono text-[var(--text-faint)]">{t.jobRef}</p>}
         <p className="text-sm text-[var(--text)] truncate">{t.title}</p>
         <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(t.createdAt)}{t.breached && !t.overdue ? ' · ⚠ breached' : ''}</p>
+        {/* eslint-disable-next-line react-hooks/purity -- Date.now() drives a relative "overdue by" display; cosmetic elapsed-time readout, not a hydration-correctness concern */}
         {t.overdue && <p className="text-[11px] font-semibold text-red-600 dark:text-red-400">Overdue by {humanizeDuration(Date.now() - new Date(t.dueAt).getTime())}</p>}
         {m && <p className={`text-[11px] font-medium ${sm.text}`}>{m.label} · {formatDateTime(m.at)}</p>}
       </div>
@@ -103,6 +104,7 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const s = params.get('store')
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reads window.location (client-only) after mount to apply deep-linked ?store=; cannot run during SSR render
     if (s) setPanelStore(s)
     const f = params.get('filter')
     if (f && PILLS.some(p => p.key === f)) setFilter(f as RmFilter)
@@ -147,6 +149,7 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
   // Restore the expand/collapse state the user left (per-session; wiped on sign-in)
   // so navigating into a ticket and back keeps the lists exactly as they were.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- restores persisted expand/collapse state from localStorage (client-only) after mount; cannot run during SSR render
     setExpanded(new Set(readCollapseSet('rm-tickets-expanded')))
     setBreachedOpen(readCollapse('rm-tickets-breached') ?? false)
     setArchiveOpen(readCollapse('rm-tickets-archive') ?? false)
@@ -174,6 +177,7 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
     if (!params.get('filter') && !params.get('expand')) return
     didAutoExpand.current = true
     const names = groups.map(([s]) => s)
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot auto-expand driven by a client-only URL query param (?filter/?expand); cannot run during SSR render
     setExpanded(new Set(names)); writeCollapseSet('rm-tickets-expanded', names)
     setBreachedOpen(true); writeCollapse('rm-tickets-breached', true)
     // The Archive (completed) stays collapsed on a KPI deep-link — only the live
@@ -290,6 +294,7 @@ function StorePanel({ store, rows, onClose }: { store: string; rows: RegionalTic
   const barTotal = BAR_ORDER.reduce((s, b) => s + c[b], 0) || 1
   const breached = rows.filter(t => t.breached).length
   const active = rows.filter(t => { const b = bucketOf(t.status, t.supplierAssigned); return b !== 'completed' && b !== 'cancelled' })
+  // eslint-disable-next-line react-hooks/purity -- Date.now() computes an "oldest open (days)" stat for display only; cosmetic age readout, not a hydration-correctness concern
   const oldest = active.length ? Math.max(...active.map(t => Math.floor((Date.now() - new Date(t.createdAt).getTime()) / 86_400_000))) : 0
 
   const Stat = ({ label, value, tone = '' }: { label: string; value: number | string; tone?: string }) => (

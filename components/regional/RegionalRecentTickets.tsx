@@ -17,6 +17,7 @@ const MAX_RECENT = 5
 export function RegionalRecentTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
   const [open, setOpen] = useState(false)
   // Remember the expand/collapse choice across navigation (wiped on next sign-in).
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- restores persisted open state from localStorage (client-only) after mount; cannot run during SSR render
   useEffect(() => { const v = readCollapse('rm-recent-open'); if (v !== null) setOpen(v) }, [])
   const toggle = () => setOpen(o => { const v = !o; writeCollapse('rm-recent-open', v); return v })
   const recent = useMemo(() => {
@@ -46,6 +47,7 @@ export function RegionalRecentTickets({ tickets }: { tickets: RegionalTicketRow[
             <div className="min-w-0">
               <p className="text-sm text-[var(--text)] truncate">{t.title}</p>
               <p className="text-[11px] text-[var(--text-faint)] truncate">{t.storeName}{t.branchCode ? ` · ${t.branchCode}` : ''} · {formatDateTime(t.createdAt)}</p>
+              {/* eslint-disable-next-line react-hooks/purity -- Date.now() drives a relative "overdue by" display; cosmetic elapsed-time readout, not a hydration-correctness concern */}
               {t.overdue && <p className="text-[11px] font-semibold text-red-600 dark:text-red-400">Overdue by {humanizeDuration(Date.now() - new Date(t.dueAt).getTime())}</p>}
               {(() => {
                 const m = t.quoteAcceptedAt ? { l: 'Quote accepted', at: t.quoteAcceptedAt }

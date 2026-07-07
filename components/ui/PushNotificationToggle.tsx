@@ -24,6 +24,7 @@ export function PushNotificationToggle() {
       !('serviceWorker' in navigator) ||
       !('PushManager' in window)
     ) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only init from window/navigator feature-detection (Notification/serviceWorker/PushManager); cannot run during SSR render
       setStatus('unsupported')
       return
     }
