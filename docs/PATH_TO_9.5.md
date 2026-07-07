@@ -80,9 +80,9 @@
 | C4 | Vercel log drain → alerts on auth failures + 5xx spikes | Infra | You | 🔲 |
 | C5 | Custom SMTP for Supabase auth mail | Infra | You | 🔲 |
 | C6 | Incident runbook (key rotation, deploy rollback, DB restore) | Infra | Both | 🔲 |
-| C7 | CSP `report-to`/`report-uri` endpoint to collect violations | CSP | Code | 🔲 |
+| C7 | CSP `report-to`/`report-uri` endpoint to collect violations | CSP | Code | ✅ 2026-07-07 — `proxy.ts` CSP now carries `report-uri /api/csp-report` + `report-to csp-endpoint` (+ `Reporting-Endpoints` header); new `app/api/csp-report/route.ts` accepts both wire formats, logs to Sentry + Vercel logs, rate-limited 60/min (a broken policy can storm). ⏳ confirm a violation lands in Sentry once deployed. |
 | C8 | Submit domain to HSTS preload list (header already opts in) | CSP | You | 🔲 |
-| C9 | Schema-drift CI: run `export_live_schema.sql` vs `schema.sql` and diff (monthly or CI) | DB | Code | 🔲 |
+| C9 | Schema-drift CI: run `export_live_schema.sql` vs `schema.sql` and diff (monthly or CI) | DB | Code | 🟡 2026-07-07 — the literal "diff live vs schema.sql" isn't cleanly automatable (schema.sql is a **curated** reconstruction, not a byte-perfect dump; true live diff needs a prod DB-URL secret). Shipped the achievable + testable half: `scripts/check-schema.mjs` (`npm run schema:check`, wired into CI) statically verifies **every FK/policy/alter/trigger references a table schema.sql defines** — catches a folded migration that forgot a CREATE or typo'd a name. **It immediately caught 2 real bugs**: `push_subscriptions.user_id` + `user_profiles.id` FKs were malformed `references public.null(null)` placeholders (unresolved `auth.users` targets) → fixed to `references auth.users(id) on delete cascade`. ⏳ true live-DB drift (pg_dump vs baseline, needs `SUPABASE_DB_URL` secret) still deferred/owner. |
 | C10 | Quarterly: Supabase Security Advisor re-run + manual `xlsx` (SheetJS) advisory check | DB/Deps | You | 🔲 |
 | C11 | POPIA: appoint + register Information Officer with the Information Regulator; signup consent checkbox with stored timestamp | Legal | ⛔ You + Code (checkbox) | 🔲 |
 | C12 | Independent penetration test | Validation | You | 🔲 |
