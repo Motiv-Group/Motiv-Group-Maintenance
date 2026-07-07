@@ -19,7 +19,7 @@ export default async function RegionalSnagPage() {
     if (storeIds.length) {
       const { data: snags } = await admin.from('snags').select('id, ticket_id, store_id, description, severity, status, created_at').eq('company_id', companyId).in('store_id', storeIds).in('status', ['open', 'assigned', 'in_progress']).order('created_at', { ascending: false })
       const ticketIds = Array.from(new Set((snags ?? []).map(s => s.ticket_id).filter(Boolean)))
-      const { data: tickets } = ticketIds.length ? await admin.from('tickets').select('id, title, priority').in('id', ticketIds) : { data: [] as any[] }
+      const { data: tickets } = ticketIds.length ? await admin.from('tickets').select('id, title, priority').in('id', ticketIds as string[]) : { data: [] as any[] }
       const ticketBy = new Map((tickets ?? []).map((t: any) => [t.id, t]))
       rows = (snags ?? []).map((s: any) => ({ id: s.id, ticketId: s.ticket_id, ticketTitle: ticketBy.get(s.ticket_id)?.title ?? '—', priority: ticketBy.get(s.ticket_id)?.priority ?? 'P3', storeName: storeName.get(s.store_id) ?? 'Store', description: s.description ?? 'Snag', severity: s.severity ?? 'medium', status: s.status ?? 'open', createdAt: s.created_at }))
     }

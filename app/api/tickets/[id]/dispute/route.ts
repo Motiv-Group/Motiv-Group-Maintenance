@@ -173,7 +173,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       await admin.from('tickets').update({ last_supplier_update_at: now }).eq('id', ticketId)
       await notifyResolver(admin, ticket, title, 'New reply on the dispute.')
     } else {
-      await push(admin, await supplierIds(admin, ticket.supplier_id), ticket.company_id, title, 'The manager replied on your dispute.', `/supplier/tickets/${ticketId}`)
+      await push(admin, await supplierIds(admin, ticket.supplier_id), ticket.company_id ?? '', title, 'The manager replied on your dispute.', `/supplier/tickets/${ticketId}`)
     }
   } else if (action === 'withdraw') {
     // Supplier concedes → the request STANDS (outcome 'upheld').
@@ -198,7 +198,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     await admin.from('ticket_dispute_messages').insert({ dispute_id: openDispute.id, ticket_id: ticketId, author_id: user.id, author_role: actingRole, body: `${roleName(actingRole)} ${label}. Awaiting the other party's agreement.${note ? ` — ${note}` : ''}`, evidence_urls: [], created_at: now })
     await admin.from('tickets').update({ updated_at: now, ...(actingRole === 'supplier' ? { last_supplier_update_at: now } : { last_internal_update_at: now }) }).eq('id', ticketId)
     if (actingRole === 'supplier') await notifyResolver(admin, ticket, title, 'The supplier proposed to resolve the dispute — confirm to drop the request.')
-    else await push(admin, await supplierIds(admin, ticket.supplier_id), ticket.company_id, title, 'The manager proposed to uphold the request — confirm to agree.', `/supplier/tickets/${ticketId}`)
+    else await push(admin, await supplierIds(admin, ticket.supplier_id), ticket.company_id ?? '', title, 'The manager proposed to uphold the request — confirm to agree.', `/supplier/tickets/${ticketId}`)
   } else if (action === 'confirm') {
     // The OTHER party agrees to the pending proposal → resolve with its outcome.
     if (!openDispute) return NextResponse.json({ error: 'No open dispute on this ticket.' }, { status: 409 })

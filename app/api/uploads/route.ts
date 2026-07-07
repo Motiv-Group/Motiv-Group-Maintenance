@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
   // slip past the cap. Fail-open if the quota infra isn't present yet (migration
   // not applied) — a missing function must never hard-break uploads.
   if (incoming > 0) {
-    const { data: ok, error } = await admin.rpc('reserve_upload_quota', {
+    const { data: ok, error } = await (admin.rpc as any)('reserve_upload_quota', {
       p_user: user.id, p_bytes: incoming, p_cap: MAX_USER_UPLOAD_BYTES,
     })
     if (error) {

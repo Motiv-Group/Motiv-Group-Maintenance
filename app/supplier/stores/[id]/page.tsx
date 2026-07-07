@@ -143,7 +143,7 @@ export default async function AdminStoreDetailPage(props: { params: Promise<{ id
           </div>
         ) : (
           <div className="space-y-2">
-            {(tickets as Ticket[]).map(ticket => (
+            {(tickets as unknown as Ticket[]).map(ticket => (
               <Link key={ticket.id} href={`/supplier/tickets/${ticket.id}`}>
                 <div className="bg-slate-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 hover:border-brand-400 dark:hover:border-gray-400 transition-colors">
                   <div className="flex items-start justify-between gap-3">

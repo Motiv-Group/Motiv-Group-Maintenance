@@ -1,5 +1,6 @@
 import 'server-only'
 import type { createAdminClient } from '@/lib/supabase/server'
+import type { Database } from '@/lib/database.types'
 
 type AdminClient = ReturnType<typeof createAdminClient>
 
@@ -35,7 +36,7 @@ export async function logAudit(admin: AdminClient, entry: AuditEntry): Promise<v
       entity_type: entry.entityType ?? null,
       entity_id: entry.entityId ?? null,
       metadata: entry.metadata ?? null,
-    })
+    } as Database['public']['Tables']['audit_logs']['Insert'])
     if (error) console.error('[audit] insert failed:', entry.action, error.message)
   } catch (e) {
     console.error('[audit] insert threw:', entry.action, e)

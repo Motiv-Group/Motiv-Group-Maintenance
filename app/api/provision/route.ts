@@ -9,6 +9,7 @@ import { sendEmail, storeInviteEmail, supplierInviteEmail, supplierAddedNoticeEm
 import { randomBytes } from 'crypto'
 import { z } from 'zod'
 import { parseJsonBody } from '@/lib/validate'
+import type { Database } from '@/lib/database.types'
 
 const BodySchema = z.object({
   action: z.string().optional(),
@@ -63,7 +64,7 @@ export async function POST(request: Request) {
       }
       case 'invite_rm': {
         if (!isExec) return forbid()
-        const { data: region } = await admin.from('regions').select('id, company_id').eq('id', body.regionId).single()
+        const { data: region } = await admin.from('regions').select('id, company_id').eq('id', body.regionId ?? '').single()
         if (!region || region.company_id !== companyId) return NextResponse.json({ error: 'Invalid region' }, { status: 400 })
         const rm = await inviteUser({ email: body.email, role: 'regional_manager', companyId, roleLabel: 'Regional Manager', baseUrl: origin, link: { regionId: body.regionId } })
         await logAudit(admin, { actorId: user.id, companyId, action: 'provision.invite_rm', entityType: 'user', entityId: rm.userId, metadata: { email: body.email, regionId: body.regionId } })
@@ -118,8 +119,8 @@ export async function POST(request: Request) {
       case 'invite_store_manager': {
         if (!isRM) return forbid()
         const regions = await myRegions()
-        const { data: store } = await admin.from('stores').select('id, region_id, company_id').eq('id', body.storeId).single()
-        if (!store || store.company_id !== companyId || !regions.includes(store.region_id)) return NextResponse.json({ error: 'Store not in your region' }, { status: 400 })
+        const { data: store } = await admin.from('stores').select('id, region_id, company_id').eq('id', body.storeId ?? '').single()
+        if (!store || store.company_id !== companyId || !regions.includes(store.region_id ?? '')) return NextResponse.json({ error: 'Store not in your region' }, { status: 400 })
         const sm = await inviteUser({ email: body.email, role: 'store_manager', companyId, roleLabel: 'Store Manager', baseUrl: origin, link: { storeId: body.storeId } })
         await logAudit(admin, { actorId: user.id, companyId, action: 'provision.invite_store_manager', entityType: 'user', entityId: sm.userId, metadata: { email: body.email, storeId: body.storeId } })
         return NextResponse.json({ ok: true, actionLink: sm.actionLink, emailed: sm.emailed })
@@ -210,8 +211,8 @@ export async function POST(request: Request) {
       case 'store_detail': {
         if (!isRM) return forbid()
         const regions = await myRegions()
-        const { data: store } = await admin.from('stores').select('id, name, sub_store, branch_code, region_id, company_id, active, closed_at').eq('id', body.storeId).single()
-        if (!store || store.company_id !== companyId || !regions.includes(store.region_id)) return NextResponse.json({ error: 'Store not in your region' }, { status: 400 })
+        const { data: store } = await admin.from('stores').select('id, name, sub_store, branch_code, region_id, company_id, active, closed_at').eq('id', body.storeId ?? '').single()
+        if (!store || store.company_id !== companyId || !regions.includes(store.region_id ?? '')) return NextResponse.json({ error: 'Store not in your region' }, { status: 400 })
         const { data: links } = await admin.from('store_users').select('user_id').eq('store_id', store.id)
         const smId = (links ?? [])[0]?.user_id ?? null
         let sm: { userId: string; email: string | null; phone: string | null; fullName: string | null } | null = null
@@ -224,15 +225,15 @@ export async function POST(request: Request) {
       case 'update_store': {
         if (!isRM) return forbid()
         const regions = await myRegions()
-        const { data: store } = await admin.from('stores').select('id, name, sub_store, region_id, company_id').eq('id', body.storeId).single()
-        if (!store || store.company_id !== companyId || !regions.includes(store.region_id)) return NextResponse.json({ error: 'Store not in your region' }, { status: 400 })
+        const { data: store } = await admin.from('stores').select('id, name, sub_store, region_id, company_id').eq('id', body.storeId ?? '').single()
+        if (!store || store.company_id !== companyId || !regions.includes(store.region_id ?? '')) return NextResponse.json({ error: 'Store not in your region' }, { status: 400 })
 
         // Store name / sub-store edits.
         const patch: Record<string, any> = {}
         if (typeof body.store_name === 'string' && body.store_name.trim()) patch.name = body.store_name.trim()
         if (typeof body.sub_store === 'string' && body.sub_store.trim()) patch.sub_store = body.sub_store.trim()
         if (Object.keys(patch).length) {
-          const { error } = await admin.from('stores').update(patch).eq('id', store.id)
+          const { error } = await admin.from('stores').update(patch as Database['public']['Tables']['stores']['Update']).eq('id', store.id)
           if (error) return NextResponse.json({ error: error.message }, { status: 400 })
         }
 
@@ -258,7 +259,7 @@ export async function POST(request: Request) {
             const { error: authErr } = await admin.auth.admin.updateUserById(smId, { email: newEmail, password, email_confirm: true })
             if (authErr) return NextResponse.json({ error: /already|registered|exists/i.test(authErr.message) ? 'That email already has an account' : authErr.message }, { status: 400 })
             profPatch.email = newEmail
-            if (Object.keys(profPatch).length) await admin.from('user_profiles').update(profPatch).eq('id', smId)
+            if (Object.keys(profPatch).length) await admin.from('user_profiles').update(profPatch as Database['public']['Tables']['user_profiles']['Update']).eq('id', smId)
             // Email the new credentials (invite link + username + password).
             const { data: company } = await admin.from('companies').select('name').eq('id', companyId).single()
             const { subject, html, text } = storeInviteEmail({
@@ -267,7 +268,7 @@ export async function POST(request: Request) {
             })
             emailed = await sendEmail({ to: newEmail, subject, html, text })
           } else if (Object.keys(profPatch).length) {
-            await admin.from('user_profiles').update(profPatch).eq('id', smId)
+            await admin.from('user_profiles').update(profPatch as Database['public']['Tables']['user_profiles']['Update']).eq('id', smId)
           }
         }
         await logAudit(admin, { actorId: user.id, companyId, action: 'provision.update_store', entityType: 'store', entityId: store.id, metadata: { storeId: store.id, contactChanged: !!(newEmail || newPhoneRaw) } })
@@ -277,8 +278,8 @@ export async function POST(request: Request) {
       case 'deactivate_store': {
         if (!isRM) return forbid()
         const regions = await myRegions()
-        const { data: store } = await admin.from('stores').select('id, region_id, company_id').eq('id', body.storeId).single()
-        if (!store || store.company_id !== companyId || !regions.includes(store.region_id)) return NextResponse.json({ error: 'Store not in your region' }, { status: 400 })
+        const { data: store } = await admin.from('stores').select('id, region_id, company_id').eq('id', body.storeId ?? '').single()
+        if (!store || store.company_id !== companyId || !regions.includes(store.region_id ?? '')) return NextResponse.json({ error: 'Store not in your region' }, { status: 400 })
         const { error } = await admin.from('stores').update({ active: false, closed_at: new Date().toISOString() }).eq('id', store.id)
         if (error) return NextResponse.json({ error: error.message }, { status: 400 })
         await logAudit(admin, { actorId: user.id, companyId, action: 'provision.deactivate_store', entityType: 'store', entityId: store.id })
@@ -288,8 +289,8 @@ export async function POST(request: Request) {
       case 'reactivate_store': {
         if (!isRM) return forbid()
         const regions = await myRegions()
-        const { data: store } = await admin.from('stores').select('id, region_id, company_id').eq('id', body.storeId).single()
-        if (!store || store.company_id !== companyId || !regions.includes(store.region_id)) return NextResponse.json({ error: 'Store not in your region' }, { status: 400 })
+        const { data: store } = await admin.from('stores').select('id, region_id, company_id').eq('id', body.storeId ?? '').single()
+        if (!store || store.company_id !== companyId || !regions.includes(store.region_id ?? '')) return NextResponse.json({ error: 'Store not in your region' }, { status: 400 })
         const { error } = await admin.from('stores').update({ active: true, closed_at: null }).eq('id', store.id)
         if (error) return NextResponse.json({ error: error.message }, { status: 400 })
         await logAudit(admin, { actorId: user.id, companyId, action: 'provision.reactivate_store', entityType: 'store', entityId: store.id })
@@ -299,8 +300,8 @@ export async function POST(request: Request) {
       case 'delete_store': {
         if (!isRM) return forbid()
         const regions = await myRegions()
-        const { data: store } = await admin.from('stores').select('id, region_id, company_id').eq('id', body.storeId).single()
-        if (!store || store.company_id !== companyId || !regions.includes(store.region_id)) return NextResponse.json({ error: 'Store not in your region' }, { status: 400 })
+        const { data: store } = await admin.from('stores').select('id, region_id, company_id').eq('id', body.storeId ?? '').single()
+        if (!store || store.company_id !== companyId || !regions.includes(store.region_id ?? '')) return NextResponse.json({ error: 'Store not in your region' }, { status: 400 })
         // Block hard-delete when the store has ticket history.
         const { count } = await admin.from('tickets').select('id', { count: 'exact', head: true }).eq('store_id', store.id)
         if ((count ?? 0) > 0) return NextResponse.json({ error: 'This store has tickets — deactivate it instead of deleting.' }, { status: 400 })

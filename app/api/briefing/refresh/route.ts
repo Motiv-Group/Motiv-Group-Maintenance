@@ -34,7 +34,7 @@ export async function POST(request: Request) {
 
   const date = new Date().toISOString().slice(0, 10)
   const { error } = await admin.from('daily_briefings').delete()
-    .eq('company_id', profile.company_id).eq('scope', scope).eq('scope_id', scopeId).eq('briefing_date', date)
+    .eq('company_id', profile.company_id).eq('scope', scope ?? '').eq('scope_id', scopeId).eq('briefing_date', date)
   if (error) return serverError(error)
 
   return NextResponse.json({ ok: true })

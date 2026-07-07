@@ -127,7 +127,7 @@ export default async function RegionalStoreDetailPage(props: { params: Promise<{
     phone: sm?.phone ?? null,
   }
 
-  const ticketList = (tickets ?? []) as (Ticket & { quotes: Quote[] })[]
+  const ticketList = (tickets ?? []) as unknown as (Ticket & { quotes: Quote[] })[]
   const allQuotes  = ticketList.flatMap(t => t.quotes ?? [])
 
   // Ticket groups
