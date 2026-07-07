@@ -55,10 +55,9 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ci-placeholder-service-role-key
           NEXT_PUBLIC_APP_URL: https://example.com
 
-      # Fail-on-high for production dependencies. NON-BLOCKING for now: there is a
-      # known HIGH Next.js advisory that only clears by upgrading to Next 15/16
-      # (tracker item B6, a breaking change). Once B6 lands and this is clean,
-      # delete `continue-on-error` so a new high vuln blocks the merge.
+      # Fail-on-high for production dependencies — BLOCKING: a new prod HIGH vuln
+      # now fails CI. (Was non-blocking until B6 upgraded Next 14 -> 16, which
+      # cleared the Next advisory bundle; `npm audit --omit=dev --audit-level=high`
+      # is now 0-high — only moderates remain, via next's nested postcss.)
       - name: Audit (prod deps, high)
         run: npm audit --omit=dev --audit-level=high
-        continue-on-error: true
