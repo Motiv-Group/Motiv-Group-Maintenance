@@ -42,7 +42,8 @@ function DetailItem({ label, value }: { label: string; value: string }) {
   )
 }
 
-export default async function StoreTicketDetailPage({ params }: { params: { id: string } }) {
+export default async function StoreTicketDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   // Wave 1: auth gate ∥ ticket ∥ per-ticket child rows (all key on params.id).
   // The old version ran SIX serial awaits — the main reason this page felt slow.
   const admin = createAdminClient()

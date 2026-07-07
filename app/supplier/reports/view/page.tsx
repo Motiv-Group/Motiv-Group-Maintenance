@@ -7,12 +7,13 @@ import { addNarrative } from '@/lib/report-groq'
 import { ReportDocument } from '@/components/reports/ReportDocument'
 import { PrintButton } from '@/components/reports/PrintButton'
 
-export default async function SupplierReportView({
-  searchParams,
-}: {
-  searchParams: { period?: string; from?: string; to?: string }
-}) {
-  const supabase = createClient()
+export default async function SupplierReportView(
+  props: {
+    searchParams: Promise<{ period?: string; from?: string; to?: string }>
+  }
+) {
+  const searchParams = await props.searchParams;
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 

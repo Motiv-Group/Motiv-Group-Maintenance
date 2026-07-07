@@ -11,8 +11,7 @@ const nextConfig = {
     // supplier updates" watermark never re-evaluated. 0 = always refetch fresh on
     // navigation, which suits this force-dynamic + realtime app.
     staleTimes: { dynamic: 0 },
-    // Required on Next 14.2 for instrumentation.ts (Sentry) to load.
-    instrumentationHook: true,
+    // (instrumentationHook removed — instrumentation.ts is stable in Next 16, no flag needed.)
   },
   images: {
     remotePatterns: [

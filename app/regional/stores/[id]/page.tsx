@@ -84,8 +84,9 @@ function CollapsibleSection({
   )
 }
 
-export default async function RegionalStoreDetailPage({ params }: { params: { id: string } }) {
-  const supabase    = createClient()
+export default async function RegionalStoreDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const supabase    = await createClient()
   const adminClient = createAdminClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')

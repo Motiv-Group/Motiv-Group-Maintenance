@@ -60,8 +60,9 @@ const BodySchema = z.object({
 // Single entry point for every lifecycle move. Validates the transition against
 // lib/workflow (status + role), applies the status change + side effects, and
 // notifies the relevant parties.
-export async function POST(request: Request, { params }: { params: { id: string } }) {
-  const supabase = createClient()
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   if (!(await rateLimit(`transition:${user.id}`, 40, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
@@ -319,8 +320,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   await notify(admin, action, ticket, prof.full_name ?? null, { scheduleProposed, scheduledAt: (updates.scheduled_at as string | undefined) ?? snagFixAt, declineReason: body.reason ?? null })
 
-  revalidatePath(`/supplier/tickets/${ticketId}`); revalidatePath('/supplier')
-  revalidatePath('/regional'); revalidatePath('/regional/tickets'); revalidatePath('/client'); revalidatePath('/client/visits'); revalidatePath(`/client/tickets/${ticketId}`); revalidatePath('/executive')
+  revalidatePath(`/supplier/tickets/${ticketId}`);revalidatePath('/supplier')
+  revalidatePath('/regional');revalidatePath('/regional/tickets');revalidatePath('/client');revalidatePath('/client/visits');revalidatePath(`/client/tickets/${ticketId}`);revalidatePath('/executive')
   if (action === 'close_out' || tr.to === 'completed') {
     // Completion → refresh reports + estate/regional dashboards (health scores live-compute from tickets).
     revalidatePath('/regional/reports'); revalidatePath('/executive/reports'); revalidatePath('/executive/stores'); revalidatePath('/regional/stores')

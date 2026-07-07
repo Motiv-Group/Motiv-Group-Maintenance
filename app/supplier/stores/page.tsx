@@ -4,7 +4,7 @@ import { Store, ArrowRight, Users } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 
 export default async function AdminStoresPage() {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   // v3: stores live on `stores`; RMs are user_profiles rows; a store's RM is

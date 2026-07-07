@@ -2,7 +2,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 
 /** Count of unread notifications for the current user (0 if signed out). */
 export async function getUnreadCount(): Promise<number> {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return 0
   const admin = createAdminClient()

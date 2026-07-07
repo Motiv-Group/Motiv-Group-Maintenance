@@ -6,11 +6,12 @@ import { Users, ArrowRight, SearchX } from 'lucide-react'
 import { SearchInput } from '@/components/ui/SearchInput'
 import { Suspense } from 'react'
 
-export default async function AdminRegionalPage({
-  searchParams,
-}: {
-  searchParams: { q?: string }
-}) {
+export default async function AdminRegionalPage(
+  props: {
+    searchParams: Promise<{ q?: string }>
+  }
+) {
+  const searchParams = await props.searchParams;
   const adminClient = createAdminClient()
   const q = (searchParams.q ?? '').toLowerCase().trim()
 

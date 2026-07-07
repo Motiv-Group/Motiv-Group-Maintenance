@@ -90,8 +90,9 @@ async function resolveDispute(admin: Admin, ticket: any, dispute: any, outcome: 
 // Supplier↔RM dispute thread over a snag or a "more evidence" request. A dispute
 // pauses the snag/evidence step (enforced in the transition route) until the RM
 // resolves it as 'upheld' (requirement stands) or 'withdrawn' (dropped → close-out).
-export async function POST(request: Request, { params }: { params: { id: string } }) {
-  const supabase = createClient()
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   if (!(await rateLimit(`dispute:${user.id}`, 40, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
@@ -214,7 +215,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
   }
 
-  revalidatePath(`/supplier/tickets/${ticketId}`); revalidatePath(`/regional/tickets/${ticketId}`)
-  revalidatePath('/supplier'); revalidatePath('/regional')
+  revalidatePath(`/supplier/tickets/${ticketId}`);revalidatePath(`/regional/tickets/${ticketId}`)
+  revalidatePath('/supplier');revalidatePath('/regional')
   return NextResponse.json({ ok: true })
 }

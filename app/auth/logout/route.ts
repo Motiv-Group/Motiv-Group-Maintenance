@@ -10,13 +10,13 @@ export const dynamic = 'force-dynamic'
 // redirect response — a token refresh (e.g. after submitting a quote) can leave a
 // cookie that signOut's own clear misses, which previously made logout "stick".
 export async function POST(request: Request) {
-  const supabase = createClient()
+  const supabase = await createClient()
   try { await supabase.auth.signOut() } catch {}
 
   // 303 → browser re-issues the request to /auth/login as a GET
   const res = NextResponse.redirect(new URL('/auth/login', request.url), { status: 303 })
   try {
-    for (const c of cookies().getAll()) {
+    for (const c of (await cookies()).getAll()) {
       if (c.name.startsWith('sb-')) res.cookies.set(c.name, '', { maxAge: 0, path: '/' })
     }
   } catch {}

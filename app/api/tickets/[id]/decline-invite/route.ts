@@ -9,8 +9,9 @@ const BodySchema = z.object({ reason: z.string().optional().nullable() })
 
 // POST /api/tickets/[id]/decline-invite — an invited supplier declines to quote.
 // Marks their ticket_suppliers row 'declined'; the ticket itself is unaffected.
-export async function POST(request: Request, { params }: { params: { id: string } }) {
-  const supabase = createClient()
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   if (!(await rateLimit(`decline-invite:${user.id}`, 30, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
@@ -35,6 +36,6 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const now = new Date().toISOString()
   await admin.from('ticket_suppliers').update({ status: 'declined', decline_reason: body.reason ?? null, responded_at: now }).eq('id', invite.id)
 
-  revalidatePath('/supplier'); revalidatePath(`/supplier/tickets/${ticket.id}`); revalidatePath(`/regional/tickets/${ticket.id}`)
+  revalidatePath('/supplier');revalidatePath(`/supplier/tickets/${ticket.id}`);revalidatePath(`/regional/tickets/${ticket.id}`)
   return NextResponse.json({ ok: true })
 }

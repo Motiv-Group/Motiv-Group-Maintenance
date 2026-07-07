@@ -6,7 +6,8 @@ import { SupplierEditForm } from '@/components/admin/SupplierEditForm'
 import { BackButton } from '@/components/ui/BackButton'
 import type { Supplier } from '@/lib/types'
 
-export default async function EditSupplierPage({ params }: { params: { id: string } }) {
+export default async function EditSupplierPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const adminClient = createAdminClient()
   const { data } = await adminClient.from('suppliers').select('*').eq('id', params.id).single()
   if (!data) notFound()

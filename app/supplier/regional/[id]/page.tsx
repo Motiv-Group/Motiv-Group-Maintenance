@@ -8,7 +8,8 @@ import {
   ChevronDown, ChevronUp, User, Hash,
 } from 'lucide-react'
 
-export default async function RMDetailPage({ params }: { params: { id: string } }) {
+export default async function RMDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const adminClient = createAdminClient()
 
   // v3: the RM is a user_profiles row; their branches are the stores in the

@@ -17,7 +17,7 @@ const BodySchema = z.object({
 const SCOPES = new Set(['store', 'region', 'supplier', 'estate'])
 
 export async function POST(request: Request) {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   if (!(await rateLimit(`briefing-refresh:${user.id}`, 5, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })

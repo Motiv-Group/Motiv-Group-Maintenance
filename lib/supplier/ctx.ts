@@ -8,7 +8,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
  * — they have no client company; rows they create carry a null company_id.
  */
 export async function supplierCtx() {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
   const admin = createAdminClient()

@@ -22,9 +22,9 @@ export const viewport: Viewport = {
   themeColor: '#0d1f2d',
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // Per-request CSP nonce set by middleware; applied to the inline theme script.
-  const nonce = headers().get('x-nonce') ?? undefined
+  const nonce = (await headers()).get('x-nonce') ?? undefined
   return (
     <html lang="en" suppressHydrationWarning>
       <head>

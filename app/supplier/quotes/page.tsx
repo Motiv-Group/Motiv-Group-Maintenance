@@ -38,7 +38,8 @@ interface QItem {
   createdAt: string; amount: number | null; status: string; byYou?: boolean; byClient?: boolean
 }
 
-export default async function SupplierQuotesPage({ searchParams }: { searchParams?: { status?: string } }) {
+export default async function SupplierQuotesPage(props: { searchParams?: Promise<{ status?: string }> }) {
+  const searchParams = await props.searchParams;
   const { companyId, supplierIds } = await requireSupplierV3()
   if (!companyId) redirect('/supplier') // standalone self-signup supplier — see dashboard
   const d = await assembleSupplierDashboard(companyId, supplierIds)

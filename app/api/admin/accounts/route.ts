@@ -54,7 +54,7 @@ async function findOrCreateRegion(admin: Admin, companyId: string, name: string,
 //  invite_sm:        Store Manager + their store, in a company region
 // Each sends an email set-password (activation) link via inviteUser.
 export async function POST(request: Request) {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   if (!(await rateLimit(`admin-accounts:${user.id}`, 30, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })

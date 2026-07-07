@@ -17,7 +17,7 @@ const BodySchema = z.object({
 // commercial phase). Marks their invite declined, withdraws any pending quote,
 // and notifies the region's RMs — the ticket carries on with the other suppliers.
 export async function POST(request: Request) {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   if (!(await rateLimit(`supplier-decline:${user.id}`, 20, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })

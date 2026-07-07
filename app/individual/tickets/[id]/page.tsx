@@ -17,7 +17,8 @@ import { rmStatusMeta, formatDateTime, OPERATIONAL_IMPACT_LABELS } from '@/lib/u
 
 const ASSIGNABLE = ['open', 'info_requested', 'assigned', 'assessment', 'quote_requested', 'quoted', 'quote_revision', 'suppliers_declined']
 
-export default async function IndividualTicketDetailPage({ params }: { params: { id: string } }) {
+export default async function IndividualTicketDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   // One parallel wave: auth gate ∥ ticket ∥ child rows (all key on params.id).
   const admin = createAdminClient()
   const [{ userId }, { data: t }, { data: quotes }, { data: signoffs }, { data: invites }, { data: motiv }, { data: snags }, { data: disputeRows }, { data: disputeMsgRows }, { data: disputeExtra }] = await Promise.all([

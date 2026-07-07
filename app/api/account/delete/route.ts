@@ -21,7 +21,7 @@ const BodySchema = z.object({ confirm: z.string().optional() })
  * This is irreversible — the client must send { confirm: "DELETE" }.
  */
 export async function POST(request: Request) {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 

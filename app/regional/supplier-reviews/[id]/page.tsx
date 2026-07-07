@@ -8,7 +8,8 @@ import { Card } from '@/components/exec/ui'
 import { Stars } from '@/components/ui/Stars'
 import { formatDate } from '@/lib/utils'
 
-export default async function SupplierReviewsPage({ params }: { params: { id: string } }) {
+export default async function SupplierReviewsPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { companyId } = await requireRegionalV3()
   const admin = createAdminClient()
   const { data: supplier } = await admin.from('suppliers').select('id, company_name, company_id').eq('id', params.id).single()
