@@ -6,6 +6,7 @@ import { computePriority } from '@/lib/health/priority'
 import { rateLimit } from '@/lib/rate-limit'
 import { z } from 'zod'
 import { parseJsonBody } from '@/lib/validate'
+import type { Database } from '@/lib/database.types'
 
 const PatchSchema = z.object({
   title: z.string(),
@@ -49,7 +50,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
   if (!allowed) {
     let owns = ticket.created_by === user.id
     if (!owns) {
-      const { data: link } = await admin.from('store_users').select('store_id').eq('user_id', user.id).eq('store_id', ticket.store_id).maybeSingle()
+      const { data: link } = await admin.from('store_users').select('store_id').eq('user_id', user.id).eq('store_id', ticket.store_id ?? '').maybeSingle()
       owns = !!link
     }
     allowed = owns
@@ -87,7 +88,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
   const update: Record<string, unknown> = { title, description, category, operational_impact: impact, severity, priority, ...flags, updated_at: now, edited_at: now, edited_by: user.id, edit_note: editNote }
   if (Array.isArray(photo_urls)) update.photo_urls = photo_urls
 
-  const { data, error } = await admin.from('tickets').update(update).eq('id', params.id).select().single()
+  const { data, error } = await admin.from('tickets').update(update as Database['public']['Tables']['tickets']['Update']).eq('id', params.id).select().single()
   if (error) return serverError(error)
 
   revalidatePath('/client');revalidatePath('/client/tickets');revalidatePath(`/client/tickets/${params.id}`)
@@ -118,7 +119,7 @@ export async function DELETE(request: Request, props: { params: Promise<{ id: st
 
   let owns = ticket.created_by === user.id
   if (!owns) {
-    const { data: link } = await admin.from('store_users').select('store_id').eq('user_id', user.id).eq('store_id', ticket.store_id).maybeSingle()
+    const { data: link } = await admin.from('store_users').select('store_id').eq('user_id', user.id).eq('store_id', ticket.store_id ?? '').maybeSingle()
     owns = !!link
   }
   if (!owns) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })

@@ -7,6 +7,7 @@ import { SLA_VERSION } from '@/lib/sla'
 import { z } from 'zod'
 import { parseJsonBody } from '@/lib/validate'
 import { logAudit } from '@/lib/audit'
+import type { Database } from '@/lib/database.types'
 
 const BodySchema = z.object({
   password: z.string().optional(),
@@ -122,7 +123,7 @@ export async function POST(request: Request) {
       contact_name: b.contact_name.trim(), trades, trade: trades[0] ?? null,
       vat_number: vatNumber, address: b.address?.trim() || null,
     }
-    await admin.from('suppliers').update(supUpd).eq('id', inv.supplier_id)
+    await admin.from('suppliers').update(supUpd as Database['public']['Tables']['suppliers']['Update']).eq('id', inv.supplier_id)
 
     await admin.from('supplier_sla_acceptances').insert({
       supplier_id: inv.supplier_id, user_id: uid, sla_version: SLA_VERSION, signed_name: signedName, ip,

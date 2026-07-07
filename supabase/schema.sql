@@ -400,7 +400,9 @@ create table if not exists public.snags (
   assigned_at                  timestamptz,
   scheduled_at                 timestamptz,
   schedule_status              text,
-  schedule_decline_reason      text
+  schedule_decline_reason      text,
+  schedule_agreed_at           timestamptz,
+  schedule_declined_at         timestamptz
 );
 
 create table if not exists public.store_health_scores (

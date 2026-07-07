@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "schema:check": "node scripts/check-schema.mjs",
+    "gen:types": "node scripts/gen-db-types.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },
