@@ -15,6 +15,7 @@ export function SlideOver({ onClose, children }: { onClose: () => void; children
   const closing = useRef(false)
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only portal-mount gate; setMounted(true) must run after mount so createPortal(document.body) never runs during SSR render
     setMounted(true)
     const id = requestAnimationFrame(() => setShown(true))
     return () => cancelAnimationFrame(id)
@@ -41,6 +42,7 @@ export function SlideOver({ onClose, children }: { onClose: () => void; children
         role="dialog"
         aria-modal="true"
       >
+        {/* eslint-disable-next-line react-hooks/refs -- `close` reads closing.current from an event/close handler (backdrop click, child action), never during render */}
         {children(close)}
       </aside>
     </div>,

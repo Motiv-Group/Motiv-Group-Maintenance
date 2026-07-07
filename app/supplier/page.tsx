@@ -60,6 +60,7 @@ function TicketRow({ t, company }: { t: SupplierTicketRow; company?: string }) {
         <p className="text-[11px] text-[var(--text-muted)] truncate">{t.title}</p>
         <p className="text-[11px] text-[var(--text-faint)]">Logged {formatDateTime(t.createdAt)}</p>
         {m && <p className={`text-[11px] font-medium ${sm.text}`}>{m.label} · {formatDateTime(m.at)}</p>}
+        {/* eslint-disable-next-line react-hooks/purity -- Date.now in a server-component render runs once server-side — no hydration */}
         {t.overdue && <p className="text-[11px] font-semibold text-red-600 dark:text-red-400">Overdue by {humanizeDuration(Date.now() - new Date(t.dueAt).getTime())}</p>}
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">

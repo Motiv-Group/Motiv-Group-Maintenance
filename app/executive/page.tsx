@@ -225,6 +225,7 @@ export default async function ExecutiveEstatePage() {
                 <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded shrink-0 w-16 text-center ${BAND[d.band]}`}>{d.band}</span>
                 <p className="text-xs text-[var(--text)] flex-1 min-w-0 truncate">{d.title}</p>
                 {d.exposureValue ? <span className="text-xs text-[var(--text-muted)] whitespace-nowrap shrink-0">{fmtK(d.exposureValue)}</span> : null}
+                {/* eslint-disable-next-line react-hooks/purity -- Date.now in a server-component render runs once server-side — no hydration */}
                 <span className="text-[10px] text-[var(--text-faint)] whitespace-nowrap shrink-0 w-16 text-right">Due {new Date(Date.now() + d.deadlineDays * 86_400_000).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', timeZone: 'Africa/Johannesburg' })}</span>
               </div>
             ))}

@@ -19,7 +19,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const stored = localStorage.getItem('theme') as Theme | null
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
     const initial = stored ?? (prefersDark ? 'dark' : 'light')
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only init from localStorage + matchMedia(prefers-color-scheme); cannot run during SSR render
     setTheme(initial)
+    // eslint-disable-next-line react-hooks/immutability -- applyTheme mutates document.documentElement (classList/style.colorScheme), an external DOM node not owned by React; this is an intentional post-mount side effect, not component-state mutation
     applyTheme(initial)
     setMounted(true)
   }, [])

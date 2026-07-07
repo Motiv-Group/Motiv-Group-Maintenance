@@ -32,6 +32,7 @@ export function RegionalStores({ stores, archived = [] }: { stores: StoreCard[];
   // store's side panel directly (?store=<id>).
   useEffect(() => {
     const id = new URLSearchParams(window.location.search).get('store')
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time deep-link sync from the URL on mount; the empty-dep effect intentionally opens the panel once
     if (id && stores.some(s => s.storeId === id)) { setSelId(id); setOpen(true) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

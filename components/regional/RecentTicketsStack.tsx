@@ -43,6 +43,7 @@ export function TicketContent({ ticket, variant }: { ticket: RecentTicket; varia
     : ticket.store?.sub_store
 
   const jobId = ticket.job_ref ?? formatJobId(ticket.job_number)
+  // eslint-disable-next-line react-hooks/purity -- Date.now() flags a ticket open >7 days to show a "7d+" badge; cosmetic staleness indicator, not a hydration-correctness concern
   const isStaleOpen = ticket.status === 'open' && Date.now() - new Date(ticket.created_at).getTime() > STALE_MS
 
   return (

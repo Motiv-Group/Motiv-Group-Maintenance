@@ -14,6 +14,7 @@ export function PersistentDetails({ persistKey, defaultOpen = false, className, 
   children: ReactNode
 }) {
   const [open, setOpen] = useState(defaultOpen)
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only init from localStorage (readCollapse); cannot run during SSR render, applies remembered open-state after mount
   useEffect(() => { const v = readCollapse(persistKey); if (v !== null) setOpen(v) }, [persistKey])
 
   return (
