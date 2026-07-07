@@ -9,6 +9,7 @@ import { sendPushToMany } from '@/lib/push'
 import { resolveTransition, statusLabel, type WorkflowRole } from '@/lib/workflow'
 import { loadSlaResolver } from '@/lib/health/data'
 import type { SlaTargets } from '@/lib/health/types'
+import type { Database } from '@/lib/database.types'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -315,7 +316,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   // stored signals stay in lock-step with the health engine's own derivation.
   Object.assign(updates, lifecycleFields(tr.to, now, tgt))
 
-  const { error: upErr } = await admin.from('tickets').update(updates).eq('id', ticketId)
+  const { error: upErr } = await admin.from('tickets').update(updates as Database['public']['Tables']['tickets']['Update']).eq('id', ticketId)
   if (upErr) return serverError(upErr)
 
   await notify(admin, action, ticket, prof.full_name ?? null, { scheduleProposed, scheduledAt: (updates.scheduled_at as string | undefined) ?? snagFixAt, declineReason: body.reason ?? null })

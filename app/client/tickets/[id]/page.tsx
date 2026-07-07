@@ -53,7 +53,7 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
     admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', params.id).order('created_at', { ascending: false }),
     admin.from('snags').select('scheduled_at, schedule_status, status').eq('ticket_id', params.id).order('created_at', { ascending: false }),
   ])
-  if (!t || !storeIds.includes(t.store_id)) redirect('/client/tickets')
+  if (!t || !storeIds.includes(t.store_id ?? '')) redirect('/client/tickets')
 
   // Wave 2: lookups that need ticket columns (editor, visit names, SLA rules, signing).
   const showVisit = !!t.scheduled_at && !['completed', 'cancelled', 'declined'].includes(t.status)

@@ -32,7 +32,7 @@ export async function getSupabaseStats(): Promise<ProviderResult<SupabaseStats>>
   // auth user count, and per-table row/size estimates (see the
   // admin_db_stats migration). Falls back to per-table head counts if the
   // function hasn't been applied to the database yet.
-  const { data, error } = await db.rpc('admin_db_stats')
+  const { data, error } = await (db.rpc as any)('admin_db_stats')
   if (!error && data) {
     const d = data as any
     const tables: TableStat[] = Array.isArray(d.tables)
@@ -54,7 +54,7 @@ export async function getSupabaseStats(): Promise<ProviderResult<SupabaseStats>>
   const counts = await Promise.all(
     FALLBACK_TABLES.map(async (table) => {
       try {
-        const { count } = await db.from(table).select('id', { count: 'exact', head: true })
+        const { count } = await db.from(table as any).select('id', { count: 'exact', head: true })
         return { table, rows: count ?? null, bytes: null } as TableStat
       } catch {
         return { table, rows: null, bytes: null } as TableStat

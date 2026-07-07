@@ -22,8 +22,8 @@ export default async function RegionalSignoffPage() {
     if (tks.length) {
       const supplierIds = Array.from(new Set(tks.map(t => t.supplier_id).filter(Boolean)))
       const [{ data: stores }, { data: suppliers }] = await Promise.all([
-        admin.from('stores').select('id, name, sub_store, branch_code').in('id', Array.from(new Set(tks.map(t => t.store_id)))),
-        supplierIds.length ? admin.from('suppliers').select('id, company_name').in('id', supplierIds) : Promise.resolve({ data: [] as any[] }),
+        admin.from('stores').select('id, name, sub_store, branch_code').in('id', Array.from(new Set(tks.map(t => t.store_id))) as string[]),
+        supplierIds.length ? admin.from('suppliers').select('id, company_name').in('id', supplierIds as string[]) : Promise.resolve({ data: [] as any[] }),
       ])
       const storeName = new Map((stores ?? []).map((s: any) => [s.id, storeLabel(s.name, s.sub_store)]))
       const storeBranch = new Map((stores ?? []).map((s: any) => [s.id, s.branch_code ?? null]))

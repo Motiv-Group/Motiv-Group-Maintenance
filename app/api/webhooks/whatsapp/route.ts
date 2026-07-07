@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { sendPushToMany } from '@/lib/push';
 import { OPERATIONAL_IMPACT_LABELS, priorityWord } from '@/lib/utils';
 import type { Priority } from '@/lib/types';
+import type { Database } from '@/lib/database.types';
 import { getBriefingForUser } from '@/lib/briefing/generate';
 import { briefingToText } from '@/lib/briefing/facts';
 import https from 'https';
@@ -361,10 +362,10 @@ async function appendSessionPhoto(
   photoUrl: string,
   adminClient: ReturnType<typeof createAdminClient>
 ): Promise<string[]> {
-  const { data, error } = await adminClient.rpc('append_session_photo', {
+  const { data, error } = await adminClient.rpc('append_session_photo' as never, {
     session_id: sessionId,
     photo_url:  photoUrl,
-  });
+  } as never);
   if (error) throw new Error(`append_session_photo RPC failed: ${error.message}`);
   return (data as string[]) ?? [];
 }
@@ -755,7 +756,7 @@ async function handleConfirmText(from: string, session: WaSession, body: string,
       if (!['low', 'medium', 'high', 'urgent'].includes(v)) { await sendWhatsAppReply(from, '⚠️ Priority must be low, medium, high or urgent.'); return; }
       update.priority = v; view.priority = v;
     }
-    await adminClient.from('whatsapp_sessions').update(update).eq('id', session.id);
+    await adminClient.from('whatsapp_sessions').update(update as Database['public']['Tables']['whatsapp_sessions']['Update']).eq('id', session.id);
     await sendDraft(from, view);
     return;
   }
@@ -817,7 +818,7 @@ async function applyFieldAndRedraw(from: string, session: WaSession, field: stri
     case 'impact':      update.operational_impact = value; view.operational_impact = value; break;
     case 'priority':    update.priority = value; view.priority = value; break;
   }
-  await adminClient.from('whatsapp_sessions').update(update).eq('id', session.id);
+  await adminClient.from('whatsapp_sessions').update(update as Database['public']['Tables']['whatsapp_sessions']['Update']).eq('id', session.id);
   await sendDraft(from, view);
 }
 

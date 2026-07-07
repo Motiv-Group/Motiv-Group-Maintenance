@@ -1,6 +1,7 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import type { Database } from '@/lib/database.types'
 
 import { serverError } from '@/lib/api-error'
 import { parseJsonBody } from '@/lib/validate'
@@ -59,7 +60,7 @@ export async function PATCH(request: Request) {
   if (typeof requested_region_code === 'string') updateData.requested_region_code = requested_region_code.trim().toUpperCase()
 
   const admin = createAdminClient()
-  const { data: profile, error } = await admin.from('user_profiles').update(updateData).eq('id', user.id).select().single()
+  const { data: profile, error } = await admin.from('user_profiles').update(updateData as Database['public']['Tables']['user_profiles']['Update']).eq('id', user.id).select().single()
   if (error) return serverError(error)
   return NextResponse.json({ profile })
 }

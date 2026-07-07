@@ -5,6 +5,7 @@ import { serverError } from '@/lib/api-error'
 import { revalidatePath } from 'next/cache'
 import { rateLimit } from '@/lib/rate-limit'
 import { supplierCtx } from '@/lib/supplier/ctx'
+import type { Database } from '@/lib/database.types'
 
 const BodySchema = z.object({
   name: z.any().optional(),
@@ -20,7 +21,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
 
   // Ownership: the technician must belong to one of the caller's suppliers.
   const { data: tech } = await ctx.admin.from('technicians').select('id, supplier_id').eq('id', params.id).single()
-  if (!tech || !ctx.supplierIds.includes(tech.supplier_id)) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (!tech || !ctx.supplierIds.includes(tech.supplier_id ?? '')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const parsed = await parseJsonBody(request, BodySchema)
   if (!parsed.ok) return parsed.error
@@ -29,7 +30,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
   if (body.name !== undefined) { const n = String(body.name).trim(); if (!n) return NextResponse.json({ error: 'Name cannot be empty.' }, { status: 400 }); patch.name = n }
   if (body.phone !== undefined) { const p = String(body.phone).trim(); if (!p) return NextResponse.json({ error: 'Phone cannot be empty.' }, { status: 400 }); patch.phone = p }
 
-  const { error } = await ctx.admin.from('technicians').update(patch).eq('id', params.id)
+  const { error } = await ctx.admin.from('technicians').update(patch as Database['public']['Tables']['technicians']['Update']).eq('id', params.id)
   if (error) return serverError(error)
   revalidatePath('/supplier/technicians')
   return NextResponse.json({ ok: true })
@@ -42,7 +43,7 @@ export async function DELETE(_request: Request, props: { params: Promise<{ id: s
   if (!ctx) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { data: tech } = await ctx.admin.from('technicians').select('id, supplier_id').eq('id', params.id).single()
-  if (!tech || !ctx.supplierIds.includes(tech.supplier_id)) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (!tech || !ctx.supplierIds.includes(tech.supplier_id ?? '')) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const { error } = await ctx.admin.from('technicians').update({ active: false, updated_at: new Date().toISOString() }).eq('id', params.id)
   if (error) return serverError(error)

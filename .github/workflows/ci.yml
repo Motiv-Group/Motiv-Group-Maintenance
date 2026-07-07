@@ -49,6 +49,12 @@ jobs:
       - name: Schema consistency
         run: npm run schema:check
 
+      # DB types (B20) are generated from schema.sql — regenerate and fail if the
+      # committed lib/database.types.ts is stale (someone edited schema.sql without
+      # running `npm run gen:types`).
+      - name: DB types up to date
+        run: npm run gen:types && git diff --exit-code -- lib/database.types.ts
+
       - name: Test
         run: npm test
 

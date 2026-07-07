@@ -62,7 +62,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   const now = new Date().toISOString()
 
   const reason = body.reason ?? null
-  const { data: su } = await admin.from('supplier_users').select('user_id').eq('supplier_id', quote.supplier_id)
+  const { data: su } = await admin.from('supplier_users').select('user_id').eq('supplier_id', quote.supplier_id ?? '')
   const ids = (su ?? []).map(r => r.user_id)
   const notify = async (message: string, pushTitle: string) => {
     if (!ids.length) return
@@ -81,7 +81,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     // Stamp updated_at so the audit trail shows the real decline time (there's no
     // updated_at trigger on quotes; without this it would read the submission time).
     await admin.from('quotes').update({ status: 'declined', decline_reason: reason, updated_at: now }).eq('id', quote.id)
-    await admin.from('ticket_suppliers').update({ status: 'declined', decline_reason: reason, declined_by: 'regional_manager', responded_at: now }).eq('ticket_id', ticket.id).eq('supplier_id', quote.supplier_id)
+    await admin.from('ticket_suppliers').update({ status: 'declined', decline_reason: reason, declined_by: 'regional_manager', responded_at: now }).eq('ticket_id', ticket.id).eq('supplier_id', quote.supplier_id ?? '')
     // Decide the ticket's next state from what's left on it:
     //  • another quote still pending      → 'quoted'          (keep reviewing)
     //  • every invited supplier now off it → 'open'           (RM must re-assign)
@@ -119,7 +119,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     const quoteDueAt = isIndividual
       ? new Date(Date.now() + 48 * 60 * 60_000).toISOString()
       : new Date(Date.now() + (await loadSlaResolver(admin, ticket.company_id))(ticket.priority as 'P1' | 'P2' | 'P3' | 'P4').quote_due_mins * 60_000).toISOString()
-    await admin.from('ticket_suppliers').update({ status: 'invited', declined_by: null, requote_requested_at: now, responded_at: now }).eq('ticket_id', ticket.id).eq('supplier_id', quote.supplier_id)
+    await admin.from('ticket_suppliers').update({ status: 'invited', declined_by: null, requote_requested_at: now, responded_at: now }).eq('ticket_id', ticket.id).eq('supplier_id', quote.supplier_id ?? '')
     await admin.from('tickets').update({
       status: 'quote_requested', supplier_id: null, quote_required: true, quote_requested_at: now, quote_due_at: quoteDueAt,
       // Set-once: keep the FIRST quote request in the audit trail.
@@ -140,8 +140,8 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   // audit trail shows the real approve/decline time (no updated_at trigger on quotes).
   await admin.from('quotes').update({ status: 'accepted', updated_at: now }).eq('id', quote.id)
   await admin.from('quotes').update({ status: 'declined', updated_at: now }).eq('ticket_id', ticket.id).eq('status', 'pending').neq('id', quote.id)
-  await admin.from('ticket_suppliers').update({ status: 'awarded', responded_at: now }).eq('ticket_id', ticket.id).eq('supplier_id', quote.supplier_id)
-  await admin.from('ticket_suppliers').update({ status: 'closed', responded_at: now }).eq('ticket_id', ticket.id).neq('supplier_id', quote.supplier_id).in('status', ['invited', 'quoted'])
+  await admin.from('ticket_suppliers').update({ status: 'awarded', responded_at: now }).eq('ticket_id', ticket.id).eq('supplier_id', quote.supplier_id ?? '')
+  await admin.from('ticket_suppliers').update({ status: 'closed', responded_at: now }).eq('ticket_id', ticket.id).neq('supplier_id', quote.supplier_id ?? '').in('status', ['invited', 'quoted'])
   // If the supplier proposed a start date on the quote, schedule straight to it
   // (skip the separate "schedule the job" step); otherwise land on 'accepted'.
   const proposedAt = (quote as any).proposed_schedule_at as string | null

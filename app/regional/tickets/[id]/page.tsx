@@ -227,7 +227,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
   if (!t || !t.region_id || !regionIds.includes(t.region_id)) redirect('/regional/tickets')
 
   const [{ data: store }, { data: quotes }, { data: updates }, { data: signoffs }, { data: suppliers }, { data: variations }, { data: snags }, { data: invites }, { data: ratingRows }, { data: roundRows }] = await Promise.all([
-    admin.from('stores').select('name, sub_store').eq('id', t.store_id).single(),
+    admin.from('stores').select('name, sub_store').eq('id', t.store_id ?? '').single(),
     admin.from('quotes').select('id, supplier_id, amount, amount_incl_vat, description, file_url, status, valid_until, proposed_schedule_at, decline_reason, created_at, updated_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('signoffs').select('id, status, before_urls, after_urls, coc_url, invoice_url, notes, reject_reason, reviewed_at, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
@@ -721,7 +721,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
         {['accepted', 'scheduled'].includes(t.status) && (
           <div className="rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/30 p-3.5 flex items-start gap-2.5">
             <CheckCircle2 size={16} className="text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
-            <p className="text-sm text-[var(--text-muted)]"><span className="font-semibold text-[var(--text)]">{nameById.get(t.supplier_id) ?? 'The supplier'}</span> has been awarded the job. They&apos;ll let you know when they&apos;re on their way or on site by marking the ticket in progress.</p>
+            <p className="text-sm text-[var(--text-muted)]"><span className="font-semibold text-[var(--text)]">{nameById.get(t.supplier_id ?? '') ?? 'The supplier'}</span> has been awarded the job. They&apos;ll let you know when they&apos;re on their way or on site by marking the ticket in progress.</p>
           </div>
         )}
 
