@@ -128,8 +128,10 @@ export default function SignupPage() {
                 {...register('address', { required: 'Address is required' })} />
               <PasswordInput id="password" label="Password" placeholder="Minimum 8 characters" error={errors.password?.message}
                 {...register('password', { required: 'Password is required', minLength: { value: 8, message: 'Minimum 8 characters' } })} />
+              {/* eslint-disable react-hooks/incompatible-library -- compiler skips this component; runtime unaffected (React Compiler not enabled) */}
               <PasswordInput id="confirm_password" label="Confirm Password" placeholder="Repeat your password" error={errors.confirm_password?.message}
                 {...register('confirm_password', { required: 'Please confirm your password', validate: val => val === watch('password') || 'Passwords do not match' })} />
+              {/* eslint-enable react-hooks/incompatible-library */}
 
               {error && <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm rounded-lg px-4 py-3">{error}</div>}
 

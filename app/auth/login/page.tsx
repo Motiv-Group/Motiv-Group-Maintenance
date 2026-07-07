@@ -33,6 +33,7 @@ export default function LoginPage() {
     if (typeof window === 'undefined') return
     const hash = window.location.hash
     if (!/access_token=|type=(invite|recovery)/.test(hash)) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only init from URL hash (Supabase invite/recovery token); cannot run during SSR render
     setForwarding(true)
     const type = new URLSearchParams(hash.replace(/^#/, '')).get('type')
     const supabase = createClient()

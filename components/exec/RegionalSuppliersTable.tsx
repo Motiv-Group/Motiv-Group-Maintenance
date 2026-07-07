@@ -28,6 +28,7 @@ export function RegionalSuppliersTable({ suppliers }: { suppliers: Row[] }) {
   // (?supplier=<id>, e.g. the Supplier Performance block).
   useEffect(() => {
     const id = new URLSearchParams(window.location.search).get('supplier')
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time deep-link sync from the URL on mount; the empty-dep effect intentionally seeds selection once
     if (id) { const match = suppliers.find(s => s.id === id); if (match) setSel(match) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -99,6 +100,7 @@ function SupplierPane({ row, onClose }: { row: Row; onClose: () => void }) {
 
   useEffect(() => {
     let live = true
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resets loading state when row.id changes before re-fetching the supplier detail
     setLoading(true)
     fetch(`/api/regional/suppliers/${row.id}`)
       .then(r => r.json())
