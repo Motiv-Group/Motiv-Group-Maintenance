@@ -20,6 +20,11 @@ function buildCsp(nonce: string): string {
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'",
+    // Violation reporting → /api/csp-report. `report-to` is the modern directive
+    // (paired with the Reporting-Endpoints header below); `report-uri` is kept for
+    // browsers that only support the legacy form.
+    'report-uri /api/csp-report',
+    'report-to csp-endpoint',
   ].join('; ')
 }
 
@@ -34,7 +39,12 @@ export async function proxy(request: NextRequest) {
   requestHeaders.set('x-nonce', nonce)
   requestHeaders.set('content-security-policy', csp)
 
-  const applyCsp = (res: NextResponse) => { res.headers.set('content-security-policy', csp); return res }
+  const applyCsp = (res: NextResponse) => {
+    res.headers.set('content-security-policy', csp)
+    // Names the `csp-endpoint` group referenced by the CSP `report-to` directive.
+    res.headers.set('reporting-endpoints', 'csp-endpoint="/api/csp-report"')
+    return res
+  }
 
   const path = request.nextUrl.pathname
   const authPrefixes = ['/client', '/regional', '/supplier', '/executive', '/individual', '/admin', '/settings', '/auth']

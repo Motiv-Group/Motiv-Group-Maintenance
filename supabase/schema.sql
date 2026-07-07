@@ -920,7 +920,7 @@ alter table public.preventative_maintenance_plans add foreign key (asset_id) ref
 alter table public.preventative_maintenance_plans add foreign key (company_id) references public.companies(id);
 alter table public.preventative_maintenance_tasks add foreign key (ticket_id) references public.tickets(id);
 alter table public.preventative_maintenance_tasks add foreign key (plan_id) references public.preventative_maintenance_plans(id);
-alter table public.push_subscriptions add foreign key (user_id) references public.null(null);
+alter table public.push_subscriptions add foreign key (user_id) references auth.users(id) on delete cascade;
 alter table public.quote_line_items add foreign key (quote_id) references public.quotes(id);
 alter table public.quotes add foreign key (ticket_id) references public.tickets(id);
 alter table public.quotes add foreign key (company_id) references public.companies(id);
@@ -1019,7 +1019,7 @@ alter table public.tickets add foreign key (supplier_id) references public.suppl
 alter table public.tickets add foreign key (region_id) references public.regions(id);
 alter table public.tickets add foreign key (store_id) references public.stores(id);
 alter table public.user_profiles add foreign key (role) references public.roles(key);
-alter table public.user_profiles add foreign key (id) references public.null(null);
+alter table public.user_profiles add foreign key (id) references auth.users(id) on delete cascade;
 alter table public.user_profiles add foreign key (company_id) references public.companies(id);
 
 -- ---------------------------------------------------------------------------
