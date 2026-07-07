@@ -33,9 +33,7 @@ export function RealtimeRefresh({ tables = ['tickets', 'quotes', 'notifications'
       for (const table of tablesKey.split(',')) {
         ch = ch.on('postgres_changes', { event: '*', schema: 'public', table }, scheduleRefresh)
       }
-      // TEMP diagnostic (remove before merge): reports the channel join result —
-      // SUBSCRIBED (ok) / CHANNEL_ERROR / TIMED_OUT / CLOSED — to pin the WS failure.
-      ch.subscribe((status, err) => console.warn('[MOTIV-RT]', status, err?.message ?? ''))
+      ch.subscribe()
       channel = ch
     }
 
