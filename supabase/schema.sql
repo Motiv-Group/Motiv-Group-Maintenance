@@ -1670,13 +1670,41 @@ create policy "ticket-photos upload" on storage.objects for insert
 -- ---------------------------------------------------------------------------
 -- REALTIME (postgres_changes)
 -- ---------------------------------------------------------------------------
--- Tables are in the supabase_realtime publication (Database → Publications).
--- REPLICA IDENTITY FULL is required so RLS can be evaluated on UPDATE/DELETE
--- events (default replica identity only carries the PK → RLS drops the event).
--- The browser must also authenticate the socket with the user JWT
--- (components/ui/RealtimeRefresh.tsx calls realtime.setAuth) or RLS hides every
--- row from the connection.
-alter table public.tickets       replica identity full;
-alter table public.quotes        replica identity full;
-alter table public.signoffs      replica identity full;
-alter table public.notifications replica identity full;
+-- EVERY table a RealtimeRefresh layout subscribes to MUST be in the
+-- supabase_realtime publication — a postgres_changes channel that binds a
+-- NON-published table is rejected wholesale (CHANNEL_ERROR "transport failure")
+-- and loops the socket for that whole role. REPLICA IDENTITY FULL is required so
+-- RLS can be evaluated on UPDATE/DELETE events (default replica identity only
+-- carries the PK → RLS drops the event). The browser must also authenticate the
+-- socket with the user JWT (supabase-js 2.110 wires this on SIGNED_IN/refresh;
+-- components/ui/RealtimeRefresh.tsx seeds it on load) or RLS hides every row.
+alter table public.tickets                  replica identity full;
+alter table public.quotes                   replica identity full;
+alter table public.signoffs                 replica identity full;
+alter table public.notifications            replica identity full;
+alter table public.snags                    replica identity full;
+alter table public.decision_items           replica identity full;
+alter table public.ticket_updates           replica identity full;
+alter table public.ticket_disputes          replica identity full;
+alter table public.ticket_dispute_messages  replica identity full;
+
+-- Publication membership (idempotent). ticket_disputes / ticket_dispute_messages
+-- are deny-all under RLS (read via the service-role client), so Realtime delivers
+-- no events for them to users — they are published only so binding to them does
+-- not error the channel.
+do $$
+declare t text;
+begin
+  foreach t in array array[
+    'tickets', 'quotes', 'signoffs', 'notifications',
+    'snags', 'decision_items', 'ticket_updates', 'ticket_disputes', 'ticket_dispute_messages'
+  ]
+  loop
+    if not exists (
+      select 1 from pg_publication_tables
+      where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t
+    ) then
+      execute format('alter publication supabase_realtime add table public.%I', t);
+    end if;
+  end loop;
+end $$;
