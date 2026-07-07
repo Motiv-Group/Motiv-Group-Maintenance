@@ -51,6 +51,7 @@ export default function SupplierOnboardPage() {
   // Invited path: validate the token + prefill. No token = self-signup, no error.
   useEffect(() => {
     const t = new URLSearchParams(window.location.search).get('token')
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only init from URL query string (invite token); cannot run during SSR render
     setToken(t)
     if (!t) { setChecking(false); return }
     fetch(`/api/supplier/onboard?token=${encodeURIComponent(t)}`)

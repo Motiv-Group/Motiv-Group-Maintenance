@@ -47,6 +47,7 @@ function Row({ t }: { t: StoreManagerTicket }) {
         {t.jobRef && <p className="text-[10px] font-mono text-[var(--text-faint)]">{t.jobRef}</p>}
         <p className="text-sm text-[var(--text)] truncate">{t.title}</p>
         <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(t.createdAt)}</p>
+        {/* eslint-disable-next-line react-hooks/purity -- Date.now() drives a relative "overdue by" display; cosmetic elapsed-time readout, not a hydration-correctness concern */}
         {t.overdue && <p className="text-[11px] font-semibold text-red-600 dark:text-red-400">Overdue by {humanizeDuration(Date.now() - new Date(t.dueAt).getTime())}</p>}
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_6rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
@@ -61,6 +62,7 @@ function Row({ t }: { t: StoreManagerTicket }) {
 function Group({ title, tickets, defaultOpen = false }: { title: string; tickets: StoreManagerTicket[]; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen)
   // Remember the user's choice across navigation (wiped on next sign-in).
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- restores persisted group open state from localStorage (client-only) when the title changes; cannot run during SSR render
   useEffect(() => { const v = readCollapse(`sm-group-${title}`); if (v !== null) setOpen(v) }, [title])
   const toggle = () => setOpen(o => { const v = !o; writeCollapse(`sm-group-${title}`, v); return v })
   if (!tickets.length) return null

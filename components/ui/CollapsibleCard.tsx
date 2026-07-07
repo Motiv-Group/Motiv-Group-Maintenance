@@ -10,6 +10,7 @@ import { readCollapse, writeCollapse } from '@/lib/collapse-state'
 
 export function CollapsibleCard({ persistKey, header, children, defaultOpen = false }: { persistKey: string; header: ReactNode; children: ReactNode; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen)
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only init from localStorage (readCollapse); cannot run during SSR render, applies remembered open-state after mount
   useEffect(() => { const v = readCollapse(persistKey); if (v !== null) setOpen(v) }, [persistKey])
   const toggle = () => setOpen(o => { const v = !o; writeCollapse(persistKey, v); return v })
 

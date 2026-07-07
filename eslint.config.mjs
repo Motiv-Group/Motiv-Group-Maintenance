@@ -10,18 +10,18 @@ const config = [
   { ignores: ['.next/**', 'node_modules/**', 'android/**', 'out/**', 'next-env.d.ts', 'public/**'] },
   ...next,
   {
-    // eslint-config-next@16 newly bundles the React Compiler rule family. These
-    // did not run under the previous `next lint` (eslint 8), so they flag many
-    // pre-existing patterns. Keep them as warnings for visibility rather than
-    // failing the upgrade on them — adopting/fixing them is tracked separately
-    // (PATH_TO_9.5 B16), not part of the Next 16 dependency bump.
+    // eslint-config-next@16 bundles the React Compiler rule family. The ~37
+    // pre-existing hits were triaged and grandfathered with justified inline
+    // `eslint-disable-next-line` comments (B16); these rules are now `error` so
+    // NEW violations are caught. (The React Compiler itself is not enabled — the
+    // rules are advisory — but enforcing them keeps future code compiler-ready.)
     rules: {
-      'react-hooks/set-state-in-effect': 'warn',
-      'react-hooks/purity': 'warn',
-      'react-hooks/immutability': 'warn',
-      'react-hooks/refs': 'warn',
-      'react-hooks/incompatible-library': 'warn',
-      'react-hooks/preserve-manual-memoization': 'warn',
+      'react-hooks/set-state-in-effect': 'error',
+      'react-hooks/purity': 'error',
+      'react-hooks/immutability': 'error',
+      'react-hooks/refs': 'error',
+      'react-hooks/incompatible-library': 'error',
+      'react-hooks/preserve-manual-memoization': 'error',
     },
   },
 ]

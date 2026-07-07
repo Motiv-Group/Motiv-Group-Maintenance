@@ -24,9 +24,11 @@ const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 export function RecentTicketsCard({ tickets }: { tickets: StoreManagerTicket[] }) {
   const [open, setOpen] = useState(false)
   // Remember the expand/collapse choice across navigation (wiped on next sign-in).
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- restores persisted open state from localStorage (client-only) after mount; cannot run during SSR render
   useEffect(() => { const v = readCollapse('sm-recent-open'); if (v !== null) setOpen(v) }, [])
   const toggle = () => setOpen(o => { const v = !o; writeCollapse('sm-recent-open', v); return v })
   const recent = useMemo(() => {
+    // eslint-disable-next-line react-hooks/purity -- Date.now() computes a rolling 7-day cutoff for filtering; recomputes per render by design, not a hydration-correctness concern
     const cutoff = Date.now() - WEEK_MS
     // Completed tickets live in the Tickets-tab archive; cancelled ones are hidden.
     return tickets.filter(t => t.status !== 'completed' && t.status !== 'cancelled' && new Date(t.createdAt).getTime() >= cutoff)
@@ -50,6 +52,7 @@ export function RecentTicketsCard({ tickets }: { tickets: StoreManagerTicket[] }
             {t.jobRef && <p className="text-[10px] font-mono text-[var(--text-faint)]">{t.jobRef}</p>}
             <p className="text-sm text-[var(--text)] truncate">{t.title}</p>
             <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(t.createdAt)}</p>
+            {/* eslint-disable-next-line react-hooks/purity -- Date.now() drives a relative "overdue by" display; cosmetic elapsed-time readout, not a hydration-correctness concern */}
             {t.overdue && <p className="text-[11px] font-semibold text-red-600 dark:text-red-400">Overdue by {humanizeDuration(Date.now() - new Date(t.dueAt).getTime())}</p>}
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_6rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">

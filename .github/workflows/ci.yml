@@ -41,6 +41,14 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # Static consistency check of supabase/schema.sql (C9): every FK/policy/
+      # alter/trigger must reference a table the file defines. Catches a folded
+      # migration that forgot a CREATE or has a typo'd table name. (True live-DB
+      # drift detection needs a pg_dump against prod with a DB-URL secret — noted
+      # in the C9 tracker row.)
+      - name: Schema consistency
+        run: npm run schema:check
+
       - name: Test
         run: npm test
 

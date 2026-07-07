@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "schema:check": "node scripts/check-schema.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },

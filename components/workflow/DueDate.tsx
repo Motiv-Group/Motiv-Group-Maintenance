@@ -7,6 +7,7 @@ import { formatDateTime, humanizeDuration } from '@/lib/utils'
  * and client components. Pass `now` (ISO) on the server for SSR-stable output.
  */
 export function DueDate({ dueAt, overdue, now, showOverdueText = true }: { dueAt: string; overdue: boolean; now?: string; showOverdueText?: boolean }) {
+  // eslint-disable-next-line react-hooks/purity -- Date.now() is an intentional render-time fallback when no SSR-stable `now` is passed; the component tolerates a non-deterministic client clock read here
   const ref = now ? new Date(now).getTime() : Date.now()
   const overdueMs = ref - new Date(dueAt).getTime()
   return (

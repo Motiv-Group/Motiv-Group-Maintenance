@@ -577,6 +577,7 @@ export function SendQuoteForm({
           <div className="flex flex-wrap gap-2 mb-2">
             {PRESETS.map(p => {
               const val     = addDays(p.days)
+              // eslint-disable-next-line react-hooks/incompatible-library -- compiler skips this component; runtime unaffected (React Compiler not enabled)
               const isActive = !validNA && watch('valid_until') === val
               return (
                 <button
