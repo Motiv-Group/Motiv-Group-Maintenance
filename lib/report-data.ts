@@ -91,18 +91,38 @@ type Row = Record<string, any>
 // ─── Supplier report ────────────────────────────────────────────────────────
 export async function buildSupplierModel(
   admin: SupabaseClient,
-  supplierId: string,
+  userId: string,
   supplierName: string,
   range: DateRange,
 ): Promise<ReportModel> {
+  // Resolve which supplier(s) this user is + their company, then scope EVERY query
+  // to those supplier ids. The report must never load rows outside the caller's own
+  // work — an earlier version queried `tickets` with no filter (cross-tenant leak),
+  // used a non-existent `completions` table, and filtered quotes on a non-existent
+  // `admin_id` column.
+  const [{ data: prof }, { data: links }] = await Promise.all([
+    admin.from('user_profiles').select('company_id').eq('id', userId).single(),
+    admin.from('supplier_users').select('supplier_id').eq('user_id', userId),
+  ])
+  const companyId = (prof?.company_id as string | null) ?? null
+  const supplierIds = ((links ?? []) as { supplier_id: string }[]).map((l) => l.supplier_id)
+  // Sentinel keeps the .in() filters valid (matching nothing) when the user has no
+  // supplier link yet.
+  const ids = supplierIds.length ? supplierIds : ['00000000-0000-0000-0000-000000000000']
+
   const [{ data: tickets }, { data: quotes }, { data: completions }, { data: subs }] = await Promise.all([
     admin.from('tickets').select('id, status, priority, created_at, store_id, profiles(company_name, sub_store)')
-      .gte('created_at', range.fromISO).lte('created_at', range.toISO),
+      .in('supplier_id', ids).gte('created_at', range.fromISO).lte('created_at', range.toISO),
     admin.from('quotes').select('status, type, amount, amount_incl_vat, created_at')
-      .eq('admin_id', supplierId).gte('created_at', range.fromISO).lte('created_at', range.toISO),
-    admin.from('completions').select('status, created_at')
-      .eq('admin_id', supplierId).gte('created_at', range.fromISO).lte('created_at', range.toISO),
-    admin.from('suppliers').select('trade, qualified'),
+      .in('supplier_id', ids).gte('created_at', range.fromISO).lte('created_at', range.toISO),
+    // "Completions" live in `signoffs` (there is no `completions` table); a signoff
+    // is "approved" when accepted.
+    admin.from('signoffs').select('status, created_at')
+      .in('supplier_id', ids).gte('created_at', range.fromISO).lte('created_at', range.toISO),
+    // The sub-supplier directory is company-scoped; standalone suppliers have none.
+    companyId
+      ? admin.from('suppliers').select('trade, qualified').eq('company_id', companyId)
+      : admin.from('suppliers').select('trade, qualified').in('id', ids),
   ])
 
   const T = (tickets ?? []) as Row[]
@@ -200,7 +220,7 @@ export async function buildSupplierModel(
           columns: ['Metric', 'Value'],
           rows: [
             ['Completions submitted', C.length],
-            ['Approved', C.filter(c => c.status === 'approved').length],
+            ['Approved', C.filter(c => c.status === 'accepted').length],
             ['Rejected', C.filter(c => c.status === 'rejected').length],
             ['Tickets currently in snag', snags],
           ],

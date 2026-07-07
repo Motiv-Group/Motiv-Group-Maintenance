@@ -32,8 +32,8 @@ const DAY = 24 * 3600_000
 const HIGH_VALUE = 25_000
 
 // ── SLA resolver: company row → platform default row → hardcoded fallback ──
-export async function loadSlaResolver(db: DB, companyId: string): Promise<SlaRuleResolver> {
-  const { data } = await db.from('sla_rules').select('*').or(`company_id.eq.${companyId},company_id.is.null`)
+export async function loadSlaResolver(db: DB, companyId: string | null): Promise<SlaRuleResolver> {
+  const { data } = await db.from('sla_rules').select('*').or(companyId ? `company_id.eq.${companyId},company_id.is.null` : 'company_id.is.null')
   const rows = (data ?? []) as any[]
   const pick = (p: Priority): SlaTargets => {
     const company = rows.find(r => r.company_id === companyId && r.priority === p)
@@ -615,7 +615,7 @@ export interface SupplierDashboardData {
   generatedAt: string
 }
 
-export async function assembleSupplierDashboard(companyId: string, supplierIds: string[], now: Date = new Date()): Promise<SupplierDashboardData> {
+export async function assembleSupplierDashboard(companyId: string | null, supplierIds: string[], now: Date = new Date()): Promise<SupplierDashboardData> {
   const db = createAdminClient()
   const emptyPerf = calculateSupplierPerformance('none', [], (p) => FALLBACK_SLA[p], now)
   if (!supplierIds.length) return { perf: emptyPerf, company: '', kpis: { open: 0, overdue: 0, dueToday: 0, pendingQuotes: 0, awaitingSignoff: 0, evidenceMissing: 0, scheduled: 0 }, tickets: [], quotes: [], signoffs: [], rating: { avg: 5, count: 0 }, generatedAt: now.toISOString() }
@@ -626,7 +626,7 @@ export async function assembleSupplierDashboard(companyId: string, supplierIds: 
   const [{ data: bySupplier }, { data: invRows }] = await Promise.all([
     // Same-company tickets awarded to this supplier PLUS individual (company-null)
     // standalone tickets they've been awarded — both scoped to their supplier ids.
-    db.from('tickets').select(TICKET_COLS).or(`company_id.eq.${companyId},company_id.is.null`).in('supplier_id', supplierIds),
+    db.from('tickets').select(TICKET_COLS).or(companyId ? `company_id.eq.${companyId},company_id.is.null` : 'company_id.is.null').in('supplier_id', supplierIds),
     db.from('ticket_suppliers').select('ticket_id, status, responded_at, declined_by').in('supplier_id', supplierIds).in('status', ['invited', 'quoted', 'awarded', 'declined', 'closed']),
   ])
   const owned = (bySupplier ?? []) as any[]
@@ -658,7 +658,7 @@ export async function assembleSupplierDashboard(companyId: string, supplierIds: 
     db.from('quotes').select('id, ticket_id, amount, amount_incl_vat, status, created_at, updated_at').in('supplier_id', supplierIds).order('created_at', { ascending: false }),
     db.from('signoffs').select('id, ticket_id, status, created_at').in('supplier_id', supplierIds).order('created_at', { ascending: false }),
     db.from('ratings').select('score').in('supplier_id', supplierIds),
-    db.from('companies').select('name').eq('id', companyId).maybeSingle(),
+    companyId ? db.from('companies').select('name').eq('id', companyId).maybeSingle() : Promise.resolve({ data: null as { name: string } | null }),
   ])
   const ratingScores = ((ratingRows ?? []) as any[]).map(r => Number(r.score)).filter(n => Number.isFinite(n))
   // Suppliers start at a full 5★ and degrade as real ratings arrive.

@@ -2,7 +2,6 @@ export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
 import { ClipboardCheck, Building2, ChevronDown, ChevronUp } from 'lucide-react'
-import { redirect } from 'next/navigation'
 import { requireSupplierV3 } from '@/lib/health/guard'
 import { assembleSupplierDashboard, type SupplierSignoffRow } from '@/lib/health/data'
 import { PersistentDetails } from '@/components/ui/PersistentDetails'
@@ -23,7 +22,6 @@ const matchesFilter = (status: string, f: string) => f === 'all' || (f === 'awai
 export default async function SupplierSignoffPage(props: { searchParams?: Promise<{ status?: string }> }) {
   const searchParams = await props.searchParams;
   const { companyId, supplierIds } = await requireSupplierV3()
-  if (!companyId) redirect('/supplier') // standalone self-signup supplier — see dashboard
   const d = await assembleSupplierDashboard(companyId, supplierIds)
   const active = FILTERS.some(f => f.key === searchParams?.status) ? searchParams!.status! : 'all'
   // Show the full sign-off history incl. accepted (approved) completions.
