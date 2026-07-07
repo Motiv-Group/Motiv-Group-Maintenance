@@ -31,7 +31,7 @@ Migrations live in `supabase/migrations/` but are **not** applied via Supabase C
 
 ### Roles & route protection
 
-Six roles drive everything: `store_manager` (the store/client side — the legacy `client` role is treated identically, see `isStoreManager()` in `lib/types.ts`), `regional_manager`, `supplier` (the contractor/maintenance-company side; formerly named `admin`), `executive` (estate-wide read-only dashboards; set by an admin, not self-signup), `individual` (general-public self-signup — standalone jobs, no company/store/region; the **only** role self-signup can create, clamped by the `handle_new_user` trigger), and `system_admin` (platform/master admin — the app owner). `middleware.ts` is the single gate for route access:
+Six roles drive everything: `store_manager` (the store/client side — the legacy `client` role is treated identically, see `isStoreManager()` in `lib/types.ts`), `regional_manager`, `supplier` (the contractor/maintenance-company side; formerly named `admin`), `executive` (estate-wide read-only dashboards; set by an admin, not self-signup), `individual` (general-public self-signup — standalone jobs, no company/store/region; the **only** role self-signup can create, clamped by the `handle_new_user` trigger), and `system_admin` (platform/master admin — the app owner). `proxy.ts` (the Next 16 rename of `middleware.ts` — same convention, exports `proxy`) is the single gate for route access:
 
 - `/client/*` → `store_manager`
 - `/regional/*` → `regional_manager`

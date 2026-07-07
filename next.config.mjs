@@ -23,7 +23,7 @@ const nextConfig = {
     ],
   },
   async headers() {
-    // Static security headers. The CSP is set PER-REQUEST in middleware.ts (it needs
+    // Static security headers. The CSP is set PER-REQUEST in proxy.ts (it needs
     // a per-request nonce for the strict, no-'unsafe-inline' script policy), so it is
     // intentionally NOT here — two CSP headers would conflict.
     return [
