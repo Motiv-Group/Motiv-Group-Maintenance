@@ -16,8 +16,9 @@ const BodySchema = z.object({
 // POST /api/tickets/[id]/assign — RM invites one or more suppliers to quote.
 // Creates ticket_suppliers rows (invited), moves the ticket to "assigned", and
 // notifies every invited supplier. The winner is chosen later via /quote-decision.
-export async function POST(request: Request, { params }: { params: { id: string } }) {
-  const supabase = createClient()
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   if (!(await rateLimit(`assign:${user.id}`, 30, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
@@ -111,7 +112,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     void sendPushToMany([...reUsers, ...freshUsers], { title: 'New quote request', body: ticket.title ?? 'A ticket needs your quote', url: `/supplier/tickets/${ticket.id}` })
   }
 
-  revalidatePath('/regional'); revalidatePath('/regional/tickets'); revalidatePath(`/regional/tickets/${ticket.id}`); revalidatePath('/supplier')
-  revalidatePath('/individual'); revalidatePath(`/individual/tickets/${ticket.id}`)
+  revalidatePath('/regional');revalidatePath('/regional/tickets');revalidatePath(`/regional/tickets/${ticket.id}`);revalidatePath('/supplier')
+  revalidatePath('/individual');revalidatePath(`/individual/tickets/${ticket.id}`)
   return NextResponse.json({ ok: true })
 }

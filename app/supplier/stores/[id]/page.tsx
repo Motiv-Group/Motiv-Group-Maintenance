@@ -13,8 +13,9 @@ import {
 } from '@/lib/utils'
 import type { Ticket } from '@/lib/types'
 
-export default async function AdminStoreDetailPage({ params }: { params: { id: string } }) {
-  const supabase = createClient()
+export default async function AdminStoreDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   // Use the admin client scoped to the caller's company: a supplier has no RLS

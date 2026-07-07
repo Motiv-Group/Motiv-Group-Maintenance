@@ -14,7 +14,7 @@ const BodySchema = z.object({
 // PATCH /api/regional/store-budget — set a store's monthly Capex budget.
 // Regional managers only, and only for stores they own.
 export async function PATCH(request: Request) {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 

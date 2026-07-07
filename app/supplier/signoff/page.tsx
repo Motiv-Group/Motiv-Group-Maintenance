@@ -20,7 +20,8 @@ const FILTERS: { key: string; label: string; active: string; inactive: string }[
 const AWAITING = new Set(['submitted', 'awaiting_regional', 'awaiting_store'])
 const matchesFilter = (status: string, f: string) => f === 'all' || (f === 'awaiting' ? AWAITING.has(status) : status === f)
 
-export default async function SupplierSignoffPage({ searchParams }: { searchParams?: { status?: string } }) {
+export default async function SupplierSignoffPage(props: { searchParams?: Promise<{ status?: string }> }) {
+  const searchParams = await props.searchParams;
   const { companyId, supplierIds } = await requireSupplierV3()
   if (!companyId) redirect('/supplier') // standalone self-signup supplier — see dashboard
   const d = await assembleSupplierDashboard(companyId, supplierIds)

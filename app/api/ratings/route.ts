@@ -14,7 +14,7 @@ const BodySchema = z.object({
 // POST /api/ratings — RM rates the awarded supplier for a ticket (1–5 + comment).
 // Used as a required step when accepting the COC/POC sign-off.
 export async function POST(request: Request) {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   if (!(await rateLimit(`rating:${user.id}`, 30, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })

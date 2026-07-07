@@ -23,7 +23,8 @@ const TRADE_COLORS: Record<string, string> = {
   General:    'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
 }
 
-export default async function SupplierDetailPage({ params }: { params: { id: string } }) {
+export default async function SupplierDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const adminClient = createAdminClient()
 
   const { data } = await adminClient

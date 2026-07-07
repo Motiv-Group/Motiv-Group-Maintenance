@@ -18,8 +18,9 @@ const PatchSchema = z.object({
 })
 
 // PATCH /api/tickets/[id] — store manager edits their own ticket while it's still open.
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
-  const supabase = createClient()
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   if (!(await rateLimit(`ticket-edit:${user.id}`, 40, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
@@ -89,15 +90,16 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const { data, error } = await admin.from('tickets').update(update).eq('id', params.id).select().single()
   if (error) return serverError(error)
 
-  revalidatePath('/client'); revalidatePath('/client/tickets'); revalidatePath(`/client/tickets/${params.id}`)
-  revalidatePath('/regional'); revalidatePath('/regional/tickets'); revalidatePath(`/regional/tickets/${params.id}`)
+  revalidatePath('/client');revalidatePath('/client/tickets');revalidatePath(`/client/tickets/${params.id}`)
+  revalidatePath('/regional');revalidatePath('/regional/tickets');revalidatePath(`/regional/tickets/${params.id}`)
   revalidatePath(`/supplier/tickets/${params.id}`)
   return NextResponse.json({ ticket: data })
 }
 
 // DELETE /api/tickets/[id] — store manager deletes their own ticket while open.
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
-  const supabase = createClient()
+export async function DELETE(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   if (!(await rateLimit(`ticket-edit:${user.id}`, 40, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
@@ -124,6 +126,6 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
 
   const { error } = await admin.from('tickets').delete().eq('id', params.id)
   if (error) return serverError(error)
-  revalidatePath('/client'); revalidatePath('/client/tickets')
+  revalidatePath('/client');revalidatePath('/client/tickets')
   return NextResponse.json({ success: true })
 }

@@ -20,8 +20,9 @@ const BodySchema = z.object({
 // POST /api/tickets/[id]/submit-quote — an invited supplier submits (or resubmits)
 // their quote. Records the quote, marks their ticket_suppliers row 'quoted', and
 // moves the ticket to "quoted" so the RM can review/award.
-export async function POST(request: Request, { params }: { params: { id: string } }) {
-  const supabase = createClient()
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   if (!(await rateLimit(`submit-quote:${user.id}`, 30, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
@@ -79,6 +80,6 @@ export async function POST(request: Request, { params }: { params: { id: string 
     void sendPushToMany([ticket.created_by], { title: 'Quote submitted', body: ticket.title ?? 'A quote needs review', url: `/individual/tickets/${ticket.id}` })
   }
 
-  revalidatePath('/supplier'); revalidatePath(`/supplier/tickets/${ticket.id}`); revalidatePath('/regional'); revalidatePath(`/regional/tickets/${ticket.id}`); revalidatePath('/individual'); revalidatePath(`/individual/tickets/${ticket.id}`)
+  revalidatePath('/supplier');revalidatePath(`/supplier/tickets/${ticket.id}`);revalidatePath('/regional');revalidatePath(`/regional/tickets/${ticket.id}`);revalidatePath('/individual');revalidatePath(`/individual/tickets/${ticket.id}`)
   return NextResponse.json({ ok: true })
 }

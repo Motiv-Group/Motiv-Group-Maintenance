@@ -40,7 +40,7 @@ interface ParsedQuote {
  * input the vision model extracts everything but must return null when unsure.
  */
 export async function POST(req: NextRequest) {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 

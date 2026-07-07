@@ -20,8 +20,9 @@ function StarRow({ score }: { score: number }) {
   )
 }
 
-export default async function ContractorReviewsPage({ params }: { params: { id: string } }) {
-  const supabase = createClient()
+export default async function ContractorReviewsPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const supabase = await createClient()
   const adminDb  = createAdminClient()
 
   const { data: { user } } = await supabase.auth.getUser()

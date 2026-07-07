@@ -14,7 +14,7 @@ const BodySchema = z.object({ text: z.string().optional() })
 // Free-form WhatsApp text only delivers inside the 24-hour window (the user must
 // have messaged the business number recently) — otherwise Meta rejects it.
 export async function POST(request: Request) {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   if (!(await rateLimit(`briefing-wa:${user.id}`, 5, 60_000))) return NextResponse.json({ error: 'Too many requests — try again shortly.' }, { status: 429 })

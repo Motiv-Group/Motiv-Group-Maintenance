@@ -4,8 +4,9 @@ import { NextResponse } from 'next/server'
 // POST /api/tickets/[id]/seen — bump the current user's "last seen" watermark for this
 // ticket, so newer supplier updates read as NEW until the next time they open it.
 // Idempotent upsert (one row per user+ticket); writes go through the service role.
-export async function POST(_request: Request, { params }: { params: { id: string } }) {
-  const supabase = createClient()
+export async function POST(_request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 

@@ -68,7 +68,8 @@ import { POST as TRANSITION } from '@/app/api/tickets/[id]/transition/route'
 
 const OWNER = 'user-owner'
 const OTHER = 'user-other'
-const params = { params: { id: 'ticket-1' } }
+// Next 16: route handlers receive params as a Promise (awaited in the handler).
+const params = { params: Promise.resolve({ id: 'ticket-1' }) }
 
 /** Seed the mock: caller profile + the ticket + any link tables. */
 function seed(opts: {

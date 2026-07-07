@@ -23,7 +23,7 @@ const BodySchema = z.object({
 // company_id is required so mutations can be scoped to the caller's own company
 // (the admin client bypasses RLS, so this is the only tenant guard).
 async function requireAdmin() {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
   const { data: profile } = await supabase.from('user_profiles').select('role, company_id').eq('id', user.id).single()
@@ -31,7 +31,8 @@ async function requireAdmin() {
   return { user, companyId: profile.company_id as string }
 }
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const ctx = await requireAdmin()
   if (!ctx) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   if (!(await rateLimit(`supplier-edit:${ctx.user.id}`, 30, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
@@ -74,7 +75,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   return NextResponse.json({ supplier: data })
 }
 
-export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const ctx = await requireAdmin()
   if (!ctx) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   if (!(await rateLimit(`supplier-edit:${ctx.user.id}`, 30, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })

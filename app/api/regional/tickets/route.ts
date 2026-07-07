@@ -23,7 +23,7 @@ const BodySchema = z.object({
 // POST /api/regional/tickets — an RM logs a ticket on behalf of a store in their
 // region (same intake as the SM, plus a store selector + optional supplier invite).
 export async function POST(request: Request) {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   if (!(await rateLimit(`rm-tickets:${user.id}`, 20, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })

@@ -6,7 +6,8 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { requireSupplierV3 } from '@/lib/health/guard'
 import { SubmitCompletionForm } from '@/components/supplier/SubmitCompletionForm'
 
-export default async function SupplierCompletePage({ params }: { params: { id: string } }) {
+export default async function SupplierCompletePage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { companyId, supplierIds } = await requireSupplierV3()
   const admin = createAdminClient()
   const { data: t } = await admin.from('tickets').select('id, company_id, supplier_id, status, title, job_ref').eq('id', params.id).single()

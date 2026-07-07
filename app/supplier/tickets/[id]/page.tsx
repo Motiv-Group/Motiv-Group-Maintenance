@@ -137,7 +137,8 @@ function SignoffCard({ s, snag, ticketId, collapsible = false, title, reason }: 
   )
 }
 
-export default async function SupplierTicketDetailPage({ params }: { params: { id: string } }) {
+export default async function SupplierTicketDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   // Overlap the auth gate with the ticket fetch (admin client needs no user ctx)
   // — one round-trip wave instead of two on every detail-page load.
   const admin = createAdminClient()
@@ -365,11 +366,9 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
   return (
     <div className="space-y-5">
       <BackLink fallbackHref="/supplier/tickets" label="Back to tickets" />
-
       {/* Progress — bare, no card around it (same as RM). Hidden once this supplier
           was declined: the ticket's onward progress is no longer theirs. */}
       {!declinedForMe && <div className="px-1 pt-1"><RmPipeline status={supplierStatus} /></div>}
-
       {/* Ticket detail — same layout as the SM view */}
       <Card className="p-5 space-y-4">
         <div className="flex items-start justify-between gap-3">
@@ -443,9 +442,7 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
 
         <EditedLine at={t.edited_at} by={editorName} />
       </Card>
-
       {!declinedForMe && breached && <BreachReason nextAction={sla.nextAction} dueAt={sla.nextActionDueAt} owner="Supplier" />}
-
       {/* Dispute — the full dispute history for this ticket. An open dispute (live
           thread) sits at the top and pauses the snag / evidence step; resolved ones are
           kept read-only below with their outcome + message/evidence history. Opens by
@@ -469,7 +466,6 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           ))}
         </CollapsibleSection>
       )}
-
       {/* Off the ticket → no "Next step", just why this quote request was declined. */}
       {declinedForMe ? (
         <div className="rounded-2xl bg-red-500/10 ring-1 ring-red-500/40 p-5 space-y-1">
@@ -569,7 +565,6 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           {canDecline && <div className="pt-1"><DeclineWorkButton ticketId={t.id} /></div>}
         </Card>
       )}
-
       {/* Variation Orders — above the quotes block; full detail + attachments
           (pending / approved / declined). Opens by default while a VO is under
           review or has just been declined. */}
@@ -607,7 +602,6 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           })}
         </CollapsibleSection>
       )}
-
       {/* COC & POC — the submission(s) currently under review. Sits ABOVE the Quotes
           block: it's the latest thing being worked on once the job reaches sign-off.
           Each card is collapsed by default (tap the row to reveal the detail). */}
@@ -616,7 +610,6 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           {pendingSignoffs.map(s => <SignoffCard key={s.id} s={s} ticketId={t.id} title={submissionLabel(s)} collapsible />)}
         </CollapsibleSection>
       )}
-
       {/* Snag — the current, active snag shown above Quotes so the supplier sees what
           to fix. Previous snag / evidence rounds live in the Archived block below. */}
       {liveSnag && (
@@ -624,13 +617,12 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           <SignoffCard s={liveSnag} snag={latestSnag} ticketId={t.id} title={submissionLabel(liveSnag)} reason={roundBySignoff.get(liveSnag.id)?.reason ?? liveSnag.reject_reason} />
         </CollapsibleSection>
       )}
-
       {/* Quotes — active (pending / accepted) quotes only. Declined ones move to the
           Archived quotes block below. */}
       {activeQuotes.length > 0 && (
         // Open during quoting / before work starts; collapsed once the job is marked
         // in progress (and every stage after).
-        <CollapsibleSection key={quotesLivePhase ? 'quotes-live' : 'quotes-done'} id={quotesLivePhase ? 'ticket-quotes' : 'ticket-quotes-done'} title="Quotes" defaultOpen={quotesLivePhase}>
+        (<CollapsibleSection key={quotesLivePhase ? 'quotes-live' : 'quotes-done'} id={quotesLivePhase ? 'ticket-quotes' : 'ticket-quotes-done'} title="Quotes" defaultOpen={quotesLivePhase}>
           {activeQuotes.map((q, i, arr) => (
             <QuoteSummary
               key={q.id}
@@ -650,9 +642,8 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
               }
             />
           ))}
-        </CollapsibleSection>
+        </CollapsibleSection>)
       )}
-
       {/* Archived — one block holding both this supplier's declined quotes (by the RM
           or themselves) and every time they declined the quote request. The request
           declines are durable (kept even after the RM re-assigns them). */}
@@ -730,14 +721,12 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           )}
         </CollapsibleSection>
       )}
-
       {/* Completion — the approved COC & POC, created once sign-off is accepted */}
       {acceptedSignoff && (
         <CollapsibleSection id="ticket-completion" title="Completion" defaultOpen={phase === 'completion'}>
           <SignoffCard s={acceptedSignoff} ticketId={t.id} />
         </CollapsibleSection>
       )}
-
       {/* Only the AWARDED supplier posts updates — a still-competing supplier's note
           would otherwise surface in the awarded supplier's trail (they're isolated). */}
       {awarded && (
@@ -746,7 +735,6 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
           <SupplierAttachments ticketId={t.id} />
         </Card>
       )}
-
       {/* Isolation: a supplier only ever sees THEIR OWN involvement. Until they're
           awarded the job, the trail is scoped to their invite + their own quote (no
           other supplier's progress). View events are always this supplier's own
@@ -788,5 +776,5 @@ export default async function SupplierTicketDetailPage({ params }: { params: { i
         }} />
       )}
     </div>
-  )
+  );
 }

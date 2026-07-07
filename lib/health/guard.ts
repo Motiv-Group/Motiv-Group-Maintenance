@@ -11,7 +11,7 @@ export interface SupplierContext { userId: string; companyId: string | null; sup
  *  pending or approved) — they have no client company; queries keyed on companyId
  *  simply return nothing for them. */
 export async function requireSupplierV3(): Promise<SupplierContext> {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
   // Profile + scope links both key on user.id only — fetch in parallel (one RTT, not two).
@@ -27,7 +27,7 @@ export interface StoreContext { userId: string; companyId: string; storeIds: str
 
 /** Gate a v3 store-manager page + return their store scope. */
 export async function requireStoreManagerV3(): Promise<StoreContext> {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
   const [{ data: profile }, { data: links }] = await Promise.all([
@@ -46,7 +46,7 @@ export interface RegionalContext { userId: string; companyId: string; regionIds:
  *  shows a "pending region assignment" screen — never back to /auth/login (that
  *  would loop with the middleware). */
 export async function requireRegionalV3(): Promise<RegionalContext> {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
   const [{ data: profile }, { data: links }] = await Promise.all([
@@ -68,7 +68,7 @@ export interface RegionalUser {
  *  allows a pending (un-approved, no-company) RM through so they can see the
  *  pending screen and reach Settings. Does not redirect on missing company. */
 export async function requireRegionalUser(): Promise<RegionalUser> {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
   const [{ data: profile }, { data: links }] = await Promise.all([
@@ -88,7 +88,7 @@ export interface IndividualContext { userId: string; fullName: string | null }
 /** Gate an Individual (general-public) page. Individuals are standalone — no company
  *  / store / region — so this only checks the role; their tickets scope by created_by. */
 export async function requireIndividual(): Promise<IndividualContext> {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
   const { data: profile } = await supabase.from('user_profiles').select('role, full_name').eq('id', user.id).single()
@@ -103,7 +103,7 @@ export interface MasterAdminContext { userId: string; email: string }
  *  restricts /admin/* to that role and login redirects them here; this is the
  *  page-level defence-in-depth check. Role is the sole gate. */
 export async function requireMasterAdmin(): Promise<MasterAdminContext> {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
   const { data: profile } = await supabase.from('user_profiles').select('role').eq('id', user.id).single()
@@ -113,7 +113,7 @@ export async function requireMasterAdmin(): Promise<MasterAdminContext> {
 
 /** Gate a v3 executive page + return their company scope. */
 export async function requireExecutiveV3(): Promise<ExecContext> {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
   const { data: profile } = await supabase

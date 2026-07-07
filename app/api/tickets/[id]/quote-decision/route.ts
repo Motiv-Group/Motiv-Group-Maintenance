@@ -18,8 +18,9 @@ const BodySchema = z.object({
 //  decline: decline that one quote (with reason) and re-open the ticket so the RM
 //           can pick one of the remaining quotes OR assign a different supplier.
 //           Remaining suppliers' quotes are left pending (still selectable).
-export async function POST(request: Request, { params }: { params: { id: string } }) {
-  const supabase = createClient()
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   if (!(await rateLimit(`quote-decision:${user.id}`, 40, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
@@ -160,6 +161,6 @@ export async function POST(request: Request, { params }: { params: { id: string 
     void sendPushToMany([ticket.created_by], { title: 'Work approved', body: ticket.title ?? '', url: `/client/tickets/${ticket.id}` })
   }
 
-  revalidatePath('/regional'); revalidatePath(`/regional/tickets/${ticket.id}`); revalidatePath('/supplier'); revalidatePath('/client'); revalidatePath('/individual'); revalidatePath(`/individual/tickets/${ticket.id}`)
+  revalidatePath('/regional');revalidatePath(`/regional/tickets/${ticket.id}`);revalidatePath('/supplier');revalidatePath('/client');revalidatePath('/individual');revalidatePath(`/individual/tickets/${ticket.id}`)
   return NextResponse.json({ ok: true })
 }

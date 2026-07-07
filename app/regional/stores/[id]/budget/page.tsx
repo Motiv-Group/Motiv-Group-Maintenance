@@ -5,8 +5,9 @@ import { notFound, redirect } from 'next/navigation'
 import { BackButton } from '@/components/ui/BackButton'
 import { StoreBudgetForm } from '@/components/regional/StoreBudgetForm'
 
-export default async function StoreBudgetPage({ params }: { params: { id: string } }) {
-  const supabase = createClient()
+export default async function StoreBudgetPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 

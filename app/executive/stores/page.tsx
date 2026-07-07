@@ -6,7 +6,8 @@ import { StoresTab } from '@/components/exec/StoresTab'
 
 const STATUSES = ['controlled', 'attention', 'at_risk', 'critical']
 
-export default async function ExecutiveStoresPage({ searchParams }: { searchParams?: { status?: string } }) {
+export default async function ExecutiveStoresPage(props: { searchParams?: Promise<{ status?: string }> }) {
+  const searchParams = await props.searchParams;
   const { companyId } = await requireExecutiveV3()
   const data = await assembleEstateDashboard(companyId)
   const initialStatus = STATUSES.includes(searchParams?.status ?? '') ? searchParams!.status! : 'all'

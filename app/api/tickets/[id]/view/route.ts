@@ -13,8 +13,9 @@ const BodySchema = z.object({
   itemLabel: z.string().optional(),
 })
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
-  const supabase = createClient()
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 

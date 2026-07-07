@@ -5,7 +5,8 @@ import { requireRegionalV3 } from '@/lib/health/guard'
 // GET /api/regional/suppliers/[id] — extra detail for the RM supplier slide-out:
 // contact info, jobs completed in-region, and recent rating comments. The
 // headline performance numbers come from the dashboard row already on the page.
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export async function GET(_req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   let companyId: string, regionIds: string[]
   try { ({ companyId, regionIds } = await requireRegionalV3()) }
   catch { return NextResponse.json({ error: 'Forbidden' }, { status: 403 }) }

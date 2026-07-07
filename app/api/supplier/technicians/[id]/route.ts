@@ -12,7 +12,8 @@ const BodySchema = z.object({
 })
 
 // PATCH /api/supplier/technicians/[id] — edit a technician's name/phone.
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const ctx = await supplierCtx()
   if (!ctx) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   if (!(await rateLimit(`technicians:${ctx.userId}`, 30, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
@@ -35,7 +36,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 }
 
 // DELETE /api/supplier/technicians/[id] — remove (soft-delete so scheduled tickets keep their reference).
-export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const ctx = await supplierCtx()
   if (!ctx) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 

@@ -32,7 +32,7 @@ const BodySchema = z.object({
 //  Exec: add_region, invite_rm, add_supplier
 //  RM:   add_store, invite_store_manager, add_supplier
 export async function POST(request: Request) {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   if (!(await rateLimit(`provision:${user.id}`, 30, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })

@@ -21,7 +21,7 @@ export async function GET(request: Request) {
 async function authorize(request: Request): Promise<boolean> {
   const secret = process.env.CRON_SECRET
   if (secret && request.headers.get('authorization') === `Bearer ${secret}`) return true
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return false
   const { data: p } = await supabase.from('user_profiles').select('role').eq('id', user.id).single()

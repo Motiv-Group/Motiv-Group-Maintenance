@@ -215,7 +215,8 @@ function SupplierUpdateItem({ u, ticketId, isNew = false }: { u: { body: string;
   )
 }
 
-export default async function RegionalTicketDetailPage({ params }: { params: { id: string } }) {
+export default async function RegionalTicketDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   // Overlap the auth gate with the ticket fetch (admin client needs no user ctx)
   // — one round-trip wave instead of two on every detail-page load.
   const admin = createAdminClient()
@@ -509,10 +510,8 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
   return (
     <div className="space-y-5">
       <BackLink fallbackHref="/regional/tickets" label="Back to tickets" />
-
       {/* Progress — bare, no card around it */}
       <div className="px-1 pt-1"><RmPipeline status={t.status} /></div>
-
       {/* Ticket detail — structured, mirrors the SM layout */}
       <Card className="p-5 space-y-4">
         <div className="flex items-start justify-between gap-3">
@@ -606,11 +605,9 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
           {canEdit && <RmEditTicketForm ticketId={t.id} initial={{ title: t.title, category: t.category ?? 'General', impact: t.operational_impact ?? 'none', priority: t.priority, description: t.description }} />}
         </div>
       </Card>
-
       {/* Bump this RM's "last seen" watermark on a real open (fires client-side, not on
           prefetch) so these updates read as seen next visit. */}
       <MarkTicketSeen ticketId={t.id} latestUpdateAt={supplierUpdates[0]?.created_at ?? null} />
-
       {/* NEW updates from the supplier — surfaced right below the ticket detail so
           they're the first thing the RM notices. Shows only the unseen updates; on the
           next open they fold into the collapsible history above the audit trail. */}
@@ -631,21 +628,17 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
           </ol>
         </Card>
       )}
-
       {(t.status === 'cancelled' || t.status === 'declined') && (
         <div className="rounded-2xl bg-red-500/10 ring-1 ring-red-500/40 p-5 space-y-1">
           <p className="text-sm font-bold text-red-700 dark:text-red-400">Ticket {t.status === 'declined' ? 'declined' : 'cancelled'}</p>
           <p className="text-sm text-[var(--text-muted)]">{t.cancellation_reason || `This ticket was ${t.status === 'declined' ? 'declined' : 'cancelled'}.`}</p>
         </div>
       )}
-
       {breached && <BreachReason nextAction={sla.nextAction} dueAt={sla.nextActionDueAt} owner={breachOwner} />}
-
       {/* Dispute — while a dispute is live it sits ABOVE the Actions (needs the RM's
           attention); once done it moves below the Actions as history (see after the
           Actions card). */}
       {openDispute && disputeBlock}
-
       {/* COC & POC — only the submission currently under review. Earlier submissions
           that were sent back (evidence / snag) live in the Archive as round cards. */}
       {pendingSignoffs.length > 0 && (
@@ -653,14 +646,12 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
           {pendingSignoffs.map((s: any) => <RmSignoffCard key={s.id} s={s} tone="review" ticketId={t.id} title={submissionLabel(s)} collapsible defaultOpen freshEvidence={isEvidenceResubmission} priorUrls={priorEvidenceUrls} />)}
         </CollapsibleSection>
       )}
-
       {/* Completion — the approved COC & POC, created once sign-off is accepted */}
       {acceptedSignoff && (
         <CollapsibleSection id="ticket-completion" title="Completion" defaultOpen={phase === 'completion'}>
           <RmSignoffCard s={acceptedSignoff} tone="approved" ticketId={t.id} />
         </CollapsibleSection>
       )}
-
       <Card className="p-5 space-y-4">
         <h2 className="text-sm font-bold text-[var(--text)]">Actions</h2>
 
@@ -757,10 +748,8 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
           exclude={['validate', 'reject', 'request_info', 'request_quote', 'require_assessment', 'approve_quote', 'reject_quote', 'request_revision', 'proceed_no_quote', 'schedule', 'approve', 'assign_snag', 'accept_schedule', 'approve_snag', 'decline_snag_schedule', 'approve_variation', 'reject_variation', 'request_evidence', 'raise_snag', 'close_out']}
         />
       </Card>
-
       {/* Resolved dispute(s) → history below the Actions once nothing is live. */}
       {!openDispute && disputeBlock}
-
       {/* Quotes — suppliers requested, quotes to review, the accepted quote. Open
           during quoting / before work; collapsed once the job is in progress. */}
       {hasQuoteBlock && (
@@ -823,7 +812,6 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
           )}
         </CollapsibleSection>
       )}
-
       {/* Variation Orders — their own block (raised at the close-out stage). Opens by
           default while one is under review. */}
       {(variations ?? []).length > 0 && (
@@ -855,7 +843,6 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
           ))}
         </CollapsibleSection>
       )}
-
       {/* Archive — declined / not-selected quotes (by the RM or the supplier) plus the
           suppliers auto-closed when the job was awarded, moved out of the main Quotes
           block. Each is a click-to-expand row with its reason. */}
@@ -944,7 +931,6 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
           )}
         </CollapsibleSection>
       )}
-
       {/* Updates from the supplier — full history, collapsed by default. Sits just
           above the audit trail once there's nothing new (everything here is seen). */}
       {supplierUpdates.length > 0 && newSupplierUpdates.length === 0 && (
@@ -954,7 +940,6 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
           </ol>
         </CollapsibleSection>
       )}
-
       <AuditTrail ticket={{
         createdAt: t.created_at, status: t.status, updatedAt: t.updated_at,
         quoteRequestedAt: t.first_quote_requested_at ?? t.quote_requested_at,
@@ -978,5 +963,5 @@ export default async function RegionalTicketDetailPage({ params }: { params: { i
         supplierDeclines,
       }} />
     </div>
-  )
+  );
 }
