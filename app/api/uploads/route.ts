@@ -12,8 +12,11 @@ import { rateLimit } from '@/lib/rate-limit'
 export const runtime = 'nodejs'
 export const maxDuration = 60
 
-const MAX_BYTES = 15 * 1024 * 1024   // matches the bucket size limits
+const MAX_BYTES = 15 * 1024 * 1024   // per-file, matches the bucket size limits
 const MAX_FILES = 10
+// Cumulative per-user storage cap across all buckets (abuse guard — the free-tier
+// Supabase bucket is ~1 GB total). Tunable via MAX_USER_UPLOAD_BYTES; default 500 MB.
+const MAX_USER_UPLOAD_BYTES = Number(process.env.MAX_USER_UPLOAD_BYTES) || 500 * 1024 * 1024
 
 const IMG = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
 const BUCKET_MIME: Record<string, string[]> = {
@@ -43,12 +46,32 @@ export async function POST(req: NextRequest) {
   if (files.length > MAX_FILES) return NextResponse.json({ error: `Too many files (max ${MAX_FILES})` }, { status: 400 })
 
   const admin = createAdminClient()
-  const urls: string[] = []
-  const failed: string[] = []
 
-  await Promise.all(files.map(async (f) => {
-    if (f.size > MAX_BYTES) { failed.push(f.name); return }
-    if (f.type && !allowed.includes(f.type)) { failed.push(f.name); return }
+  // Per-file validation up front. Files that fail never reach storage, so they
+  // don't count toward the quota.
+  const isValid = (f: File) => f.size <= MAX_BYTES && (!f.type || allowed.includes(f.type))
+  const valid = files.filter(isValid)
+  const failed: string[] = files.filter((f) => !isValid(f)).map((f) => f.name || 'file')
+  const incoming = valid.reduce((sum, f) => sum + f.size, 0)
+
+  // Reserve quota atomically BEFORE uploading, so concurrent batches can't both
+  // slip past the cap. Fail-open if the quota infra isn't present yet (migration
+  // not applied) — a missing function must never hard-break uploads.
+  if (incoming > 0) {
+    const { data: ok, error } = await admin.rpc('reserve_upload_quota', {
+      p_user: user.id, p_bytes: incoming, p_cap: MAX_USER_UPLOAD_BYTES,
+    })
+    if (error) {
+      console.error('[api/uploads] quota check unavailable, allowing:', error.message)
+    } else if (ok === false) {
+      return NextResponse.json({
+        error: 'Upload limit reached for your account. Please contact support to raise it.',
+      }, { status: 413 })
+    }
+  }
+
+  const urls: string[] = []
+  await Promise.all(valid.map(async (f) => {
     // Path is server-controlled and always prefixed with the caller's id.
     const safeName = (f.name || 'file').replace(/[^\w.\-]/g, '_')
     const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeName}`
@@ -58,6 +81,8 @@ export async function POST(req: NextRequest) {
         contentType: f.type || 'application/octet-stream',
         upsert: true,
       })
+      // A storage failure here leaves the reserved bytes counted (conservative —
+      // it can only make the cap stricter, and storage errors are rare).
       if (error) { console.error('[api/uploads]', bucket, f.name, error.message); failed.push(f.name); return }
       urls.push(admin.storage.from(bucket).getPublicUrl(path).data.publicUrl)
     } catch (e: any) {
