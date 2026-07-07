@@ -24,7 +24,9 @@ function buildCsp(nonce: string): string {
 }
 
 // v3 cutover: roles live in user_profiles (company-scoped identity).
-export async function middleware(request: NextRequest) {
+// Next 16 renamed the `middleware` file convention to `proxy` — same behaviour,
+// same per-request CSP-nonce logic; the file is proxy.ts and the export is `proxy`.
+export async function proxy(request: NextRequest) {
   const nonce = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))))
   const csp = buildCsp(nonce)
 
