@@ -810,7 +810,8 @@ create table if not exists public.user_profiles (
   company_name                 text,
   sub_store                    text,
   branch_code                  text,
-  last_wa_inbound_at           timestamptz
+  last_wa_inbound_at           timestamptz,
+  storage_bytes_used           bigint not null default 0
 );
 
 create table if not exists public.whatsapp_sessions (
@@ -1056,6 +1057,31 @@ $function$;
 revoke all on function public.admin_db_stats() from public;
 revoke all on function public.admin_db_stats() from anon, authenticated;
 grant execute on function public.admin_db_stats() to service_role;
+
+-- Per-user upload quota (B5). Atomically add p_bytes to the caller's usage IFF it
+-- stays within p_cap; returns true when the reservation succeeded. Called only via
+-- the service-role client from POST /api/uploads. EXECUTE is limited to service_role
+-- so a signed-in user can't RPC a negative delta to zero their own counter.
+CREATE OR REPLACE FUNCTION public.reserve_upload_quota(p_user uuid, p_bytes bigint, p_cap bigint)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  if p_bytes <= 0 then
+    return true;
+  end if;
+  update public.user_profiles
+    set storage_bytes_used = storage_bytes_used + p_bytes
+    where id = p_user
+      and storage_bytes_used + p_bytes <= p_cap;
+  return found;
+end;
+$function$;
+revoke all on function public.reserve_upload_quota(uuid, bigint, bigint) from public;
+revoke all on function public.reserve_upload_quota(uuid, bigint, bigint) from anon, authenticated;
+grant execute on function public.reserve_upload_quota(uuid, bigint, bigint) to service_role;
 
 CREATE OR REPLACE FUNCTION public.app_can_see_ticket(t_id uuid)
  RETURNS boolean
