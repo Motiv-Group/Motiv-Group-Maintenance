@@ -2,12 +2,13 @@
 
 import type { ReactNode } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { Globe2, Map as MapIcon, Store, Truck, Gavel, Bell, Settings, LogOut, FileBarChart, LayoutDashboard, Ticket, ClipboardCheck, AlertTriangle, ReceiptText, BarChart2, Users, CalendarClock } from 'lucide-react'
+import { usePathname, useSearchParams } from 'next/navigation'
+import { Globe2, Map as MapIcon, Store, Truck, Gavel, Bell, Settings, LogOut, FileBarChart, LayoutDashboard, Ticket, ClipboardCheck, AlertTriangle, ReceiptText, BarChart2, Users, CalendarClock, PlusCircle, CheckCircle2 } from 'lucide-react'
 import { MotivLogo } from '@/components/ui/MotivLogo'
 import { SwipeNav } from '@/components/ui/SwipeNav'
 
 interface ChromeTab { href: string; label: string; icon: React.ElementType }
+type SearchParamsLike = { get(name: string): string | null }
 
 const EXEC_TABS: ChromeTab[] = [
   { href: '/executive',           label: 'Dashboard', icon: Globe2 },
@@ -28,6 +29,13 @@ const STORE_TABS: ChromeTab[] = [
   { href: '/client',         label: 'Dashboard', icon: LayoutDashboard },
   { href: '/client/tickets', label: 'Tickets',   icon: Ticket },
   { href: '/client/visits',  label: 'Visits',    icon: CalendarClock },
+]
+const STORE_DESKTOP_TABS: ChromeTab[] = [
+  { href: '/client',                          label: 'Today',     icon: LayoutDashboard },
+  { href: '/client/tickets/new',              label: 'Log',       icon: PlusCircle },
+  { href: '/client/tickets',                  label: 'Tickets',   icon: Ticket },
+  { href: '/client/visits',                   label: 'Visits',    icon: CalendarClock },
+  { href: '/client/tickets?status=completed', label: 'Completed', icon: CheckCircle2 },
 ]
 const SUPPLIER_TABS: ChromeTab[] = [
   { href: '/supplier',         label: 'Dashboard',   icon: LayoutDashboard },
@@ -53,21 +61,37 @@ const VARIANTS = {
 } as const
 
 export function ExecChrome({
-  children, userName, variant = 'exec', unreadCount = 0,
-}: { children: ReactNode; userName: string | null; variant?: keyof typeof VARIANTS; unreadCount?: number }) {
+  children, userName, variant = 'exec', unreadCount = 0, contextLabel,
+}: { children: ReactNode; userName: string | null; variant?: keyof typeof VARIANTS; unreadCount?: number; contextLabel?: string | null }) {
   const { tabs, roleLabel, base, reports } = VARIANTS[variant]
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const home = tabs[0]?.href ?? base
   const initial = (userName ?? roleLabel).trim().charAt(0).toUpperCase()
+  const isStore = variant === 'store'
   // Nav bars are always deep navy (brand-600) in both light and dark mode,
   // matching the Settings Navbar — so icons/labels use light tones on navy.
   const iconBtn = 'p-2 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 transition-colors'
   // All roles share the same content width so the chrome is consistent.
   const wrap = 'max-w-[1500px]'
+  const mainWrap = isStore ? 'lg:max-w-[1280px]' : wrap
 
   return (
     <div className="min-h-screen bg-[var(--app-bg)] text-[var(--text)] flex flex-col">
-      <header className="sticky top-0 z-20 bg-brand-600 border-b border-brand-700">
+      {isStore && (
+        <StoreDesktopSidebar
+          userName={userName}
+          roleLabel={roleLabel}
+          contextLabel={contextLabel}
+          unreadCount={unreadCount}
+          pathname={pathname}
+          searchParams={searchParams}
+          initial={initial}
+        />
+      )}
+
+      <div className={isStore ? 'lg:pl-[260px] flex min-h-screen flex-col' : 'flex min-h-screen flex-col'}>
+      <header className={`sticky top-0 z-20 bg-brand-600 border-b border-brand-700 ${isStore ? 'lg:hidden' : ''}`}>
         <div className={`${wrap} mx-auto px-4 h-16 flex items-center justify-between`}>
           <Link href={home}><MotivLogo height={36} /></Link>
           <div className="flex items-center gap-1">
@@ -95,13 +119,13 @@ export function ExecChrome({
 
       {/* Swipe left/right on mobile moves between this section's tabs. */}
       <SwipeNav links={tabs}>
-        <main className={`flex-1 ${wrap} w-full mx-auto px-4 py-6 pb-32`}>{children}</main>
+        <main className={`flex-1 ${mainWrap} w-full mx-auto px-4 sm:px-5 ${isStore ? 'py-5 pb-32 lg:px-10 lg:py-8 lg:pb-10' : 'py-6 pb-32'}`}>{children}</main>
       </SwipeNav>
 
-      <nav className="fixed bottom-0 inset-x-0 z-20 bg-brand-600 border-t border-brand-700">
+      <nav className={`fixed bottom-0 inset-x-0 z-20 bg-brand-600 border-t border-brand-700 ${isStore ? 'lg:hidden' : ''}`}>
         <div className={`${wrap} mx-auto flex items-stretch h-20 justify-around`}>
           {tabs.map(({ href, label, icon: Icon }) => {
-            const active = pathname === href || (href !== home && pathname.startsWith(href))
+            const active = isActiveHref(href, home, pathname, searchParams)
             return (
               <Link key={href} href={href}
                 className={`flex flex-col items-center justify-center gap-1 flex-1 text-[11px] font-medium transition-colors ${active ? 'text-[#C6A35D]' : 'text-gray-400 hover:text-gray-200'}`}>
@@ -112,6 +136,108 @@ export function ExecChrome({
           })}
         </div>
       </nav>
+      </div>
     </div>
   )
+}
+
+function isActiveHref(href: string, home: string, pathname: string, searchParams: SearchParamsLike): boolean {
+  const [path, query = ''] = href.split('?')
+  if (query) {
+    const expected = new URLSearchParams(query)
+    for (const [key, value] of expected.entries()) {
+      if (searchParams.get(key) !== value) return false
+    }
+    return pathname === path
+  }
+  return pathname === path || (href !== home && pathname.startsWith(path))
+}
+
+function StoreDesktopSidebar({
+  userName,
+  roleLabel,
+  contextLabel,
+  unreadCount,
+  pathname,
+  searchParams,
+  initial,
+}: {
+  userName: string | null
+  roleLabel: string
+  contextLabel?: string | null
+  unreadCount: number
+  pathname: string
+  searchParams: SearchParamsLike
+  initial: string
+}) {
+  const user = userName ?? roleLabel
+  const store = contextLabel ?? 'Store'
+
+  return (
+    <aside className="fixed inset-y-0 left-0 z-30 hidden w-[260px] border-r border-white/10 bg-brand-600 text-white lg:flex lg:flex-col">
+      <div className="px-5 pt-6 pb-4">
+        <Link href="/client" className="inline-flex"><MotivLogo height={34} /></Link>
+        <div className="mt-6 flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-gray-200">
+          <span className="truncate">{store}</span>
+          <Store size={14} className="shrink-0 text-gray-400" />
+        </div>
+      </div>
+
+      <nav className="flex-1 px-3">
+        <div className="space-y-1">
+          {STORE_DESKTOP_TABS.map(({ href, label, icon: Icon }) => {
+            const active = isStoreDesktopActive(href, pathname, searchParams)
+            return (
+              <Link
+                key={href}
+                href={href}
+                className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition ${
+                  active
+                    ? 'bg-blue-600/25 text-white ring-1 ring-blue-500/30'
+                    : 'text-gray-300 hover:bg-white/[0.06] hover:text-white'
+                }`}
+              >
+                <Icon size={18} className={active ? 'text-blue-300' : 'text-gray-400'} />
+                <span>{label}</span>
+              </Link>
+            )
+          })}
+        </div>
+      </nav>
+
+      <div className="border-t border-white/10 px-3 py-4">
+        <Link href="/client/notifications" className="flex items-center justify-between rounded-xl px-3 py-3 text-sm font-semibold text-gray-300 hover:bg-white/[0.06] hover:text-white">
+          <span className="flex items-center gap-3"><Bell size={18} className="text-gray-400" /> Notifications</span>
+          {unreadCount > 0 && <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] text-white">{unreadCount > 9 ? '9+' : unreadCount}</span>}
+        </Link>
+        <Link href="/settings" className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-gray-300 hover:bg-white/[0.06] hover:text-white">
+          <Settings size={18} className="text-gray-400" /> Settings
+        </Link>
+        <form action="/auth/logout" method="post">
+          <button type="submit" className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold text-gray-300 hover:bg-white/[0.06] hover:text-white">
+            <LogOut size={18} className="text-gray-400" /> Log out
+          </button>
+        </form>
+      </div>
+
+      <div className="border-t border-white/10 p-4">
+        <div className="flex items-center gap-3 rounded-2xl bg-white/[0.04] p-3">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-blue-600 text-sm font-bold text-white">{initial}</span>
+          <div className="min-w-0">
+            <div className="truncate text-sm font-bold text-white">{user}</div>
+            <div className="truncate text-xs text-gray-400">{roleLabel}</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+  )
+}
+
+function isStoreDesktopActive(href: string, pathname: string, searchParams: SearchParamsLike): boolean {
+  if (href === '/client/tickets') {
+    return pathname.startsWith('/client/tickets')
+      && pathname !== '/client/tickets/new'
+      && searchParams.get('status') !== 'completed'
+  }
+  return isActiveHref(href, '/client', pathname, searchParams)
 }
