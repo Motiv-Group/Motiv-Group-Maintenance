@@ -529,7 +529,7 @@ export type ClientStatus = 'open' | 'info_requested' | 'scheduled' | 'in_progres
 // ticket read "Open" on the detail page but "In Progress" on the dashboard).
 const clientVisible = (status: string): ClientStatus | null =>
   clientVisibleStatus(status as TicketStatus)
-export interface StoreManagerTicket { id: string; title: string; description: string | null; category: string | null; status: ClientStatus; priority: Priority; operationalImpact: string | null; createdAt: string; supplierAssigned: boolean; jobRef: string | null; dueAt: string; overdue: boolean; infoAdded: boolean }
+export interface StoreManagerTicket { id: string; title: string; description: string | null; category: string | null; status: ClientStatus; rawStatus: string; priority: Priority; operationalImpact: string | null; createdAt: string; supplierAssigned: boolean; jobRef: string | null; dueAt: string; overdue: boolean; infoAdded: boolean }
 export interface StoreManagerData {
   storeName: string
   company: string
@@ -571,7 +571,7 @@ export async function assembleStoreManagerDashboard(companyId: string, storeIds:
     const { dueAt, overdue } = dueInfo(t, rules, now)
     // "Info added" = the SM resubmitted after the RM requested info (back at open, reason kept).
     const infoAdded = t.status === 'open' && !!(t as any).info_request_reason
-    visible.push({ id: t.id, title: t.title ?? 'Untitled', description: (t as any).description ?? null, category: t.category ?? null, status: v, priority: t.priority, operationalImpact: t.operational_impact ?? null, createdAt: t.created_at, supplierAssigned: !!t.supplier_id, jobRef: (t as any).job_ref ?? null, dueAt, overdue, infoAdded })
+    visible.push({ id: t.id, title: t.title ?? 'Untitled', description: (t as any).description ?? null, category: t.category ?? null, status: v, rawStatus: t.status, priority: t.priority, operationalImpact: t.operational_impact ?? null, createdAt: t.created_at, supplierAssigned: !!t.supplier_id, jobRef: (t as any).job_ref ?? null, dueAt, overdue, infoAdded })
   }
   visible.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
   return {
