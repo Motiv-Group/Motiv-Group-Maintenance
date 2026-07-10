@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { Globe2, Map as MapIcon, Store, Truck, Gavel, Bell, Settings, LogOut, FileBarChart, LayoutDashboard, Ticket, ClipboardCheck, AlertTriangle, ReceiptText, BarChart2, Users, CalendarClock, PlusCircle, CheckCircle2 } from 'lucide-react'
+import { Globe2, Map as MapIcon, Store, Truck, Gavel, Bell, Settings, LogOut, FileBarChart, LayoutDashboard, Ticket, ClipboardCheck, AlertTriangle, ReceiptText, BarChart2, Users, CalendarClock, CheckCircle2 } from 'lucide-react'
 import { MotivLogo } from '@/components/ui/MotivLogo'
 import { SwipeNav } from '@/components/ui/SwipeNav'
 
@@ -32,7 +32,6 @@ const STORE_TABS: ChromeTab[] = [
 ]
 const STORE_DESKTOP_TABS: ChromeTab[] = [
   { href: '/client',                          label: 'Today',     icon: LayoutDashboard },
-  { href: '/client/tickets/new',              label: 'Log',       icon: PlusCircle },
   { href: '/client/tickets',                  label: 'Tickets',   icon: Ticket },
   { href: '/client/visits',                   label: 'Visits',    icon: CalendarClock },
   { href: '/client/tickets?status=completed', label: 'Completed', icon: CheckCircle2 },
@@ -72,9 +71,10 @@ export function ExecChrome({
   // Nav bars are always deep navy (brand-600) in both light and dark mode,
   // matching the Settings Navbar — so icons/labels use light tones on navy.
   const iconBtn = 'p-2 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 transition-colors'
-  // All roles share the same content width so the chrome is consistent.
-  const wrap = 'max-w-[1500px]'
-  const mainWrap = isStore ? 'lg:max-w-[1280px]' : wrap
+  // All roles share the same content width so the chrome (header, main, nav) is
+  // consistent and margins stay tight on wide screens.
+  const wrap = 'max-w-[1700px]'
+  const mainWrap = wrap
 
   return (
     <div className="min-h-screen bg-[var(--app-bg)] text-[var(--text)] flex flex-col">
