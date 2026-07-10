@@ -30,8 +30,9 @@ export function Pill({ status, label, className = '' }: { status: HealthStatus; 
 }
 
 export function Card({ children, className = '', tint = false, ...rest }: { children: ReactNode; className?: string; tint?: boolean } & HTMLAttributes<HTMLDivElement>) {
-  // tint → light-blue surface in light mode (unchanged in dark). See --surface-tint.
-  return <div className={`rounded-2xl ${tint ? 'bg-[var(--surface-tint)]' : 'bg-[var(--surface)]'} ring-1 ring-black/10 dark:ring-white/10 shadow-sm dark:shadow-md dark:shadow-black/20 ${className}`} {...rest}>{children}</div>
+  // tint → navy "island" (brand-600 surface + light text, like the nav bar), in
+  // both light and dark themes. See the .navy-block rule in globals.css.
+  return <div className={`rounded-2xl bg-[var(--surface)] ring-1 shadow-sm dark:shadow-md dark:shadow-black/20 ${tint ? 'navy-block dark ring-white/10' : 'ring-black/10 dark:ring-white/10'} ${className}`} {...rest}>{children}</div>
 }
 
 export function SectionCard({ title, icon, action, children }: { title: string; icon?: ReactNode; action?: ReactNode; children: ReactNode }) {

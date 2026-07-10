@@ -24,9 +24,6 @@
     --app-bg:     #eef2f7;
     --surface:    #ffffff;
     --surface-2:  #f8fafc;
-    /* Light-blue tint of the navy nav — used for the SM dashboard blocks in light
-       mode. Same as --surface in dark (see below) so dark mode is unchanged. */
-    --surface-tint: #dbe7f5;
     --nav-bg:     #ffffff;
     --border:     rgba(15, 23, 42, 0.10);
     --hover:      rgba(15, 23, 42, 0.045);
@@ -39,7 +36,6 @@
     --app-bg:     #0a0e17;
     --surface:    #1f2937;
     --surface-2:  #0e1422;
-    --surface-tint: #1f2937;
     --nav-bg:     #0c1120;
     --border:     rgba(255, 255, 255, 0.07);
     --hover:      rgba(255, 255, 255, 0.05);
@@ -53,6 +49,21 @@
 @layer utilities {
   .safe-top    { padding-top: env(safe-area-inset-top); }
   .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+}
+
+/* Navy "island" blocks (SM dashboard) — brand-600 surface with light text, so a
+   block reads like the nav bar regardless of the page theme. Paired with the
+   `dark` class (Card `tint`) so Tailwind dark: utilities inside also resolve for
+   readable contrast on navy. Unlayered so the var overrides win. */
+.navy-block {
+  --surface:    #0d1f2d;
+  --surface-2:  #0a1922;
+  --border:     rgba(255, 255, 255, 0.12);
+  --hover:      rgba(255, 255, 255, 0.06);
+  --input-bg:   rgba(0, 0, 0, 0.22);
+  --text:       #f8fafc;
+  --text-muted: #cbd5e1;
+  --text-faint: #94a3b8;
 }
 
 /* ── Native <select> dark-mode popup fix ──
