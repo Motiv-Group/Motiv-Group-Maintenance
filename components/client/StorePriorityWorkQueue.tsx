@@ -14,7 +14,7 @@ import {
 } from 'lucide-react'
 import type { StoreManagerTicket } from '@/lib/health/data'
 import { Card } from '@/components/exec/ui'
-import { humanizeDuration, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
+import { formatDate, humanizeDuration, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
 import { categoryVisual } from '@/lib/categoryVisual'
 
 type TodayVisit = {
@@ -208,13 +208,16 @@ function QueueRow({ ticket, storeName, nowMs }: { ticket: StoreManagerTicket; st
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 lg:block">
-        <span className={`inline-flex rounded-lg px-3 py-1 text-xs font-bold ${statusPill(ticket)}`}>{statusLabel(ticket)}</span>
-        <p className="mt-0 text-sm text-[var(--text-muted)] lg:mt-2">{ticket.supplierAssigned ? 'Supplier assigned' : 'No supplier assigned'}</p>
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className={`inline-flex rounded-md px-2 py-0.5 text-[10px] font-bold ${priorityBadgeClass(ticket)}`}>{priorityLabel(ticket)}</span>
+          <span className={`inline-flex rounded-md px-2 py-0.5 text-[10px] font-bold ${clientStatusBadgeClass(ticket)}`}>{clientStatusLabel(ticket)}</span>
+        </div>
+        <p className="mt-1.5 truncate text-sm text-[var(--text-muted)]">{ticket.supplierAssigned ? 'Supplier assigned' : 'No supplier assigned'}</p>
       </div>
 
       <div className="min-w-0 border-l-0 border-[var(--border)] lg:border-l lg:pl-6">
-        <p className="text-xs text-[var(--text-faint)]">Next step</p>
+        <p className="truncate text-xs text-[var(--text-faint)]">Next step · Logged {formatDate(ticket.createdAt)}</p>
         <p className="truncate text-sm font-bold text-[var(--text)]">{nextStep(ticket)}</p>
         {ticket.overdue ? (
           <p className="mt-1 flex items-center gap-1.5 text-sm font-bold text-red-600 dark:text-red-400">
@@ -275,18 +278,41 @@ function isUrgent(ticket: StoreManagerTicket): boolean {
   return ticket.overdue || p === 'urgent' || p === 'P1'
 }
 
-function statusLabel(ticket: StoreManagerTicket): string {
-  if (ticket.infoAdded) return 'Info added'
-  if (ticket.status === 'info_requested') return 'Input needed'
-  return PRIORITY_LEVEL_LABELS[ticket.priority] ?? (ticket.status === 'open' ? 'New' : ticket.status.replace(/_/g, ' '))
+function priorityLabel(ticket: StoreManagerTicket): string {
+  return PRIORITY_LEVEL_LABELS[String(ticket.priority)] ?? 'Medium'
 }
 
-function statusPill(ticket: StoreManagerTicket): string {
-  if (ticket.overdue || isUrgent(ticket)) return 'bg-red-500/15 text-red-600 dark:text-red-400'
-  if (ticket.status === 'info_requested') return 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
-  if (ticket.status === 'in_progress') return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
-  if (ticket.status === 'scheduled') return 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-400'
-  return 'bg-blue-500/15 text-blue-600 dark:text-blue-400'
+// Priority badge colour — handles both the engine's P1–P4 and classic words.
+function priorityBadgeClass(ticket: StoreManagerTicket): string {
+  const p = String(ticket.priority)
+  if (p === 'urgent' || p === 'P1') return 'bg-red-500/15 text-red-600 dark:text-red-400'
+  if (p === 'high' || p === 'P2') return 'bg-orange-500/15 text-orange-600 dark:text-orange-400'
+  if (p === 'medium' || p === 'P3') return 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
+  return 'bg-slate-500/15 text-slate-600 dark:text-slate-300' // low / P4
+}
+
+function clientStatusLabel(ticket: StoreManagerTicket): string {
+  if (ticket.infoAdded) return 'Info added'
+  switch (ticket.status) {
+    case 'open':           return 'New'
+    case 'info_requested': return 'Input needed'
+    case 'scheduled':      return 'Scheduled'
+    case 'in_progress':    return 'In progress'
+    case 'completed':      return 'Completed'
+    case 'cancelled':      return 'Cancelled'
+    default:               return String(ticket.status).replace(/_/g, ' ')
+  }
+}
+
+function clientStatusBadgeClass(ticket: StoreManagerTicket): string {
+  if (ticket.infoAdded || ticket.status === 'info_requested') return 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
+  switch (ticket.status) {
+    case 'in_progress': return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
+    case 'completed':   return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
+    case 'scheduled':   return 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-400'
+    case 'cancelled':   return 'bg-slate-500/15 text-slate-600 dark:text-slate-300'
+    default:            return 'bg-blue-500/15 text-blue-600 dark:text-blue-400' // open / New
+  }
 }
 
 function nextStep(ticket: StoreManagerTicket): string {
