@@ -1,6 +1,25 @@
 import { createClient } from '@/lib/supabase/server'
-import { Navbar } from '@/components/ui/Navbar'
 import { redirect } from 'next/navigation'
+import { SettingsChrome } from '@/components/settings/SettingsChrome'
+
+const ROLE_HOME: Record<string, string> = {
+  supplier: '/supplier',
+  regional_manager: '/regional',
+  executive: '/executive',
+  system_admin: '/admin',
+  individual: '/individual',
+  store_manager: '/client',
+  client: '/client',
+}
+const ROLE_LABEL: Record<string, string> = {
+  supplier: 'Supplier',
+  regional_manager: 'Regional Manager',
+  executive: 'Executive',
+  system_admin: 'System Admin',
+  individual: 'Individual',
+  store_manager: 'Store Manager',
+  client: 'Store Manager',
+}
 
 export default async function SettingsLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -9,22 +28,21 @@ export default async function SettingsLayout({ children }: { children: React.Rea
 
   const { data: profile } = await supabase
     .from('user_profiles')
-    .select('role')
+    .select('role, full_name')
     .eq('id', user.id)
     .single()
 
   const role = profile?.role ?? 'client'
-  const navRole = role === 'supplier' ? 'supplier'
-    : role === 'regional_manager' ? 'regional'
-    : 'client'
+  const isStore = role === 'store_manager' || role === 'client'
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <Navbar role={navRole as any} />
-      {/* Same content width as the rest of the app (see ExecChrome). */}
-      <main className="flex-1 max-w-[1700px] w-full mx-auto px-4 sm:px-5 py-6 pb-24">
-        {children}
-      </main>
-    </div>
+    <SettingsChrome
+      userName={profile?.full_name ?? null}
+      roleLabel={ROLE_LABEL[role] ?? 'Account'}
+      roleHome={ROLE_HOME[role] ?? '/client'}
+      profileLabel={isStore ? 'Store Info' : 'Profile'}
+    >
+      {children}
+    </SettingsChrome>
   )
 }
