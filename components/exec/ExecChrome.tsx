@@ -68,6 +68,9 @@ export function ExecChrome({
   const home = tabs[0]?.href ?? base
   const initial = (userName ?? roleLabel).trim().charAt(0).toUpperCase()
   const isStore = variant === 'store'
+  const isRegional = variant === 'regional'
+  // Store + Regional get the desktop left sidebar (top bar + bottom nav hide on lg).
+  const hasSidebar = isStore || isRegional
   // Nav bars are always deep navy (brand-600) in both light and dark mode,
   // matching the Settings Navbar — so icons/labels use light tones on navy.
   const iconBtn = 'p-2 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 transition-colors'
@@ -78,20 +81,25 @@ export function ExecChrome({
 
   return (
     <div className="min-h-screen bg-[var(--app-bg)] text-[var(--text)] flex flex-col">
-      {isStore && (
-        <StoreDesktopSidebar
+      {hasSidebar && (
+        <DesktopSidebar
           userName={userName}
           roleLabel={roleLabel}
           contextLabel={contextLabel}
+          ContextIcon={isStore ? Store : MapIcon}
           unreadCount={unreadCount}
-          pathname={pathname}
-          searchParams={searchParams}
           initial={initial}
+          tabs={isStore ? STORE_DESKTOP_TABS : tabs}
+          home={home}
+          notificationsHref={`${base}/notifications`}
+          isActive={(href) => isStore
+            ? isStoreDesktopActive(href, pathname, searchParams)
+            : isActiveHref(href, home, pathname, searchParams)}
         />
       )}
 
-      <div className={isStore ? 'lg:pl-[260px] flex min-h-screen flex-col' : 'flex min-h-screen flex-col'}>
-      <header className={`sticky top-0 z-20 bg-brand-600 border-b border-brand-700 ${isStore ? 'lg:hidden' : ''}`}>
+      <div className={hasSidebar ? 'lg:pl-[260px] flex min-h-screen flex-col' : 'flex min-h-screen flex-col'}>
+      <header className={`sticky top-0 z-20 bg-brand-600 border-b border-brand-700 ${hasSidebar ? 'lg:hidden' : ''}`}>
         <div className={`${wrap} mx-auto px-4 h-16 flex items-center justify-between`}>
           <Link href={home}><MotivLogo height={36} /></Link>
           <div className="flex items-center gap-1">
@@ -119,10 +127,10 @@ export function ExecChrome({
 
       {/* Swipe left/right on mobile moves between this section's tabs. */}
       <SwipeNav links={tabs}>
-        <main className={`flex-1 ${mainWrap} w-full mx-auto px-4 sm:px-5 ${isStore ? 'py-5 pb-32 lg:px-10 lg:py-8 lg:pb-10' : 'py-6 pb-32'}`}>{children}</main>
+        <main className={`flex-1 ${mainWrap} w-full mx-auto px-4 sm:px-5 ${hasSidebar ? 'py-5 pb-32 lg:px-10 lg:py-8 lg:pb-10' : 'py-6 pb-32'}`}>{children}</main>
       </SwipeNav>
 
-      <nav className={`fixed bottom-0 inset-x-0 z-20 bg-brand-600 border-t border-brand-700 ${isStore ? 'lg:hidden' : ''}`}>
+      <nav className={`fixed bottom-0 inset-x-0 z-20 bg-brand-600 border-t border-brand-700 ${hasSidebar ? 'lg:hidden' : ''}`}>
         <div className={`${wrap} mx-auto flex items-stretch h-20 justify-around`}>
           {tabs.map(({ href, label, icon: Icon }) => {
             const active = isActiveHref(href, home, pathname, searchParams)
@@ -153,40 +161,50 @@ function isActiveHref(href: string, home: string, pathname: string, searchParams
   return pathname === path || (href !== home && pathname.startsWith(path))
 }
 
-function StoreDesktopSidebar({
+// Desktop left sidebar shared by the store + regional chromes. Tabs, context
+// chip icon, home + notifications links and the active-tab test are injected so
+// each role drives its own nav while sharing the exact look.
+function DesktopSidebar({
   userName,
   roleLabel,
   contextLabel,
+  ContextIcon,
   unreadCount,
-  pathname,
-  searchParams,
   initial,
+  tabs,
+  home,
+  notificationsHref,
+  isActive,
 }: {
   userName: string | null
   roleLabel: string
   contextLabel?: string | null
+  ContextIcon: React.ElementType
   unreadCount: number
-  pathname: string
-  searchParams: SearchParamsLike
   initial: string
+  tabs: ChromeTab[]
+  home: string
+  notificationsHref: string
+  isActive: (href: string) => boolean
 }) {
   const user = userName ?? roleLabel
-  const store = contextLabel ?? 'Store'
 
   return (
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-[260px] border-r border-white/10 bg-brand-600 text-white lg:flex lg:flex-col">
       <div className="px-5 pt-6 pb-4">
-        <Link href="/client" className="inline-flex"><MotivLogo height={34} /></Link>
-        <div className="mt-6 flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-gray-200">
-          <span className="truncate">{store}</span>
-          <Store size={14} className="shrink-0 text-gray-400" />
-        </div>
+        <Link href={home} className="inline-flex"><MotivLogo height={34} /></Link>
+        {contextLabel && (
+          <div className="mt-6 flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-gray-200">
+            <span className="truncate">{contextLabel}</span>
+            <ContextIcon size={14} className="shrink-0 text-gray-400" />
+          </div>
+        )}
       </div>
 
       <nav className="flex-1 px-3">
         <div className="space-y-1">
-          {STORE_DESKTOP_TABS.map(({ href, label, icon: Icon }) => {
-            const active = isStoreDesktopActive(href, pathname, searchParams)
+          {tabs.map(({ href, label, icon: Icon }) => {
+            const active = isActive(href)
             return (
               <Link
                 key={href}
@@ -206,7 +224,7 @@ function StoreDesktopSidebar({
       </nav>
 
       <div className="border-t border-white/10 px-3 py-4">
-        <Link href="/client/notifications" className="flex items-center justify-between rounded-xl px-3 py-3 text-sm font-semibold text-gray-300 hover:bg-white/[0.06] hover:text-white">
+        <Link href={notificationsHref} className="flex items-center justify-between rounded-xl px-3 py-3 text-sm font-semibold text-gray-300 hover:bg-white/[0.06] hover:text-white">
           <span className="flex items-center gap-3"><Bell size={18} className="text-gray-400" /> Notifications</span>
           {unreadCount > 0 && <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] text-white">{unreadCount > 9 ? '9+' : unreadCount}</span>}
         </Link>
