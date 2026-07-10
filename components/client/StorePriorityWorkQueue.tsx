@@ -213,7 +213,7 @@ function QueueRow({ ticket, storeName, nowMs }: { ticket: StoreManagerTicket; st
   const needsInfo = ticket.status === 'info_requested'
   // The CTA sits above the whole-row link (z-20) so its click opens the modal /
   // navigates on its own instead of triggering the row's "view ticket" link.
-  const ctaCls = 'relative z-20 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-blue-500/60 px-4 py-2 text-sm font-bold text-blue-600 transition hover:bg-blue-500/10 dark:text-blue-300'
+  const ctaCls = 'relative z-20 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-blue-500/60 px-4 py-2 text-sm font-bold text-blue-600 transition hover:bg-blue-500/10 dark:text-blue-300 lg:w-40'
 
   return (
     <div className="relative grid gap-4 border-b border-[var(--border)] px-4 py-4 transition last:border-b-0 hover:bg-[var(--hover)] lg:grid-cols-[1fr_180px_1.1fr_160px] lg:items-center">
