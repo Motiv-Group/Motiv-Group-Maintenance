@@ -161,6 +161,11 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
               <p className="mt-0.5 text-sm text-[var(--text-muted)]">{meta.sub}</p>
             </div>
           </div>
+          {t.status === 'info_requested' && t.info_request_reason && (
+            <div className="mt-3 rounded-lg bg-amber-500/10 px-3 py-2.5 text-sm text-[var(--text)] ring-1 ring-amber-500/20">
+              <span className="font-semibold text-amber-700 dark:text-amber-400">Your manager asked:</span> {t.info_request_reason}
+            </div>
+          )}
           {t.status === 'info_requested' ? (
             <AddInfoModal ticketId={t.id} title={t.title} description={t.description} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} photoUrls={photoUrlsRaw} docUrls={docUrlsRaw} requestReason={t.info_request_reason} />
           ) : canEdit ? (
