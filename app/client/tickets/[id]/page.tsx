@@ -179,7 +179,10 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
               Edit ticket <ArrowRight size={16} />
             </a>
           ) : (
-            <p className="mt-4 rounded-lg bg-[var(--surface-2)] px-3 py-2 text-xs text-[var(--text-faint)]">Nothing needed from you right now — we&apos;ll notify you of any updates.</p>
+            <div className="mt-4 flex items-center gap-2 rounded-lg bg-[var(--surface-2)] px-3 py-2.5 text-xs text-[var(--text-muted)]">
+              <CheckCircle2 size={15} className="shrink-0 text-emerald-500" />
+              <span>You&apos;re all set. We&apos;ll let you know when there&apos;s an update.</span>
+            </div>
           )}
         </Card>
 
