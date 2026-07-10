@@ -51,21 +51,6 @@
   .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
 }
 
-/* Navy "island" blocks (SM dashboard) — brand-600 surface with light text, so a
-   block reads like the nav bar regardless of the page theme. Paired with the
-   `dark` class (Card `tint`) so Tailwind dark: utilities inside also resolve for
-   readable contrast on navy. Unlayered so the var overrides win. */
-.navy-block {
-  --surface:    #0d1f2d;
-  --surface-2:  #0a1922;
-  --border:     rgba(255, 255, 255, 0.12);
-  --hover:      rgba(255, 255, 255, 0.06);
-  --input-bg:   rgba(0, 0, 0, 0.22);
-  --text:       #f8fafc;
-  --text-muted: #cbd5e1;
-  --text-faint: #94a3b8;
-}
-
 /* ── Native <select> dark-mode popup fix ──
    Option popups composite their background from the control's
    background-color. The dark --input-bg is translucent (rgba black), so the

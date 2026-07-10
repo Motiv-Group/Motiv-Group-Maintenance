@@ -112,7 +112,7 @@ export function StorePriorityWorkQueue({
         />
       </section>
 
-      <Card tint className="overflow-hidden p-0">
+      <Card className="overflow-hidden p-0">
         <div className="flex items-start gap-3 border-b border-[var(--border)] px-5 py-5">
           <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-blue-600/15 text-blue-600 dark:text-blue-300">
             <ClipboardList size={21} />
@@ -190,7 +190,7 @@ function MetricButton({
       onClick={onClick}
       className={`block rounded-2xl text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 ${active ? 'ring-2 ring-blue-500/70' : ''}`}
     >
-      <Card tint className={`h-full p-4 transition hover:-translate-y-0.5 hover:ring-blue-500/30 ${stateBorder} ${active ? 'ring-blue-500/60' : ''}`}>
+      <Card className={`h-full p-4 transition hover:-translate-y-0.5 hover:ring-blue-500/30 ${stateBorder} ${active ? 'ring-blue-500/60' : ''}`}>
         <div className="flex items-center gap-4">
           <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-full ring-1 ${tones[tone]}`}>{icon}</span>
           <div className="min-w-0">

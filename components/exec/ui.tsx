@@ -29,10 +29,8 @@ export function Pill({ status, label, className = '' }: { status: HealthStatus; 
   return <span className={`inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full ${STATUS_PILL[status]} ${className}`}>{label ?? STATUS_WORD[status]}</span>
 }
 
-export function Card({ children, className = '', tint = false, ...rest }: { children: ReactNode; className?: string; tint?: boolean } & HTMLAttributes<HTMLDivElement>) {
-  // tint → navy "island" (brand-600 surface + light text, like the nav bar), in
-  // both light and dark themes. See the .navy-block rule in globals.css.
-  return <div className={`rounded-2xl bg-[var(--surface)] ring-1 shadow-sm dark:shadow-md dark:shadow-black/20 ${tint ? 'navy-block dark ring-white/10' : 'ring-black/10 dark:ring-white/10'} ${className}`} {...rest}>{children}</div>
+export function Card({ children, className = '', ...rest }: { children: ReactNode; className?: string } & HTMLAttributes<HTMLDivElement>) {
+  return <div className={`rounded-2xl bg-[var(--surface)] ring-1 ring-black/10 dark:ring-white/10 shadow-sm dark:shadow-md dark:shadow-black/20 ${className}`} {...rest}>{children}</div>
 }
 
 export function SectionCard({ title, icon, action, children }: { title: string; icon?: ReactNode; action?: ReactNode; children: ReactNode }) {

@@ -33,30 +33,32 @@ export default async function StoreOverviewPage() {
 
   return (
     <div className="space-y-5">
-      {/* Navy banner: greeting + AI briefing (left) with the health donut (right). */}
-      <Card tint className="px-5 py-5 sm:px-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      {/* Greeting (left) · health donut (middle) · status + AI briefing (right). */}
+      <Card className="px-5 py-5 sm:px-6">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between lg:gap-6">
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2.5">
-              <h1 className="text-2xl font-bold tracking-normal text-[var(--text)] sm:text-3xl">{greeting}, {firstName(fullName)}</h1>
-              {h && <Pill status={h.finalStatus} label={STATUS_LABELS[h.finalStatus]} />}
-            </div>
+            <h1 className="text-2xl font-bold tracking-normal text-[var(--text)] sm:text-3xl">{greeting}, {firstName(fullName)}</h1>
             <p className="mt-1 text-sm text-[var(--text-muted)]">
               Here&apos;s what&apos;s happening at {d.branch || d.storeName}{d.branchCode ? ` / ${d.branchCode}` : ''}
             </p>
-            {h && (
-              <div className="mt-3 max-w-xl">
-                <div className="mb-1 flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1 rounded-full bg-[#C6A35D]/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#C6A35D]"><Sparkles size={11} /> AI</span>
-                  <BriefingRefresh scope="store" scopeId={briefingScopeId} />
-                </div>
-                <p className="text-xs leading-relaxed text-[var(--text-muted)]">
-                  {briefing?.body ?? 'Keep it up. Your store is running smoothly.'}
-                </p>
-              </div>
-            )}
           </div>
-          {h && <Donut value={h.finalHealthScore} status={h.finalStatus} size={104} label="Health" />}
+          {h && (
+            <>
+              <Donut value={h.finalHealthScore} status={h.finalStatus} size={104} label="Health" />
+              <div className="min-w-0 lg:w-64">
+                <Pill status={h.finalStatus} label={STATUS_LABELS[h.finalStatus]} />
+                <div className="mt-2">
+                  <div className="mb-1 flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-[#C6A35D]/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#C6A35D]"><Sparkles size={11} /> AI</span>
+                    <BriefingRefresh scope="store" scopeId={briefingScopeId} />
+                  </div>
+                  <p className="text-xs leading-relaxed text-[var(--text-muted)]">
+                    {briefing?.body ?? 'Keep it up. Your store is running smoothly.'}
+                  </p>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </Card>
 
@@ -115,7 +117,7 @@ function saTodayBounds(): { start: string; end: string } {
 
 function QuickLogPanel() {
   return (
-    <Card tint className="overflow-hidden p-0">
+    <Card className="overflow-hidden p-0">
       <div className="grid gap-5 px-5 py-5 md:grid-cols-[1fr_auto] md:items-center lg:px-8">
         <div className="flex gap-4">
           <span className="grid h-16 w-16 shrink-0 place-items-center rounded-full border border-blue-500/40 bg-blue-600/10 text-blue-600 dark:text-blue-300 sm:h-20 sm:w-20">
