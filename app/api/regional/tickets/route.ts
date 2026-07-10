@@ -87,7 +87,7 @@ export async function POST(request: Request) {
     const { data: su } = await admin.from('supplier_users').select('user_id').in('supplier_id', supplierIds)
     const ids = Array.from(new Set((su ?? []).map(r => r.user_id)))
     if (ids.length) {
-      await admin.from('notifications').insert(ids.map(id => ({ company_id: prof.company_id, user_id: id, type: 'ticket_update', title: `Ticket: ${title}`, message: 'You have been invited to quote.', link: `/supplier/tickets/${ticket.id}` })))
+      await admin.from('notifications').insert(ids.map(id => ({ company_id: prof.company_id, user_id: id, ticket_id: ticket.id, type: 'ticket_update', title: `${title}`, message: 'You have been invited to submit a quote for this job.', link: `/supplier/tickets/${ticket.id}` })))
       void sendPushToMany(ids, { title: 'New quote request', body: title, url: `/supplier/tickets/${ticket.id}` })
     }
   }
@@ -96,7 +96,7 @@ export async function POST(request: Request) {
   const { data: sm } = await admin.from('store_users').select('user_id').eq('store_id', store.id)
   const smIds = (sm ?? []).map(r => r.user_id)
   if (smIds.length) {
-    await admin.from('notifications').insert(smIds.map(id => ({ company_id: prof.company_id, user_id: id, type: 'new_ticket', title: 'New ticket logged', message: `${prof.full_name ?? 'Your regional manager'} logged: "${title}"`, link: `/client/tickets/${ticket.id}` })))
+    await admin.from('notifications').insert(smIds.map(id => ({ company_id: prof.company_id, user_id: id, ticket_id: ticket.id, type: 'new_ticket', title: `${title}`, message: `${prof.full_name ?? 'Your regional manager'} logged a new ticket for your store.`, link: `/client/tickets/${ticket.id}` })))
     void sendPushToMany(smIds, { title: 'New ticket', body: title, url: `/client/tickets/${ticket.id}` })
   }
 

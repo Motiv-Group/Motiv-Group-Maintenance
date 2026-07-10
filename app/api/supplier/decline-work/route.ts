@@ -76,14 +76,14 @@ export async function POST(request: Request) {
     const { data: rms } = await admin.from('regional_users').select('user_id').eq('region_id', ticket.region_id)
     const ids = (rms ?? []).map(r => r.user_id)
     if (ids.length) {
-      const msg = allDeclined ? `All invited suppliers have declined — re-assign the ticket. Last reason: ${reason}` : `A supplier declined the work — ${reason}`
-      await admin.from('notifications').insert(ids.map(id => ({ company_id: ticket.company_id, user_id: id, type: 'ticket_update', title: `Supplier declined: ${ticket.title ?? 'Untitled'}`, message: msg, link: `/regional/tickets/${ticketId}` })))
+      const msg = allDeclined ? `Every invited supplier has now declined this job, so it needs a new supplier. Their latest reason: ${reason}.` : `A supplier has declined this job. Their reason: ${reason}.`
+      await admin.from('notifications').insert(ids.map(id => ({ company_id: ticket.company_id, user_id: id, ticket_id: ticketId, type: 'ticket_update', title: `${ticket.title ?? 'Untitled'}`, message: msg, link: `/regional/tickets/${ticketId}` })))
       void sendPushToMany(ids, { title: allDeclined ? 'All suppliers declined' : 'A supplier declined the work', body: reason, url: `/regional/tickets/${ticketId}` })
     }
   } else if (ticket.created_by) {
     // Standalone individual ticket — tell the owner so they can pick another supplier.
-    const msg = allDeclined ? `All invited suppliers have declined — assign another. Last reason: ${reason}` : `A supplier declined the work — ${reason}`
-    await admin.from('notifications').insert([{ company_id: ticket.company_id, user_id: ticket.created_by, type: 'ticket_update', title: `Supplier declined: ${ticket.title ?? 'Untitled'}`, message: msg, link: `/individual/tickets/${ticketId}` }])
+    const msg = allDeclined ? `Every supplier you invited has declined this job, so please choose another. Their latest reason: ${reason}.` : `A supplier has declined this job. Their reason: ${reason}.`
+    await admin.from('notifications').insert([{ company_id: ticket.company_id, user_id: ticket.created_by, ticket_id: ticketId, type: 'ticket_update', title: `${ticket.title ?? 'Untitled'}`, message: msg, link: `/individual/tickets/${ticketId}` }])
     void sendPushToMany([ticket.created_by], { title: 'A supplier declined the work', body: reason, url: `/individual/tickets/${ticketId}` })
   }
 

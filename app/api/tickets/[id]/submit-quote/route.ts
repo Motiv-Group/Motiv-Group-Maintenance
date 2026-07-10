@@ -72,11 +72,11 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     const { data: rms } = await admin.from('regional_users').select('user_id').eq('region_id', ticket.region_id)
     const ids = (rms ?? []).map(r => r.user_id)
     if (ids.length) {
-      await admin.from('notifications').insert(ids.map(id => ({ company_id: ticket.company_id, user_id: id, type: 'ticket_update', title: `Ticket: ${ticket.title ?? 'Untitled'}`, message: 'A quote was submitted for review.', link: `/regional/tickets/${ticket.id}` })))
+      await admin.from('notifications').insert(ids.map(id => ({ company_id: ticket.company_id, ticket_id: ticket.id, user_id: id, type: 'ticket_update', title: `${ticket.title ?? 'Untitled'}`, message: 'A new quote has come in and is ready for your review.', link: `/regional/tickets/${ticket.id}` })))
       void sendPushToMany(ids, { title: 'Quote submitted', body: ticket.title ?? 'A quote needs review', url: `/regional/tickets/${ticket.id}` })
     }
   } else if (ticket.created_by) {
-    await admin.from('notifications').insert([{ company_id: ticket.company_id, user_id: ticket.created_by, type: 'ticket_update', title: `Ticket: ${ticket.title ?? 'Untitled'}`, message: 'A quote was submitted — review and approve it.', link: `/individual/tickets/${ticket.id}` }])
+    await admin.from('notifications').insert([{ company_id: ticket.company_id, ticket_id: ticket.id, user_id: ticket.created_by, type: 'ticket_update', title: `${ticket.title ?? 'Untitled'}`, message: 'A new quote has come in. Take a look and approve it when you are ready.', link: `/individual/tickets/${ticket.id}` }])
     void sendPushToMany([ticket.created_by], { title: 'Quote submitted', body: ticket.title ?? 'A quote needs review', url: `/individual/tickets/${ticket.id}` })
   }
 

@@ -602,6 +602,8 @@ export interface Database {
           link: string | null
           read: boolean
           created_at: string
+          ticket_id: string | null
+          archived_at: string | null
         }
         Insert: {
           id?: string
@@ -613,6 +615,8 @@ export interface Database {
           link?: string | null
           read?: boolean
           created_at?: string
+          ticket_id?: string | null
+          archived_at?: string | null
         }
         Update: {
           id?: string
@@ -624,6 +628,8 @@ export interface Database {
           link?: string | null
           read?: boolean
           created_at?: string
+          ticket_id?: string | null
+          archived_at?: string | null
         }
         Relationships: [
         {

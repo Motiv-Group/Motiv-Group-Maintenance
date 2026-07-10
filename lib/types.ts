@@ -217,6 +217,11 @@ export interface Notification {
   link: string | null
   read: boolean
   created_at: string
+  // Ticket linkage (nullable). ticket_id/archived_at are columns; job_ref is
+  // enriched by the API from the linked ticket for compact display + grouping.
+  ticket_id?: string | null
+  archived_at?: string | null
+  job_ref?: string | null
 }
 
 export interface Supplier {

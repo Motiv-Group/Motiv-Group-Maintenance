@@ -52,8 +52,8 @@ export async function POST(request: Request) {
   if (ids.length) {
     const title = action === 'approve' ? 'You are live on Motiv 🎉' : 'Registration update'
     const message = action === 'approve'
-      ? `${sup.company_name} is verified — you can now receive job invitations.`
-      : `${sup.company_name}'s registration was not approved. Reply to your welcome email if you believe this is an error.`
+      ? `Great news — ${sup.company_name} is now verified, so you can start receiving job invitations.`
+      : `Unfortunately ${sup.company_name}'s registration wasn't approved this time. If you think this is a mistake, just reply to your welcome email and we'll take a look.`
     await admin.from('notifications').insert(ids.map(id => ({ company_id: null, user_id: id, type: 'supplier_review', title, message, link: '/supplier' })))
     void sendPushToMany(ids, { title, body: message, url: '/supplier' })
   }

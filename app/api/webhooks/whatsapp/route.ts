@@ -379,10 +379,10 @@ async function notifyRegion(
     const { data: rms } = await adminClient.from('regional_users').select('user_id').eq('region_id', o.regionId);
     const ids = (rms ?? []).map((r: { user_id: string }) => r.user_id);
     if (ids.length) {
-      const reviewHint = o.needsReview ? ' ⚠️ Low AI confidence — please review.' : '';
+      const reviewHint = o.needsReview ? ' Please double-check this one — I wasn’t fully sure I captured the details correctly.' : '';
       await adminClient.from('notifications').insert(ids.map(id => ({
-        company_id: o.companyId, user_id: id, type: 'new_ticket', title: 'New Ticket in Your Region',
-        message: `${o.storeName} logged a ${priorityWord(o.priority)} ticket via WhatsApp: "${o.title}"${reviewHint}`, link: `/regional/tickets/${o.ticketId}`,
+        company_id: o.companyId, user_id: id, ticket_id: o.ticketId, type: 'new_ticket', title: o.title,
+        message: `${o.storeName} just logged a ${priorityWord(o.priority)} priority ticket over WhatsApp.${reviewHint}`, link: `/regional/tickets/${o.ticketId}`,
       })));
       void sendPushToMany(ids, { title: 'New Ticket', body: `${o.storeName}: ${o.title}`, url: `/regional/tickets/${o.ticketId}` });
     }

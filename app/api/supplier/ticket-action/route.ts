@@ -54,9 +54,9 @@ export async function POST(request: Request) {
         const ids = (rms ?? []).map(r => r.user_id)
         if (ids.length) {
           const preview = /^📷\s*Progress photo:/.test(text) ? '📷 Sent a progress photo' : (text.length > 100 ? `${text.slice(0, 100)}…` : text)
-          const title = `Supplier update: ${ticket.title ?? 'Ticket'}`
+          const title = `${ticket.title ?? 'Ticket'}`
           const link = `/regional/tickets/${ticketId}`
-          await admin.from('notifications').insert(ids.map(id => ({ company_id: ticket.company_id, user_id: id, type: 'ticket_update', title, message: preview, link })))
+          await admin.from('notifications').insert(ids.map(id => ({ company_id: ticket.company_id, user_id: id, ticket_id: ticketId, type: 'ticket_update', title, message: preview, link })))
           void sendPushToMany(ids, { title, body: preview, url: link })
         }
       }
@@ -81,7 +81,7 @@ export async function POST(request: Request) {
         const { data: rms } = await admin.from('regional_users').select('user_id').eq('region_id', ticket.region_id)
         const ids = (rms ?? []).map(r => r.user_id)
         if (ids.length) {
-          await admin.from('notifications').insert(ids.map(id => ({ company_id: ticket.company_id, user_id: id, type: 'ticket_update', title: `Ticket: ${ticket.title ?? 'Ticket'}`, message: 'The supplier confirmed no further variation orders — ready for close-out.', link: `/regional/tickets/${ticketId}` })))
+          await admin.from('notifications').insert(ids.map(id => ({ company_id: ticket.company_id, user_id: id, ticket_id: ticketId, type: 'ticket_update', title: `${ticket.title ?? 'Ticket'}`, message: 'The supplier confirmed there are no further variation orders, so this ticket is ready for close-out.', link: `/regional/tickets/${ticketId}` })))
           void sendPushToMany(ids, { title: 'Ready for close-out', body: ticket.title ?? '', url: `/regional/tickets/${ticketId}` })
         }
       }
