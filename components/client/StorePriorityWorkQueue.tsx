@@ -77,6 +77,7 @@ export function StorePriorityWorkQueue({
           label="Open Tickets"
           value={counts.open}
           sub={`${counts.urgent} urgent`}
+          subActive={counts.urgent > 0}
           onClick={() => setFilter('open')}
         />
         <MetricButton
@@ -86,6 +87,7 @@ export function StorePriorityWorkQueue({
           label="Supplier Coming Today"
           value={counts.today}
           sub={counts.today ? `${counts.today} visit${counts.today === 1 ? '' : 's'} booked` : 'No visits booked'}
+          subActive={counts.today > 0}
           onClick={() => setFilter('today')}
         />
         <MetricButton
@@ -95,6 +97,7 @@ export function StorePriorityWorkQueue({
           label="Needs Your Input"
           value={counts.input}
           sub={counts.input === 1 ? '1 job to update' : `${counts.input} jobs to update`}
+          subActive={counts.input > 0}
           onClick={() => setFilter('input')}
         />
         <MetricButton
@@ -104,6 +107,7 @@ export function StorePriorityWorkQueue({
           label="In Progress"
           value={counts.progress}
           sub="Being worked on"
+          subActive={counts.progress > 0}
           onClick={() => setFilter('progress')}
         />
       </section>
@@ -147,6 +151,7 @@ function MetricButton({
   label,
   value,
   sub,
+  subActive,
   onClick,
 }: {
   active: boolean
@@ -155,6 +160,7 @@ function MetricButton({
   label: string
   value: number
   sub: string
+  subActive: boolean
   onClick: () => void
 }) {
   const tones: Record<Tone, string> = {
@@ -163,10 +169,15 @@ function MetricButton({
     gold: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D] ring-[#C6A35D]/20',
     green: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 ring-emerald-500/20',
   }
-  const subColor = tone === 'red' ? 'text-red-600 dark:text-red-400'
-    : tone === 'gold' ? 'text-amber-600 dark:text-[#C6A35D]'
-    : tone === 'green' ? 'text-emerald-600 dark:text-emerald-400'
-    : 'text-[var(--text-muted)]'
+  // Sub-line stays grey when its count is zero; takes the card's colour when
+  // there's something to flag.
+  const subTone: Record<Tone, string> = {
+    red: 'text-red-600 dark:text-red-400',
+    gold: 'text-amber-600 dark:text-[#C6A35D]',
+    green: 'text-emerald-600 dark:text-emerald-400',
+    purple: 'text-purple-600 dark:text-purple-300',
+  }
+  const subColor = subActive ? subTone[tone] : 'text-[var(--text-faint)]'
 
   // Green = all clear (zero), amber = has tickets that need attention.
   const zero = value === 0
@@ -210,8 +221,8 @@ function QueueRow({ ticket, storeName, nowMs }: { ticket: StoreManagerTicket; st
 
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className={`inline-flex rounded-md px-2 py-0.5 text-[10px] font-bold ${priorityBadgeClass(ticket)}`}>{priorityLabel(ticket)}</span>
-          <span className={`inline-flex rounded-md px-2 py-0.5 text-[10px] font-bold ${clientStatusBadgeClass(ticket)}`}>{clientStatusLabel(ticket)}</span>
+          <span className={`inline-flex min-w-[68px] justify-center rounded-md px-2 py-1 text-[10px] font-bold ${priorityBadgeClass(ticket)}`}>{priorityLabel(ticket)}</span>
+          <span className={`inline-flex min-w-[68px] justify-center rounded-md px-2 py-1 text-[10px] font-bold ${clientStatusBadgeClass(ticket)}`}>{clientStatusLabel(ticket)}</span>
         </div>
         <p className="mt-1.5 truncate text-sm text-[var(--text-muted)]">{ticket.supplierAssigned ? 'Supplier assigned' : 'No supplier assigned'}</p>
       </div>

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { BellOff, Search, X, Check, Circle, Archive, ChevronDown } from 'lucide-react'
+import { BellOff, Search, X, Check, CheckCheck, Archive, ChevronDown } from 'lucide-react'
 import { formatDateTime } from '@/lib/utils'
 import { BackButton } from '@/components/ui/BackButton'
 import type { Notification } from '@/lib/types'
@@ -176,35 +176,34 @@ export function NotificationList({ initial }: { initial?: Notification[] } = {})
 }
 
 function Row({ n, onToggle, archived }: { n: Notification; onToggle: (id: string, read: boolean) => void; archived?: boolean }) {
+  const unread = !n.read
   const inner = (
     <>
-      <div className="flex items-center gap-2">
-        <span className="shrink-0" aria-hidden>
-          {n.read ? <span className="block h-2 w-2 rounded-full border border-[var(--border)]" /> : <span className="block h-2 w-2 rounded-full bg-blue-500" />}
-        </span>
-        <p className={`min-w-0 flex-1 truncate text-sm text-[var(--text)] ${n.read ? 'font-medium' : 'font-semibold'}`}>{n.title}</p>
-      </div>
-      <p className="mt-0.5 pl-4 text-sm text-[var(--text-muted)]">{n.message}</p>
-      <p className="mt-1 pl-4 text-[11px] text-[var(--text-faint)]" title={formatDateTime(n.created_at)}>
+      <p className={`truncate text-sm text-[var(--text)] ${unread ? 'font-semibold' : 'font-medium'}`}>{n.title}</p>
+      <p className={`mt-0.5 text-sm ${unread ? 'text-[var(--text-muted)]' : 'text-[var(--text-faint)]'}`}>{n.message}</p>
+      <p className="mt-1 text-[11px] text-[var(--text-faint)]" title={formatDateTime(n.created_at)}>
         {timeAgo(n.created_at)}{n.job_ref ? <span className="font-mono"> · {n.job_ref}</span> : ''}
       </p>
     </>
   )
   return (
-    <li className={`relative rounded-xl border ${archived ? 'border-transparent' : n.read ? 'border-[var(--border)] bg-[var(--surface)]' : 'border-blue-500/30 bg-blue-500/[0.06]'}`}>
+    <li className={`relative rounded-xl border ${archived ? 'border-transparent' : unread ? 'border-blue-500/40 bg-blue-500/[0.06]' : 'border-[var(--border)] bg-[var(--surface)]'}`}>
+      {/* Left accent bar makes unread unmistakable at a glance. */}
+      {!archived && unread && <span aria-hidden className="absolute inset-y-2 left-0 w-1 rounded-full bg-blue-500" />}
       {n.link ? (
-        <Link href={n.link} onClick={() => { if (!n.read) onToggle(n.id, true) }} className="block px-4 py-3 pr-10">{inner}</Link>
+        <Link href={n.link} onClick={() => { if (unread) onToggle(n.id, true) }} className="block py-3 pl-4 pr-12">{inner}</Link>
       ) : (
-        <div className="px-4 py-3 pr-10">{inner}</div>
+        <div className="py-3 pl-4 pr-12">{inner}</div>
       )}
+      {/* Read receipt: double blue tick = read, single grey tick = unread. Tap to toggle. */}
       <button
         type="button"
-        onClick={() => onToggle(n.id, !n.read)}
-        title={n.read ? 'Mark as unread' : 'Mark as read'}
-        aria-label={n.read ? 'Mark as unread' : 'Mark as read'}
-        className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-lg text-[var(--text-faint)] transition hover:bg-[var(--hover)] hover:text-[var(--text)]"
+        onClick={() => onToggle(n.id, unread)}
+        title={unread ? 'Mark as read' : 'Mark as unread'}
+        aria-label={unread ? 'Mark as read' : 'Mark as unread'}
+        className="absolute right-2 top-2.5 grid h-7 w-9 place-items-center rounded-lg transition hover:bg-[var(--hover)]"
       >
-        {n.read ? <Circle size={14} /> : <Check size={15} />}
+        {unread ? <Check size={16} className="text-[var(--text-faint)]" /> : <CheckCheck size={18} className="text-blue-500" />}
       </button>
     </li>
   )

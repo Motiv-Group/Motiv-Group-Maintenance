@@ -9,6 +9,13 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
+  const admin = createAdminClient()
+  // Housekeeping: a completed ticket's notifications are archived; 3 days later
+  // they're deleted for good. Clean this user's own on load (the daily cron does
+  // it globally). archived_at is only set once the ticket completes.
+  const cutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
+  await admin.from('notifications').delete().eq('user_id', user.id).not('archived_at', 'is', null).lt('archived_at', cutoff)
+
   const { data } = await supabase
     .from('notifications')
     .select('*')
@@ -20,7 +27,6 @@ export async function GET() {
   const ticketIds = Array.from(new Set(rows.map(n => n.ticket_id).filter(Boolean)))
   const jobRef = new Map<string, string | null>()
   if (ticketIds.length) {
-    const admin = createAdminClient()
     const { data: tks } = await admin.from('tickets').select('id, job_ref').in('id', ticketIds)
     for (const t of (tks ?? []) as any[]) jobRef.set(t.id, t.job_ref ?? null)
   }
