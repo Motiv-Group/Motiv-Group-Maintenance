@@ -35,15 +35,15 @@ export default async function StoreOverviewPage() {
     <div className="space-y-5">
       {/* Greeting (left) · health donut (middle) · status + AI briefing (right). */}
       <Card className="px-5 py-5 sm:px-6">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="min-w-0">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-center">
+          <div className="min-w-0 lg:w-1/2">
             <h1 className="text-2xl font-bold tracking-normal text-[var(--text)] sm:text-3xl">{greeting}, {firstName(fullName)}</h1>
             <p className="mt-1 text-sm text-[var(--text-muted)]">
               Here&apos;s what&apos;s happening at {d.branch || d.storeName}{d.branchCode ? ` / ${d.branchCode}` : ''}
             </p>
           </div>
           {h && (
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               <Donut value={h.finalHealthScore} status={h.finalStatus} size={104} label="Health" />
               <div className="min-w-0 lg:w-56">
                 <Pill status={h.finalStatus} label={STATUS_LABELS[h.finalStatus]} />
