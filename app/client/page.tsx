@@ -6,7 +6,7 @@ import { requireStoreManagerV3 } from '@/lib/health/guard'
 import { assembleStoreManagerDashboard } from '@/lib/health/data'
 import { STATUS_LABELS } from '@/lib/health/constants'
 import { createAdminClient } from '@/lib/supabase/server'
-import { Card, Donut, Pill } from '@/components/exec/ui'
+import { Card, Donut, STATUS_TEXT } from '@/components/exec/ui'
 import { BriefingRefresh } from '@/components/briefing/BriefingRefresh'
 import { getDailyBriefing } from '@/lib/briefing/generate'
 import { storeFacts } from '@/lib/briefing/facts'
@@ -33,34 +33,31 @@ export default async function StoreOverviewPage() {
 
   return (
     <div className="space-y-5">
-      {/* Greeting (left) · health donut (middle) · status + AI briefing (right). */}
-      <Card className="px-5 py-5 sm:px-6">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-center">
-          <div className="min-w-0 lg:w-1/2">
-            <h1 className="text-2xl font-bold tracking-normal text-[var(--text)] sm:text-3xl">{greeting}, {firstName(fullName)}</h1>
-            <p className="mt-1 text-sm text-[var(--text-muted)]">
-              Here&apos;s what&apos;s happening at {d.branch || d.storeName}{d.branchCode ? ` / ${d.branchCode}` : ''}
-            </p>
-          </div>
-          {h && (
-            <div className="flex items-center gap-3">
-              <Donut value={h.finalHealthScore} status={h.finalStatus} size={104} label="Health" />
-              <div className="min-w-0 lg:w-56">
-                <Pill status={h.finalStatus} label={STATUS_LABELS[h.finalStatus]} />
-                <div className="mt-2">
-                  <div className="mb-1 flex items-center gap-2">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-[#C6A35D]/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#C6A35D]"><Sparkles size={11} /> AI</span>
-                    <BriefingRefresh scope="store" scopeId={briefingScopeId} />
-                  </div>
-                  <p className="text-xs leading-relaxed text-[var(--text-muted)]">
-                    {briefing?.body ?? 'Keep it up. Your store is running smoothly.'}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
+      {/* Page header — greeting (left half) · health donut + AI briefing (right).
+          No card surface: it sits flush on the page background. */}
+      <div className="flex flex-col gap-6 py-1 lg:flex-row lg:items-center">
+        <div className="min-w-0 lg:w-1/2">
+          <h1 className="text-2xl font-bold tracking-normal text-[var(--text)] sm:text-3xl">{greeting}, {firstName(fullName)}</h1>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">
+            Here&apos;s what&apos;s happening at {d.branch || d.storeName}{d.branchCode ? ` / ${d.branchCode}` : ''}
+          </p>
         </div>
-      </Card>
+        {h && (
+          <div className="flex items-center gap-4">
+            <Donut value={h.finalHealthScore} status={h.finalStatus} size={100} label="Health" />
+            <div className="min-w-0 max-w-xs border-l border-[var(--border)] pl-4">
+              <div className="flex items-center gap-2">
+                <span className={`text-sm font-bold ${STATUS_TEXT[h.finalStatus]}`}>{STATUS_LABELS[h.finalStatus]}</span>
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-faint)]"><Sparkles size={11} className="text-[#C6A35D]" /> AI</span>
+                <BriefingRefresh scope="store" scopeId={briefingScopeId} />
+              </div>
+              <p className="mt-1.5 text-xs leading-relaxed text-[var(--text-muted)]">
+                {briefing?.body ?? 'Keep it up. Your store is running smoothly.'}
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
 
       <QuickLogPanel />
 
