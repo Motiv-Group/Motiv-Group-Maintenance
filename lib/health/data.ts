@@ -336,7 +336,8 @@ export interface RegionalTicketAction {
 }
 // Simple ticket row for the RM recent-tickets card + tickets tab (SM-style).
 export interface RegionalTicketRow {
-  id: string; title: string; storeName: string; branchCode: string | null
+  id: string; title: string; category: string | null; scheduledAt: string | null
+  storeName: string; branchCode: string | null
   status: string; priority: Priority; jobRef: string | null; createdAt: string
   quoteRequestedAt: string | null; quoteReceivedAt: string | null; quoteAcceptedAt: string | null
   breached: boolean; supplierBreached: boolean; internalBreached: boolean
@@ -415,6 +416,7 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
       const s = isActive(t.status) ? computeTicketSla(t, rules(t.priority), now) : null
       return {
       id: t.id, title: t.title ?? 'Untitled',
+      category: (t as any).category ?? null, scheduledAt: (t as any).scheduled_at ?? null,
       storeName: storeName.get(t.store_id) ?? 'Store', branchCode: storeBranch.get(t.store_id) ?? null,
       status: t.status, priority: t.priority, jobRef: (t as any).job_ref ?? null, createdAt: t.created_at,
       quoteRequestedAt: (t as any).quote_requested_at ?? null,
