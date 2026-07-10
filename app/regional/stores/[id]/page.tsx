@@ -218,7 +218,7 @@ export default async function RegionalStoreDetailPage(props: { params: Promise<{
               { label: 'Total',       value: ticketList.length,        color: 'text-gray-900 dark:text-white', href: `/regional/tickets?store=${params.id}` },
               { label: 'Open',        value: openTickets.length,       color: 'text-blue-600',  href: `/regional/tickets?status=open&store=${params.id}` },
               { label: 'Approved',    value: inProgressTickets.length, color: 'text-green-600', href: `/regional/tickets?status=accepted&store=${params.id}` },
-              { label: 'In Progress', value: ticketList.filter(t => t.status === 'in_progress').length, color: 'text-emerald-600', href: `/regional/tickets?status=in_progress&store=${params.id}` },
+              { label: 'In Progress', value: ticketList.filter(t => t.status === 'in_progress').length, color: 'text-amber-600', href: `/regional/tickets?status=in_progress&store=${params.id}` },
               { label: 'Completed',   value: completedTickets.length,  color: 'text-green-600', href: `/regional/tickets?status=completed&store=${params.id}` },
               { label: 'Declined',    value: declinedTickets.length,   color: 'text-red-500',   href: `/regional/tickets?status=declined&store=${params.id}` },
             ].map(s => (

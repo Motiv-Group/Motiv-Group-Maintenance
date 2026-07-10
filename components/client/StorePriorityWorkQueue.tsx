@@ -27,7 +27,7 @@ type TodayVisit = {
 
 // Filters are driven only by the KPI cards now — 'all' is the default, unfiltered view.
 type QueueFilter = 'all' | 'open' | 'today' | 'input' | 'progress'
-type Tone = 'red' | 'purple' | 'gold' | 'green'
+type Tone = 'red' | 'purple' | 'gold' | 'green' | 'orange'
 
 const URGENCY_RANK: Record<string, number> = { urgent: 0, P1: 0, high: 1, P2: 1, medium: 2, P3: 2, low: 3, P4: 3 }
 const SIGNOFF_STATUSES = new Set(['submitted_for_signoff', 'pending_sign_off', 'evidence_requested', 'approved_closeout'])
@@ -93,7 +93,7 @@ export function StorePriorityWorkQueue({
         <MetricButton
           active={filter === 'input'}
           icon={<Info size={21} />}
-          tone="gold"
+          tone="orange"
           label="Needs Your Input"
           value={counts.input}
           sub={counts.input === 1 ? '1 job to update' : `${counts.input} jobs to update`}
@@ -103,7 +103,7 @@ export function StorePriorityWorkQueue({
         <MetricButton
           active={filter === 'progress'}
           icon={<Loader2 size={21} />}
-          tone="green"
+          tone="gold"
           label="In Progress"
           value={counts.progress}
           sub="Being worked on"
@@ -168,6 +168,7 @@ function MetricButton({
     purple: 'bg-purple-500/15 text-purple-600 dark:text-purple-300 ring-purple-500/20',
     gold: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D] ring-[#C6A35D]/20',
     green: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 ring-emerald-500/20',
+    orange: 'bg-orange-500/15 text-orange-600 dark:text-orange-400 ring-orange-500/20',
   }
   // Sub-line stays grey when its count is zero; takes the card's colour when
   // there's something to flag.
@@ -176,6 +177,7 @@ function MetricButton({
     gold: 'text-amber-600 dark:text-[#C6A35D]',
     green: 'text-emerald-600 dark:text-emerald-400',
     purple: 'text-purple-600 dark:text-purple-300',
+    orange: 'text-orange-600 dark:text-orange-400',
   }
   const subColor = subActive ? subTone[tone] : 'text-[var(--text-faint)]'
 
@@ -318,7 +320,7 @@ function clientStatusLabel(ticket: StoreManagerTicket): string {
 function clientStatusBadgeClass(ticket: StoreManagerTicket): string {
   if (ticket.infoAdded || ticket.status === 'info_requested') return 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
   switch (ticket.status) {
-    case 'in_progress': return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
+    case 'in_progress': return 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D]'
     case 'completed':   return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
     case 'scheduled':   return 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-400'
     case 'cancelled':   return 'bg-slate-500/15 text-slate-600 dark:text-slate-300'

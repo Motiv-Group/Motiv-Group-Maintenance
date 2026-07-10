@@ -28,7 +28,7 @@ function bucketOf(s: string, supplierAssigned = false): Bucket {
   return 'cancelled'
 }
 const BUCKET_LABEL: Record<Bucket, string> = { open: 'New', quote_requested: 'Quote requested', quoted: 'Quoted', approved: 'Approved', scheduled: 'Job scheduled', in_progress: 'In progress', awaiting_signoff: 'Sign-off', completed: 'Completed', cancelled: 'Cancelled' }
-const BUCKET_BAR: Record<Bucket, string> = { open: 'bg-blue-500', quote_requested: 'bg-cyan-500', quoted: 'bg-violet-500', approved: 'bg-teal-500', scheduled: 'bg-indigo-500', in_progress: 'bg-emerald-500', awaiting_signoff: 'bg-orange-500', completed: 'bg-emerald-500', cancelled: 'bg-red-500' }
+const BUCKET_BAR: Record<Bucket, string> = { open: 'bg-blue-500', quote_requested: 'bg-cyan-500', quoted: 'bg-violet-500', approved: 'bg-teal-500', scheduled: 'bg-indigo-500', in_progress: 'bg-[#C6A35D]', awaiting_signoff: 'bg-orange-500', completed: 'bg-emerald-500', cancelled: 'bg-red-500' }
 const BAR_ORDER: Bucket[] = ['open', 'quote_requested', 'quoted', 'approved', 'scheduled', 'in_progress', 'awaiting_signoff', 'completed']
 
 // Urgency rank (handles classic low/medium/high/urgent and engine P1–P4).
@@ -55,7 +55,7 @@ const PILLS: { key: RmFilter; label: string; active: string; inactive: string }[
   { key: 'quoted', label: 'Quoted', active: 'bg-violet-500 text-white border-violet-500', inactive: 'text-violet-600 dark:text-violet-400 border-violet-500/40 hover:border-violet-400' },
   { key: 'approved', label: 'Approved', active: 'bg-teal-500 text-white border-teal-500', inactive: 'text-teal-600 dark:text-teal-400 border-teal-500/40 hover:border-teal-400' },
   { key: 'scheduled', label: 'Job scheduled', active: 'bg-indigo-500 text-white border-indigo-500', inactive: 'text-indigo-600 dark:text-indigo-400 border-indigo-500/40 hover:border-indigo-400' },
-  { key: 'in_progress', label: 'In progress', active: 'bg-emerald-500 text-white border-emerald-500', inactive: 'text-emerald-600 dark:text-emerald-400 border-emerald-500/40 hover:border-emerald-400' },
+  { key: 'in_progress', label: 'In progress', active: 'bg-[#C6A35D] text-[#0a0e17] border-[#C6A35D]', inactive: 'text-amber-600 dark:text-[#C6A35D] border-[#C6A35D]/40 hover:border-[#C6A35D]' },
   { key: 'awaiting_signoff', label: 'Sign-off', active: 'bg-orange-500 text-white border-orange-500', inactive: 'text-orange-600 dark:text-orange-400 border-orange-500/40 hover:border-orange-400' },
   { key: 'completed', label: 'Completed', active: 'bg-emerald-500 text-white border-emerald-500', inactive: 'text-emerald-600 dark:text-emerald-400 border-emerald-500/40 hover:border-emerald-400' },
   { key: 'internal_breach', label: 'Internal Breached', active: 'bg-red-600 text-white border-red-600', inactive: 'text-red-600 dark:text-red-400 border-red-500/50 hover:border-red-500' },

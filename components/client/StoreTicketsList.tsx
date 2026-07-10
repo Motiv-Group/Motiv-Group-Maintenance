@@ -28,7 +28,7 @@ const PILLS: { key: Filter; label: string; active: string; inactive: string }[] 
   { key: 'open',           label: 'New',           active: 'bg-blue-500 text-white',     inactive: 'bg-blue-500/15 text-blue-700 dark:text-blue-400' },
   { key: 'info_requested', label: 'Info Requested', active: 'bg-amber-500 text-white',    inactive: 'bg-amber-500/15 text-amber-700 dark:text-amber-400' },
   { key: 'scheduled',      label: 'Job scheduled', active: 'bg-indigo-500 text-white',    inactive: 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-400' },
-  { key: 'in_progress',    label: 'In Progress',   active: 'bg-emerald-500 text-white',   inactive: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' },
+  { key: 'in_progress',    label: 'In Progress',   active: 'bg-[#C6A35D] text-[#0a0e17]', inactive: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D]' },
   { key: 'completed',      label: 'Completed',     active: 'bg-emerald-500 text-white',   inactive: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' },
   { key: 'cancelled',      label: 'Cancelled',     active: 'bg-gray-500 text-white',      inactive: 'bg-gray-500/15 text-gray-600 dark:text-gray-400' },
   { key: 'overdue',        label: 'Overdue',       active: 'bg-red-600 text-white',       inactive: 'bg-red-500/15 text-red-600 dark:text-red-400' },
@@ -142,7 +142,7 @@ export function StoreTicketsList({ tickets, initialFilter = 'all', storeName = '
         <div className="h-3 rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden flex">
           {counts.open > 0 && <div className="h-full bg-blue-500" style={{ width: `${barPct(counts.open)}%` }} />}
           {counts.scheduled > 0 && <div className="h-full bg-indigo-500" style={{ width: `${barPct(counts.scheduled)}%` }} />}
-          {counts.in_progress > 0 && <div className="h-full bg-emerald-500" style={{ width: `${barPct(counts.in_progress)}%` }} />}
+          {counts.in_progress > 0 && <div className="h-full bg-[#C6A35D]" style={{ width: `${barPct(counts.in_progress)}%` }} />}
           {counts.completed > 0 && <div className="h-full bg-emerald-500" style={{ width: `${barPct(counts.completed)}%` }} />}
         </div>
       </Card>

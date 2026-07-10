@@ -13,20 +13,11 @@ import { EditTicketModal } from '@/components/client/EditTicketModal'
 import { AddInfoModal } from '@/components/client/AddInfoModal'
 import { DeleteTicketButton } from '@/components/client/DeleteTicketButton'
 import { SmTicketTabs } from '@/components/client/SmTicketTabs'
-import { PriorityBadge } from '@/components/ui/PriorityBadge'
+import { TicketBadges } from '@/components/client/ticketBadges'
 import { EditedLine } from '@/components/ui/EditedLine'
 import { formatDateTime, clientVisibleStatus, PRIORITY_LEVEL_LABELS, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
+import type { StoreManagerTicket } from '@/lib/health/data'
 import type { TicketStatus } from '@/lib/types'
-
-const CV_TONE: Record<string, string> = {
-  open: 'bg-blue-500/15 text-blue-700 dark:text-blue-400',
-  info_requested: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
-  scheduled: 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-400',
-  in_progress: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
-  completed: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
-  cancelled: 'bg-gray-500/15 text-gray-600 dark:text-gray-400',
-}
-const CV_WORD: Record<string, string> = { open: 'New', info_requested: 'Info Requested', scheduled: 'Job scheduled', in_progress: 'In Progress', completed: 'Completed', cancelled: 'Cancelled' }
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
@@ -135,9 +126,9 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
   const naColor = done ? 'text-emerald-500' : closed ? 'text-[var(--text-faint)]' : isWait ? 'text-blue-500' : 'text-[#C6A35D]'
 
   const cv = clientVisibleStatus(t.status as TicketStatus)
-  const pill = infoAdded
-    ? { cls: 'bg-teal-500/15 text-teal-700 dark:text-teal-400', word: 'Info added' }
-    : cv ? { cls: CV_TONE[cv], word: CV_WORD[cv] } : null
+  // Priority + status badges rendered with the same component (and sizing) as the
+  // today page / Tickets tab, so they match everywhere.
+  const badgeTicket = { priority: t.priority, status: (cv ?? t.status) as any, infoAdded } as unknown as StoreManagerTicket
 
   const timeline = buildSmTimeline(t, (eventRows ?? []) as EventRow[], (viewRows ?? []) as ViewRow[])
 
@@ -152,10 +143,7 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
             {t.job_ref && <span className="font-mono text-sm font-semibold text-[var(--text-faint)]">{t.job_ref}</span>}
             <h1 className="text-xl font-bold text-[var(--text)]">{t.title}</h1>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <PriorityBadge priority={t.priority} />
-            {pill && <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${pill.cls}`}>{pill.word}</span>}
-          </div>
+          <TicketBadges ticket={badgeTicket} className="shrink-0" />
         </div>
 
         {!['cancelled', 'declined'].includes(t.status) && <ClientTicketProgress status={t.status} />}
