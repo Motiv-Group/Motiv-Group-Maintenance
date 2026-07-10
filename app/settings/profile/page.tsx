@@ -61,6 +61,9 @@ export default function ProfileSettingsPage() {
   const isStoreManager = role === 'store_manager' || role === 'client'
   const isRegionalManager = role === 'regional_manager'
   const title = isStoreManager ? 'Store Information' : 'Profile Information'
+  // Store managers may only edit their own name; the rest is managed for them.
+  const lock = isStoreManager
+  const lockCls = 'disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-gray-100 dark:disabled:bg-gray-800'
 
   return (
     <div className="max-w-2xl mx-auto space-y-5">
@@ -70,10 +73,10 @@ export default function ProfileSettingsPage() {
           <div className="flex justify-center py-6"><div className="animate-spin rounded-full h-7 w-7 border-b-2 border-brand-600" /></div>
         ) : (
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <Input id="full_name" label="Full Name" placeholder="Jane Smith" error={errors.full_name?.message}
+            <Input id="full_name" label={isStoreManager ? 'Store manager full name' : 'Full Name'} placeholder="Jane Smith" error={errors.full_name?.message}
               {...register('full_name', { required: 'Full name is required' })} />
             <Input id="company_name" label="Company Name" placeholder="Acme Corporation" error={errors.company_name?.message}
-              {...register('company_name')} />
+              disabled={lock} className={lockCls} {...register('company_name')} />
 
             {isRegionalManager && (
               <Input id="requested_region_code" label="Region Code" placeholder="e.g. GP — given by your executive"
@@ -83,15 +86,15 @@ export default function ProfileSettingsPage() {
             {isStoreManager && (
               <>
                 <Input id="sub_store" label="Branch / Sub-Store" placeholder="e.g. Cape Town Branch"
-                  error={errors.sub_store?.message} {...register('sub_store')} />
+                  disabled={lock} className={lockCls} error={errors.sub_store?.message} {...register('sub_store')} />
                 <Input id="branch_code" label="Branch Code" placeholder="e.g. CPT001"
-                  error={errors.branch_code?.message} {...register('branch_code')} />
+                  disabled={lock} className={lockCls} error={errors.branch_code?.message} {...register('branch_code')} />
               </>
             )}
 
             <Input id="phone" type="tel" label="Phone Number" placeholder="+27 71 234 5678"
-              error={errors.phone?.message} {...register('phone', { validate: v => !v || isValidPhone(v) || 'Enter a valid phone number' })} />
-            <Input id="address" label="Address" placeholder="123 Main St, Cape Town" {...register('address')} />
+              disabled={lock} className={lockCls} error={errors.phone?.message} {...register('phone', { validate: v => !v || isValidPhone(v) || 'Enter a valid phone number' })} />
+            <Input id="address" label="Address" placeholder="123 Main St, Cape Town" disabled={lock} className={lockCls} {...register('address')} />
 
             {error && (
               <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm rounded-lg px-4 py-3">{error}</div>
