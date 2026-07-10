@@ -11,6 +11,7 @@ import { ClientTicketProgress } from '@/components/client/ClientTicketProgress'
 import { clientStatusMeta } from '@/components/client/ClientTicketStatus'
 import { EditTicketForm } from '@/components/client/EditTicketForm'
 import { AddInfoModal } from '@/components/client/AddInfoModal'
+import { DeleteTicketButton } from '@/components/client/DeleteTicketButton'
 import { SmTicketTabs } from '@/components/client/SmTicketTabs'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { EditedLine } from '@/components/ui/EditedLine'
@@ -175,9 +176,12 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
           {t.status === 'info_requested' ? (
             <AddInfoModal ticketId={t.id} title={t.title} description={t.description} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} photoUrls={photoUrlsRaw} docUrls={docUrlsRaw} requestReason={t.info_request_reason} />
           ) : canEdit ? (
-            <a href="#sm-action" className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-blue-500">
-              Edit ticket <ArrowRight size={16} />
-            </a>
+            <div className="mt-4 space-y-2">
+              <a href="#sm-action" className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-blue-500">
+                Edit ticket <ArrowRight size={16} />
+              </a>
+              <DeleteTicketButton ticketId={t.id} />
+            </div>
           ) : (
             <div className="mt-4 flex items-center gap-2 rounded-lg bg-[var(--surface-2)] px-3 py-2.5 text-xs text-[var(--text-muted)]">
               <CheckCircle2 size={15} className="shrink-0 text-emerald-500" />
@@ -194,7 +198,7 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
             <InfoRow label="Priority" value={priorityValue} />
             <div>
               <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Description</div>
-              <p className="text-sm text-[var(--text-muted)] mt-0.5 whitespace-pre-line">{t.description}</p>
+              <p className="text-sm text-[var(--text)] mt-0.5 whitespace-pre-line">{t.description}</p>
               <EditedLine at={t.edited_at} by={editorName} />
             </div>
             {(showVisit || showFollowUp) && <InfoRow label="Assigned supplier" value={visitSupplier ?? 'Assigned supplier'} />}
