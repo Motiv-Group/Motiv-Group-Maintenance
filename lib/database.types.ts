@@ -645,6 +645,13 @@ export interface Database {
           isOneToOne: false
           referencedRelation: "companies"
           referencedColumns: ["id"]
+        },
+        {
+          foreignKeyName: "notifications_ticket_id_fkey"
+          columns: ["ticket_id"]
+          isOneToOne: false
+          referencedRelation: "tickets"
+          referencedColumns: ["id"]
         }
       ]
       }
@@ -2432,6 +2439,41 @@ export interface Database {
         }
       ]
       }
+      ticket_events: {
+        Row: {
+          id: string
+          ticket_id: string
+          company_id: string | null
+          from_status: string | null
+          to_status: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          ticket_id?: string
+          company_id?: string | null
+          from_status?: string | null
+          to_status?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          ticket_id?: string
+          company_id?: string | null
+          from_status?: string | null
+          to_status?: string
+          created_at?: string
+        }
+        Relationships: [
+        {
+          foreignKeyName: "ticket_events_ticket_id_fkey"
+          columns: ["ticket_id"]
+          isOneToOne: false
+          referencedRelation: "tickets"
+          referencedColumns: ["id"]
+        }
+      ]
+      }
       ticket_evidence: {
         Row: {
           id: string
@@ -2927,6 +2969,7 @@ export interface Database {
           staff_impact_flag: boolean
           status: string
           photo_urls: string[] | null
+          info_doc_urls: string[] | null
           created_at: string
           updated_at: string
           closed_at: string | null
@@ -3022,6 +3065,7 @@ export interface Database {
           staff_impact_flag?: boolean
           status?: string
           photo_urls?: string[] | null
+          info_doc_urls?: string[] | null
           created_at?: string
           updated_at?: string
           closed_at?: string | null
@@ -3117,6 +3161,7 @@ export interface Database {
           staff_impact_flag?: boolean
           status?: string
           photo_urls?: string[] | null
+          info_doc_urls?: string[] | null
           created_at?: string
           updated_at?: string
           closed_at?: string | null
