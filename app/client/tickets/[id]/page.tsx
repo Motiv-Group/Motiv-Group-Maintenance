@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import { redirect } from 'next/navigation'
-import { Loader2, CheckCircle2, XCircle, ArrowRight } from 'lucide-react'
+import { Loader2, CheckCircle2, XCircle } from 'lucide-react'
 import { BackLink } from '@/components/ui/BackLink'
 import { createAdminClient } from '@/lib/supabase/server'
 import { signManyUrls } from '@/lib/storage'
@@ -9,7 +9,7 @@ import { requireStoreManagerV3 } from '@/lib/health/guard'
 import { Card } from '@/components/exec/ui'
 import { ClientTicketProgress } from '@/components/client/ClientTicketProgress'
 import { clientStatusMeta } from '@/components/client/ClientTicketStatus'
-import { EditTicketForm } from '@/components/client/EditTicketForm'
+import { EditTicketModal } from '@/components/client/EditTicketModal'
 import { AddInfoModal } from '@/components/client/AddInfoModal'
 import { DeleteTicketButton } from '@/components/client/DeleteTicketButton'
 import { SmTicketTabs } from '@/components/client/SmTicketTabs'
@@ -177,9 +177,7 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
             <AddInfoModal ticketId={t.id} title={t.title} description={t.description} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} photoUrls={photoUrlsRaw} docUrls={docUrlsRaw} requestReason={t.info_request_reason} />
           ) : canEdit ? (
             <div className="mt-4 space-y-2">
-              <a href="#sm-action" className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-blue-500">
-                Edit ticket <ArrowRight size={16} />
-              </a>
+              <EditTicketModal ticketId={t.id} title={t.title} description={t.description ?? ''} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} photoUrls={photoUrlsRaw} />
               <DeleteTicketButton ticketId={t.id} />
             </div>
           ) : (
@@ -210,13 +208,6 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
           </div>
         </Card>
       </div>
-
-      {/* Edit form — the only inline action left (add-info now lives in a modal). */}
-      {canEdit && (
-        <div id="sm-action" className="scroll-mt-20">
-          <EditTicketForm ticketId={t.id} initial={{ title: t.title, category: t.category ?? 'General', impact: t.operational_impact ?? 'none', description: t.description }} />
-        </div>
-      )}
 
       {/* Photos + documents · Activity · Timeline (audit trail). */}
       <SmTicketTabs photoUrls={signedPhotoUrls} docUrls={signedDocUrls} ticketId={t.id} updates={(updates ?? []) as any} timeline={timeline} />
