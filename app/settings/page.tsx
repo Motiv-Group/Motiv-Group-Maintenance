@@ -31,7 +31,7 @@ export default function AccountSettingsPage() {
   }, [])
 
   return (
-    <div className="max-w-2xl space-y-5">
+    <div className="max-w-2xl mx-auto space-y-5">
       <SettingsHeader title="Account" subtitle="Your login details and role." Icon={UserCircle2} />
       <Card className="p-5">
         {loading ? (

@@ -7,7 +7,7 @@ import { SettingsHeader } from '@/components/settings/SettingsHeader'
 
 export default function NotificationsSettingsPage() {
   return (
-    <div className="max-w-2xl space-y-5">
+    <div className="max-w-2xl mx-auto space-y-5">
       <SettingsHeader title="Notifications" subtitle="Choose how Motiv keeps you posted." Icon={Bell} />
       <Card className="p-5">
         <PushNotificationToggle />

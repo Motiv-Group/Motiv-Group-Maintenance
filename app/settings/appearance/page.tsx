@@ -8,7 +8,7 @@ import { SettingsHeader } from '@/components/settings/SettingsHeader'
 export default function AppearanceSettingsPage() {
   const { theme, toggle } = useTheme()
   return (
-    <div className="max-w-2xl space-y-5">
+    <div className="max-w-2xl mx-auto space-y-5">
       <SettingsHeader title="Appearance" subtitle="Light or dark — your call." Icon={Palette} />
       <Card className="p-5">
         <div className="flex items-center justify-between">

@@ -6,7 +6,7 @@ import { SettingsHeader } from '@/components/settings/SettingsHeader'
 
 export default function PrivacySettingsPage() {
   return (
-    <div className="max-w-2xl space-y-5">
+    <div className="max-w-2xl mx-auto space-y-5">
       <SettingsHeader title="Privacy & Data" subtitle="Export your data or close your account." Icon={ShieldCheck} />
       <DataPrivacySection />
     </div>

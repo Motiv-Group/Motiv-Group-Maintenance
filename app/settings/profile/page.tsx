@@ -63,7 +63,7 @@ export default function ProfileSettingsPage() {
   const title = isStoreManager ? 'Store Information' : 'Profile Information'
 
   return (
-    <div className="max-w-2xl space-y-5">
+    <div className="max-w-2xl mx-auto space-y-5">
       <SettingsHeader title={title} subtitle="Update your contact and company details." Icon={Building2} />
       <Card className="p-5">
         {fetching ? (
