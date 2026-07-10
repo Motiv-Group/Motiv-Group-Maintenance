@@ -236,7 +236,7 @@ function QueueRow({ ticket, storeName, nowMs }: { ticket: StoreManagerTicket; st
           </p>
         ) : (
           <p className="mt-1 flex items-center gap-1.5 text-sm text-[var(--text-muted)]">
-            <CalendarClock size={14} /> SLA in {humanizeDuration(dueMs)}
+            <CalendarClock size={14} /> Due in {humanizeDuration(dueMs)}
           </p>
         )}
       </div>
