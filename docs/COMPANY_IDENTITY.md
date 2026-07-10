@@ -12,26 +12,21 @@ visually consistent in light and dark mode.
 
 ## Typography
 
-**No custom/web font is loaded.** The app uses Tailwind's default `font-sans`
-system stack, which resolves to the operating system's native UI font:
+**Primary typeface: Geist** (Vercel's `geist` npm package, self-hosted via
+`next/font` — no external request, so it's CSP-safe). Loaded once in
+`app/layout.tsx` (`GeistSans` + `GeistMono` as CSS-var classes on `<html>`) and
+wired into Tailwind's `fontFamily` in `tailwind.config.ts`, so plain `font-sans`
+(the default) is Geist everywhere. It falls back to the system UI stack
+(Segoe UI / San Francisco / Roboto) until the font paints.
 
-| Platform | Renders as |
-|----------|------------|
-| Windows | Segoe UI |
-| macOS / iOS | San Francisco (`-apple-system`) |
-| Android | Roboto |
-| Fallback | `ui-sans-serif, system-ui, sans-serif` |
-
-This is deliberate — a system font is fast (no web-font download / layout shift)
-and feels native inside the Capacitor Android wrapper.
-
-- **Body / UI:** `font-sans` (default — no class needed).
+- **Body / UI:** `font-sans` → Geist Sans (default — no class needed).
 - **Weights in use:** `font-medium` (500), `font-semibold` (600), `font-bold` (700).
-- Numeric/monospace: `font-mono` (default stack) — only where alignment matters.
+- **Monospace:** `font-mono` → Geist Mono (`var(--font-geist-mono)`).
 
-> If a branded typeface is ever wanted, add it with `next/font` in
-> `app/layout.tsx` and expose it as a `--font-sans` CSS var — do **not** add a
-> `<link>` to Google Fonts (the strict CSP blocks external hosts).
+> To change the typeface, swap the `next/font` import in `app/layout.tsx` and the
+> `fontFamily` vars in `tailwind.config.ts` — do **not** add a `<link>` to Google
+> Fonts (the strict CSP blocks external hosts). Prefer a self-hosting package
+> (like `geist`) or `next/font/google` (which self-hosts at build time).
 
 ---
 

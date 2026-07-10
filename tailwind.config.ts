@@ -1,4 +1,5 @@
 import type { Config } from 'tailwindcss'
+import defaultTheme from 'tailwindcss/defaultTheme'
 
 const config: Config = {
   darkMode: 'class',
@@ -12,6 +13,12 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        // Geist is loaded in app/layout.tsx (self-hosted via next/font — CSP-safe).
+        // Falls back to the system UI stack until the font paints.
+        sans: ['var(--font-geist-sans)', ...defaultTheme.fontFamily.sans],
+        mono: ['var(--font-geist-mono)', ...defaultTheme.fontFamily.mono],
+      },
       colors: {
         brand: {
           50:  '#f8f5ed',
