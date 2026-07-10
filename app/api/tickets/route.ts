@@ -96,8 +96,8 @@ export async function POST(request: Request) {
     const ids = (rms ?? []).map(r => r.user_id)
     if (ids.length) {
       await admin.from('notifications').insert(ids.map(id => ({
-        company_id: profile.company_id, user_id: id, type: 'new_ticket', title: 'New Ticket in Your Region',
-        message: `${store.name} logged a ${priorityWord(priority)} ticket: "${title}"`, link: `/regional/tickets/${ticket.id}`,
+        company_id: profile.company_id, user_id: id, ticket_id: ticket.id, type: 'new_ticket', title: title,
+        message: `${store.name} just logged a ${priorityWord(priority)} priority ticket in your region: "${title}".`, link: `/regional/tickets/${ticket.id}`,
       })))
       void sendPushToMany(ids, { title: 'New Ticket', body: `${store.name}: ${title}`, url: `/regional/tickets/${ticket.id}` })
     }

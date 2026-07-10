@@ -168,7 +168,9 @@ create table if not exists public.notifications (
   message                      text not null,
   link                         text,
   read                         boolean not null default false,
-  created_at                   timestamptz not null default now()
+  created_at                   timestamptz not null default now(),
+  ticket_id                    uuid,
+  archived_at                  timestamptz
 );
 
 create table if not exists public.preventative_maintenance_plans (
@@ -699,6 +701,16 @@ create table if not exists public.ticket_views (
   item_label                   text not null default ''::text
 );
 
+-- Ticket status-change audit trail (one row per status change; 20260710).
+create table if not exists public.ticket_events (
+  id                           uuid not null default gen_random_uuid(),
+  ticket_id                    uuid not null,
+  company_id                   uuid,
+  from_status                  text,
+  to_status                    text not null,
+  created_at                   timestamptz not null default now()
+);
+
 create table if not exists public.tickets (
   id                           uuid not null default gen_random_uuid(),
   job_number                   bigint,
@@ -726,6 +738,7 @@ create table if not exists public.tickets (
   staff_impact_flag            boolean not null default false,
   status                       text not null default 'open'::text,
   photo_urls                   text[] default '{}'::text[],
+  info_doc_urls                text[] default '{}'::text[],
   created_at                   timestamptz not null default now(),
   updated_at                   timestamptz not null default now(),
   closed_at                    timestamptz,
@@ -891,6 +904,7 @@ alter table public.ticket_suppliers add primary key (id);
 alter table public.ticket_updates add primary key (id);
 alter table public.ticket_variations add primary key (id);
 alter table public.ticket_views add primary key (id);
+alter table public.ticket_events add primary key (id);
 alter table public.tickets add primary key (id);
 alter table public.user_profiles add primary key (id);
 alter table public.whatsapp_sessions add primary key (id);
@@ -1012,6 +1026,8 @@ alter table public.ticket_variations add foreign key (ticket_id) references publ
 alter table public.ticket_views add foreign key (company_id) references public.companies(id);
 alter table public.ticket_views add foreign key (ticket_id) references public.tickets(id);
 alter table public.ticket_views add foreign key (viewer_id) references public.user_profiles(id);
+alter table public.ticket_events add foreign key (ticket_id) references public.tickets(id) on delete cascade;
+alter table public.notifications add foreign key (ticket_id) references public.tickets(id) on delete set null;
 alter table public.tickets add foreign key (company_id) references public.companies(id);
 alter table public.tickets add foreign key (edited_by) references public.user_profiles(id);
 alter table public.tickets add foreign key (repeat_defect_group_id) references public.repeat_defect_groups(id);
@@ -1271,6 +1287,33 @@ revoke execute on function public.append_session_photo(uuid, text) from anon, au
 revoke execute on function public.handle_new_user()                 from anon, authenticated;
 revoke execute on function public.assign_store_job_ref()            from anon, authenticated;
 
+-- Log every ticket status change for the audit trail (20260710).
+create or replace function public.log_ticket_event()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if (tg_op = 'INSERT') then
+    insert into public.ticket_events (ticket_id, company_id, from_status, to_status)
+    values (new.id, new.company_id, null, new.status);
+  elsif (tg_op = 'UPDATE' and new.status is distinct from old.status) then
+    insert into public.ticket_events (ticket_id, company_id, from_status, to_status)
+    values (new.id, new.company_id, old.status, new.status);
+  end if;
+  return new;
+end;
+$$;
+
+-- Archive a ticket's notifications when it completes (20260711).
+create or replace function public.archive_ticket_notifications()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if (new.status = 'completed' and old.status is distinct from 'completed') then
+    update public.notifications set archived_at = now()
+    where ticket_id = new.id and archived_at is null;
+  end if;
+  return new;
+end;
+$$;
+
 -- ---------------------------------------------------------------------------
 -- INDEXES (beyond PK/FK — only explicitly-created ones are listed)
 -- ---------------------------------------------------------------------------
@@ -1283,12 +1326,25 @@ create index if not exists sla_acceptances_user_idx on public.supplier_sla_accep
 create index if not exists sla_acceptances_supplier_idx on public.supplier_sla_acceptances (supplier_id);
 create index if not exists verification_docs_supplier_idx on public.supplier_verification_docs (supplier_id);
 
+-- Ticket status-change audit trail (20260710).
+create index if not exists ticket_events_ticket_idx on public.ticket_events (ticket_id, created_at);
+-- Notifications archive/grouping (20260711).
+create index if not exists notifications_user_archived_idx on public.notifications (user_id, archived_at, created_at desc);
+
 -- ---------------------------------------------------------------------------
 -- TRIGGERS
 -- ---------------------------------------------------------------------------
 
 drop trigger if exists trg_assign_store_job_ref on public.tickets;
 create trigger trg_assign_store_job_ref BEFORE INSERT on public.tickets for each row EXECUTE FUNCTION assign_store_job_ref();
+
+-- Ticket audit trail + notification archive (20260710 / 20260711).
+drop trigger if exists trg_ticket_events_ins on public.tickets;
+create trigger trg_ticket_events_ins after insert on public.tickets for each row execute function public.log_ticket_event();
+drop trigger if exists trg_ticket_events_upd on public.tickets;
+create trigger trg_ticket_events_upd after update of status on public.tickets for each row execute function public.log_ticket_event();
+drop trigger if exists trg_archive_ticket_notifications on public.tickets;
+create trigger trg_archive_ticket_notifications after update of status on public.tickets for each row execute function public.archive_ticket_notifications();
 
 -- ---------------------------------------------------------------------------
 -- ROW-LEVEL SECURITY
@@ -1661,6 +1717,13 @@ drop policy if exists "own profile update" on public.user_profiles;
 create policy "own profile update" on public.user_profiles for update
   using ((id = auth.uid()));
 
+-- Ticket audit trail — company-scoped read; writes only via the SECURITY DEFINER
+-- trigger (20260710). The app reads it via the service-role client.
+alter table public.ticket_events enable row level security;
+drop policy if exists "ticket_events read" on public.ticket_events;
+create policy "ticket_events read" on public.ticket_events for select
+  using ((company_id = app_company_id()));
+
 -- ---------------------------------------------------------------------------
 -- STORAGE (buckets + object policies)
 -- ---------------------------------------------------------------------------
@@ -1678,7 +1741,8 @@ insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_typ
   ('ticket-photos','ticket-photos',false, 15728640, array['image/jpeg','image/jpg','image/png','image/webp']),
   ('completion-docs','completion-docs',false, 15728640, array['image/jpeg','image/jpg','image/png','image/webp','application/pdf']),
   ('quote-attachments','quote-attachments',false, 15728640, array['application/pdf','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','application/vnd.ms-excel','image/jpeg','image/jpg','image/png','image/webp']),
-  ('supplier-docs','supplier-docs',false, 15728640, array['application/pdf','image/jpeg','image/jpg','image/png','image/webp'])
+  ('supplier-docs','supplier-docs',false, 15728640, array['application/pdf','image/jpeg','image/jpg','image/png','image/webp']),
+  ('ticket-docs','ticket-docs',false, 15728640, array['image/jpeg','image/jpg','image/png','image/webp','application/pdf','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/vnd.ms-excel','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','text/plain','text/csv'])
 on conflict (id) do update set public = excluded.public, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
 
 -- Upload policies only (no public read — private buckets read via signed URLs).
@@ -1694,6 +1758,9 @@ create policy "supplier-docs upload" on storage.objects for insert
 drop policy if exists "ticket-photos upload" on storage.objects;
 create policy "ticket-photos upload" on storage.objects for insert
   with check (((bucket_id = 'ticket-photos'::text) AND (auth.uid() IS NOT NULL)));
+drop policy if exists "ticket-docs upload" on storage.objects;
+create policy "ticket-docs upload" on storage.objects for insert
+  with check (((bucket_id = 'ticket-docs'::text) AND (auth.uid() IS NOT NULL)));
 
 -- ---------------------------------------------------------------------------
 -- REALTIME (postgres_changes)

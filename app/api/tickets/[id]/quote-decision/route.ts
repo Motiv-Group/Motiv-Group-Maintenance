@@ -66,7 +66,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   const ids = (su ?? []).map(r => r.user_id)
   const notify = async (message: string, pushTitle: string) => {
     if (!ids.length) return
-    await admin.from('notifications').insert(ids.map(id => ({ company_id: ticket.company_id, user_id: id, type: 'ticket_update', title: `Ticket: ${ticket.title ?? 'Untitled'}`, message, link: `/supplier/tickets/${ticket.id}` })))
+    await admin.from('notifications').insert(ids.map(id => ({ company_id: ticket.company_id, user_id: id, ticket_id: ticket.id, type: 'ticket_update', title: `${ticket.title ?? 'Untitled'}`, message, link: `/supplier/tickets/${ticket.id}` })))
     void sendPushToMany(ids, { title: pushTitle, body: ticket.title ?? '', url: `/supplier/tickets/${ticket.id}` })
   }
 
@@ -106,8 +106,8 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       ...stateFields, supplier_id: null, last_internal_update_at: now, updated_at: now,
     }).eq('id', ticket.id)
     const supplierMsg = reason
-      ? `Your quote was declined — ${reason}.`
-      : 'Thank you for your submission. Although your quotation was not selected for this request, we value your participation and look forward to inviting you to future opportunities.'
+      ? `Your quote wasn't selected for this job — ${reason}.`
+      : 'Thank you for your quote. It was not selected for this job this time, but we value your participation and look forward to inviting you to future work.'
     await notify(supplierMsg, 'Quote declined')
     revalidatePath('/regional'); revalidatePath(`/regional/tickets/${ticket.id}`); revalidatePath('/supplier'); revalidatePath(`/supplier/tickets/${ticket.id}`)
     return NextResponse.json({ ok: true })
@@ -131,7 +131,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     // Durable per-round log, attributed to this supplier → a "Revised quote
     // requested" event on their audit trail that survives re-assignment.
     await admin.from('ticket_quote_requests').insert({ company_id: ticket.company_id, ticket_id: ticket.id, requested_at: now, supplier_id: quote.supplier_id })
-    await notify('You have been asked to submit a revised quote.', 'Revise your quote')
+    await notify('Please submit a revised quote for this job when you get a chance.', 'Revise your quote')
     revalidatePath('/regional'); revalidatePath(`/regional/tickets/${ticket.id}`); revalidatePath('/supplier')
     return NextResponse.json({ ok: true })
   }
@@ -155,9 +155,9 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   }).eq('id', ticket.id)
 
   // Notify the winning supplier (su/ids already resolved for this quote's supplier) + the store.
-  await notify('Your quote was approved — you can proceed.', 'Quote approved')
+  await notify('Great news — your quote was approved. You can go ahead and start the work.', 'Quote approved')
   if (!isIndividual && ticket.created_by) {
-    await admin.from('notifications').insert([{ company_id: ticket.company_id, user_id: ticket.created_by, type: 'ticket_update', title: `Ticket: ${ticket.title ?? 'Untitled'}`, message: 'Work approved — a supplier has been assigned.', link: `/client/tickets/${ticket.id}` }])
+    await admin.from('notifications').insert([{ company_id: ticket.company_id, user_id: ticket.created_by, ticket_id: ticket.id, type: 'ticket_update', title: `${ticket.title ?? 'Untitled'}`, message: 'Good news — your request was approved and a supplier has been assigned.', link: `/client/tickets/${ticket.id}` }])
     void sendPushToMany([ticket.created_by], { title: 'Work approved', body: ticket.title ?? '', url: `/client/tickets/${ticket.id}` })
   }
 

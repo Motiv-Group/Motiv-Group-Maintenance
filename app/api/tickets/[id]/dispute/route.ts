@@ -15,9 +15,9 @@ const BodySchema = z.object({
 
 type Admin = ReturnType<typeof createAdminClient>
 
-async function push(admin: Admin, ids: string[], companyId: string, title: string, message: string, link: string) {
+async function push(admin: Admin, ids: string[], companyId: string, ticketId: string, title: string, message: string, link: string) {
   if (!ids.length) return
-  await admin.from('notifications').insert(ids.map(id => ({ company_id: companyId, user_id: id, type: 'ticket_update', title, message, link })))
+  await admin.from('notifications').insert(ids.map(id => ({ company_id: companyId, user_id: id, ticket_id: ticketId, type: 'ticket_update', title, message, link })))
   void sendPushToMany(ids, { title, body: message, url: link })
 }
 async function regionIds(admin: Admin, regionId: string | null): Promise<string[]> {
@@ -34,9 +34,9 @@ async function supplierIds(admin: Admin, supplierId: string | null): Promise<str
 // standalone Individual (company-null) ticket — the owner, who plays the resolver.
 async function notifyResolver(admin: Admin, ticket: any, title: string, message: string) {
   if (ticket.region_id) {
-    await push(admin, await regionIds(admin, ticket.region_id), ticket.company_id, title, message, `/regional/tickets/${ticket.id}`)
+    await push(admin, await regionIds(admin, ticket.region_id), ticket.company_id, ticket.id, title, message, `/regional/tickets/${ticket.id}`)
   } else if (ticket.created_by) {
-    await push(admin, [ticket.created_by], ticket.company_id, title, message, `/individual/tickets/${ticket.id}`)
+    await push(admin, [ticket.created_by], ticket.company_id, ticket.id, title, message, `/individual/tickets/${ticket.id}`)
   }
 }
 function cleanUrls(v: unknown): string[] {
@@ -54,7 +54,7 @@ async function resolveDispute(admin: Admin, ticket: any, dispute: any, outcome: 
   const ticketId = ticket.id as string
   const what = originWord(dispute.origin)
   const isVariation = dispute.origin === 'variation'
-  const title = `Ticket: ${ticket.title ?? 'Untitled'}`
+  const title = `${ticket.title ?? 'Untitled'}`
   await admin.from('ticket_disputes').update({ status: 'resolved', outcome, resolved_by: actorId, resolved_at: now, resolution_note: note, pending_outcome: null, pending_by: null, pending_at: null }).eq('id', dispute.id)
   const label = outcome === 'withdrawn'
     ? (isVariation ? 'Variation-order decline retracted — reopened for review' : `${what[0].toUpperCase()}${what.slice(1)} dropped — the submission is back under review for approval`)
@@ -82,8 +82,8 @@ async function resolveDispute(admin: Admin, ticket: any, dispute: any, outcome: 
   const summary = outcome === 'withdrawn'
     ? (isVariation ? 'the variation order reopens for review' : `the ${what} was dropped — the submission is back under review for the manager's approval`)
     : (isVariation ? 'the variation-order decline stands' : `the ${what} stands`)
-  if (actorRole === 'regional_manager') await push(admin, await supplierIds(admin, ticket.supplier_id), ticket.company_id, title, `Dispute resolved — ${summary}.`, `/supplier/tickets/${ticketId}`)
-  else await notifyResolver(admin, ticket, title, `Dispute resolved — ${summary}.`)
+  if (actorRole === 'regional_manager') await push(admin, await supplierIds(admin, ticket.supplier_id), ticket.company_id, ticketId, title, `This dispute has been resolved — ${summary}.`, `/supplier/tickets/${ticketId}`)
+  else await notifyResolver(admin, ticket, title, `This dispute has been resolved — ${summary}.`)
 }
 
 // POST /api/tickets/:id/dispute  { action: 'raise' | 'reply' | 'resolve', ... }
@@ -140,7 +140,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
 
   const now = new Date().toISOString()
   const { data: openDispute } = await admin.from('ticket_disputes').select('*').eq('ticket_id', ticketId).eq('status', 'open').maybeSingle()
-  const title = `Ticket: ${ticket.title ?? 'Untitled'}`
+  const title = `${ticket.title ?? 'Untitled'}`
 
   if (action === 'raise') {
     if (actingRole !== 'supplier') return NextResponse.json({ error: 'Only the supplier can raise a dispute.' }, { status: 403 })
@@ -162,7 +162,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     }
     await admin.from('ticket_dispute_messages').insert({ dispute_id: disp.id, ticket_id: ticketId, author_id: user.id, author_role: 'supplier', body: messageBody || null, evidence_urls: evidence, created_at: now })
     await admin.from('tickets').update({ last_supplier_update_at: now, updated_at: now }).eq('id', ticketId)
-    await notifyResolver(admin, ticket, title, 'The supplier has raised a dispute — review and respond.')
+    await notifyResolver(admin, ticket, title, 'The supplier has raised a dispute. Please review it and respond.')
   } else if (action === 'reply') {
     if (!openDispute) return NextResponse.json({ error: 'No open dispute on this ticket.' }, { status: 409 })
     const messageBody = String(body.body ?? '').trim()
@@ -171,9 +171,9 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     await admin.from('ticket_dispute_messages').insert({ dispute_id: openDispute.id, ticket_id: ticketId, author_id: user.id, author_role: actingRole, body: messageBody || null, evidence_urls: evidence, created_at: now })
     if (actingRole === 'supplier') {
       await admin.from('tickets').update({ last_supplier_update_at: now }).eq('id', ticketId)
-      await notifyResolver(admin, ticket, title, 'New reply on the dispute.')
+      await notifyResolver(admin, ticket, title, 'The supplier added a new reply to the dispute.')
     } else {
-      await push(admin, await supplierIds(admin, ticket.supplier_id), ticket.company_id ?? '', title, 'The manager replied on your dispute.', `/supplier/tickets/${ticketId}`)
+      await push(admin, await supplierIds(admin, ticket.supplier_id), ticket.company_id ?? '', ticketId, title, 'The manager has replied to your dispute.', `/supplier/tickets/${ticketId}`)
     }
   } else if (action === 'withdraw') {
     // Supplier concedes → the request STANDS (outcome 'upheld').
@@ -197,8 +197,8 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     const label = proposed === 'withdrawn' ? `proposed to resolve the dispute — drop the ${what}` : `proposed to uphold the ${what} — it stands`
     await admin.from('ticket_dispute_messages').insert({ dispute_id: openDispute.id, ticket_id: ticketId, author_id: user.id, author_role: actingRole, body: `${roleName(actingRole)} ${label}. Awaiting the other party's agreement.${note ? ` — ${note}` : ''}`, evidence_urls: [], created_at: now })
     await admin.from('tickets').update({ updated_at: now, ...(actingRole === 'supplier' ? { last_supplier_update_at: now } : { last_internal_update_at: now }) }).eq('id', ticketId)
-    if (actingRole === 'supplier') await notifyResolver(admin, ticket, title, 'The supplier proposed to resolve the dispute — confirm to drop the request.')
-    else await push(admin, await supplierIds(admin, ticket.supplier_id), ticket.company_id ?? '', title, 'The manager proposed to uphold the request — confirm to agree.', `/supplier/tickets/${ticketId}`)
+    if (actingRole === 'supplier') await notifyResolver(admin, ticket, title, 'The supplier has proposed resolving the dispute. Confirm to drop the request.')
+    else await push(admin, await supplierIds(admin, ticket.supplier_id), ticket.company_id ?? '', ticketId, title, 'The manager has proposed upholding the request. Confirm to agree.', `/supplier/tickets/${ticketId}`)
   } else if (action === 'confirm') {
     // The OTHER party agrees to the pending proposal → resolve with its outcome.
     if (!openDispute) return NextResponse.json({ error: 'No open dispute on this ticket.' }, { status: 409 })

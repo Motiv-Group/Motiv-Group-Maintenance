@@ -1,9 +1,17 @@
 import { withSentryConfig } from '@sentry/nextjs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const projectRoot = path.dirname(fileURLToPath(import.meta.url))
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  outputFileTracingRoot: projectRoot,
+  turbopack: {
+    root: projectRoot,
+  },
   experimental: {
     // Next 14.2 reuses a dynamic page's client render for 30s on back-navigation,
     // so reopening a ticket (open → dashboard → reopen) served the STALE first

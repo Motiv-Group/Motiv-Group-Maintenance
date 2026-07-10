@@ -2,8 +2,17 @@
 // Shows a spinner while the job is being handled, a tick when done.
 import { Loader2, CheckCircle2, XCircle } from 'lucide-react'
 
-type Mode = 'wait' | 'spin' | 'done' | 'closed'
-interface Meta { msg: string; sub: string; mode: Mode }
+export type ClientStatusMode = 'wait' | 'spin' | 'done' | 'closed'
+export interface ClientStatusMeta { msg: string; sub: string; mode: ClientStatusMode }
+
+// Exported so the ticket-detail "Next action" card can reuse the exact same
+// plain-language copy without re-rendering the whole status card.
+export function clientStatusMeta(status: string): ClientStatusMeta {
+  return MAP[status] ?? { msg: 'In progress', sub: 'Being handled.', mode: 'spin' }
+}
+
+type Mode = ClientStatusMode
+type Meta = ClientStatusMeta
 
 const MAP: Record<string, Meta> = {
   open:              { msg: 'Being processed',              sub: 'Your ticket has been received and is being processed. You will be notified once work begins.', mode: 'wait' },

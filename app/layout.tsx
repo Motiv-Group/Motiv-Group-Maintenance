@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { headers } from 'next/headers'
+import { GeistSans } from 'geist/font/sans'
+import { GeistMono } from 'geist/font/mono'
 import { ThemeProvider } from '@/components/providers/ThemeProvider'
 import { ServiceWorkerSetup } from '@/components/ui/ServiceWorkerSetup'
 import './globals.css'
@@ -26,7 +28,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // Per-request CSP nonce set by middleware; applied to the inline theme script.
   const nonce = (await headers()).get('x-nonce') ?? undefined
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`} suppressHydrationWarning>
       <head>
         {/* Blocking script prevents flash of wrong theme */}
         <script

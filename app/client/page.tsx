@@ -1,102 +1,169 @@
 export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
-import { PlusCircle, Calendar, ClipboardList, Wrench, CheckCircle2, AlertTriangle, ListTodo, Sparkles, Info } from 'lucide-react'
+import { ArrowRight, FilePlus2, ShieldCheck, Sparkles } from 'lucide-react'
 import { requireStoreManagerV3 } from '@/lib/health/guard'
 import { assembleStoreManagerDashboard } from '@/lib/health/data'
 import { STATUS_LABELS } from '@/lib/health/constants'
-import { Card, Donut, Pill, KpiCard, SectionCard, type Kpi } from '@/components/exec/ui'
-import { RecentTicketsCard } from '@/components/client/RecentTicketsCard'
+import { createAdminClient } from '@/lib/supabase/server'
+import { Card, Donut, STATUS_TEXT } from '@/components/exec/ui'
 import { BriefingRefresh } from '@/components/briefing/BriefingRefresh'
 import { getDailyBriefing } from '@/lib/briefing/generate'
 import { storeFacts } from '@/lib/briefing/facts'
-import { formatDate } from '@/lib/utils'
+import { StorePriorityWorkQueue } from '@/components/client/StorePriorityWorkQueue'
+
+type TodayVisit = {
+  id: string
+  title: string
+  supplier: string
+  scheduledAt: string
+  proposed: boolean
+}
 
 export default async function StoreOverviewPage() {
   const { companyId, storeIds, fullName } = await requireStoreManagerV3()
   const d = await assembleStoreManagerDashboard(companyId, storeIds)
   const h = d.health
   const briefingScopeId = storeIds.slice().sort().join(',')
-  const briefing = await getDailyBriefing({ companyId, scope: 'store', scopeId: briefingScopeId, role: 'store_manager', facts: storeFacts(d) })
+  const [briefing, todayVisits] = await Promise.all([
+    getDailyBriefing({ companyId, scope: 'store', scopeId: briefingScopeId, role: 'store_manager', facts: storeFacts(d) }),
+    loadTodayVisits(storeIds),
+  ])
   const greeting = (() => { const x = new Date().getHours(); return x < 12 ? 'Good morning' : x < 17 ? 'Good afternoon' : 'Good evening' })()
-
-  // Overdue = active tickets past their resolution deadline (same basis the
-  // Overdue filter + per-ticket red indicator use, so the count always matches).
-  const overdueCount = d.tickets.filter(t => t.overdue).length
-
-  // Store managers only ever see ticket status — never money or quotes.
-  const kpis: Kpi[] = [
-    { label: 'Open', value: d.open, icon: <ClipboardList size={13} />, tone: 'info', actionable: true, href: '/client/tickets?status=open' },
-    { label: 'Info Requested', value: d.awaitingInput, icon: <Info size={13} />, tone: 'warn', actionable: true, href: '/client/tickets?status=info_requested' },
-    { label: 'Job Scheduled', value: d.scheduled, icon: <Calendar size={13} />, tone: 'info', actionable: true, href: '/client/tickets?status=scheduled' },
-    { label: 'In Progress', value: d.inProgress, icon: <Wrench size={13} />, tone: 'gold', actionable: true, href: '/client/tickets?status=in_progress' },
-    { label: 'Completed', value: d.completed, icon: <CheckCircle2 size={13} />, tone: 'good', actionable: true, href: '/client/tickets?status=completed' },
-    { label: 'Overdue', value: overdueCount, icon: <AlertTriangle size={13} />, tone: 'bad', actionable: true, href: '/client/tickets?status=overdue' },
-  ]
-
-  // Status-only prompts. The SM can't action tickets — these nudge them to flag
-  // anything stalling to their Regional Manager, who owns the decisions.
-  const actions: { icon: React.ReactNode; text: string }[] = []
-  if (overdueCount > 0) actions.push({ icon: <AlertTriangle size={15} className="text-amber-500 mt-0.5 shrink-0" />, text: `${overdueCount} ticket${overdueCount > 1 ? 's' : ''} past target. If it's affecting trade, let your Regional Manager know it isn't being actioned yet.` })
 
   return (
     <div className="space-y-5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-bold text-[var(--text)]">{greeting}, {fullName?.split(' ')[0] ?? 'there'} 👋</h1>
-          <p className="text-sm text-[var(--text-muted)] mt-0.5 flex items-center gap-2 min-w-0">
-            <span className="truncate">{d.branch}</span>
-            {d.branchCode && <span className="inline-flex items-center shrink-0 rounded-md bg-[var(--surface)] ring-1 ring-[var(--border)] px-2 py-0.5 text-[11px] font-mono font-semibold tracking-wider text-[var(--text)]">{d.branchCode}</span>}
+      {/* Page header — greeting (left half) · health donut + AI briefing (right).
+          No card surface: it sits flush on the page background. */}
+      <div className="flex flex-col gap-6 py-1 lg:flex-row lg:items-center">
+        <div className="min-w-0 lg:w-1/2">
+          <h1 className="text-2xl font-bold tracking-normal text-[var(--text)] sm:text-3xl">{greeting}, {firstName(fullName)}</h1>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">
+            Here&apos;s what&apos;s happening at {d.branch || d.storeName}{d.branchCode ? ` / ${d.branchCode}` : ''}
           </p>
         </div>
-        <div className="flex flex-col items-end gap-1.5 shrink-0">
-          <Link href="/client/tickets/new" className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-500 transition">
-            <PlusCircle size={16} /> Log a Ticket
-          </Link>
-          <span className="flex items-center gap-1.5 text-[11px] text-[var(--text-muted)] bg-[var(--surface)] ring-1 ring-[var(--border)] rounded-xl px-2.5 py-1">
-            <Calendar size={12} className="text-[var(--text-muted)]" />
-            {formatDate(d.generatedAt)}
-          </span>
-        </div>
-      </div>
-
-      {/* Store health + AI summary */}
-      {h && (
-        <Card className="p-6">
-          <div className="flex flex-col sm:flex-row items-center gap-6">
-            <Donut value={h.finalHealthScore} status={h.finalStatus} size={140} label="Store" />
-            <div className="flex-1 min-w-0 w-full space-y-3 text-center sm:text-left">
-              <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
-                <h2 className="text-lg font-bold text-[var(--text)]">Store Health</h2>
-                <Pill status={h.finalStatus} label={STATUS_LABELS[h.finalStatus]} />
-                <span className="ml-auto"><BriefingRefresh scope="store" scopeId={briefingScopeId} /></span>
+        {h && (
+          <div className="flex items-center gap-4 lg:flex-1 lg:min-w-0">
+            <Donut value={h.finalHealthScore} status={h.finalStatus} size={100} label="Health" />
+            <div className="min-w-0 flex-1 border-l border-[var(--border)] pl-4">
+              <div className="flex items-center gap-2">
+                <span className={`text-sm font-bold ${STATUS_TEXT[h.finalStatus]}`}>{STATUS_LABELS[h.finalStatus]}</span>
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-faint)]"><Sparkles size={11} className="text-[#C6A35D]" /> AI</span>
+                <BriefingRefresh scope="store" scopeId={briefingScopeId} />
               </div>
-              {briefing?.body && (
-                <div className="flex items-start gap-2 justify-center sm:justify-start text-left">
-                  <span className="shrink-0 mt-0.5 inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wide text-[#C6A35D] bg-[#C6A35D]/10 rounded-full px-1.5 py-0.5">
-                    <Sparkles size={10} /> AI
-                  </span>
-                  <p className="text-sm text-[var(--text-muted)] leading-relaxed">{briefing.body}</p>
-                </div>
-              )}
+              <p className="mt-1.5 text-xs leading-relaxed text-[var(--text-muted)]">
+                {briefing?.body ?? 'Keep it up. Your store is running smoothly.'}
+              </p>
             </div>
           </div>
-        </Card>
-      )}
-
-      {/* KPI grid */}
-      <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
-        {kpis.map((k, i) => <KpiCard key={i} kpi={k} />)}
+        )}
       </div>
 
-      {/* Recommended actions */}
-      <SectionCard title="What needs your attention" icon={<ListTodo size={15} className="text-[#C6A35D]" />}>
-        {actions.length
-          ? <ul className="space-y-2">{actions.map((a, i) => <li key={i} className="flex items-start gap-2 text-sm text-[var(--text)]">{a.icon}<span>{a.text}</span></li>)}</ul>
-          : <p className="text-sm text-[var(--text-faint)]">Nothing needs your attention — your store is under control.</p>}
-      </SectionCard>
+      <QuickLogPanel />
 
-      <RecentTicketsCard tickets={d.tickets} />
+      <StorePriorityWorkQueue
+        tickets={d.tickets}
+        todayVisits={todayVisits}
+        storeName={d.branch || d.storeName}
+        generatedAt={d.generatedAt}
+      />
     </div>
   )
+}
+
+async function loadTodayVisits(storeIds: string[]): Promise<TodayVisit[]> {
+  if (!storeIds.length) return []
+  const admin = createAdminClient()
+  const { start, end } = saTodayBounds()
+  const { data: tickets } = await admin
+    .from('tickets')
+    .select('id, title, scheduled_at, schedule_status, supplier_id, status')
+    .in('store_id', storeIds)
+    .gte('scheduled_at', start)
+    .lt('scheduled_at', end)
+    .in('status', ['scheduled', 'in_progress', 'snag_assigned', 'snag_in_progress'])
+    .order('scheduled_at', { ascending: true })
+
+  const list = (tickets ?? []) as any[]
+  const supplierIds = Array.from(new Set(list.map(t => t.supplier_id).filter(Boolean)))
+  const { data: suppliers } = supplierIds.length
+    ? await admin.from('suppliers').select('id, company_name').in('id', supplierIds)
+    : { data: [] as any[] }
+  const supplierName = new Map((suppliers ?? []).map((s: any) => [s.id, s.company_name]))
+
+  return list.map(t => ({
+    id: t.id,
+    title: t.title ?? 'Scheduled visit',
+    supplier: supplierName.get(t.supplier_id) ?? 'Assigned supplier',
+    scheduledAt: t.scheduled_at,
+    proposed: t.schedule_status === 'proposed',
+  }))
+}
+
+function saTodayBounds(): { start: string; end: string } {
+  const pieces = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Africa/Johannesburg',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date())
+  const byType = Object.fromEntries(pieces.map(p => [p.type, p.value]))
+  const start = new Date(`${byType.year}-${byType.month}-${byType.day}T00:00:00+02:00`)
+  return { start: start.toISOString(), end: new Date(start.getTime() + 24 * 60 * 60_000).toISOString() }
+}
+
+function QuickLogPanel() {
+  return (
+    <Card className="overflow-hidden p-0">
+      <div className="grid gap-5 px-5 py-5 md:grid-cols-[1fr_auto] md:items-center lg:px-8">
+        <div className="flex gap-4">
+          <span className="grid h-16 w-16 shrink-0 place-items-center rounded-full border border-blue-500/40 bg-blue-600/10 text-blue-600 dark:text-blue-300 sm:h-20 sm:w-20">
+            <FilePlus2 size={34} />
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-lg font-bold text-[var(--text)] sm:text-xl">Report a problem in under 60 seconds</h2>
+            <p className="mt-1 text-sm text-[var(--text-muted)]">Choose issue, add a photo, and submit. We&apos;ll take it from there.</p>
+            <div className="mt-5 hidden max-w-xl items-center gap-3 text-xs text-[var(--text-muted)] sm:flex">
+              <Step n="1" label="Choose issue" />
+              <span className="h-px flex-1 border-t border-dashed border-slate-300 dark:border-slate-500" />
+              <Step n="2" label="Add photo" />
+              <span className="h-px flex-1 border-t border-dashed border-slate-300 dark:border-slate-500" />
+              <Step n="3" label="Submit" />
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-col justify-center gap-3 md:min-w-[260px]">
+          <Link href="/client/tickets/new" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-blue-500">
+            Start Quick Log <ArrowRight size={16} />
+          </Link>
+        </div>
+      </div>
+    </Card>
+  )
+}
+
+function Step({ n, label }: { n: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-2 whitespace-nowrap">
+      <span className="grid h-7 w-7 place-items-center rounded-full border border-blue-500/40 text-xs font-bold text-blue-600 dark:text-blue-300">{n}</span>
+      {label}
+    </span>
+  )
+}
+
+function EmptyState({ title }: { title: string }) {
+  return (
+    <div className="grid min-h-28 place-items-center rounded-xl border border-dashed border-[var(--border)] px-4 py-6 text-center">
+      <div>
+        <div className="mx-auto mb-2 grid h-10 w-10 place-items-center rounded-full bg-[var(--surface-2)] text-[var(--text-faint)]">
+          <ShieldCheck size={24} />
+        </div>
+        <p className="text-sm font-semibold text-[var(--text-muted)]">{title}</p>
+      </div>
+    </div>
+  )
+}
+
+function firstName(name: string | null): string {
+  return name?.trim().split(/\s+/)[0] || 'there'
 }

@@ -47,3 +47,6 @@ android/app/release/
 # Local source archives (never commit — too large for GitHub)
 Motiv Source New.zip
 *.zip
+
+# Local scratch artifact
+.rt_orig.json

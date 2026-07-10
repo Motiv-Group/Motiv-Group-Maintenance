@@ -104,8 +104,8 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   const reUsers = Array.from(new Set((su ?? []).filter(r => reSet.has(r.supplier_id)).map(r => r.user_id)))
   const freshUsers = Array.from(new Set((su ?? []).filter(r => !reSet.has(r.supplier_id)).map(r => r.user_id))).filter(id => !reUsers.includes(id))
   const notifRows = [
-    ...reUsers.map(id => ({ company_id: ticket.company_id, user_id: id, type: 'ticket_update', title: `Ticket: ${ticket.title ?? 'Untitled'}`, message: 'The regional manager requested a re-quote.', link: `/supplier/tickets/${ticket.id}` })),
-    ...freshUsers.map(id => ({ company_id: ticket.company_id, user_id: id, type: 'ticket_update', title: `Ticket: ${ticket.title ?? 'Untitled'}`, message: 'You have been invited to quote.', link: `/supplier/tickets/${ticket.id}` })),
+    ...reUsers.map(id => ({ company_id: ticket.company_id, user_id: id, ticket_id: ticket.id, type: 'ticket_update', title: `${ticket.title ?? 'Untitled'}`, message: 'The regional manager has asked you to send an updated quote for this job.', link: `/supplier/tickets/${ticket.id}` })),
+    ...freshUsers.map(id => ({ company_id: ticket.company_id, user_id: id, ticket_id: ticket.id, type: 'ticket_update', title: `${ticket.title ?? 'Untitled'}`, message: 'You have been invited to send a quote for this job.', link: `/supplier/tickets/${ticket.id}` })),
   ]
   if (notifRows.length) {
     await admin.from('notifications').insert(notifRows)

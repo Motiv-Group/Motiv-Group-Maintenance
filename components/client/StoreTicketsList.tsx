@@ -5,20 +5,12 @@ import Link from 'next/link'
 import { PlusCircle, Search, Ticket, ChevronDown } from 'lucide-react'
 import type { StoreManagerTicket } from '@/lib/health/data'
 import { Card } from '@/components/exec/ui'
-import { PriorityBadge } from '@/components/ui/PriorityBadge'
+import { CategoryIcon, TicketBadges } from './ticketBadges'
 import { readCollapse, writeCollapse } from '@/lib/collapse-state'
 import { formatDate, formatDateTime, humanizeDuration, urgencyCountCls, OPERATIONAL_IMPACT_LABELS, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
 
 type Filter = 'all' | 'open' | 'info_requested' | 'scheduled' | 'in_progress' | 'completed' | 'cancelled' | 'overdue'
 
-const TONE: Record<string, string> = {
-  open: 'bg-blue-500/15 text-blue-700 dark:text-blue-400',
-  info_requested: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
-  scheduled: 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-400',
-  in_progress: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D]',
-  completed: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
-  cancelled: 'bg-gray-500/15 text-gray-600 dark:text-gray-400',
-}
 const WORD: Record<string, string> = { open: 'New', info_requested: 'Info Requested', scheduled: 'Job scheduled', in_progress: 'In Progress', completed: 'Completed', cancelled: 'Cancelled' }
 
 // Urgency rank (handles classic low/medium/high/urgent and engine P1–P4).
@@ -30,36 +22,44 @@ const byDateThenUrgency = (a: StoreManagerTicket, b: StoreManagerTicket) =>
 
 // No "All" pill — the default (unselected) view is the collapsible status groups.
 // Open leads; Overdue sits last. Clicking the active pill returns to the groups.
+// Pills styled like the status/priority badges: tinted when inactive, filled when
+// selected.
 const PILLS: { key: Filter; label: string; active: string; inactive: string }[] = [
-  { key: 'open',        label: 'New',         active: 'bg-blue-500 text-white border-blue-500',              inactive: 'text-blue-600 dark:text-blue-400 border-blue-500/40 hover:border-blue-400' },
-  { key: 'info_requested', label: 'Info Requested', active: 'bg-amber-500 text-white border-amber-500',     inactive: 'text-amber-600 dark:text-amber-400 border-amber-500/40 hover:border-amber-400' },
-  { key: 'scheduled',   label: 'Job scheduled', active: 'bg-indigo-500 text-white border-indigo-500',       inactive: 'text-indigo-600 dark:text-indigo-400 border-indigo-500/40 hover:border-indigo-400' },
-  { key: 'in_progress', label: 'In Progress', active: 'bg-[#C6A35D] text-[#0a0e17] border-[#C6A35D]',        inactive: 'text-amber-600 dark:text-[#C6A35D] border-[#C6A35D]/40 hover:border-[#C6A35D]' },
-  { key: 'completed',   label: 'Completed',   active: 'bg-emerald-500 text-white border-emerald-500',        inactive: 'text-emerald-600 dark:text-emerald-400 border-emerald-500/40 hover:border-emerald-400' },
-  { key: 'cancelled',   label: 'Cancelled',   active: 'bg-gray-500 text-white border-gray-500',              inactive: 'text-gray-600 dark:text-gray-400 border-gray-500/40 hover:border-gray-400' },
-  { key: 'overdue',     label: 'Overdue',     active: 'bg-red-600 text-white border-red-600',                inactive: 'text-red-600 dark:text-red-400 border-red-500/50 hover:border-red-500' },
+  { key: 'open',           label: 'New',           active: 'bg-blue-500 text-white',     inactive: 'bg-blue-500/15 text-blue-700 dark:text-blue-400' },
+  { key: 'info_requested', label: 'Info Requested', active: 'bg-amber-500 text-white',    inactive: 'bg-amber-500/15 text-amber-700 dark:text-amber-400' },
+  { key: 'scheduled',      label: 'Job scheduled', active: 'bg-indigo-500 text-white',    inactive: 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-400' },
+  { key: 'in_progress',    label: 'In Progress',   active: 'bg-[#C6A35D] text-[#0a0e17]', inactive: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D]' },
+  { key: 'completed',      label: 'Completed',     active: 'bg-emerald-500 text-white',   inactive: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' },
+  { key: 'cancelled',      label: 'Cancelled',     active: 'bg-gray-500 text-white',      inactive: 'bg-gray-500/15 text-gray-600 dark:text-gray-400' },
+  { key: 'overdue',        label: 'Overdue',       active: 'bg-red-600 text-white',       inactive: 'bg-red-500/15 text-red-600 dark:text-red-400' },
 ]
 
-function Row({ t }: { t: StoreManagerTicket }) {
+function Row({ t, storeName }: { t: StoreManagerTicket; storeName: string }) {
   return (
-    <Link href={`/client/tickets/${t.id}`} className="flex items-center justify-between gap-2 px-3 py-3 border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition">
-      <div className="min-w-0">
-        {t.jobRef && <p className="text-[10px] font-mono text-[var(--text-faint)]">{t.jobRef}</p>}
-        <p className="text-sm text-[var(--text)] truncate">{t.title}</p>
-        <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(t.createdAt)}</p>
-        {/* eslint-disable-next-line react-hooks/purity -- Date.now() drives a relative "overdue by" display; cosmetic elapsed-time readout, not a hydration-correctness concern */}
-        {t.overdue && <p className="text-[11px] font-semibold text-red-600 dark:text-red-400">Overdue by {humanizeDuration(Date.now() - new Date(t.dueAt).getTime())}</p>}
+    <Link href={`/client/tickets/${t.id}`} className="grid gap-3 border-b border-[var(--border)] px-4 py-3 last:border-0 transition hover:bg-[var(--hover)] sm:grid-cols-[1fr_auto] sm:items-center">
+      <div className="flex min-w-0 items-center gap-3">
+        <CategoryIcon category={t.category ?? t.title} className="h-11 w-11" iconSize={18} />
+        <div className="min-w-0">
+          {t.jobRef && <p className="text-[10px] font-mono text-[var(--text-faint)]">{t.jobRef}</p>}
+          <p className="truncate text-sm font-bold text-[var(--text)]">{t.category || t.title}</p>
+          <p className="truncate text-xs text-[var(--text-muted)]">{storeName}</p>
+        </div>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_6rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
-        <PriorityBadge priority={t.priority} className="w-full text-center" />
-        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${t.infoAdded ? 'bg-teal-500/15 text-teal-700 dark:text-teal-400' : TONE[t.status]}`}>{t.infoAdded ? 'Info added' : WORD[t.status]}</span>
+      <div className="flex flex-col items-start gap-1 sm:items-end">
+        <TicketBadges ticket={t} />
+        <p className="text-xs text-[var(--text-muted)]">{t.supplierAssigned ? 'Supplier assigned' : 'No supplier assigned'}</p>
+        <p className="text-[11px] text-[var(--text-faint)]">
+          {formatDateTime(t.createdAt)}
+          {/* eslint-disable-next-line react-hooks/purity -- cosmetic "overdue by" readout, not hydration-critical */}
+          {t.overdue && <span className="ml-1.5 font-semibold text-red-600 dark:text-red-400">· Overdue by {humanizeDuration(Date.now() - new Date(t.dueAt).getTime())}</span>}
+        </p>
       </div>
     </Link>
   )
 }
 
 /** Collapsible status group used in the "All" view. */
-function Group({ title, tickets, defaultOpen = false }: { title: string; tickets: StoreManagerTicket[]; defaultOpen?: boolean }) {
+function Group({ title, tickets, defaultOpen = false, storeName }: { title: string; tickets: StoreManagerTicket[]; defaultOpen?: boolean; storeName: string }) {
   const [open, setOpen] = useState(defaultOpen)
   // Remember the user's choice across navigation (wiped on next sign-in).
   // eslint-disable-next-line react-hooks/set-state-in-effect -- restores persisted group open state from localStorage (client-only) when the title changes; cannot run during SSR render
@@ -73,12 +73,12 @@ function Group({ title, tickets, defaultOpen = false }: { title: string; tickets
         <span className="text-sm font-bold text-[var(--text)]">{title}</span>
         <span className={`text-[11px] font-medium rounded-full px-2 py-0.5 ${urgencyCountCls(tickets.filter(t => !['completed', 'cancelled'].includes(t.status)).map(t => t.priority))}`}>{tickets.length}</span>
       </div>
-      {open && <div onClick={e => e.stopPropagation()}>{tickets.map(t => <Row key={t.id} t={t} />)}</div>}
+      {open && <div onClick={e => e.stopPropagation()}>{tickets.map(t => <Row key={t.id} t={t} storeName={storeName} />)}</div>}
     </Card>
   )
 }
 
-export function StoreTicketsList({ tickets, initialFilter = 'all' }: { tickets: StoreManagerTicket[]; initialFilter?: Filter }) {
+export function StoreTicketsList({ tickets, initialFilter = 'all', storeName = 'Your store' }: { tickets: StoreManagerTicket[]; initialFilter?: Filter; storeName?: string }) {
   const [filter, setFilter] = useState<Filter>(initialFilter)
   const [q, setQ] = useState('')
 
@@ -154,7 +154,7 @@ export function StoreTicketsList({ tickets, initialFilter = 'all' }: { tickets: 
           const on = filter === p.key
           return (
             <button key={p.key} onClick={() => setFilter(f => f === p.key ? 'all' : p.key)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium border transition text-center ${on ? p.active : p.inactive}`}>
+              className={`rounded-md px-3 py-1.5 text-xs font-semibold transition text-center ${on ? p.active : p.inactive}`}>
               {p.label} <span className="opacity-70">{n}</span>
             </button>
           )
@@ -173,13 +173,13 @@ export function StoreTicketsList({ tickets, initialFilter = 'all' }: { tickets: 
           A specific filter → flat list. */}
       {filter === 'all' ? (
         shown.length ? (
-          <Group title="All Tickets" tickets={shownSorted} defaultOpen />
+          <Group title="All Tickets" tickets={shownSorted} defaultOpen storeName={storeName} />
         ) : (
           <Card className="p-2"><p className="text-sm text-[var(--text-faint)] text-center py-8">{tickets.length ? 'No tickets match.' : 'No tickets yet.'}</p></Card>
         )
       ) : (
         <Card className="p-2">
-          {shownSorted.map(t => <Row key={t.id} t={t} />)}
+          {shownSorted.map(t => <Row key={t.id} t={t} storeName={storeName} />)}
           {!shownSorted.length && <p className="text-sm text-[var(--text-faint)] text-center py-8">{tickets.length ? 'No tickets match.' : 'No tickets yet.'}</p>}
         </Card>
       )}

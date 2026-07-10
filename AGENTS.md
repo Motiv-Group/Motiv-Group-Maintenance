@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
 ## Project
 
@@ -112,7 +112,6 @@ Two layers, distinct images in `public/splash/` (web) and `android/.../res/drawa
 
 ## Conventions
 
-- **Brand/CI reference:** fonts + colours are documented in `docs/COMPANY_IDENTITY.md` (Geist font via `next/font`, wired through Tailwind `font-sans`; navy/gold `brand-*` palette; `#C6A35D` gold accent; surface/text CSS vars). Consult it before adding colours or a typeface.
 - Currency is always ZAR via `formatCurrency`; dates via `formatDate`/`formatDateTime` (`en-ZA` locale).
 - Dark mode is class-based (`darkMode: 'class'` in `tailwind.config.ts`); the brand palette is `brand-50..900` (deep navy/gold, `brand-600` ≈ `#0d1f2d`). A blocking inline script in `app/layout.tsx` sets the `dark` class before paint to avoid theme flash — don't remove it without preserving that behavior.
 - Surface/text colors are CSS vars in `globals.css` (`--app-bg`, `--surface` ≈ `#1f2937` dark, `--surface-2`, `--border`, `--hover`, `--input-bg`, `--text` / `--text-muted` / `--text-faint`) that auto-swap light/dark — use `var(--…)`, never hardcoded hex, or it breaks one mode. The shared card is `Card` in `components/exec/ui.tsx`. Older `components/regional|admin/*` still use raw `gray-*`/`white` classes.

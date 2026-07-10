@@ -182,8 +182,8 @@ export async function POST(request: Request) {
   if (adminIds.length) {
     await admin.from('notifications').insert(adminIds.map(id => ({
       company_id: null, user_id: id, type: 'supplier_review',
-      title: 'New supplier awaiting review',
-      message: `${(b.company_name ?? '').trim()} (${trades.join(', ')}) signed up and needs verification.`,
+      title: 'New supplier ready for review',
+      message: `${(b.company_name ?? '').trim()} just signed up and offers ${trades.join(', ')}. They're waiting for you to review and verify them.`,
       link: '/admin/suppliers',
     })))
   }

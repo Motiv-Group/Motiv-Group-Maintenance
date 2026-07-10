@@ -4,6 +4,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { notFound, redirect } from 'next/navigation'
 import { BackButton } from '@/components/ui/BackButton'
 import { StoreBudgetForm } from '@/components/regional/StoreBudgetForm'
+import { storeLabel } from '@/lib/utils'
 
 export default async function StoreBudgetPage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -33,7 +34,7 @@ export default async function StoreBudgetPage(props: { params: Promise<{ id: str
         <div>
           <h1 className="text-xl font-bold text-gray-900 dark:text-white">Capex Budget</h1>
           <p className="text-sm text-brand-600 dark:text-brand-400">
-            {store.name}{store.sub_store ? ` — ${store.sub_store}` : ''}
+            {storeLabel(store.name, store.sub_store)}
           </p>
         </div>
       </div>

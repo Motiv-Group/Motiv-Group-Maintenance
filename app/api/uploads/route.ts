@@ -19,8 +19,10 @@ const MAX_FILES = 10
 const MAX_USER_UPLOAD_BYTES = Number(process.env.MAX_USER_UPLOAD_BYTES) || 500 * 1024 * 1024
 
 const IMG = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+const DOCS = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/plain', 'text/csv']
 const BUCKET_MIME: Record<string, string[]> = {
   'ticket-photos':     IMG,
+  'ticket-docs':       [...IMG, ...DOCS],
   'completion-docs':   [...IMG, 'application/pdf'],
   'quote-attachments': [...IMG, 'application/pdf', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel'],
   'supplier-docs':     [...IMG, 'application/pdf'],
