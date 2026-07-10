@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
-import { ArrowRight, CheckCircle2, FilePlus2, ShieldCheck, Sparkles } from 'lucide-react'
+import { ArrowRight, FilePlus2, ShieldCheck, Sparkles } from 'lucide-react'
 import { requireStoreManagerV3 } from '@/lib/health/guard'
 import { assembleStoreManagerDashboard } from '@/lib/health/data'
 import { STATUS_LABELS } from '@/lib/health/constants'
@@ -30,12 +30,6 @@ export default async function StoreOverviewPage() {
     loadTodayVisits(storeIds),
   ])
   const greeting = (() => { const x = new Date().getHours(); return x < 12 ? 'Good morning' : x < 17 ? 'Good afternoon' : 'Good evening' })()
-  const activeTickets = d.tickets.filter(t => t.status !== 'completed' && t.status !== 'cancelled')
-  const urgentCount = activeTickets.filter(t => {
-    const p = String(t.priority)
-    return t.overdue || p === 'urgent' || p === 'P1'
-  }).length
-  const overdueCount = d.tickets.filter(t => t.overdue).length
 
   return (
     <div className="space-y-5">
@@ -66,10 +60,7 @@ export default async function StoreOverviewPage() {
           <div className="mt-4 grid gap-5 sm:grid-cols-[110px_1fr]">
             <Donut value={h.finalHealthScore} status={h.finalStatus} size={104} label="Health" />
             <div className="space-y-2">
-              <HealthLine label={`${d.open} open tickets`} value={urgentCount ? `${urgentCount} urgent` : 'On track'} tone={urgentCount ? 'bad' : 'good'} />
-              <HealthLine label={`${d.inProgress} in progress`} value={d.inProgress ? 'Active' : 'Clear'} tone="good" />
-              <HealthLine label={`${overdueCount} overdue today`} value={overdueCount ? 'Needs attention' : 'Great'} tone={overdueCount ? 'bad' : 'good'} />
-              <div className="pt-2">
+              <div>
                 <div className="mb-1 flex items-center justify-between gap-2">
                   <span className="inline-flex items-center gap-1 rounded-full bg-[#C6A35D]/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#C6A35D]"><Sparkles size={11} /> AI</span>
                   <BriefingRefresh scope="store" scopeId={briefingScopeId} />
@@ -177,18 +168,6 @@ function EmptyState({ title }: { title: string }) {
         </div>
         <p className="text-sm font-semibold text-[var(--text-muted)]">{title}</p>
       </div>
-    </div>
-  )
-}
-
-function HealthLine({ label, value, tone }: { label: string; value: string; tone: 'good' | 'bad' }) {
-  return (
-    <div className="flex items-center justify-between gap-3 border-b border-[var(--border)] pb-2 text-xs last:border-0">
-      <span className="flex min-w-0 items-center gap-2 text-[var(--text-muted)]">
-        <CheckCircle2 size={14} className="text-emerald-600 dark:text-emerald-400" />
-        <span className="truncate">{label}</span>
-      </span>
-      <span className={`shrink-0 font-semibold ${tone === 'bad' ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>{value}</span>
     </div>
   )
 }

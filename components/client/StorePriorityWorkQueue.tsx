@@ -13,7 +13,6 @@ import {
   Flame,
   Info,
   Loader2,
-  ShieldAlert,
   Snowflake,
   Wrench,
   Zap,
@@ -30,20 +29,13 @@ type TodayVisit = {
   proposed: boolean
 }
 
-type QueueFilter = 'all' | 'sla' | 'blocked' | 'signoff' | 'snag' | 'open' | 'today' | 'input' | 'progress'
+// Filters are driven only by the KPI cards now — 'all' is the default, unfiltered view.
+type QueueFilter = 'all' | 'open' | 'today' | 'input' | 'progress'
 type Tone = 'red' | 'purple' | 'gold' | 'green'
 
 const URGENCY_RANK: Record<string, number> = { urgent: 0, P1: 0, high: 1, P2: 1, medium: 2, P3: 2, low: 3, P4: 3 }
 const SIGNOFF_STATUSES = new Set(['submitted_for_signoff', 'pending_sign_off', 'evidence_requested', 'approved_closeout'])
 const SNAG_STATUSES = new Set(['snag', 'snag_assigned', 'snag_in_progress', 'snag_resolved'])
-
-const QUEUE_FILTERS: { key: QueueFilter; label: string }[] = [
-  { key: 'all', label: 'All' },
-  { key: 'sla', label: 'SLA Risk' },
-  { key: 'blocked', label: 'Blocked' },
-  { key: 'signoff', label: 'Sign-off' },
-  { key: 'snag', label: 'Snags' },
-]
 
 export function StorePriorityWorkQueue({
   tickets,
@@ -70,13 +62,11 @@ export function StorePriorityWorkQueue({
   }, [activeTickets, tickets, todayVisitIds])
 
   const rows = useMemo(() => {
+    // Urgency first, then most recently logged ticket.
     return activeTickets
       .filter(t => matchesFilter(t, filter, todayVisitIds))
       .sort((a, b) =>
-        Number(b.overdue) - Number(a.overdue)
-        || Number(isBlocked(b)) - Number(isBlocked(a))
-        || (URGENCY_RANK[String(a.priority)] ?? 9) - (URGENCY_RANK[String(b.priority)] ?? 9)
-        || new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime()
+        (URGENCY_RANK[String(a.priority)] ?? 9) - (URGENCY_RANK[String(b.priority)] ?? 9)
         || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       )
   }, [activeTickets, filter, todayVisitIds])
@@ -123,31 +113,13 @@ export function StorePriorityWorkQueue({
       </section>
 
       <Card className="overflow-hidden p-0">
-        <div className="flex flex-col gap-4 border-b border-[var(--border)] px-5 py-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-start gap-3">
-            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-blue-600/15 text-blue-600 dark:text-blue-300">
-              <ClipboardList size={21} />
-            </span>
-            <div>
-              <h2 className="text-lg font-bold text-[var(--text)]">Priority Work Queue</h2>
-              <p className="mt-0.5 text-xs text-[var(--text-muted)]">Sorted by urgency, SLA risk and blockers</p>
-            </div>
-          </div>
-          <div className="flex gap-2 overflow-x-auto pb-1 lg:pb-0">
-            {QUEUE_FILTERS.map(f => (
-              <button
-                key={f.key}
-                type="button"
-                onClick={() => setFilter(f.key)}
-                className={`shrink-0 rounded-full px-4 py-2 text-sm font-bold transition ${
-                  filter === f.key
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-brand-900/70 text-blue-100 ring-1 ring-white/10 hover:bg-blue-600/20'
-                }`}
-              >
-                {f.label}
-              </button>
-            ))}
+        <div className="flex items-start gap-3 border-b border-[var(--border)] px-5 py-5">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-blue-600/15 text-blue-600 dark:text-blue-300">
+            <ClipboardList size={21} />
+          </span>
+          <div>
+            <h2 className="text-lg font-bold text-[var(--text)]">Priority Work Queue</h2>
+            <p className="mt-0.5 text-xs text-[var(--text-muted)]">Sorted by urgency, then most recent</p>
           </div>
         </div>
 
@@ -200,18 +172,23 @@ function MetricButton({
     : tone === 'green' ? 'text-emerald-600 dark:text-emerald-400'
     : 'text-[var(--text-muted)]'
 
+  // Green = all clear (zero), amber = has tickets that need attention.
+  const zero = value === 0
+  const valueColor = zero ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'
+  const stateBorder = zero ? 'border-2 border-emerald-500/60' : 'border-2 border-amber-500/70'
+
   return (
     <button
       type="button"
       onClick={onClick}
       className={`block rounded-2xl text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 ${active ? 'ring-2 ring-blue-500/70' : ''}`}
     >
-      <Card className={`h-full p-4 transition hover:-translate-y-0.5 hover:ring-blue-500/30 ${active ? 'ring-blue-500/60' : ''}`}>
+      <Card className={`h-full p-4 transition hover:-translate-y-0.5 hover:ring-blue-500/30 ${stateBorder} ${active ? 'ring-blue-500/60' : ''}`}>
         <div className="flex items-center gap-4">
           <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-full ring-1 ${tones[tone]}`}>{icon}</span>
           <div className="min-w-0">
             <p className="truncate text-xs font-semibold text-[var(--text-muted)]">{label}</p>
-            <p className="mt-1 text-2xl font-bold leading-none text-[var(--text)]">{value}</p>
+            <p className={`mt-1 text-2xl font-bold leading-none ${valueColor}`}>{value}</p>
             <p className={`mt-1 truncate text-xs font-semibold ${subColor}`}>{sub}</p>
           </div>
         </div>
@@ -304,19 +281,7 @@ function matchesFilter(ticket: StoreManagerTicket, filter: QueueFilter, todayVis
       return ticket.status === 'info_requested'
     case 'progress':
       return ticket.status === 'in_progress'
-    case 'sla':
-      return ticket.overdue || isUrgent(ticket)
-    case 'blocked':
-      return isBlocked(ticket)
-    case 'signoff':
-      return SIGNOFF_STATUSES.has(ticket.rawStatus)
-    case 'snag':
-      return SNAG_STATUSES.has(ticket.rawStatus)
   }
-}
-
-function isBlocked(ticket: StoreManagerTicket): boolean {
-  return ticket.status === 'info_requested' || !ticket.supplierAssigned || ticket.rawStatus === 'suppliers_declined'
 }
 
 function isUrgent(ticket: StoreManagerTicket): boolean {
