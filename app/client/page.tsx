@@ -33,12 +33,41 @@ export default async function StoreOverviewPage() {
 
   return (
     <div className="space-y-5">
-      <header className="min-w-0">
-        <h1 className="text-2xl font-bold tracking-normal text-[var(--text)] sm:text-3xl">{greeting}, {firstName(fullName)}</h1>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Here&apos;s what&apos;s happening at {d.branch || d.storeName}{d.branchCode ? ` / ${d.branchCode}` : ''}
-        </p>
-      </header>
+      <div className="grid gap-5 lg:grid-cols-[1fr_minmax(320px,380px)] lg:items-start">
+        <header className="min-w-0">
+          <h1 className="text-2xl font-bold tracking-normal text-[var(--text)] sm:text-3xl">{greeting}, {firstName(fullName)}</h1>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">
+            Here&apos;s what&apos;s happening at {d.branch || d.storeName}{d.branchCode ? ` / ${d.branchCode}` : ''}
+          </p>
+        </header>
+
+        <Card tint className="p-5">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="flex items-center gap-2 text-sm font-bold text-[var(--text)]">
+              <ShieldCheck size={16} className="text-emerald-600 dark:text-emerald-400" /> Store health
+            </h2>
+            {h && <Pill status={h.finalStatus} label={STATUS_LABELS[h.finalStatus]} />}
+          </div>
+          {h ? (
+            <div className="mt-4 grid gap-5 sm:grid-cols-[110px_1fr]">
+              <Donut value={h.finalHealthScore} status={h.finalStatus} size={104} label="Health" />
+              <div className="space-y-2">
+                <div>
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-[#C6A35D]/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#C6A35D]"><Sparkles size={11} /> AI</span>
+                    <BriefingRefresh scope="store" scopeId={briefingScopeId} />
+                  </div>
+                  <p className="text-xs leading-relaxed text-[var(--text-muted)]">
+                    {briefing?.body ?? 'Keep it up. Your store is running smoothly.'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <EmptyState title="Health will appear once store data is available." />
+          )}
+        </Card>
+      </div>
 
       <QuickLogPanel />
 
@@ -48,33 +77,6 @@ export default async function StoreOverviewPage() {
         storeName={d.branch || d.storeName}
         generatedAt={d.generatedAt}
       />
-
-      <Card className="p-5">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="flex items-center gap-2 text-sm font-bold text-[var(--text)]">
-            <ShieldCheck size={16} className="text-emerald-600 dark:text-emerald-400" /> Store health
-          </h2>
-          {h && <Pill status={h.finalStatus} label={STATUS_LABELS[h.finalStatus]} />}
-        </div>
-        {h ? (
-          <div className="mt-4 grid gap-5 sm:grid-cols-[110px_1fr]">
-            <Donut value={h.finalHealthScore} status={h.finalStatus} size={104} label="Health" />
-            <div className="space-y-2">
-              <div>
-                <div className="mb-1 flex items-center justify-between gap-2">
-                  <span className="inline-flex items-center gap-1 rounded-full bg-[#C6A35D]/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#C6A35D]"><Sparkles size={11} /> AI</span>
-                  <BriefingRefresh scope="store" scopeId={briefingScopeId} />
-                </div>
-                <p className="text-xs leading-relaxed text-[var(--text-muted)]">
-                  {briefing?.body ?? 'Keep it up. Your store is running smoothly.'}
-                </p>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <EmptyState title="Health will appear once store data is available." />
-        )}
-      </Card>
     </div>
   )
 }
@@ -122,7 +124,7 @@ function saTodayBounds(): { start: string; end: string } {
 
 function QuickLogPanel() {
   return (
-    <Card className="overflow-hidden p-0">
+    <Card tint className="overflow-hidden p-0">
       <div className="grid gap-5 px-5 py-5 md:grid-cols-[1fr_auto] md:items-center lg:px-8">
         <div className="flex gap-4">
           <span className="grid h-16 w-16 shrink-0 place-items-center rounded-full border border-blue-500/40 bg-blue-600/10 text-blue-600 dark:text-blue-300 sm:h-20 sm:w-20">

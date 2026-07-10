@@ -24,6 +24,9 @@
     --app-bg:     #eef2f7;
     --surface:    #ffffff;
     --surface-2:  #f8fafc;
+    /* Light-blue tint of the navy nav — used for the SM dashboard blocks in light
+       mode. Same as --surface in dark (see below) so dark mode is unchanged. */
+    --surface-tint: #dbe7f5;
     --nav-bg:     #ffffff;
     --border:     rgba(15, 23, 42, 0.10);
     --hover:      rgba(15, 23, 42, 0.045);
@@ -36,6 +39,7 @@
     --app-bg:     #0a0e17;
     --surface:    #1f2937;
     --surface-2:  #0e1422;
+    --surface-tint: #1f2937;
     --nav-bg:     #0c1120;
     --border:     rgba(255, 255, 255, 0.07);
     --hover:      rgba(255, 255, 255, 0.05);
