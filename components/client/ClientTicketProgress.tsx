@@ -1,15 +1,17 @@
-// 3-step progress dots for the store-manager ticket view. Collapses the full
-// lifecycle to Open → In Progress → Completed (clientVisibleStatus) and colours
-// each reached dot in its status colour. Pure/server-safe.
+// Horizontal progress stepper for the store-manager ticket view. Collapses the
+// full lifecycle to New → Scheduled → In Progress → Completed
+// (clientVisibleStatus) — deliberately no quote/sign-off steps. Pure/server-safe.
+import { FileText, CalendarClock, Wrench, CheckCircle2, Check } from 'lucide-react'
 import { clientVisibleStatus } from '@/lib/utils'
 import type { TicketStatus } from '@/lib/types'
+import type { LucideIcon } from 'lucide-react'
 
-const STEPS = [
-  { label: 'Open',          dot: 'bg-blue-500',    ring: 'ring-blue-500/30',    text: 'text-blue-600 dark:text-blue-400' },
-  { label: 'Job scheduled', dot: 'bg-indigo-500',  ring: 'ring-indigo-500/30',  text: 'text-indigo-600 dark:text-indigo-400' },
-  { label: 'In Progress',   dot: 'bg-[#C6A35D]',   ring: 'ring-[#C6A35D]/30',   text: 'text-amber-600 dark:text-[#C6A35D]' },
-  { label: 'Completed',     dot: 'bg-emerald-500', ring: 'ring-emerald-500/30', text: 'text-emerald-600 dark:text-emerald-400' },
-] as const
+const STEPS: { key: string; label: string; Icon: LucideIcon }[] = [
+  { key: 'open',        label: 'New',         Icon: FileText },
+  { key: 'scheduled',   label: 'Scheduled',   Icon: CalendarClock },
+  { key: 'in_progress', label: 'In Progress', Icon: Wrench },
+  { key: 'completed',   label: 'Completed',   Icon: CheckCircle2 },
+]
 
 export function ClientTicketProgress({ status }: { status: string }) {
   const cv = clientVisibleStatus(status as TicketStatus)
@@ -19,19 +21,31 @@ export function ClientTicketProgress({ status }: { status: string }) {
   const idx = cv === 'completed' ? 3 : cv === 'in_progress' ? 2 : cv === 'scheduled' ? 1 : 0
 
   return (
-    <div className="flex items-start px-1">
+    <ol className="flex px-1">
       {STEPS.map((s, i) => {
+        const done = i < idx
+        const current = i === idx
         const reached = i <= idx
+        // Opaque circle bg so the connector line sits behind, not through it.
+        const circle = reached
+          ? 'border-blue-600 bg-blue-600 text-white'
+          : 'border-[var(--border)] bg-[var(--surface)] text-[var(--text-faint)]'
+        const Icon = done ? Check : s.Icon
         return (
-          <div key={s.label} className={i < STEPS.length - 1 ? 'flex items-start flex-1' : 'flex items-start'}>
-            <div className="flex flex-col items-center gap-1.5 w-20">
-              <div className={`w-4 h-4 rounded-full transition ${reached ? s.dot : 'bg-black/15 dark:bg-white/10'} ${i === idx ? `ring-4 ${s.ring}` : ''}`} />
-              <span className={`text-[11px] font-medium ${reached ? s.text : 'text-[var(--text-faint)]'}`}>{s.label}</span>
-            </div>
-            {i < STEPS.length - 1 && <div className={`flex-1 h-0.5 mt-[7px] rounded ${i < idx ? STEPS[i].dot : 'bg-black/15 dark:bg-white/10'}`} />}
-          </div>
+          <li key={s.key} className="relative flex-1 flex flex-col items-center">
+            {i > 0 && (
+              <span aria-hidden className={`absolute top-4 right-1/2 h-0.5 w-full ${i <= idx ? 'bg-blue-600' : 'bg-[var(--border)]'}`} />
+            )}
+            <span
+              aria-current={current ? 'step' : undefined}
+              className={`relative z-10 grid h-8 w-8 place-items-center rounded-full border-2 ${circle} ${current ? 'ring-4 ring-blue-500/25' : ''}`}
+            >
+              <Icon size={15} />
+            </span>
+            <span className={`mt-2 text-[11px] text-center ${current ? 'font-semibold text-[var(--text)]' : reached ? 'text-[var(--text-muted)]' : 'text-[var(--text-faint)]'}`}>{s.label}</span>
+          </li>
         )
       })}
-    </div>
+    </ol>
   )
 }

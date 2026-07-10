@@ -1,10 +1,8 @@
 export const dynamic = 'force-dynamic'
 
 import { redirect } from 'next/navigation'
-import { CalendarClock } from 'lucide-react'
+import { CalendarClock, Loader2, CheckCircle2, XCircle, ArrowRight } from 'lucide-react'
 import { BackLink } from '@/components/ui/BackLink'
-import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
-import { PhotoThumbs } from '@/components/ui/PhotoThumbs'
 import { createAdminClient } from '@/lib/supabase/server'
 import { signManyUrls } from '@/lib/storage'
 import { requireStoreManagerV3 } from '@/lib/health/guard'
@@ -14,13 +12,13 @@ import { isActive } from '@/lib/health/types'
 import type { HealthTicket, Priority } from '@/lib/health/types'
 import { Card } from '@/components/exec/ui'
 import { ClientTicketProgress } from '@/components/client/ClientTicketProgress'
-import { ClientTicketStatus } from '@/components/client/ClientTicketStatus'
+import { clientStatusMeta } from '@/components/client/ClientTicketStatus'
 import { EditTicketForm } from '@/components/client/EditTicketForm'
 import { AddInfoForm } from '@/components/client/AddInfoForm'
-import { DueDate } from '@/components/workflow/DueDate'
+import { SmTicketTabs } from '@/components/client/SmTicketTabs'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { EditedLine } from '@/components/ui/EditedLine'
-import { formatDateTime, humanizeDuration, clientVisibleStatus } from '@/lib/utils'
+import { formatDateTime, humanizeDuration, clientVisibleStatus, storeLabel } from '@/lib/utils'
 import type { TicketStatus } from '@/lib/types'
 
 const CV_TONE: Record<string, string> = {
@@ -33,19 +31,20 @@ const CV_TONE: Record<string, string> = {
 }
 const CV_WORD: Record<string, string> = { open: 'New', info_requested: 'Info Requested', scheduled: 'Job scheduled', in_progress: 'In Progress', completed: 'Completed', cancelled: 'Cancelled' }
 
-function DetailItem({ label, value }: { label: string; value: string }) {
+function InfoRow({ label, value, tone }: { label: string; value: string; tone?: 'red' | 'amber' }) {
+  const color = tone === 'red' ? 'text-red-600 dark:text-red-400 font-semibold'
+    : tone === 'amber' ? 'text-amber-600 dark:text-[#C6A35D] font-semibold'
+    : 'text-[var(--text)]'
   return (
     <div>
       <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">{label}</div>
-      <div className="text-sm text-[var(--text)] mt-0.5">{value}</div>
+      <div className={`text-sm mt-0.5 ${color}`}>{value}</div>
     </div>
   )
 }
 
 export default async function StoreTicketDetailPage(props: { params: Promise<{ id: string }> }) {
-  const params = await props.params;
-  // Wave 1: auth gate ∥ ticket ∥ per-ticket child rows (all key on params.id).
-  // The old version ran SIX serial awaits — the main reason this page felt slow.
+  const params = await props.params
   const admin = createAdminClient()
   const [{ storeIds }, { data: t }, { data: updates }, { data: snagRows }] = await Promise.all([
     requireStoreManagerV3(),
@@ -55,145 +54,167 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
   ])
   if (!t || !storeIds.includes(t.store_id ?? '')) redirect('/client/tickets')
 
-  // Wave 2: lookups that need ticket columns (editor, visit names, SLA rules, signing).
   const showVisit = !!t.scheduled_at && !['completed', 'cancelled', 'declined'].includes(t.status)
   const photoUrlsRaw = Array.isArray(t.photo_urls) ? (t.photo_urls as string[]) : []
-  const [editorName, visitSupplier, visitTech, rules, signedPhotoUrls] = await Promise.all([
+  const [editorName, visitSupplier, visitTech, rules, signedPhotoUrls, storeRow] = await Promise.all([
     t.edited_by ? admin.from('user_profiles').select('full_name').eq('id', t.edited_by).single().then(r => r.data?.full_name ?? null) : null,
     showVisit && t.supplier_id ? admin.from('suppliers').select('company_name').eq('id', t.supplier_id).single().then(r => r.data?.company_name ?? null) : null,
     showVisit && t.technician_id ? admin.from('technicians').select('name').eq('id', t.technician_id).single().then(r => r.data?.name ?? null) : null,
     loadSlaResolver(admin, t.company_id),
     signManyUrls(photoUrlsRaw),
+    admin.from('stores').select('name, sub_store').eq('id', t.store_id ?? '').single().then(r => r.data),
   ])
   const followUp = ((snagRows ?? []) as any[]).find(s => s.scheduled_at && s.schedule_status === 'agreed' && ['assigned', 'in_progress'].includes(s.status)) ?? null
   const showFollowUp = !!followUp && !['completed', 'cancelled', 'declined'].includes(t.status)
-  // "Info added" = back at open after the SM resubmitted the requested info.
   const infoAdded = t.status === 'open' && !!t.info_request_reason
-  // Edit / delete only while the ticket is genuinely fresh-open — once the RM has
-  // acted (requested info → info added, assigned, …) the SM can only add info.
+  // Edit / delete only while the ticket is genuinely fresh-open.
   const canEdit = t.status === 'open' && !t.info_request_reason
+  const storeName = storeRow ? storeLabel(storeRow.name, storeRow.sub_store) : 'Your store'
 
   // SLA due date (final resolution deadline) + overdue state.
   const now = new Date()
   const dueAt = deriveDueDates(t as HealthTicket, rules(t.priority as Priority)).resolutionDue
-  const overdue = isActive(t.status) && now.getTime() > new Date(dueAt).getTime()
+  const active = isActive(t.status)
+  const overdue = active && now.getTime() > new Date(dueAt).getTime()
 
-  // AddInfoForm keeps the RAW stored URLs — it re-submits them on PATCH, so it
-  // must not receive the signed ones (signedPhotoUrls are display-only).
-  const photoUrls = photoUrlsRaw
+  // Plain-language status + the SM's only real actions (add info / edit).
+  const meta = clientStatusMeta(t.status)
+  const done = t.status === 'completed'
+  const closed = t.status === 'cancelled' || t.status === 'declined'
+  const spinning = !done && !closed
+  const isWait = meta.mode === 'wait'
+  const NaIcon = done ? CheckCircle2 : closed ? XCircle : Loader2
+  const naColor = done ? 'text-emerald-500' : closed ? 'text-[var(--text-faint)]' : isWait ? 'text-blue-500' : 'text-[#C6A35D]'
+  const action = t.status === 'info_requested' ? 'Add the requested info' : canEdit ? 'Edit ticket' : null
+
+  // Header status pill.
+  const cv = clientVisibleStatus(t.status as TicketStatus)
+  const pill = infoAdded
+    ? { cls: 'bg-teal-500/15 text-teal-700 dark:text-teal-400', word: 'Info added' }
+    : cv ? { cls: CV_TONE[cv], word: CV_WORD[cv] } : null
+
+  const slaValue = !active ? '—' : overdue ? `Overdue by ${humanizeDuration(now.getTime() - new Date(dueAt).getTime())}` : `${humanizeDuration(new Date(dueAt).getTime() - now.getTime())} remaining`
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <BackLink fallbackHref="/client/tickets" label="Back to tickets" />
 
-      {/* Progress — its own block, dots. Hidden once the ticket is closed off
-          (cancelled / declined); the status card below already explains why. */}
-      {!['cancelled', 'declined'].includes(t.status) && (
-        <Card className="p-5"><ClientTicketProgress status={t.status} /></Card>
-      )}
-
-      {/* Ticket detail — all info, structured */}
-      <Card className="p-5 space-y-4">
-        <div className="flex items-start justify-between gap-3">
+      {/* Header: reference, title, priority + status, context line, stepper */}
+      <Card className="p-5 sm:p-6 space-y-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            {t.job_ref && <p className="text-[11px] font-mono font-semibold tracking-wide text-[var(--text-faint)] mb-0.5">{t.job_ref}</p>}
-            <h1 className="text-lg font-bold text-[var(--text)]">{t.title}</h1>
+            <div className="flex flex-wrap items-center gap-2">
+              {t.job_ref && <span className="font-mono text-sm font-semibold text-[var(--text-faint)]">{t.job_ref}</span>}
+              <h1 className="text-xl font-bold text-[var(--text)]">{t.title}</h1>
+            </div>
+            <p className="mt-1 text-sm text-[var(--text-muted)]">
+              {storeName} · {t.category ?? 'General'} · Reported {formatDateTime(t.created_at)}
+            </p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 w-fit shrink-0 justify-items-end">
+          <div className="flex shrink-0 items-center gap-2">
             <PriorityBadge priority={t.priority} />
-            {(() => {
-              if (infoAdded) return <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full text-center bg-teal-500/15 text-teal-700 dark:text-teal-400">Info added</span>
-              const cv = clientVisibleStatus(t.status as TicketStatus)
-              return cv ? <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full text-center ${CV_TONE[cv]}`}>{CV_WORD[cv]}</span> : null
-            })()}
+            {pill && <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${pill.cls}`}>{pill.word}</span>}
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-          <DetailItem label="Category" value={t.category ?? 'General'} />
-          <div>
-            <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Logged</div>
-            <div className="text-sm text-[var(--text)] mt-0.5">{formatDateTime(t.created_at)}</div>
-            {overdue && <div className="text-[11px] font-semibold text-red-600 dark:text-red-400 mt-0.5">Overdue by {humanizeDuration(now.getTime() - new Date(dueAt).getTime())}</div>}
-          </div>
-          <DueDate dueAt={dueAt} overdue={overdue} now={now.toISOString()} showOverdueText={false} />
-        </div>
+        {!['cancelled', 'declined'].includes(t.status) && <ClientTicketProgress status={t.status} />}
 
-        <div>
-          <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Description</div>
-          <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{t.description}</p>
-        </div>
-
-        {signedPhotoUrls.length > 0 && (
-          <div>
-            <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Photos</div>
-            <PhotoThumbs urls={signedPhotoUrls} ticketId={t.id} />
+        {t.description && (
+          <div className="border-t border-[var(--border)] pt-4">
+            <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Description</div>
+            <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{t.description}</p>
+            <EditedLine at={t.edited_at} by={editorName} />
           </div>
         )}
-
-        <EditedLine at={t.edited_at} by={editorName} />
       </Card>
 
-      {/* Scheduled supplier visit — who is coming on site and when. Hidden once a
-          follow-up visit is scheduled (that card replaces it). */}
-      {showVisit && t.scheduled_at && !showFollowUp && (
+      {/* Three columns: Next action · Ticket information · Timeline */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        {/* Next action */}
         <Card className="p-5">
+          <h2 className="text-sm font-bold text-[var(--text)] mb-3">Next action</h2>
           <div className="flex items-start gap-3">
-            <span className="grid place-items-center w-10 h-10 rounded-xl bg-indigo-500/10 ring-1 ring-indigo-500/30 shrink-0">
-              <CalendarClock size={20} className="text-indigo-600 dark:text-indigo-400" />
-            </span>
+            <NaIcon size={22} className={`${naColor} shrink-0 ${spinning ? 'animate-spin' : ''}`} />
             <div className="min-w-0">
-              <p className="text-[11px] uppercase tracking-wide font-semibold text-indigo-700 dark:text-indigo-400">Scheduled visit{t.schedule_status === 'proposed' ? ' · proposed' : ''}</p>
-              <p className="text-base font-bold text-[var(--text)]">{formatDateTime(t.scheduled_at)}</p>
-              <p className="text-sm text-[var(--text-muted)]">{visitSupplier ?? 'Assigned supplier'}{visitTech ? ` · ${visitTech}` : ''}</p>
-              {t.schedule_status === 'proposed' && <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-0.5">Awaiting the regional manager&apos;s confirmation.</p>}
+              <p className="text-sm font-bold text-[var(--text)]">{meta.msg}</p>
+              <p className="mt-0.5 text-sm text-[var(--text-muted)]">{meta.sub}</p>
             </div>
           </div>
+          {action ? (
+            <a href="#sm-action" className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-blue-500">
+              {action} <ArrowRight size={16} />
+            </a>
+          ) : (
+            <p className="mt-4 rounded-lg bg-[var(--surface-2)] px-3 py-2 text-xs text-[var(--text-faint)]">Nothing needed from you right now — we&apos;ll notify you of any updates.</p>
+          )}
         </Card>
-      )}
 
-      {/* Follow-up visit — the approved corrective-work date. Neutral wording + a
-          distinct teal colour (the store manager isn't shown snag internals). */}
-      {showFollowUp && followUp && (
+        {/* Ticket information */}
         <Card className="p-5">
-          <div className="flex items-start gap-3">
-            <span className="grid place-items-center w-10 h-10 rounded-xl bg-teal-500/10 ring-1 ring-teal-500/30 shrink-0">
-              <CalendarClock size={20} className="text-teal-600 dark:text-teal-400" />
-            </span>
-            <div className="min-w-0">
-              <p className="text-[11px] uppercase tracking-wide font-semibold text-teal-700 dark:text-teal-400">Follow-up visit scheduled</p>
-              <p className="text-base font-bold text-[var(--text)]">{formatDateTime(followUp.scheduled_at)}</p>
-              <p className="text-sm text-[var(--text-muted)]">{visitSupplier ?? 'Assigned supplier'}</p>
-            </div>
+          <h2 className="text-sm font-bold text-[var(--text)] mb-3">Ticket information</h2>
+          <div className="space-y-3">
+            <InfoRow label="Category" value={t.category ?? 'General'} />
+            <InfoRow label="Logged" value={formatDateTime(t.created_at)} />
+            <InfoRow label="SLA target" value={formatDateTime(dueAt)} />
+            <InfoRow label="SLA status" value={slaValue} tone={overdue ? 'red' : active ? 'amber' : undefined} />
+            {(showVisit || showFollowUp) && (
+              <InfoRow label="Assigned supplier" value={visitSupplier ?? 'Assigned supplier'} />
+            )}
+            {showVisit && t.scheduled_at && !showFollowUp && (
+              <InfoRow label={`Scheduled visit${t.schedule_status === 'proposed' ? ' · proposed' : ''}`} value={`${formatDateTime(t.scheduled_at)}${visitTech ? ` · ${visitTech}` : ''}`} />
+            )}
+            {showFollowUp && followUp && (
+              <InfoRow label="Follow-up visit" value={formatDateTime(followUp.scheduled_at)} />
+            )}
+            {!showVisit && !showFollowUp && active && (
+              <InfoRow label="Assigned supplier" value="Awaiting assignment" />
+            )}
           </div>
         </Card>
+
+        {/* Timeline (activity preview) */}
+        <Card className="p-5">
+          <h2 className="text-sm font-bold text-[var(--text)] mb-3">Timeline</h2>
+          {(updates ?? []).length ? (
+            <ol className="space-y-3">
+              {(updates ?? []).slice(0, 5).map((u: any, i: number) => (
+                <li key={i} className="flex gap-3">
+                  <span className="mt-1 grid place-items-center">
+                    <span className="h-2 w-2 rounded-full bg-blue-500" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-sm text-[var(--text)]">{u.body}</p>
+                    <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(u.created_at)}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="text-sm text-[var(--text-faint)]">No updates yet.</p>
+          )}
+        </Card>
+      </div>
+
+      {/* Action zone — the SM's only interactions (add info / edit). */}
+      {(t.status === 'info_requested' || canEdit) && (
+        <div id="sm-action" className="space-y-4 scroll-mt-20">
+          {t.status === 'info_requested' && (
+            <>
+              <div className="rounded-2xl bg-amber-500/10 ring-1 ring-amber-500/40 p-5 space-y-1">
+                <p className="text-sm font-bold text-amber-700 dark:text-amber-400">More information requested</p>
+                <p className="text-sm text-[var(--text-muted)]">{t.info_request_reason || 'Add the requested details (and any extra photos) below, then resubmit.'}</p>
+              </div>
+              <AddInfoForm ticketId={t.id} title={t.title} description={t.description} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} photoUrls={photoUrlsRaw} />
+            </>
+          )}
+          {canEdit && (
+            <EditTicketForm ticketId={t.id} initial={{ title: t.title, category: t.category ?? 'General', impact: t.operational_impact ?? 'none', description: t.description }} />
+          )}
+        </div>
       )}
 
-      {/* More info requested by the RM — show the message + an add-info / resubmit form */}
-      {t.status === 'info_requested' && (
-        <>
-          <div className="rounded-2xl bg-amber-500/10 ring-1 ring-amber-500/40 p-5 space-y-1">
-            <p className="text-sm font-bold text-amber-700 dark:text-amber-400">More information requested</p>
-            <p className="text-sm text-[var(--text-muted)]">{t.info_request_reason || 'Add the requested details (and any extra photos) below, then resubmit.'}</p>
-          </div>
-          <AddInfoForm ticketId={t.id} title={t.title} description={t.description} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} photoUrls={Array.isArray(t.photo_urls) ? t.photo_urls : []} />
-        </>
-      )}
-
-      {/* Edit / delete — only while the ticket is still open (RM hasn't acted yet) */}
-      {canEdit && (
-        <EditTicketForm ticketId={t.id} initial={{ title: t.title, category: t.category ?? 'General', impact: t.operational_impact ?? 'none', description: t.description }} />
-      )}
-
-      {/* Plain-language status (no quote/sign-off jargon) — its own accented card */}
-      <ClientTicketStatus status={t.status} cancellationReason={t.cancellation_reason} />
-
-      <Card className="p-5">
-        <h2 className="text-sm font-bold text-[var(--text)] mb-3">Activity</h2>
-        {(updates ?? []).length ? (updates ?? []).map((u: any, i: number) => (
-          <div key={i} className="py-2 border-b border-[var(--border)] last:border-0"><p className="text-sm text-[var(--text)]">{u.body}</p><p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(u.created_at)}</p></div>
-        )) : <p className="text-sm text-[var(--text-faint)]">No updates yet.</p>}
-      </Card>
+      {/* Photos + full Activity — the only lower tabs an SM can access. */}
+      <SmTicketTabs photoUrls={signedPhotoUrls} ticketId={t.id} updates={(updates ?? []) as any} />
     </div>
   )
 }
