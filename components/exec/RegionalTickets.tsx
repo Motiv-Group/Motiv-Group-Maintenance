@@ -9,6 +9,7 @@ import { Ticket, Search, ChevronDown, BarChart3, X, PlusCircle } from 'lucide-re
 import type { RegionalTicketRow } from '@/lib/health/data'
 import { Card } from '@/components/exec/ui'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
+import { CategoryIcon, priorityBadgeClass, priorityLabel } from '@/components/client/ticketBadges'
 import { SlideOver } from '@/components/ui/SlideOver'
 import { readCollapse, writeCollapse, readCollapseSet, writeCollapseSet } from '@/lib/collapse-state'
 import { rmStatusMeta, formatDateTime, humanizeDuration, urgencyCountCls } from '@/lib/utils'
@@ -64,29 +65,35 @@ const PILLS: { key: RmFilter; label: string; active: string; inactive: string }[
   { key: 'cancelled', label: 'Cancelled', active: 'bg-gray-500 text-white border-gray-500', inactive: 'text-gray-600 dark:text-gray-400 border-gray-500/40 hover:border-gray-400' },
 ]
 
-function milestone(t: RegionalTicketRow): { label: string; at: string } | null {
-  if (t.quoteAcceptedAt) return { label: 'Quote accepted', at: t.quoteAcceptedAt }
-  if (t.quoteReceivedAt) return { label: 'Quoted', at: t.quoteReceivedAt }
-  if (t.quoteRequestedAt) return { label: 'Quote requested', at: t.quoteRequestedAt }
-  return null
-}
-
+// Row form factor matches the store-manager Tickets tab: category icon + job ref
+// + category/title + store on the left; priority + status badges, supplier line
+// and the logged date on the right. RM statuses come from rmStatusMeta.
 function TicketRow({ t }: { t: RegionalTicketRow }) {
   const sm = rmStatusMeta(t.status)
-  const m = milestone(t)
+  const statusCls = t.disputed ? 'bg-red-500/15 text-red-700 dark:text-red-400' : t.infoAdded ? 'bg-teal-500/15 text-teal-700 dark:text-teal-400' : sm.cls
+  const statusLabel = t.disputed ? 'Dispute' : t.infoAdded ? 'Info added' : sm.label
   return (
-    <Link href={`/regional/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2.5 -mx-2 px-2 rounded-lg border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition">
-      <div className="min-w-0">
-        {t.jobRef && <p className="text-[10px] font-mono text-[var(--text-faint)]">{t.jobRef}</p>}
-        <p className="text-sm text-[var(--text)] truncate">{t.title}</p>
-        <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(t.createdAt)}{t.breached && !t.overdue ? ' · ⚠ breached' : ''}</p>
-        {/* eslint-disable-next-line react-hooks/purity -- Date.now() drives a relative "overdue by" display; cosmetic elapsed-time readout, not a hydration-correctness concern */}
-        {t.overdue && <p className="text-[11px] font-semibold text-red-600 dark:text-red-400">Overdue by {humanizeDuration(Date.now() - new Date(t.dueAt).getTime())}</p>}
-        {m && <p className={`text-[11px] font-medium ${sm.text}`}>{m.label} · {formatDateTime(m.at)}</p>}
+    <Link href={`/regional/tickets/${t.id}`} className="grid gap-3 border-b border-[var(--border)] px-2 py-3 last:border-0 transition hover:bg-[var(--hover)] sm:grid-cols-[1fr_auto] sm:items-center">
+      <div className="flex min-w-0 items-center gap-3">
+        <CategoryIcon category={t.category ?? t.title} className="h-11 w-11" iconSize={18} />
+        <div className="min-w-0">
+          {t.jobRef && <p className="text-[10px] font-mono text-[var(--text-faint)]">{t.jobRef}</p>}
+          <p className="truncate text-sm font-bold text-[var(--text)]">{t.category || t.title}</p>
+          <p className="truncate text-xs text-[var(--text-muted)]">{t.storeName}</p>
+        </div>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
-        <PriorityBadge priority={t.priority} className="w-full text-center" />
-        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${t.disputed ? 'bg-red-500/15 text-red-700 dark:text-red-400' : t.infoAdded ? 'bg-teal-500/15 text-teal-700 dark:text-teal-400' : sm.cls}`}>{t.disputed ? 'Dispute' : t.infoAdded ? 'Info added' : sm.label}</span>
+      <div className="flex flex-col items-start gap-1 sm:items-end">
+        <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
+          <span className={`inline-flex min-w-[92px] justify-center rounded-md px-2 py-1 text-[10px] font-bold ${priorityBadgeClass(t as never)}`}>{priorityLabel(t as never)}</span>
+          <span className={`inline-flex min-w-[92px] justify-center rounded-md px-2 py-1 text-[10px] font-bold ${statusCls}`}>{statusLabel}</span>
+        </div>
+        <p className="text-xs text-[var(--text-muted)]">{t.supplierAssigned ? 'Supplier assigned' : 'No supplier assigned'}</p>
+        <p className="text-[11px] text-[var(--text-faint)]">
+          {formatDateTime(t.createdAt)}
+          {/* eslint-disable-next-line react-hooks/purity -- cosmetic "overdue by" / breach readout, not hydration-critical */}
+          {t.overdue ? <span className="ml-1.5 font-semibold text-red-600 dark:text-red-400">· Overdue by {humanizeDuration(Date.now() - new Date(t.dueAt).getTime())}</span>
+            : t.breached ? <span className="ml-1.5 font-semibold text-amber-600 dark:text-amber-400">· ⚠ breached</span> : null}
+        </p>
       </div>
     </Link>
   )

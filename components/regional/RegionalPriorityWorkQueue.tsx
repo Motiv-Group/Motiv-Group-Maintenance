@@ -10,7 +10,7 @@ import { AlertCircle, AlertOctagon, AlertTriangle, ArrowRight, CalendarClock, Ch
 import type { RegionalTicketRow } from '@/lib/health/data'
 import { Card } from '@/components/exec/ui'
 import { CategoryIcon } from '@/components/client/ticketBadges'
-import { rmStatusMeta, formatDate, humanizeDuration, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
+import { rmStatusMeta, formatDate, formatDateTime, humanizeDuration, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
 
 type QueueFilter = 'all' | 'assign' | 'quotes' | 'signoff' | 'sla' | 'snags'
 type Tone = 'red' | 'purple' | 'gold' | 'green' | 'orange' | 'blue'
@@ -135,7 +135,11 @@ function MetricButton({ active, icon, tone, label, value, sub, subActive, onClic
 }
 
 function QueueRow({ ticket, nowMs }: { ticket: RegionalTicketRow; nowMs: number }) {
-  const dueMs = Math.max(0, new Date(ticket.dueAt).getTime() - nowMs)
+  // The next SLA checkpoint (quote decision / sign-off / supplier action), falling
+  // back to the final resolution deadline when there's no active blocker.
+  const slaDeadline = ticket.slaDueAt ?? ticket.dueAt
+  const slaMs = new Date(slaDeadline).getTime() - nowMs
+  const breached = ticket.overdue || ticket.breached || slaMs <= 0
   const meta = rmStatusMeta(ticket.status)
   return (
     <Link href={`/regional/tickets/${ticket.id}`} className="grid gap-4 border-b border-[var(--border)] px-4 py-4 transition last:border-b-0 hover:bg-[var(--hover)] lg:grid-cols-[1fr_200px_1.1fr_160px] lg:items-center">
@@ -158,10 +162,13 @@ function QueueRow({ ticket, nowMs }: { ticket: RegionalTicketRow; nowMs: number 
       <div className="min-w-0 border-l-0 border-[var(--border)] lg:border-l lg:pl-6">
         <p className="truncate text-xs text-[var(--text-faint)]">Next step · Logged {formatDate(ticket.createdAt)}</p>
         <p className="truncate text-sm font-bold text-[var(--text)]">{nextStep(ticket)}</p>
-        {ticket.overdue ? (
+        {breached ? (
           <p className="mt-1 flex items-center gap-1.5 text-sm font-bold text-red-600 dark:text-red-400"><AlertCircle size={14} /> SLA breached</p>
         ) : (
-          <p className="mt-1 flex items-center gap-1.5 text-sm text-[var(--text-muted)]"><CalendarClock size={14} /> Due in {humanizeDuration(dueMs)}</p>
+          <>
+            <p className="mt-1 flex items-center gap-1.5 text-sm text-[var(--text-muted)]"><CalendarClock size={14} /> SLA in {humanizeDuration(slaMs)}</p>
+            <p className="truncate text-[11px] text-[var(--text-faint)]">Next deadline · {formatDateTime(slaDeadline)}</p>
+          </>
         )}
       </div>
 

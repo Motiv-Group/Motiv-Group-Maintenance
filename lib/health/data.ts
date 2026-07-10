@@ -341,7 +341,7 @@ export interface RegionalTicketRow {
   status: string; priority: Priority; jobRef: string | null; createdAt: string
   quoteRequestedAt: string | null; quoteReceivedAt: string | null; quoteAcceptedAt: string | null
   breached: boolean; supplierBreached: boolean; internalBreached: boolean
-  dueAt: string; overdue: boolean; infoAdded: boolean
+  dueAt: string; slaDueAt: string | null; overdue: boolean; infoAdded: boolean
   supplierAssigned: boolean
   // An open supplier↔RM dispute (snag / evidence) — the badge reads "Dispute".
   disputed: boolean
@@ -424,6 +424,7 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
       quoteAcceptedAt: ((t as any).quote_decision_status === 'approved' ? (t as any).quote_decided_at : null) ?? acceptedQuoteAt.get(t.id) ?? null,
       breached: !!s && (s.supplierBreached || s.internalBreached),
       supplierBreached: !!s?.supplierBreached, internalBreached: !!s?.internalBreached,
+      slaDueAt: s?.nextActionDueAt ?? null,
       ...dueInfo(t, rules, now),
       infoAdded: t.status === 'open' && !!(t as any).info_request_reason,
       supplierAssigned: !!(t as any).supplier_id,
