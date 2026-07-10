@@ -46,12 +46,13 @@ export function clientStatusBadgeClass(ticket: StoreManagerTicket): string {
   }
 }
 
-// Priority + status badges, sized identically (min width so they match).
+// Priority + status badges, sized identically (fixed width so both align
+// regardless of label length — e.g. "Low" and "Input needed" render same size).
 export function TicketBadges({ ticket, className = '' }: { ticket: StoreManagerTicket; className?: string }) {
   return (
-    <div className={`flex flex-wrap items-center gap-1.5 ${className}`}>
-      <span className={`inline-flex min-w-[68px] justify-center rounded-md px-2 py-1 text-[10px] font-bold ${priorityBadgeClass(ticket)}`}>{priorityLabel(ticket)}</span>
-      <span className={`inline-flex min-w-[68px] justify-center rounded-md px-2 py-1 text-[10px] font-bold ${clientStatusBadgeClass(ticket)}`}>{clientStatusLabel(ticket)}</span>
+    <div className={`flex items-center gap-1.5 ${className}`}>
+      <span className={`inline-flex w-[92px] justify-center rounded-md px-2 py-1 text-[10px] font-bold ${priorityBadgeClass(ticket)}`}>{priorityLabel(ticket)}</span>
+      <span className={`inline-flex w-[92px] justify-center rounded-md px-2 py-1 text-[10px] font-bold ${clientStatusBadgeClass(ticket)}`}>{clientStatusLabel(ticket)}</span>
     </div>
   )
 }
