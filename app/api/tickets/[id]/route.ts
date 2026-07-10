@@ -14,6 +14,7 @@ const PatchSchema = z.object({
   category: z.string().optional().nullable(),
   operational_impact: z.string().optional().nullable(),
   photo_urls: z.array(z.string()).optional(),
+  info_doc_urls: z.array(z.string()).optional(),
   priority: z.string().optional(),
   edit_note: z.string().optional().nullable(),
 })
@@ -61,7 +62,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
   const parsed = await parseJsonBody(request, PatchSchema)
   if (!parsed.ok) return parsed.error
   const body = parsed.data
-  const { title, description, category, operational_impact, photo_urls } = body
+  const { title, description, category, operational_impact, photo_urls, info_doc_urls } = body
   if (!title || !description) return NextResponse.json({ error: 'Title and description are required' }, { status: 400 })
 
   const impact = String(operational_impact ?? 'none')
@@ -87,6 +88,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
   const now = new Date().toISOString()
   const update: Record<string, unknown> = { title, description, category, operational_impact: impact, severity, priority, ...flags, updated_at: now, edited_at: now, edited_by: user.id, edit_note: editNote }
   if (Array.isArray(photo_urls)) update.photo_urls = photo_urls
+  if (Array.isArray(info_doc_urls)) update.info_doc_urls = info_doc_urls
 
   const { data, error } = await admin.from('tickets').update(update as Database['public']['Tables']['tickets']['Update']).eq('id', params.id).select().single()
   if (error) return serverError(error)
