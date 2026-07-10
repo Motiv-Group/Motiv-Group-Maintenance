@@ -3,29 +3,17 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { BackLink } from '@/components/ui/BackLink'
-import {
-  PlusCircle, ImagePlus, Camera, X, Check, ArrowRight, ArrowLeft,
-  Zap, Droplets, Snowflake, Refrigerator, Flame, Building2, Store, Wrench, Sparkles, MoreHorizontal,
-  type LucideIcon,
-} from 'lucide-react'
+import { PlusCircle, ImagePlus, Camera, X, Check, ArrowRight, ArrowLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { uploadTicketPhotos } from '@/lib/upload'
 import { Card } from '@/components/exec/ui'
-import { OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
+import { OPERATIONAL_IMPACT_LABELS, storeLabel } from '@/lib/utils'
+import { categoryVisual } from '@/lib/categoryVisual'
 
-// Category grid — same taxonomy the API + health engine expect, each given an icon.
-const CATEGORIES: { name: string; Icon: LucideIcon }[] = [
-  { name: 'Electrical', Icon: Zap },
-  { name: 'Plumbing', Icon: Droplets },
-  { name: 'HVAC', Icon: Snowflake },
-  { name: 'Refrigeration', Icon: Refrigerator },
-  { name: 'Gas', Icon: Flame },
-  { name: 'Structural', Icon: Building2 },
-  { name: 'Shopfront', Icon: Store },
-  { name: 'General', Icon: Wrench },
-  { name: 'Cleaning', Icon: Sparkles },
-  { name: 'Other', Icon: MoreHorizontal },
-]
+// Category grid — same taxonomy the API + health engine expect. Icons/colours
+// come from the shared categoryVisual() map so they match everywhere. "Multiple"
+// covers a job spanning several trades (e.g. shopfront + plumbing + electrical).
+const CATEGORIES = ['Electrical', 'Plumbing', 'HVAC', 'Refrigeration', 'Gas', 'Structural', 'Shopfront', 'Cleaning', 'General', 'Multiple', 'Other']
 const IMPACTS = Object.entries(OPERATIONAL_IMPACT_LABELS).map(([v, label]) => ({ v, label }))
 const MAX_PHOTOS = 5
 
@@ -67,7 +55,8 @@ export default function LogTicketPage() {
         const { data: link } = await supabase.from('store_users').select('store_id').eq('user_id', user.id).limit(1).maybeSingle()
         if (!link?.store_id) return
         const { data: s } = await supabase.from('stores').select('name, sub_store').eq('id', link.store_id).maybeSingle()
-        if (alive && s) setStoreName(s.sub_store ? `${s.name} — ${s.sub_store}` : s.name)
+        // storeLabel() de-dupes so a store whose sub_store == name shows once.
+        if (alive && s) setStoreName(storeLabel(s.name, s.sub_store))
       } catch { /* best-effort; Review falls back to a generic label */ }
     })()
     return () => { alive = false }
@@ -139,16 +128,17 @@ export default function LogTicketPage() {
           {step === 0 && (
             <fieldset>
               <legend className="text-sm font-semibold text-[var(--text)]">What is the issue?</legend>
-              <p className="text-xs text-[var(--text-muted)] mt-0.5 mb-3">Select a category.</p>
+              <p className="text-xs text-[var(--text-muted)] mt-0.5 mb-3">Select a category. Choose <span className="font-semibold">Multiple</span> for a job that spans several trades.</p>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                {CATEGORIES.map(({ name, Icon }) => {
+                {CATEGORIES.map(name => {
                   const active = category === name
+                  const { Icon, textClass } = categoryVisual(name)
                   return (
                     <button key={name} type="button" onClick={() => setCategory(name)} aria-pressed={active}
                       className={`flex flex-col items-center justify-center gap-2 rounded-xl border px-2 py-4 text-sm font-medium transition ${active
                         ? 'border-emerald-500 bg-emerald-500/10 text-[var(--text)] ring-2 ring-emerald-500/30'
                         : 'border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/60 text-[var(--text-muted)] hover:border-emerald-500/60'}`}>
-                      <Icon size={22} className={active ? 'text-emerald-500' : 'text-[var(--text-faint)]'} />
+                      <Icon size={22} className={textClass} />
                       {name}
                     </button>
                   )
@@ -210,11 +200,17 @@ export default function LogTicketPage() {
                 <p className="text-center text-[11px] text-[var(--text-faint)] mt-2.5">{remaining} of {MAX_PHOTOS} slots remaining · drag &amp; drop also works</p>
 
                 {files.length > 0 && (
-                  <div className="mt-3 space-y-1">
+                  <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
                     {files.map((f, i) => (
-                      <div key={i} className="flex items-center justify-between gap-2">
-                        <button type="button" onClick={() => setPreview(previews[i])} className="text-sm text-[#C6A35D] underline truncate min-w-0 text-left" title={`View ${f.name}`}>Photo {i + 1} — {f.name}</button>
-                        <button type="button" onClick={() => setFiles(files.filter((_, j) => j !== i))} className="shrink-0 text-[var(--text-faint)] hover:text-red-500" title="Remove"><X size={14} /></button>
+                      <div key={i} className="relative aspect-square overflow-hidden rounded-lg border border-[var(--border)]">
+                        <button type="button" onClick={() => setPreview(previews[i])} className="block h-full w-full" title={`View ${f.name}`}>
+                          {/* eslint-disable-next-line @next/next/no-img-element -- ephemeral blob: preview URL */}
+                          <img src={previews[i]} alt={`Photo ${i + 1}`} className="h-full w-full object-cover" />
+                        </button>
+                        <button type="button" onClick={() => setFiles(files.filter((_, j) => j !== i))} title="Remove photo"
+                          className="absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-full bg-black/60 text-white transition hover:bg-red-500">
+                          <X size={13} />
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -229,7 +225,7 @@ export default function LogTicketPage() {
               <p className="text-xs text-[var(--text-muted)] mt-0.5 mb-3">Check the details, then submit.</p>
               <dl className="divide-y divide-[var(--border)] rounded-xl border border-[var(--border)]">
                 <ReviewRow label="Store">{storeName ?? 'Your assigned store'}</ReviewRow>
-                <ReviewRow label="Category" onEdit={() => setStep(0)}>{category || '—'}</ReviewRow>
+                <ReviewRow label="Category" onEdit={() => setStep(0)}>{category ? <CategoryTag category={category} /> : '—'}</ReviewRow>
                 <ReviewRow label="Description" onEdit={() => setStep(1)}>{description.trim() || '—'}</ReviewRow>
                 <ReviewRow label="Urgency" onEdit={() => setStep(2)}>{impactLabel || '—'}</ReviewRow>
                 <ReviewRow label="Photos" onEdit={() => setStep(3)}>
@@ -287,8 +283,10 @@ function Stepper({ step, onJump }: { step: number; onJump: (i: number) => void }
       <ol className="flex">
         {STEPS.map((s, i) => {
           const state = i < step ? 'done' : i === step ? 'current' : 'todo'
+          // Opaque circle bg (matches the card) so the connector line sits BEHIND
+          // the circles instead of striking through them.
           const circle = state === 'todo'
-            ? 'border-slate-300 dark:border-slate-600 text-[var(--text-faint)] bg-transparent'
+            ? 'border-slate-300 dark:border-slate-600 text-[var(--text-faint)] bg-[var(--surface)]'
             : 'border-blue-600 bg-blue-600 text-white'
           return (
             <li key={s.key} className="relative flex-1 flex flex-col items-center">
@@ -312,6 +310,11 @@ function Stepper({ step, onJump }: { step: number; onJump: (i: number) => void }
       </ol>
     </nav>
   )
+}
+
+function CategoryTag({ category }: { category: string }) {
+  const { Icon, textClass } = categoryVisual(category)
+  return <span className="inline-flex items-center gap-2"><Icon size={16} className={textClass} /> {category}</span>
 }
 
 function ReviewRow({ label, children, onEdit }: { label: string; children: React.ReactNode; onEdit?: () => void }) {

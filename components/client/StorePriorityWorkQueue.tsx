@@ -9,17 +9,13 @@ import {
   CheckCircle2,
   CircleAlert,
   ClipboardList,
-  Droplets,
-  Flame,
   Info,
   Loader2,
-  Snowflake,
-  Wrench,
-  Zap,
 } from 'lucide-react'
 import type { StoreManagerTicket } from '@/lib/health/data'
 import { Card } from '@/components/exec/ui'
 import { humanizeDuration, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
+import { categoryVisual } from '@/lib/categoryVisual'
 
 type TodayVisit = {
   id: string
@@ -239,18 +235,8 @@ function QueueRow({ ticket, storeName, nowMs }: { ticket: StoreManagerTicket; st
 }
 
 function CategoryIcon({ category }: { category?: string | null }) {
-  const text = String(category ?? '').toLowerCase()
-  const Icon = text.includes('gas') ? Flame
-    : text.includes('refriger') || text.includes('air') ? Snowflake
-    : text.includes('plumb') || text.includes('water') || text.includes('leak') ? Droplets
-    : text.includes('electric') || text.includes('power') ? Zap
-    : Wrench
-  const cls = Icon === Flame ? 'bg-orange-500/15 text-orange-500'
-    : Icon === Snowflake ? 'bg-cyan-500/15 text-cyan-500'
-    : Icon === Droplets ? 'bg-pink-500/15 text-pink-500'
-    : Icon === Zap ? 'bg-blue-500/15 text-blue-500'
-    : 'bg-red-500/15 text-red-400'
-  return <span className={`grid h-14 w-14 shrink-0 place-items-center rounded-full ${cls}`}><Icon size={22} /></span>
+  const { Icon, badgeClass } = categoryVisual(category)
+  return <span className={`grid h-14 w-14 shrink-0 place-items-center rounded-full ${badgeClass}`}><Icon size={22} /></span>
 }
 
 function EmptyQueue({ filter }: { filter: QueueFilter }) {
