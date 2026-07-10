@@ -14,7 +14,7 @@ import { AddInfoModal } from '@/components/client/AddInfoModal'
 import { SmTicketTabs } from '@/components/client/SmTicketTabs'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { EditedLine } from '@/components/ui/EditedLine'
-import { formatDateTime, clientVisibleStatus, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
+import { formatDateTime, clientVisibleStatus, PRIORITY_LEVEL_LABELS, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
 import type { TicketStatus } from '@/lib/types'
 
 const CV_TONE: Record<string, string> = {
@@ -36,38 +36,69 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   )
 }
 
-// Build the SM-safe status-change trail from ticket_events (ascending). Quote /
-// assignment / sign-off transitions collapse to the same client-visible status,
-// so they're dropped — the SM only sees plain milestones.
-function smTimeline(events: { from_status: string | null; to_status: string; created_at: string }[], createdAt: string): { label: string; at: string }[] {
-  const out: { label: string; at: string }[] = []
-  let sawCreated = false
+type TimelineEntry = { label: string; at: string }
+type EventRow = { from_status: string | null; to_status: string; created_at: string }
+type ViewRow = { viewer_role: string | null; item_type: string; item_label: string; first_viewed_at: string }
+
+// The store manager only ever sees role-based actors (no internal staff names),
+// so each viewer role maps to a plain label.
+function viewerWho(role: string | null): string {
+  if (role === 'regional_manager') return 'Your manager'
+  if (role === 'supplier') return 'The supplier'
+  if (role === 'store_manager' || role === 'client') return 'You'
+  if (role === 'executive' || role === 'system_admin') return 'An administrator'
+  return 'Someone'
+}
+
+// SM-safe label for a status transition. Quote / assignment / sign-off changes
+// collapse to the same client-visible status and are dropped.
+function lifecycleLabel(from: string | null, to: string): string | null {
+  if (to === 'info_requested') return 'Your manager requested more information'
+  if (from === 'info_requested' && to === 'open') return 'You added the requested information'
+  const cvTo = clientVisibleStatus(to as TicketStatus)
+  if (from != null && cvTo === clientVisibleStatus(from as TicketStatus)) return null
+  return cvTo === 'scheduled' ? 'A visit was scheduled'
+    : cvTo === 'in_progress' ? 'The supplier started work'
+    : cvTo === 'completed' ? 'Work was completed'
+    : cvTo === 'cancelled' ? 'The ticket was cancelled' : null
+}
+
+// The SM audit trail: who did what / viewed what. Merges the status-change trail
+// (ticket_events, with a fallback for tickets created before the trigger) with
+// the view log (ticket_views), sorted oldest-first.
+function buildSmTimeline(t: any, events: EventRow[], views: ViewRow[]): TimelineEntry[] {
+  const out: TimelineEntry[] = [{ label: 'You logged the ticket', at: t.created_at }]
+
   for (const ev of events) {
-    const to = ev.to_status
-    if (ev.from_status == null) { out.push({ label: 'Ticket logged', at: ev.created_at }); sawCreated = true; continue }
-    if (to === 'info_requested') { out.push({ label: 'More information requested', at: ev.created_at }); continue }
-    if (ev.from_status === 'info_requested' && to === 'open') { out.push({ label: 'Information added', at: ev.created_at }); continue }
-    const cvTo = clientVisibleStatus(to as TicketStatus)
-    if (cvTo === clientVisibleStatus(ev.from_status as TicketStatus)) continue
-    const label = cvTo === 'scheduled' ? 'Visit scheduled'
-      : cvTo === 'in_progress' ? 'Work started'
-      : cvTo === 'completed' ? 'Completed'
-      : cvTo === 'cancelled' ? 'Cancelled' : null
+    if (ev.from_status == null) continue // "created" already added above
+    const label = lifecycleLabel(ev.from_status, ev.to_status)
     if (label) out.push({ label, at: ev.created_at })
   }
-  if (!sawCreated) out.unshift({ label: 'Ticket logged', at: createdAt })
-  return out
+  // Fallback: surface the current "info requested" even if it predates the
+  // ticket_events trigger (no captured event) — best-effort timestamp.
+  if (t.status === 'info_requested' && t.info_request_reason && !events.some(e => e.to_status === 'info_requested')) {
+    out.push({ label: 'Your manager requested more information', at: t.updated_at ?? t.created_at })
+  }
+
+  for (const v of views) {
+    const verb = v.item_type === 'photo' || v.item_type === 'photos' ? 'viewed' : 'opened'
+    const item = v.item_label || (v.item_type.startsWith('photo') ? 'a photo' : 'an attachment')
+    out.push({ label: `${viewerWho(v.viewer_role)} ${verb} ${item}`, at: v.first_viewed_at })
+  }
+
+  return out.sort((a, b) => +new Date(a.at) - +new Date(b.at))
 }
 
 export default async function StoreTicketDetailPage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params
   const admin = createAdminClient()
-  const [{ storeIds }, { data: t }, { data: updates }, { data: snagRows }, { data: eventRows }] = await Promise.all([
+  const [{ storeIds }, { data: t }, { data: updates }, { data: snagRows }, { data: eventRows }, { data: viewRows }] = await Promise.all([
     requireStoreManagerV3(),
     admin.from('tickets').select('*').eq('id', params.id).single(),
     admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', params.id).order('created_at', { ascending: false }),
     admin.from('snags').select('scheduled_at, schedule_status, status').eq('ticket_id', params.id).order('created_at', { ascending: false }),
     (admin as any).from('ticket_events').select('from_status, to_status, created_at').eq('ticket_id', params.id).order('created_at', { ascending: true }),
+    admin.from('ticket_views').select('viewer_role, item_type, item_label, first_viewed_at').eq('ticket_id', params.id),
   ])
   if (!t || !storeIds.includes(t.store_id ?? '')) redirect('/client/tickets')
 
@@ -87,6 +118,12 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
   const canEdit = t.status === 'open' && !t.info_request_reason
   const active = !['completed', 'cancelled', 'declined'].includes(t.status)
 
+  // Priority shown as the operational impact the SM chose at creation + the
+  // derived level, e.g. "Trading affected — Urgent".
+  const impactLabel = OPERATIONAL_IMPACT_LABELS[t.operational_impact ?? 'none'] ?? null
+  const priorityWord = PRIORITY_LEVEL_LABELS[String(t.priority)] ?? 'Medium'
+  const priorityValue = impactLabel ? `${impactLabel} — ${priorityWord}` : priorityWord
+
   // Plain-language status + the SM's only real actions (add info / edit).
   const meta = clientStatusMeta(t.status)
   const done = t.status === 'completed'
@@ -101,7 +138,7 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
     ? { cls: 'bg-teal-500/15 text-teal-700 dark:text-teal-400', word: 'Info added' }
     : cv ? { cls: CV_TONE[cv], word: CV_WORD[cv] } : null
 
-  const timeline = smTimeline((eventRows ?? []) as any[], t.created_at)
+  const timeline = buildSmTimeline(t, (eventRows ?? []) as EventRow[], (viewRows ?? []) as ViewRow[])
 
   return (
     <div className="space-y-4">
@@ -151,18 +188,18 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
           <h2 className="text-sm font-bold text-[var(--text)] mb-3">Ticket information</h2>
           <div className="space-y-3">
             <InfoRow label="Category" value={t.category ?? 'General'} />
-            <InfoRow label="Priority" value={PRIORITY_LEVEL_LABELS[String(t.priority)] ?? 'Medium'} />
+            <InfoRow label="Priority" value={priorityValue} />
+            <div>
+              <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Description</div>
+              <p className="text-sm text-[var(--text-muted)] mt-0.5 whitespace-pre-line">{t.description}</p>
+              <EditedLine at={t.edited_at} by={editorName} />
+            </div>
             {(showVisit || showFollowUp) && <InfoRow label="Assigned supplier" value={visitSupplier ?? 'Assigned supplier'} />}
             {showVisit && t.scheduled_at && !showFollowUp && (
               <InfoRow label={`Scheduled visit${t.schedule_status === 'proposed' ? ' · proposed' : ''}`} value={`${formatDateTime(t.scheduled_at)}${visitTech ? ` · ${visitTech}` : ''}`} />
             )}
             {showFollowUp && followUp && <InfoRow label="Follow-up visit" value={formatDateTime(followUp.scheduled_at)} />}
             {!showVisit && !showFollowUp && active && <InfoRow label="Assigned supplier" value="Awaiting assignment" />}
-            <div>
-              <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Description</div>
-              <p className="text-sm text-[var(--text-muted)] mt-0.5 whitespace-pre-line">{t.description}</p>
-              <EditedLine at={t.edited_at} by={editorName} />
-            </div>
           </div>
         </Card>
       </div>

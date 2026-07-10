@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { FileText, Download } from 'lucide-react'
 import { Card } from '@/components/exec/ui'
 import { PhotoThumbs } from '@/components/ui/PhotoThumbs'
+import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { formatDateTime } from '@/lib/utils'
 
 type Update = { body: string; created_at: string }
@@ -35,7 +36,7 @@ export function SmTicketTabs({
 
   return (
     <Card className="p-5">
-      <div className="mb-4 flex gap-1 overflow-x-auto border-b border-[var(--border)]">
+      <div className="mb-4 flex gap-1 overflow-x-auto overflow-y-hidden border-b border-[var(--border)]">
         {tabs.map(t => (
           <button
             key={t.key}
@@ -60,10 +61,10 @@ export function SmTicketTabs({
               <ul className="space-y-1">
                 {docUrls.map((u, i) => (
                   <li key={i}>
-                    <a href={u} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between gap-2 rounded-lg bg-[var(--surface-2)] px-3 py-2 transition hover:bg-[var(--hover)]">
+                    <ViewTrackedLink ticketId={ticketId} itemType="attachment" itemLabel={docName(u)} href={u} className="flex items-center justify-between gap-2 rounded-lg bg-[var(--surface-2)] px-3 py-2 transition hover:bg-[var(--hover)]">
                       <span className="flex min-w-0 items-center gap-2 text-sm text-[var(--text)]"><FileText size={14} className="shrink-0 text-[#C6A35D]" /> <span className="truncate">{docName(u)}</span></span>
                       <Download size={14} className="shrink-0 text-[var(--text-faint)]" />
-                    </a>
+                    </ViewTrackedLink>
                   </li>
                 ))}
               </ul>
