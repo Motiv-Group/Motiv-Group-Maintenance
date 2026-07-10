@@ -43,9 +43,9 @@ export default async function StoreOverviewPage() {
           </p>
         </div>
         {h && (
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 lg:flex-1 lg:min-w-0">
             <Donut value={h.finalHealthScore} status={h.finalStatus} size={100} label="Health" />
-            <div className="min-w-0 max-w-xs border-l border-[var(--border)] pl-4">
+            <div className="min-w-0 flex-1 border-l border-[var(--border)] pl-4">
               <div className="flex items-center gap-2">
                 <span className={`text-sm font-bold ${STATUS_TEXT[h.finalStatus]}`}>{STATUS_LABELS[h.finalStatus]}</span>
                 <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-faint)]"><Sparkles size={11} className="text-[#C6A35D]" /> AI</span>
