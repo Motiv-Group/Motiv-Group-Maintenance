@@ -6,11 +6,12 @@ import { formatDateTime } from '@/lib/utils'
 
 export interface SnagRow { id: string; ticketId: string; ticketTitle: string; priority: string; storeName: string; description: string; severity: string; status: string; createdAt: string }
 
-// Snag status pill — open (red) is unaddressed, accepted/in-progress are amber.
+// Snag status pill — open (red) is unaddressed, accepted is amber, in-progress
+// is green (matches the "In Progress" status colour used app-wide).
 const STATUS_META: Record<string, { label: string; cls: string }> = {
   open:        { label: 'Open',        cls: 'bg-red-500/15 text-red-700 dark:text-red-400' },
   assigned:    { label: 'Accepted',    cls: 'bg-amber-500/15 text-amber-700 dark:text-amber-400' },
-  in_progress: { label: 'In progress', cls: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D]' },
+  in_progress: { label: 'In progress', cls: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' },
 }
 
 export function RegionalSnagList({ rows }: { rows: SnagRow[] }) {
