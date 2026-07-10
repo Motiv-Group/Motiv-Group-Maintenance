@@ -50,19 +50,20 @@ function groupCountCls(rows: RegionalTicketRow[]): string {
 // Cancelled. A breach that has gone fully overdue drops out of the breach pills
 // and shows only under Overdue.
 type RmFilter = 'internal_breach' | 'supplier_breach' | 'overdue' | Bucket
+// Pills styled like the SM Tickets tab: tinted when inactive, filled when selected.
 const PILLS: { key: RmFilter; label: string; active: string; inactive: string }[] = [
-  { key: 'open', label: 'New', active: 'bg-blue-500 text-white border-blue-500', inactive: 'text-blue-600 dark:text-blue-400 border-blue-500/40 hover:border-blue-400' },
-  { key: 'quote_requested', label: 'Quote requested', active: 'bg-cyan-500 text-white border-cyan-500', inactive: 'text-cyan-600 dark:text-cyan-400 border-cyan-500/40 hover:border-cyan-400' },
-  { key: 'quoted', label: 'Quoted', active: 'bg-violet-500 text-white border-violet-500', inactive: 'text-violet-600 dark:text-violet-400 border-violet-500/40 hover:border-violet-400' },
-  { key: 'approved', label: 'Approved', active: 'bg-teal-500 text-white border-teal-500', inactive: 'text-teal-600 dark:text-teal-400 border-teal-500/40 hover:border-teal-400' },
-  { key: 'scheduled', label: 'Job scheduled', active: 'bg-indigo-500 text-white border-indigo-500', inactive: 'text-indigo-600 dark:text-indigo-400 border-indigo-500/40 hover:border-indigo-400' },
-  { key: 'in_progress', label: 'In progress', active: 'bg-[#C6A35D] text-[#0a0e17] border-[#C6A35D]', inactive: 'text-amber-600 dark:text-[#C6A35D] border-[#C6A35D]/40 hover:border-[#C6A35D]' },
-  { key: 'awaiting_signoff', label: 'Sign-off', active: 'bg-orange-500 text-white border-orange-500', inactive: 'text-orange-600 dark:text-orange-400 border-orange-500/40 hover:border-orange-400' },
-  { key: 'completed', label: 'Completed', active: 'bg-emerald-500 text-white border-emerald-500', inactive: 'text-emerald-600 dark:text-emerald-400 border-emerald-500/40 hover:border-emerald-400' },
-  { key: 'internal_breach', label: 'Internal Breached', active: 'bg-red-600 text-white border-red-600', inactive: 'text-red-600 dark:text-red-400 border-red-500/50 hover:border-red-500' },
-  { key: 'supplier_breach', label: 'Supplier Breached', active: 'bg-orange-600 text-white border-orange-600', inactive: 'text-orange-600 dark:text-orange-400 border-orange-500/50 hover:border-orange-500' },
-  { key: 'overdue', label: 'Overdue', active: 'bg-red-500 text-white border-red-500', inactive: 'text-red-600 dark:text-red-400 border-red-500/40 hover:border-red-400' },
-  { key: 'cancelled', label: 'Cancelled', active: 'bg-gray-500 text-white border-gray-500', inactive: 'text-gray-600 dark:text-gray-400 border-gray-500/40 hover:border-gray-400' },
+  { key: 'open', label: 'New', active: 'bg-blue-500 text-white', inactive: 'bg-blue-500/15 text-blue-700 dark:text-blue-400' },
+  { key: 'quote_requested', label: 'Quote requested', active: 'bg-cyan-500 text-white', inactive: 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-400' },
+  { key: 'quoted', label: 'Quoted', active: 'bg-violet-500 text-white', inactive: 'bg-violet-500/15 text-violet-700 dark:text-violet-400' },
+  { key: 'approved', label: 'Approved', active: 'bg-teal-500 text-white', inactive: 'bg-teal-500/15 text-teal-700 dark:text-teal-400' },
+  { key: 'scheduled', label: 'Job scheduled', active: 'bg-indigo-500 text-white', inactive: 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-400' },
+  { key: 'in_progress', label: 'In progress', active: 'bg-[#C6A35D] text-[#0a0e17]', inactive: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D]' },
+  { key: 'awaiting_signoff', label: 'Sign-off', active: 'bg-orange-500 text-white', inactive: 'bg-orange-500/15 text-orange-700 dark:text-orange-400' },
+  { key: 'completed', label: 'Completed', active: 'bg-emerald-500 text-white', inactive: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' },
+  { key: 'internal_breach', label: 'Internal Breached', active: 'bg-red-600 text-white', inactive: 'bg-red-600/15 text-red-700 dark:text-red-400' },
+  { key: 'supplier_breach', label: 'Supplier Breached', active: 'bg-orange-600 text-white', inactive: 'bg-orange-600/15 text-orange-700 dark:text-orange-400' },
+  { key: 'overdue', label: 'Overdue', active: 'bg-red-500 text-white', inactive: 'bg-red-500/15 text-red-600 dark:text-red-400' },
+  { key: 'cancelled', label: 'Cancelled', active: 'bg-gray-500 text-white', inactive: 'bg-gray-500/15 text-gray-600 dark:text-gray-400' },
 ]
 
 // Row form factor matches the store-manager Tickets tab: category icon + job ref
@@ -214,7 +215,7 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
           const n = p.key === 'internal_breach' ? internalBreachCount : p.key === 'supplier_breach' ? supplierBreachCount : p.key === 'overdue' ? overdueCount : counts[p.key as Bucket]
           const on = filter === p.key
           return (
-            <button key={p.key} onClick={() => setFilter(f => f === p.key ? null : p.key)} aria-pressed={on} className={`px-3 py-1.5 rounded-full text-xs font-medium border transition text-center ${on ? p.active : p.inactive}`}>
+            <button key={p.key} onClick={() => setFilter(f => f === p.key ? null : p.key)} aria-pressed={on} className={`rounded-md px-3 py-1.5 text-xs font-semibold transition text-center ${on ? p.active : p.inactive}`}>
               {p.label} <span className="opacity-70">{n}</span>
             </button>
           )
