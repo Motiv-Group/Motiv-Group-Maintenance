@@ -6,63 +6,63 @@
 // border effect as the SM cards; RM-appropriate statuses, next steps and links.
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { AlertCircle, ArrowRight, CalendarClock, CheckCircle2, CircleAlert, ClipboardList, Info, Loader2 } from 'lucide-react'
+import { AlertCircle, AlertOctagon, AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, ClipboardCheck, ClipboardList, ReceiptText, UserPlus } from 'lucide-react'
 import type { RegionalTicketRow } from '@/lib/health/data'
 import { Card } from '@/components/exec/ui'
 import { CategoryIcon } from '@/components/client/ticketBadges'
 import { rmStatusMeta, formatDate, humanizeDuration, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
 
-type QueueFilter = 'all' | 'open' | 'today' | 'input' | 'progress'
-type Tone = 'red' | 'purple' | 'gold' | 'green' | 'orange'
+type QueueFilter = 'all' | 'assign' | 'quotes' | 'signoff' | 'sla' | 'snags'
+type Tone = 'red' | 'purple' | 'gold' | 'green' | 'orange' | 'blue'
 
 const URGENCY_RANK: Record<string, number> = { urgent: 0, P1: 0, high: 1, P2: 1, medium: 2, P3: 2, low: 3, P4: 3 }
 const INACTIVE = new Set(['completed', 'cancelled', 'declined'])
 const isActive = (s: string) => !INACTIVE.has(s)
-// "Needs your input" = the RM's decision queue: quotes to approve, variation
-// orders to review, and completed work awaiting sign-off.
-const INPUT_STATUSES = new Set(['quoted', 'quote_revision', 'variation_review', 'submitted_for_signoff', 'snag_resolved', 'approved_closeout'])
 
-const saDay = (iso: string) =>
-  new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Johannesburg', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(iso))
+// Each KPI card counts (and filters the queue to) one slice of the RM's work.
+const QUOTE_STATUSES = new Set(['quoted', 'quote_revision'])                              // waiting on the RM to approve
+const SIGNOFF_STATUSES = new Set(['submitted_for_signoff', 'snag_resolved', 'approved_closeout']) // completed work awaiting sign-off
+const SNAG_STATUSES = new Set(['snag', 'snag_assigned', 'snag_in_progress'])              // open snags
+const needsAssignment = (t: RegionalTicketRow) => !t.supplierAssigned && (t.status === 'open' || t.status === 'info_requested')
+const slaAtRisk = (t: RegionalTicketRow) => t.breached || t.overdue
 
 export function RegionalPriorityWorkQueue({ tickets, generatedAt }: { tickets: RegionalTicketRow[]; generatedAt: string }) {
   const [filter, setFilter] = useState<QueueFilter>('all')
   const nowMs = new Date(generatedAt).getTime()
-  const genDay = saDay(generatedAt)
+  // Click the active card again to clear the filter.
+  const pick = (k: QueueFilter) => setFilter(f => (f === k ? 'all' : k))
 
   const activeTickets = useMemo(() => tickets.filter(t => isActive(t.status)), [tickets])
-  const todayIds = useMemo(
-    () => new Set(activeTickets.filter(t => t.scheduledAt && saDay(t.scheduledAt) === genDay).map(t => t.id)),
-    [activeTickets, genDay],
-  )
 
   const counts = useMemo(() => ({
-    open: activeTickets.length,
-    today: todayIds.size,
-    input: activeTickets.filter(t => INPUT_STATUSES.has(t.status)).length,
-    progress: activeTickets.filter(t => t.status === 'in_progress').length,
-    urgent: activeTickets.filter(t => isUrgent(t)).length,
-  }), [activeTickets, todayIds])
+    assign: activeTickets.filter(needsAssignment).length,
+    quotes: activeTickets.filter(t => QUOTE_STATUSES.has(t.status)).length,
+    signoff: activeTickets.filter(t => SIGNOFF_STATUSES.has(t.status)).length,
+    sla: activeTickets.filter(slaAtRisk).length,
+    snags: activeTickets.filter(t => SNAG_STATUSES.has(t.status)).length,
+  }), [activeTickets])
 
   const rows = useMemo(() =>
     activeTickets
-      .filter(t => matchesFilter(t, filter, todayIds))
+      .filter(t => matchesFilter(t, filter))
       .sort((a, b) =>
         (URGENCY_RANK[String(a.priority)] ?? 9) - (URGENCY_RANK[String(b.priority)] ?? 9)
         || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
-    [activeTickets, filter, todayIds])
+    [activeTickets, filter])
 
   return (
     <div className="space-y-5">
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricButton active={filter === 'open'} icon={<CircleAlert size={21} />} tone="red" label="Open Tickets"
-          value={counts.open} sub={`${counts.urgent} urgent`} subActive={counts.urgent > 0} onClick={() => setFilter('open')} />
-        <MetricButton active={filter === 'today'} icon={<CalendarClock size={21} />} tone="purple" label="Supplier Coming Today"
-          value={counts.today} sub={counts.today ? `${counts.today} visit${counts.today === 1 ? '' : 's'} booked` : 'No visits booked'} subActive={counts.today > 0} onClick={() => setFilter('today')} />
-        <MetricButton active={filter === 'input'} icon={<Info size={21} />} tone="orange" label="Needs Your Input"
-          value={counts.input} sub={counts.input ? `${counts.input} to action` : 'Nothing to action'} subActive={counts.input > 0} onClick={() => setFilter('input')} />
-        <MetricButton active={filter === 'progress'} icon={<Loader2 size={21} />} tone="gold" label="In Progress"
-          value={counts.progress} sub="Being worked on" subActive={counts.progress > 0} onClick={() => setFilter('progress')} />
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        <MetricButton active={filter === 'assign'} icon={<UserPlus size={21} />} tone="blue" label="Needs Assignment"
+          value={counts.assign} sub={counts.assign ? `${counts.assign} to assign` : 'All assigned'} subActive={counts.assign > 0} onClick={() => pick('assign')} />
+        <MetricButton active={filter === 'quotes'} icon={<ReceiptText size={21} />} tone="purple" label="Quotes to Approve"
+          value={counts.quotes} sub={counts.quotes ? `${counts.quotes} to review` : 'None to review'} subActive={counts.quotes > 0} onClick={() => pick('quotes')} />
+        <MetricButton active={filter === 'signoff'} icon={<ClipboardCheck size={21} />} tone="orange" label="Awaiting Sign-off"
+          value={counts.signoff} sub={counts.signoff ? `${counts.signoff} to sign off` : 'Nothing to sign off'} subActive={counts.signoff > 0} onClick={() => pick('signoff')} />
+        <MetricButton active={filter === 'sla'} icon={<AlertTriangle size={21} />} tone="red" label="SLA at Risk"
+          value={counts.sla} sub={counts.sla ? `${counts.sla} breaching` : 'On track'} subActive={counts.sla > 0} onClick={() => pick('sla')} />
+        <MetricButton active={filter === 'snags'} icon={<AlertOctagon size={21} />} tone="gold" label="Snags Open"
+          value={counts.snags} sub={counts.snags ? `${counts.snags} to resolve` : 'No open snags'} subActive={counts.snags > 0} onClick={() => pick('snags')} />
       </section>
 
       <Card className="overflow-hidden p-0">
@@ -102,6 +102,7 @@ function MetricButton({ active, icon, tone, label, value, sub, subActive, onClic
     gold: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D] ring-[#C6A35D]/20',
     green: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 ring-emerald-500/20',
     orange: 'bg-orange-500/15 text-orange-600 dark:text-orange-400 ring-orange-500/20',
+    blue: 'bg-blue-500/15 text-blue-600 dark:text-blue-300 ring-blue-500/20',
   }
   const subTone: Record<Tone, string> = {
     red: 'text-red-600 dark:text-red-400',
@@ -109,6 +110,7 @@ function MetricButton({ active, icon, tone, label, value, sub, subActive, onClic
     green: 'text-emerald-600 dark:text-emerald-400',
     purple: 'text-purple-600 dark:text-purple-300',
     orange: 'text-orange-600 dark:text-orange-400',
+    blue: 'text-blue-600 dark:text-blue-400',
   }
   const subColor = subActive ? subTone[tone] : 'text-[var(--text-faint)]'
   const zero = value === 0
@@ -171,9 +173,11 @@ function QueueRow({ ticket, nowMs }: { ticket: RegionalTicketRow; nowMs: number 
 }
 
 function EmptyQueue({ filter }: { filter: QueueFilter }) {
-  const copy = filter === 'today' ? 'No supplier visits booked for today.'
-    : filter === 'input' ? 'Nothing waiting on your decision.'
-    : filter === 'progress' ? 'No tickets are in progress.'
+  const copy = filter === 'assign' ? 'No tickets waiting for a supplier.'
+    : filter === 'quotes' ? 'No quotes waiting for approval.'
+    : filter === 'signoff' ? 'Nothing awaiting your sign-off.'
+    : filter === 'sla' ? 'No tickets are breaching SLA.'
+    : filter === 'snags' ? 'No open snags in your region.'
     : 'No active tickets in your region.'
   return (
     <div className="grid min-h-28 place-items-center rounded-xl border border-dashed border-[var(--border)] px-4 py-6 text-center">
@@ -185,19 +189,15 @@ function EmptyQueue({ filter }: { filter: QueueFilter }) {
   )
 }
 
-function matchesFilter(t: RegionalTicketRow, filter: QueueFilter, todayIds: Set<string>): boolean {
+function matchesFilter(t: RegionalTicketRow, filter: QueueFilter): boolean {
   switch (filter) {
-    case 'all':
-    case 'open': return true
-    case 'today': return todayIds.has(t.id)
-    case 'input': return INPUT_STATUSES.has(t.status)
-    case 'progress': return t.status === 'in_progress'
+    case 'all': return true
+    case 'assign': return needsAssignment(t)
+    case 'quotes': return QUOTE_STATUSES.has(t.status)
+    case 'signoff': return SIGNOFF_STATUSES.has(t.status)
+    case 'sla': return slaAtRisk(t)
+    case 'snags': return SNAG_STATUSES.has(t.status)
   }
-}
-
-function isUrgent(t: RegionalTicketRow): boolean {
-  const p = String(t.priority)
-  return t.overdue || p === 'urgent' || p === 'P1'
 }
 
 function priorityBadgeClass(p: string): string {
