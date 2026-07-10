@@ -142,19 +142,16 @@ function QuickLogPanel() {
             <p className="mt-1 text-sm text-[var(--text-muted)]">Choose issue, add a photo, and submit. We&apos;ll take it from there.</p>
             <div className="mt-5 hidden max-w-xl items-center gap-3 text-xs text-[var(--text-muted)] sm:flex">
               <Step n="1" label="Choose issue" />
-              <span className="h-px flex-1 border-t border-dashed border-[var(--border)]" />
+              <span className="h-px flex-1 border-t border-dashed border-slate-300 dark:border-slate-500" />
               <Step n="2" label="Add photo" />
-              <span className="h-px flex-1 border-t border-dashed border-[var(--border)]" />
+              <span className="h-px flex-1 border-t border-dashed border-slate-300 dark:border-slate-500" />
               <Step n="3" label="Submit" />
             </div>
           </div>
         </div>
-        <div className="flex flex-col gap-3 md:min-w-[260px]">
+        <div className="flex flex-col justify-center gap-3 md:min-w-[260px]">
           <Link href="/client/tickets/new" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-blue-500">
             Start Quick Log <ArrowRight size={16} />
-          </Link>
-          <Link href="/client/tickets" className="inline-flex items-center justify-center gap-2 text-sm font-semibold text-blue-600 hover:underline dark:text-blue-400">
-            View all tickets <ArrowRight size={15} />
           </Link>
         </div>
       </div>
