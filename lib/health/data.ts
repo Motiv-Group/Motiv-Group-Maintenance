@@ -79,7 +79,7 @@ function regionSignals(tickets: HealthTicket[], rules: SlaRuleResolver, now: Dat
 }
 
 export interface StoreManagerContact { name: string | null; email: string | null; phone: string | null }
-export interface StoreCard extends StoreHealthResult { storeName: string; regionName: string; sm?: StoreManagerContact | null }
+export interface StoreCard extends StoreHealthResult { storeName: string; branchCode: string | null; regionName: string; sm?: StoreManagerContact | null }
 export interface TrendDelta { dir: 'up' | 'down' | 'flat'; pct: number }
 export interface EstateTrends { openWork: TrendDelta; slaPressure: TrendDelta; cost: TrendDelta; supplierBreaches: TrendDelta }
 export interface ExposureBucket { label: string; value: number }
@@ -115,7 +115,7 @@ export async function assembleEstateDashboard(companyId: string, now: Date = new
 
   const [{ data: regionsRaw }, { data: storesRaw }, { data: ticketsRaw }, { data: suppliersRaw }] = await Promise.all([
     db.from('regions').select('id, name').eq('company_id', companyId).eq('active', true),
-    db.from('stores').select('id, name, sub_store, region_id').eq('company_id', companyId).eq('active', true).is('closed_at', null),
+    db.from('stores').select('id, name, sub_store, branch_code, region_id').eq('company_id', companyId).eq('active', true).is('closed_at', null),
     db.from('tickets').select(TICKET_COLS).eq('company_id', companyId),
     db.from('suppliers').select('id, company_name').eq('company_id', companyId),
   ])
@@ -123,6 +123,7 @@ export async function assembleEstateDashboard(companyId: string, now: Date = new
   const regionName = new Map((regionsRaw ?? []).map((r: any) => [r.id, r.name]))
   const stores = (storesRaw ?? []) as any[]
   const storeName = new Map(stores.map(s => [s.id, storeLabel(s.name, s.sub_store)]))
+  const storeBranch = new Map(stores.map(s => [s.id, s.branch_code ?? null]))
   const tickets = ((ticketsRaw ?? []) as any[]).map(asTicket)
   const supplierName = new Map((suppliersRaw ?? []).map((s: any) => [s.id, s.company_name]))
 
@@ -140,7 +141,7 @@ export async function assembleEstateDashboard(companyId: string, now: Date = new
   // store health
   const cards: StoreCard[] = stores.map(s => {
     const res = calculateStoreHealth({ id: s.id, region_id: s.region_id } as StoreInput, ticketsByStore.get(s.id) ?? [], rules, now)
-    return { ...res, storeName: storeName.get(s.id) ?? 'Store', regionName: regionName.get(s.region_id) ?? '—' }
+    return { ...res, storeName: storeName.get(s.id) ?? 'Store', branchCode: storeBranch.get(s.id) ?? null, regionName: regionName.get(s.region_id) ?? '—' }
   })
 
   // regional rollup
@@ -452,7 +453,7 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
 
   const cards: StoreCard[] = stores.map(s => {
     const res = calculateStoreHealth({ id: s.id, region_id: s.region_id }, byStore.get(s.id) ?? [], rules, now)
-    return { ...res, storeName: storeName.get(s.id) ?? 'Store', regionName: regionName.get(s.region_id) ?? '—', sm: storeSm.get(s.id) ?? null }
+    return { ...res, storeName: storeName.get(s.id) ?? 'Store', branchCode: storeBranch.get(s.id) ?? null, regionName: regionName.get(s.region_id) ?? '—', sm: storeSm.get(s.id) ?? null }
   })
   const portfolio = calculateRegionalPortfolioHealth('portfolio', cards, regionSignals(tickets, rules, now))
 

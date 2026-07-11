@@ -9,7 +9,7 @@ import type { RegionalDashboardData } from '@/lib/health/data'
 import { SectionCard, Pill, STATUS_TEXT } from '@/components/exec/ui'
 import { Stars } from '@/components/ui/Stars'
 import { MapLink } from '@/components/ui/MapLink'
-import { SlideOver } from '@/components/ui/SlideOver'
+import { Modal } from '@/components/ui/Modal'
 import { formatCurrency, formatDate } from '@/lib/utils'
 
 type Row = RegionalDashboardData['suppliers'][number]
@@ -119,7 +119,7 @@ function SupplierPane({ row, onClose }: { row: Row; onClose: () => void }) {
   )
 
   return (
-    <SlideOver onClose={onClose}>
+    <Modal onClose={onClose}>
       {close => (
         <>
         <div className="flex items-start justify-between gap-2">
@@ -222,6 +222,6 @@ function SupplierPane({ row, onClose }: { row: Row; onClose: () => void }) {
         </div>
         </>
       )}
-    </SlideOver>
+    </Modal>
   )
 }

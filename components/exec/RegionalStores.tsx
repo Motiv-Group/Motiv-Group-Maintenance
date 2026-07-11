@@ -9,7 +9,7 @@ import { formatCurrency, formatDateTime } from '@/lib/utils'
 import { isValidEmail, isValidPhone } from '@/lib/csv'
 import { Card, SectionCard, Pill, Donut, BreakdownList, STATUS_TEXT } from '@/components/exec/ui'
 import { DrawerHeader } from '@/components/exec/Drawer'
-import { SlideOver } from '@/components/ui/SlideOver'
+import { Modal } from '@/components/ui/Modal'
 
 const fmtK = (n: number) => n ? (n >= 1000 ? `R ${(n / 1000).toFixed(0)}K` : formatCurrency(n)) : 'R 0'
 
@@ -87,7 +87,7 @@ export function RegionalStores({ stores, archived = [] }: { stores: StoreCard[];
               <tbody>
                 {ranked.map((s, i) => (
                   <tr key={s.storeId} onClick={() => { setSelId(s.storeId); setOpen(true) }} className={`border-b border-[var(--border)] cursor-pointer hover:bg-[var(--hover)] ${selId === s.storeId ? 'bg-[var(--hover)]' : ''}`}>
-                    <td className="py-2.5 px-2 text-[var(--text-faint)]">{i + 1}</td><td className="px-2 text-[var(--text)]">{s.storeName}</td>
+                    <td className="py-2.5 px-2 text-[var(--text-faint)]">{i + 1}</td><td className="px-2 text-[var(--text)]">{s.storeName}{s.branchCode && <span className="ml-1.5 font-mono text-[11px] text-[var(--text-faint)]">{s.branchCode}</span>}</td>
                     <td className={`px-2 font-semibold ${STATUS_TEXT[s.finalStatus]}`}>{s.finalHealthScore}%</td><td className="px-2"><Pill status={s.finalStatus} /></td>
                     <td className="px-2 text-center text-[var(--text)]">{s.openTickets}</td><td className="px-2 text-center text-red-400">{s.overdueTickets}</td>
                     <td className="px-2 text-center text-[var(--text)]">{s.pendingDecisions}</td><td className="px-2 text-[var(--text)] whitespace-nowrap">{fmtK(s.costExposure)}</td>
@@ -109,7 +109,7 @@ export function RegionalStores({ stores, archived = [] }: { stores: StoreCard[];
                 <button onClick={() => { setSelId(s.storeId); setOpen(true) }} className="w-full text-left rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3 pr-10 hover:bg-[var(--hover)] transition">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-[var(--text)] truncate"><span className="text-[var(--text-faint)]">#{i + 1}</span> {s.storeName}</p>
+                      <p className="text-sm font-medium text-[var(--text)] truncate"><span className="text-[var(--text-faint)]">#{i + 1}</span> {s.storeName}{s.branchCode && <span className="ml-1.5 font-mono text-[11px] text-[var(--text-faint)]">{s.branchCode}</span>}</p>
                       <p className="text-[11px] text-[var(--text-faint)] truncate mt-0.5">{s.mainIssue}</p>
                     </div>
                     <span className="flex flex-col items-end gap-1 shrink-0">
@@ -161,7 +161,7 @@ export function RegionalStores({ stores, archived = [] }: { stores: StoreCard[];
         </Card>
       )}
 
-      {open && selected && <SlideOver onClose={() => setOpen(false)}>{close => <Detail s={selected} onClose={close} />}</SlideOver>}
+      {open && selected && <Modal onClose={() => setOpen(false)}>{close => <Detail s={selected} onClose={close} />}</Modal>}
 
       {actionTarget && (
         <StoreActionsModal
@@ -339,7 +339,7 @@ function EditStoreModal({ storeId, onClose, onSaved }: { storeId: string; onClos
 function Detail({ s, onClose }: { s: StoreCard; onClose?: () => void }) {
   return (
     <div className="space-y-4">
-      <DrawerHeader onClose={onClose} title={<div className="flex items-center gap-2 flex-wrap"><Store size={18} className="text-[#C6A35D] shrink-0" /><h3 className="text-lg font-bold text-[var(--text)]">{s.storeName}</h3><Pill status={s.finalStatus} /></div>} />
+      <DrawerHeader onClose={onClose} title={<div className="flex items-center gap-2 flex-wrap"><Store size={18} className="text-[#C6A35D] shrink-0" /><h3 className="text-lg font-bold text-[var(--text)]">{s.storeName}</h3>{s.branchCode && <span className="font-mono text-xs text-[var(--text-faint)]">{s.branchCode}</span>}<Pill status={s.finalStatus} /></div>} />
       <div><div className={`text-3xl font-bold ${STATUS_TEXT[s.finalStatus]}`}>{s.finalHealthScore}%</div><p className="text-xs text-[var(--text-muted)] mt-1">Open {s.openTickets} · Overdue {s.overdueTickets} · Pending approvals {s.pendingDecisions}</p></div>
 
       {/* Store manager contact */}
