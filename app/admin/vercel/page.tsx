@@ -43,7 +43,7 @@ export default async function VercelAdminPage() {
 
       {d && (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             <StatTile
               label="Production"
               icon={<Rocket size={13} />}
@@ -101,7 +101,7 @@ export default async function VercelAdminPage() {
                 </thead>
                 <tbody>
                   {d.deployments.map((x: VercelDeployment) => (
-                    <tr key={x.uid} className="border-b border-[var(--border)] last:border-0">
+                    <tr key={x.uid} className="border-b border-[var(--border)] last:border-0 transition hover:bg-[var(--hover)]">
                       <td className="py-2 px-2 text-[var(--text-muted)] whitespace-nowrap">{when(x.createdAt)}</td>
                       <td className="px-2 text-[var(--text-muted)] font-mono text-[12px]">{x.branch ?? '—'}</td>
                       <td className="px-2 text-[var(--text)] truncate max-w-[240px]">{x.commitMessage ?? '—'}</td>
@@ -120,8 +120,8 @@ export default async function VercelAdminPage() {
               <h2 className="text-sm font-bold text-[var(--text)] flex items-center gap-2"><Globe size={15} className="text-blue-500" /> Domains</h2>
               <div className="flex flex-wrap gap-2">
                 {d.domains.map((dm) => (
-                  <span key={dm.name} className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full ring-1 ${dm.verified ? 'ring-emerald-500/30 text-emerald-700 dark:text-emerald-400' : 'ring-[#C6A35D]/30 text-amber-700 dark:text-[#C6A35D]'}`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${dm.verified ? 'bg-emerald-500' : 'bg-[#C6A35D]'}`} />
+                  <span key={dm.name} className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full ring-1 ${dm.verified ? 'ring-emerald-500/30 text-emerald-700 dark:text-emerald-400' : 'ring-amber-500/30 text-amber-700 dark:text-amber-400'}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${dm.verified ? 'bg-emerald-500' : 'bg-amber-500'}`} />
                     {dm.name}
                   </span>
                 ))}

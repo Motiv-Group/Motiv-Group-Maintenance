@@ -3,7 +3,8 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { BackButton } from '@/components/ui/BackButton'
 import { Mail, Phone, MapPin, Building2 } from 'lucide-react'
-import { Badge } from '@/components/ui/Badge'
+import { Card, SectionCard } from '@/components/exec/ui'
+import { CategoryIcon } from '@/components/client/ticketBadges'
 import { MapLink } from '@/components/ui/MapLink'
 import { AssignRMForm } from '@/components/admin/AssignRMForm'
 import {
@@ -84,45 +85,46 @@ export default async function AdminStoreDetailPage(props: { params: Promise<{ id
       <div className="flex items-center gap-3">
         <BackButton />
         <div>
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white">{store.company_name}</h1>
-          <p className="text-sm text-brand-600 dark:text-brand-400">{store.sub_store}</p>
+          <h1 className="text-xl font-bold text-[var(--text)]">{store.company_name}</h1>
+          <p className="text-sm text-[var(--text-muted)]">{store.sub_store}</p>
         </div>
       </div>
 
       {/* Store info */}
-      <div className="bg-slate-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 space-y-2">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Store Info</p>
-        {store.full_name && (
-          <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
-            <Building2 size={14} className="text-gray-400" />
-            <span>{store.full_name}</span>
-          </div>
-        )}
-        {store.branch_code && (
-          <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
-            <span className="text-gray-400 font-mono text-xs">CODE</span>
-            <span className="font-mono font-semibold">{store.branch_code}</span>
-          </div>
-        )}
-        {store.email && (
-          <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
-            <Mail size={14} className="text-gray-400" />
-            <a href={`mailto:${store.email}`} className="hover:underline">{store.email}</a>
-          </div>
-        )}
-        {store.phone && (
-          <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
-            <Phone size={14} className="text-gray-400" />
-            <a href={`tel:${store.phone}`} className="hover:underline">{store.phone}</a>
-          </div>
-        )}
-        {store.address && (
-          <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
-            <MapPin size={14} className="text-gray-400" />
-            <MapLink address={store.address} className="hover:underline">{store.address}</MapLink>
-          </div>
-        )}
-      </div>
+      <SectionCard title="Store Info">
+        <div className="space-y-2">
+          {store.full_name && (
+            <div className="flex items-center gap-2 text-sm text-[var(--text)]">
+              <Building2 size={14} className="text-[var(--text-faint)]" />
+              <span>{store.full_name}</span>
+            </div>
+          )}
+          {store.branch_code && (
+            <div className="flex items-center gap-2 text-sm text-[var(--text)]">
+              <span className="text-[var(--text-faint)] font-mono text-xs">CODE</span>
+              <span className="font-mono font-semibold">{store.branch_code}</span>
+            </div>
+          )}
+          {store.email && (
+            <div className="flex items-center gap-2 text-sm text-[var(--text)]">
+              <Mail size={14} className="text-[var(--text-faint)]" />
+              <a href={`mailto:${store.email}`} className="hover:underline">{store.email}</a>
+            </div>
+          )}
+          {store.phone && (
+            <div className="flex items-center gap-2 text-sm text-[var(--text)]">
+              <Phone size={14} className="text-[var(--text-faint)]" />
+              <a href={`tel:${store.phone}`} className="hover:underline">{store.phone}</a>
+            </div>
+          )}
+          {store.address && (
+            <div className="flex items-center gap-2 text-sm text-[var(--text)]">
+              <MapPin size={14} className="text-[var(--text-faint)]" />
+              <MapLink address={store.address} className="hover:underline">{store.address}</MapLink>
+            </div>
+          )}
+        </div>
+      </SectionCard>
 
       {/* Assign Regional Manager */}
       <AssignRMForm
@@ -134,36 +136,37 @@ export default async function AdminStoreDetailPage(props: { params: Promise<{ id
 
       {/* Tickets */}
       <div>
-        <h2 className="font-semibold text-gray-900 dark:text-white mb-3">
+        <h2 className="font-semibold text-[var(--text)] mb-3">
           Tickets ({tickets?.length ?? 0})
         </h2>
         {!tickets?.length ? (
-          <div className="bg-slate-50 dark:bg-gray-800 border border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-8 text-center">
-            <p className="text-sm text-gray-400">No tickets from this store yet.</p>
+          <div className="grid min-h-28 place-items-center rounded-xl border border-dashed border-[var(--border)] px-4 py-8 text-center">
+            <p className="text-sm text-[var(--text-faint)]">No tickets from this store yet.</p>
           </div>
         ) : (
-          <div className="space-y-2">
+          <Card className="overflow-hidden p-0">
             {(tickets as unknown as Ticket[]).map(ticket => (
-              <Link key={ticket.id} href={`/supplier/tickets/${ticket.id}`}>
-                <div className="bg-slate-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 hover:border-brand-400 dark:hover:border-gray-400 transition-colors">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="font-medium text-sm text-gray-900 dark:text-white truncate">{ticket.title}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">{formatDate(ticket.created_at)}</p>
-                    </div>
-                    <div className="flex flex-col gap-1 items-end shrink-0">
-                      <Badge className={PRIORITY_COLORS[ticket.priority]}>
-                        {PRIORITY_LABELS[ticket.priority]}
-                      </Badge>
-                      <Badge className={STATUS_COLORS[ticket.status]}>
-                        {STATUS_LABELS[ticket.status]}
-                      </Badge>
-                    </div>
-                  </div>
+              <Link
+                key={ticket.id}
+                href={`/supplier/tickets/${ticket.id}`}
+                className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition"
+              >
+                <CategoryIcon category={ticket.category} className="h-11 w-11" iconSize={18} />
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-sm text-[var(--text)] truncate">{ticket.title}</p>
+                  <p className="text-xs text-[var(--text-faint)] mt-0.5">{formatDate(ticket.created_at)}</p>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className={`inline-flex w-[92px] justify-center rounded-md px-2 py-1 text-[10px] font-bold ${PRIORITY_COLORS[ticket.priority]}`}>
+                    {PRIORITY_LABELS[ticket.priority]}
+                  </span>
+                  <span className={`inline-flex w-[92px] justify-center rounded-md px-2 py-1 text-[10px] font-bold ${STATUS_COLORS[ticket.status]}`}>
+                    {STATUS_LABELS[ticket.status]}
+                  </span>
                 </div>
               </Link>
             ))}
-          </div>
+          </Card>
         )}
       </div>
     </div>

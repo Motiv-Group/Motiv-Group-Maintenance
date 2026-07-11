@@ -7,7 +7,6 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Calendar, X, Wrench, Plus, PlayCircle } from 'lucide-react'
 import { SchedulePicker } from '@/components/ui/SchedulePicker'
-import { Button } from '@/components/ui/Button'
 import { SendQuoteForm } from '@/components/admin/SendQuoteForm'
 import { createClient } from '@/lib/supabase/client'
 
@@ -57,7 +56,7 @@ export function DeclineWorkButton({ ticketId }: { ticketId: string }) {
 
   return (
     <>
-      <Button onClick={() => setOpen(true)} variant="danger" className="w-full">Decline work</Button>
+      <button type="button" onClick={() => setOpen(true)} className="w-full py-2.5 rounded-xl ring-1 ring-red-500/40 text-red-600 dark:text-red-400 text-sm font-semibold hover:bg-red-500/10 transition">Decline work</button>
       {open && (
         <Modal title="Decline this work" onClose={() => { if (!busy) setOpen(false) }}>
           <p className="text-xs text-[var(--text-muted)]">The manager is notified and the job goes to other suppliers. This can&apos;t be undone.</p>
@@ -94,7 +93,7 @@ export function AcceptSnagCard({ ticketId, priority, createdAt }: { ticketId: st
 
   return (
     <>
-      <button onClick={() => setOpen(true)} className="w-full py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition flex items-center justify-center gap-1.5">
+      <button onClick={() => setOpen(true)} className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition flex items-center justify-center gap-1.5">
         <Calendar size={15} /> Accept snag &amp; schedule fix
       </button>
       {open && (
@@ -124,15 +123,15 @@ export function AssignTechnicianButton({ technicians = [] }: { technicians?: { i
           <div className="bg-[var(--surface-2)] ring-1 ring-[var(--border)] rounded-2xl p-5 max-w-sm w-full space-y-3" onClick={e => e.stopPropagation()}>
             <p className="font-semibold text-[var(--text)]">Assign a technician</p>
             {technicians.length ? (
-              <select value={techId} onChange={e => setTechId(e.target.value)} className="w-full px-3 py-2 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm outline-none focus:ring-[#C6A35D]/40">
+              <select value={techId} onChange={e => setTechId(e.target.value)} className="w-full px-3 py-2 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm outline-none focus:ring-emerald-500/40">
                 <option value="">— Select a technician —</option>
                 {technicians.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
             ) : (
-              <p className="text-xs text-[var(--text-muted)]">No technicians yet — add them under the <span className="text-[#C6A35D]">Technicians</span> tab.</p>
+              <p className="text-xs text-[var(--text-muted)]">No technicians yet — add them under the <span className="text-blue-600 dark:text-blue-400">Technicians</span> tab.</p>
             )}
             <div className="flex gap-2">
-              <button disabled={!techId} onClick={() => setOpen(false)} className="flex-1 py-2 rounded-lg bg-[#C6A35D] text-[#0a0e17] text-sm font-semibold disabled:opacity-50">Assign</button>
+              <button disabled={!techId} onClick={() => setOpen(false)} className="flex-1 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold disabled:opacity-50">Assign</button>
               <button onClick={() => setOpen(false)} className="flex-1 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm">Cancel</button>
             </div>
           </div>
@@ -160,7 +159,7 @@ export function MarkInProgressButton({ ticketId }: { ticketId: string }) {
         <p className="text-sm text-[var(--text)]">Mark this job as in progress? The store will see that the work has started.</p>
         {err && <p className="text-xs text-red-500">{err}</p>}
         <div className="flex gap-2">
-          <button onClick={go} disabled={busy} className="flex-1 py-2 rounded-lg bg-[#C6A35D] hover:brightness-95 text-[#0a0e17] text-sm font-semibold disabled:opacity-50">{busy ? 'Starting…' : 'Yes, mark in progress'}</button>
+          <button onClick={go} disabled={busy} className="flex-1 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Starting…' : 'Yes, mark in progress'}</button>
           <button onClick={() => { setConfirm(false); setErr('') }} disabled={busy} className="flex-1 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm disabled:opacity-50">Cancel</button>
         </div>
       </div>
@@ -171,7 +170,7 @@ export function MarkInProgressButton({ ticketId }: { ticketId: string }) {
       <p className="text-sm text-[var(--text-muted)]">
         Mark the ticket in progress when you&apos;re ready to start the job, or once the scheduled time has arrived. This lets the store know you&apos;re on your way or busy with the work.
       </p>
-      <button onClick={() => setConfirm(true)} className="w-full py-2.5 rounded-xl bg-[#C6A35D] hover:brightness-95 text-[#0a0e17] text-sm font-semibold transition flex items-center justify-center gap-1.5">
+      <button onClick={() => setConfirm(true)} className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition flex items-center justify-center gap-1.5">
         <PlayCircle size={15} /> Mark in progress
       </button>
     </div>
@@ -218,7 +217,7 @@ export function SupplierVariationGate({ ticketId, priority, createdAt, variation
       ) : (
         <p className="text-sm text-[var(--text-muted)]">Your COC &amp; POC were approved. Raise a variation order for any extra work, or confirm there are none so the manager can close out.</p>
       )}
-      <button onClick={() => setShowForm(v => !v)} className="w-full py-2.5 rounded-xl bg-[#C6A35D] hover:brightness-95 text-white text-sm font-semibold transition flex items-center justify-center gap-1.5">
+      <button onClick={() => setShowForm(v => !v)} className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition flex items-center justify-center gap-1.5">
         <Plus size={15} /> {raiseLabel}
       </button>
       {showForm && <SendQuoteForm ticketId={ticketId} variant="variation" competitive priority={priority} createdAt={createdAt} defaultOpen onClose={() => setShowForm(false)} />}
@@ -241,7 +240,7 @@ export function StartSnagButton({ ticketId }: { ticketId: string }) {
   }
   return (
     <>
-      <button onClick={go} disabled={busy} className="w-full py-2.5 rounded-xl bg-[#C6A35D] hover:bg-amber-600 text-[#0a0e17] text-sm font-semibold transition disabled:opacity-50">{busy ? 'Starting…' : 'Start snag fix (in progress)'}</button>
+      <button onClick={go} disabled={busy} className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition disabled:opacity-50">{busy ? 'Starting…' : 'Start snag fix (in progress)'}</button>
       {err && <p className="text-xs text-red-500">{err}</p>}
     </>
   )
@@ -270,7 +269,7 @@ export function ScheduleJobCard({ ticketId, priority, createdAt, technicians = [
 
   return (
     <>
-      <button onClick={() => setOpen(true)} className="w-full py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition flex items-center justify-center gap-1.5">
+      <button onClick={() => setOpen(true)} className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition flex items-center justify-center gap-1.5">
         <Calendar size={15} /> Schedule job
       </button>
       {open && (
@@ -282,7 +281,7 @@ export function ScheduleJobCard({ ticketId, priority, createdAt, technicians = [
                 <p className="text-sm text-[var(--text)]">No technician is assigned for this job. Schedule without one?</p>
                 {err && <p className="text-xs text-red-500">{err}</p>}
                 <div className="flex gap-2">
-                  <button onClick={() => doSchedule(pendingIso)} disabled={busy} className="flex-1 py-2 rounded-lg bg-green-600 text-white text-sm font-semibold hover:bg-green-500 disabled:opacity-50">{busy ? 'Scheduling…' : 'Yes, schedule'}</button>
+                  <button onClick={() => doSchedule(pendingIso)} disabled={busy} className="flex-1 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-500 disabled:opacity-50">{busy ? 'Scheduling…' : 'Yes, schedule'}</button>
                   <button onClick={() => setPendingIso(null)} disabled={busy} className="flex-1 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm disabled:opacity-50">Back</button>
                 </div>
               </div>
@@ -292,12 +291,12 @@ export function ScheduleJobCard({ ticketId, priority, createdAt, technicians = [
                 <div>
                   <label className="block text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Technician</label>
                   {technicians.length ? (
-                    <select value={techId} onChange={e => setTechId(e.target.value)} className="w-full px-3 py-2 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm outline-none focus:ring-[#C6A35D]/40">
+                    <select value={techId} onChange={e => setTechId(e.target.value)} className="w-full px-3 py-2 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm outline-none focus:ring-emerald-500/40">
                       <option value="">— Unassigned —</option>
                       {technicians.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                     </select>
                   ) : (
-                    <p className="text-xs text-[var(--text-muted)]">No technicians yet — add them under the <span className="text-[#C6A35D]">Technicians</span> tab.</p>
+                    <p className="text-xs text-[var(--text-muted)]">No technicians yet — add them under the <span className="text-blue-600 dark:text-blue-400">Technicians</span> tab.</p>
                   )}
                 </div>
                 {err && <p className="text-xs text-red-500">{err}</p>}

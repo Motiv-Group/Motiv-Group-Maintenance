@@ -52,7 +52,7 @@ export default async function AdminSuppliersPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><Truck size={22} className="text-[#C6A35D]" /> Supplier review</h1>
+        <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><Truck size={22} className="text-blue-600 dark:text-blue-400" /> Supplier review</h1>
         <p className="text-sm text-[var(--text-muted)] mt-0.5">Self-signup suppliers awaiting verification. Approving adds them to the Motiv pool.</p>
       </div>
 
@@ -83,7 +83,7 @@ export default async function AdminSuppliersPage() {
                 <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Trades</div>
                 <div className="flex flex-wrap gap-1.5">
                   {((s.trades as string[] | null) ?? (s.trade ? [s.trade] : [])).map((t: string) => (
-                    <span key={t} className="rounded-full bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D] px-2 py-0.5 text-xs font-medium">{t}</span>
+                    <span key={t} className="rounded-full bg-slate-500/15 text-slate-600 dark:text-slate-300 px-2 py-0.5 text-xs font-medium">{t}</span>
                   ))}
                 </div>
               </div>
@@ -94,7 +94,7 @@ export default async function AdminSuppliersPage() {
               <div>
                 <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">SLA signature</div>
                 <div className="text-[var(--text)]">
-                  {sla ? <>v{sla.sla_version} — “{sla.signed_name}”, {formatDateTime(sla.accepted_at)}</> : <span className="text-red-500">Missing</span>}
+                  {sla ? <>v{sla.sla_version} — “{sla.signed_name}”, {formatDateTime(sla.accepted_at)}</> : <span className="text-red-600 dark:text-red-400">Missing</span>}
                 </div>
               </div>
             </div>
@@ -105,7 +105,7 @@ export default async function AdminSuppliersPage() {
                 <div className="flex flex-wrap gap-x-4 gap-y-1">
                   {sdocs.map((d: any, i: number) => (
                     <a key={i} href={d.url} target="_blank" rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline">
+                      className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline">
                       <FileText size={14} /> {DOC_LABEL[d.kind] ?? d.kind}
                     </a>
                   ))}
@@ -123,7 +123,7 @@ export default async function AdminSuppliersPage() {
             {(recent ?? []).map((r: any) => (
               <li key={r.id} className="flex items-center justify-between py-2 text-sm">
                 <span className="text-[var(--text)]">{r.company_name}</span>
-                <span className={r.verification_status === 'verified' ? 'text-emerald-500 font-medium' : 'text-red-500 font-medium'}>
+                <span className={r.verification_status === 'verified' ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-red-600 dark:text-red-400 font-medium'}>
                   {r.verification_status === 'verified' ? 'Approved' : 'Rejected'}
                 </span>
               </li>

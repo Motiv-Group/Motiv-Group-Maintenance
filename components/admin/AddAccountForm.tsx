@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Crown, Building2, Store, Copy, CheckCircle2 } from 'lucide-react'
+import { Crown, Building2, Store, Copy, CheckCircle2, Check } from 'lucide-react'
 import { Card } from '@/components/exec/ui'
 
 export interface CompanyOpt { id: string; name: string }
@@ -43,7 +43,7 @@ export function AddAccountForm({ companies, regions }: { companies: CompanyOpt[]
 
   const companyRegions = useMemo(() => regions.filter(r => r.companyId === companyId), [regions, companyId])
 
-  const input = 'w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)] outline-none focus:ring-[#C6A35D]/40'
+  const input = 'w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)] outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500/60'
 
   function reset() {
     setFullName(''); setEmail(''); setPhone(''); setAddress(''); setCompanyName('')
@@ -80,9 +80,10 @@ export function AddAccountForm({ companies, regions }: { companies: CompanyOpt[]
       <div className="grid grid-cols-3 gap-2">
         {ROLE_TABS.map(t => (
           <button key={t.value} type="button" onClick={() => { setRole(t.value); setErr(''); setResult(null) }}
-            className={`flex flex-col items-center gap-1 p-3 rounded-xl border-2 text-center transition ${role === t.value ? 'border-[#C6A35D] bg-[#C6A35D]/10' : 'border-[var(--border)] hover:border-[#C6A35D]/50'}`}>
-            <t.icon size={18} className="text-[#C6A35D]" />
-            <span className={`text-xs font-semibold ${role === t.value ? 'text-[#C6A35D]' : 'text-[var(--text)]'}`}>{t.label}</span>
+            className={`relative flex flex-col items-center gap-1 p-3 rounded-xl border-2 text-center transition ${role === t.value ? 'border-emerald-500 bg-emerald-500/10 ring-2 ring-emerald-500/30' : 'border-[var(--border)] hover:border-emerald-500/60'}`}>
+            {role === t.value && <Check size={16} className="absolute top-1.5 right-1.5 text-emerald-500" />}
+            <t.icon size={18} className={role === t.value ? 'text-emerald-500' : 'text-[var(--text-muted)]'} />
+            <span className={`text-xs font-semibold ${role === t.value ? 'text-[var(--text)]' : 'text-[var(--text-muted)]'}`}>{t.label}</span>
             <span className="text-[10px] text-[var(--text-faint)]">{t.desc}</span>
           </button>
         ))}
@@ -149,12 +150,12 @@ export function AddAccountForm({ companies, regions }: { companies: CompanyOpt[]
             <p className="text-sm text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5"><CheckCircle2 size={14} /> {result.message}</p>
             {result.actionLink && (
               <button type="button" onClick={() => { navigator.clipboard?.writeText(result.actionLink!); setCopied(true); setTimeout(() => setCopied(false), 1500) }}
-                className="inline-flex items-center gap-1.5 text-xs font-medium text-[#C6A35D] hover:underline"><Copy size={12} /> {copied ? 'Copied!' : 'Copy activation link'}</button>
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"><Copy size={12} /> {copied ? 'Copied!' : 'Copy activation link'}</button>
             )}
           </div>
         )}
 
-        <button type="submit" disabled={busy} className="w-full py-2.5 rounded-xl bg-[#C6A35D] hover:brightness-95 text-[#0a0e17] text-sm font-semibold transition disabled:opacity-50">
+        <button type="submit" disabled={busy} className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition disabled:opacity-50">
           {busy ? 'Creating…' : `Create ${ROLE_TABS.find(t => t.value === role)?.label} & send invite`}
         </button>
       </form>

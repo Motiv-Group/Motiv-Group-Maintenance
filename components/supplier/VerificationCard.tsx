@@ -48,9 +48,9 @@ export function VerificationCard() {
   const has = (kind: string) => docs.some(d => d.kind === kind)
 
   return (
-    <Card className="p-5 space-y-4 ring-1 ring-[#C6A35D]/40">
+    <Card className="p-5 space-y-4 ring-1 ring-amber-500/30">
       <div className="flex items-start gap-3">
-        <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#C6A35D]/15 text-[#C6A35D]"><ShieldCheck size={18} /></span>
+        <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-500"><ShieldCheck size={18} /></span>
         <div>
           <h2 className="font-semibold text-[var(--text)]">Your account is under review</h2>
           <p className="text-sm text-[var(--text-muted)] mt-0.5">
@@ -72,7 +72,7 @@ export function VerificationCard() {
             <label className={`shrink-0 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium cursor-pointer transition ${
               has(d.kind)
                 ? 'border border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--hover)]'
-                : 'bg-[#C6A35D] text-[#0a0e17] hover:opacity-90'
+                : 'bg-blue-600 hover:bg-blue-500 text-white'
             } ${busyKind === d.kind ? 'opacity-60 pointer-events-none' : ''}`}>
               <Upload size={13} /> {busyKind === d.kind ? 'Uploading…' : has(d.kind) ? 'Replace' : 'Upload'}
               <input type="file" accept="application/pdf,image/*" className="hidden"

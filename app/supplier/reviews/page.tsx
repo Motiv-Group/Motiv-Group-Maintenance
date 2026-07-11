@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireSupplierV3 } from '@/lib/health/guard'
 import { BackButton } from '@/components/ui/BackButton'
+import { Card } from '@/components/exec/ui'
 import { Star } from 'lucide-react'
 import { formatDateTime } from '@/lib/utils'
 
@@ -13,7 +14,7 @@ function StarRow({ score }: { score: number }) {
         <Star
           key={i}
           size={13}
-          className={i <= score ? 'fill-amber-400 text-amber-400' : 'fill-gray-200 text-gray-300 dark:fill-gray-700 dark:text-gray-600'}
+          className={i <= score ? 'fill-amber-400 text-amber-400' : 'fill-slate-200 text-slate-300 dark:fill-slate-700 dark:text-slate-600'}
         />
       ))}
     </span>
@@ -54,7 +55,7 @@ export default async function SupplierReviewsPage() {
       <div className="flex items-center gap-3">
         <BackButton />
         <div>
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white">My Reviews</h1>
+          <h1 className="text-xl font-bold text-[var(--text)]">My Reviews</h1>
           <p className="text-sm text-amber-600 dark:text-amber-400 mt-0.5 flex items-center gap-1.5">
             <Star size={14} className="fill-amber-400 text-amber-400" />
             {avgRating.toFixed(1)} / 5 {reviews.length > 0 ? `average across ${reviews.length} review${reviews.length !== 1 ? 's' : ''}` : '— starting rating, no reviews yet'}
@@ -63,20 +64,22 @@ export default async function SupplierReviewsPage() {
       </div>
 
       {reviews.length === 0 ? (
-        <div className="bg-slate-50 dark:bg-gray-800 border border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-12 text-center">
-          <Star size={28} className="mx-auto text-gray-300 mb-2" />
-          <p className="text-sm text-gray-400">No reviews yet — they appear here after a regional manager approves a job.</p>
+        <div className="grid min-h-28 place-items-center rounded-xl border border-dashed border-[var(--border)] px-4 py-10 text-center">
+          <div>
+            <Star size={28} className="mx-auto text-[var(--text-faint)] mb-2" />
+            <p className="text-sm text-[var(--text-faint)]">No reviews yet — they appear here after a regional manager approves a job.</p>
+          </div>
         </div>
       ) : (
         <div className="space-y-3">
           {reviews.map((r: any) => (
-            <div key={r.id} className="bg-slate-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 space-y-2">
+            <Card key={r.id} className="p-4 space-y-2">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                  <p className="text-sm font-medium text-[var(--text)] truncate">
                     {r.ticketTitle ?? 'Unknown ticket'}
                   </p>
-                  <p className="text-xs text-gray-400 mt-0.5">{formatDateTime(r.created_at)}</p>
+                  <p className="text-xs text-[var(--text-faint)] mt-0.5">{formatDateTime(r.created_at)}</p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <StarRow score={r.score} />
@@ -84,13 +87,13 @@ export default async function SupplierReviewsPage() {
                 </div>
               </div>
               {r.comment ? (
-                <p className="text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700/40 rounded-lg px-3 py-2 leading-relaxed">
+                <p className="text-sm text-[var(--text-muted)] bg-[var(--hover)] ring-1 ring-[var(--border)] rounded-lg px-3 py-2 leading-relaxed">
                   {r.comment}
                 </p>
               ) : (
-                <p className="text-xs text-gray-400 italic">No comment left.</p>
+                <p className="text-xs text-[var(--text-faint)] italic">No comment left.</p>
               )}
-            </div>
+            </Card>
           ))}
         </div>
       )}

@@ -27,7 +27,7 @@ function ReLinkSelect({ value, regions, onPick, label }: { value: string; region
   return (
     <select disabled={busy} value={value} title={label}
       onChange={async e => { const v = e.target.value; if (!v || v === value) return; setBusy(true); await onPick(v); setBusy(false) }}
-      className="text-[11px] rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] px-2 py-1 outline-none focus:ring-[#C6A35D]/40 disabled:opacity-50">
+      className="text-[11px] rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] px-2 py-1 outline-none focus:ring-2 focus:ring-emerald-500/40 disabled:opacity-50">
       {regions.map(r => <option key={r.id} value={r.id}>{r.name} ({r.code})</option>)}
     </select>
   )
@@ -49,10 +49,10 @@ export function HierarchyView({ companies, regionsByCompany }: { companies: Comp
           <Card key={c.id} className="overflow-hidden">
             <details open>
               <summary className="flex items-center gap-2 px-4 py-3 cursor-pointer list-none hover:bg-[var(--hover)]">
-                <Building2 size={16} className="text-[#C6A35D]" />
+                <Building2 size={16} className="text-[var(--text-faint)]" />
                 <span className="text-sm font-bold text-[var(--text)]">{c.name}</span>
                 <span className="text-[11px] text-[var(--text-faint)]">· {c.regions.length} region{c.regions.length === 1 ? '' : 's'}</span>
-                {c.execs.length > 0 && <span className="ml-auto flex items-center gap-1 text-[11px] text-[var(--text-muted)]"><Crown size={12} className="text-[#C6A35D]" />{c.execs.map(e => e.name).join(', ')}</span>}
+                {c.execs.length > 0 && <span className="ml-auto flex items-center gap-1 text-[11px] text-[var(--text-muted)]"><Crown size={12} className="text-[var(--text-faint)]" />{c.execs.map(e => e.name).join(', ')}</span>}
               </summary>
               <div className="px-4 pb-4 space-y-3 border-t border-[var(--border)]">
                 {c.execs.length === 0 && <p className="text-[11px] text-amber-600 dark:text-amber-400 pt-3">No executive yet.</p>}
@@ -60,11 +60,11 @@ export function HierarchyView({ companies, regionsByCompany }: { companies: Comp
                 {c.regions.map(r => (
                   <div key={r.id} className="rounded-xl ring-1 ring-[var(--border)] p-3 mt-3 space-y-2">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <MapPin size={14} className="text-indigo-500" />
+                      <MapPin size={14} className="text-[var(--text-faint)]" />
                       <span className="text-sm font-semibold text-[var(--text)]">{r.name}</span>
                       <span className="text-[10px] font-mono text-[var(--text-faint)] bg-[var(--surface)] rounded px-1.5 py-0.5">{r.code}</span>
                       <span className="ml-auto flex items-center gap-1.5 text-[11px] text-[var(--text-muted)]">
-                        <User size={12} className="text-teal-500" />
+                        <User size={12} className="text-[var(--text-faint)]" />
                         {r.rms.length ? r.rms.map(rm => (
                           <span key={rm.id} className="inline-flex items-center gap-1">{rm.name}
                             <ReLinkSelect value={r.id} regions={regs} label="Reassign this RM to a region" onPick={rid => move({ action: 'relink_rm', userId: rm.id, regionId: rid })} />

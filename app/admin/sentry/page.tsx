@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic'
 
-import { ShieldAlert, Bug, Activity, Users } from 'lucide-react'
+import { ShieldAlert, Bug, Activity, Users, CheckCircle2 } from 'lucide-react'
 import { requireMasterAdmin } from '@/lib/health/guard'
 import { getSentryStats, type SentryIssue } from '@/lib/admin/sentry'
 import { Card } from '@/components/exec/ui'
@@ -11,7 +11,7 @@ import { FREE_LIMITS, formatNumber } from '@/lib/admin/limits'
 const LEVEL_CLS: Record<string, string> = {
   fatal:   'ring-red-600/40 text-red-800 dark:text-red-300',
   error:   'ring-red-500/30 text-red-700 dark:text-red-400',
-  warning: 'ring-[#C6A35D]/30 text-amber-700 dark:text-[#C6A35D]',
+  warning: 'ring-amber-500/30 text-amber-700 dark:text-amber-400',
   info:    'ring-blue-500/30 text-blue-700 dark:text-blue-400',
 }
 function ago(iso: string | null): string {
@@ -36,7 +36,7 @@ export default async function SentryAdminPage() {
 
       {d && (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             <StatTile
               label="Unresolved issues"
               icon={<Bug size={13} />}
@@ -88,10 +88,10 @@ export default async function SentryAdminPage() {
                 </thead>
                 <tbody>
                   {d.unresolved.map((i: SentryIssue) => (
-                    <tr key={i.id} className="border-b border-[var(--border)] last:border-0">
+                    <tr key={i.id} className="border-b border-[var(--border)] last:border-0 transition hover:bg-[var(--hover)]">
                       <td className="py-2 px-2 max-w-[280px]">
                         {i.permalink
-                          ? <a href={i.permalink} target="_blank" rel="noopener noreferrer" className="text-[var(--text)] hover:text-[#C6A35D] transition-colors block truncate">{i.title}</a>
+                          ? <a href={i.permalink} target="_blank" rel="noopener noreferrer" className="text-[var(--text)] hover:text-blue-600 dark:hover:text-blue-400 transition-colors block truncate">{i.title}</a>
                           : <span className="text-[var(--text)] block truncate">{i.title}</span>}
                         {i.culprit && <span className="block text-[11px] text-[var(--text-faint)] font-mono truncate">{i.culprit}</span>}
                       </td>
@@ -103,7 +103,7 @@ export default async function SentryAdminPage() {
                       <td className="px-2 text-right text-[var(--text-muted)] whitespace-nowrap">{ago(i.lastSeen)}</td>
                     </tr>
                   ))}
-                  {!d.unresolved.length && <tr><td colSpan={5} className="py-6 text-center text-emerald-600 dark:text-emerald-400">No unresolved issues — all clear. 🎉</td></tr>}
+                  {!d.unresolved.length && <tr><td colSpan={5} className="py-6 text-center"><span className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400"><CheckCircle2 size={15} /> No unresolved issues — all clear.</span></td></tr>}
                 </tbody>
               </table>
             </div>

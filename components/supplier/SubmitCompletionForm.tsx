@@ -69,7 +69,7 @@ export function SubmitCompletionForm({ ticketId, evidenceRequested = false, requ
   if (!open) {
     return (
       <button type="button" onClick={() => setOpen(true)}
-        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition">
+        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition">
         <CheckCircle2 size={18} /> {evidenceRequested ? 'Upload more evidence' : 'Upload COC & POC'}
       </button>
     )
@@ -85,14 +85,14 @@ export function SubmitCompletionForm({ ticketId, evidenceRequested = false, requ
         <label className="block text-sm font-bold text-[var(--text)] mb-1.5">Certificate of Completion (COC) {requireBoth && <span className="text-red-500">*</span>} <span className="font-normal text-[var(--text-muted)]">(PDF, Word or photo)</span></label>
         {coc ? (
           <div className="flex items-center gap-3 p-3 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)]">
-            <FileText size={18} className="text-[#C6A35D] shrink-0" />
+            <FileText size={18} className="text-blue-600 dark:text-blue-400 shrink-0" />
             <span className="text-sm text-[var(--text)] truncate flex-1">{coc.name}</span>
             <span className="text-xs text-[var(--text-faint)] shrink-0">{(coc.size / 1024 / 1024).toFixed(1)} MB</span>
             <button type="button" onClick={() => setCoc(null)} className="p-1 text-[var(--text-faint)] hover:text-red-500"><X size={16} /></button>
           </div>
         ) : (
           <label onDragOver={e => { e.preventDefault(); setDragCoc(true) }} onDragLeave={() => setDragCoc(false)} onDrop={e => { e.preventDefault(); setDragCoc(false); pickCoc(e.dataTransfer.files?.[0]) }}
-            className={`flex flex-col items-center justify-center gap-1.5 py-8 rounded-xl border-2 border-dashed cursor-pointer transition ${dragCoc ? 'border-[#C6A35D] bg-[#C6A35D]/5' : 'border-[var(--border)] hover:border-[#C6A35D]/50'}`}>
+            className={`flex flex-col items-center justify-center gap-1.5 py-8 rounded-xl border-2 border-dashed cursor-pointer transition ${dragCoc ? 'border-emerald-500 bg-emerald-500/10' : 'border-[var(--border)] hover:border-emerald-500/60'}`}>
             <UploadCloud size={26} className="text-[var(--text-faint)]" />
             <span className="text-sm text-[var(--text-muted)]">PDF, Word or photo up to {COC_MAX_MB} MB</span>
             <input type="file" accept={COC_ACCEPT} className="hidden" onChange={e => pickCoc(e.target.files?.[0])} />
@@ -104,13 +104,13 @@ export function SubmitCompletionForm({ ticketId, evidenceRequested = false, requ
       <div>
         <label className="block text-sm font-bold text-[var(--text)] mb-1.5">Proof of Completion (POC) Photos {requireBoth && <span className="text-red-500">*</span>} <span className="font-normal text-[var(--text-muted)]">({requireBoth ? `minimum ${MIN_PHOTOS}, ` : ''}up to {MAX_PHOTOS})</span></label>
         <div onDragOver={e => { e.preventDefault(); setDragPoc(true) }} onDragLeave={() => setDragPoc(false)} onDrop={e => { e.preventDefault(); setDragPoc(false); addPhotos(Array.from(e.dataTransfer.files ?? [])) }}
-          className={`rounded-xl border-2 border-dashed p-3 transition ${dragPoc ? 'border-[#C6A35D] bg-[#C6A35D]/5' : 'border-[var(--border)]'}`}>
+          className={`rounded-xl border-2 border-dashed p-3 transition ${dragPoc ? 'border-emerald-500 bg-emerald-500/10' : 'border-[var(--border)]'}`}>
           <div className="grid grid-cols-2 gap-2">
-            <label className={`flex items-center justify-center gap-2 py-3 rounded-lg ring-1 ring-[var(--border)] text-sm text-[var(--text)] transition ${remaining ? 'cursor-pointer hover:border-[#C6A35D] hover:bg-[var(--hover)]' : 'opacity-50 cursor-not-allowed'}`}>
+            <label className={`flex items-center justify-center gap-2 py-3 rounded-lg ring-1 ring-[var(--border)] text-sm text-[var(--text)] transition ${remaining ? 'cursor-pointer hover:border-emerald-500/60 hover:bg-[var(--hover)]' : 'opacity-50 cursor-not-allowed'}`}>
               <ImagePlus size={16} /> Browse
               <input type="file" accept="image/*" multiple disabled={!remaining} className="hidden" onChange={e => addPhotos(Array.from(e.target.files ?? []))} />
             </label>
-            <label className={`flex items-center justify-center gap-2 py-3 rounded-lg ring-1 ring-[var(--border)] text-sm text-[var(--text)] transition ${remaining ? 'cursor-pointer hover:border-[#C6A35D] hover:bg-[var(--hover)]' : 'opacity-50 cursor-not-allowed'}`}>
+            <label className={`flex items-center justify-center gap-2 py-3 rounded-lg ring-1 ring-[var(--border)] text-sm text-[var(--text)] transition ${remaining ? 'cursor-pointer hover:border-emerald-500/60 hover:bg-[var(--hover)]' : 'opacity-50 cursor-not-allowed'}`}>
               <Camera size={16} /> Take Photo
               <input type="file" accept="image/*" capture="environment" disabled={!remaining} className="hidden" onChange={e => addPhotos(Array.from(e.target.files ?? []))} />
             </label>
@@ -121,7 +121,7 @@ export function SubmitCompletionForm({ ticketId, evidenceRequested = false, requ
             <div className="mt-3 space-y-1">
               {photos.map((f, i) => (
                 <div key={i} className="flex items-center justify-between gap-2">
-                  <a href={previews[i]} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C6A35D] underline truncate min-w-0">Photo {i + 1} — {f.name}</a>
+                  <a href={previews[i]} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 dark:text-blue-400 underline truncate min-w-0">Photo {i + 1} — {f.name}</a>
                   <button type="button" onClick={() => setPhotos(p => p.filter((_, j) => j !== i))} className="shrink-0 text-[var(--text-faint)] hover:text-red-500"><X size={14} /></button>
                 </div>
               ))}
@@ -133,13 +133,13 @@ export function SubmitCompletionForm({ ticketId, evidenceRequested = false, requ
       {/* Notes */}
       <div>
         <label className="block text-sm font-bold text-[var(--text)] mb-1.5">Notes <span className="font-normal text-[var(--text-muted)]">(optional)</span></label>
-        <textarea className="w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)] min-h-[80px]" placeholder="Notes for the regional manager…" value={notes} onChange={e => setNotes(e.target.value)} />
+        <textarea className="w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)] min-h-[80px] focus:outline-none focus:ring-2 focus:ring-emerald-500/40" placeholder="Notes for the regional manager…" value={notes} onChange={e => setNotes(e.target.value)} />
       </div>
 
       {err && <p className="text-sm text-red-500">{err}</p>}
 
       <div className="grid grid-cols-2 gap-3">
-        <button onClick={submit} disabled={busy} className="py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Submitting…' : 'Review & Submit'}</button>
+        <button onClick={submit} disabled={busy} className="py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Submitting…' : 'Review & Submit'}</button>
         <button onClick={() => { setOpen(false); setErr('') }} disabled={busy} className="py-3 rounded-xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm font-semibold disabled:opacity-50 hover:bg-[var(--hover)]">Cancel</button>
       </div>
     </div>

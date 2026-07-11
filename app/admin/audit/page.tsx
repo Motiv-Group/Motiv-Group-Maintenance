@@ -71,7 +71,7 @@ export default async function AdminAuditPage() {
     <div className="space-y-5">
       <div>
         <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2">
-          <ScrollText size={22} className="text-[#C6A35D]" /> Audit log
+          <ScrollText size={22} className="text-blue-600 dark:text-blue-400" /> Audit log
         </h1>
         <p className="text-sm text-[var(--text-muted)] mt-0.5">
           Every privileged action — provisioning, account operations and role changes — recorded append-only. Most recent first.
@@ -103,7 +103,7 @@ export default async function AdminAuditPage() {
                   const actor = actorById.get(l.actor_id) as any
                   const company = companyById.get(l.company_id) as any
                   return (
-                    <tr key={l.id} className="border-b border-[var(--border)] last:border-0 align-top">
+                    <tr key={l.id} className="border-b border-[var(--border)] last:border-0 align-top transition hover:bg-[var(--hover)]">
                       <td className="py-2.5 px-3 whitespace-nowrap text-[var(--text-muted)]">{formatDateTime(l.created_at)}</td>
                       <td className="px-3">
                         <div className="text-[var(--text)]">{actor ? (actor.full_name || actor.email || 'Unknown') : 'System'}</div>

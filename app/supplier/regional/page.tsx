@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic'
 import { createAdminClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { Users, ArrowRight, SearchX } from 'lucide-react'
+import { Card } from '@/components/exec/ui'
 import { SearchInput } from '@/components/ui/SearchInput'
 import { Suspense } from 'react'
 
@@ -56,8 +57,8 @@ export default async function AdminRegionalPage(
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-gray-900 dark:text-white">Clients</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+        <h1 className="text-xl font-bold text-[var(--text)]">Clients</h1>
+        <p className="text-sm text-[var(--text-muted)] mt-0.5">
           {regionalManagers?.length ?? 0} regional manager{regionalManagers?.length !== 1 ? 's' : ''} · {totalBranches} branch{totalBranches !== 1 ? 'es' : ''} total
         </p>
       </div>
@@ -67,55 +68,57 @@ export default async function AdminRegionalPage(
       </Suspense>
 
       {filtered.length === 0 ? (
-        <div className="bg-slate-50 dark:bg-gray-800 border border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-12 text-center">
+        <div className="grid min-h-28 place-items-center rounded-xl border border-dashed border-[var(--border)] px-4 py-10 text-center">
           {q ? (
-            <>
-              <SearchX size={32} className="mx-auto text-gray-300 mb-3" />
-              <p className="text-gray-400 text-sm">No results for &quot;{q}&quot;</p>
-            </>
+            <div>
+              <SearchX size={28} className="mx-auto text-[var(--text-faint)] mb-2" />
+              <p className="text-sm text-[var(--text-faint)]">No results for &quot;{q}&quot;</p>
+            </div>
           ) : (
-            <>
-              <Users size={32} className="mx-auto text-gray-300 mb-3" />
-              <p className="text-gray-400 text-sm">No regional managers registered yet.</p>
-              <p className="text-xs text-gray-400 mt-1">They can sign up at /auth/signup and select the Regional Manager role.</p>
-            </>
+            <div>
+              <Users size={28} className="mx-auto text-[var(--text-faint)] mb-2" />
+              <p className="text-sm text-[var(--text-faint)]">No regional managers registered yet.</p>
+              <p className="text-xs text-[var(--text-faint)] mt-1">They can sign up at /auth/signup and select the Regional Manager role.</p>
+            </div>
           )}
         </div>
       ) : (
-        <div className="space-y-3">
+        <Card className="overflow-hidden p-0">
           {filtered.map(rm => {
             const count = branchCounts[rm.id] ?? 0
             return (
-              <Link key={rm.id} href={`/supplier/regional/${rm.id}`}>
-                <div className="bg-slate-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 border-l-4 border-l-brand-500 rounded-xl px-5 py-4 hover:border-brand-400 dark:hover:border-gray-400 transition-colors flex items-center gap-4">
-                  {/* Avatar */}
-                  <div className="w-10 h-10 rounded-full bg-brand-100 dark:bg-brand-900/30 flex items-center justify-center shrink-0">
-                    <span className="text-brand-700 dark:text-brand-400 font-bold text-sm">
-                      {(rm.full_name ?? rm.email ?? '?')[0].toUpperCase()}
-                    </span>
-                  </div>
+              <Link
+                key={rm.id}
+                href={`/supplier/regional/${rm.id}`}
+                className="flex items-center gap-4 px-5 py-4 border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition"
+              >
+                {/* Avatar */}
+                <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center shrink-0">
+                  <span className="text-white font-bold text-sm">
+                    {(rm.full_name ?? rm.email ?? '?')[0].toUpperCase()}
+                  </span>
+                </div>
 
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-900 dark:text-white truncate">{rm.full_name ?? 'Unnamed'}</p>
-                    <p className={`text-sm truncate ${rm.company_name ? 'text-brand-600 dark:text-brand-400' : 'text-gray-400 italic'}`}>
-                      {rm.company_name ?? 'No company set'}
-                    </p>
-                  </div>
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-[var(--text)] truncate">{rm.full_name ?? 'Unnamed'}</p>
+                  <p className={`text-sm truncate ${rm.company_name ? 'text-blue-600 dark:text-blue-400' : 'text-[var(--text-faint)] italic'}`}>
+                    {rm.company_name ?? 'No company set'}
+                  </p>
+                </div>
 
-                  {/* Branch count + arrow */}
-                  <div className="flex items-center gap-3 shrink-0">
-                    <div className="text-right">
-                      <p className="text-lg font-bold text-gray-900 dark:text-white">{count}</p>
-                      <p className="text-xs text-gray-400">branch{count !== 1 ? 'es' : ''}</p>
-                    </div>
-                    <ArrowRight size={16} className="text-gray-400" />
+                {/* Branch count + arrow */}
+                <div className="flex items-center gap-3 shrink-0">
+                  <div className="text-right">
+                    <p className="text-lg font-bold text-[var(--text)]">{count}</p>
+                    <p className="text-xs text-[var(--text-faint)]">branch{count !== 1 ? 'es' : ''}</p>
                   </div>
+                  <ArrowRight size={16} className="text-[var(--text-faint)]" />
                 </div>
               </Link>
             )
           })}
-        </div>
+        </Card>
       )}
     </div>
   )

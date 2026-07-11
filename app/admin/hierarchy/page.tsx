@@ -46,7 +46,7 @@ export default async function AdminHierarchyPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2">
-          <Network className="text-[#C6A35D]" size={22} /> Hierarchy
+          <Network className="text-blue-600 dark:text-blue-400" size={22} /> Hierarchy
           <InfoTip title="Hierarchy" align="left">Company → Executives, Regions → Regional Managers and Stores → Store Managers. Move a store to another region (re-links its SM under that region&apos;s RM), or reassign an RM to a region.</InfoTip>
         </h1>
         <p className="text-sm text-[var(--text-muted)] mt-0.5">Which store belongs to which company, and who manages what. Move stores or reassign managers to re-link the tree.</p>

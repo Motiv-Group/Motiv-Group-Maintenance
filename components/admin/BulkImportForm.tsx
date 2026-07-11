@@ -53,12 +53,12 @@ export function BulkImportForm() {
 
   return (
     <Card className="p-5 space-y-4">
-      <h2 className="text-sm font-bold text-[var(--text)] flex items-center gap-2"><Upload size={15} className="text-[#C6A35D]" /> Bulk import (CSV)</h2>
+      <h2 className="text-sm font-bold text-[var(--text)] flex items-center gap-2"><Upload size={15} className="text-[var(--text-muted)]" /> Bulk import (CSV)</h2>
 
       <div className="grid grid-cols-3 gap-2">
         {ROLES.map(r => (
           <button key={r.value} type="button" onClick={() => { setRole(r.value); setResults(null); setErr('') }}
-            className={`px-3 py-2 rounded-xl border-2 text-xs font-semibold transition ${role === r.value ? 'border-[#C6A35D] bg-[#C6A35D]/10 text-[#C6A35D]' : 'border-[var(--border)] text-[var(--text)] hover:border-[#C6A35D]/50'}`}>
+            className={`px-3 py-2 rounded-xl border-2 text-xs font-semibold transition ${role === r.value ? 'border-emerald-500 bg-emerald-500/10 text-[var(--text)] ring-2 ring-emerald-500/30' : 'border-[var(--border)] text-[var(--text-muted)] hover:border-emerald-500/60'}`}>
             {r.label}
           </button>
         ))}
@@ -67,14 +67,14 @@ export function BulkImportForm() {
       <p className="text-[11px] text-[var(--text-muted)]">First row = headers. Columns: <span className="font-mono text-[var(--text)]">{cols}</span>. Company &amp; region are matched by name (created if new). Each new account gets an email activation link.</p>
 
       <textarea value={text} onChange={e => setText(e.target.value)} rows={6} placeholder={`company_name,region_name,region_code,store_name,branch_name,branch_code,full_name,email,phone,address\nAcme,Gauteng,GP,Acme Sandton,Sandton City,SND01,Jane Smith,jane@acme.com,0712345678,123 Main St`}
-        className="w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-xs font-mono placeholder-[var(--text-faint)] outline-none focus:ring-[#C6A35D]/40" />
+        className="w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-xs font-mono placeholder-[var(--text-faint)] outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500/60" />
 
       <div className="flex items-center gap-2">
         <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl ring-1 ring-[var(--border)] text-sm text-[var(--text)] cursor-pointer hover:bg-[var(--hover)] transition shrink-0">
           Choose CSV file
           <input type="file" accept=".csv,text/csv" className="hidden" onChange={async e => { const f = e.target.files?.[0]; if (f) setText(await f.text()); e.target.value = '' }} />
         </label>
-        <button onClick={importRows} disabled={busy || !text.trim()} className="flex-1 py-2.5 rounded-xl bg-[#C6A35D] hover:brightness-95 text-[#0a0e17] text-sm font-semibold transition disabled:opacity-50">
+        <button onClick={importRows} disabled={busy || !text.trim()} className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition disabled:opacity-50">
           {busy ? 'Importing…' : 'Import & invite'}
         </button>
       </div>
