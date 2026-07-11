@@ -561,6 +561,41 @@ export function RmQuotePanel({ ticketId, rows, canReQuote }: { ticketId: string;
   )
 }
 
+// Today-queue "Approve quote" pop-up: fetches the ticket's quote-panel rows on
+// open (they're not in the queue payload) and shows the same RmQuotePanel — view
+// each quote + Approve / Decline in place, no navigating into the ticket.
+export function QuoteReviewButton({ ticketId, trigger }: { ticketId: string; trigger: (open: () => void) => ReactNode }) {
+  const [open, setOpen] = useState(false)
+  const [data, setData] = useState<{ rows: QuotePanelRow[]; canReQuote: boolean } | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [err, setErr] = useState('')
+  useEffect(() => {
+    if (!open) return
+    let live = true
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resets fetch state when the pop-up opens, before the async load; cannot run during render
+    setLoading(true); setErr('')
+    fetch(`/api/tickets/${ticketId}/quotes`)
+      .then(r => r.json())
+      .then(d => { if (!live) return; if (d?.error) setErr(d.error); else setData(d) })
+      .catch(() => { if (live) setErr('Could not load the quotes.') })
+      .finally(() => { if (live) setLoading(false) })
+    return () => { live = false }
+  }, [open, ticketId])
+  return (
+    <>
+      {trigger(() => setOpen(true))}
+      {open && (
+        <Modal title="Review quotes" maxWidth="max-w-2xl" onClose={() => setOpen(false)}>
+          {loading ? <p className="py-4 text-center text-sm text-[var(--text-faint)]">Loading…</p>
+            : err ? <p className="text-sm text-red-500">{err}</p>
+            : data ? (data.rows.length ? <RmQuotePanel ticketId={ticketId} rows={data.rows} canReQuote={data.canReQuote} /> : <p className="text-sm text-[var(--text-faint)]">No quotes yet.</p>)
+            : null}
+        </Modal>
+      )}
+    </>
+  )
+}
+
 // ── RM adds extra work to the ticket (before a supplier is assigned) ─
 export function RmAddWorkForm({ ticketId, description, photoUrls, title, category, impact }: {
   ticketId: string; description: string; photoUrls: string[]; title: string; category: string; impact: string

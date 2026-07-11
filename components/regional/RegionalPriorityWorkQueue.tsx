@@ -10,7 +10,7 @@ import { AlertCircle, AlertOctagon, AlertTriangle, ArrowRight, CalendarClock, Ch
 import type { RegionalTicketRow } from '@/lib/health/data'
 import { Card } from '@/components/exec/ui'
 import { CategoryIcon } from '@/components/client/ticketBadges'
-import { AssignSuppliersButton } from '@/components/regional/RmTicketActions'
+import { AssignSuppliersButton, QuoteReviewButton } from '@/components/regional/RmTicketActions'
 import { rmStatusMeta, formatDate, formatDateTime, humanizeDuration, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
 
 type QueueFilter = 'all' | 'assign' | 'quotes' | 'signoff' | 'sla' | 'snags'
@@ -144,9 +144,12 @@ function QueueRow({ ticket, nowMs, suppliers, motivSuppliers }: { ticket: Region
   const breached = ticket.overdue || ticket.breached || slaMs <= 0
   const meta = rmStatusMeta(ticket.status)
   const ticketUrl = `/regional/tickets/${ticket.id}`
-  // A new ticket's next step is to assign a supplier — the CTA opens the assign
-  // picker in place (no navigation), exactly like the SM "Add Info" button.
-  const assignable = needsAssignment(ticket)
+  // CTA per phase (all pop-ups open in place, like the SM "Add Info" button):
+  //  · a quote is in to review        → "Approve quote"  (view + approve/decline)
+  //  · still gathering / awaiting quotes → "Assign supplier" (assign / add more)
+  //  · anything else                   → "View Ticket"
+  const reviewQuote = ['quoted', 'quote_revision'].includes(ticket.status)
+  const assignable = !reviewQuote && ['open', 'info_requested', 'suppliers_declined', 'assigned', 'quote_requested', 'assessment'].includes(ticket.status)
   // Same outline form-factor + size as the "View Ticket" button, so the queue's
   // CTAs are consistent. Sits above the whole-row link (z-20) so its click opens
   // the pop-up / navigates on its own.
@@ -186,7 +189,10 @@ function QueueRow({ ticket, nowMs, suppliers, motivSuppliers }: { ticket: Region
       </div>
 
       <div className="flex lg:justify-end">
-        {assignable ? (
+        {reviewQuote ? (
+          <QuoteReviewButton ticketId={ticket.id}
+            trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}>Approve quote</button>} />
+        ) : assignable ? (
           <AssignSuppliersButton ticketId={ticket.id} suppliers={suppliers} motivSuppliers={motivSuppliers}
             trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}>Assign supplier</button>} />
         ) : (
