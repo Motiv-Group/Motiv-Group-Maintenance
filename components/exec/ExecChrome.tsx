@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { Globe2, Map as MapIcon, Store, Truck, Gavel, Bell, Settings, LogOut, FileBarChart, LayoutDashboard, Ticket, ClipboardCheck, AlertTriangle, ReceiptText, BarChart2, Users, CalendarClock, CheckCircle2 } from 'lucide-react'
 import { MotivLogo } from '@/components/ui/MotivLogo'
+import { ContextSwitcher } from '@/components/ui/ContextSwitcher'
 import { SwipeNav } from '@/components/ui/SwipeNav'
 
 interface ChromeTab { href: string; label: string; icon: React.ElementType }
@@ -61,7 +62,8 @@ const VARIANTS = {
 
 export function ExecChrome({
   children, userName, variant = 'exec', unreadCount = 0, contextLabel,
-}: { children: ReactNode; userName: string | null; variant?: keyof typeof VARIANTS; unreadCount?: number; contextLabel?: string | null }) {
+  contextOptions, activeContextId, contextCookie,
+}: { children: ReactNode; userName: string | null; variant?: keyof typeof VARIANTS; unreadCount?: number; contextLabel?: string | null; contextOptions?: { id: string; label: string }[]; activeContextId?: string | null; contextCookie?: string }) {
   const { tabs, roleLabel, base, reports } = VARIANTS[variant]
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -86,6 +88,9 @@ export function ExecChrome({
           userName={userName}
           roleLabel={roleLabel}
           contextLabel={contextLabel}
+          contextOptions={contextOptions}
+          activeContextId={activeContextId}
+          contextCookie={contextCookie}
           ContextIcon={isStore ? Store : MapIcon}
           unreadCount={unreadCount}
           initial={initial}
@@ -168,6 +173,9 @@ function DesktopSidebar({
   userName,
   roleLabel,
   contextLabel,
+  contextOptions,
+  activeContextId,
+  contextCookie,
   ContextIcon,
   unreadCount,
   initial,
@@ -179,6 +187,9 @@ function DesktopSidebar({
   userName: string | null
   roleLabel: string
   contextLabel?: string | null
+  contextOptions?: { id: string; label: string }[]
+  activeContextId?: string | null
+  contextCookie?: string
   ContextIcon: React.ElementType
   unreadCount: number
   initial: string
@@ -193,12 +204,14 @@ function DesktopSidebar({
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-[260px] border-r border-white/10 bg-brand-600 text-white lg:flex lg:flex-col">
       <div className="px-5 pt-6 pb-4">
         <Link href={home} className="inline-flex"><MotivLogo height={34} /></Link>
-        {contextLabel && (
+        {contextOptions && contextOptions.length > 0 ? (
+          <ContextSwitcher options={contextOptions} activeId={activeContextId ?? null} cookieName={contextCookie ?? 'motiv_ctx'} Icon={ContextIcon} />
+        ) : contextLabel ? (
           <div className="mt-6 flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-gray-200">
             <span className="truncate">{contextLabel}</span>
             <ContextIcon size={14} className="shrink-0 text-gray-400" />
           </div>
-        )}
+        ) : null}
       </div>
 
       <nav className="flex-1 px-3">
