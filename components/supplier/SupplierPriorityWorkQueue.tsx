@@ -148,7 +148,9 @@ function QueueRow({ ticket, nowMs, company }: { ticket: SupplierTicketRow; nowMs
     : needsEvidence(ticket) ? 'Upload evidence'
     : isSnag(ticket) ? 'Accept snag'
     : 'View Ticket'
-  const ctaCls = 'relative z-20 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-blue-500/60 px-4 py-2 text-sm font-bold text-blue-600 transition hover:bg-blue-500/10 dark:text-blue-300 lg:w-40'
+  // Genuinely critical (P1 / urgent) jobs get a RED action button so they stand out.
+  const critical = ['P1', 'urgent'].includes(String(ticket.priority))
+  const ctaCls = `relative z-20 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-bold transition lg:w-40 ${critical ? 'border-red-500/60 text-red-600 hover:bg-red-500/10 dark:text-red-300' : 'border-blue-500/60 text-blue-600 hover:bg-blue-500/10 dark:text-blue-300'}`
 
   return (
     <div className="relative grid gap-4 border-b border-[var(--border)] px-4 py-4 transition last:border-b-0 hover:bg-[var(--hover)] lg:grid-cols-[1fr_200px_1.1fr_160px] lg:items-center">
@@ -163,8 +165,8 @@ function QueueRow({ ticket, nowMs, company }: { ticket: SupplierTicketRow; nowMs
       </div>
 
       <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className={`inline-flex w-[120px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${priorityBadgeClass(String(ticket.priority))}`}>{PRIORITY_LEVEL_LABELS[String(ticket.priority)] ?? 'Medium'}</span>
+        <div className="flex items-center gap-1.5">
+          <span className={`inline-flex w-[72px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${priorityBadgeClass(String(ticket.priority))}`}>{PRIORITY_LEVEL_LABELS[String(ticket.priority)] ?? 'Medium'}</span>
           <span className={`inline-flex w-[120px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${statusCls}`}>{statusLabel}</span>
         </div>
         <p className="mt-1.5 truncate text-sm text-[var(--text-muted)]">{ticket.awardedToMe ? 'Awarded to you' : 'Invited to quote'}</p>
