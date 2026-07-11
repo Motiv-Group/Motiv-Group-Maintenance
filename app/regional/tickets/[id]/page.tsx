@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { redirect } from 'next/navigation'
 import { BackLink } from '@/components/ui/BackLink'
-import { CheckCircle2, FileText, Calendar, CalendarClock, Clock, MessageSquare, Camera } from 'lucide-react'
+import { CheckCircle2, FileText, Calendar, CalendarClock, Clock, MessageSquare, Camera, Loader2, XCircle, ClipboardCheck } from 'lucide-react'
 import { createAdminClient } from '@/lib/supabase/server'
 import { signedUrl } from '@/lib/storage'
 import { requireRegionalV3 } from '@/lib/health/guard'
@@ -507,13 +507,39 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
   const lastSeenMs = (readRow as any)?.last_seen_at ? +new Date((readRow as any).last_seen_at) : 0
   const newSupplierUpdates = supplierUpdates.filter(u => +new Date(u.created_at) > lastSeenMs)
 
+  // The RM's single most important pending step — the "Next action" signpost that
+  // mirrors the SM ticket's flavor. The real controls live in the Actions card
+  // below; this just tells the RM (or reassures them) what's next. `act` = needs
+  // the RM, `wait` = waiting on someone else, `done`/`closed` = finished.
+  const nextAction: { mode: 'act' | 'wait' | 'done' | 'closed'; msg: string; sub: string } = (() => {
+    if (t.status === 'completed') return { mode: 'done', msg: 'This job is complete', sub: 'The completion has been approved and signed off.' }
+    if (t.status === 'cancelled' || t.status === 'declined') return { mode: 'closed', msg: `Ticket ${t.status}`, sub: t.cancellation_reason || 'No further action needed.' }
+    if (openDispute) return { mode: 'act', msg: 'Resolve the open dispute', sub: 'A dispute is paused on this ticket — review the thread and resolve it in the Dispute section.' }
+    if (snagAwaitingApproval) return { mode: 'act', msg: 'Approve the snag-fix date', sub: 'The supplier proposed a date to carry out the corrective work — approve it below.' }
+    if (pendingSignoffs.length > 0) return { mode: 'act', msg: 'Review & approve the completion', sub: 'The supplier submitted the COC & POC — approve it, request more evidence, or raise a snag.' }
+    if (t.status === 'variation_review') return { mode: 'act', msg: 'Review the variation order', sub: 'A variation order for extra work is awaiting your approval below.' }
+    if (reviewQuotes.length > 0) return { mode: 'act', msg: `Review ${reviewQuotes.length} quote${reviewQuotes.length === 1 ? '' : 's'}`, sub: 'Compare the quotes and approve one, or ask a supplier to re-quote.' }
+    if (t.status === 'scheduled' && t.schedule_status === 'proposed' && t.scheduled_at) return { mode: 'act', msg: 'Accept the proposed visit time', sub: 'The supplier proposed a time beyond the SLA window — accept it below.' }
+    if (t.status === 'approved_closeout') return { mode: 'act', msg: 'Finalise the close-out', sub: 'The completion is approved — finalise once the supplier confirms there are no variation orders.' }
+    if (rmInfoAdded) return { mode: 'act', msg: 'Review the added information', sub: 'The store manager answered your request — assign a supplier or move the ticket on.' }
+    if (canAssign) return { mode: 'act', msg: 'Assign a supplier', sub: 'Send this job to one or more suppliers to request quotes.' }
+    if (awaitingSupplierQuotes) return { mode: 'wait', msg: 'Waiting on supplier quotes', sub: 'The assigned supplier(s) will submit their quotes.' }
+    if (t.status === 'evidence_requested') return { mode: 'wait', msg: 'Waiting on more evidence', sub: 'The supplier will provide the additional evidence you requested.' }
+    if (SNAG_WAIT_MSG[t.status]) return { mode: 'wait', msg: 'Waiting on the snag fix', sub: SNAG_WAIT_MSG[t.status] }
+    if (t.status === 'vo_declined') return { mode: 'wait', msg: 'Waiting on the supplier', sub: 'You declined the variation order — the supplier can revise it or message you.' }
+    if (['accepted', 'scheduled'].includes(t.status)) return { mode: 'wait', msg: 'Waiting on the supplier to attend', sub: `${nameById.get(t.supplier_id ?? '') ?? 'The supplier'} has been awarded the job and will attend on the agreed date.` }
+    if (t.status === 'in_progress') return { mode: 'wait', msg: 'Work in progress', sub: 'The supplier is on site or en route. The completion will follow once the work is done.' }
+    return { mode: 'wait', msg: rmStatusMeta(t.status).label, sub: 'No action needed from you right now.' }
+  })()
+  const NaIcon = nextAction.mode === 'done' ? CheckCircle2 : nextAction.mode === 'closed' ? XCircle : nextAction.mode === 'wait' ? Loader2 : ClipboardCheck
+  const naColor = nextAction.mode === 'done' ? 'text-emerald-500' : nextAction.mode === 'closed' ? 'text-[var(--text-faint)]' : nextAction.mode === 'wait' ? 'text-blue-500' : 'text-[#C6A35D]'
+
   return (
     <div className="space-y-5">
       <BackLink fallbackHref="/regional/tickets" label="Back to tickets" />
-      {/* Progress — bare, no card around it */}
-      <div className="px-1 pt-1"><RmPipeline status={t.status} /></div>
-      {/* Ticket detail — structured, mirrors the SM layout */}
-      <Card className="p-5 space-y-4">
+
+      {/* Header — reference, title, priority + status, progress stepper (SM flavor). */}
+      <Card className="p-5 space-y-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             {t.job_ref && <p className="text-[11px] font-mono font-semibold tracking-wide text-[var(--text-faint)] mb-0.5">{t.job_ref}</p>}
@@ -537,74 +563,100 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-          <DetailItem label="Store" value={storeName} />
-          <DetailItem label="Category" value={t.category ?? 'General'} />
-          <DetailItem label="Operational Impact" value={OPERATIONAL_IMPACT_LABELS[t.operational_impact ?? 'none'] ?? 'No operational impact'} />
-          <DetailItem label="Logged" value={formatDateTime(t.created_at)} />
-          <DueDate dueAt={dueAt} overdue={overdue} now={now.toISOString()} />
-        </div>
-
-        <div>
-          <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Description</div>
-          {(() => {
-            // Two kinds of appended segment are highlighted red until the RM moves the
-            // ticket on: the store manager's answer ("— Added info: …", red while the
-            // info is freshly added) and the RM's own extra scope ("— Extra Work: …",
-            // red until a supplier is assigned / re-assigned). Everything else is muted.
-            const parts = String(t.description ?? '').split(/(\n\n— (?:Added info|Extra Work): )/)
-            const segs: JSX.Element[] = []
-            for (let i = 1; i < parts.length; i += 2) {
-              const sep = parts[i], seg = parts[i + 1] ?? ''
-              const hot = sep.includes('Extra Work') ? canAssign : rmInfoAdded
-              segs.push(<span key={i} className={hot ? 'text-red-600 dark:text-red-400 font-medium' : 'text-[var(--text-muted)]'}>{`${sep}${seg}`}</span>)
-            }
-            return (
-              <p className="text-sm whitespace-pre-line">
-                <span className="text-[var(--text-muted)]">{parts[0]}</span>
-                {segs}
-              </p>
-            )
-          })()}
-        </div>
-
-        {Array.isArray(t.photo_urls) && t.photo_urls.length > 0 && (
-          <div>
-            <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Photos</div>
-            <PhotoThumbs urls={t.photo_urls as string[]} ticketId={t.id} />
-          </div>
-        )}
-
-        {t.info_request_reason && <p className="text-xs text-amber-600 dark:text-amber-400">Info requested: {t.info_request_reason}</p>}
-        {/* Scheduled visit — hidden once a snag fix is in play (that callout replaces it). */}
-        {t.scheduled_at && !snagScheduleActive && (
-          <div className="flex items-center gap-2.5 rounded-xl bg-indigo-500/10 ring-1 ring-indigo-500/30 px-3.5 py-3">
-            <Calendar size={18} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
-            <div className="min-w-0">
-              <p className="text-[11px] uppercase tracking-wide font-semibold text-indigo-700 dark:text-indigo-400">Scheduled{t.schedule_status === 'proposed' ? ' · proposed' : ''}</p>
-              <p className="text-sm font-bold text-[var(--text)]">{formatDateTime(t.scheduled_at)}</p>
-              {t.schedule_status === 'proposed' && <p className="text-[11px] text-amber-600 dark:text-amber-400">Past the SLA window — awaiting your acceptance.</p>}
-            </div>
-          </div>
-        )}
-        {/* Snag fix schedule — only shown once the RM has approved the date (replaces
-            the original Scheduled callout above). */}
-        {snagFixApproved && (
-          <div className="flex items-center gap-2.5 rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 px-3.5 py-3">
-            <Calendar size={18} className="text-amber-600 dark:text-amber-400 shrink-0" />
-            <div className="min-w-0">
-              <p className="text-[11px] uppercase tracking-wide font-semibold text-amber-700 dark:text-amber-400">Snag fix scheduled</p>
-              <p className="text-sm font-bold text-[var(--text)]">{formatDateTime(latestSnag.scheduled_at)}</p>
-            </div>
-          </div>
-        )}
-
-        {/* Last text on the left, Edit ticket on the right, on the same line. */}
-        <div className="flex items-end justify-between gap-2">
-          <EditedLine at={t.edited_at} by={editorName} />
-          {canEdit && <RmEditTicketForm ticketId={t.id} initial={{ title: t.title, category: t.category ?? 'General', impact: t.operational_impact ?? 'none', priority: t.priority, description: t.description }} />}
-        </div>
+        <RmPipeline status={t.status} />
       </Card>
+
+      {/* Two columns: Next action · Ticket information (SM flavor). */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        {/* Next action — the RM's single most important pending step. */}
+        <Card className="p-5">
+          <h2 className="text-sm font-bold text-[var(--text)] mb-3">Next action</h2>
+          <div className="flex items-start gap-3">
+            <NaIcon size={22} className={`${naColor} shrink-0 ${nextAction.mode === 'wait' ? 'animate-spin' : ''}`} />
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-[var(--text)]">{nextAction.msg}</p>
+              <p className="mt-0.5 text-sm text-[var(--text-muted)]">{nextAction.sub}</p>
+            </div>
+          </div>
+          {nextAction.mode === 'act' && (
+            <p className="mt-4 flex items-center gap-1.5 rounded-lg bg-[#C6A35D]/10 px-3 py-2.5 text-xs text-[var(--text-muted)] ring-1 ring-[#C6A35D]/20">
+              <ClipboardCheck size={14} className="shrink-0 text-[#C6A35D]" /> Take this step in the highlighted section below.
+            </p>
+          )}
+        </Card>
+
+        {/* Ticket information */}
+        <Card className="p-5 space-y-4">
+          <h2 className="text-sm font-bold text-[var(--text)]">Ticket information</h2>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+            <DetailItem label="Store" value={storeName} />
+            <DetailItem label="Category" value={t.category ?? 'General'} />
+            <DetailItem label="Operational Impact" value={OPERATIONAL_IMPACT_LABELS[t.operational_impact ?? 'none'] ?? 'No operational impact'} />
+            <DetailItem label="Logged" value={formatDateTime(t.created_at)} />
+            <DueDate dueAt={dueAt} overdue={overdue} now={now.toISOString()} />
+          </div>
+
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Description</div>
+            {(() => {
+              // Two kinds of appended segment are highlighted red until the RM moves the
+              // ticket on: the store manager's answer ("— Added info: …", red while the
+              // info is freshly added) and the RM's own extra scope ("— Extra Work: …",
+              // red until a supplier is assigned / re-assigned). Everything else is muted.
+              const parts = String(t.description ?? '').split(/(\n\n— (?:Added info|Extra Work): )/)
+              const segs: JSX.Element[] = []
+              for (let i = 1; i < parts.length; i += 2) {
+                const sep = parts[i], seg = parts[i + 1] ?? ''
+                const hot = sep.includes('Extra Work') ? canAssign : rmInfoAdded
+                segs.push(<span key={i} className={hot ? 'text-red-600 dark:text-red-400 font-medium' : 'text-[var(--text-muted)]'}>{`${sep}${seg}`}</span>)
+              }
+              return (
+                <p className="text-sm whitespace-pre-line">
+                  <span className="text-[var(--text-muted)]">{parts[0]}</span>
+                  {segs}
+                </p>
+              )
+            })()}
+          </div>
+
+          {Array.isArray(t.photo_urls) && t.photo_urls.length > 0 && (
+            <div>
+              <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Photos</div>
+              <PhotoThumbs urls={t.photo_urls as string[]} ticketId={t.id} />
+            </div>
+          )}
+
+          {t.info_request_reason && <p className="text-xs text-amber-600 dark:text-amber-400">Info requested: {t.info_request_reason}</p>}
+          {/* Scheduled visit — hidden once a snag fix is in play (that callout replaces it). */}
+          {t.scheduled_at && !snagScheduleActive && (
+            <div className="flex items-center gap-2.5 rounded-xl bg-indigo-500/10 ring-1 ring-indigo-500/30 px-3.5 py-3">
+              <Calendar size={18} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[11px] uppercase tracking-wide font-semibold text-indigo-700 dark:text-indigo-400">Scheduled{t.schedule_status === 'proposed' ? ' · proposed' : ''}</p>
+                <p className="text-sm font-bold text-[var(--text)]">{formatDateTime(t.scheduled_at)}</p>
+                {t.schedule_status === 'proposed' && <p className="text-[11px] text-amber-600 dark:text-amber-400">Past the SLA window — awaiting your acceptance.</p>}
+              </div>
+            </div>
+          )}
+          {/* Snag fix schedule — only shown once the RM has approved the date (replaces
+              the original Scheduled callout above). */}
+          {snagFixApproved && (
+            <div className="flex items-center gap-2.5 rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 px-3.5 py-3">
+              <Calendar size={18} className="text-amber-600 dark:text-amber-400 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[11px] uppercase tracking-wide font-semibold text-amber-700 dark:text-amber-400">Snag fix scheduled</p>
+                <p className="text-sm font-bold text-[var(--text)]">{formatDateTime(latestSnag.scheduled_at)}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Last text on the left, Edit ticket on the right, on the same line. */}
+          <div className="flex items-end justify-between gap-2">
+            <EditedLine at={t.edited_at} by={editorName} />
+            {canEdit && <RmEditTicketForm ticketId={t.id} initial={{ title: t.title, category: t.category ?? 'General', impact: t.operational_impact ?? 'none', priority: t.priority, description: t.description }} />}
+          </div>
+        </Card>
+      </div>
       {/* Bump this RM's "last seen" watermark on a real open (fires client-side, not on
           prefetch) so these updates read as seen next visit. */}
       <MarkTicketSeen ticketId={t.id} latestUpdateAt={supplierUpdates[0]?.created_at ?? null} />
