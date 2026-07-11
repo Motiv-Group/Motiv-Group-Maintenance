@@ -565,6 +565,43 @@ export function RmQuotePanel({ ticketId, rows, canReQuote }: { ticketId: string;
   )
 }
 
+// ── Generic review panel (COC/POC · snag · VO) — mirrors the quote panel ─────
+// A compact clickable summary row in the "Next action" block that pops up the
+// full detail + the action buttons (composed on the server and passed in as
+// `body`). Same look as RmQuotePanel so every pending decision reads the same.
+export function RmReviewPanel({ heading, items }: {
+  heading?: string
+  items: { id: string; dot: string; title: string; subtitle?: string | null; statusLabel: string; statusCls: string; modalTitle?: string; body: ReactNode }[]
+}) {
+  const [openId, setOpenId] = useState<string | null>(null)
+  const active = items.find(i => i.id === openId) ?? null
+  if (!items.length) return null
+  return (
+    <div className="space-y-2">
+      {heading && <p className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">{heading}</p>}
+      <div className="rounded-xl ring-1 ring-[var(--border)] bg-[var(--surface)] divide-y divide-[var(--border)]">
+        {items.map(it => (
+          <button key={it.id} type="button" onClick={() => setOpenId(it.id)} className="w-full px-3 py-2 flex items-center justify-between gap-2 text-left transition hover:bg-[var(--hover)]">
+            <span className="flex items-center gap-2 min-w-0">
+              <i className={`w-2.5 h-2.5 rounded-full shrink-0 ${it.dot}`} />
+              <span className="min-w-0">
+                <span className="block truncate text-sm text-[var(--text)]">{it.title}</span>
+                {it.subtitle && <span className="text-[11px] text-[var(--text-faint)]">{it.subtitle}</span>}
+              </span>
+            </span>
+            <span className={`flex items-center gap-1.5 shrink-0 text-[11px] font-semibold ${it.statusCls}`}>{it.statusLabel} <FileText size={13} /></span>
+          </button>
+        ))}
+      </div>
+      {active && (
+        <Modal title={active.modalTitle ?? active.title} maxWidth="max-w-2xl" onClose={() => setOpenId(null)}>
+          {active.body}
+        </Modal>
+      )}
+    </div>
+  )
+}
+
 // Today-queue "Approve quote" pop-up: fetches the ticket's quote-panel rows on
 // open (they're not in the queue payload) and shows the same RmQuotePanel — view
 // each quote + Approve / Decline in place, no navigating into the ticket.

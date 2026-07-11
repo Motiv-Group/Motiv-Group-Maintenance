@@ -15,7 +15,7 @@ import { BreachReason } from '@/components/workflow/BreachReason'
 import { Card } from '@/components/exec/ui'
 import { WorkflowActions } from '@/components/workflow/WorkflowActions'
 import { RmPipeline } from '@/components/regional/RmPipeline'
-import { AssignSuppliersButton, RequestInfoButton, RmEditTicketForm, RmQuotePanel, CancelTicketCard, ApproveSignoffCard, ReQuoteButton, AcceptScheduleCard, AcceptSnagScheduleCard, VariationReviewCard, RmAddWorkForm, RequestEvidenceButton, RaiseSnagButton, CloseOutButton } from '@/components/regional/RmTicketActions'
+import { AssignSuppliersButton, RequestInfoButton, RmEditTicketForm, RmQuotePanel, RmReviewPanel, CancelTicketCard, ApproveSignoffCard, ReQuoteButton, AcceptScheduleCard, AcceptSnagScheduleCard, VariationReviewCard, RmAddWorkForm, RequestEvidenceButton, RaiseSnagButton, CloseOutButton } from '@/components/regional/RmTicketActions'
 import { DueDate } from '@/components/workflow/DueDate'
 import { EditedLine } from '@/components/ui/EditedLine'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
@@ -541,7 +541,9 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
     if (t.status === 'evidence_requested') return { mode: 'wait', msg: 'Waiting on more evidence', sub: 'The supplier will provide the additional evidence you requested.' }
     if (SNAG_WAIT_MSG[t.status]) return { mode: 'wait', msg: 'Waiting on the snag fix', sub: SNAG_WAIT_MSG[t.status] }
     if (t.status === 'vo_declined') return { mode: 'wait', msg: 'Waiting on the supplier', sub: 'You declined the variation order — the supplier can revise it or message you.' }
-    if (t.status === 'in_progress') return { mode: 'wait', msg: 'Work in progress', sub: 'The supplier is on site or en route. The completion will follow once the work is done.' }
+    // In progress — the standing "…on site or en route…" callout below carries the
+    // message; the signpost line is intentionally blank to avoid saying it twice.
+    if (t.status === 'in_progress') return { mode: 'wait', msg: '', sub: '' }
     return { mode: 'wait', msg: rmStatusMeta(t.status).label, sub: 'No action needed from you right now.' }
   })()
 
@@ -594,7 +596,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
   // "History" tab content — everything archived (superseded / not-selected quotes,
   // declined quote requests, sent-back submissions, a declined snag-fix date),
   // grouped and labelled. Rendered inside the bottom tabbed card.
-  const hasHistory = archivedDeclinedQuotes.length > 0 || archivedRequestDeclines.length > 0 || closedWaitingRows.length > 0 || supersededSubmissions.length > 0 || !!declinedSnag
+  const hasHistory = archivedDeclinedQuotes.length > 0 || archivedRequestDeclines.length > 0 || closedWaitingRows.length > 0 || supersededSubmissions.length > 0 || !!declinedSnag || (variations ?? []).length > 0
   const historyContent = hasHistory ? (
     <div className="space-y-4">
       {archivedDeclinedQuotes.length > 0 && (
@@ -670,6 +672,44 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
           </details>
         </ArchiveGroup>
       )}
+      {(variations ?? []).length > 0 && (
+        <ArchiveGroup label="Variation orders">
+          {((variations ?? []) as any[]).map((v, i) => {
+            const meta = v.status === 'approved' ? { l: 'VO accepted', c: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' }
+              : v.status === 'rejected' ? { l: 'VO rejected', c: 'bg-red-500/15 text-red-700 dark:text-red-400' }
+              : { l: 'Pending', c: 'bg-amber-500/15 text-amber-700 dark:text-amber-400' }
+            return (
+              <details key={i} className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
+                <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
+                  <span className="text-sm font-semibold text-[var(--text)] min-w-0 truncate">Variation order {i + 1}</span>
+                  <span className="flex items-center gap-2 shrink-0">
+                    {v.amount != null && <span className="text-sm text-[var(--text)] tabular-nums">{formatCurrency(v.amount)}</span>}
+                    <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 ${meta.c}`}>{meta.l}</span>
+                  </span>
+                </summary>
+                <div className="border-t border-[var(--border)] p-4 space-y-2">
+                  <p className="text-sm text-[var(--text)] whitespace-pre-line">{v.description}</p>
+                  {v.warranty && <p className="text-[13px] text-[var(--text-muted)]"><span className="font-medium text-[var(--text)]">Warranty:</span> {v.warranty}</p>}
+                  {v.reject_reason && (
+                    <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3">
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Decline reason</p>
+                      <p className="text-sm text-[var(--text)]">{v.reject_reason}</p>
+                    </div>
+                  )}
+                  {Array.isArray(v.file_urls) && v.file_urls.length > 0 && (
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 pt-1">
+                      {v.file_urls.map((u: string, j: number) => (
+                        <a key={j} href={u} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"><FileText size={14} /> Attachment {j + 1}</a>
+                      ))}
+                    </div>
+                  )}
+                  <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(v.created_at)}</p>
+                </div>
+              </details>
+            )
+          })}
+        </ArchiveGroup>
+      )}
     </div>
   ) : null
 
@@ -733,6 +773,68 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
     </div>
   ) : null
 
+  // ── Review-panel items (COC/POC · snag · VO) — same compact-row-+-pop-up
+  // structure as the quote panel. Each row opens a modal with the full detail and
+  // the action buttons; the old standalone sections/cards are removed.
+  const cocReviewItems = t.status === 'submitted_for_signoff' ? pendingSignoffs.map((s: any) => ({
+    id: s.id as string,
+    dot: 'bg-[#C6A35D]',
+    title: submissionLabel(s),
+    subtitle: `submitted ${formatDateTime(s.created_at)}`,
+    statusLabel: 'Under review',
+    statusCls: 'text-amber-700 dark:text-[#C6A35D]',
+    modalTitle: 'Completion — review',
+    body: (
+      <div className="space-y-4">
+        <RmSignoffCard s={s} tone="review" ticketId={t.id} title={submissionLabel(s)} freshEvidence={isEvidenceResubmission} priorUrls={priorEvidenceUrls} />
+        <ApproveSignoffCard ticketId={t.id} />
+        <div className="grid grid-cols-1 gap-2">
+          <RequestEvidenceButton ticketId={t.id} />
+          <RaiseSnagButton ticketId={t.id} />
+        </div>
+      </div>
+    ),
+  })) : []
+
+  const snagReviewItems = (snagAwaitingApproval && latestSnag?.scheduled_at) ? [{
+    id: 'snag-schedule',
+    dot: 'bg-amber-500',
+    title: 'Snag fix schedule',
+    subtitle: `proposed ${formatDateTime(latestSnag.scheduled_at)}`,
+    statusLabel: 'Awaiting your approval',
+    statusCls: 'text-amber-700 dark:text-amber-400',
+    modalTitle: 'Snag fix schedule',
+    body: <AcceptSnagScheduleCard ticketId={t.id} scheduledAt={latestSnag.scheduled_at} />,
+  }] : []
+
+  const pendingVariation = ((variations ?? []) as any[]).find(v => v.status === 'pending') ?? null
+  const voReviewItems = (t.status === 'variation_review' && pendingVariation) ? [{
+    id: 'vo-review',
+    dot: 'bg-amber-500',
+    title: 'Variation order',
+    subtitle: pendingVariation.amount != null ? formatCurrency(pendingVariation.amount) : 'Extra work',
+    statusLabel: 'Awaiting your approval',
+    statusCls: 'text-amber-700 dark:text-amber-400',
+    modalTitle: 'Variation order — review',
+    body: (
+      <div className="space-y-4">
+        <div className="rounded-xl ring-1 ring-[var(--border)] p-4 space-y-2">
+          <p className="text-sm text-[var(--text)] whitespace-pre-line">{pendingVariation.description}</p>
+          {pendingVariation.warranty && <p className="text-[13px] text-[var(--text-muted)]"><span className="font-medium text-[var(--text)]">Warranty:</span> {pendingVariation.warranty}</p>}
+          {pendingVariation.amount != null && <p className="text-[13px] text-[var(--text-muted)]"><span className="font-medium text-[var(--text)]">Amount:</span> {formatCurrency(pendingVariation.amount)}</p>}
+          {Array.isArray(pendingVariation.file_urls) && pendingVariation.file_urls.length > 0 && (
+            <div className="flex flex-wrap gap-x-3 gap-y-1 pt-1">
+              {pendingVariation.file_urls.map((u: string, j: number) => (
+                <a key={j} href={u} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"><FileText size={14} /> Attachment {j + 1}</a>
+              ))}
+            </div>
+          )}
+        </div>
+        <VariationReviewCard ticketId={t.id} />
+      </div>
+    ),
+  }] : []
+
   return (
     <div className="space-y-5">
       <BackLink fallbackHref="/regional/tickets" label="Back to tickets" />
@@ -775,7 +877,8 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
           {nextAction.sub && <p className="mt-0.5 text-sm text-[var(--text-muted)]">{nextAction.sub}</p>}
         </div>
 
-        {snagAwaitingApproval && latestSnag?.scheduled_at && <AcceptSnagScheduleCard ticketId={t.id} scheduledAt={latestSnag.scheduled_at} />}
+        {/* Snag-fix schedule awaiting approval — compact row → pop-up (approve/decline). */}
+        <RmReviewPanel heading="Snag" items={snagReviewItems} />
 
         {SNAG_WAIT_MSG[t.status] && !snagAwaitingApproval && !openDispute && (t.status !== 'snag_assigned' || latestSnag?.schedule_status === 'agreed') && (
           <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 flex items-start gap-2.5">
@@ -815,17 +918,14 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
           </div>
         )}
 
-        {t.status === 'submitted_for_signoff' && <ApproveSignoffCard ticketId={t.id} />}
-        {t.status === 'submitted_for_signoff' && (
-          <div className="grid grid-cols-1 gap-2">
-            <RequestEvidenceButton ticketId={t.id} />
-            <RaiseSnagButton ticketId={t.id} />
-          </div>
-        )}
+        {/* Completion (COC & POC) under review — compact row → pop-up with the full
+            submission + Approve / Request evidence / Raise snag. */}
+        <RmReviewPanel heading="Completion (COC &amp; POC)" items={cocReviewItems} />
 
         {t.status === 'scheduled' && t.schedule_status === 'proposed' && t.scheduled_at && <AcceptScheduleCard ticketId={t.id} scheduledAt={t.scheduled_at} />}
 
-        {t.status === 'variation_review' && <VariationReviewCard ticketId={t.id} />}
+        {/* Variation order awaiting approval — compact row → pop-up (approve/decline). */}
+        <RmReviewPanel heading="Variation order" items={voReviewItems} />
 
         {t.status === 'in_progress' && (
           <div className="rounded-xl bg-[#C6A35D]/10 ring-1 ring-[#C6A35D]/30 p-3.5 text-sm text-[var(--text-muted)]">Work in progress — the supplier is on site or en route to attend to the job. The completion certificate and proof-of-completion photos will follow once the work is done.</div>
@@ -950,13 +1050,8 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
           attention); once done it moves below the Actions as history (see after the
           Actions card). */}
       {openDispute && disputeBlock}
-      {/* COC & POC — only the submission currently under review. Earlier submissions
-          that were sent back (evidence / snag) live in the Archive as round cards. */}
-      {pendingSignoffs.length > 0 && (
-        <CollapsibleSection id="ticket-coc" title="COC & POC" defaultOpen={phase === 'coc'}>
-          {pendingSignoffs.map((s: any) => <RmSignoffCard key={s.id} s={s} tone="review" ticketId={t.id} title={submissionLabel(s)} collapsible defaultOpen freshEvidence={isEvidenceResubmission} priorUrls={priorEvidenceUrls} />)}
-        </CollapsibleSection>
-      )}
+      {/* COC & POC under review now lives in the "Next action" review pop-up (compact
+          row → full detail + actions); its files are also in the Documents/Photos tabs. */}
       {/* Completion — the approved COC & POC, created once sign-off is accepted */}
       {acceptedSignoff && (
         <CollapsibleSection id="ticket-completion" title="Completion" defaultOpen={phase === 'completion'}>
@@ -965,37 +1060,8 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
       )}
       {/* Resolved dispute(s) → history below the Actions once nothing is live. */}
       {!openDispute && disputeBlock}
-      {/* Variation Orders — their own block (raised at the close-out stage). Opens by
-          default while one is under review. */}
-      {(variations ?? []).length > 0 && (
-        <CollapsibleSection id="ticket-vos" title="Variation Orders" defaultOpen={t.status === 'variation_review' || (variations ?? []).some((v: any) => v.status === 'pending')}>
-          {(variations ?? []).map((v: any, i: number) => (
-            <div key={i} className="py-2 border-b border-[var(--border)] last:border-0 flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <p className="text-sm text-[var(--text)]">{v.description}</p>
-                {v.warranty && <p className="text-[11px] text-[var(--text-muted)] mt-0.5"><span className="font-medium text-[var(--text)]">Warranty:</span> {v.warranty}</p>}
-                <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(v.created_at)}</p>
-                {Array.isArray(v.file_urls) && v.file_urls.length > 0 && (
-                  <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
-                    {v.file_urls.map((u: string, j: number) => (
-                      <a key={j} href={u} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[11px] font-medium text-[#C6A35D] hover:underline"><FileText size={12} /> Attachment {j + 1}</a>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div className="flex flex-col items-end gap-1 shrink-0 whitespace-nowrap">
-                {v.amount != null && <span className="text-xs font-semibold text-[var(--text)]">{formatCurrency(v.amount)}</span>}
-                {(() => {
-                  const meta = v.status === 'approved' ? { l: 'VO accepted', c: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' }
-                    : v.status === 'rejected' ? { l: 'VO rejected', c: 'bg-red-500/15 text-red-700 dark:text-red-400' }
-                    : { l: 'Pending', c: 'bg-amber-500/15 text-amber-700 dark:text-amber-400' }
-                  return <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 ${meta.c}`}>{meta.l}</span>
-                })()}
-              </div>
-            </div>
-          ))}
-        </CollapsibleSection>
-      )}
+      {/* Variation orders now open from the "Next action" review pop-up while pending;
+          the full record (any status) lives in the History tab + Documents tab. */}
       {/* Photos · Activity (supplier updates) · Timeline (the full audit trail —
           status changes, edits, attachments/photos viewed, quotes, sign-offs …). */}
       <RmTicketTabs ticketId={t.id} photoGroups={photoGroups} updates={supplierUpdates} timeline={timelineItems} documents={documentsContent} quotes={quotesContent} history={historyContent} />
