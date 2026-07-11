@@ -362,6 +362,8 @@ function ContactRow({ icon: Icon, label, value, href, external }: { icon: React.
 
 function Detail({ s, onClose }: { s: StoreCard; onClose?: () => void }) {
   const recommended = s.finalStatus === 'controlled' ? 'Store controlled — keep it up.' : `Resolve: ${s.mainIssue}.`
+  // Prefer the store's street address; fall back to its region so a location always shows.
+  const loc = s.location || (s.regionName && s.regionName !== '—' ? s.regionName : null)
   return (
     <div className="space-y-4">
       <DrawerHeader onClose={onClose} title={<div className="flex items-center gap-2 flex-wrap"><Store size={18} className="text-blue-600 dark:text-blue-400 shrink-0" /><h3 className="text-lg font-bold text-[var(--text)]">{s.storeName}</h3>{s.branchCode && <span className="font-mono text-xs text-[var(--text-faint)]">{s.branchCode}</span>}<Pill status={s.finalStatus} /></div>} />
@@ -379,12 +381,12 @@ function Detail({ s, onClose }: { s: StoreCard; onClose?: () => void }) {
       {/* Store manager — full contact, all clickable */}
       <div className="rounded-xl ring-1 ring-[var(--border)] bg-[var(--surface)] p-4">
         <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-faint)]"><User size={13} /> Store Manager</div>
-        {s.sm?.name || s.sm?.email || s.sm?.phone || s.location ? (
+        {s.sm?.name || s.sm?.email || s.sm?.phone || loc ? (
           <div className="space-y-0.5">
             {s.sm?.name && <p className="mb-1 text-base font-bold text-[var(--text)]">{s.sm.name}</p>}
             <ContactRow icon={Mail} label="Email" value={s.sm?.email} href={s.sm?.email ? `mailto:${s.sm.email}` : null} />
             <ContactRow icon={Phone} label="Phone" value={s.sm?.phone} href={s.sm?.phone ? `tel:${s.sm.phone}` : null} />
-            <ContactRow icon={MapPin} label="Location" value={s.location} href={s.location ? `https://maps.google.com/?q=${encodeURIComponent(s.location)}` : null} external />
+            <ContactRow icon={MapPin} label="Location" value={loc} href={loc ? `https://maps.google.com/?q=${encodeURIComponent(loc)}` : null} external />
           </div>
         ) : (
           <p className="text-sm text-[var(--text-faint)]">No store manager on record.</p>
