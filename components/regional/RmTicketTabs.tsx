@@ -10,14 +10,14 @@ import type { TimelineEvent } from '@/lib/ticket-timeline'
 
 type PhotoGroup = { label: string; urls: string[] }
 type Update = { body: string; created_at: string }
-type Tab = 'photos' | 'documents' | 'quotes' | 'activity' | 'timeline' | 'history'
+type Tab = 'photos' | 'documents' | 'quotes' | 'completion' | 'activity' | 'timeline' | 'history'
 
 /** Lower tabbed section of the RM ticket detail — Photos (every image on the
  *  ticket, grouped by source), Documents (COC/invoice/quote/VO attachments),
- *  Quotes (the approved quote + any under review), Activity (supplier updates)
- *  and the full Timeline (status changes, edits, attachments viewed, …). */
+ *  Quotes (the approved quote + any under review), Completion (the approved COC
+ *  & POC), Activity (supplier updates) and the full Timeline. */
 export function RmTicketTabs({
-  ticketId, photoGroups, updates, timeline, history, documents, quotes,
+  ticketId, photoGroups, updates, timeline, history, documents, quotes, completion,
 }: {
   ticketId: string
   photoGroups: PhotoGroup[]
@@ -26,6 +26,7 @@ export function RmTicketTabs({
   history?: ReactNode
   documents?: ReactNode
   quotes?: ReactNode
+  completion?: ReactNode
 }) {
   const totalPhotos = photoGroups.reduce((n, g) => n + g.urls.length, 0)
   const [tab, setTab] = useState<Tab>(totalPhotos ? 'photos' : 'timeline')
@@ -33,6 +34,7 @@ export function RmTicketTabs({
     { key: 'photos', label: `Photos${totalPhotos ? ` (${totalPhotos})` : ''}` },
     { key: 'documents', label: 'Documents' },
     { key: 'quotes', label: 'Quotes' },
+    { key: 'completion', label: 'Completion' },
     { key: 'activity', label: `Activity${updates.length ? ` (${updates.length})` : ''}` },
     { key: 'timeline', label: 'Timeline' },
     { key: 'history', label: 'History' },
@@ -75,6 +77,10 @@ export function RmTicketTabs({
 
       {tab === 'quotes' && (
         quotes ?? <p className="text-sm text-[var(--text-faint)]">No quotes yet.</p>
+      )}
+
+      {tab === 'completion' && (
+        completion ?? <p className="text-sm text-[var(--text-faint)]">Not completed yet.</p>
       )}
 
       {tab === 'activity' && (

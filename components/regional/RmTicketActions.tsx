@@ -985,7 +985,7 @@ export function CloseOutButton({ ticketId, voConfirmed }: { ticketId: string; vo
   return (
     <div className="space-y-1.5">
       {!voConfirmed && <p className="text-xs text-[var(--text-muted)]">Waiting for the supplier to confirm there are no further variation orders before you can close out.</p>}
-      <button onClick={closeOut} disabled={busy || !voConfirmed} className="w-full py-2.5 rounded-xl bg-[#C6A35D] hover:brightness-95 text-[#0a0e17] text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed">{busy ? 'Closing out…' : 'Final close-out'}</button>
+      <button onClick={closeOut} disabled={busy || !voConfirmed} className="w-full py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed">{busy ? 'Closing out…' : 'Final close-out'}</button>
       {err && <p className="text-xs text-red-500">{err}</p>}
     </div>
   )

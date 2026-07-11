@@ -534,7 +534,9 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
     if (t.status === 'variation_review') return { mode: 'act', msg: 'Review the variation order', sub: 'A variation order for extra work is awaiting your approval below.' }
     if (reviewQuotes.length > 0) return { mode: 'act', msg: 'Quotes received', sub: '' }
     if (t.status === 'scheduled' && t.schedule_status === 'proposed' && t.scheduled_at) return { mode: 'act', msg: 'Accept the proposed visit time', sub: 'The supplier proposed a time beyond the SLA window — accept it below.' }
-    if (t.status === 'approved_closeout') return { mode: 'act', msg: 'Finalise the close-out', sub: 'The completion is approved — finalise once the supplier confirms there are no variation orders.' }
+    // Approved — awaiting close-out: the standing callout below carries the detail,
+    // so the signpost line is blank (not said twice).
+    if (t.status === 'approved_closeout') return { mode: 'act', msg: '', sub: '' }
     if (rmInfoAdded) return { mode: 'act', msg: 'Review the added information', sub: 'The store manager answered your request — assign a supplier or move the ticket on.' }
     if (canAssign) return { mode: 'act', msg: 'Assign a supplier', sub: 'Send this job to one or more suppliers to request quotes.' }
     if (awaitingSupplierQuotes) return { mode: 'wait', msg: 'Waiting on supplier quotes', sub: '' }
@@ -780,6 +782,12 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
         )
       })}
     </div>
+  ) : null
+
+  // "Completion" tab — the approved COC & POC as a collapsible card (open by
+  // default), like the Quotes tab. Replaces the old standalone Completion section.
+  const completionContent = acceptedSignoff ? (
+    <RmSignoffCard s={acceptedSignoff} tone="approved" ticketId={t.id} collapsible defaultOpen />
   ) : null
 
   // ── Review-panel items (COC/POC · snag · VO) — same compact-row-+-pop-up
@@ -1072,19 +1080,15 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
       {openDispute && disputeBlock}
       {/* COC & POC under review now lives in the "Next action" review pop-up (compact
           row → full detail + actions); its files are also in the Documents/Photos tabs. */}
-      {/* Completion — the approved COC & POC, created once sign-off is accepted */}
-      {acceptedSignoff && (
-        <CollapsibleSection id="ticket-completion" title="Completion" defaultOpen={phase === 'completion'}>
-          <RmSignoffCard s={acceptedSignoff} tone="approved" ticketId={t.id} />
-        </CollapsibleSection>
-      )}
+      {/* The approved COC & POC now lives in the "Completion" tab (collapsible, like
+          the Quotes tab) — no standalone section here. */}
       {/* Resolved dispute(s) → history below the Actions once nothing is live. */}
       {!openDispute && disputeBlock}
       {/* Variation orders now open from the "Next action" review pop-up while pending;
           the full record (any status) lives in the History tab + Documents tab. */}
       {/* Photos · Activity (supplier updates) · Timeline (the full audit trail —
           status changes, edits, attachments/photos viewed, quotes, sign-offs …). */}
-      <RmTicketTabs ticketId={t.id} photoGroups={photoGroups} updates={supplierUpdates} timeline={timelineItems} documents={documentsContent} quotes={quotesContent} history={historyContent} />
+      <RmTicketTabs ticketId={t.id} photoGroups={photoGroups} updates={supplierUpdates} timeline={timelineItems} documents={documentsContent} quotes={quotesContent} completion={completionContent} history={historyContent} />
     </div>
   );
 }

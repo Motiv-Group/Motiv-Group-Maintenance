@@ -254,7 +254,7 @@ export function rmStatusMeta(status: string): { label: string; cls: string; text
     snag:                  { label: 'Snag',              cls: `bg-red-500/15 ${redT}`, text: redT },
     snag_assigned:         { label: 'Snag scheduled',    cls: indigo, text: indigoT },
     snag_resolved:         { label: 'Awaiting sign-off', cls: orange, text: orangeT },
-    approved_closeout:     { label: 'Awaiting sign-off', cls: orange, text: orangeT },
+    approved_closeout:     { label: 'Close-out',         cls: orange, text: orangeT },
     suppliers_declined:    { label: 'Declined (Supplier)', cls: `bg-red-500/15 ${redT}`, text: redT },
     completed:             { label: 'Completed',         cls: `bg-emerald-500/15 ${greenT}`, text: greenT },
     cancelled:             { label: 'Cancelled',         cls: `bg-gray-500/15 ${grayT}`, text: grayT },
