@@ -731,12 +731,13 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
           </div>
         )}
 
-        {canAssign && <RmAddWorkForm ticketId={t.id} description={t.description ?? ''} photoUrls={Array.isArray(t.photo_urls) ? t.photo_urls : []} title={t.title} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} />}
-
+        {/* Primary actions — two per row: Add extra work · Request more info,
+            then Assign supplier · Cancel ticket. */}
         {!isTerminal && (canAssign || canCancel) && (
-          <div className="grid grid-cols-1 gap-2">
-            {canAssignSupplier && <AssignSuppliersButton ticketId={t.id} suppliers={supplierList} motivSuppliers={motivSupplierList} declinedSupplierIds={declinedSupplierIds} awaitingById={engagedSupplierIds} />}
+          <div className="grid grid-cols-2 gap-2">
+            {canAssign && <RmAddWorkForm ticketId={t.id} description={t.description ?? ''} photoUrls={Array.isArray(t.photo_urls) ? t.photo_urls : []} title={t.title} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} />}
             {['open', 'info_requested'].includes(t.status) && <RequestInfoButton ticketId={t.id} />}
+            {canAssignSupplier && <AssignSuppliersButton ticketId={t.id} suppliers={supplierList} motivSuppliers={motivSupplierList} declinedSupplierIds={declinedSupplierIds} awaitingById={engagedSupplierIds} />}
             {canCancel && <CancelTicketCard ticketId={t.id} />}
           </div>
         )}
