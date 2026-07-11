@@ -5,7 +5,8 @@
 // stats. Mirrors the RM tickets tab, tailored to the supplier's lifecycle.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Ticket, Search, ChevronDown, BarChart3, Store } from 'lucide-react'
+import { Ticket, Search, ChevronDown, BarChart3, Store, ReceiptText, Camera, FileText, CheckCircle2, Calendar, Loader2, ClipboardCheck, AlertTriangle, Clock, XCircle, Ban } from 'lucide-react'
+import { TicketFilterTiles, type FilterGroup } from '@/components/ui/TicketFilterTiles'
 import type { SupplierTicketRow, SupplierQuoteRow } from '@/lib/health/data'
 import { Card, Donut } from '@/components/exec/ui'
 import { CategoryIcon, priorityBadgeClass, priorityLabel } from '@/components/client/ticketBadges'
@@ -55,24 +56,9 @@ function groupCountCls(rows: SupplierTicketRow[]): string {
   return urgencyCountCls(active.map(t => t.priority))
 }
 
-// No "All" pill: a null filter means all tickets, and clicking an active pill
-// deselects back to that default. Pills use the tinted-fill badge standard —
-// tinted when inactive, solid-filled when selected.
 type FilterKey = 'breached' | 'overdue' | 'evidence' | 'declined' | 'cancelled' | Bucket
-const PILLS: { key: FilterKey; label: string; active: string; inactive: string }[] = [
-  { key: 'breached', label: 'SLA Breached', active: 'bg-red-500 text-white', inactive: 'bg-red-500/15 text-red-700 dark:text-red-400' },
-  { key: 'overdue', label: 'Overdue', active: 'bg-red-500 text-white', inactive: 'bg-red-500/15 text-red-700 dark:text-red-400' },
-  { key: 'evidence', label: 'Missing Evidence', active: 'bg-amber-500 text-white', inactive: 'bg-amber-500/15 text-amber-700 dark:text-amber-400' },
-  { key: 'to_quote', label: 'Quote requested', active: 'bg-amber-500 text-white', inactive: 'bg-amber-500/15 text-amber-700 dark:text-amber-400' },
-  { key: 'quoted', label: 'Quoted', active: 'bg-blue-500 text-white', inactive: 'bg-blue-500/15 text-blue-700 dark:text-blue-400' },
-  { key: 'approved', label: 'Quote approved', active: 'bg-blue-500 text-white', inactive: 'bg-blue-500/15 text-blue-700 dark:text-blue-400' },
-  { key: 'scheduled', label: 'Job scheduled', active: 'bg-blue-500 text-white', inactive: 'bg-blue-500/15 text-blue-700 dark:text-blue-400' },
-  { key: 'in_progress', label: 'In Progress', active: 'bg-blue-500 text-white', inactive: 'bg-blue-500/15 text-blue-700 dark:text-blue-400' },
-  { key: 'signoff', label: 'Sign-off', active: 'bg-blue-500 text-white', inactive: 'bg-blue-500/15 text-blue-700 dark:text-blue-400' },
-  { key: 'completed', label: 'Completed', active: 'bg-emerald-500 text-white', inactive: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' },
-  { key: 'declined', label: 'Declined', active: 'bg-gray-500 text-white', inactive: 'bg-gray-500/15 text-gray-600 dark:text-gray-400' },
-  { key: 'cancelled', label: 'Cancelled', active: 'bg-gray-500 text-white', inactive: 'bg-gray-500/15 text-gray-600 dark:text-gray-400' },
-]
+// Valid deep-link (?filter=) keys — the bucket keys plus the extra slices.
+const SUPPLIER_FILTER_KEYS = new Set<string>(['to_quote', 'quoted', 'approved', 'scheduled', 'in_progress', 'signoff', 'completed', 'closed', 'breached', 'overdue', 'evidence', 'declined', 'cancelled'])
 
 function milestone(t: SupplierTicketRow): { label: string; at: string } | null {
   // A declined supplier must never see the ticket's "Quote approved" (that was
@@ -138,7 +124,7 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reads window.location (client-only) after mount to apply deep-linked ?store=; cannot run during SSR render
     if (s) setPanelStore(s)
     const f = params.get('filter')
-    if (f && PILLS.some(p => p.key === f)) setFilter(f as FilterKey)
+    if (f && SUPPLIER_FILTER_KEYS.has(f)) setFilter(f as FilterKey)
   }, [])
 
   const counts = useMemo(() => {
@@ -156,6 +142,30 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
   const declinedCount = useMemo(() => tickets.filter(t => t.declinedForMe).length, [tickets])
   const cancelledCount = useMemo(() => tickets.filter(t => t.status === 'cancelled').length, [tickets])
   const evidenceCount = useMemo(() => tickets.filter(missingEvidence).length, [tickets])
+
+  // Filters grouped by intent (My actions / Awaiting / Critical / Completed).
+  const filterGroups: FilterGroup[] = useMemo(() => [
+    { tone: 'mine', label: 'My actions (requiring response)', tiles: [
+      { key: 'to_quote', label: 'Quote requested', count: counts.to_quote, icon: <ReceiptText size={16} /> },
+      { key: 'evidence', label: 'Missing evidence', count: evidenceCount, icon: <Camera size={16} /> },
+    ] },
+    { tone: 'awaiting', label: 'Awaiting action (from others)', tiles: [
+      { key: 'quoted', label: 'Quoted', count: counts.quoted, icon: <FileText size={16} /> },
+      { key: 'approved', label: 'Quote approved', count: counts.approved, icon: <CheckCircle2 size={16} /> },
+      { key: 'scheduled', label: 'Job scheduled', count: counts.scheduled, icon: <Calendar size={16} /> },
+      { key: 'in_progress', label: 'In progress', count: counts.in_progress, icon: <Loader2 size={16} /> },
+      { key: 'signoff', label: 'Sign-off', count: counts.signoff, icon: <ClipboardCheck size={16} /> },
+    ] },
+    { tone: 'critical', label: 'Critical & overdue', tiles: [
+      { key: 'breached', label: 'SLA breached', count: breachedCount, icon: <AlertTriangle size={16} /> },
+      { key: 'overdue', label: 'Overdue', count: overdueCount, icon: <Clock size={16} /> },
+    ] },
+    { tone: 'closed', label: 'Completed & closed', tiles: [
+      { key: 'completed', label: 'Completed', count: counts.completed, icon: <CheckCircle2 size={16} /> },
+      { key: 'declined', label: 'Declined', count: declinedCount, icon: <XCircle size={16} /> },
+      { key: 'cancelled', label: 'Cancelled', count: cancelledCount, icon: <Ban size={16} /> },
+    ] },
+  ], [counts, breachedCount, overdueCount, declinedCount, cancelledCount, evidenceCount])
 
   const shown = useMemo(() => {
     const terms = q.toLowerCase().split(/\s+/).filter(Boolean)
@@ -232,18 +242,8 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
         </div>
       </Card>
 
-      {/* Filter pills — above the search. Click an active pill to deselect (= all). */}
-      <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
-        {PILLS.map(p => {
-          const n = p.key === 'breached' ? breachedCount : p.key === 'overdue' ? overdueCount : p.key === 'declined' ? declinedCount : p.key === 'cancelled' ? cancelledCount : p.key === 'evidence' ? evidenceCount : counts[p.key as Bucket]
-          const on = filter === p.key
-          return (
-            <button key={p.key} onClick={() => setFilter(f => f === p.key ? null : p.key)} aria-pressed={on} className={`rounded-md px-3 py-1.5 text-xs font-semibold transition text-center ${on ? p.active : p.inactive}`}>
-              {p.label} <span className="opacity-70">{n}</span>
-            </button>
-          )
-        })}
-      </div>
+      {/* Grouped filter tiles — My actions / Awaiting / Critical / Completed. */}
+      <TicketFilterTiles groups={filterGroups} active={filter} onPick={k => setFilter(f => (f === k ? null : (k as FilterKey)))} />
 
       {/* Search */}
       <div className="relative">

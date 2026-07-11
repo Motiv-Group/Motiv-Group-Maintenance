@@ -5,7 +5,8 @@
 // milestone (requested → received → accepted) coloured to the status.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Ticket, Search, ChevronDown, BarChart3, Store, PlusCircle } from 'lucide-react'
+import { Ticket, Search, ChevronDown, BarChart3, Store, PlusCircle, FilePlus2, MessageSquare, Calendar, FileText, UserCheck, AlertCircle, Truck, Clock, CheckCircle2, XCircle, Loader2 } from 'lucide-react'
+import { TicketFilterTiles, type FilterGroup } from '@/components/ui/TicketFilterTiles'
 import type { RegionalTicketRow } from '@/lib/health/data'
 import { Card } from '@/components/exec/ui'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
@@ -51,21 +52,8 @@ function groupCountCls(rows: RegionalTicketRow[]): string {
 // Cancelled. A breach that has gone fully overdue drops out of the breach pills
 // and shows only under Overdue.
 type RmFilter = 'internal_breach' | 'supplier_breach' | 'overdue' | Bucket
-// Pills styled like the SM Tickets tab: tinted when inactive, filled when selected.
-const PILLS: { key: RmFilter; label: string; active: string; inactive: string }[] = [
-  { key: 'open', label: 'New', active: 'bg-blue-500 text-white', inactive: 'bg-blue-500/15 text-blue-700 dark:text-blue-400' },
-  { key: 'quote_requested', label: 'Quote requested', active: 'bg-blue-500 text-white', inactive: 'bg-blue-500/15 text-blue-700 dark:text-blue-400' },
-  { key: 'quoted', label: 'Quoted', active: 'bg-amber-500 text-white', inactive: 'bg-amber-500/15 text-amber-700 dark:text-amber-400' },
-  { key: 'approved', label: 'Approved', active: 'bg-blue-500 text-white', inactive: 'bg-blue-500/15 text-blue-700 dark:text-blue-400' },
-  { key: 'scheduled', label: 'Job scheduled', active: 'bg-blue-500 text-white', inactive: 'bg-blue-500/15 text-blue-700 dark:text-blue-400' },
-  { key: 'in_progress', label: 'In progress', active: 'bg-blue-500 text-white', inactive: 'bg-blue-500/15 text-blue-700 dark:text-blue-400' },
-  { key: 'awaiting_signoff', label: 'Sign-off', active: 'bg-amber-500 text-white', inactive: 'bg-amber-500/15 text-amber-700 dark:text-amber-400' },
-  { key: 'completed', label: 'Completed', active: 'bg-emerald-500 text-white', inactive: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' },
-  { key: 'internal_breach', label: 'Internal Breached', active: 'bg-red-500 text-white', inactive: 'bg-red-500/15 text-red-700 dark:text-red-400' },
-  { key: 'supplier_breach', label: 'Supplier Breached', active: 'bg-red-500 text-white', inactive: 'bg-red-500/15 text-red-700 dark:text-red-400' },
-  { key: 'overdue', label: 'Overdue', active: 'bg-red-500 text-white', inactive: 'bg-red-500/15 text-red-700 dark:text-red-400' },
-  { key: 'cancelled', label: 'Cancelled', active: 'bg-gray-500 text-white', inactive: 'bg-gray-500/15 text-gray-600 dark:text-gray-400' },
-]
+// Valid deep-link (?filter=) keys — the bucket keys plus the breach/overdue slices.
+const RM_FILTER_KEYS = new Set<string>(['open', 'quote_requested', 'quoted', 'approved', 'scheduled', 'in_progress', 'awaiting_signoff', 'completed', 'cancelled', 'internal_breach', 'supplier_breach', 'overdue'])
 
 // Row form factor matches the store-manager Tickets tab: category icon + job ref
 // + category/title + store on the left; priority + status badges, supplier line
@@ -116,7 +104,7 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reads window.location (client-only) after mount to apply deep-linked ?store=; cannot run during SSR render
     if (s) setPanelStore(s)
     const f = params.get('filter')
-    if (f && PILLS.some(p => p.key === f)) setFilter(f as RmFilter)
+    if (f && RM_FILTER_KEYS.has(f)) setFilter(f as RmFilter)
   }, [])
 
   const counts = useMemo(() => {
@@ -130,6 +118,30 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
   const internalBreachCount = useMemo(() => tickets.filter(t => t.internalBreached && !t.overdue).length, [tickets])
   const supplierBreachCount = useMemo(() => tickets.filter(t => t.supplierBreached && !t.overdue).length, [tickets])
   const overdueCount = useMemo(() => tickets.filter(t => t.overdue).length, [tickets])
+
+  // Filters grouped by intent (My actions / Awaiting / Critical / Completed).
+  const filterGroups: FilterGroup[] = useMemo(() => [
+    { tone: 'mine', label: 'My actions (requiring response)', tiles: [
+      { key: 'quoted', label: 'Quoted', count: counts.quoted, icon: <FileText size={16} /> },
+      { key: 'awaiting_signoff', label: 'Sign-off', count: counts.awaiting_signoff, icon: <UserCheck size={16} /> },
+    ] },
+    { tone: 'awaiting', label: 'Awaiting action (from others)', tiles: [
+      { key: 'open', label: 'New', count: counts.open, icon: <FilePlus2 size={16} /> },
+      { key: 'quote_requested', label: 'Quote requested', count: counts.quote_requested, icon: <MessageSquare size={16} /> },
+      { key: 'approved', label: 'Approved', count: counts.approved, icon: <CheckCircle2 size={16} /> },
+      { key: 'scheduled', label: 'Job scheduled', count: counts.scheduled, icon: <Calendar size={16} /> },
+      { key: 'in_progress', label: 'In progress', count: counts.in_progress, icon: <Loader2 size={16} /> },
+    ] },
+    { tone: 'critical', label: 'Critical & overdue', tiles: [
+      { key: 'internal_breach', label: 'Internal Breached', count: internalBreachCount, icon: <AlertCircle size={16} /> },
+      { key: 'supplier_breach', label: 'Supplier Breached', count: supplierBreachCount, icon: <Truck size={16} /> },
+      { key: 'overdue', label: 'Overdue', count: overdueCount, icon: <Clock size={16} /> },
+    ] },
+    { tone: 'closed', label: 'Completed & closed', tiles: [
+      { key: 'completed', label: 'Completed', count: counts.completed, icon: <CheckCircle2 size={16} /> },
+      { key: 'cancelled', label: 'Cancelled', count: counts.cancelled, icon: <XCircle size={16} /> },
+    ] },
+  ], [counts, internalBreachCount, supplierBreachCount, overdueCount])
 
   const shown = useMemo(() => {
     const terms = q.toLowerCase().split(/\s+/).filter(Boolean)
@@ -210,18 +222,8 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
         </div>
       </Card>
 
-      {/* Filter pills — above the search. Click an active pill to deselect (= all). */}
-      <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
-        {PILLS.map(p => {
-          const n = p.key === 'internal_breach' ? internalBreachCount : p.key === 'supplier_breach' ? supplierBreachCount : p.key === 'overdue' ? overdueCount : counts[p.key as Bucket]
-          const on = filter === p.key
-          return (
-            <button key={p.key} onClick={() => setFilter(f => f === p.key ? null : p.key)} aria-pressed={on} className={`rounded-md px-3 py-1.5 text-xs font-semibold transition text-center ${on ? p.active : p.inactive}`}>
-              {p.label} <span className="opacity-70">{n}</span>
-            </button>
-          )
-        })}
-      </div>
+      {/* Grouped filter tiles — My actions / Awaiting / Critical / Completed. */}
+      <TicketFilterTiles groups={filterGroups} active={filter} onPick={k => setFilter(f => (f === k ? null : (k as RmFilter)))} />
 
       {/* Search */}
       <div className="relative">
