@@ -14,7 +14,7 @@ import { CategoryIcon, priorityBadgeClass, priorityLabel } from '@/components/cl
 import { Modal } from '@/components/ui/Modal'
 import { DrawerHeader } from '@/components/exec/Drawer'
 import { readCollapse, writeCollapse, readCollapseSet, writeCollapseSet } from '@/lib/collapse-state'
-import { rmStatusMeta, formatDateTime, humanizeDuration, urgencyCountCls } from '@/lib/utils'
+import { rmStatusMeta, formatDateTime, humanizeDuration } from '@/lib/utils'
 
 type Bucket = 'open' | 'quote_requested' | 'quoted' | 'approved' | 'scheduled' | 'in_progress' | 'awaiting_signoff' | 'completed' | 'cancelled'
 // A ticket counts as "Open" only while it's still open/info-requested AND has no
@@ -40,11 +40,14 @@ const urgency = (p: string) => URGENCY[p] ?? 5
 const byDateThenUrgency = (a: RegionalTicketRow, b: RegionalTicketRow) =>
   (+new Date(b.createdAt) - +new Date(a.createdAt)) || (urgency(a.priority) - urgency(b.priority))
 
-// Tint a store group's count badge by its most urgent active ticket (cancelled
-// tickets don't count) — shared with the SM/supplier tabs via urgencyCountCls.
-function groupCountCls(rows: RegionalTicketRow[]): string {
-  const active = rows.filter(t => bucketOf(t.status, t.supplierAssigned) !== 'cancelled')
-  return urgencyCountCls(active.map(t => t.priority))
+// Per-store summary line: total tickets, critical/high counts, and the soonest
+// SLA deadline among the store's active tickets.
+function groupSummary(rows: RegionalTicketRow[], nowMs: number) {
+  const active = rows.filter(t => !['completed', 'cancelled', 'declined'].includes(t.status))
+  const critical = rows.filter(t => ['P1', 'urgent'].includes(String(t.priority))).length
+  const high = rows.filter(t => ['P2', 'high'].includes(String(t.priority))).length
+  const upcoming = active.map(t => +new Date(t.slaDueAt ?? t.dueAt)).filter(ms => ms > nowMs)
+  return { total: rows.length, critical, high, nextSla: upcoming.length ? Math.min(...upcoming) : null }
 }
 
 // No "All" pill: a null filter means all tickets, and clicking an active pill
@@ -55,10 +58,44 @@ type RmFilter = 'internal_breach' | 'supplier_breach' | 'overdue' | Bucket
 // Valid deep-link (?filter=) keys — the bucket keys plus the breach/overdue slices.
 const RM_FILTER_KEYS = new Set<string>(['open', 'quote_requested', 'quoted', 'approved', 'scheduled', 'in_progress', 'awaiting_signoff', 'completed', 'cancelled', 'internal_breach', 'supplier_breach', 'overdue'])
 
+// What the RM should do next on this ticket — replaces the passive
+// "Supplier assigned / No supplier assigned" line with an action cue. `act` marks
+// the states where the RM themselves must do something (shown emphasised).
+function rmRowAction(t: RegionalTicketRow): { text: string; act: boolean } {
+  if (t.disputed) return { text: 'Resolve the dispute', act: true }
+  switch (t.status) {
+    case 'open':
+    case 'info_requested': return t.supplierAssigned ? { text: 'Awaiting supplier quote', act: false } : { text: 'Assign a supplier', act: true }
+    case 'suppliers_declined': return { text: 'Re-assign a supplier', act: true }
+    case 'assigned':
+    case 'quote_requested':
+    case 'assessment': return { text: 'Awaiting supplier quote', act: false }
+    case 'quoted':
+    case 'quote_revision': return { text: 'Review & approve quote', act: true }
+    case 'variation_review': return { text: 'Review variation order', act: true }
+    case 'accepted': return { text: 'Awaiting scheduling', act: false }
+    case 'scheduled': return { text: 'Supplier visit scheduled', act: false }
+    case 'in_progress': return { text: 'Work in progress', act: false }
+    case 'submitted_for_signoff':
+    case 'pending_sign_off':
+    case 'snag_resolved': return { text: 'Review & sign off', act: true }
+    case 'evidence_requested': return { text: 'Awaiting evidence', act: false }
+    case 'snag':
+    case 'snag_assigned':
+    case 'snag_in_progress': return { text: 'Snag in progress', act: false }
+    case 'approved_closeout': return { text: 'Finalise close-out', act: true }
+    case 'completed': return { text: 'Completed', act: false }
+    case 'cancelled':
+    case 'declined': return { text: 'Closed', act: false }
+    default: return { text: 'Track progress', act: false }
+  }
+}
+
 // Row form factor matches the store-manager Tickets tab: category icon + job ref
-// + category/title + store on the left; priority + status badges, supplier line
+// + category/title + store on the left; priority + status badges, next-action line
 // and the logged date on the right. RM statuses come from rmStatusMeta.
 function TicketRow({ t }: { t: RegionalTicketRow }) {
+  const action = rmRowAction(t)
   const sm = rmStatusMeta(t.status)
   const statusCls = t.disputed ? 'bg-red-500/15 text-red-700 dark:text-red-400' : t.infoAdded ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : sm.cls
   const statusLabel = t.disputed ? 'Dispute' : t.infoAdded ? 'Info added' : sm.label
@@ -77,7 +114,7 @@ function TicketRow({ t }: { t: RegionalTicketRow }) {
           <span className={`inline-flex w-[120px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${priorityBadgeClass(t as never)}`}>{priorityLabel(t as never)}</span>
           <span className={`inline-flex w-[120px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${statusCls}`}>{statusLabel}</span>
         </div>
-        <p className="text-xs text-[var(--text-muted)]">{t.supplierAssigned ? 'Supplier assigned' : 'No supplier assigned'}</p>
+        <p className={`text-xs ${action.act ? 'font-semibold text-[var(--text)]' : 'text-[var(--text-muted)]'}`}>{action.text}</p>
         <p className="text-xs text-[var(--text-muted)]">
           {formatDateTime(t.createdAt)}
           {/* eslint-disable-next-line react-hooks/purity -- cosmetic "overdue by" / breach readout, not hydration-critical */}
@@ -247,13 +284,23 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
       {/* Store groups */}
       {groups.map(([store, g]) => {
         const isCollapsed = !expanded.has(store)
+        // eslint-disable-next-line react-hooks/purity -- cosmetic "next SLA in" countdown, recomputed per render by design
+        const nowMs = Date.now()
+        const s = groupSummary(g.rows, nowMs)
         return (
           <Card key={store} className="p-3 cursor-pointer hover:ring-[#C6A35D]/30 transition" onClick={() => toggle(store)} role="button" tabIndex={0} aria-expanded={!isCollapsed} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(store) } }}>
-            <div className="flex items-center justify-between gap-2 mb-1">
-              <span className="flex items-center gap-2 min-w-0">
-                <ChevronDown size={16} className={`shrink-0 text-[var(--text-muted)] transition-transform ${isCollapsed ? '' : 'rotate-180'}`} />
-                <span className="text-sm font-bold text-[var(--text)] truncate">{store}{g.branchCode ? ` · ${g.branchCode}` : ''}</span>
-                <span className={`text-[11px] font-medium rounded-full px-2 py-0.5 shrink-0 ${groupCountCls(g.rows)}`}>{g.rows.length}</span>
+            <div className="flex items-start justify-between gap-2 mb-1">
+              <span className="flex items-start gap-2 min-w-0">
+                <ChevronDown size={16} className={`mt-0.5 shrink-0 text-[var(--text-muted)] transition-transform ${isCollapsed ? '' : 'rotate-180'}`} />
+                <span className="min-w-0">
+                  <span className="block text-sm font-bold text-[var(--text)] truncate">{store}{g.branchCode ? ` · ${g.branchCode}` : ''}</span>
+                  <span className="mt-0.5 block text-xs text-[var(--text-muted)]">
+                    {s.total} ticket{s.total === 1 ? '' : 's'}
+                    {s.critical > 0 && <> · <span className="font-semibold text-red-600 dark:text-red-400">{s.critical} critical</span></>}
+                    {s.high > 0 && <> · <span className="font-semibold text-orange-600 dark:text-orange-400">{s.high} high</span></>}
+                    {s.nextSla != null && <> · Next SLA in {humanizeDuration(s.nextSla - nowMs)}</>}
+                  </span>
+                </span>
               </span>
               <button onClick={e => { e.stopPropagation(); setPanelStore(store) }} title="Store overview" className="shrink-0 -m-1 p-1.5 rounded-lg text-[var(--text-faint)] hover:text-[#C6A35D] hover:bg-[#C6A35D]/10 transition"><BarChart3 size={16} /></button>
             </div>

@@ -23,7 +23,9 @@ export function AiBriefing({ headline, body, className = 'text-sm leading-relaxe
 }) {
   const [open, setOpen] = useState(false)
   const full = (body ?? '').trim() || FALLBACK
-  const condensed = (headline ?? '').trim() || firstSentence(full)
+  // Inline = a short FULL sentence (the first sentence of the briefing), with the
+  // full in-depth summary behind "View insight →".
+  const condensed = firstSentence(full)
   const hasMore = full !== condensed
 
   return (
