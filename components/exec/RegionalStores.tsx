@@ -17,7 +17,7 @@ const RAG_LABEL: Record<string, string> = { controlled: 'Controlled', attention:
 export interface ArchivedStore { id: string; name: string; deactivatedAt: string | null }
 type ActionTarget = { id: string; name: string; archived: boolean }
 
-export function RegionalStores({ stores, archived = [] }: { stores: StoreCard[]; archived?: ArchivedStore[] }) {
+export function RegionalStores({ stores, archived = [], companyName = '' }: { stores: StoreCard[]; archived?: ArchivedStore[]; companyName?: string }) {
   const router = useRouter()
   const [selId, setSelId] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
@@ -186,9 +186,9 @@ export function RegionalStores({ stores, archived = [] }: { stores: StoreCard[];
         />
       )}
 
-      {editId && <EditStoreModal storeId={editId} onClose={() => setEditId(null)} onSaved={msg => { setEditId(null); setNotice({ ok: true, text: msg }); router.refresh() }} />}
+      {editId && <EditStoreModal storeId={editId} companyName={companyName} onClose={() => setEditId(null)} onSaved={msg => { setEditId(null); setNotice({ ok: true, text: msg }); router.refresh() }} />}
 
-      {addOpen && <AddStoreModal onClose={() => setAddOpen(false)} onSaved={msg => { setAddOpen(false); setNotice({ ok: true, text: msg }); router.refresh() }} />}
+      {addOpen && <AddStoreModal companyName={companyName} onClose={() => setAddOpen(false)} onSaved={msg => { setAddOpen(false); setNotice({ ok: true, text: msg }); router.refresh() }} />}
     </div>
   )
 }
@@ -248,7 +248,7 @@ function StoreActionsModal({ target, busy, onClose, onEdit, onDeactivate, onReac
  *  greyed-out in their Settings (they can't self-edit these). Changing the email
  *  re-issues login credentials (username + new password) by email. Uses the shared
  *  Modal for consistency with the store-detail and actions pop-ups. */
-function EditStoreModal({ storeId, onClose, onSaved }: { storeId: string; onClose: () => void; onSaved: (msg: string) => void }) {
+function EditStoreModal({ storeId, companyName = '', onClose, onSaved }: { storeId: string; companyName?: string; onClose: () => void; onSaved: (msg: string) => void }) {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [confirming, setConfirming] = useState(false)
@@ -275,13 +275,14 @@ function EditStoreModal({ storeId, onClose, onSaved }: { storeId: string; onClos
           full_name: d.sm?.fullName ?? '',
           email: d.sm?.email ?? '',
           phone: d.sm?.phone ?? '',
-          company_name: d.sm?.companyName ?? '',
+          // Company applies to all the RM's stores — default to the RM's company.
+          company_name: d.sm?.companyName || companyName || '',
         })
         setHasSm(!!d.sm)
       } catch (e: any) { if (live) setErr(e.message) } finally { if (live) setLoading(false) }
     })()
     return () => { live = false }
-  }, [storeId])
+  }, [storeId, companyName])
 
   // Validate, then show an in-app confirm step (no native browser dialog).
   function review(e: React.FormEvent) {
@@ -321,6 +322,7 @@ function EditStoreModal({ storeId, onClose, onSaved }: { storeId: string; onClos
             <form onSubmit={review} className="space-y-4">
               {/* Store details */}
               <FormSection title="Store details">
+                <Field label="Company name"><input className={FIELD_INPUT} value={vals.company_name ?? ''} onChange={set('company_name')} placeholder="Acme Corporation" /></Field>
                 <Field label="Store / branch name"><input className={FIELD_INPUT} value={vals.store_name ?? ''} onChange={set('store_name')} required /></Field>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <Field label="Branch code"><input className={`${FIELD_INPUT} font-mono uppercase`} value={vals.branch_code ?? ''} onChange={setUpper('branch_code')} placeholder="e.g. CPT001" required /></Field>
@@ -333,10 +335,7 @@ function EditStoreModal({ storeId, onClose, onSaved }: { storeId: string; onClos
               {hasSm ? (
                 <FormSection title="Store manager">
                   <Field label="Full name"><input className={FIELD_INPUT} value={vals.full_name ?? ''} onChange={set('full_name')} placeholder="e.g. Thabo Mokoena" /></Field>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <Field label="Company name"><input className={FIELD_INPUT} value={vals.company_name ?? ''} onChange={set('company_name')} placeholder="Acme Corporation" /></Field>
-                    <Field label="Phone"><input className={FIELD_INPUT} type="tel" value={vals.phone ?? ''} onChange={set('phone')} placeholder="e.g. 0761936165" /></Field>
-                  </div>
+                  <Field label="Phone"><input className={FIELD_INPUT} type="tel" value={vals.phone ?? ''} onChange={set('phone')} placeholder="e.g. 0761936165" /></Field>
                   <Field label="Login email"><input className={FIELD_INPUT} type="email" value={vals.email ?? ''} onChange={set('email')} placeholder="manager@store.co.za" /></Field>
                   <p className="text-[11px] text-[var(--text-faint)]">Changing the email re-issues login details (username + new password) to the new address.</p>
                 </FormSection>
@@ -367,8 +366,9 @@ function EditStoreModal({ storeId, onClose, onSaved }: { storeId: string; onClos
 
 /** Add a store + its store-manager login in one pop-up. Posts `create_store_manager`
  *  (creates the store, the auth user, links them, emails the credentials). */
-function AddStoreModal({ onClose, onSaved }: { onClose: () => void; onSaved: (msg: string) => void }) {
-  const [vals, setVals] = useState<Record<string, string>>({})
+function AddStoreModal({ companyName = '', onClose, onSaved }: { companyName?: string; onClose: () => void; onSaved: (msg: string) => void }) {
+  // Company applies to all the RM's stores — pre-fill with the RM's own company.
+  const [vals, setVals] = useState<Record<string, string>>({ company_name: companyName })
   const [busy, setBusy] = useState(false)
   const [showPw, setShowPw] = useState(false)
   const [err, setErr] = useState('')
@@ -403,6 +403,7 @@ function AddStoreModal({ onClose, onSaved }: { onClose: () => void; onSaved: (ms
           <form onSubmit={submit} className="space-y-4">
             {/* Store details */}
             <FormSection title="Store details">
+              <Field label="Company name"><input className={FIELD_INPUT} value={vals.company_name ?? ''} onChange={set('company_name')} placeholder="Acme Corporation" /></Field>
               <Field label="Store / branch name"><input className={FIELD_INPUT} value={vals.store_name ?? ''} onChange={set('store_name')} placeholder="e.g. Canal Walk" required /></Field>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label="Branch code"><input className={`${FIELD_INPUT} font-mono uppercase`} value={vals.branch_code ?? ''} onChange={setUpper('branch_code')} placeholder="e.g. CPT001" required /></Field>
@@ -414,10 +415,7 @@ function AddStoreModal({ onClose, onSaved }: { onClose: () => void; onSaved: (ms
             {/* Store manager */}
             <FormSection title="Store manager">
               <Field label="Full name"><input className={FIELD_INPUT} value={vals.full_name ?? ''} onChange={set('full_name')} placeholder="e.g. Thabo Mokoena" required /></Field>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Field label="Company name"><input className={FIELD_INPUT} value={vals.company_name ?? ''} onChange={set('company_name')} placeholder="Acme Corporation" /></Field>
-                <Field label="Phone"><input className={FIELD_INPUT} type="tel" value={vals.phone ?? ''} onChange={set('phone')} onBlur={formatPhone} placeholder="e.g. 0761936165" required /></Field>
-              </div>
+              <Field label="Phone"><input className={FIELD_INPUT} type="tel" value={vals.phone ?? ''} onChange={set('phone')} onBlur={formatPhone} placeholder="e.g. 0761936165" required /></Field>
               <Field label="Login email"><input className={FIELD_INPUT} type="email" value={vals.email ?? ''} onChange={set('email')} placeholder="manager@store.co.za" required /></Field>
               <Field label="Temporary password (min 8)">
                 <div className="relative">
