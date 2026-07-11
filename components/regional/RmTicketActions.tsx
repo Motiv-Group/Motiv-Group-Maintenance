@@ -475,44 +475,48 @@ export function RmQuotePanel({ ticketId, rows, canReQuote }: { ticketId: string;
   return (
     <div className="space-y-2">
       <p className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Suppliers &amp; quotes</p>
-      {rows.map(r => {
-        const m = PANEL_META[r.kind]
-        return (
-          <div key={r.supplierId} className="rounded-xl ring-1 ring-[var(--border)] bg-[var(--surface)] px-3 py-2.5">
-            <div className="flex items-center justify-between gap-2">
-              <span className="flex items-center gap-2 min-w-0">
-                <i className={`w-2.5 h-2.5 rounded-full shrink-0 ${m.dot}`} />
-                <span className="min-w-0">
-                  <span className="block truncate text-sm text-[var(--text)]">{r.name}</span>
-                  {r.requestedAt && <span className="text-[11px] text-[var(--text-faint)]">requested {formatDateTime(r.requestedAt)}</span>}
+      {/* One grouped list — suppliers stacked under each other (no per-supplier box)
+          so it stays compact even with several invited. */}
+      <div className="rounded-xl ring-1 ring-[var(--border)] bg-[var(--surface)] divide-y divide-[var(--border)]">
+        {rows.map(r => {
+          const m = PANEL_META[r.kind]
+          return (
+            <div key={r.supplierId} className="px-3 py-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="flex items-center gap-2 min-w-0">
+                  <i className={`w-2.5 h-2.5 rounded-full shrink-0 ${m.dot}`} />
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm text-[var(--text)]">{r.name}</span>
+                    {r.requestedAt && <span className="text-[11px] text-[var(--text-faint)]">requested {formatDateTime(r.requestedAt)}</span>}
+                  </span>
                 </span>
-              </span>
-              {r.quote ? (
-                <button type="button" onClick={() => openModal(r.supplierId)} className={`flex items-center gap-1.5 shrink-0 text-[11px] font-semibold ${m.txt} hover:underline`}>
-                  {m.label} · {formatCurrency(r.quote.amount)} <FileText size={13} />
-                </button>
-              ) : (
-                <span className={`text-[11px] font-semibold shrink-0 ${m.txt}`}>{m.label}</span>
+                {r.quote ? (
+                  <button type="button" onClick={() => openModal(r.supplierId)} className={`flex items-center gap-1.5 shrink-0 text-[11px] font-semibold ${m.txt} hover:underline`}>
+                    {m.label} · {formatCurrency(r.quote.amount)} <FileText size={13} />
+                  </button>
+                ) : (
+                  <span className={`text-[11px] font-semibold shrink-0 ${m.txt}`}>{m.label}</span>
+                )}
+              </div>
+              {r.kind === 'received' && (
+                <div className="mt-2 flex gap-2">
+                  <button type="button" onClick={() => openModal(r.supplierId, 'approve')} className="flex-1 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition">Approve</button>
+                  <button type="button" onClick={() => openModal(r.supplierId, 'decline')} className="flex-1 py-1.5 rounded-lg ring-1 ring-red-500/40 text-red-600 dark:text-red-400 text-xs font-semibold transition hover:bg-red-500/10">Decline</button>
+                </div>
+              )}
+              {r.kind === 'declined' && r.declineReason && (
+                <div className="mt-2 rounded-lg bg-red-500/10 ring-1 ring-red-500/30 px-3 py-2">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Decline reason</p>
+                  <p className="text-sm text-[var(--text)]">{r.declineReason}</p>
+                </div>
               )}
             </div>
-            {r.kind === 'received' && (
-              <div className="mt-2 flex gap-2">
-                <button type="button" onClick={() => openModal(r.supplierId, 'approve')} className="flex-1 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition">Approve</button>
-                <button type="button" onClick={() => openModal(r.supplierId, 'decline')} className="flex-1 py-1.5 rounded-lg ring-1 ring-red-500/40 text-red-600 dark:text-red-400 text-xs font-semibold transition hover:bg-red-500/10">Decline</button>
-              </div>
-            )}
-            {r.kind === 'declined' && r.declineReason && (
-              <div className="mt-2 rounded-lg bg-red-500/10 ring-1 ring-red-500/30 px-3 py-2">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Decline reason</p>
-                <p className="text-sm text-[var(--text)]">{r.declineReason}</p>
-              </div>
-            )}
-          </div>
-        )
-      })}
+          )
+        })}
+      </div>
 
       {active?.quote && (
-        <Modal title={`${active.name}'s quote`} maxWidth="max-w-lg" onClose={() => setOpenId(null)}>
+        <Modal title={`${active.name}'s quote`} maxWidth="max-w-2xl" onClose={() => setOpenId(null)}>
           <div className="flex items-center justify-between gap-2">
             <span className="text-sm font-semibold text-[var(--text)] truncate">{active.name}</span>
             <span className="text-lg font-bold text-[var(--text)] shrink-0">{formatCurrency(active.quote.amount)}</span>
@@ -892,7 +896,7 @@ export function ReQuoteButton({ ticketId, quoteId }: { ticketId: string; quoteId
   }
   return (
     <div>
-      <button onClick={go} disabled={busy} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#C6A35D] text-[#0a0e17] text-xs font-semibold disabled:opacity-50">{busy ? 'Sending…' : 'Ask to re-quote'}</button>
+      <button onClick={go} disabled={busy} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition disabled:opacity-50">{busy ? 'Sending…' : 'Ask to re-quote'}</button>
       {sent && <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">Re-quote request sent to the supplier.</p>}
       {err && <p className="text-xs text-red-500 mt-1">{err}</p>}
     </div>

@@ -10,24 +10,29 @@ import type { TimelineEvent } from '@/lib/ticket-timeline'
 
 type PhotoGroup = { label: string; urls: string[] }
 type Update = { body: string; created_at: string }
-type Tab = 'photos' | 'activity' | 'timeline' | 'history'
+type Tab = 'photos' | 'documents' | 'quotes' | 'activity' | 'timeline' | 'history'
 
 /** Lower tabbed section of the RM ticket detail — Photos (every image on the
- *  ticket, grouped by source), Activity (supplier updates/progress notes) and
- *  the full Timeline (status changes, edits, attachments/photos viewed, …). */
+ *  ticket, grouped by source), Documents (COC/invoice/quote/VO attachments),
+ *  Quotes (the approved quote + any under review), Activity (supplier updates)
+ *  and the full Timeline (status changes, edits, attachments viewed, …). */
 export function RmTicketTabs({
-  ticketId, photoGroups, updates, timeline, history,
+  ticketId, photoGroups, updates, timeline, history, documents, quotes,
 }: {
   ticketId: string
   photoGroups: PhotoGroup[]
   updates: Update[]
   timeline: TimelineEvent[]
   history?: ReactNode
+  documents?: ReactNode
+  quotes?: ReactNode
 }) {
   const totalPhotos = photoGroups.reduce((n, g) => n + g.urls.length, 0)
   const [tab, setTab] = useState<Tab>(totalPhotos ? 'photos' : 'timeline')
   const tabs: { key: Tab; label: string }[] = [
     { key: 'photos', label: `Photos${totalPhotos ? ` (${totalPhotos})` : ''}` },
+    { key: 'documents', label: 'Documents' },
+    { key: 'quotes', label: 'Quotes' },
     { key: 'activity', label: `Activity${updates.length ? ` (${updates.length})` : ''}` },
     { key: 'timeline', label: 'Timeline' },
     { key: 'history', label: 'History' },
@@ -62,6 +67,14 @@ export function RmTicketTabs({
             ))}
           </div>
         ) : <p className="text-sm text-[var(--text-faint)]">No photos attached.</p>
+      )}
+
+      {tab === 'documents' && (
+        documents ?? <p className="text-sm text-[var(--text-faint)]">No documents attached yet.</p>
+      )}
+
+      {tab === 'quotes' && (
+        quotes ?? <p className="text-sm text-[var(--text-faint)]">No quotes yet.</p>
       )}
 
       {tab === 'activity' && (

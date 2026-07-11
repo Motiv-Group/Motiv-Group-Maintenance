@@ -541,7 +541,6 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
     if (t.status === 'evidence_requested') return { mode: 'wait', msg: 'Waiting on more evidence', sub: 'The supplier will provide the additional evidence you requested.' }
     if (SNAG_WAIT_MSG[t.status]) return { mode: 'wait', msg: 'Waiting on the snag fix', sub: SNAG_WAIT_MSG[t.status] }
     if (t.status === 'vo_declined') return { mode: 'wait', msg: 'Waiting on the supplier', sub: 'You declined the variation order — the supplier can revise it or message you.' }
-    if (['accepted', 'scheduled'].includes(t.status)) return { mode: 'wait', msg: 'Waiting on the supplier to attend', sub: `${nameById.get(t.supplier_id ?? '') ?? 'The supplier'} has been awarded the job and will attend on the agreed date.` }
     if (t.status === 'in_progress') return { mode: 'wait', msg: 'Work in progress', sub: 'The supplier is on site or en route. The completion will follow once the work is done.' }
     return { mode: 'wait', msg: rmStatusMeta(t.status).label, sub: 'No action needed from you right now.' }
   })()
@@ -674,6 +673,66 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
     </div>
   ) : null
 
+  // "Documents" tab — every document (PDF) on the ticket in one place: the approved
+  // quote, the COC & invoice, and any variation-order attachments. Photos have their
+  // own tab; a few docs also stay in their in-context cards (same pattern as photos).
+  type DocLink = { label: string; href: string; itemType: 'quote' | 'coc' | 'invoice' | 'attachment' }
+  const documentLinks: DocLink[] = []
+  for (const q of acceptedQuotes) if (q.fileUrl) documentLinks.push({ label: `${q.supplierName}'s quote`, href: q.fileUrl, itemType: 'quote' })
+  for (const s of [acceptedSignoff, ...pendingSignoffs].filter(Boolean) as any[]) {
+    if (s.coc_url) documentLinks.push({ label: 'Certificate of Completion (COC)', href: s.coc_url, itemType: 'coc' })
+    if (s.invoice_url) documentLinks.push({ label: 'Invoice', href: s.invoice_url, itemType: 'invoice' })
+  }
+  ;((variations ?? []) as any[]).forEach((v, i) => {
+    if (Array.isArray(v.file_urls)) v.file_urls.forEach((u: string, j: number) => documentLinks.push({ label: `Variation order ${i + 1} · Attachment ${j + 1}`, href: u, itemType: 'attachment' }))
+  })
+  const documentsContent = documentLinks.length > 0 ? (
+    <ul className="space-y-2">
+      {documentLinks.map((d, i) => (
+        <li key={i}>
+          <ViewTrackedLink ticketId={t.id} itemType={d.itemType} itemLabel={d.label} href={d.href} className="flex items-center gap-2.5 rounded-xl ring-1 ring-[var(--border)] bg-[var(--surface)] px-3.5 py-3 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--hover)]">
+            <FileText size={16} className="text-blue-600 dark:text-blue-400 shrink-0" />
+            <span className="truncate">{d.label}</span>
+          </ViewTrackedLink>
+        </li>
+      ))}
+    </ul>
+  ) : null
+
+  // "Quotes" tab — a read-only record of the quotes on the ticket: the approved one
+  // plus any still under review. The live approve/decline workspace stays in the
+  // Next action block; declined/superseded quotes live in History.
+  const quotesTabList = [...acceptedQuotes, ...reviewQuotes]
+  const acceptedQuoteIds = new Set(acceptedQuotes.map(q => q.id))
+  const quotesContent = quotesTabList.length > 0 ? (
+    <div className="space-y-3">
+      {quotesTabList.map(q => {
+        const isApproved = acceptedQuoteIds.has(q.id)
+        return (
+          <div key={q.id} className="rounded-xl ring-1 ring-[var(--border)] p-4 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm font-semibold text-[var(--text)] min-w-0 truncate">{q.supplierName}</span>
+              <span className="flex items-center gap-2 shrink-0">
+                <span className="text-base font-bold text-[var(--text)]">{formatCurrency(q.amount)}</span>
+                <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 ${isApproved ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' : 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D]'}`}>{isApproved ? 'Approved' : 'Received'}</span>
+              </span>
+            </div>
+            <p className="text-[11px] text-[var(--text-faint)]">Received {formatDateTime(q.createdAt)}{q.amountInclVat ? ` · incl VAT ${formatCurrency(q.amountInclVat)}` : ''}</p>
+            {q.proposedScheduleAt && (
+              <div className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-500/10 ring-1 ring-indigo-500/30 px-2.5 py-1 text-[13px]">
+                <CalendarClock size={14} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
+                <span className="text-[var(--text-muted)]">Proposed visit</span>
+                <span className="font-semibold text-[var(--text)]">{formatDateTime(q.proposedScheduleAt)}</span>
+              </div>
+            )}
+            {q.description && <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{q.description}</p>}
+            {q.fileUrl && <ViewTrackedLink ticketId={t.id} itemType="quote" itemLabel={`${q.supplierName}'s quote`} href={q.fileUrl} className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"><FileText size={14} /> View attachment</ViewTrackedLink>}
+          </div>
+        )
+      })}
+    </div>
+  ) : null
+
   return (
     <div className="space-y-5">
       <BackLink fallbackHref="/regional/tickets" label="Back to tickets" />
@@ -741,8 +800,9 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
 
         {/* Quoting workspace — requested suppliers + their quotes (a received quote is
             a clickable item that pops up the full quote with Approve / Decline). Sits
-            above the primary action buttons. */}
-        {!isTerminal && quotePanelRows.length > 0 && <RmQuotePanel ticketId={t.id} rows={quotePanelRows} canReQuote={canReQuote} />}
+            above the primary action buttons. Only while still collecting/deciding: once
+            a quote is awarded the approved quote lives in the Quotes tab. */}
+        {!isTerminal && !awarded && quotePanelRows.length > 0 && <RmQuotePanel ticketId={t.id} rows={quotePanelRows} canReQuote={canReQuote} />}
 
         {/* Primary actions — two per row: Add extra work · Request more info,
             then Assign supplier · Cancel ticket. */}
@@ -766,13 +826,6 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
         {t.status === 'scheduled' && t.schedule_status === 'proposed' && t.scheduled_at && <AcceptScheduleCard ticketId={t.id} scheduledAt={t.scheduled_at} />}
 
         {t.status === 'variation_review' && <VariationReviewCard ticketId={t.id} />}
-
-        {['accepted', 'scheduled'].includes(t.status) && (
-          <div className="rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/30 p-3.5 flex items-start gap-2.5">
-            <CheckCircle2 size={16} className="text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
-            <p className="text-sm text-[var(--text-muted)]"><span className="font-semibold text-[var(--text)]">{nameById.get(t.supplier_id ?? '') ?? 'The supplier'}</span> has been awarded the job. They&apos;ll let you know when they&apos;re on their way or on site by marking the ticket in progress.</p>
-          </div>
-        )}
 
         {t.status === 'in_progress' && (
           <div className="rounded-xl bg-[#C6A35D]/10 ring-1 ring-[#C6A35D]/30 p-3.5 text-sm text-[var(--text-muted)]">Work in progress — the supplier is on site or en route to attend to the job. The completion certificate and proof-of-completion photos will follow once the work is done.</div>
@@ -945,7 +998,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
       )}
       {/* Photos · Activity (supplier updates) · Timeline (the full audit trail —
           status changes, edits, attachments/photos viewed, quotes, sign-offs …). */}
-      <RmTicketTabs ticketId={t.id} photoGroups={photoGroups} updates={supplierUpdates} timeline={timelineItems} history={historyContent} />
+      <RmTicketTabs ticketId={t.id} photoGroups={photoGroups} updates={supplierUpdates} timeline={timelineItems} documents={documentsContent} quotes={quotesContent} history={historyContent} />
     </div>
   );
 }
