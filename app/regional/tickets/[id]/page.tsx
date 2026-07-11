@@ -15,7 +15,7 @@ import { BreachReason } from '@/components/workflow/BreachReason'
 import { Card } from '@/components/exec/ui'
 import { WorkflowActions } from '@/components/workflow/WorkflowActions'
 import { RmPipeline } from '@/components/regional/RmPipeline'
-import { AssignSuppliersButton, RequestInfoButton, RmEditTicketForm, SupplierStatusList, QuoteReviewCard, CancelTicketCard, ApproveSignoffCard, ReQuoteButton, AcceptScheduleCard, AcceptSnagScheduleCard, VariationReviewCard, RmAddWorkForm, RequestEvidenceButton, RaiseSnagButton, CloseOutButton } from '@/components/regional/RmTicketActions'
+import { AssignSuppliersButton, RequestInfoButton, RmEditTicketForm, RmQuotePanel, CancelTicketCard, ApproveSignoffCard, ReQuoteButton, AcceptScheduleCard, AcceptSnagScheduleCard, VariationReviewCard, RmAddWorkForm, RequestEvidenceButton, RaiseSnagButton, CloseOutButton } from '@/components/regional/RmTicketActions'
 import { DueDate } from '@/components/workflow/DueDate'
 import { EditedLine } from '@/components/ui/EditedLine'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
@@ -480,9 +480,22 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
   // is accepted (status 'accepted' or later), the job is committed.
   const canCancel = ['open', 'info_requested', 'assigned', 'assessment', 'quote_requested', 'quoted', 'quote_revision', 'suppliers_declined'].includes(t.status)
   const canEdit = ['open', 'info_requested'].includes(t.status)
-  // Gate the main Quotes block on its OWN live content (superseded declines live in
-  // the separate Archive block, so they don't keep an otherwise-empty block open).
-  const hasQuoteBlock = requestedRows.length > 0 || reviewQuotes.length > 0 || acceptedQuotes.length > 0 || liveDeclinedQuotes.length > 0
+  // The RM's quoting workspace rows, rendered inside the "Next action" block: each
+  // requested supplier, with any submitted quote attached so its status becomes a
+  // clickable item that pops up the full quote (+ Approve / Decline).
+  const quoteBySupplier = new Map<string, { kind: 'received' | 'accepted' | 'declined'; q: any }>()
+  for (const q of acceptedQuotes) quoteBySupplier.set(q.supplierId, { kind: 'accepted', q })
+  for (const q of reviewQuotes) if (!quoteBySupplier.has(q.supplierId)) quoteBySupplier.set(q.supplierId, { kind: 'received', q })
+  for (const q of liveDeclinedQuotes) if (!quoteBySupplier.has(q.supplierId)) quoteBySupplier.set(q.supplierId, { kind: 'declined', q })
+  const toPanelQuote = (q: any) => ({ id: q.id, amount: q.amount, amountInclVat: q.amountInclVat ?? null, description: q.description ?? null, fileUrl: q.fileUrl ?? null, createdAt: q.createdAt, validUntil: q.validUntil ?? null, proposedScheduleAt: q.proposedScheduleAt ?? null })
+  const quotePanelSeen = new Set<string>()
+  const quotePanelRows: { supplierId: string; name: string; requestedAt: string | null; kind: 'waiting' | 'received' | 'accepted' | 'declined'; declineReason: string | null; quote: ReturnType<typeof toPanelQuote> | null }[] = []
+  for (const r of requestedRows) {
+    const qs = quoteBySupplier.get(r.id)
+    quotePanelRows.push({ supplierId: r.id, name: r.name, requestedAt: r.invitedAt ?? null, kind: qs?.kind ?? 'waiting', declineReason: r.declineReason ?? qs?.q?.declineReason ?? null, quote: qs ? toPanelQuote(qs.q) : null })
+    quotePanelSeen.add(r.id)
+  }
+  for (const [sid, qs] of quoteBySupplier) if (!quotePanelSeen.has(sid)) quotePanelRows.push({ supplierId: sid, name: qs.q.supplierName, requestedAt: qs.q.createdAt, kind: qs.kind, declineReason: qs.q.declineReason ?? null, quote: toPanelQuote(qs.q) })
   // The "Assign supplier" button stays available through the whole commercial phase —
   // the RM can add / re-assign suppliers at any time until a quote is approved
   // (awarded). Mirrors the /assign route's allowed statuses.
@@ -519,12 +532,12 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
     if (snagAwaitingApproval) return { mode: 'act', msg: 'Approve the snag-fix date', sub: 'The supplier proposed a date to carry out the corrective work — approve it below.' }
     if (pendingSignoffs.length > 0) return { mode: 'act', msg: 'Review & approve the completion', sub: 'The supplier submitted the COC & POC — approve it, request more evidence, or raise a snag.' }
     if (t.status === 'variation_review') return { mode: 'act', msg: 'Review the variation order', sub: 'A variation order for extra work is awaiting your approval below.' }
-    if (reviewQuotes.length > 0) return { mode: 'act', msg: `Review ${reviewQuotes.length} quote${reviewQuotes.length === 1 ? '' : 's'}`, sub: 'Compare the quotes and approve one, or ask a supplier to re-quote.' }
+    if (reviewQuotes.length > 0) return { mode: 'act', msg: 'Quotes received', sub: '' }
     if (t.status === 'scheduled' && t.schedule_status === 'proposed' && t.scheduled_at) return { mode: 'act', msg: 'Accept the proposed visit time', sub: 'The supplier proposed a time beyond the SLA window — accept it below.' }
     if (t.status === 'approved_closeout') return { mode: 'act', msg: 'Finalise the close-out', sub: 'The completion is approved — finalise once the supplier confirms there are no variation orders.' }
     if (rmInfoAdded) return { mode: 'act', msg: 'Review the added information', sub: 'The store manager answered your request — assign a supplier or move the ticket on.' }
     if (canAssign) return { mode: 'act', msg: 'Assign a supplier', sub: 'Send this job to one or more suppliers to request quotes.' }
-    if (awaitingSupplierQuotes) return { mode: 'wait', msg: 'Waiting on supplier quotes', sub: 'The assigned supplier(s) will submit their quotes.' }
+    if (awaitingSupplierQuotes) return { mode: 'wait', msg: 'Waiting on supplier quotes', sub: '' }
     if (t.status === 'evidence_requested') return { mode: 'wait', msg: 'Waiting on more evidence', sub: 'The supplier will provide the additional evidence you requested.' }
     if (SNAG_WAIT_MSG[t.status]) return { mode: 'wait', msg: 'Waiting on the snag fix', sub: SNAG_WAIT_MSG[t.status] }
     if (t.status === 'vo_declined') return { mode: 'wait', msg: 'Waiting on the supplier', sub: 'You declined the variation order — the supplier can revise it or message you.' }
@@ -699,8 +712,8 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
       <Card className="p-5 space-y-4">
         <div>
           <h2 className="text-sm font-bold text-[var(--text)]">Next action</h2>
-          <p className="mt-1 text-sm font-bold text-[var(--text)]">{nextAction.msg}</p>
-          <p className="mt-0.5 text-sm text-[var(--text-muted)]">{nextAction.sub}</p>
+          {nextAction.msg && <p className="mt-1 text-sm font-bold text-[var(--text)]">{nextAction.msg}</p>}
+          {nextAction.sub && <p className="mt-0.5 text-sm text-[var(--text-muted)]">{nextAction.sub}</p>}
         </div>
 
         {snagAwaitingApproval && latestSnag?.scheduled_at && <AcceptSnagScheduleCard ticketId={t.id} scheduledAt={latestSnag.scheduled_at} />}
@@ -726,12 +739,10 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
           </div>
         )}
 
-        {awaitingSupplierQuotes && (
-          <div className="rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/30 p-3.5 flex items-start gap-2.5">
-            <CheckCircle2 size={16} className="text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
-            <p className="text-sm text-[var(--text-muted)]">Supplier{activeSupplierRows.filter(r => r.status === 'invited').length === 1 ? '' : 's'} assigned — awaiting their quote{activeSupplierRows.filter(r => r.status === 'invited').length === 1 ? '' : 's'}.</p>
-          </div>
-        )}
+        {/* Quoting workspace — requested suppliers + their quotes (a received quote is
+            a clickable item that pops up the full quote with Approve / Decline). Sits
+            above the primary action buttons. */}
+        {!isTerminal && quotePanelRows.length > 0 && <RmQuotePanel ticketId={t.id} rows={quotePanelRows} canReQuote={canReQuote} />}
 
         {/* Primary actions — two per row: Add extra work · Request more info,
             then Assign supplier · Cancel ticket. */}
@@ -901,68 +912,6 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
       )}
       {/* Resolved dispute(s) → history below the Actions once nothing is live. */}
       {!openDispute && disputeBlock}
-      {/* Quotes — suppliers requested, quotes to review, the accepted quote. Open
-          during quoting / before work; collapsed once the job is in progress. */}
-      {hasQuoteBlock && (
-        <CollapsibleSection id="ticket-quotes" title="Quotes" defaultOpen={['assigned', 'assessment', 'quote_requested', 'quote_revision', 'quoted', 'accepted', 'scheduled'].includes(t.status)}>
-          {requestedRows.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Suppliers requested</h3>
-              <SupplierStatusList rows={requestedRows} />
-            </div>
-          )}
-          {reviewQuotes.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Quotes for review</h3>
-              <QuoteReviewCard ticketId={t.id} quotes={reviewQuotes} />
-            </div>
-          )}
-          {/* Declined quotes still in play — full card + "Ask to re-quote" so the RM can
-              invite that supplier to re-quote before assigning suppliers again. */}
-          {liveDeclinedQuotes.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Declined quotes</h3>
-              {liveDeclinedQuotes.map(q => <RmDeclinedQuoteCard key={q.id} q={q} ticketId={t.id} canReQuote={canReQuote} />)}
-            </div>
-          )}
-          {acceptedQuotes.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Accepted quote</h3>
-              {acceptedQuotes.map(q => (
-                <div key={q.id} className="rounded-xl ring-1 ring-emerald-500/40 bg-emerald-500/5 overflow-hidden">
-                  <div className="flex items-center justify-between gap-2 px-4 py-2.5 bg-emerald-500/10 border-b border-emerald-500/20">
-                    <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)] min-w-0"><CheckCircle2 size={15} className="text-emerald-500 shrink-0" /><span className="truncate">{q.supplierName}</span></span>
-                    <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400 bg-emerald-500/15 rounded-full px-2 py-0.5 shrink-0">Accepted</span>
-                  </div>
-                  <div className="p-4 space-y-3">
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                      <DetailItem label="Excl. VAT" value={formatCurrency(q.amount)} />
-                      <DetailItem label="Incl. VAT" value={q.amountInclVat ? formatCurrency(q.amountInclVat) : '—'} />
-                      <DetailItem label="Received" value={formatDateTime(q.createdAt)} />
-                      <DetailItem label="Valid until" value={q.validUntil ? formatDate(q.validUntil) : 'N/A'} />
-                    </div>
-                    {t.scheduled_at && (
-                      <div className="flex items-center gap-2 text-sm flex-wrap">
-                        <CalendarClock size={15} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
-                        <span className="text-[var(--text-muted)]">Scheduled visit</span>
-                        <span className="font-semibold text-[var(--text)]">{formatDateTime(t.scheduled_at)}</span>
-                        {t.schedule_status === 'proposed' && <span className="text-[11px] text-amber-600 dark:text-amber-400">(proposed)</span>}
-                      </div>
-                    )}
-                    {q.description && (
-                      <div>
-                        <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Description</div>
-                        <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{q.description}</p>
-                      </div>
-                    )}
-                    {q.fileUrl && <a href={q.fileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View attached quote</a>}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CollapsibleSection>
-      )}
       {/* Variation Orders — their own block (raised at the close-out stage). Opens by
           default while one is under review. */}
       {(variations ?? []).length > 0 && (

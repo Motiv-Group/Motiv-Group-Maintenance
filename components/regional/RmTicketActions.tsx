@@ -438,6 +438,129 @@ export function QuoteReviewCard({ ticketId, quotes }: { ticketId: string; quotes
   )
 }
 
+// ── Quoting workspace shown inside the RM's "Next action" block ──────
+// One list of the requested suppliers; a supplier that has submitted a quote is
+// a clickable item that pops up the full quote (amount, visit, description,
+// attachment) with Approve / Decline — those actions live in both the pop-up and
+// on the block row. Replaces the standalone "Quotes" section.
+export interface QuotePanelQuote { id: string; amount: number; amountInclVat: number | null; description: string | null; fileUrl: string | null; createdAt: string; validUntil?: string | null; proposedScheduleAt?: string | null }
+export interface QuotePanelRow { supplierId: string; name: string; requestedAt: string | null; kind: 'waiting' | 'received' | 'accepted' | 'declined'; declineReason: string | null; quote: QuotePanelQuote | null }
+
+const PANEL_META: Record<QuotePanelRow['kind'], { dot: string; label: string; txt: string }> = {
+  waiting: { dot: 'bg-amber-500', label: 'Waiting for quote', txt: 'text-amber-700 dark:text-amber-400' },
+  received: { dot: 'bg-emerald-500', label: 'Quote received', txt: 'text-emerald-600 dark:text-emerald-400' },
+  accepted: { dot: 'bg-emerald-500', label: 'Accepted', txt: 'text-emerald-600 dark:text-emerald-400' },
+  declined: { dot: 'bg-red-500', label: 'Declined', txt: 'text-red-600 dark:text-red-400' },
+}
+
+export function RmQuotePanel({ ticketId, rows, canReQuote }: { ticketId: string; rows: QuotePanelRow[]; canReQuote: boolean }) {
+  const router = useRouter()
+  const [openId, setOpenId] = useState<string | null>(null)      // supplierId whose quote pop-up is open
+  const [mode, setMode] = useState<'view' | 'approve' | 'decline'>('view')
+  const [busy, setBusy] = useState(false)
+  const [reason, setReason] = useState(DECLINE_REASONS[0])
+  const [other, setOther] = useState('')
+  const [err, setErr] = useState('')
+  const active = rows.find(r => r.supplierId === openId) ?? null
+
+  function openModal(id: string, m: 'view' | 'approve' | 'decline' = 'view') { setOpenId(id); setMode(m); setReason(DECLINE_REASONS[0]); setOther(''); setErr('') }
+  async function decide(quoteId: string, action: 'approve' | 'decline') {
+    setBusy(true); setErr('')
+    const declineReason = action === 'decline' ? (reason === 'Other' ? (other.trim() || 'Other') : reason) : undefined
+    try { await post(`/api/tickets/${ticketId}/quote-decision`, { action, quoteId, reason: declineReason }); setBusy(false); setOpenId(null); router.refresh() }
+    catch (e: any) { setErr(e.message); setBusy(false) }
+  }
+  const input = 'w-full px-3 py-2 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm'
+
+  return (
+    <div className="space-y-2">
+      <p className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Suppliers &amp; quotes</p>
+      {rows.map(r => {
+        const m = PANEL_META[r.kind]
+        return (
+          <div key={r.supplierId} className="rounded-xl ring-1 ring-[var(--border)] bg-[var(--surface)] px-3 py-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="flex items-center gap-2 min-w-0">
+                <i className={`w-2.5 h-2.5 rounded-full shrink-0 ${m.dot}`} />
+                <span className="min-w-0">
+                  <span className="block truncate text-sm text-[var(--text)]">{r.name}</span>
+                  {r.requestedAt && <span className="text-[11px] text-[var(--text-faint)]">requested {formatDateTime(r.requestedAt)}</span>}
+                </span>
+              </span>
+              {r.quote ? (
+                <button type="button" onClick={() => openModal(r.supplierId)} className={`flex items-center gap-1.5 shrink-0 text-[11px] font-semibold ${m.txt} hover:underline`}>
+                  {m.label} · {formatCurrency(r.quote.amount)} <FileText size={13} />
+                </button>
+              ) : (
+                <span className={`text-[11px] font-semibold shrink-0 ${m.txt}`}>{m.label}</span>
+              )}
+            </div>
+            {r.kind === 'received' && (
+              <div className="mt-2 flex gap-2">
+                <button type="button" onClick={() => openModal(r.supplierId, 'approve')} className="flex-1 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition">Approve</button>
+                <button type="button" onClick={() => openModal(r.supplierId, 'decline')} className="flex-1 py-1.5 rounded-lg ring-1 ring-red-500/40 text-red-600 dark:text-red-400 text-xs font-semibold transition hover:bg-red-500/10">Decline</button>
+              </div>
+            )}
+            {r.kind === 'declined' && r.declineReason && (
+              <div className="mt-2 rounded-lg bg-red-500/10 ring-1 ring-red-500/30 px-3 py-2">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Decline reason</p>
+                <p className="text-sm text-[var(--text)]">{r.declineReason}</p>
+              </div>
+            )}
+          </div>
+        )
+      })}
+
+      {active?.quote && (
+        <Modal title={`${active.name}'s quote`} maxWidth="max-w-lg" onClose={() => setOpenId(null)}>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm font-semibold text-[var(--text)] truncate">{active.name}</span>
+            <span className="text-lg font-bold text-[var(--text)] shrink-0">{formatCurrency(active.quote.amount)}</span>
+          </div>
+          <p className="text-[11px] text-[var(--text-faint)]">Received {formatDateTime(active.quote.createdAt)}{active.quote.amountInclVat ? ` · incl VAT ${formatCurrency(active.quote.amountInclVat)}` : ''}</p>
+          {active.quote.proposedScheduleAt && (
+            <div className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-500/10 ring-1 ring-indigo-500/30 px-2.5 py-1 text-[13px]">
+              <CalendarClock size={14} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
+              <span className="text-[var(--text-muted)]">Proposed visit</span>
+              <span className="font-semibold text-[var(--text)]">{formatDateTime(active.quote.proposedScheduleAt)}</span>
+            </div>
+          )}
+          {active.quote.description && <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{active.quote.description}</p>}
+          {active.quote.fileUrl && <ViewTrackedLink ticketId={ticketId} itemType="quote" itemLabel={`${active.name}'s quote`} href={active.quote.fileUrl} className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"><FileText size={14} /> View attachment</ViewTrackedLink>}
+
+          {active.kind === 'received' && (
+            mode === 'decline' ? (
+              <div className="space-y-2 pt-1">
+                <select className={input} value={reason} onChange={e => setReason(e.target.value)}>{DECLINE_REASONS.map(r => <option key={r} value={r}>{r}</option>)}</select>
+                {reason === 'Other' && <textarea className={`${input} min-h-[60px]`} placeholder="Reason…" value={other} onChange={e => setOther(e.target.value)} />}
+                <div className="flex gap-2">
+                  <button onClick={() => decide(active.quote!.id, 'decline')} disabled={busy} className="flex-1 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold disabled:opacity-50">Confirm decline</button>
+                  <button onClick={() => setMode('view')} className="flex-1 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm">Back</button>
+                </div>
+              </div>
+            ) : mode === 'approve' ? (
+              <div className="space-y-2 pt-1">
+                <p className="text-sm text-[var(--text)]">Approve and award <span className="font-semibold">{active.name}</span>? Other quotes for this ticket will be declined.</p>
+                <div className="flex gap-2">
+                  <button onClick={() => decide(active.quote!.id, 'approve')} disabled={busy} className="flex-1 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold disabled:opacity-50">{busy ? '…' : 'Yes, approve'}</button>
+                  <button onClick={() => setMode('view')} className="flex-1 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm">Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex gap-2 pt-1">
+                <button onClick={() => setMode('approve')} className="flex-1 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition">Approve</button>
+                <button onClick={() => setMode('decline')} className="flex-1 py-2 rounded-lg ring-1 ring-red-500/40 text-red-600 dark:text-red-400 text-sm font-semibold transition hover:bg-red-500/10">Decline</button>
+              </div>
+            )
+          )}
+          {active.kind === 'declined' && canReQuote && <div className="pt-1"><ReQuoteButton ticketId={ticketId} quoteId={active.quote.id} /></div>}
+          {err && <p className="text-xs text-red-500">{err}</p>}
+        </Modal>
+      )}
+    </div>
+  )
+}
+
 // ── RM adds extra work to the ticket (before a supplier is assigned) ─
 export function RmAddWorkForm({ ticketId, description, photoUrls, title, category, impact }: {
   ticketId: string; description: string; photoUrls: string[]; title: string; category: string; impact: string
