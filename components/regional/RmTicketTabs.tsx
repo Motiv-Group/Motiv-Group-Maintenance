@@ -30,7 +30,7 @@ export function RmTicketTabs({
     { key: 'photos', label: `Photos${totalPhotos ? ` (${totalPhotos})` : ''}` },
     { key: 'activity', label: `Activity${updates.length ? ` (${updates.length})` : ''}` },
     { key: 'timeline', label: 'Timeline' },
-    ...(history ? [{ key: 'history' as Tab, label: 'History' }] : []),
+    { key: 'history', label: 'History' },
   ]
 
   return (
@@ -72,7 +72,7 @@ export function RmTicketTabs({
               return (
                 <div key={i} className="border-b border-[var(--border)] py-2.5 last:border-0">
                   {photo
-                    ? <ViewTrackedLink ticketId={ticketId} itemType="photo" itemLabel="Supplier progress photo" href={photo[1]} className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><Camera size={14} /> View progress photo</ViewTrackedLink>
+                    ? <ViewTrackedLink ticketId={ticketId} itemType="photo" itemLabel="Supplier progress photo" href={photo[1]} className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"><Camera size={14} /> View progress photo</ViewTrackedLink>
                     : <p className="text-sm text-[var(--text)] whitespace-pre-line">{u.body}</p>}
                   <p className="text-[11px] text-[var(--text-faint)]">Supplier · {formatDateTime(u.created_at)}</p>
                 </div>
