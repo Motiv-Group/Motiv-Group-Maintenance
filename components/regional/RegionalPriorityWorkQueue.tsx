@@ -105,7 +105,7 @@ function MetricButton({ active, icon, label, value, sub, subActive, onClick }: {
   // green when the count is 0 (all clear), amber when there's work outstanding.
   const stateText = zero ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'
   const iconChip = zero ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 ring-emerald-500/20' : 'bg-amber-500/15 text-amber-600 dark:text-amber-400 ring-amber-500/20'
-  const stateBorder = zero ? 'border-2 border-emerald-500/60' : 'border-2 border-amber-500/70'
+  const stateBorder = zero ? 'border-2 border-black/10 dark:border-white/10' : 'border-2 border-amber-500/70'
 
   return (
     <button type="button" onClick={onClick}
@@ -145,7 +145,7 @@ function QueueRow({ ticket, nowMs, suppliers, motivSuppliers }: { ticket: Region
   // the pop-up / navigates on its own.
   // Genuinely critical (P1 / urgent) tickets get a RED action button so they stand out.
   const critical = ['P1', 'urgent'].includes(String(ticket.priority))
-  const ctaCls = `relative z-20 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-bold transition lg:w-40 ${critical ? 'border-red-500/60 text-red-600 hover:bg-red-500/10 dark:text-red-300' : 'border-blue-500/60 text-blue-600 hover:bg-blue-500/10 dark:text-blue-300'}`
+  const ctaCls = `relative z-20 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-bold transition lg:w-40 ${critical ? 'border-red-500/60 bg-red-500/10 text-red-600 hover:bg-red-500/15 dark:text-red-300' : 'border-blue-500/60 text-blue-600 hover:bg-blue-500/10 dark:text-blue-300'}`
   return (
     <div className="relative grid gap-4 border-b border-[var(--border)] px-4 py-4 transition last:border-b-0 hover:bg-[var(--hover)] lg:grid-cols-[1fr_200px_1.1fr_160px] lg:items-center">
       {/* The whole row (except the CTA island) links to the ticket. */}
@@ -168,14 +168,14 @@ function QueueRow({ ticket, nowMs, suppliers, motivSuppliers }: { ticket: Region
       </div>
 
       <div className="min-w-0 border-l-0 border-[var(--border)] lg:border-l lg:pl-6">
-        <p className="truncate text-xs text-[var(--text-faint)]">Next step · Logged {formatDate(ticket.createdAt)}</p>
+        <p className="truncate text-xs text-[var(--text-muted)]">Next step · Logged {formatDate(ticket.createdAt)}</p>
         <p className="truncate text-sm font-bold text-[var(--text)]">{nextStep(ticket)}</p>
         {breached ? (
           <p className="mt-1 flex items-center gap-1.5 text-sm font-bold text-red-600 dark:text-red-400"><AlertCircle size={14} /> SLA breached</p>
         ) : (
           <>
             <p className="mt-1 flex items-center gap-1.5 text-sm text-[var(--text-muted)]"><CalendarClock size={14} /> SLA in {humanizeDuration(slaMs)}</p>
-            <p className="truncate text-[11px] text-[var(--text-faint)]">Next deadline · {formatDateTime(slaDeadline)}</p>
+            <p className="truncate text-xs text-[var(--text-muted)]">Next deadline · {formatDateTime(slaDeadline)}</p>
           </>
         )}
       </div>

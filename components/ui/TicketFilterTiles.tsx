@@ -46,7 +46,7 @@ export function TicketFilterTiles({ groups, active, onPick }: {
                       <span className={`text-xl font-bold leading-none tabular-nums ${tn.count}`}>{t.count}</span>
                       <span className={`shrink-0 ${tn.icon}`}>{t.icon}</span>
                     </div>
-                    <div className="mt-1.5 truncate text-[11px] font-medium text-[var(--text-muted)]">{t.label}</div>
+                    <div className="mt-1.5 truncate text-xs font-medium text-[var(--text-muted)]">{t.label}</div>
                   </button>
                 )
               })}

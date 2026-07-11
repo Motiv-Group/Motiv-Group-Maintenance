@@ -35,7 +35,7 @@ function Row({ t, storeName }: { t: StoreManagerTicket; storeName: string }) {
       <div className="flex flex-col items-start gap-1 sm:items-end">
         <TicketBadges ticket={t} />
         <p className="text-xs text-[var(--text-muted)]">{t.supplierAssigned ? 'Supplier assigned' : 'No supplier assigned'}</p>
-        <p className="text-[11px] text-[var(--text-faint)]">
+        <p className="text-xs text-[var(--text-muted)]">
           {formatDateTime(t.createdAt)}
           {/* eslint-disable-next-line react-hooks/purity -- cosmetic "overdue by" readout, not hydration-critical */}
           {t.overdue && <span className="ml-1.5 font-semibold text-red-600 dark:text-red-400">· Overdue by {humanizeDuration(Date.now() - new Date(t.dueAt).getTime())}</span>}

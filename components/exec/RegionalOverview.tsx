@@ -25,7 +25,7 @@ export function RegionalOverview({ data, name, briefing, briefingScopeId, motivS
         greeting={greeting}
         name={name}
         subtitle="Regional portfolio overview"
-        scopePrefix="Region"
+        scopePrefix="Portfolio"
         score={p.finalPortfolioHealth}
         status={p.status}
         briefingBody={briefing?.body}

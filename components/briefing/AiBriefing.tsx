@@ -37,7 +37,7 @@ export function AiBriefing({ headline, body, className = 'text-sm leading-relaxe
               onClick={() => setOpen(true)}
               className="whitespace-nowrap text-xs font-medium text-[var(--text-faint)] underline underline-offset-2 transition hover:text-[var(--text-muted)]"
             >
-              View more insight
+              View insight →
             </button>
           </>
         )}

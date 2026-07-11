@@ -7,8 +7,16 @@ import { Sparkles } from 'lucide-react'
 import { Donut, STATUS_TEXT } from '@/components/exec/ui'
 import { BriefingRefresh } from '@/components/briefing/BriefingRefresh'
 import { AiBriefing } from '@/components/briefing/AiBriefing'
-import { STATUS_LABELS } from '@/lib/health/constants'
 import type { HealthStatus } from '@/lib/health/types'
+
+// A friendlier reading of each health band than the raw status label — e.g.
+// "Portfolio attention required" rather than the awkward "Portfolio At Risk".
+const HEADLINE: Record<HealthStatus, string> = {
+  controlled: 'on track',
+  attention: 'needs attention',
+  at_risk: 'attention required',
+  critical: 'critical — act now',
+}
 import type { BriefingScope } from '@/lib/briefing/facts'
 
 export function DashboardHealthHeader({
@@ -40,7 +48,7 @@ export function DashboardHealthHeader({
             <div className="flex items-center gap-2">
               <span className="text-sm font-bold">
                 <span className="text-[var(--text)]">{scopePrefix} </span>
-                <span className={STATUS_TEXT[status]}>{STATUS_LABELS[status]}</span>
+                <span className={STATUS_TEXT[status]}>{HEADLINE[status]}</span>
               </span>
               <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-faint)]"><Sparkles size={11} className="text-[#C6A35D]" /> AI</span>
               {briefingScope && briefingScopeId && <BriefingRefresh scope={briefingScope} scopeId={briefingScopeId} />}

@@ -78,7 +78,7 @@ function TicketRow({ t }: { t: RegionalTicketRow }) {
           <span className={`inline-flex w-[120px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${statusCls}`}>{statusLabel}</span>
         </div>
         <p className="text-xs text-[var(--text-muted)]">{t.supplierAssigned ? 'Supplier assigned' : 'No supplier assigned'}</p>
-        <p className="text-[11px] text-[var(--text-faint)]">
+        <p className="text-xs text-[var(--text-muted)]">
           {formatDateTime(t.createdAt)}
           {/* eslint-disable-next-line react-hooks/purity -- cosmetic "overdue by" / breach readout, not hydration-critical */}
           {t.overdue ? <span className="ml-1.5 font-semibold text-red-600 dark:text-red-400">· Overdue by {humanizeDuration(Date.now() - new Date(t.dueAt).getTime())}</span>
@@ -279,7 +279,7 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
                   <Link key={t.id} href={`/regional/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2.5 -mx-2 px-2 rounded-lg border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition">
                     <div className="min-w-0">
                       <p className="text-sm text-[var(--text)] truncate">{t.title}</p>
-                      <p className="text-[11px] text-[var(--text-faint)] truncate">{t.storeName} · {formatDateTime(t.createdAt)}</p>
+                      <p className="text-xs text-[var(--text-muted)] truncate">{t.storeName} · {formatDateTime(t.createdAt)}</p>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
                       <PriorityBadge priority={t.priority} className="w-full text-center" />
@@ -311,7 +311,7 @@ function StorePanel({ store, rows, onClose }: { store: string; rows: RegionalTic
   const Stat = ({ label, value, tone = '' }: { label: string; value: number | string; tone?: string }) => (
     <div className="rounded-xl bg-[var(--surface)] ring-1 ring-[var(--border)] p-3">
       <div className={`text-xl font-bold ${tone || 'text-[var(--text)]'}`}>{value}</div>
-      <div className="text-[11px] text-[var(--text-faint)]">{label}</div>
+      <div className="text-xs text-[var(--text-muted)]">{label}</div>
     </div>
   )
 
