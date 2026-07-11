@@ -538,8 +538,10 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
     if (rmInfoAdded) return { mode: 'act', msg: 'Review the added information', sub: 'The store manager answered your request — assign a supplier or move the ticket on.' }
     if (canAssign) return { mode: 'act', msg: 'Assign a supplier', sub: 'Send this job to one or more suppliers to request quotes.' }
     if (awaitingSupplierQuotes) return { mode: 'wait', msg: 'Waiting on supplier quotes', sub: '' }
-    if (t.status === 'evidence_requested') return { mode: 'wait', msg: 'Waiting on more evidence', sub: 'The supplier will provide the additional evidence you requested.' }
-    if (SNAG_WAIT_MSG[t.status]) return { mode: 'wait', msg: 'Waiting on the snag fix', sub: SNAG_WAIT_MSG[t.status] }
+    // Evidence-requested / snagged — the standing callout below carries the detail;
+    // the signpost line is blank so it isn't said twice.
+    if (t.status === 'evidence_requested') return { mode: 'wait', msg: '', sub: '' }
+    if (SNAG_WAIT_MSG[t.status]) return { mode: 'wait', msg: '', sub: '' }
     if (t.status === 'vo_declined') return { mode: 'wait', msg: 'Waiting on the supplier', sub: 'You declined the variation order — the supplier can revise it or message you.' }
     // In progress — the standing "…on site or en route…" callout below carries the
     // message; the signpost line is intentionally blank to avoid saying it twice.
