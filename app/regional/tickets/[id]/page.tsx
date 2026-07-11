@@ -20,7 +20,7 @@ import { DueDate } from '@/components/workflow/DueDate'
 import { EditedLine } from '@/components/ui/EditedLine'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { RmTicketTabs } from '@/components/regional/RmTicketTabs'
-import { buildTicketTimeline } from '@/lib/ticket-timeline'
+import { buildTicketTimeline, rmFriendlyLabel } from '@/lib/ticket-timeline'
 import { priorityBadgeClass, priorityLabel } from '@/components/client/ticketBadges'
 import type { StoreManagerTicket } from '@/lib/health/data'
 import { CollapsibleSection } from '@/components/ui/CollapsibleSection'
@@ -553,7 +553,9 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
   if (progressPhotoUrls.length) photoGroups.push({ label: 'Supplier progress', urls: progressPhotoUrls })
 
   // Full life-of-ticket timeline (status changes, edits, attachments/photos
-  // viewed, quotes, sign-offs, disputes…) for the bottom "Timeline" tab.
+  // viewed, quotes, sign-offs, disputes…) for the bottom "Timeline" tab. Restated
+  // in a friendly, SM-style voice (actor baked into the sentence → the "who" line
+  // drops away) while keeping every detail.
   const timelineItems = buildTicketTimeline({
     createdAt: t.created_at, status: t.status, updatedAt: t.updated_at,
     quoteRequestedAt: t.first_quote_requested_at ?? t.quote_requested_at,
@@ -575,7 +577,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
     disputeMessages: disputeMsgs.map((m: any) => ({ author_role: m.author_role, body: m.body, created_at: m.created_at })),
     signoffs: allSignoffs, updates: (updates ?? []) as any[], views: (viewRows ?? []) as any[],
     supplierDeclines,
-  })
+  }).map(e => ({ ...e, label: rmFriendlyLabel(e), who: null }))
 
   // "History" tab content — everything archived (superseded / not-selected quotes,
   // declined quote requests, sent-back submissions, a declined snag-fix date),

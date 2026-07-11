@@ -196,3 +196,74 @@ export function buildTicketTimeline(t: TimelineInput): TimelineEvent[] {
   const sorted = ev.sort((a, b) => (+new Date(a.at) - +new Date(b.at)) || (a.seq - b.seq))
   return t.startAt ? sorted.filter(e => +new Date(e.at) >= +new Date(t.startAt!)) : sorted
 }
+
+// Restate one audit event as a friendly, store-manager-style sentence for the RM
+// Timeline tab — the actor is baked into the sentence (so the "who" line drops
+// away) while every detail (supplier names, reasons) is kept. `buildTicketTimeline`
+// stays the audit voice for the supplier trail; only the RM view is re-narrated.
+function actorOf(who?: string | null): string | null {
+  if (!who) return null
+  if (who === 'Regional Manager') return 'You'
+  if (who === 'Store Manager') return 'The store manager'
+  if (who === 'Supplier') return 'The supplier'
+  if (who === 'Executive') return 'An executive'
+  if (who === 'System') return 'The system'
+  return who // a person's name (e.g. on an edit)
+}
+/** The " — reason/note" tail of an audit label, kept verbatim on the friendly one. */
+function tailOf(label: string): string { const i = label.indexOf(' — '); return i >= 0 ? label.slice(i) : '' }
+/** The word after `key` in an audit label ("Quote requested from X" → X), sans any reason tail. */
+function nameAfter(label: string, key: string): string | null {
+  const m = label.match(new RegExp(`${key} (.+)$`)); return m ? m[1].replace(/ — .*$/, '') : null
+}
+
+export function rmFriendlyLabel(e: TimelineEvent): string {
+  const A = actorOf(e.who)
+  const L = e.label
+  const tail = tailOf(L)
+  switch (e.tone) {
+    case 'logged': return 'The store manager logged the ticket'
+    case 'info_added': return 'The store manager added the requested information'
+    case 'info_requested':
+      if (/on COC & POC/.test(L)) return `You requested more evidence on the completion${tail}`
+      if (/stands/.test(L)) return 'The supplier withdrew the dispute — the request stands'
+      if (/Proposed to resolve/.test(L)) return `${A ?? 'Someone'} proposed to drop the request`
+      if (/Proposed to uphold/.test(L)) return `${A ?? 'Someone'} proposed that the request stands`
+      return `You requested more information${tail}`
+    case 'quote_requested': {
+      if (/Revised/.test(L)) return 'You asked for a revised quote'
+      const n = nameAfter(L, 'from'); return n ? `You requested a quote from ${n}` : 'You requested quotes from suppliers'
+    }
+    case 'quote_submitted': { const n = nameAfter(L, 'by'); return n ? `${n} submitted a quote` : 'The supplier submitted a quote' }
+    case 'quote_approved': {
+      if (/retracted/i.test(L)) return 'You reopened the variation order for review'
+      const m = L.match(/— (.+)$/); return m ? `You approved ${m[1]}'s quote` : 'You approved the quote'
+    }
+    case 'quote_declined': {
+      if (/request declined by/.test(L)) { const n = nameAfter(L, 'by'); return `${n ?? 'A supplier'} declined the quote request` }
+      if (/Dispute raised/.test(L)) return `The supplier raised a dispute${tail}`
+      if (/Snag schedule declined/.test(L)) return `You declined the snag-fix date${tail}`
+      const m = L.match(/— (.+)$/); return m ? `You declined ${m[1]}'s quote` : 'You declined the quote'
+    }
+    case 'scheduled':
+      if (/Snag accepted/.test(L)) return 'The supplier accepted the snag'
+      if (/Snag fix proposed/.test(L)) return 'The supplier proposed a snag-fix date'
+      if (/Snag schedule approved/.test(L)) return 'You approved the snag-fix date'
+      if (/Marked job in progress/.test(L)) return 'The supplier started work'
+      return 'The supplier scheduled a visit'
+    case 'variation': return 'The supplier raised a variation order'
+    case 'variation_approved': return 'You approved the variation order'
+    case 'variation_declined': return `You declined the variation order${tail}`
+    case 'completion_submitted': return 'The supplier submitted the completion'
+    case 'completion_approved': return /retracted/i.test(L) ? `You retracted the request — reopened for review${tail}` : 'You approved the completion'
+    case 'completion_rejected': return 'You snagged the completion'
+    case 'completed': return 'The job was completed'
+    case 'cancelled': return /Declined/.test(L) ? 'Declined — no further updates on this ticket' : `The ticket was cancelled${tail}`
+    case 'edited':
+      if (/proposal cancelled/.test(L)) return `${A ?? 'Someone'} cancelled their dispute proposal`
+      return A ? `${A} edited the ticket${tail}` : `The ticket was edited${tail}`
+    case 'update': return A ? `${A}: ${L}` : L
+    case 'viewed': return `${A ?? 'Someone'} viewed ${L.replace(/^Viewed /, '')}`
+    default: return L
+  }
+}
