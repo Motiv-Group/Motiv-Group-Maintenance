@@ -196,7 +196,7 @@ function QueueRow({ ticket, nowMs, suppliers, motivSuppliers }: { ticket: Region
             trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}>Approve quote</button>} />
         ) : reviewSignoff ? (
           <SignoffReviewButton ticketId={ticket.id}
-            trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}>Sign off</button>} />
+            trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}><ClipboardCheck size={15} /> Sign-Off</button>} />
         ) : assignable ? (
           <AssignSuppliersButton ticketId={ticket.id} suppliers={suppliers} motivSuppliers={motivSuppliers}
             trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}>Assign supplier</button>} />
