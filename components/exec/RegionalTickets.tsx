@@ -30,7 +30,7 @@ function bucketOf(s: string, supplierAssigned = false): Bucket {
   return 'cancelled'
 }
 const BUCKET_LABEL: Record<Bucket, string> = { open: 'New', quote_requested: 'Quote requested', quoted: 'Quoted', approved: 'Approved', scheduled: 'Job scheduled', in_progress: 'In progress', awaiting_signoff: 'Sign-off', completed: 'Completed', cancelled: 'Cancelled' }
-const BUCKET_BAR: Record<Bucket, string> = { open: 'bg-blue-500', quote_requested: 'bg-cyan-500', quoted: 'bg-violet-500', approved: 'bg-teal-500', scheduled: 'bg-indigo-500', in_progress: 'bg-[#C6A35D]', awaiting_signoff: 'bg-orange-500', completed: 'bg-emerald-500', cancelled: 'bg-red-500' }
+const BUCKET_BAR: Record<Bucket, string> = { open: 'bg-blue-500', quote_requested: 'bg-blue-500', quoted: 'bg-amber-500', approved: 'bg-blue-500', scheduled: 'bg-blue-500', in_progress: 'bg-blue-500', awaiting_signoff: 'bg-amber-500', completed: 'bg-emerald-500', cancelled: 'bg-gray-500' }
 const BAR_ORDER: Bucket[] = ['open', 'quote_requested', 'quoted', 'approved', 'scheduled', 'in_progress', 'awaiting_signoff', 'completed']
 
 // Urgency rank (handles classic low/medium/high/urgent and engine P1–P4).
@@ -54,16 +54,16 @@ type RmFilter = 'internal_breach' | 'supplier_breach' | 'overdue' | Bucket
 // Pills styled like the SM Tickets tab: tinted when inactive, filled when selected.
 const PILLS: { key: RmFilter; label: string; active: string; inactive: string }[] = [
   { key: 'open', label: 'New', active: 'bg-blue-500 text-white', inactive: 'bg-blue-500/15 text-blue-700 dark:text-blue-400' },
-  { key: 'quote_requested', label: 'Quote requested', active: 'bg-cyan-500 text-white', inactive: 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-400' },
-  { key: 'quoted', label: 'Quoted', active: 'bg-violet-500 text-white', inactive: 'bg-violet-500/15 text-violet-700 dark:text-violet-400' },
-  { key: 'approved', label: 'Approved', active: 'bg-teal-500 text-white', inactive: 'bg-teal-500/15 text-teal-700 dark:text-teal-400' },
-  { key: 'scheduled', label: 'Job scheduled', active: 'bg-indigo-500 text-white', inactive: 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-400' },
-  { key: 'in_progress', label: 'In progress', active: 'bg-[#C6A35D] text-[#0a0e17]', inactive: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D]' },
-  { key: 'awaiting_signoff', label: 'Sign-off', active: 'bg-orange-500 text-white', inactive: 'bg-orange-500/15 text-orange-700 dark:text-orange-400' },
+  { key: 'quote_requested', label: 'Quote requested', active: 'bg-blue-500 text-white', inactive: 'bg-blue-500/15 text-blue-700 dark:text-blue-400' },
+  { key: 'quoted', label: 'Quoted', active: 'bg-amber-500 text-white', inactive: 'bg-amber-500/15 text-amber-700 dark:text-amber-400' },
+  { key: 'approved', label: 'Approved', active: 'bg-blue-500 text-white', inactive: 'bg-blue-500/15 text-blue-700 dark:text-blue-400' },
+  { key: 'scheduled', label: 'Job scheduled', active: 'bg-blue-500 text-white', inactive: 'bg-blue-500/15 text-blue-700 dark:text-blue-400' },
+  { key: 'in_progress', label: 'In progress', active: 'bg-blue-500 text-white', inactive: 'bg-blue-500/15 text-blue-700 dark:text-blue-400' },
+  { key: 'awaiting_signoff', label: 'Sign-off', active: 'bg-amber-500 text-white', inactive: 'bg-amber-500/15 text-amber-700 dark:text-amber-400' },
   { key: 'completed', label: 'Completed', active: 'bg-emerald-500 text-white', inactive: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' },
-  { key: 'internal_breach', label: 'Internal Breached', active: 'bg-red-600 text-white', inactive: 'bg-red-600/15 text-red-700 dark:text-red-400' },
-  { key: 'supplier_breach', label: 'Supplier Breached', active: 'bg-orange-600 text-white', inactive: 'bg-orange-600/15 text-orange-700 dark:text-orange-400' },
-  { key: 'overdue', label: 'Overdue', active: 'bg-red-500 text-white', inactive: 'bg-red-500/15 text-red-600 dark:text-red-400' },
+  { key: 'internal_breach', label: 'Internal Breached', active: 'bg-red-500 text-white', inactive: 'bg-red-500/15 text-red-700 dark:text-red-400' },
+  { key: 'supplier_breach', label: 'Supplier Breached', active: 'bg-red-500 text-white', inactive: 'bg-red-500/15 text-red-700 dark:text-red-400' },
+  { key: 'overdue', label: 'Overdue', active: 'bg-red-500 text-white', inactive: 'bg-red-500/15 text-red-700 dark:text-red-400' },
   { key: 'cancelled', label: 'Cancelled', active: 'bg-gray-500 text-white', inactive: 'bg-gray-500/15 text-gray-600 dark:text-gray-400' },
 ]
 
@@ -72,7 +72,7 @@ const PILLS: { key: RmFilter; label: string; active: string; inactive: string }[
 // and the logged date on the right. RM statuses come from rmStatusMeta.
 function TicketRow({ t }: { t: RegionalTicketRow }) {
   const sm = rmStatusMeta(t.status)
-  const statusCls = t.disputed ? 'bg-red-500/15 text-red-700 dark:text-red-400' : t.infoAdded ? 'bg-teal-500/15 text-teal-700 dark:text-teal-400' : sm.cls
+  const statusCls = t.disputed ? 'bg-red-500/15 text-red-700 dark:text-red-400' : t.infoAdded ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : sm.cls
   const statusLabel = t.disputed ? 'Dispute' : t.infoAdded ? 'Info added' : sm.label
   return (
     <Link href={`/regional/tickets/${t.id}`} className="grid gap-3 border-b border-[var(--border)] px-2 py-3 last:border-0 transition hover:bg-[var(--hover)] sm:grid-cols-[1fr_auto] sm:items-center">

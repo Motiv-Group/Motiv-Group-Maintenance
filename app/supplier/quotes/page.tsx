@@ -9,22 +9,22 @@ import { formatCurrency, formatDateTime } from '@/lib/utils'
 
 // Pill (badge) classes per quote state — incl. the synthetic "requested".
 const STATUS_BADGE: Record<string, string> = {
-  requested: 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-400',
-  pending: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
+  requested: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
+  pending: 'bg-blue-500/15 text-blue-700 dark:text-blue-400',
   accepted: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
-  declined: 'bg-red-500/15 text-red-700 dark:text-red-400',
-  revision_requested: 'bg-blue-500/15 text-blue-700 dark:text-blue-400',
+  declined: 'bg-gray-500/15 text-gray-600 dark:text-gray-400',
+  revision_requested: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
 }
 const STATUS_LABEL: Record<string, string> = { requested: 'Quote requested', pending: 'Pending', accepted: 'Approved', declined: 'Declined', revision_requested: 'Revision requested' }
 // Uniform badge size so the VAT + status pills line up.
 const BADGE = 'inline-flex items-center justify-center w-full text-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide'
 
 const FILTERS: { key: string; label: string; active: string; inactive: string }[] = [
-  { key: 'all', label: 'All', active: 'bg-slate-600 text-white', inactive: 'bg-slate-500/15 text-slate-600 dark:text-slate-400' },
-  { key: 'requested', label: 'Quote requested', active: 'bg-cyan-500 text-white', inactive: 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-400' },
-  { key: 'pending', label: 'Pending', active: 'bg-amber-500 text-white', inactive: 'bg-amber-500/15 text-amber-700 dark:text-amber-400' },
+  { key: 'all', label: 'All', active: 'bg-gray-500 text-white', inactive: 'bg-gray-500/15 text-gray-600 dark:text-gray-400' },
+  { key: 'requested', label: 'Quote requested', active: 'bg-amber-500 text-white', inactive: 'bg-amber-500/15 text-amber-700 dark:text-amber-400' },
+  { key: 'pending', label: 'Pending', active: 'bg-blue-500 text-white', inactive: 'bg-blue-500/15 text-blue-700 dark:text-blue-400' },
   { key: 'accepted', label: 'Approved', active: 'bg-emerald-500 text-white', inactive: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' },
-  { key: 'declined', label: 'Declined', active: 'bg-red-500 text-white', inactive: 'bg-red-500/15 text-red-700 dark:text-red-400' },
+  { key: 'declined', label: 'Declined', active: 'bg-gray-500 text-white', inactive: 'bg-gray-500/15 text-gray-600 dark:text-gray-400' },
 ]
 // Submitted quotes whose ticket is past the quoting/decision phase belong in Sign-off /
 // archive, not here — EXCEPT declined ones, which the supplier should still see.

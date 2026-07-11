@@ -10,7 +10,7 @@ export interface SnagRow { id: string; ticketId: string; ticketTitle: string; pr
 const STATUS_META: Record<string, { label: string; cls: string }> = {
   open:        { label: 'Open',        cls: 'bg-red-500/15 text-red-700 dark:text-red-400' },
   assigned:    { label: 'Accepted',    cls: 'bg-amber-500/15 text-amber-700 dark:text-amber-400' },
-  in_progress: { label: 'In progress', cls: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D]' },
+  in_progress: { label: 'In progress', cls: 'bg-amber-500/15 text-amber-700 dark:text-amber-400' },
 }
 
 export function RegionalSnagList({ rows }: { rows: SnagRow[] }) {

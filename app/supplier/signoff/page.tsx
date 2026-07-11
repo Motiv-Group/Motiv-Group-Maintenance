@@ -8,12 +8,12 @@ import { PersistentDetails } from '@/components/ui/PersistentDetails'
 import { formatDateTime } from '@/lib/utils'
 
 // Small status-chip tints per sign-off state — waiting states are amber, never gold.
-const TONE: Record<string, string> = { submitted: 'bg-amber-500/15 text-amber-700 dark:text-amber-400', awaiting_regional: 'bg-amber-500/15 text-amber-700 dark:text-amber-400', awaiting_store: 'bg-blue-500/15 text-blue-700 dark:text-blue-400', accepted: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400', rejected: 'bg-red-500/15 text-red-700 dark:text-red-400' }
+const TONE: Record<string, string> = { submitted: 'bg-blue-500/15 text-blue-700 dark:text-blue-400', awaiting_regional: 'bg-blue-500/15 text-blue-700 dark:text-blue-400', awaiting_store: 'bg-blue-500/15 text-blue-700 dark:text-blue-400', accepted: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400', rejected: 'bg-red-500/15 text-red-700 dark:text-red-400' }
 const WORD: Record<string, string> = { submitted: 'More info', awaiting_regional: 'More info', awaiting_store: 'More info', accepted: 'Accepted', rejected: 'Rejected' }
-const NEUTRAL = { active: 'bg-slate-600 text-white', inactive: 'bg-slate-500/15 text-slate-600 dark:text-slate-400' }
+const NEUTRAL = { active: 'bg-gray-500 text-white', inactive: 'bg-gray-500/15 text-gray-600 dark:text-gray-400' }
 const FILTERS: { key: string; label: string; active: string; inactive: string }[] = [
   { key: 'all', label: 'All', ...NEUTRAL },
-  { key: 'awaiting', label: 'Awaiting', active: 'bg-amber-500 text-white', inactive: 'bg-amber-500/15 text-amber-700 dark:text-amber-400' },
+  { key: 'awaiting', label: 'Awaiting', active: 'bg-blue-500 text-white', inactive: 'bg-blue-500/15 text-blue-700 dark:text-blue-400' },
   { key: 'accepted', label: 'Accepted', active: 'bg-emerald-500 text-white', inactive: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' },
   { key: 'rejected', label: 'Rejected', active: 'bg-red-500 text-white', inactive: 'bg-red-500/15 text-red-700 dark:text-red-400' },
 ]
