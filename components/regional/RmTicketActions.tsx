@@ -1,7 +1,7 @@
 'use client'
 
 // RM ticket-page custom actions for the competitive-quoting model.
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { Search, Pencil, CalendarClock, Plus, ImagePlus, X, FileText } from 'lucide-react'
 import { StarInput, Stars } from '@/components/ui/Stars'
@@ -37,7 +37,7 @@ function Modal({ title, onClose, children, maxWidth = 'max-w-md' }: { title: str
 
 // ── Assign suppliers (button → modal with search + multi-select) ─
 type SupplierChoice = { id: string; name: string; avgRating?: number; ratingCount?: number }
-export function AssignSuppliersButton({ ticketId, suppliers, motivSuppliers = [], declinedSupplierIds = [], awaitingById = {} }: { ticketId: string; suppliers: SupplierChoice[]; motivSuppliers?: SupplierChoice[]; declinedSupplierIds?: string[]; awaitingById?: Record<string, 'invited' | 'quoted'> }) {
+export function AssignSuppliersButton({ ticketId, suppliers, motivSuppliers = [], declinedSupplierIds = [], awaitingById = {}, trigger }: { ticketId: string; suppliers: SupplierChoice[]; motivSuppliers?: SupplierChoice[]; declinedSupplierIds?: string[]; awaitingById?: Record<string, 'invited' | 'quoted'>; trigger?: (open: () => void) => ReactNode }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   // Auto-open when deep-linked from the Today queue's "Assign supplier" action
@@ -81,7 +81,9 @@ export function AssignSuppliersButton({ ticketId, suppliers, motivSuppliers = []
   const tabCls = (on: boolean) => `flex-1 py-1.5 rounded-lg text-xs font-semibold transition ${on ? 'bg-emerald-600 text-white' : 'ring-1 ring-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--hover)]'}`
   return (
     <>
-      <button onClick={() => setOpen(true)} className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition">Assign supplier</button>
+      {trigger ? trigger(() => setOpen(true)) : (
+        <button onClick={() => setOpen(true)} className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition">Assign supplier</button>
+      )}
       {open && (
         <Modal title="Assign suppliers" maxWidth="max-w-2xl" onClose={() => setOpen(false)}>
           <p className="text-xs text-[var(--text-muted)]">Search and select one or more suppliers to invite to quote — from your own list or the Motiv directory.</p>
@@ -158,7 +160,7 @@ export function RequestInfoButton({ ticketId }: { ticketId: string }) {
   const input = 'w-full px-3 py-2 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm'
   return (
     <>
-      <button onClick={() => setOpen(true)} className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-[#0a0e17] text-sm font-semibold transition">Request more info</button>
+      <button onClick={() => setOpen(true)} className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold transition">Request more info</button>
       {open && (
         <Modal title="Request more information" onClose={() => setOpen(false)}>
           <p className="text-xs text-[var(--text-muted)]">The store manager will see this message and can edit + resubmit the ticket.</p>

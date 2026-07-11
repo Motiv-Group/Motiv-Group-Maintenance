@@ -10,10 +10,12 @@ import { AlertCircle, AlertOctagon, AlertTriangle, ArrowRight, CalendarClock, Ch
 import type { RegionalTicketRow } from '@/lib/health/data'
 import { Card } from '@/components/exec/ui'
 import { CategoryIcon } from '@/components/client/ticketBadges'
+import { AssignSuppliersButton } from '@/components/regional/RmTicketActions'
 import { rmStatusMeta, formatDate, formatDateTime, humanizeDuration, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
 
 type QueueFilter = 'all' | 'assign' | 'quotes' | 'signoff' | 'sla' | 'snags'
 type Tone = 'red' | 'purple' | 'gold' | 'green' | 'orange' | 'blue'
+type SupplierChoice = { id: string; name: string; avgRating?: number; ratingCount?: number }
 
 const URGENCY_RANK: Record<string, number> = { urgent: 0, P1: 0, high: 1, P2: 1, medium: 2, P3: 2, low: 3, P4: 3 }
 const INACTIVE = new Set(['completed', 'cancelled', 'declined'])
@@ -26,7 +28,7 @@ const SNAG_STATUSES = new Set(['snag', 'snag_assigned', 'snag_in_progress'])    
 const needsAssignment = (t: RegionalTicketRow) => !t.supplierAssigned && (t.status === 'open' || t.status === 'info_requested')
 const slaAtRisk = (t: RegionalTicketRow) => t.breached || t.overdue
 
-export function RegionalPriorityWorkQueue({ tickets, generatedAt }: { tickets: RegionalTicketRow[]; generatedAt: string }) {
+export function RegionalPriorityWorkQueue({ tickets, generatedAt, suppliers = [], motivSuppliers = [] }: { tickets: RegionalTicketRow[]; generatedAt: string; suppliers?: SupplierChoice[]; motivSuppliers?: SupplierChoice[] }) {
   const [filter, setFilter] = useState<QueueFilter>('all')
   const nowMs = new Date(generatedAt).getTime()
   // Click the active card again to clear the filter.
@@ -78,7 +80,7 @@ export function RegionalPriorityWorkQueue({ tickets, generatedAt }: { tickets: R
 
         <div className="px-4 py-4 sm:px-5">
           <div className="overflow-hidden rounded-2xl border border-[var(--border)]">
-            {rows.length ? rows.map(t => <QueueRow key={t.id} ticket={t} nowMs={nowMs} />) : (
+            {rows.length ? rows.map(t => <QueueRow key={t.id} ticket={t} nowMs={nowMs} suppliers={suppliers} motivSuppliers={motivSuppliers} />) : (
               <div className="px-4 py-10"><EmptyQueue filter={filter} /></div>
             )}
             <div className="border-t border-[var(--border)] px-4 py-4">
@@ -134,19 +136,26 @@ function MetricButton({ active, icon, tone, label, value, sub, subActive, onClic
   )
 }
 
-function QueueRow({ ticket, nowMs }: { ticket: RegionalTicketRow; nowMs: number }) {
+function QueueRow({ ticket, nowMs, suppliers, motivSuppliers }: { ticket: RegionalTicketRow; nowMs: number; suppliers: SupplierChoice[]; motivSuppliers: SupplierChoice[] }) {
   // The next SLA checkpoint (quote decision / sign-off / supplier action), falling
   // back to the final resolution deadline when there's no active blocker.
   const slaDeadline = ticket.slaDueAt ?? ticket.dueAt
   const slaMs = new Date(slaDeadline).getTime() - nowMs
   const breached = ticket.overdue || ticket.breached || slaMs <= 0
   const meta = rmStatusMeta(ticket.status)
-  // A new ticket's next step is to assign a supplier — the CTA jumps straight to
-  // the detail page with the assign picker auto-opened (?assign=1).
+  const ticketUrl = `/regional/tickets/${ticket.id}`
+  // A new ticket's next step is to assign a supplier — the CTA opens the assign
+  // picker in place (no navigation), exactly like the SM "Add Info" button.
   const assignable = needsAssignment(ticket)
-  const href = assignable ? `/regional/tickets/${ticket.id}?assign=1` : `/regional/tickets/${ticket.id}`
+  // Same outline form-factor + size as the "View Ticket" button, so the queue's
+  // CTAs are consistent. Sits above the whole-row link (z-20) so its click opens
+  // the pop-up / navigates on its own.
+  const ctaCls = 'relative z-20 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-blue-500/60 px-4 py-2 text-sm font-bold text-blue-600 transition hover:bg-blue-500/10 dark:text-blue-300 lg:w-40'
   return (
-    <Link href={href} className="grid gap-4 border-b border-[var(--border)] px-4 py-4 transition last:border-b-0 hover:bg-[var(--hover)] lg:grid-cols-[1fr_200px_1.1fr_160px] lg:items-center">
+    <div className="relative grid gap-4 border-b border-[var(--border)] px-4 py-4 transition last:border-b-0 hover:bg-[var(--hover)] lg:grid-cols-[1fr_200px_1.1fr_160px] lg:items-center">
+      {/* The whole row (except the CTA island) links to the ticket. */}
+      <Link href={ticketUrl} aria-label={`View ${ticket.category || ticket.title} ticket`} className="absolute inset-0 z-10" />
+
       <div className="flex min-w-0 items-center gap-3">
         <CategoryIcon category={ticket.category ?? ticket.title} />
         <div className="min-w-0">
@@ -176,10 +185,15 @@ function QueueRow({ ticket, nowMs }: { ticket: RegionalTicketRow; nowMs: number 
         )}
       </div>
 
-      <span className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-bold ${assignable ? 'bg-blue-600 text-white' : 'border border-blue-500/60 text-blue-600 dark:text-blue-300'}`}>
-        {assignable ? <><UserPlus size={15} /> Assign supplier</> : <>View Ticket <ArrowRight size={15} /></>}
-      </span>
-    </Link>
+      <div className="flex lg:justify-end">
+        {assignable ? (
+          <AssignSuppliersButton ticketId={ticket.id} suppliers={suppliers} motivSuppliers={motivSuppliers}
+            trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}>Assign supplier</button>} />
+        ) : (
+          <Link href={ticketUrl} className={ctaCls}>View Ticket <ArrowRight size={15} /></Link>
+        )}
+      </div>
+    </div>
   )
 }
 
