@@ -14,6 +14,7 @@ import {
 } from '@/components/exec/ui'
 import { getDailyBriefing } from '@/lib/briefing/generate'
 import { BriefingRefresh } from '@/components/briefing/BriefingRefresh'
+import { AiBriefing } from '@/components/briefing/AiBriefing'
 import { estateFacts } from '@/lib/briefing/facts'
 import { STATUS_LABELS } from '@/lib/health/constants'
 import { formatCurrency, formatDate } from '@/lib/utils'
@@ -77,7 +78,7 @@ export default async function ExecutiveEstatePage() {
             {briefing?.body && (
               <div className="flex items-start gap-2 justify-center lg:justify-start text-left">
                 <span className="shrink-0 mt-0.5 inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wide text-[#C6A35D] bg-[#C6A35D]/10 rounded-full px-1.5 py-0.5"><Sparkles size={10} /> AI</span>
-                <p className="text-sm text-[var(--text-muted)] leading-relaxed">{briefing.body}</p>
+                <AiBriefing headline={briefing.headline} body={briefing.body} className="text-sm leading-relaxed text-[var(--text-muted)]" />
               </div>
             )}
             {/* Health bands across the estate (all stores in the exec's regions) */}

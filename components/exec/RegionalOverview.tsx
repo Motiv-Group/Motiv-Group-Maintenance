@@ -29,6 +29,7 @@ export function RegionalOverview({ data, name, briefing, briefingScopeId, motivS
         score={p.finalPortfolioHealth}
         status={p.status}
         briefingBody={briefing?.body}
+        briefingHeadline={briefing?.headline}
         briefingScope="region"
         briefingScopeId={briefingScopeId}
       />

@@ -8,6 +8,7 @@ import { Card, Donut, Pill } from '@/components/exec/ui'
 import { BriefingRefresh } from '@/components/briefing/BriefingRefresh'
 import { VerificationCard } from '@/components/supplier/VerificationCard'
 import { SupplierPriorityWorkQueue } from '@/components/supplier/SupplierPriorityWorkQueue'
+import { AiBriefing } from '@/components/briefing/AiBriefing'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getDailyBriefing } from '@/lib/briefing/generate'
 import { supplierFacts } from '@/lib/briefing/facts'
@@ -77,7 +78,7 @@ export default async function SupplierOverviewPage() {
             {briefing?.body && (
               <div className="flex items-start gap-2 justify-center sm:justify-start text-left">
                 <span className="shrink-0 mt-0.5 inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wide text-[#C6A35D] bg-[#C6A35D]/10 rounded-full px-1.5 py-0.5"><Sparkles size={10} /> AI</span>
-                <p className="text-sm text-[var(--text-muted)] leading-relaxed">{briefing.body}</p>
+                <AiBriefing headline={briefing.headline} body={briefing.body} className="text-sm leading-relaxed text-[var(--text-muted)]" />
               </div>
             )}
           </div>

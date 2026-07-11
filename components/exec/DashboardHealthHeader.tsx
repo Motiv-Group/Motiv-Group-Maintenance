@@ -6,13 +6,14 @@
 import { Sparkles } from 'lucide-react'
 import { Donut, STATUS_TEXT } from '@/components/exec/ui'
 import { BriefingRefresh } from '@/components/briefing/BriefingRefresh'
+import { AiBriefing } from '@/components/briefing/AiBriefing'
 import { STATUS_LABELS } from '@/lib/health/constants'
 import type { HealthStatus } from '@/lib/health/types'
 import type { BriefingScope } from '@/lib/briefing/facts'
 
 export function DashboardHealthHeader({
   greeting, name, subtitle, scopePrefix,
-  score, status, briefingBody, briefingScope, briefingScopeId,
+  score, status, briefingBody, briefingHeadline, briefingScope, briefingScopeId,
 }: {
   greeting: string
   name: string | null
@@ -21,6 +22,7 @@ export function DashboardHealthHeader({
   score?: number
   status?: HealthStatus
   briefingBody?: string | null
+  briefingHeadline?: string | null
   briefingScope?: BriefingScope
   briefingScopeId?: string
 }) {
@@ -43,9 +45,7 @@ export function DashboardHealthHeader({
               <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-faint)]"><Sparkles size={11} className="text-[#C6A35D]" /> AI</span>
               {briefingScope && briefingScopeId && <BriefingRefresh scope={briefingScope} scopeId={briefingScopeId} />}
             </div>
-            <p className="mt-1.5 text-xs leading-relaxed text-[var(--text-muted)]">
-              {briefingBody ?? 'Keep it up — everything is running smoothly.'}
-            </p>
+            <AiBriefing headline={briefingHeadline} body={briefingBody} className="mt-1.5 text-xs leading-relaxed text-[var(--text-muted)]" />
           </div>
         </div>
       )}

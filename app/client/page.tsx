@@ -41,6 +41,7 @@ export default async function StoreOverviewPage() {
         score={h?.finalHealthScore}
         status={h?.finalStatus}
         briefingBody={briefing?.body ?? 'Keep it up. Your store is running smoothly.'}
+        briefingHeadline={briefing?.headline}
         briefingScope="store"
         briefingScopeId={h ? briefingScopeId : undefined}
       />
