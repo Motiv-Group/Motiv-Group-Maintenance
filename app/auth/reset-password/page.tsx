@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { PasswordInput } from '@/components/ui/PasswordInput'
 import { Button } from '@/components/ui/Button'
-import { MotivLogo } from '@/components/ui/MotivLogo'
+import { MotivLockup } from '@/components/ui/MotivLockup'
 import { CheckCircle2 } from 'lucide-react'
 
 export default function ResetPasswordPage() {
@@ -41,7 +41,7 @@ export default function ResetPasswordPage() {
       <div className="min-h-screen bg-[#0b0c11] flex flex-col items-center justify-center px-4">
         <div className="w-full max-w-sm">
           <div className="flex items-center justify-center mb-10">
-            <MotivLogo height={100} />
+            <MotivLockup height={120} />
           </div>
 
           <div className="bg-[#17181e] rounded-2xl shadow-xl border border-white/10 p-6 sm:p-8">

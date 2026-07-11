@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { isValidEmail } from '@/lib/csv'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
-import { MotivLogo } from '@/components/ui/MotivLogo'
+import { MotivLockup } from '@/components/ui/MotivLockup'
 import { MailCheck } from 'lucide-react'
 
 export default function ForgotPasswordPage() {
@@ -34,7 +34,7 @@ export default function ForgotPasswordPage() {
       <div className="min-h-screen bg-[#0b0c11] flex flex-col items-center justify-center px-4">
         <div className="w-full max-w-sm">
           <div className="flex items-center justify-center mb-10">
-            <MotivLogo height={100} />
+            <MotivLockup height={120} />
           </div>
 
           <div className="bg-[#17181e] rounded-2xl shadow-xl border border-white/10 p-6 sm:p-8">

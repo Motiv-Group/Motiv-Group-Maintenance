@@ -9,7 +9,7 @@ import { clearCollapseState } from '@/lib/collapse-state'
 import { Input } from '@/components/ui/Input'
 import { PasswordInput } from '@/components/ui/PasswordInput'
 import { Button } from '@/components/ui/Button'
-import { MotivLogo } from '@/components/ui/MotivLogo'
+import { MotivLockup } from '@/components/ui/MotivLockup'
 
 interface LoginForm {
   email: string
@@ -98,7 +98,7 @@ export default function LoginPage() {
 
           {/* Logo — larger and centred */}
           <div className="flex items-center justify-center mb-10">
-            <MotivLogo height={120} />
+            <MotivLockup height={150} />
           </div>
 
           <div className="bg-[#17181e] rounded-2xl shadow-xl border border-white/10 p-6 sm:p-10">
