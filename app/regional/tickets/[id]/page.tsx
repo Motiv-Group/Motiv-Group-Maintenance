@@ -867,7 +867,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
           </div>
           {/* Priority + status badges — same form factor as the SM ticket detail. */}
           <div className="flex items-center gap-1.5 shrink-0">
-            <span className={`inline-flex w-[92px] justify-center rounded-md px-2 py-1 text-[10px] font-bold ${priorityBadgeClass({ priority: t.priority } as StoreManagerTicket)}`}>{priorityLabel({ priority: t.priority } as StoreManagerTicket)}</span>
+            <span className={`inline-flex w-[120px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${priorityBadgeClass({ priority: t.priority } as StoreManagerTicket)}`}>{priorityLabel({ priority: t.priority } as StoreManagerTicket)}</span>
             {(() => {
               const sm = rmStatusMeta(t.status)
               // An open dispute overrides the badge with "Dispute" (the snag/evidence
@@ -877,7 +877,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
               // description until the RM acts.
               const label = openDispute ? 'Dispute' : rmInfoAdded ? 'Info added' : sm.label
               const cls = openDispute ? 'bg-red-500/15 text-red-700 dark:text-red-400' : rmInfoAdded ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : sm.cls
-              return <span className={`inline-flex w-[92px] justify-center rounded-md px-2 py-1 text-[10px] font-bold ${cls}`}>{label}</span>
+              return <span className={`inline-flex w-[120px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${cls}`}>{label}</span>
             })()}
           </div>
         </div>

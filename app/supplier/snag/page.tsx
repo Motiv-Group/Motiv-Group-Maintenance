@@ -51,8 +51,8 @@ export default async function SupplierSnagPage() {
                       <p className="text-[11px] text-[var(--text-faint)]">Logged {formatDateTime(t.createdAt)}</p>
                     </div>
                     <div className="flex flex-wrap items-center justify-end gap-1.5 shrink-0">
-                      <span className={`inline-flex w-[92px] justify-center rounded-md px-2 py-1 text-[10px] font-bold ${priorityBadgeClass(t as never)}`}>{priorityLabel(t as never)}</span>
-                      <span className={`inline-flex w-[92px] justify-center rounded-md px-2 py-1 text-[10px] font-bold ${sm.cls}`}>{sm.label}</span>
+                      <span className={`inline-flex w-[120px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${priorityBadgeClass(t as never)}`}>{priorityLabel(t as never)}</span>
+                      <span className={`inline-flex w-[120px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${sm.cls}`}>{sm.label}</span>
                     </div>
                   </Link>
                 )
