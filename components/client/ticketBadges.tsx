@@ -5,9 +5,24 @@ import { categoryVisual } from '@/lib/categoryVisual'
 import { PRIORITY_LEVEL_LABELS } from '@/lib/utils'
 import type { StoreManagerTicket } from '@/lib/health/data'
 
-export function CategoryIcon({ category, className = 'h-14 w-14', iconSize = 22 }: { category?: string | null; className?: string; iconSize?: number }) {
+// Category-icon chip: the GLYPH comes from the category, but the COLOUR follows
+// the ticket's PRIORITY (urgent=red, high=orange, medium=amber, low=slate) when a
+// priority is given — so a row's icon reads its urgency at a glance. Falls back to
+// the category colour when no priority is passed.
+function priorityChip(priority?: string | null): string | null {
+  if (!priority) return null
+  const p = String(priority)
+  if (p === 'urgent' || p === 'P1') return 'bg-red-500/15 text-red-600 dark:text-red-400'
+  if (p === 'high' || p === 'P2') return 'bg-orange-500/15 text-orange-600 dark:text-orange-400'
+  if (p === 'medium' || p === 'P3') return 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
+  if (p === 'low' || p === 'P4') return 'bg-slate-500/15 text-slate-600 dark:text-slate-300'
+  return null
+}
+
+export function CategoryIcon({ category, priority, className = 'h-14 w-14', iconSize = 22 }: { category?: string | null; priority?: string | null; className?: string; iconSize?: number }) {
   const { Icon, badgeClass } = categoryVisual(category)
-  return <span className={`grid shrink-0 place-items-center rounded-full ${className} ${badgeClass}`}><Icon size={iconSize} /></span>
+  const chip = priorityChip(priority) ?? badgeClass
+  return <span className={`grid shrink-0 place-items-center rounded-full ${className} ${chip}`}><Icon size={iconSize} /></span>
 }
 
 export function priorityLabel(ticket: StoreManagerTicket): string {

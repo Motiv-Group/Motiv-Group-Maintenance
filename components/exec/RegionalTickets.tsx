@@ -77,7 +77,7 @@ function TicketRow({ t }: { t: RegionalTicketRow }) {
   return (
     <Link href={`/regional/tickets/${t.id}`} className="grid gap-3 border-b border-[var(--border)] px-2 py-3 last:border-0 transition hover:bg-[var(--hover)] sm:grid-cols-[1fr_auto] sm:items-center">
       <div className="flex min-w-0 items-center gap-3">
-        <CategoryIcon category={t.category ?? t.title} className="h-11 w-11" iconSize={18} />
+        <CategoryIcon category={t.category ?? t.title} priority={t.priority} className="h-11 w-11" iconSize={18} />
         <div className="min-w-0">
           {t.jobRef && <p className="text-[10px] font-mono text-[var(--text-faint)]">{t.jobRef}</p>}
           <p className="truncate text-sm font-bold text-[var(--text)]">{t.category || t.title}</p>

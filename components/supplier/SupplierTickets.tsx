@@ -103,7 +103,7 @@ function TicketRow({ t, company, showStore }: { t: SupplierTicketRow; company?: 
   return (
     <Link href={`/supplier/tickets/${t.id}`} className="grid gap-3 border-b border-[var(--border)] px-2 py-3 last:border-0 transition hover:bg-[var(--hover)] sm:grid-cols-[1fr_auto] sm:items-center">
       <div className="flex min-w-0 items-center gap-3">
-        <CategoryIcon category={t.category ?? t.title} className="h-11 w-11" iconSize={18} />
+        <CategoryIcon category={t.category ?? t.title} priority={t.priority} className="h-11 w-11" iconSize={18} />
         <div className="min-w-0">
           {showStore && <p className="text-[10px] text-[var(--text-faint)] truncate">{t.isIndividual ? 'Individual' : [company, t.storeName].filter(Boolean).join(' · ')}</p>}
           <p className="truncate text-sm font-bold text-[var(--text)]">{t.title}</p>
@@ -299,7 +299,7 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
                 return (
                   <Link key={t.id} href={`/supplier/tickets/${t.id}`} className="grid gap-3 border-b border-[var(--border)] px-2 py-3 last:border-0 transition hover:bg-[var(--hover)] sm:grid-cols-[1fr_auto] sm:items-center">
                     <div className="flex min-w-0 items-center gap-3">
-                      <CategoryIcon category={t.category ?? t.title} className="h-11 w-11" iconSize={18} />
+                      <CategoryIcon category={t.category ?? t.title} priority={t.priority} className="h-11 w-11" iconSize={18} />
                       <div className="min-w-0">
                         <p className="text-[10px] text-[var(--text-faint)] truncate">{t.isIndividual ? 'Individual' : [company, t.storeName].filter(Boolean).join(' · ')}</p>
                         <p className="truncate text-sm font-bold text-[var(--text)]">{t.title}</p>

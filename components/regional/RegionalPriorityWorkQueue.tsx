@@ -97,28 +97,14 @@ export function RegionalPriorityWorkQueue({ tickets, generatedAt, suppliers = []
   )
 }
 
-function MetricButton({ active, icon, tone, label, value, sub, subActive, onClick }: {
-  active: boolean; icon: React.ReactNode; tone: Tone; label: string; value: number; sub: string; subActive: boolean; onClick: () => void
+function MetricButton({ active, icon, label, value, sub, subActive, onClick }: {
+  active: boolean; icon: React.ReactNode; tone?: Tone; label: string; value: number; sub: string; subActive: boolean; onClick: () => void
 }) {
-  const tones: Record<Tone, string> = {
-    red: 'bg-red-500/15 text-red-600 dark:text-red-300 ring-red-500/20',
-    purple: 'bg-purple-500/15 text-purple-600 dark:text-purple-300 ring-purple-500/20',
-    gold: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D] ring-[#C6A35D]/20',
-    green: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 ring-emerald-500/20',
-    orange: 'bg-orange-500/15 text-orange-600 dark:text-orange-400 ring-orange-500/20',
-    blue: 'bg-blue-500/15 text-blue-600 dark:text-blue-300 ring-blue-500/20',
-  }
-  const subTone: Record<Tone, string> = {
-    red: 'text-red-600 dark:text-red-400',
-    gold: 'text-amber-600 dark:text-[#C6A35D]',
-    green: 'text-emerald-600 dark:text-emerald-400',
-    purple: 'text-purple-600 dark:text-purple-300',
-    orange: 'text-orange-600 dark:text-orange-400',
-    blue: 'text-blue-600 dark:text-blue-400',
-  }
-  const subColor = subActive ? subTone[tone] : 'text-[var(--text-faint)]'
   const zero = value === 0
-  const valueColor = zero ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'
+  // Icon chip, value, border and the (active) sub-line all share ONE state colour:
+  // green when the count is 0 (all clear), amber when there's work outstanding.
+  const stateText = zero ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'
+  const iconChip = zero ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 ring-emerald-500/20' : 'bg-amber-500/15 text-amber-600 dark:text-amber-400 ring-amber-500/20'
   const stateBorder = zero ? 'border-2 border-emerald-500/60' : 'border-2 border-amber-500/70'
 
   return (
@@ -126,11 +112,11 @@ function MetricButton({ active, icon, tone, label, value, sub, subActive, onClic
       className={`block rounded-2xl text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 ${active ? 'ring-2 ring-blue-500/70' : ''}`}>
       <Card className={`h-full p-4 transition hover:-translate-y-0.5 hover:ring-blue-500/30 ${stateBorder} ${active ? 'ring-blue-500/60' : ''}`}>
         <div className="flex items-center gap-4">
-          <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-full ring-1 ${tones[tone]}`}>{icon}</span>
+          <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-full ring-1 ${iconChip}`}>{icon}</span>
           <div className="min-w-0">
             <p className="truncate text-xs font-semibold text-[var(--text-muted)]">{label}</p>
-            <p className={`mt-1 text-2xl font-bold leading-none ${valueColor}`}>{value}</p>
-            <p className={`mt-1 truncate text-xs font-semibold ${subColor}`}>{sub}</p>
+            <p className={`mt-1 text-2xl font-bold leading-none ${stateText}`}>{value}</p>
+            <p className={`mt-1 truncate text-xs font-semibold ${subActive ? stateText : 'text-[var(--text-faint)]'}`}>{sub}</p>
           </div>
         </div>
       </Card>
@@ -164,7 +150,7 @@ function QueueRow({ ticket, nowMs, suppliers, motivSuppliers }: { ticket: Region
       <Link href={ticketUrl} aria-label={`View ${ticket.category || ticket.title} ticket`} className="absolute inset-0 z-10" />
 
       <div className="flex min-w-0 items-center gap-3">
-        <CategoryIcon category={ticket.category ?? ticket.title} />
+        <CategoryIcon category={ticket.category ?? ticket.title} priority={ticket.priority} />
         <div className="min-w-0">
           <p className="truncate text-base font-bold text-[var(--text)]">{ticket.category || ticket.title}</p>
           <p className="truncate text-sm text-[var(--text-muted)]">{ticket.storeName}</p>

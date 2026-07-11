@@ -151,7 +151,7 @@ export default async function AdminStoreDetailPage(props: { params: Promise<{ id
                 href={`/supplier/tickets/${ticket.id}`}
                 className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition"
               >
-                <CategoryIcon category={ticket.category} className="h-11 w-11" iconSize={18} />
+                <CategoryIcon category={ticket.category} priority={ticket.priority} className="h-11 w-11" iconSize={18} />
                 <div className="min-w-0 flex-1">
                   <p className="font-medium text-sm text-[var(--text)] truncate">{ticket.title}</p>
                   <p className="text-xs text-[var(--text-faint)] mt-0.5">{formatDate(ticket.created_at)}</p>
