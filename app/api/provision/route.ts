@@ -22,6 +22,8 @@ const BodySchema = z.object({
   branch_code: z.string().optional(),
   store_name: z.string().optional(),
   sub_store: z.string().optional(),
+  address: z.string().optional(),
+  company_name: z.string().optional(),
   full_name: z.string().optional(),
   password: z.string().optional(),
   phone: z.string().optional(),
@@ -140,10 +142,12 @@ export async function POST(request: Request) {
         const bcode = String(branch_code).toUpperCase()
         const cleanEmail = String(email).trim().toLowerCase()
         const subStore = body.sub_store || store_name
+        const address = typeof body.address === 'string' ? body.address.trim() || null : null
+        const companyName = typeof body.company_name === 'string' ? body.company_name.trim() || null : null
 
         // 1) create the store
         const { data: store, error: storeErr } = await admin.from('stores')
-          .insert({ company_id: companyId, region_id: regionId, region_code: region?.region_code, branch_code: bcode, name: store_name, sub_store: subStore })
+          .insert({ company_id: companyId, region_id: regionId, region_code: region?.region_code, branch_code: bcode, name: store_name, sub_store: subStore, address })
           .select('id').single()
         if (storeErr || !store) return NextResponse.json({ error: storeErr?.message?.includes('duplicate') ? 'Branch code already exists' : (storeErr?.message ?? 'Could not create store') }, { status: 400 })
 
@@ -161,7 +165,7 @@ export async function POST(request: Request) {
         const uid = created.user.id
 
         // 3) enforce profile + link to the store
-        await admin.from('user_profiles').upsert({ id: uid, role: 'store_manager', company_id: companyId, full_name, phone: phoneE164, sub_store: subStore, branch_code: bcode }, { onConflict: 'id' })
+        await admin.from('user_profiles').upsert({ id: uid, role: 'store_manager', company_id: companyId, full_name, phone: phoneE164, sub_store: subStore, branch_code: bcode, address, company_name: companyName }, { onConflict: 'id' })
         await admin.from('store_users').upsert({ user_id: uid, store_id: store.id })
 
         // 4) email the credentials
@@ -211,16 +215,16 @@ export async function POST(request: Request) {
       case 'store_detail': {
         if (!isRM) return forbid()
         const regions = await myRegions()
-        const { data: store } = await admin.from('stores').select('id, name, sub_store, branch_code, region_id, company_id, active, closed_at').eq('id', body.storeId ?? '').single()
+        const { data: store } = await admin.from('stores').select('id, name, sub_store, branch_code, address, region_id, company_id, active, closed_at').eq('id', body.storeId ?? '').single()
         if (!store || store.company_id !== companyId || !regions.includes(store.region_id ?? '')) return NextResponse.json({ error: 'Store not in your region' }, { status: 400 })
         const { data: links } = await admin.from('store_users').select('user_id').eq('store_id', store.id)
         const smId = (links ?? [])[0]?.user_id ?? null
-        let sm: { userId: string; email: string | null; phone: string | null; fullName: string | null } | null = null
+        let sm: { userId: string; email: string | null; phone: string | null; fullName: string | null; companyName: string | null } | null = null
         if (smId) {
-          const { data: p } = await admin.from('user_profiles').select('email, phone, full_name').eq('id', smId).single()
-          sm = { userId: smId, email: p?.email ?? null, phone: p?.phone ?? null, fullName: p?.full_name ?? null }
+          const { data: p } = await admin.from('user_profiles').select('email, phone, full_name, company_name').eq('id', smId).single()
+          sm = { userId: smId, email: p?.email ?? null, phone: p?.phone ?? null, fullName: p?.full_name ?? null, companyName: p?.company_name ?? null }
         }
-        return NextResponse.json({ store: { id: store.id, name: store.name, subStore: store.sub_store, branchCode: store.branch_code, active: store.active, closedAt: store.closed_at }, sm })
+        return NextResponse.json({ store: { id: store.id, name: store.name, subStore: store.sub_store, branchCode: store.branch_code, address: (store as any).address ?? null, active: store.active, closedAt: store.closed_at }, sm })
       }
       case 'update_store': {
         if (!isRM) return forbid()
@@ -228,24 +232,37 @@ export async function POST(request: Request) {
         const { data: store } = await admin.from('stores').select('id, name, sub_store, region_id, company_id').eq('id', body.storeId ?? '').single()
         if (!store || store.company_id !== companyId || !regions.includes(store.region_id ?? '')) return NextResponse.json({ error: 'Store not in your region' }, { status: 400 })
 
-        // Store name / sub-store edits.
+        // Store row edits (name / sub-store / branch code / address). These mirror
+        // the store-manager's greyed-out "Store Information" settings fields.
+        const bcode = typeof body.branch_code === 'string' && body.branch_code.trim() ? body.branch_code.trim().toUpperCase() : null
+        const subStore = typeof body.sub_store === 'string' && body.sub_store.trim() ? body.sub_store.trim() : null
+        const address = typeof body.address === 'string' ? body.address.trim() || null : undefined
         const patch: Record<string, any> = {}
         if (typeof body.store_name === 'string' && body.store_name.trim()) patch.name = body.store_name.trim()
-        if (typeof body.sub_store === 'string' && body.sub_store.trim()) patch.sub_store = body.sub_store.trim()
+        if (subStore) patch.sub_store = subStore
+        if (bcode) patch.branch_code = bcode
+        if (address !== undefined) patch.address = address
         if (Object.keys(patch).length) {
           const { error } = await admin.from('stores').update(patch as Database['public']['Tables']['stores']['Update']).eq('id', store.id)
-          if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+          if (error) return NextResponse.json({ error: error.message.includes('duplicate') ? 'Branch code already exists' : error.message }, { status: 400 })
         }
 
-        // Store-manager contact edits.
+        // Store-manager profile edits — keep the SM's own record in sync with the
+        // store (name/company/contact/branch), matching what they see in Settings.
         const { data: links } = await admin.from('store_users').select('user_id').eq('store_id', store.id)
         const smId = (links ?? [])[0]?.user_id ?? null
         const newEmail = typeof body.email === 'string' ? body.email.trim().toLowerCase() : null
         const newPhoneRaw = typeof body.phone === 'string' ? body.phone : null
         let emailed: boolean | undefined
-        if (smId && (newEmail || newPhoneRaw)) {
+        if (smId) {
           const { data: cur } = await admin.from('user_profiles').select('email, phone, full_name').eq('id', smId).single()
           const profPatch: Record<string, any> = {}
+
+          if (typeof body.full_name === 'string' && body.full_name.trim()) profPatch.full_name = body.full_name.trim()
+          if (typeof body.company_name === 'string') profPatch.company_name = body.company_name.trim() || null
+          if (subStore) profPatch.sub_store = subStore
+          if (bcode) profPatch.branch_code = bcode
+          if (address !== undefined) profPatch.address = address
 
           if (newPhoneRaw != null && newPhoneRaw !== '') {
             if (!isValidPhone(newPhoneRaw)) return NextResponse.json({ error: 'Please enter a valid phone number' }, { status: 400 })

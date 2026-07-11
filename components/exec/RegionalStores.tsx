@@ -3,10 +3,10 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { Store, Plus, User, Mail, Phone, MapPin, Ticket, MoreVertical, Pencil, Power, RotateCcw, Trash2, X, ChevronDown, Archive, ArrowRight } from 'lucide-react'
+import { Store, Plus, User, Mail, Phone, MapPin, Ticket, MoreVertical, Pencil, Power, RotateCcw, Trash2, X, ChevronDown, Archive, ArrowRight, Eye, EyeOff } from 'lucide-react'
 import type { StoreCard } from '@/lib/health/data'
 import { formatCurrency, formatDateTime } from '@/lib/utils'
-import { isValidEmail, isValidPhone } from '@/lib/csv'
+import { isValidEmail, isValidPhone, normalisePhone } from '@/lib/csv'
 import { Card, SectionCard, Pill, Donut, BreakdownList, STATUS_TEXT } from '@/components/exec/ui'
 import { DrawerHeader } from '@/components/exec/Drawer'
 import { Modal } from '@/components/ui/Modal'
@@ -22,6 +22,7 @@ export function RegionalStores({ stores, archived = [] }: { stores: StoreCard[];
   const [selId, setSelId] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
+  const [addOpen, setAddOpen] = useState(false)
   const [actionTarget, setActionTarget] = useState<ActionTarget | null>(null)
   const [archiveOpen, setArchiveOpen] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -69,9 +70,9 @@ export function RegionalStores({ stores, archived = [] }: { stores: StoreCard[];
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><Store className="text-indigo-600 dark:text-indigo-400" size={22} /> Stores</h1>
-        <Link href="/regional/stores/add" className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-500 transition shrink-0">
-          <Plus size={16} /> Add Stores
-        </Link>
+        <button onClick={() => setAddOpen(true)} className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-500 transition shrink-0">
+          <Plus size={16} /> Add Store
+        </button>
       </div>
 
       {notice && (
@@ -186,6 +187,8 @@ export function RegionalStores({ stores, archived = [] }: { stores: StoreCard[];
       )}
 
       {editId && <EditStoreModal storeId={editId} onClose={() => setEditId(null)} onSaved={msg => { setEditId(null); setNotice({ ok: true, text: msg }); router.refresh() }} />}
+
+      {addOpen && <AddStoreModal onClose={() => setAddOpen(false)} onSaved={msg => { setAddOpen(false); setNotice({ ok: true, text: msg }); router.refresh() }} />}
     </div>
   )
 }
@@ -241,17 +244,20 @@ function StoreActionsModal({ target, busy, onClose, onEdit, onDeactivate, onReac
   )
 }
 
-/** Edit store name + store-manager contact. Changing the email re-issues login
- *  credentials (username + new password) by email. */
+/** Edit the full store + store-manager record — the same fields the SM sees
+ *  greyed-out in their Settings (they can't self-edit these). Changing the email
+ *  re-issues login credentials (username + new password) by email. Uses the shared
+ *  Modal for consistency with the store-detail and actions pop-ups. */
 function EditStoreModal({ storeId, onClose, onSaved }: { storeId: string; onClose: () => void; onSaved: (msg: string) => void }) {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [err, setErr] = useState('')
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
-  const [phone, setPhone] = useState('')
+  const [vals, setVals] = useState<Record<string, string>>({})
   const [hasSm, setHasSm] = useState(false)
+
+  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) => setVals(v => ({ ...v, [k]: e.target.value }))
+  const setUpper = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) => setVals(v => ({ ...v, [k]: e.target.value.toUpperCase() }))
 
   useEffect(() => {
     let live = true
@@ -261,9 +267,16 @@ function EditStoreModal({ storeId, onClose, onSaved }: { storeId: string; onClos
         const d = await res.json().catch(() => ({}))
         if (!res.ok) throw new Error(d.error ?? 'Could not load store')
         if (!live) return
-        setName(d.store?.name ?? '')
-        setEmail(d.sm?.email ?? '')
-        setPhone(d.sm?.phone ?? '')
+        setVals({
+          store_name: d.store?.name ?? '',
+          branch_code: d.store?.branchCode ?? '',
+          sub_store: d.store?.subStore ?? '',
+          address: d.store?.address ?? '',
+          full_name: d.sm?.fullName ?? '',
+          email: d.sm?.email ?? '',
+          phone: d.sm?.phone ?? '',
+          company_name: d.sm?.companyName ?? '',
+        })
         setHasSm(!!d.sm)
       } catch (e: any) { if (live) setErr(e.message) } finally { if (live) setLoading(false) }
     })()
@@ -273,10 +286,11 @@ function EditStoreModal({ storeId, onClose, onSaved }: { storeId: string; onClos
   // Validate, then show an in-app confirm step (no native browser dialog).
   function review(e: React.FormEvent) {
     e.preventDefault()
-    if (!name.trim()) { setErr('Store name is required.'); return }
+    if (!vals.store_name?.trim()) { setErr('Store name is required.'); return }
+    if (!vals.branch_code?.trim()) { setErr('Branch code is required.'); return }
     if (hasSm) {
-      if (email.trim() && !isValidEmail(email)) { setErr('Please enter a valid email address.'); return }
-      if (phone.trim() && !isValidPhone(phone)) { setErr('Please enter a valid phone number.'); return }
+      if (vals.email?.trim() && !isValidEmail(vals.email)) { setErr('Please enter a valid email address.'); return }
+      if (vals.phone?.trim() && !isValidPhone(vals.phone)) { setErr('Please enter a valid phone number.'); return }
     }
     setErr(''); setConfirming(true)
   }
@@ -284,66 +298,162 @@ function EditStoreModal({ storeId, onClose, onSaved }: { storeId: string; onClos
   async function doSave() {
     setBusy(true); setErr('')
     try {
-      const res = await fetch('/api/provision', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'update_store', storeId, store_name: name, ...(hasSm ? { email, phone } : {}) }),
-      })
+      const body = {
+        action: 'update_store', storeId,
+        store_name: vals.store_name, branch_code: vals.branch_code, sub_store: vals.sub_store, address: vals.address ?? '',
+        ...(hasSm ? { full_name: vals.full_name, email: vals.email, phone: vals.phone, company_name: vals.company_name ?? '' } : {}),
+      }
+      const res = await fetch('/api/provision', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       const d = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(d.error ?? 'Update failed')
       onSaved(d.message ?? 'Store updated.')
     } catch (e: any) { setErr(e.message); setBusy(false); setConfirming(false) }
   }
 
-  const input = 'w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)] focus:outline-none focus:ring-2 focus:ring-[#C6A35D]/40'
+  return (
+    <Modal onClose={onClose} maxWidth="max-w-lg">
+      {close => (
+        <>
+          <DrawerHeader onClose={close} title={<div className="flex items-center gap-2"><Pencil size={17} className="text-blue-600 dark:text-blue-400 shrink-0" /><h3 className="text-lg font-bold text-[var(--text)]">Edit store</h3></div>} />
+          {loading ? (
+            <p className="py-8 text-center text-sm text-[var(--text-faint)]">Loading…</p>
+          ) : (
+            <form onSubmit={review} className="space-y-4">
+              {/* Store details */}
+              <FormSection title="Store details">
+                <Field label="Store / branch name"><input className={FIELD_INPUT} value={vals.store_name ?? ''} onChange={set('store_name')} required /></Field>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <Field label="Branch code"><input className={`${FIELD_INPUT} font-mono uppercase`} value={vals.branch_code ?? ''} onChange={setUpper('branch_code')} placeholder="e.g. CPT001" required /></Field>
+                  <Field label="Branch / sub-store"><input className={FIELD_INPUT} value={vals.sub_store ?? ''} onChange={set('sub_store')} placeholder="e.g. Cape Town Branch" /></Field>
+                </div>
+                <Field label="Address"><input className={FIELD_INPUT} value={vals.address ?? ''} onChange={set('address')} placeholder="123 Main St, Cape Town" /></Field>
+              </FormSection>
+
+              {/* Store manager — the SM's greyed-out Settings fields */}
+              {hasSm ? (
+                <FormSection title="Store manager">
+                  <Field label="Full name"><input className={FIELD_INPUT} value={vals.full_name ?? ''} onChange={set('full_name')} placeholder="e.g. Thabo Mokoena" /></Field>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <Field label="Company name"><input className={FIELD_INPUT} value={vals.company_name ?? ''} onChange={set('company_name')} placeholder="Acme Corporation" /></Field>
+                    <Field label="Phone"><input className={FIELD_INPUT} type="tel" value={vals.phone ?? ''} onChange={set('phone')} placeholder="e.g. 0761936165" /></Field>
+                  </div>
+                  <Field label="Login email"><input className={FIELD_INPUT} type="email" value={vals.email ?? ''} onChange={set('email')} placeholder="manager@store.co.za" /></Field>
+                  <p className="text-[11px] text-[var(--text-faint)]">Changing the email re-issues login details (username + new password) to the new address.</p>
+                </FormSection>
+              ) : (
+                <p className="rounded-xl bg-[var(--surface-2)] px-3 py-2.5 text-[11px] text-[var(--text-faint)]">No store manager linked yet — only the store details can be edited.</p>
+              )}
+
+              {err && <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-500">{err}</p>}
+
+              {confirming ? (
+                <div className="space-y-2 rounded-xl bg-[var(--surface-2)] p-3 ring-1 ring-[var(--border)]">
+                  <p className="text-sm text-[var(--text)]">Save these changes to <span className="font-semibold">{vals.store_name}</span>?</p>
+                  <div className="flex gap-2">
+                    <button type="button" disabled={busy} onClick={doSave} className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:opacity-60">{busy ? 'Saving…' : 'Yes, save'}</button>
+                    <button type="button" disabled={busy} onClick={() => setConfirming(false)} className="flex-1 rounded-xl py-2.5 text-sm font-medium text-[var(--text-muted)] ring-1 ring-[var(--border)]">Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <button type="submit" disabled={busy} className="w-full rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:opacity-60">Save changes</button>
+              )}
+            </form>
+          )}
+        </>
+      )}
+    </Modal>
+  )
+}
+
+/** Add a store + its store-manager login in one pop-up. Posts `create_store_manager`
+ *  (creates the store, the auth user, links them, emails the credentials). */
+function AddStoreModal({ onClose, onSaved }: { onClose: () => void; onSaved: (msg: string) => void }) {
+  const [vals, setVals] = useState<Record<string, string>>({})
+  const [busy, setBusy] = useState(false)
+  const [showPw, setShowPw] = useState(false)
+  const [err, setErr] = useState('')
+
+  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) => setVals(v => ({ ...v, [k]: e.target.value }))
+  const setUpper = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) => setVals(v => ({ ...v, [k]: e.target.value.toUpperCase() }))
+  const formatPhone = () => { const n = normalisePhone(vals.phone); if (n) setVals(v => ({ ...v, phone: n })) }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!isValidEmail(vals.email)) { setErr('Please enter a valid email address.'); return }
+    if (!isValidPhone(vals.phone)) { setErr('Please enter a valid phone number.'); return }
+    if ((vals.password ?? '').length < 8) { setErr('Password must be at least 8 characters.'); return }
+    setBusy(true); setErr('')
+    try {
+      const res = await fetch('/api/provision', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'create_store_manager', ...vals }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(d.error ?? 'Failed to create account')
+      onSaved(d.message ?? 'Store manager account created.')
+    } catch (e: any) { setErr(e.message); setBusy(false) }
+  }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/50" />
-      <div className="relative w-full max-w-md rounded-2xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] p-5 space-y-4" onClick={e => e.stopPropagation()}>
-        <div className="flex items-start justify-between gap-2">
-          <h3 className="text-lg font-bold text-[var(--text)]">Edit store</h3>
-          <button onClick={onClose} className="shrink-0 -m-1 p-1.5 rounded-lg text-[var(--text-faint)] hover:text-[var(--text)] hover:bg-[var(--hover)]"><X size={18} /></button>
-        </div>
-        {loading ? (
-          <p className="text-sm text-[var(--text-faint)] py-6 text-center">Loading…</p>
-        ) : (
-          <form onSubmit={review} className="space-y-3">
-            <div>
-              <label className="block text-xs text-[var(--text-muted)] mb-1">Store / branch name</label>
-              <input className={input} value={name} onChange={e => setName(e.target.value)} required />
-            </div>
-            {hasSm ? (
-              <>
-                <div>
-                  <label className="block text-xs text-[var(--text-muted)] mb-1">Manager email</label>
-                  <input className={input} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="manager@store.co.za" />
-                  <p className="text-[11px] text-[var(--text-faint)] mt-1">Changing the email re-issues login details (username + new password) to the new address.</p>
-                </div>
-                <div>
-                  <label className="block text-xs text-[var(--text-muted)] mb-1">Manager phone</label>
-                  <input className={input} type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="e.g. 0761936165" />
-                </div>
-              </>
-            ) : (
-              <p className="text-[11px] text-[var(--text-faint)]">No store manager linked yet — only the store name can be edited.</p>
-            )}
-            {err && <p className="text-sm text-red-500 bg-red-500/10 rounded-lg px-3 py-2">{err}</p>}
-            {confirming ? (
-              <div className="space-y-2 rounded-xl ring-1 ring-[var(--border)] bg-[var(--surface)] p-3">
-                <p className="text-sm text-[var(--text)]">Save these changes to <span className="font-semibold">{name}</span>?</p>
-                <div className="flex gap-2">
-                  <button type="button" disabled={busy} onClick={doSave} className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold disabled:opacity-60">{busy ? 'Saving…' : 'Yes, save'}</button>
-                  <button type="button" disabled={busy} onClick={() => setConfirming(false)} className="flex-1 py-2.5 rounded-xl ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm font-medium">Cancel</button>
-                </div>
+    <Modal onClose={onClose} maxWidth="max-w-lg">
+      {close => (
+        <>
+          <DrawerHeader onClose={close} title={<div className="flex items-center gap-2"><Plus size={17} className="text-emerald-500 shrink-0" /><h3 className="text-lg font-bold text-[var(--text)]">Add store</h3></div>} />
+          <p className="-mt-2 text-sm text-[var(--text-muted)]">Create a store and its store-manager login. The login details are emailed to the manager.</p>
+          <form onSubmit={submit} className="space-y-4">
+            {/* Store details */}
+            <FormSection title="Store details">
+              <Field label="Store / branch name"><input className={FIELD_INPUT} value={vals.store_name ?? ''} onChange={set('store_name')} placeholder="e.g. Canal Walk" required /></Field>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Field label="Branch code"><input className={`${FIELD_INPUT} font-mono uppercase`} value={vals.branch_code ?? ''} onChange={setUpper('branch_code')} placeholder="e.g. CPT001" required /></Field>
+                <Field label="Branch / sub-store"><input className={FIELD_INPUT} value={vals.sub_store ?? ''} onChange={set('sub_store')} placeholder="e.g. Cape Town Branch" /></Field>
               </div>
-            ) : (
-              <button type="submit" disabled={busy} className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold disabled:opacity-60">Save changes</button>
-            )}
+              <Field label="Address"><input className={FIELD_INPUT} value={vals.address ?? ''} onChange={set('address')} placeholder="123 Main St, Cape Town" /></Field>
+            </FormSection>
+
+            {/* Store manager */}
+            <FormSection title="Store manager">
+              <Field label="Full name"><input className={FIELD_INPUT} value={vals.full_name ?? ''} onChange={set('full_name')} placeholder="e.g. Thabo Mokoena" required /></Field>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Field label="Company name"><input className={FIELD_INPUT} value={vals.company_name ?? ''} onChange={set('company_name')} placeholder="Acme Corporation" /></Field>
+                <Field label="Phone"><input className={FIELD_INPUT} type="tel" value={vals.phone ?? ''} onChange={set('phone')} onBlur={formatPhone} placeholder="e.g. 0761936165" required /></Field>
+              </div>
+              <Field label="Login email"><input className={FIELD_INPUT} type="email" value={vals.email ?? ''} onChange={set('email')} placeholder="manager@store.co.za" required /></Field>
+              <Field label="Temporary password (min 8)">
+                <div className="relative">
+                  <input className={`${FIELD_INPUT} pr-11`} type={showPw ? 'text' : 'password'} value={vals.password ?? ''} onChange={set('password')} placeholder="At least 8 characters" minLength={8} required />
+                  <button type="button" onClick={() => setShowPw(s => !s)} aria-label={showPw ? 'Hide password' : 'Show password'}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-[var(--text-faint)] transition hover:bg-[var(--hover)] hover:text-[var(--text)]">
+                    {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </Field>
+            </FormSection>
+
+            {err && <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-500">{err}</p>}
+            <button disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-60">
+              <Plus size={16} /> {busy ? 'Creating…' : 'Create store'}
+            </button>
           </form>
-        )}
-      </div>
+        </>
+      )}
+    </Modal>
+  )
+}
+
+const FIELD_INPUT = 'w-full rounded-xl bg-[var(--input-bg)] px-3 py-2.5 text-sm text-[var(--text)] ring-1 ring-[var(--border)] placeholder-[var(--text-faint)] focus:outline-none focus:ring-2 focus:ring-[#C6A35D]/40'
+
+function FormSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-3 rounded-xl bg-[var(--surface-2)] p-3.5 ring-1 ring-[var(--border)]">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-faint)]">{title}</p>
+      {children}
     </div>
   )
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return <div><label className="mb-1 block text-xs text-[var(--text-muted)]">{label}</label>{children}</div>
 }
 
 /** One contact line: clickable (mail/tel/maps) when a value exists, else hidden. */
