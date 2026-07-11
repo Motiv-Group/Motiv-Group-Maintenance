@@ -594,7 +594,7 @@ export function RmReviewPanel({ heading, items }: {
         ))}
       </div>
       {active && (
-        <Modal title={active.modalTitle ?? active.title} maxWidth="max-w-2xl" onClose={() => setOpenId(null)}>
+        <Modal title={active.modalTitle ?? active.title} maxWidth="max-w-3xl" onClose={() => setOpenId(null)}>
           {active.body}
         </Modal>
       )}
@@ -634,6 +634,81 @@ export function QuoteReviewButton({ ticketId, trigger }: { ticketId: string; tri
         </Modal>
       )}
     </>
+  )
+}
+
+// Today-queue "Sign off" pop-up: fetches the submission currently under review
+// and shows it + Accept COC/POC / Request evidence / Raise snag in place, so the
+// RM can sign off from the queue without navigating into the ticket.
+type SignoffSubmission = { id: string; label: string; createdAt: string; beforeUrls: string[]; afterUrls: string[]; cocUrl: string | null; invoiceUrl: string | null; notes: string | null }
+
+export function SignoffReviewButton({ ticketId, trigger }: { ticketId: string; trigger: (open: () => void) => ReactNode }) {
+  const [open, setOpen] = useState(false)
+  const [data, setData] = useState<{ submission: SignoffSubmission | null } | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [err, setErr] = useState('')
+  useEffect(() => {
+    if (!open) return
+    let live = true
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resets fetch state when the pop-up opens, before the async load; cannot run during render
+    setLoading(true); setErr('')
+    fetch(`/api/tickets/${ticketId}/signoff`)
+      .then(r => r.json())
+      .then(d => { if (!live) return; if (d?.error) setErr(d.error); else setData(d) })
+      .catch(() => { if (live) setErr('Could not load the submission.') })
+      .finally(() => { if (live) setLoading(false) })
+    return () => { live = false }
+  }, [open, ticketId])
+  return (
+    <>
+      {trigger(() => setOpen(true))}
+      {open && (
+        <Modal title="Sign off completion" maxWidth="max-w-3xl" onClose={() => setOpen(false)}>
+          {loading ? <p className="py-4 text-center text-sm text-[var(--text-faint)]">Loading…</p>
+            : err ? <p className="text-sm text-red-500">{err}</p>
+            : data?.submission ? <SignoffReviewBody ticketId={ticketId} s={data.submission} />
+            : <p className="text-sm text-[var(--text-faint)]">Nothing awaiting your sign-off on this ticket.</p>}
+        </Modal>
+      )}
+    </>
+  )
+}
+
+function SignoffReviewBody({ ticketId, s }: { ticketId: string; s: SignoffSubmission }) {
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl ring-1 ring-[var(--border)] bg-[var(--surface)] p-4 space-y-3">
+        <p className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]"><FileText size={15} className="text-[#C6A35D] shrink-0" />{s.label} · {formatDateTime(s.createdAt)}</p>
+        <div>
+          <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Proof of completion</div>
+          <div className="flex flex-wrap gap-x-4 gap-y-1">
+            {s.beforeUrls.map((u, i) => <ViewTrackedLink key={`b${i}`} ticketId={ticketId} itemType="photo" itemLabel={`Before photo ${i + 1}`} href={u} className="text-sm text-[#C6A35D] underline hover:text-amber-500">Before {i + 1}</ViewTrackedLink>)}
+            {s.afterUrls.map((u, i) => <ViewTrackedLink key={`a${i}`} ticketId={ticketId} itemType="photo" itemLabel={`Completion photo ${i + 1}`} href={u} className="text-sm text-[#C6A35D] underline hover:text-amber-500">After {i + 1}</ViewTrackedLink>)}
+            {!s.beforeUrls.length && !s.afterUrls.length && <span className="text-sm text-[var(--text-faint)]">No photos</span>}
+          </div>
+        </div>
+        {(s.cocUrl || s.invoiceUrl) && (
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Certificate of Completion</div>
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
+              {s.cocUrl && <ViewTrackedLink ticketId={ticketId} itemType="coc" itemLabel="COC" href={s.cocUrl} className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View COC</ViewTrackedLink>}
+              {s.invoiceUrl && <ViewTrackedLink ticketId={ticketId} itemType="invoice" itemLabel="Invoice" href={s.invoiceUrl} className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View invoice</ViewTrackedLink>}
+            </div>
+          </div>
+        )}
+        {s.notes && (
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Notes</div>
+            <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{s.notes}</p>
+          </div>
+        )}
+      </div>
+      <ApproveSignoffCard ticketId={ticketId} />
+      <div className="grid grid-cols-2 gap-2">
+        <RequestEvidenceButton ticketId={ticketId} />
+        <RaiseSnagButton ticketId={ticketId} />
+      </div>
+    </div>
   )
 }
 

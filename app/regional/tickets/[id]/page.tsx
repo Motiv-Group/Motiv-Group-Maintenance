@@ -530,7 +530,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
     if (t.status === 'cancelled' || t.status === 'declined') return { mode: 'closed', msg: `Ticket ${t.status}`, sub: t.cancellation_reason || 'No further action needed.' }
     if (openDispute) return { mode: 'act', msg: 'Resolve the open dispute', sub: 'A dispute is paused on this ticket — review the thread and resolve it in the Dispute section.' }
     if (snagAwaitingApproval) return { mode: 'act', msg: 'Approve the snag-fix date', sub: 'The supplier proposed a date to carry out the corrective work — approve it below.' }
-    if (pendingSignoffs.length > 0) return { mode: 'act', msg: 'Review & approve the completion', sub: 'The supplier submitted the COC & POC — approve it, request more evidence, or raise a snag.' }
+    if (pendingSignoffs.length > 0) return { mode: 'act', msg: '', sub: 'The supplier submitted the COC & POC — approve it, request more evidence, or raise a snag.' }
     if (t.status === 'variation_review') return { mode: 'act', msg: 'Review the variation order', sub: 'A variation order for extra work is awaiting your approval below.' }
     if (reviewQuotes.length > 0) return { mode: 'act', msg: 'Quotes received', sub: '' }
     if (t.status === 'scheduled' && t.schedule_status === 'proposed' && t.scheduled_at) return { mode: 'act', msg: 'Accept the proposed visit time', sub: 'The supplier proposed a time beyond the SLA window — accept it below.' }
@@ -792,7 +792,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
       <div className="space-y-4">
         <RmSignoffCard s={s} tone="review" ticketId={t.id} title={submissionLabel(s)} freshEvidence={isEvidenceResubmission} priorUrls={priorEvidenceUrls} />
         <ApproveSignoffCard ticketId={t.id} />
-        <div className="grid grid-cols-1 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           <RequestEvidenceButton ticketId={t.id} />
           <RaiseSnagButton ticketId={t.id} />
         </div>

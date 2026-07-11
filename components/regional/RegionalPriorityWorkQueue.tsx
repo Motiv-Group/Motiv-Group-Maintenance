@@ -10,7 +10,7 @@ import { AlertCircle, AlertOctagon, AlertTriangle, ArrowRight, CalendarClock, Ch
 import type { RegionalTicketRow } from '@/lib/health/data'
 import { Card } from '@/components/exec/ui'
 import { CategoryIcon } from '@/components/client/ticketBadges'
-import { AssignSuppliersButton, QuoteReviewButton } from '@/components/regional/RmTicketActions'
+import { AssignSuppliersButton, QuoteReviewButton, SignoffReviewButton } from '@/components/regional/RmTicketActions'
 import { rmStatusMeta, formatDate, formatDateTime, humanizeDuration, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
 
 type QueueFilter = 'all' | 'assign' | 'quotes' | 'signoff' | 'sla' | 'snags'
@@ -146,9 +146,11 @@ function QueueRow({ ticket, nowMs, suppliers, motivSuppliers }: { ticket: Region
   const ticketUrl = `/regional/tickets/${ticket.id}`
   // CTA per phase (all pop-ups open in place, like the SM "Add Info" button):
   //  · a quote is in to review        → "Approve quote"  (view + approve/decline)
+  //  · a completion is in to sign off → "Sign off"       (view + approve/evidence/snag)
   //  · still gathering / awaiting quotes → "Assign supplier" (assign / add more)
   //  · anything else                   → "View Ticket"
   const reviewQuote = ['quoted', 'quote_revision'].includes(ticket.status)
+  const reviewSignoff = ticket.status === 'submitted_for_signoff'
   const assignable = !reviewQuote && ['open', 'info_requested', 'suppliers_declined', 'assigned', 'quote_requested', 'assessment'].includes(ticket.status)
   // Same outline form-factor + size as the "View Ticket" button, so the queue's
   // CTAs are consistent. Sits above the whole-row link (z-20) so its click opens
@@ -192,6 +194,9 @@ function QueueRow({ ticket, nowMs, suppliers, motivSuppliers }: { ticket: Region
         {reviewQuote ? (
           <QuoteReviewButton ticketId={ticket.id}
             trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}>Approve quote</button>} />
+        ) : reviewSignoff ? (
+          <SignoffReviewButton ticketId={ticket.id}
+            trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}>Sign off</button>} />
         ) : assignable ? (
           <AssignSuppliersButton ticketId={ticket.id} suppliers={suppliers} motivSuppliers={motivSuppliers}
             trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}>Assign supplier</button>} />
