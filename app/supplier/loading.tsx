@@ -1,6 +1,6 @@
 import { SkeletonStatGrid, SkeletonStackedDeck, Skeleton } from '@/components/ui/Skeleton'
 
-export default function AdminDashboardLoading() {
+export default function SupplierDashboardLoading() {
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
@@ -8,7 +8,7 @@ export default function AdminDashboardLoading() {
         <Skeleton className="h-9 w-28 rounded-xl" />
       </div>
       <SkeletonStatGrid />
-      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 space-y-3">
+      <div className="bg-[var(--surface)] ring-1 ring-black/10 dark:ring-white/10 rounded-2xl p-4 space-y-3">
         <Skeleton className="h-4 w-48" />
         <Skeleton className="h-3 w-full rounded-full" />
         <div className="flex gap-4">
