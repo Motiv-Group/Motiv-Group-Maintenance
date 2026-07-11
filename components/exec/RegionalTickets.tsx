@@ -5,12 +5,13 @@
 // milestone (requested → received → accepted) coloured to the status.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Ticket, Search, ChevronDown, BarChart3, X, PlusCircle } from 'lucide-react'
+import { Ticket, Search, ChevronDown, BarChart3, Store, PlusCircle } from 'lucide-react'
 import type { RegionalTicketRow } from '@/lib/health/data'
 import { Card } from '@/components/exec/ui'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { CategoryIcon, priorityBadgeClass, priorityLabel } from '@/components/client/ticketBadges'
-import { SlideOver } from '@/components/ui/SlideOver'
+import { Modal } from '@/components/ui/Modal'
+import { DrawerHeader } from '@/components/exec/Drawer'
 import { readCollapse, writeCollapse, readCollapseSet, writeCollapseSet } from '@/lib/collapse-state'
 import { rmStatusMeta, formatDateTime, humanizeDuration, urgencyCountCls } from '@/lib/utils'
 
@@ -313,13 +314,16 @@ function StorePanel({ store, rows, onClose }: { store: string; rows: RegionalTic
   )
 
   return (
-    <SlideOver onClose={onClose}>
+    <Modal onClose={onClose} maxWidth="max-w-2xl">
       {close => (
         <>
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0"><h2 className="text-lg font-bold text-[var(--text)] truncate">{store}</h2><p className="text-xs text-[var(--text-muted)]">{total} ticket{total === 1 ? '' : 's'}</p></div>
-          <button onClick={close} className="shrink-0 -m-1 p-1.5 rounded-lg text-[var(--text-faint)] hover:text-[var(--text)] hover:bg-[var(--hover)]"><X size={18} /></button>
-        </div>
+        <DrawerHeader onClose={close} title={
+          <div className="flex items-center gap-2 flex-wrap">
+            <Store size={18} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
+            <h3 className="text-lg font-bold text-[var(--text)]">{store}</h3>
+            <span className="text-xs text-[var(--text-muted)]">{total} ticket{total === 1 ? '' : 's'}</span>
+          </div>
+        } />
 
         <div className="space-y-2">
           <div className="h-3 rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden flex">
@@ -332,7 +336,7 @@ function StorePanel({ store, rows, onClose }: { store: string; rows: RegionalTic
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           <Stat label="Total" value={total} />
           <Stat label="Breached" value={breached} tone={breached ? 'text-red-600 dark:text-red-400' : 'text-[var(--text)]'} />
           <Stat label="Open / Quoting" value={c.open + c.quote_requested + c.quoted} />
@@ -347,6 +351,6 @@ function StorePanel({ store, rows, onClose }: { store: string; rows: RegionalTic
         </div>
         </>
       )}
-    </SlideOver>
+    </Modal>
   )
 }

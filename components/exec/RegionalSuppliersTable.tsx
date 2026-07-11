@@ -4,12 +4,13 @@
 // pane (mirrors the Stores tab) with contact details, jobs completed, SLA + star
 // rating, and expandable rating comments.
 import { useEffect, useState } from 'react'
-import { Truck, X, User, Mail, Phone, MapPin, Wrench, ChevronDown } from 'lucide-react'
+import { Truck, User, Mail, Phone, MapPin, Wrench, ChevronDown } from 'lucide-react'
 import type { RegionalDashboardData } from '@/lib/health/data'
 import { SectionCard, Pill, STATUS_TEXT } from '@/components/exec/ui'
 import { Stars } from '@/components/ui/Stars'
 import { MapLink } from '@/components/ui/MapLink'
 import { Modal } from '@/components/ui/Modal'
+import { DrawerHeader } from '@/components/exec/Drawer'
 import { formatCurrency, formatDate } from '@/lib/utils'
 
 type Row = RegionalDashboardData['suppliers'][number]
@@ -119,23 +120,24 @@ function SupplierPane({ row, onClose }: { row: Row; onClose: () => void }) {
   )
 
   return (
-    <Modal onClose={onClose}>
+    <Modal onClose={onClose} maxWidth="max-w-2xl">
       {close => (
         <>
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <h2 className="text-lg font-bold text-[var(--text)] truncate flex items-center gap-2"><Truck size={18} className="text-[#C6A35D] shrink-0" />{row.name}</h2>
-            <div className="mt-1 flex items-center gap-2">
-              <Pill status={row.perf.band} />
-              <span className={`text-sm font-semibold ${STATUS_TEXT[row.perf.band]}`}>{row.perf.performanceScore}% SLA</span>
-            </div>
-            <div className="mt-1"><Stars value={row.avgRating} count={row.ratingCount} size={14} /></div>
+        <DrawerHeader onClose={close} title={
+          <div className="flex items-center gap-2 flex-wrap">
+            <Truck size={18} className="text-[#C6A35D] shrink-0" />
+            <h3 className="text-lg font-bold text-[var(--text)]">{row.name}</h3>
+            <Pill status={row.perf.band} />
           </div>
-          <button onClick={close} className="shrink-0 -m-1 p-1.5 rounded-lg text-[var(--text-faint)] hover:text-[var(--text)] hover:bg-[var(--hover)]"><X size={18} /></button>
+        } />
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 -mt-1">
+          <span className={`text-sm font-semibold ${STATUS_TEXT[row.perf.band]}`}>{row.perf.performanceScore}% SLA</span>
+          <span className="text-[var(--text-faint)]">·</span>
+          <Stars value={row.avgRating} count={row.ratingCount} size={14} />
         </div>
 
         {/* Performance stats */}
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <Stat label="Jobs completed" value={loading ? '…' : (detail?.jobsCompleted ?? 0)} />
           <Stat label="SLA performance" value={`${row.perf.performanceScore}%`} tone={STATUS_TEXT[row.perf.band]} />
           <Stat label="Open" value={row.open} />

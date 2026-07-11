@@ -6,23 +6,11 @@ import { Card } from '@/components/exec/ui'
 import { PhotoThumbs } from '@/components/ui/PhotoThumbs'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { formatDateTime } from '@/lib/utils'
-import type { TimelineEvent, TimelineTone } from '@/lib/ticket-timeline'
+import type { TimelineEvent } from '@/lib/ticket-timeline'
 
 type PhotoGroup = { label: string; urls: string[] }
 type Update = { body: string; created_at: string }
 type Tab = 'photos' | 'activity' | 'timeline' | 'history'
-
-// Dot colour per event tone — mirrors the app's status palette (matches the old
-// AuditTrail dots) so the timeline reads at a glance.
-const DOT_TONE: Record<TimelineTone, string> = {
-  logged: 'bg-blue-500', info_requested: 'bg-amber-500', info_added: 'bg-teal-500',
-  quote_requested: 'bg-cyan-500', quote_submitted: 'bg-violet-500',
-  quote_approved: 'bg-emerald-500', quote_declined: 'bg-red-500', scheduled: 'bg-indigo-500',
-  completion_submitted: 'bg-[#C6A35D]', completion_approved: 'bg-emerald-500', completion_rejected: 'bg-red-500',
-  completed: 'bg-emerald-500', cancelled: 'bg-red-500', edited: 'bg-slate-400', update: 'bg-[#C6A35D]',
-  viewed: 'bg-slate-400',
-  variation: 'bg-purple-500', variation_approved: 'bg-emerald-500', variation_declined: 'bg-red-500',
-}
 
 /** Lower tabbed section of the RM ticket detail — Photos (every image on the
  *  ticket, grouped by source), Activity (supplier updates/progress notes) and
@@ -96,12 +84,19 @@ export function RmTicketTabs({
 
       {tab === 'timeline' && (
         timeline.length ? (
-          <ol className="relative ml-1.5 space-y-4 border-l border-[var(--border)]">
+          // Same look & feel as the store-manager Timeline (dot + connecting line),
+          // but the RM also sees who acted — who viewed a photo/attachment, edits, etc.
+          <ol className="space-y-4">
             {timeline.map((e, i) => (
-              <li key={i} className="ml-4">
-                <span className={`absolute -left-[5px] mt-1 h-2.5 w-2.5 rounded-full ring-2 ring-[var(--surface)] ${DOT_TONE[e.tone] ?? 'bg-[#C6A35D]'}`} />
-                <p className="text-sm text-[var(--text)]">{e.label}</p>
-                <p className="text-[11px] text-[var(--text-faint)]">{e.who ? `${e.who} · ` : ''}{formatDateTime(e.at)}</p>
+              <li key={i} className="flex gap-3">
+                <div className="flex flex-col items-center">
+                  <span className={`mt-1 h-2.5 w-2.5 rounded-full ${i === timeline.length - 1 ? 'bg-blue-500' : 'bg-[var(--text-faint)]'}`} />
+                  {i < timeline.length - 1 && <span className="mt-1 w-px flex-1 bg-[var(--border)]" />}
+                </div>
+                <div className="min-w-0 pb-1">
+                  <p className="text-sm font-medium text-[var(--text)]">{e.label}</p>
+                  <p className="text-[11px] text-[var(--text-faint)]">{e.who ? `${e.who} · ` : ''}{formatDateTime(e.at)}</p>
+                </div>
               </li>
             ))}
           </ol>
