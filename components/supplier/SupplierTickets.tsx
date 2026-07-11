@@ -5,11 +5,12 @@
 // stats. Mirrors the RM tickets tab, tailored to the supplier's lifecycle.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Ticket, Search, ChevronDown, BarChart3, X } from 'lucide-react'
+import { Ticket, Search, ChevronDown, BarChart3, Store } from 'lucide-react'
 import type { SupplierTicketRow, SupplierQuoteRow } from '@/lib/health/data'
 import { Card, Donut } from '@/components/exec/ui'
-import { PriorityBadge } from '@/components/ui/PriorityBadge'
-import { SlideOver } from '@/components/ui/SlideOver'
+import { CategoryIcon, priorityBadgeClass, priorityLabel } from '@/components/client/ticketBadges'
+import { Modal } from '@/components/ui/Modal'
+import { DrawerHeader } from '@/components/exec/Drawer'
 import { readCollapse, writeCollapse, readCollapseSet, writeCollapseSet } from '@/lib/collapse-state'
 import { rmStatusMeta, formatDateTime, humanizeDuration, urgencyCountCls } from '@/lib/utils'
 
@@ -54,21 +55,23 @@ function groupCountCls(rows: SupplierTicketRow[]): string {
   return urgencyCountCls(active.map(t => t.priority))
 }
 
-type FilterKey = 'all' | 'breached' | 'overdue' | 'evidence' | 'declined' | 'cancelled' | Bucket
+// No "All" pill: a null filter means all tickets, and clicking an active pill
+// deselects back to that default. Pills use the tinted-fill badge standard —
+// tinted when inactive, solid-filled when selected.
+type FilterKey = 'breached' | 'overdue' | 'evidence' | 'declined' | 'cancelled' | Bucket
 const PILLS: { key: FilterKey; label: string; active: string; inactive: string }[] = [
-  { key: 'all', label: 'All', active: 'bg-slate-800 text-white border-slate-800 dark:bg-white dark:text-[#0a0e17] dark:border-white', inactive: 'text-[var(--text-muted)] border-[var(--border)] hover:border-slate-400' },
-  { key: 'breached', label: 'SLA Breached', active: 'bg-red-600 text-white border-red-600', inactive: 'text-red-600 dark:text-red-400 border-red-500/50 hover:border-red-500' },
-  { key: 'overdue', label: 'Overdue', active: 'bg-red-500 text-white border-red-500', inactive: 'text-red-600 dark:text-red-400 border-red-500/40 hover:border-red-400' },
-  { key: 'evidence', label: 'Missing Evidence', active: 'bg-amber-500 text-white border-amber-500', inactive: 'text-amber-600 dark:text-amber-500 border-amber-500/50 hover:border-amber-500' },
-  { key: 'to_quote', label: 'Quote requested', active: 'bg-cyan-500 text-white border-cyan-500', inactive: 'text-cyan-600 dark:text-cyan-400 border-cyan-500/40 hover:border-cyan-400' },
-  { key: 'quoted', label: 'Quoted', active: 'bg-violet-500 text-white border-violet-500', inactive: 'text-violet-600 dark:text-violet-400 border-violet-500/40 hover:border-violet-400' },
-  { key: 'approved', label: 'Quote approved', active: 'bg-teal-500 text-white border-teal-500', inactive: 'text-teal-600 dark:text-teal-400 border-teal-500/40 hover:border-teal-400' },
-  { key: 'scheduled', label: 'Job scheduled', active: 'bg-indigo-500 text-white border-indigo-500', inactive: 'text-indigo-600 dark:text-indigo-400 border-indigo-500/40 hover:border-indigo-400' },
-  { key: 'in_progress', label: 'In Progress', active: 'bg-[#C6A35D] text-[#0a0e17] border-[#C6A35D]', inactive: 'text-amber-600 dark:text-[#C6A35D] border-[#C6A35D]/40 hover:border-[#C6A35D]' },
-  { key: 'signoff', label: 'Sign-off', active: 'bg-orange-500 text-white border-orange-500', inactive: 'text-orange-600 dark:text-orange-400 border-orange-500/40 hover:border-orange-400' },
-  { key: 'completed', label: 'Completed', active: 'bg-emerald-500 text-white border-emerald-500', inactive: 'text-emerald-600 dark:text-emerald-400 border-emerald-500/40 hover:border-emerald-400' },
-  { key: 'declined', label: 'Declined', active: 'bg-red-500 text-white border-red-500', inactive: 'text-red-600 dark:text-red-400 border-red-500/40 hover:border-red-400' },
-  { key: 'cancelled', label: 'Cancelled', active: 'bg-gray-500 text-white border-gray-500', inactive: 'text-gray-600 dark:text-gray-400 border-gray-500/40 hover:border-gray-400' },
+  { key: 'breached', label: 'SLA Breached', active: 'bg-red-600 text-white', inactive: 'bg-red-600/15 text-red-700 dark:text-red-400' },
+  { key: 'overdue', label: 'Overdue', active: 'bg-red-500 text-white', inactive: 'bg-red-500/15 text-red-600 dark:text-red-400' },
+  { key: 'evidence', label: 'Missing Evidence', active: 'bg-amber-500 text-white', inactive: 'bg-amber-500/15 text-amber-700 dark:text-amber-400' },
+  { key: 'to_quote', label: 'Quote requested', active: 'bg-cyan-500 text-white', inactive: 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-400' },
+  { key: 'quoted', label: 'Quoted', active: 'bg-violet-500 text-white', inactive: 'bg-violet-500/15 text-violet-700 dark:text-violet-400' },
+  { key: 'approved', label: 'Quote approved', active: 'bg-teal-500 text-white', inactive: 'bg-teal-500/15 text-teal-700 dark:text-teal-400' },
+  { key: 'scheduled', label: 'Job scheduled', active: 'bg-indigo-500 text-white', inactive: 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-400' },
+  { key: 'in_progress', label: 'In Progress', active: 'bg-[#C6A35D] text-[#0a0e17]', inactive: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D]' },
+  { key: 'signoff', label: 'Sign-off', active: 'bg-orange-500 text-white', inactive: 'bg-orange-500/15 text-orange-700 dark:text-orange-400' },
+  { key: 'completed', label: 'Completed', active: 'bg-emerald-500 text-white', inactive: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' },
+  { key: 'declined', label: 'Declined', active: 'bg-red-500 text-white', inactive: 'bg-red-500/15 text-red-600 dark:text-red-400' },
+  { key: 'cancelled', label: 'Cancelled', active: 'bg-gray-500 text-white', inactive: 'bg-gray-500/15 text-gray-600 dark:text-gray-400' },
 ]
 
 function milestone(t: SupplierTicketRow): { label: string; at: string } | null {
@@ -94,19 +97,29 @@ function milestone(t: SupplierTicketRow): { label: string; at: string } | null {
 function TicketRow({ t, company, showStore }: { t: SupplierTicketRow; company?: string; showStore?: boolean }) {
   const sm = rmStatusMeta(myStatus(t))
   const m = milestone(t)
+  // Dispute/declined force a red status badge; otherwise the rmStatusMeta class.
+  const statusCls = t.declinedForMe || t.disputed ? 'bg-red-500/15 text-red-700 dark:text-red-400' : sm.cls
+  const statusLabel = t.disputed ? 'Dispute' : t.declinedForMe ? (t.declinedBy === 'supplier' ? 'Declined (you)' : t.declinedBy === 'regional_manager' ? 'Declined (Client)' : 'Declined') : sm.label
   return (
-    <Link href={`/supplier/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2.5 -mx-2 px-2 rounded-lg border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition">
-      <div className="min-w-0">
-        {showStore && <p className="text-[10px] text-[var(--text-faint)] truncate">{t.isIndividual ? 'Individual' : [company, t.storeName].filter(Boolean).join(' · ')}</p>}
-        <p className="text-sm text-[var(--text)] truncate">{t.title}</p>
-        <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(t.createdAt)}</p>
-        {/* eslint-disable-next-line react-hooks/purity -- Date.now() drives a relative "overdue by" display; cosmetic elapsed-time readout, not a hydration-correctness concern */}
-        {t.overdue && <p className="text-[11px] font-semibold text-red-600 dark:text-red-400">Overdue by {humanizeDuration(Date.now() - new Date(t.dueAt).getTime())}</p>}
-        {m && <p className={`text-[11px] font-medium ${m.label.startsWith('Declined') ? 'text-red-600 dark:text-red-400' : sm.text}`}>{m.label} · {formatDateTime(m.at)}</p>}
+    <Link href={`/supplier/tickets/${t.id}`} className="grid gap-3 border-b border-[var(--border)] px-2 py-3 last:border-0 transition hover:bg-[var(--hover)] sm:grid-cols-[1fr_auto] sm:items-center">
+      <div className="flex min-w-0 items-center gap-3">
+        <CategoryIcon category={t.category ?? t.title} className="h-11 w-11" iconSize={18} />
+        <div className="min-w-0">
+          {showStore && <p className="text-[10px] text-[var(--text-faint)] truncate">{t.isIndividual ? 'Individual' : [company, t.storeName].filter(Boolean).join(' · ')}</p>}
+          <p className="truncate text-sm font-bold text-[var(--text)]">{t.title}</p>
+          {m && <p className={`text-[11px] font-medium ${m.label.startsWith('Declined') ? 'text-red-600 dark:text-red-400' : sm.text}`}>{m.label} · {formatDateTime(m.at)}</p>}
+        </div>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
-        <PriorityBadge priority={t.priority} className="w-full text-center" />
-        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${t.declinedForMe || t.disputed ? 'bg-red-500/15 text-red-700 dark:text-red-400' : sm.cls}`}>{t.disputed ? 'Dispute' : t.declinedForMe ? (t.declinedBy === 'supplier' ? 'Declined (you)' : t.declinedBy === 'regional_manager' ? 'Declined (Client)' : 'Declined') : sm.label}</span>
+      <div className="flex flex-col items-start gap-1 sm:items-end">
+        <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
+          <span className={`inline-flex min-w-[92px] justify-center rounded-md px-2 py-1 text-[10px] font-bold ${priorityBadgeClass(t as never)}`}>{priorityLabel(t as never)}</span>
+          <span className={`inline-flex min-w-[92px] justify-center rounded-md px-2 py-1 text-[10px] font-bold ${statusCls}`}>{statusLabel}</span>
+        </div>
+        <p className="text-[11px] text-[var(--text-faint)]">
+          {formatDateTime(t.createdAt)}
+          {/* eslint-disable-next-line react-hooks/purity -- Date.now() drives a relative "overdue by" display; cosmetic elapsed-time readout, not a hydration-correctness concern */}
+          {t.overdue && <span className="ml-1.5 font-semibold text-red-600 dark:text-red-400">· Overdue by {humanizeDuration(Date.now() - new Date(t.dueAt).getTime())}</span>}
+        </p>
       </div>
     </Link>
   )
@@ -114,7 +127,7 @@ function TicketRow({ t, company, showStore }: { t: SupplierTicketRow; company?: 
 
 export function SupplierTickets({ tickets, quotes, company }: { tickets: SupplierTicketRow[]; quotes: SupplierQuoteRow[]; company: string }) {
   const [q, setQ] = useState('')
-  const [filter, setFilter] = useState<FilterKey>('all')
+  const [filter, setFilter] = useState<FilterKey | null>(null)
   // Store groups start collapsed; the set tracks which the user has expanded.
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [panelStore, setPanelStore] = useState<string | null>(null)
@@ -152,7 +165,7 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
       else if (filter === 'declined') { if (!t.declinedForMe) return false }
       else if (filter === 'cancelled') { if (t.status !== 'cancelled') return false }
       else if (filter === 'evidence') { if (!missingEvidence(t)) return false }
-      else if (filter !== 'all' && bucketOfRow(t) !== filter) return false
+      else if (filter !== null && bucketOfRow(t) !== filter) return false
       // Tickets where this supplier was declined (and not re-invited) only show under Declined / Cancelled.
       if (filter !== 'declined' && filter !== 'cancelled' && t.declinedForMe) return false
       if (!terms.length) return true
@@ -163,9 +176,9 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
 
   // Under "All": breached pins to the top, completed drops into the Archive, the
   // rest groups by store. Everything is ordered newest → most urgent.
-  const breachedRows = useMemo(() => filter === 'all' ? shown.filter(t => t.breached && !t.overdue).sort(byDateThenUrgency) : [], [shown, filter])
-  const liveShown = useMemo(() => (filter === 'all' ? shown.filter(t => !(t.breached && !t.overdue) && bucketOfRow(t) !== 'completed') : shown).slice().sort(byDateThenUrgency), [shown, filter])
-  const archived = useMemo(() => (filter === 'all' ? shown.filter(t => bucketOfRow(t) === 'completed') : []).slice().sort(byDateThenUrgency), [shown, filter])
+  const breachedRows = useMemo(() => filter === null ? shown.filter(t => t.breached && !t.overdue).sort(byDateThenUrgency) : [], [shown, filter])
+  const liveShown = useMemo(() => (filter === null ? shown.filter(t => !(t.breached && !t.overdue) && bucketOfRow(t) !== 'completed') : shown).slice().sort(byDateThenUrgency), [shown, filter])
+  const archived = useMemo(() => (filter === null ? shown.filter(t => bucketOfRow(t) === 'completed') : []).slice().sort(byDateThenUrgency), [shown, filter])
   const [archiveOpen, setArchiveOpen] = useState(false)
   const [breachedOpen, setBreachedOpen] = useState(false)
 
@@ -188,7 +201,7 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
   // are visible immediately — runs once, only for the deep-link (not manual clicks).
   const didAutoExpand = useRef(false)
   useEffect(() => {
-    if (didAutoExpand.current || filter === 'all') return
+    if (didAutoExpand.current || filter === null) return
     if (!new URLSearchParams(window.location.search).get('filter')) return
     didAutoExpand.current = true
     const names = groups.map(([s]) => s)
@@ -219,13 +232,13 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
         </div>
       </Card>
 
-      {/* Filter pills — above the search */}
+      {/* Filter pills — above the search. Click an active pill to deselect (= all). */}
       <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
         {PILLS.map(p => {
-          const n = p.key === 'all' ? tickets.length : p.key === 'breached' ? breachedCount : p.key === 'overdue' ? overdueCount : p.key === 'declined' ? declinedCount : p.key === 'cancelled' ? cancelledCount : p.key === 'evidence' ? evidenceCount : counts[p.key]
+          const n = p.key === 'breached' ? breachedCount : p.key === 'overdue' ? overdueCount : p.key === 'declined' ? declinedCount : p.key === 'cancelled' ? cancelledCount : p.key === 'evidence' ? evidenceCount : counts[p.key as Bucket]
           const on = filter === p.key
           return (
-            <button key={p.key} onClick={() => setFilter(p.key)} className={`px-3 py-1.5 rounded-full text-xs font-medium border transition text-center ${on ? p.active : p.inactive}`}>
+            <button key={p.key} onClick={() => setFilter(f => f === p.key ? null : p.key)} aria-pressed={on} className={`rounded-md px-3 py-1.5 text-xs font-semibold transition text-center ${on ? p.active : p.inactive}`}>
               {p.label} <span className="opacity-70">{n}</span>
             </button>
           )
@@ -239,8 +252,8 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
           className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)] outline-none focus:ring-[#C6A35D]/40" />
       </div>
 
-      {/* SLA breached — pinned at the top under the All filter, collapsible */}
-      {filter === 'all' && breachedRows.length > 0 && (
+      {/* SLA breached — pinned at the top when no filter is active, collapsible */}
+      {filter === null && breachedRows.length > 0 && (
         <Card className="p-3 ring-1 ring-red-500/40 cursor-pointer hover:ring-red-500/60 transition" onClick={toggleBreached} role="button" tabIndex={0} aria-expanded={breachedOpen} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleBreached() } }}>
           <div className="w-full flex items-center gap-2">
             <ChevronDown size={16} className={`shrink-0 text-red-500 transition-transform ${breachedOpen ? 'rotate-180' : ''}`} />
@@ -263,7 +276,7 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
                 <span className="text-sm font-bold text-[var(--text)] truncate">{groupIndividual ? 'Individual' : <>{[company, store].filter(Boolean).join(' · ')}{g.branchCode ? ` · ${g.branchCode}` : ''}</>}</span>
                 <span className={`text-[11px] font-medium rounded-full px-2 py-0.5 shrink-0 ${groupCountCls(g.rows)}`}>{g.rows.length}</span>
               </span>
-              <button onClick={e => { e.stopPropagation(); setPanelStore(store) }} title="Store overview" className="shrink-0 -m-1 p-1.5 rounded-lg text-[var(--text-faint)] hover:text-[#C6A35D] hover:bg-[#C6A35D]/10 transition"><BarChart3 size={16} /></button>
+              <button onClick={e => { e.stopPropagation(); setPanelStore(store) }} title="Store overview" className="shrink-0 -m-1 p-1.5 rounded-lg text-[var(--text-faint)] hover:text-blue-600 hover:bg-blue-500/10 transition"><BarChart3 size={16} /></button>
             </div>
             {!isCollapsed && <div className="px-1" onClick={e => e.stopPropagation()}>{g.rows.map(t => <TicketRow key={t.id} t={t} />)}</div>}
           </Card>
@@ -284,15 +297,20 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
               {archived.map(t => {
                 const sm = rmStatusMeta(myStatus(t))
                 return (
-                  <Link key={t.id} href={`/supplier/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2.5 -mx-2 px-2 rounded-lg border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition">
-                    <div className="min-w-0">
-                      <p className="text-[10px] text-[var(--text-faint)] truncate">{t.isIndividual ? 'Individual' : [company, t.storeName].filter(Boolean).join(' · ')}</p>
-                      <p className="text-sm text-[var(--text)] truncate">{t.title}</p>
-                      <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(t.createdAt)}</p>
+                  <Link key={t.id} href={`/supplier/tickets/${t.id}`} className="grid gap-3 border-b border-[var(--border)] px-2 py-3 last:border-0 transition hover:bg-[var(--hover)] sm:grid-cols-[1fr_auto] sm:items-center">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <CategoryIcon category={t.category ?? t.title} className="h-11 w-11" iconSize={18} />
+                      <div className="min-w-0">
+                        <p className="text-[10px] text-[var(--text-faint)] truncate">{t.isIndividual ? 'Individual' : [company, t.storeName].filter(Boolean).join(' · ')}</p>
+                        <p className="truncate text-sm font-bold text-[var(--text)]">{t.title}</p>
+                        <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(t.createdAt)}</p>
+                      </div>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
-                      <PriorityBadge priority={t.priority} className="w-full text-center" />
-                      <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${sm.cls}`}>{sm.label}</span>
+                    <div className="flex flex-col items-start gap-1 sm:items-end">
+                      <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
+                        <span className={`inline-flex min-w-[92px] justify-center rounded-md px-2 py-1 text-[10px] font-bold ${priorityBadgeClass(t as never)}`}>{priorityLabel(t as never)}</span>
+                        <span className={`inline-flex min-w-[92px] justify-center rounded-md px-2 py-1 text-[10px] font-bold ${sm.cls}`}>{sm.label}</span>
+                      </div>
                     </div>
                   </Link>
                 )
@@ -333,13 +351,19 @@ function StorePanel({ store, company, rows, quotes, onClose }: { store: string; 
   )
 
   return (
-    <SlideOver onClose={onClose}>
+    <Modal onClose={onClose} maxWidth="max-w-2xl">
       {close => (
         <>
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">{company && !panelIndividual && <p className="text-[10px] text-[var(--text-faint)] truncate">{company}</p>}<h2 className="text-lg font-bold text-[var(--text)] truncate">{store}</h2><p className="text-xs text-[var(--text-muted)]">{total} ticket{total === 1 ? '' : 's'}</p></div>
-          <button onClick={close} className="shrink-0 -m-1 p-1.5 rounded-lg text-[var(--text-faint)] hover:text-[var(--text)] hover:bg-[var(--hover)]"><X size={18} /></button>
-        </div>
+        <DrawerHeader onClose={close} title={
+          <div className="min-w-0">
+            {company && !panelIndividual && <p className="text-[10px] text-[var(--text-faint)] truncate">{company}</p>}
+            <div className="flex items-center gap-2 flex-wrap">
+              <Store size={18} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
+              <h3 className="text-lg font-bold text-[var(--text)]">{store}</h3>
+              <span className="text-xs text-[var(--text-muted)]">{total} ticket{total === 1 ? '' : 's'}</span>
+            </div>
+          </div>
+        } />
 
         {/* SLA donut */}
         <div className="flex items-center gap-4">
@@ -376,6 +400,6 @@ function StorePanel({ store, company, rows, quotes, onClose }: { store: string; 
         </div>
         </>
       )}
-    </SlideOver>
+    </Modal>
   )
 }

@@ -596,7 +596,7 @@ export async function assembleStoreManagerDashboard(companyId: string, storeIds:
 // SUPPLIER DASHBOARD (own assigned tickets only)
 // ============================================================
 export interface SupplierTicketRow {
-  id: string; storeName: string; branchCode: string | null; title: string; priority: Priority; status: string
+  id: string; storeName: string; branchCode: string | null; title: string; category: string | null; priority: Priority; status: string
   ageDays: number; createdAt: string; slaLabel: string; nextActionDueAt: string | null
   acknowledged: boolean; evidenceRequired: boolean; beforeUploaded: boolean; afterUploaded: boolean; cocUploaded: boolean
   active: boolean; breached: boolean
@@ -725,7 +725,7 @@ export async function assembleSupplierDashboard(companyId: string | null, suppli
       : sla.supplierBreached ? 'Breached' : sla.supplierStatus === 'paused' ? 'Paused (internal)' : sla.atRisk ? 'At risk' : sla.supplierStatus === 'not_started' ? 'Not started' : 'Running'
     const approvedAt = (raw.quote_decision_status === 'approved' ? raw.quote_decided_at : null) ?? acceptedQuoteAt.get(t.id) ?? null
     rows.push({
-      id: t.id, storeName: storeName.get(t.store_id) ?? (raw.company_id ? 'Store' : 'Individual'), branchCode: storeBranch.get(t.store_id) ?? null, title: t.title ?? 'Ticket', priority: t.priority, status: t.status,
+      id: t.id, storeName: storeName.get(t.store_id) ?? (raw.company_id ? 'Store' : 'Individual'), branchCode: storeBranch.get(t.store_id) ?? null, title: t.title ?? 'Ticket', category: (t as any).category ?? null, priority: t.priority, status: t.status,
       ageDays: Math.floor((now.getTime() - new Date(t.created_at).getTime()) / DAY), createdAt: t.created_at, slaLabel: lbl, nextActionDueAt: sla.nextActionDueAt,
       acknowledged: !!t.first_response_at, evidenceRequired: !!t.evidence_required,
       beforeUploaded: !!t.before_photo_uploaded, afterUploaded: !!t.after_photo_uploaded, cocUploaded: !!t.completion_certificate_uploaded,

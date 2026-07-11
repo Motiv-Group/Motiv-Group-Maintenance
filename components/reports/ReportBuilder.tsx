@@ -2,8 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Button } from '@/components/ui/Button'
-import { FileText, FileType2, Calendar, Building2 } from 'lucide-react'
+import { FileText, FileType2, Calendar, Building2, Check } from 'lucide-react'
 
 interface StoreOpt { id: string; label: string }
 
@@ -82,26 +81,30 @@ export function ReportBuilder({ role, stores }: { role: 'supplier' | 'regional';
     <div className="space-y-5 max-w-2xl">
       {/* Period */}
       <div>
-        <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-1.5"><Calendar size={14} /> Period</p>
+        <p className="text-sm font-medium text-[var(--text-muted)] mb-2 flex items-center gap-1.5"><Calendar size={14} /> Period</p>
         <div className="flex flex-wrap gap-2">
-          {PERIODS.map(p => (
-            <button key={p.key} type="button" onClick={() => setPeriod(p.key)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
-                period === p.key ? 'bg-[#C6A35D] text-white border-[#C6A35D]'
-                : 'bg-slate-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-brand-400'}`}>
-              {p.label}
-            </button>
-          ))}
+          {PERIODS.map(p => {
+            const active = period === p.key
+            return (
+              <button key={p.key} type="button" onClick={() => setPeriod(p.key)} aria-pressed={active}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition ${
+                  active ? 'border-emerald-500 bg-emerald-500/10 text-[var(--text)] ring-2 ring-emerald-500/30'
+                  : 'border-[var(--border)] text-[var(--text-muted)] hover:border-emerald-500/60'}`}>
+                {p.label}
+                {active && <Check size={16} className="text-emerald-500" />}
+              </button>
+            )
+          })}
         </div>
         {period === 'custom' && (
           <div className="flex gap-3 mt-3">
-            <label className="text-xs text-gray-500 dark:text-gray-400">From
+            <label className="text-xs text-[var(--text-muted)]">From
               <input type="date" value={from} onChange={e => setFrom(e.target.value)}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white" />
+                className="mt-1 block w-full px-3 py-2 rounded-lg text-sm bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-emerald-500/40" />
             </label>
-            <label className="text-xs text-gray-500 dark:text-gray-400">To
+            <label className="text-xs text-[var(--text-muted)]">To
               <input type="date" value={to} onChange={e => setTo(e.target.value)}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white" />
+                className="mt-1 block w-full px-3 py-2 rounded-lg text-sm bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-emerald-500/40" />
             </label>
           </div>
         )}
@@ -111,42 +114,44 @@ export function ReportBuilder({ role, stores }: { role: 'supplier' | 'regional';
       {role === 'regional' && stores && (
         <div>
           <div className="flex items-center justify-between mb-2">
-            <p className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1.5"><Building2 size={14} /> Stores ({selected.size}/{stores.length})</p>
+            <p className="text-sm font-medium text-[var(--text-muted)] flex items-center gap-1.5"><Building2 size={14} /> Stores ({selected.size}/{stores.length})</p>
             <div className="flex gap-3 text-xs">
-              <button type="button" className="text-brand-600 hover:underline" onClick={() => setSelected(new Set(stores.map(s => s.id)))}>All</button>
-              <button type="button" className="text-gray-500 hover:underline" onClick={() => setSelected(new Set())}>None</button>
+              <button type="button" className="text-blue-600 dark:text-blue-400 hover:underline" onClick={() => setSelected(new Set(stores.map(s => s.id)))}>All</button>
+              <button type="button" className="text-[var(--text-muted)] hover:underline" onClick={() => setSelected(new Set())}>None</button>
             </div>
           </div>
-          <div className="max-h-56 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-lg divide-y divide-gray-100 dark:divide-gray-700">
+          <div className="max-h-56 overflow-y-auto border border-[var(--border)] rounded-lg divide-y divide-[var(--border)]">
             {stores.map(s => (
-              <label key={s.id} className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/40">
-                <input type="checkbox" checked={selected.has(s.id)} onChange={() => toggle(s.id)} className="accent-[#C6A35D]" />
-                <span className="text-gray-700 dark:text-gray-200">{s.label}</span>
+              <label key={s.id} className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-[var(--hover)]">
+                <input type="checkbox" checked={selected.has(s.id)} onChange={() => toggle(s.id)} className="accent-emerald-600" />
+                <span className="text-[var(--text)]">{s.label}</span>
               </label>
             ))}
-            {stores.length === 0 && <p className="px-3 py-3 text-sm text-gray-400">No stores assigned to you.</p>}
+            {stores.length === 0 && <p className="px-3 py-3 text-sm text-[var(--text-faint)]">No stores assigned to you.</p>}
           </div>
         </div>
       )}
 
       {/* Format */}
       <div>
-        <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Format</p>
+        <p className="text-sm font-medium text-[var(--text-muted)] mb-2">Format</p>
         <div className="flex gap-2">
-          <button type="button" onClick={() => setFormat('docx')}
-            className={`flex-1 inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium border transition-colors ${
-              format === 'docx' ? 'bg-[#C6A35D] text-white border-[#C6A35D]'
-              : 'bg-slate-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-brand-400'}`}>
+          <button type="button" onClick={() => setFormat('docx')} aria-pressed={format === 'docx'}
+            className={`flex-1 inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium border transition ${
+              format === 'docx' ? 'border-emerald-500 bg-emerald-500/10 text-[var(--text)] ring-2 ring-emerald-500/30'
+              : 'border-[var(--border)] text-[var(--text-muted)] hover:border-emerald-500/60'}`}>
             <FileText size={16} /> Word (.docx)
+            {format === 'docx' && <Check size={16} className="text-emerald-500" />}
           </button>
-          <button type="button" onClick={() => setFormat('pdf')}
-            className={`flex-1 inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium border transition-colors ${
-              format === 'pdf' ? 'bg-[#C6A35D] text-white border-[#C6A35D]'
-              : 'bg-slate-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-brand-400'}`}>
+          <button type="button" onClick={() => setFormat('pdf')} aria-pressed={format === 'pdf'}
+            className={`flex-1 inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium border transition ${
+              format === 'pdf' ? 'border-emerald-500 bg-emerald-500/10 text-[var(--text)] ring-2 ring-emerald-500/30'
+              : 'border-[var(--border)] text-[var(--text-muted)] hover:border-emerald-500/60'}`}>
             <FileType2 size={16} /> PDF
+            {format === 'pdf' && <Check size={16} className="text-emerald-500" />}
           </button>
         </div>
-        <p className="mt-1.5 text-xs text-gray-400">
+        <p className="mt-1.5 text-xs text-[var(--text-faint)]">
           {format === 'docx'
             ? 'Word document with auto Table of Contents, Figures & Tables. Open in Word and allow it to update fields.'
             : 'Opens a print-ready page — use “Save as PDF / Print”.'}
@@ -155,9 +160,10 @@ export function ReportBuilder({ role, stores }: { role: 'supplier' | 'regional';
 
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
-      <Button onClick={generate} loading={loading} className="w-full sm:w-auto">
-        Generate Report
-      </Button>
+      <button type="button" onClick={generate} disabled={loading}
+        className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:opacity-60 w-full sm:w-auto">
+        {loading ? 'Generating…' : 'Generate Report'}
+      </button>
     </div>
   )
 }
