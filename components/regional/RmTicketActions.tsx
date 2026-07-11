@@ -1,7 +1,7 @@
 'use client'
 
 // RM ticket-page custom actions for the competitive-quoting model.
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { Search, Pencil, CalendarClock, Plus, ImagePlus, X, FileText } from 'lucide-react'
 import { StarInput, Stars } from '@/components/ui/Stars'
@@ -24,10 +24,10 @@ function Labeled({ label, children }: { label: string; children: React.ReactNode
   )
 }
 
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+function Modal({ title, onClose, children, maxWidth = 'max-w-md' }: { title: string; onClose: () => void; children: React.ReactNode; maxWidth?: string }) {
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-[var(--surface-2)] ring-1 ring-[var(--border)] rounded-2xl p-5 max-w-md w-full space-y-3 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+      <div className={`bg-[var(--surface-2)] ring-1 ring-[var(--border)] rounded-2xl p-5 ${maxWidth} w-full space-y-3 max-h-[85vh] overflow-y-auto`} onClick={e => e.stopPropagation()}>
         <p className="font-semibold text-[var(--text)]">{title}</p>
         {children}
       </div>
@@ -37,9 +37,15 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 
 // ── Assign suppliers (button → modal with search + multi-select) ─
 type SupplierChoice = { id: string; name: string; avgRating?: number; ratingCount?: number }
-export function AssignSuppliersButton({ ticketId, suppliers, motivSuppliers = [], declinedSupplierIds = [], awaitingById = {} }: { ticketId: string; suppliers: SupplierChoice[]; motivSuppliers?: SupplierChoice[]; declinedSupplierIds?: string[]; awaitingById?: Record<string, 'invited' | 'quoted'> }) {
+export function AssignSuppliersButton({ ticketId, suppliers, motivSuppliers = [], declinedSupplierIds = [], awaitingById = {}, trigger }: { ticketId: string; suppliers: SupplierChoice[]; motivSuppliers?: SupplierChoice[]; declinedSupplierIds?: string[]; awaitingById?: Record<string, 'invited' | 'quoted'>; trigger?: (open: () => void) => ReactNode }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
+  // Auto-open when deep-linked from the Today queue's "Assign supplier" action
+  // (?assign=1) — the new-ticket next step opens straight into the picker.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time client-only deep-link (?assign=1) read from window.location after mount; cannot run during SSR render
+    if (new URLSearchParams(window.location.search).get('assign') === '1') setOpen(true)
+  }, [])
   const [tab, setTab] = useState<'mine' | 'motiv'>('mine')
   const [q, setQ] = useState('')
   const [sel, setSel] = useState<Set<string>>(new Set())
@@ -72,12 +78,14 @@ export function AssignSuppliersButton({ ticketId, suppliers, motivSuppliers = []
     doAssign()
   }
 
-  const tabCls = (on: boolean) => `flex-1 py-1.5 rounded-lg text-xs font-semibold transition ${on ? 'bg-[#C6A35D] text-[#0a0e17]' : 'ring-1 ring-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--hover)]'}`
+  const tabCls = (on: boolean) => `flex-1 py-1.5 rounded-lg text-xs font-semibold transition ${on ? 'bg-emerald-600 text-white' : 'ring-1 ring-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--hover)]'}`
   return (
     <>
-      <button onClick={() => setOpen(true)} className="flex-1 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition">Assign supplier</button>
+      {trigger ? trigger(() => setOpen(true)) : (
+        <button onClick={() => setOpen(true)} className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition">Assign supplier</button>
+      )}
       {open && (
-        <Modal title="Assign suppliers" onClose={() => setOpen(false)}>
+        <Modal title="Assign suppliers" maxWidth="max-w-2xl" onClose={() => setOpen(false)}>
           <p className="text-xs text-[var(--text-muted)]">Search and select one or more suppliers to invite to quote — from your own list or the Motiv directory.</p>
           {/* Switch directories; the selection carries across both. */}
           <div className="flex gap-2">
@@ -104,8 +112,8 @@ export function AssignSuppliersButton({ ticketId, suppliers, motivSuppliers = []
                 )
               }
               return (
-                <label key={s.id} className={`flex items-center gap-2 text-sm px-2 py-2 rounded-lg cursor-pointer ${sel.has(s.id) ? 'bg-[#C6A35D]/10' : 'hover:bg-[var(--hover)]'}`}>
-                  <input type="checkbox" checked={sel.has(s.id)} onChange={() => toggle(s.id)} className="accent-[#C6A35D] w-4 h-4" />
+                <label key={s.id} className={`flex items-center gap-2 text-sm px-2 py-2 rounded-lg cursor-pointer ${sel.has(s.id) ? 'bg-emerald-500/10' : 'hover:bg-[var(--hover)]'}`}>
+                  <input type="checkbox" checked={sel.has(s.id)} onChange={() => toggle(s.id)} className="accent-emerald-600 w-4 h-4" />
                   <span className="truncate text-[var(--text)] flex-1 min-w-0">{s.name}{declinedSet.has(s.id) && <span className="ml-1.5 text-[10px] font-semibold text-red-500">· declined before</span>}</span>
                   <span className="shrink-0"><Stars value={s.avgRating ?? 5} count={s.ratingCount} size={12} /></span>
                 </label>
@@ -152,7 +160,7 @@ export function RequestInfoButton({ ticketId }: { ticketId: string }) {
   const input = 'w-full px-3 py-2 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm'
   return (
     <>
-      <button onClick={() => setOpen(true)} className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-[#0a0e17] text-sm font-semibold transition">Request more info</button>
+      <button onClick={() => setOpen(true)} className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold transition">Request more info</button>
       {open && (
         <Modal title="Request more information" onClose={() => setOpen(false)}>
           <p className="text-xs text-[var(--text-muted)]">The store manager will see this message and can edit + resubmit the ticket.</p>
@@ -292,7 +300,7 @@ export function RmEditTicketForm({ ticketId, initial }: { ticketId: string; init
 
   return (
     <>
-      <button onClick={() => setOpen(true)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#C6A35D] hover:underline"><Pencil size={13} /> Edit ticket</button>
+      <button onClick={() => setOpen(true)} className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-500"><Pencil size={13} /> Edit ticket</button>
       {open && (
         <Modal title="Edit ticket" onClose={() => setOpen(false)}>
           <Labeled label="Title"><input className={input} value={title} onChange={e => setTitle(e.target.value)} placeholder="Title" /></Labeled>
@@ -430,6 +438,280 @@ export function QuoteReviewCard({ ticketId, quotes }: { ticketId: string; quotes
   )
 }
 
+// ── Quoting workspace shown inside the RM's "Next action" block ──────
+// One list of the requested suppliers; a supplier that has submitted a quote is
+// a clickable item that pops up the full quote (amount, visit, description,
+// attachment) with Approve / Decline — those actions live in both the pop-up and
+// on the block row. Replaces the standalone "Quotes" section.
+export interface QuotePanelQuote { id: string; amount: number; amountInclVat: number | null; description: string | null; fileUrl: string | null; createdAt: string; validUntil?: string | null; proposedScheduleAt?: string | null }
+export interface QuotePanelRow { supplierId: string; name: string; requestedAt: string | null; kind: 'waiting' | 'received' | 'accepted' | 'declined'; declineReason: string | null; quote: QuotePanelQuote | null }
+
+const PANEL_META: Record<QuotePanelRow['kind'], { dot: string; label: string; txt: string }> = {
+  waiting: { dot: 'bg-amber-500', label: 'Waiting for quote', txt: 'text-amber-700 dark:text-amber-400' },
+  received: { dot: 'bg-emerald-500', label: 'Quote received', txt: 'text-emerald-600 dark:text-emerald-400' },
+  accepted: { dot: 'bg-emerald-500', label: 'Accepted', txt: 'text-emerald-600 dark:text-emerald-400' },
+  declined: { dot: 'bg-red-500', label: 'Declined', txt: 'text-red-600 dark:text-red-400' },
+}
+
+export function RmQuotePanel({ ticketId, rows, canReQuote }: { ticketId: string; rows: QuotePanelRow[]; canReQuote: boolean }) {
+  const router = useRouter()
+  const [openId, setOpenId] = useState<string | null>(null)      // supplierId whose quote pop-up is open
+  const [mode, setMode] = useState<'view' | 'approve' | 'decline'>('view')
+  const [busy, setBusy] = useState(false)
+  const [reason, setReason] = useState(DECLINE_REASONS[0])
+  const [other, setOther] = useState('')
+  const [err, setErr] = useState('')
+  const active = rows.find(r => r.supplierId === openId) ?? null
+
+  function openModal(id: string, m: 'view' | 'approve' | 'decline' = 'view') { setOpenId(id); setMode(m); setReason(DECLINE_REASONS[0]); setOther(''); setErr('') }
+  async function decide(quoteId: string, action: 'approve' | 'decline') {
+    setBusy(true); setErr('')
+    const declineReason = action === 'decline' ? (reason === 'Other' ? (other.trim() || 'Other') : reason) : undefined
+    try { await post(`/api/tickets/${ticketId}/quote-decision`, { action, quoteId, reason: declineReason }); setBusy(false); setOpenId(null); router.refresh() }
+    catch (e: any) { setErr(e.message); setBusy(false) }
+  }
+  const input = 'w-full px-3 py-2 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm'
+
+  return (
+    <div className="space-y-2">
+      <p className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Suppliers &amp; quotes</p>
+      {/* Bare stacked rows (no box) — suppliers listed under each other, split by a
+          thin divider, to take as little space as possible. */}
+      <div className="divide-y divide-[var(--border)]">
+        {rows.map(r => {
+          const m = PANEL_META[r.kind]
+          return (
+            <div key={r.supplierId} className="py-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="flex items-center gap-2 min-w-0">
+                  <i className={`w-2.5 h-2.5 rounded-full shrink-0 ${m.dot}`} />
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm text-[var(--text)]">{r.name}</span>
+                    {r.requestedAt && <span className="text-[11px] text-[var(--text-faint)]">requested {formatDateTime(r.requestedAt)}</span>}
+                  </span>
+                </span>
+                {r.quote ? (
+                  <button type="button" onClick={() => openModal(r.supplierId)} className={`flex items-center gap-1.5 shrink-0 text-[11px] font-semibold ${m.txt} hover:underline`}>
+                    {m.label} · {formatCurrency(r.quote.amount)} <FileText size={13} />
+                  </button>
+                ) : (
+                  <span className={`text-[11px] font-semibold shrink-0 ${m.txt}`}>{m.label}</span>
+                )}
+              </div>
+              {r.kind === 'received' && (
+                <div className="mt-2 flex gap-2">
+                  <button type="button" onClick={() => openModal(r.supplierId, 'approve')} className="flex-1 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition">Approve</button>
+                  <button type="button" onClick={() => openModal(r.supplierId, 'decline')} className="flex-1 py-1.5 rounded-lg ring-1 ring-red-500/40 text-red-600 dark:text-red-400 text-xs font-semibold transition hover:bg-red-500/10">Decline</button>
+                </div>
+              )}
+              {r.kind === 'declined' && r.declineReason && (
+                <div className="mt-2 rounded-lg bg-red-500/10 ring-1 ring-red-500/30 px-3 py-2">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Decline reason</p>
+                  <p className="text-sm text-[var(--text)]">{r.declineReason}</p>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {active?.quote && (
+        <Modal title={`${active.name}'s quote`} maxWidth="max-w-2xl" onClose={() => setOpenId(null)}>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm font-semibold text-[var(--text)] truncate">{active.name}</span>
+            <span className="text-lg font-bold text-[var(--text)] shrink-0">{formatCurrency(active.quote.amount)}</span>
+          </div>
+          <p className="text-[11px] text-[var(--text-faint)]">Received {formatDateTime(active.quote.createdAt)}{active.quote.amountInclVat ? ` · incl VAT ${formatCurrency(active.quote.amountInclVat)}` : ''}</p>
+          {active.quote.proposedScheduleAt && (
+            <div className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-500/10 ring-1 ring-indigo-500/30 px-2.5 py-1 text-[13px]">
+              <CalendarClock size={14} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
+              <span className="text-[var(--text-muted)]">Proposed visit</span>
+              <span className="font-semibold text-[var(--text)]">{formatDateTime(active.quote.proposedScheduleAt)}</span>
+            </div>
+          )}
+          {active.quote.description && <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{active.quote.description}</p>}
+          {active.quote.fileUrl && <ViewTrackedLink ticketId={ticketId} itemType="quote" itemLabel={`${active.name}'s quote`} href={active.quote.fileUrl} className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"><FileText size={14} /> View attachment</ViewTrackedLink>}
+
+          {active.kind === 'received' && (
+            mode === 'decline' ? (
+              <div className="space-y-2 pt-1">
+                <select className={input} value={reason} onChange={e => setReason(e.target.value)}>{DECLINE_REASONS.map(r => <option key={r} value={r}>{r}</option>)}</select>
+                {reason === 'Other' && <textarea className={`${input} min-h-[60px]`} placeholder="Reason…" value={other} onChange={e => setOther(e.target.value)} />}
+                <div className="flex gap-2">
+                  <button onClick={() => decide(active.quote!.id, 'decline')} disabled={busy} className="flex-1 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold disabled:opacity-50">Confirm decline</button>
+                  <button onClick={() => setMode('view')} className="flex-1 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm">Back</button>
+                </div>
+              </div>
+            ) : mode === 'approve' ? (
+              <div className="space-y-2 pt-1">
+                <p className="text-sm text-[var(--text)]">Approve and award <span className="font-semibold">{active.name}</span>? Other quotes for this ticket will be declined.</p>
+                <div className="flex gap-2">
+                  <button onClick={() => decide(active.quote!.id, 'approve')} disabled={busy} className="flex-1 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold disabled:opacity-50">{busy ? '…' : 'Yes, approve'}</button>
+                  <button onClick={() => setMode('view')} className="flex-1 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm">Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex gap-2 pt-1">
+                <button onClick={() => setMode('approve')} className="flex-1 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition">Approve</button>
+                <button onClick={() => setMode('decline')} className="flex-1 py-2 rounded-lg ring-1 ring-red-500/40 text-red-600 dark:text-red-400 text-sm font-semibold transition hover:bg-red-500/10">Decline</button>
+              </div>
+            )
+          )}
+          {active.kind === 'declined' && canReQuote && <div className="pt-1"><ReQuoteButton ticketId={ticketId} quoteId={active.quote.id} /></div>}
+          {err && <p className="text-xs text-red-500">{err}</p>}
+        </Modal>
+      )}
+    </div>
+  )
+}
+
+// ── Generic review panel (COC/POC · snag · VO) — mirrors the quote panel ─────
+// A compact clickable summary row in the "Next action" block that pops up the
+// full detail + the action buttons (composed on the server and passed in as
+// `body`). Same look as RmQuotePanel so every pending decision reads the same.
+export function RmReviewPanel({ heading, items }: {
+  heading?: string
+  items: { id: string; dot: string; title: string; subtitle?: string | null; statusLabel: string; statusCls: string; modalTitle?: string; body: ReactNode }[]
+}) {
+  const [openId, setOpenId] = useState<string | null>(null)
+  const active = items.find(i => i.id === openId) ?? null
+  if (!items.length) return null
+  return (
+    <div className="space-y-2">
+      {heading && <p className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">{heading}</p>}
+      <div className="divide-y divide-[var(--border)]">
+        {items.map(it => (
+          <button key={it.id} type="button" onClick={() => setOpenId(it.id)} className="w-full py-2 flex items-center justify-between gap-2 text-left transition hover:bg-[var(--hover)]">
+            <span className="flex items-center gap-2 min-w-0">
+              <i className={`w-2.5 h-2.5 rounded-full shrink-0 ${it.dot}`} />
+              <span className="min-w-0">
+                <span className="block truncate text-sm text-[var(--text)]">{it.title}</span>
+                {it.subtitle && <span className="text-[11px] text-[var(--text-faint)]">{it.subtitle}</span>}
+              </span>
+            </span>
+            <span className={`flex items-center gap-1.5 shrink-0 text-[11px] font-semibold ${it.statusCls}`}>{it.statusLabel} <FileText size={13} /></span>
+          </button>
+        ))}
+      </div>
+      {active && (
+        <Modal title={active.modalTitle ?? active.title} maxWidth="max-w-3xl" onClose={() => setOpenId(null)}>
+          {active.body}
+        </Modal>
+      )}
+    </div>
+  )
+}
+
+// Today-queue "Approve quote" pop-up: fetches the ticket's quote-panel rows on
+// open (they're not in the queue payload) and shows the same RmQuotePanel — view
+// each quote + Approve / Decline in place, no navigating into the ticket.
+export function QuoteReviewButton({ ticketId, trigger }: { ticketId: string; trigger: (open: () => void) => ReactNode }) {
+  const [open, setOpen] = useState(false)
+  const [data, setData] = useState<{ rows: QuotePanelRow[]; canReQuote: boolean } | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [err, setErr] = useState('')
+  useEffect(() => {
+    if (!open) return
+    let live = true
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resets fetch state when the pop-up opens, before the async load; cannot run during render
+    setLoading(true); setErr('')
+    fetch(`/api/tickets/${ticketId}/quotes`)
+      .then(r => r.json())
+      .then(d => { if (!live) return; if (d?.error) setErr(d.error); else setData(d) })
+      .catch(() => { if (live) setErr('Could not load the quotes.') })
+      .finally(() => { if (live) setLoading(false) })
+    return () => { live = false }
+  }, [open, ticketId])
+  return (
+    <>
+      {trigger(() => setOpen(true))}
+      {open && (
+        <Modal title="Review quotes" maxWidth="max-w-2xl" onClose={() => setOpen(false)}>
+          {loading ? <p className="py-4 text-center text-sm text-[var(--text-faint)]">Loading…</p>
+            : err ? <p className="text-sm text-red-500">{err}</p>
+            : data ? (data.rows.length ? <RmQuotePanel ticketId={ticketId} rows={data.rows} canReQuote={data.canReQuote} /> : <p className="text-sm text-[var(--text-faint)]">No quotes yet.</p>)
+            : null}
+        </Modal>
+      )}
+    </>
+  )
+}
+
+// Today-queue "Sign off" pop-up: fetches the submission currently under review
+// and shows it + Accept COC/POC / Request evidence / Raise snag in place, so the
+// RM can sign off from the queue without navigating into the ticket.
+type SignoffSubmission = { id: string; label: string; createdAt: string; beforeUrls: string[]; afterUrls: string[]; cocUrl: string | null; invoiceUrl: string | null; notes: string | null }
+
+export function SignoffReviewButton({ ticketId, trigger }: { ticketId: string; trigger: (open: () => void) => ReactNode }) {
+  const [open, setOpen] = useState(false)
+  const [data, setData] = useState<{ submission: SignoffSubmission | null } | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [err, setErr] = useState('')
+  useEffect(() => {
+    if (!open) return
+    let live = true
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resets fetch state when the pop-up opens, before the async load; cannot run during render
+    setLoading(true); setErr('')
+    fetch(`/api/tickets/${ticketId}/signoff`)
+      .then(r => r.json())
+      .then(d => { if (!live) return; if (d?.error) setErr(d.error); else setData(d) })
+      .catch(() => { if (live) setErr('Could not load the submission.') })
+      .finally(() => { if (live) setLoading(false) })
+    return () => { live = false }
+  }, [open, ticketId])
+  return (
+    <>
+      {trigger(() => setOpen(true))}
+      {open && (
+        <Modal title="Sign off completion" maxWidth="max-w-3xl" onClose={() => setOpen(false)}>
+          {loading ? <p className="py-4 text-center text-sm text-[var(--text-faint)]">Loading…</p>
+            : err ? <p className="text-sm text-red-500">{err}</p>
+            : data?.submission ? <SignoffReviewBody ticketId={ticketId} s={data.submission} />
+            : <p className="text-sm text-[var(--text-faint)]">Nothing awaiting your sign-off on this ticket.</p>}
+        </Modal>
+      )}
+    </>
+  )
+}
+
+function SignoffReviewBody({ ticketId, s }: { ticketId: string; s: SignoffSubmission }) {
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl ring-1 ring-[var(--border)] bg-[var(--surface)] p-4 space-y-3">
+        <p className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]"><FileText size={15} className="text-[#C6A35D] shrink-0" />{s.label} · {formatDateTime(s.createdAt)}</p>
+        <div>
+          <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Proof of completion</div>
+          <div className="flex flex-wrap gap-x-4 gap-y-1">
+            {s.beforeUrls.map((u, i) => <ViewTrackedLink key={`b${i}`} ticketId={ticketId} itemType="photo" itemLabel={`Before photo ${i + 1}`} href={u} className="text-sm text-[#C6A35D] underline hover:text-amber-500">Before {i + 1}</ViewTrackedLink>)}
+            {s.afterUrls.map((u, i) => <ViewTrackedLink key={`a${i}`} ticketId={ticketId} itemType="photo" itemLabel={`Completion photo ${i + 1}`} href={u} className="text-sm text-[#C6A35D] underline hover:text-amber-500">After {i + 1}</ViewTrackedLink>)}
+            {!s.beforeUrls.length && !s.afterUrls.length && <span className="text-sm text-[var(--text-faint)]">No photos</span>}
+          </div>
+        </div>
+        {(s.cocUrl || s.invoiceUrl) && (
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Certificate of Completion</div>
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
+              {s.cocUrl && <ViewTrackedLink ticketId={ticketId} itemType="coc" itemLabel="COC" href={s.cocUrl} className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View COC</ViewTrackedLink>}
+              {s.invoiceUrl && <ViewTrackedLink ticketId={ticketId} itemType="invoice" itemLabel="Invoice" href={s.invoiceUrl} className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View invoice</ViewTrackedLink>}
+            </div>
+          </div>
+        )}
+        {s.notes && (
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Notes</div>
+            <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{s.notes}</p>
+          </div>
+        )}
+      </div>
+      <ApproveSignoffCard ticketId={ticketId} />
+      <div className="grid grid-cols-2 gap-2">
+        <RequestEvidenceButton ticketId={ticketId} />
+        <RaiseSnagButton ticketId={ticketId} />
+      </div>
+    </div>
+  )
+}
+
 // ── RM adds extra work to the ticket (before a supplier is assigned) ─
 export function RmAddWorkForm({ ticketId, description, photoUrls, title, category, impact }: {
   ticketId: string; description: string; photoUrls: string[]; title: string; category: string; impact: string
@@ -457,13 +739,13 @@ export function RmAddWorkForm({ ticketId, description, photoUrls, title, categor
 
   return (
     <>
-      <button onClick={() => setOpen(true)} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl ring-1 ring-[#C6A35D]/40 text-[#C6A35D] text-sm font-semibold hover:bg-[#C6A35D]/10 transition">
+      <button onClick={() => setOpen(true)} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold transition">
         <Plus size={16} /> Add extra work
       </button>
       {open && (
-        <Modal title="Add extra work to this ticket" onClose={() => { if (!busy) { setOpen(false); setErr('') } }}>
+        <Modal title="Add extra work to this ticket" maxWidth="max-w-2xl" onClose={() => { if (!busy) { setOpen(false); setErr('') } }}>
           <p className="text-xs text-[var(--text-muted)]">Extra scope you know of — added to the ticket brief before a supplier is assigned.</p>
-          <textarea autoFocus className={`${input} min-h-[90px]`} placeholder="Describe the extra work needed…" value={text} onChange={e => { setText(e.target.value); setErr('') }} />
+          <textarea autoFocus className={`${input} min-h-[160px]`} placeholder="Describe the extra work needed…" value={text} onChange={e => { setText(e.target.value); setErr('') }} />
           <label className="flex items-center justify-center gap-2 py-2.5 rounded-lg ring-1 ring-[var(--border)] text-sm text-[var(--text)] transition cursor-pointer hover:border-[#C6A35D] hover:bg-[var(--hover)]">
             <ImagePlus size={15} /> Add photos <span className="text-[var(--text-faint)]">(optional)</span>
             <input type="file" accept="image/*" multiple className="hidden" onChange={e => setFiles(p => [...p, ...Array.from(e.target.files ?? [])].slice(0, 5))} />
@@ -480,7 +762,7 @@ export function RmAddWorkForm({ ticketId, description, photoUrls, title, categor
           )}
           {err && <p className="text-xs text-red-500">{err}</p>}
           <div className="flex gap-2">
-            <button onClick={submit} disabled={busy} className="flex-1 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Adding…' : 'Add to ticket'}</button>
+            <button onClick={submit} disabled={busy} className="flex-1 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Adding…' : 'Add to ticket'}</button>
             <button onClick={() => { setOpen(false); setErr('') }} disabled={busy} className="flex-1 py-2 rounded-xl ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm disabled:opacity-50">Cancel</button>
           </div>
         </Modal>
@@ -703,7 +985,7 @@ export function CloseOutButton({ ticketId, voConfirmed }: { ticketId: string; vo
   return (
     <div className="space-y-1.5">
       {!voConfirmed && <p className="text-xs text-[var(--text-muted)]">Waiting for the supplier to confirm there are no further variation orders before you can close out.</p>}
-      <button onClick={closeOut} disabled={busy || !voConfirmed} className="w-full py-2.5 rounded-xl bg-[#C6A35D] hover:brightness-95 text-[#0a0e17] text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed">{busy ? 'Closing out…' : 'Final close-out'}</button>
+      <button onClick={closeOut} disabled={busy || !voConfirmed} className="w-full py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed">{busy ? 'Closing out…' : 'Final close-out'}</button>
       {err && <p className="text-xs text-red-500">{err}</p>}
     </div>
   )
@@ -726,7 +1008,7 @@ export function ReQuoteButton({ ticketId, quoteId }: { ticketId: string; quoteId
   }
   return (
     <div>
-      <button onClick={go} disabled={busy} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#C6A35D] text-[#0a0e17] text-xs font-semibold disabled:opacity-50">{busy ? 'Sending…' : 'Ask to re-quote'}</button>
+      <button onClick={go} disabled={busy} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition disabled:opacity-50">{busy ? 'Sending…' : 'Ask to re-quote'}</button>
       {sent && <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">Re-quote request sent to the supplier.</p>}
       {err && <p className="text-xs text-red-500 mt-1">{err}</p>}
     </div>

@@ -79,7 +79,7 @@ function regionSignals(tickets: HealthTicket[], rules: SlaRuleResolver, now: Dat
 }
 
 export interface StoreManagerContact { name: string | null; email: string | null; phone: string | null }
-export interface StoreCard extends StoreHealthResult { storeName: string; regionName: string; sm?: StoreManagerContact | null }
+export interface StoreCard extends StoreHealthResult { storeName: string; branchCode: string | null; location: string | null; regionName: string; sm?: StoreManagerContact | null }
 export interface TrendDelta { dir: 'up' | 'down' | 'flat'; pct: number }
 export interface EstateTrends { openWork: TrendDelta; slaPressure: TrendDelta; cost: TrendDelta; supplierBreaches: TrendDelta }
 export interface ExposureBucket { label: string; value: number }
@@ -115,7 +115,7 @@ export async function assembleEstateDashboard(companyId: string, now: Date = new
 
   const [{ data: regionsRaw }, { data: storesRaw }, { data: ticketsRaw }, { data: suppliersRaw }] = await Promise.all([
     db.from('regions').select('id, name').eq('company_id', companyId).eq('active', true),
-    db.from('stores').select('id, name, sub_store, region_id').eq('company_id', companyId).eq('active', true).is('closed_at', null),
+    db.from('stores').select('id, name, sub_store, branch_code, address, region_id').eq('company_id', companyId).eq('active', true).is('closed_at', null),
     db.from('tickets').select(TICKET_COLS).eq('company_id', companyId),
     db.from('suppliers').select('id, company_name').eq('company_id', companyId),
   ])
@@ -123,6 +123,8 @@ export async function assembleEstateDashboard(companyId: string, now: Date = new
   const regionName = new Map((regionsRaw ?? []).map((r: any) => [r.id, r.name]))
   const stores = (storesRaw ?? []) as any[]
   const storeName = new Map(stores.map(s => [s.id, storeLabel(s.name, s.sub_store)]))
+  const storeBranch = new Map(stores.map(s => [s.id, s.branch_code ?? null]))
+  const storeAddr = new Map(stores.map(s => [s.id, s.address ?? null]))
   const tickets = ((ticketsRaw ?? []) as any[]).map(asTicket)
   const supplierName = new Map((suppliersRaw ?? []).map((s: any) => [s.id, s.company_name]))
 
@@ -140,7 +142,7 @@ export async function assembleEstateDashboard(companyId: string, now: Date = new
   // store health
   const cards: StoreCard[] = stores.map(s => {
     const res = calculateStoreHealth({ id: s.id, region_id: s.region_id } as StoreInput, ticketsByStore.get(s.id) ?? [], rules, now)
-    return { ...res, storeName: storeName.get(s.id) ?? 'Store', regionName: regionName.get(s.region_id) ?? '—' }
+    return { ...res, storeName: storeName.get(s.id) ?? 'Store', branchCode: storeBranch.get(s.id) ?? null, location: storeAddr.get(s.id) ?? null, regionName: regionName.get(s.region_id) ?? '—' }
   })
 
   // regional rollup
@@ -336,11 +338,12 @@ export interface RegionalTicketAction {
 }
 // Simple ticket row for the RM recent-tickets card + tickets tab (SM-style).
 export interface RegionalTicketRow {
-  id: string; title: string; storeName: string; branchCode: string | null
+  id: string; title: string; category: string | null; scheduledAt: string | null
+  storeName: string; branchCode: string | null
   status: string; priority: Priority; jobRef: string | null; createdAt: string
   quoteRequestedAt: string | null; quoteReceivedAt: string | null; quoteAcceptedAt: string | null
   breached: boolean; supplierBreached: boolean; internalBreached: boolean
-  dueAt: string; overdue: boolean; infoAdded: boolean
+  dueAt: string; slaDueAt: string | null; overdue: boolean; infoAdded: boolean
   supplierAssigned: boolean
   // An open supplier↔RM dispute (snag / evidence) — the badge reads "Dispute".
   disputed: boolean
@@ -373,7 +376,7 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
 
   const [{ data: regionsRaw }, { data: storesRaw }, { data: ticketsRaw }, { data: suppliersRaw }] = await Promise.all([
     db.from('regions').select('id, name').in('id', regionIds),
-    db.from('stores').select('id, name, sub_store, branch_code, region_id').eq('company_id', companyId).in('region_id', regionIds).eq('active', true).is('closed_at', null),
+    db.from('stores').select('id, name, sub_store, branch_code, address, region_id').eq('company_id', companyId).in('region_id', regionIds).eq('active', true).is('closed_at', null),
     db.from('tickets').select(TICKET_COLS).eq('company_id', companyId).in('region_id', regionIds),
     db.from('suppliers').select('id, company_name, active').eq('company_id', companyId),
   ])
@@ -382,6 +385,7 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
   const storeIds = stores.map(s => s.id)
   const storeName = new Map(stores.map(s => [s.id, storeLabel(s.name, s.sub_store)]))
   const storeBranch = new Map(stores.map(s => [s.id, s.branch_code ?? null]))
+  const storeAddr = new Map(stores.map(s => [s.id, s.address ?? null]))
   const tickets = ((ticketsRaw ?? []) as any[]).map(asTicket)
   const supplierName = new Map((suppliersRaw ?? []).map((s: any) => [s.id, s.company_name]))
 
@@ -415,6 +419,7 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
       const s = isActive(t.status) ? computeTicketSla(t, rules(t.priority), now) : null
       return {
       id: t.id, title: t.title ?? 'Untitled',
+      category: (t as any).category ?? null, scheduledAt: (t as any).scheduled_at ?? null,
       storeName: storeName.get(t.store_id) ?? 'Store', branchCode: storeBranch.get(t.store_id) ?? null,
       status: t.status, priority: t.priority, jobRef: (t as any).job_ref ?? null, createdAt: t.created_at,
       quoteRequestedAt: (t as any).quote_requested_at ?? null,
@@ -422,6 +427,7 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
       quoteAcceptedAt: ((t as any).quote_decision_status === 'approved' ? (t as any).quote_decided_at : null) ?? acceptedQuoteAt.get(t.id) ?? null,
       breached: !!s && (s.supplierBreached || s.internalBreached),
       supplierBreached: !!s?.supplierBreached, internalBreached: !!s?.internalBreached,
+      slaDueAt: s?.nextActionDueAt ?? null,
       ...dueInfo(t, rules, now),
       infoAdded: t.status === 'open' && !!(t as any).info_request_reason,
       supplierAssigned: !!(t as any).supplier_id,
@@ -449,7 +455,7 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
 
   const cards: StoreCard[] = stores.map(s => {
     const res = calculateStoreHealth({ id: s.id, region_id: s.region_id }, byStore.get(s.id) ?? [], rules, now)
-    return { ...res, storeName: storeName.get(s.id) ?? 'Store', regionName: regionName.get(s.region_id) ?? '—', sm: storeSm.get(s.id) ?? null }
+    return { ...res, storeName: storeName.get(s.id) ?? 'Store', branchCode: storeBranch.get(s.id) ?? null, location: storeAddr.get(s.id) ?? null, regionName: regionName.get(s.region_id) ?? '—', sm: storeSm.get(s.id) ?? null }
   })
   const portfolio = calculateRegionalPortfolioHealth('portfolio', cards, regionSignals(tickets, rules, now))
 
@@ -529,7 +535,7 @@ export type ClientStatus = 'open' | 'info_requested' | 'scheduled' | 'in_progres
 // ticket read "Open" on the detail page but "In Progress" on the dashboard).
 const clientVisible = (status: string): ClientStatus | null =>
   clientVisibleStatus(status as TicketStatus)
-export interface StoreManagerTicket { id: string; title: string; description: string | null; category: string | null; status: ClientStatus; rawStatus: string; priority: Priority; operationalImpact: string | null; createdAt: string; supplierAssigned: boolean; jobRef: string | null; dueAt: string; overdue: boolean; infoAdded: boolean }
+export interface StoreManagerTicket { id: string; title: string; description: string | null; category: string | null; status: ClientStatus; rawStatus: string; priority: Priority; operationalImpact: string | null; createdAt: string; supplierAssigned: boolean; jobRef: string | null; dueAt: string; overdue: boolean; infoAdded: boolean; photoUrls: string[]; infoDocUrls: string[]; infoRequestReason: string | null }
 export interface StoreManagerData {
   storeName: string
   company: string
@@ -571,7 +577,10 @@ export async function assembleStoreManagerDashboard(companyId: string, storeIds:
     const { dueAt, overdue } = dueInfo(t, rules, now)
     // "Info added" = the SM resubmitted after the RM requested info (back at open, reason kept).
     const infoAdded = t.status === 'open' && !!(t as any).info_request_reason
-    visible.push({ id: t.id, title: t.title ?? 'Untitled', description: (t as any).description ?? null, category: t.category ?? null, status: v, rawStatus: t.status, priority: t.priority, operationalImpact: t.operational_impact ?? null, createdAt: t.created_at, supplierAssigned: !!t.supplier_id, jobRef: (t as any).job_ref ?? null, dueAt, overdue, infoAdded })
+    visible.push({ id: t.id, title: t.title ?? 'Untitled', description: (t as any).description ?? null, category: t.category ?? null, status: v, rawStatus: t.status, priority: t.priority, operationalImpact: t.operational_impact ?? null, createdAt: t.created_at, supplierAssigned: !!t.supplier_id, jobRef: (t as any).job_ref ?? null, dueAt, overdue, infoAdded,
+      photoUrls: Array.isArray((t as any).photo_urls) ? (t as any).photo_urls as string[] : [],
+      infoDocUrls: Array.isArray((t as any).info_doc_urls) ? (t as any).info_doc_urls as string[] : [],
+      infoRequestReason: (t as any).info_request_reason ?? null })
   }
   visible.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
   return {

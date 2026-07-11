@@ -5,11 +5,13 @@
 // milestone (requested → received → accepted) coloured to the status.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Ticket, Search, ChevronDown, BarChart3, X, PlusCircle } from 'lucide-react'
+import { Ticket, Search, ChevronDown, BarChart3, Store, PlusCircle } from 'lucide-react'
 import type { RegionalTicketRow } from '@/lib/health/data'
 import { Card } from '@/components/exec/ui'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
-import { SlideOver } from '@/components/ui/SlideOver'
+import { CategoryIcon, priorityBadgeClass, priorityLabel } from '@/components/client/ticketBadges'
+import { Modal } from '@/components/ui/Modal'
+import { DrawerHeader } from '@/components/exec/Drawer'
 import { readCollapse, writeCollapse, readCollapseSet, writeCollapseSet } from '@/lib/collapse-state'
 import { rmStatusMeta, formatDateTime, humanizeDuration, urgencyCountCls } from '@/lib/utils'
 
@@ -49,44 +51,51 @@ function groupCountCls(rows: RegionalTicketRow[]): string {
 // Cancelled. A breach that has gone fully overdue drops out of the breach pills
 // and shows only under Overdue.
 type RmFilter = 'internal_breach' | 'supplier_breach' | 'overdue' | Bucket
+// Pills styled like the SM Tickets tab: tinted when inactive, filled when selected.
 const PILLS: { key: RmFilter; label: string; active: string; inactive: string }[] = [
-  { key: 'open', label: 'New', active: 'bg-blue-500 text-white border-blue-500', inactive: 'text-blue-600 dark:text-blue-400 border-blue-500/40 hover:border-blue-400' },
-  { key: 'quote_requested', label: 'Quote requested', active: 'bg-cyan-500 text-white border-cyan-500', inactive: 'text-cyan-600 dark:text-cyan-400 border-cyan-500/40 hover:border-cyan-400' },
-  { key: 'quoted', label: 'Quoted', active: 'bg-violet-500 text-white border-violet-500', inactive: 'text-violet-600 dark:text-violet-400 border-violet-500/40 hover:border-violet-400' },
-  { key: 'approved', label: 'Approved', active: 'bg-teal-500 text-white border-teal-500', inactive: 'text-teal-600 dark:text-teal-400 border-teal-500/40 hover:border-teal-400' },
-  { key: 'scheduled', label: 'Job scheduled', active: 'bg-indigo-500 text-white border-indigo-500', inactive: 'text-indigo-600 dark:text-indigo-400 border-indigo-500/40 hover:border-indigo-400' },
-  { key: 'in_progress', label: 'In progress', active: 'bg-[#C6A35D] text-[#0a0e17] border-[#C6A35D]', inactive: 'text-amber-600 dark:text-[#C6A35D] border-[#C6A35D]/40 hover:border-[#C6A35D]' },
-  { key: 'awaiting_signoff', label: 'Sign-off', active: 'bg-orange-500 text-white border-orange-500', inactive: 'text-orange-600 dark:text-orange-400 border-orange-500/40 hover:border-orange-400' },
-  { key: 'completed', label: 'Completed', active: 'bg-emerald-500 text-white border-emerald-500', inactive: 'text-emerald-600 dark:text-emerald-400 border-emerald-500/40 hover:border-emerald-400' },
-  { key: 'internal_breach', label: 'Internal Breached', active: 'bg-red-600 text-white border-red-600', inactive: 'text-red-600 dark:text-red-400 border-red-500/50 hover:border-red-500' },
-  { key: 'supplier_breach', label: 'Supplier Breached', active: 'bg-orange-600 text-white border-orange-600', inactive: 'text-orange-600 dark:text-orange-400 border-orange-500/50 hover:border-orange-500' },
-  { key: 'overdue', label: 'Overdue', active: 'bg-red-500 text-white border-red-500', inactive: 'text-red-600 dark:text-red-400 border-red-500/40 hover:border-red-400' },
-  { key: 'cancelled', label: 'Cancelled', active: 'bg-gray-500 text-white border-gray-500', inactive: 'text-gray-600 dark:text-gray-400 border-gray-500/40 hover:border-gray-400' },
+  { key: 'open', label: 'New', active: 'bg-blue-500 text-white', inactive: 'bg-blue-500/15 text-blue-700 dark:text-blue-400' },
+  { key: 'quote_requested', label: 'Quote requested', active: 'bg-cyan-500 text-white', inactive: 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-400' },
+  { key: 'quoted', label: 'Quoted', active: 'bg-violet-500 text-white', inactive: 'bg-violet-500/15 text-violet-700 dark:text-violet-400' },
+  { key: 'approved', label: 'Approved', active: 'bg-teal-500 text-white', inactive: 'bg-teal-500/15 text-teal-700 dark:text-teal-400' },
+  { key: 'scheduled', label: 'Job scheduled', active: 'bg-indigo-500 text-white', inactive: 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-400' },
+  { key: 'in_progress', label: 'In progress', active: 'bg-[#C6A35D] text-[#0a0e17]', inactive: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D]' },
+  { key: 'awaiting_signoff', label: 'Sign-off', active: 'bg-orange-500 text-white', inactive: 'bg-orange-500/15 text-orange-700 dark:text-orange-400' },
+  { key: 'completed', label: 'Completed', active: 'bg-emerald-500 text-white', inactive: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' },
+  { key: 'internal_breach', label: 'Internal Breached', active: 'bg-red-600 text-white', inactive: 'bg-red-600/15 text-red-700 dark:text-red-400' },
+  { key: 'supplier_breach', label: 'Supplier Breached', active: 'bg-orange-600 text-white', inactive: 'bg-orange-600/15 text-orange-700 dark:text-orange-400' },
+  { key: 'overdue', label: 'Overdue', active: 'bg-red-500 text-white', inactive: 'bg-red-500/15 text-red-600 dark:text-red-400' },
+  { key: 'cancelled', label: 'Cancelled', active: 'bg-gray-500 text-white', inactive: 'bg-gray-500/15 text-gray-600 dark:text-gray-400' },
 ]
 
-function milestone(t: RegionalTicketRow): { label: string; at: string } | null {
-  if (t.quoteAcceptedAt) return { label: 'Quote accepted', at: t.quoteAcceptedAt }
-  if (t.quoteReceivedAt) return { label: 'Quoted', at: t.quoteReceivedAt }
-  if (t.quoteRequestedAt) return { label: 'Quote requested', at: t.quoteRequestedAt }
-  return null
-}
-
+// Row form factor matches the store-manager Tickets tab: category icon + job ref
+// + category/title + store on the left; priority + status badges, supplier line
+// and the logged date on the right. RM statuses come from rmStatusMeta.
 function TicketRow({ t }: { t: RegionalTicketRow }) {
   const sm = rmStatusMeta(t.status)
-  const m = milestone(t)
+  const statusCls = t.disputed ? 'bg-red-500/15 text-red-700 dark:text-red-400' : t.infoAdded ? 'bg-teal-500/15 text-teal-700 dark:text-teal-400' : sm.cls
+  const statusLabel = t.disputed ? 'Dispute' : t.infoAdded ? 'Info added' : sm.label
   return (
-    <Link href={`/regional/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2.5 -mx-2 px-2 rounded-lg border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition">
-      <div className="min-w-0">
-        {t.jobRef && <p className="text-[10px] font-mono text-[var(--text-faint)]">{t.jobRef}</p>}
-        <p className="text-sm text-[var(--text)] truncate">{t.title}</p>
-        <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(t.createdAt)}{t.breached && !t.overdue ? ' · ⚠ breached' : ''}</p>
-        {/* eslint-disable-next-line react-hooks/purity -- Date.now() drives a relative "overdue by" display; cosmetic elapsed-time readout, not a hydration-correctness concern */}
-        {t.overdue && <p className="text-[11px] font-semibold text-red-600 dark:text-red-400">Overdue by {humanizeDuration(Date.now() - new Date(t.dueAt).getTime())}</p>}
-        {m && <p className={`text-[11px] font-medium ${sm.text}`}>{m.label} · {formatDateTime(m.at)}</p>}
+    <Link href={`/regional/tickets/${t.id}`} className="grid gap-3 border-b border-[var(--border)] px-2 py-3 last:border-0 transition hover:bg-[var(--hover)] sm:grid-cols-[1fr_auto] sm:items-center">
+      <div className="flex min-w-0 items-center gap-3">
+        <CategoryIcon category={t.category ?? t.title} className="h-11 w-11" iconSize={18} />
+        <div className="min-w-0">
+          {t.jobRef && <p className="text-[10px] font-mono text-[var(--text-faint)]">{t.jobRef}</p>}
+          <p className="truncate text-sm font-bold text-[var(--text)]">{t.category || t.title}</p>
+          <p className="truncate text-xs text-[var(--text-muted)]">{t.storeName}</p>
+        </div>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
-        <PriorityBadge priority={t.priority} className="w-full text-center" />
-        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${t.disputed ? 'bg-red-500/15 text-red-700 dark:text-red-400' : t.infoAdded ? 'bg-teal-500/15 text-teal-700 dark:text-teal-400' : sm.cls}`}>{t.disputed ? 'Dispute' : t.infoAdded ? 'Info added' : sm.label}</span>
+      <div className="flex flex-col items-start gap-1 sm:items-end">
+        <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
+          <span className={`inline-flex min-w-[92px] justify-center rounded-md px-2 py-1 text-[10px] font-bold ${priorityBadgeClass(t as never)}`}>{priorityLabel(t as never)}</span>
+          <span className={`inline-flex min-w-[92px] justify-center rounded-md px-2 py-1 text-[10px] font-bold ${statusCls}`}>{statusLabel}</span>
+        </div>
+        <p className="text-xs text-[var(--text-muted)]">{t.supplierAssigned ? 'Supplier assigned' : 'No supplier assigned'}</p>
+        <p className="text-[11px] text-[var(--text-faint)]">
+          {formatDateTime(t.createdAt)}
+          {/* eslint-disable-next-line react-hooks/purity -- cosmetic "overdue by" / breach readout, not hydration-critical */}
+          {t.overdue ? <span className="ml-1.5 font-semibold text-red-600 dark:text-red-400">· Overdue by {humanizeDuration(Date.now() - new Date(t.dueAt).getTime())}</span>
+            : t.breached ? <span className="ml-1.5 font-semibold text-amber-600 dark:text-amber-400">· ⚠ breached</span> : null}
+        </p>
       </div>
     </Link>
   )
@@ -207,7 +216,7 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
           const n = p.key === 'internal_breach' ? internalBreachCount : p.key === 'supplier_breach' ? supplierBreachCount : p.key === 'overdue' ? overdueCount : counts[p.key as Bucket]
           const on = filter === p.key
           return (
-            <button key={p.key} onClick={() => setFilter(f => f === p.key ? null : p.key)} aria-pressed={on} className={`px-3 py-1.5 rounded-full text-xs font-medium border transition text-center ${on ? p.active : p.inactive}`}>
+            <button key={p.key} onClick={() => setFilter(f => f === p.key ? null : p.key)} aria-pressed={on} className={`rounded-md px-3 py-1.5 text-xs font-semibold transition text-center ${on ? p.active : p.inactive}`}>
               {p.label} <span className="opacity-70">{n}</span>
             </button>
           )
@@ -305,13 +314,16 @@ function StorePanel({ store, rows, onClose }: { store: string; rows: RegionalTic
   )
 
   return (
-    <SlideOver onClose={onClose}>
+    <Modal onClose={onClose} maxWidth="max-w-2xl">
       {close => (
         <>
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0"><h2 className="text-lg font-bold text-[var(--text)] truncate">{store}</h2><p className="text-xs text-[var(--text-muted)]">{total} ticket{total === 1 ? '' : 's'}</p></div>
-          <button onClick={close} className="shrink-0 -m-1 p-1.5 rounded-lg text-[var(--text-faint)] hover:text-[var(--text)] hover:bg-[var(--hover)]"><X size={18} /></button>
-        </div>
+        <DrawerHeader onClose={close} title={
+          <div className="flex items-center gap-2 flex-wrap">
+            <Store size={18} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
+            <h3 className="text-lg font-bold text-[var(--text)]">{store}</h3>
+            <span className="text-xs text-[var(--text-muted)]">{total} ticket{total === 1 ? '' : 's'}</span>
+          </div>
+        } />
 
         <div className="space-y-2">
           <div className="h-3 rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden flex">
@@ -324,7 +336,7 @@ function StorePanel({ store, rows, onClose }: { store: string; rows: RegionalTic
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           <Stat label="Total" value={total} />
           <Stat label="Breached" value={breached} tone={breached ? 'text-red-600 dark:text-red-400' : 'text-[var(--text)]'} />
           <Stat label="Open / Quoting" value={c.open + c.quote_requested + c.quoted} />
@@ -339,6 +351,6 @@ function StorePanel({ store, rows, onClose }: { store: string; rows: RegionalTic
         </div>
         </>
       )}
-    </SlideOver>
+    </Modal>
   )
 }

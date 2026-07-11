@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { Clock, Settings } from 'lucide-react'
 import { requireRegionalUser } from '@/lib/health/guard'
 import { assembleRegionalDashboard } from '@/lib/health/data'
+import { createAdminClient } from '@/lib/supabase/server'
 import { RegionalOverview } from '@/components/exec/RegionalOverview'
 import { Card } from '@/components/exec/ui'
 import { getDailyBriefing } from '@/lib/briefing/generate'
@@ -36,7 +37,15 @@ export default async function RegionalOverviewPage() {
   }
 
   const data = await assembleRegionalDashboard(companyId, regionIds)
+  // Motiv-curated suppliers the RM can also invite from the Today queue's in-place
+  // assign picker (company suppliers come from the dashboard payload already).
+  const admin = createAdminClient()
+  const { data: motivRaw } = await admin.from('suppliers').select('id, company_name').eq('is_motiv', true).eq('active', true).order('company_name')
+  const companySupplierIds = new Set(data.suppliers.map(s => s.id))
+  const motivSuppliers = ((motivRaw ?? []) as { id: string; company_name: string }[])
+    .filter(s => !companySupplierIds.has(s.id))
+    .map(s => ({ id: s.id, name: s.company_name }))
   const briefingScopeId = regionIds.slice().sort().join(',')
   const briefing = await getDailyBriefing({ companyId, scope: 'region', scopeId: briefingScopeId, role: 'regional_manager', facts: regionFacts(data) })
-  return <RegionalOverview data={data} name={fullName} briefing={briefing} briefingScopeId={briefingScopeId} />
+  return <RegionalOverview data={data} name={fullName} briefing={briefing} briefingScopeId={briefingScopeId} motivSuppliers={motivSuppliers} />
 }

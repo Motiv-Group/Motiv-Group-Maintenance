@@ -22,9 +22,12 @@ interface Props {
   photoUrls: string[]
   docUrls: string[]
   requestReason?: string | null
+  // Optional custom trigger (e.g. an outline button in the work queue). Receives
+  // an `open` callback; when omitted the default full-width blue button is used.
+  trigger?: (open: () => void) => React.ReactNode
 }
 
-export function AddInfoModal({ ticketId, title, description, category, impact, photoUrls, docUrls, requestReason }: Props) {
+export function AddInfoModal({ ticketId, title, description, category, impact, photoUrls, docUrls, requestReason, trigger }: Props) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [info, setInfo] = useState('')
@@ -90,13 +93,15 @@ export function AddInfoModal({ ticketId, title, description, category, impact, p
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-blue-500"
-      >
-        <MessageSquarePlus size={16} /> Add the requested info
-      </button>
+      {trigger ? trigger(() => setOpen(true)) : (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-blue-500"
+        >
+          <MessageSquarePlus size={16} /> Add the requested info
+        </button>
+      )}
 
       {open && (
         <div

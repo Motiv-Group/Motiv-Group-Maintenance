@@ -14,35 +14,35 @@
     color-scheme: dark;
   }
   body {
-    @apply bg-gray-100 text-gray-900 dark:bg-gray-950 dark:text-white;
+    @apply bg-[#f3f4f6] text-gray-900 dark:bg-[#0b0c11] dark:text-white;
   }
 
   /* ── Dashboard surface palette (single source of truth for light + dark).
      The v3 command-centre UI references these vars instead of hard-coded
      navy hex, so the theme toggle works everywhere and stays readable. ── */
   :root {
-    --app-bg:     #eef2f7;
+    --app-bg:     #f3f4f6;
     --surface:    #ffffff;
-    --surface-2:  #f8fafc;
+    --surface-2:  #f7f8fa;
     --nav-bg:     #ffffff;
-    --border:     rgba(15, 23, 42, 0.10);
-    --hover:      rgba(15, 23, 42, 0.045);
-    --input-bg:   #f1f5f9;
-    --text:       #0f172a;
-    --text-muted: #475569;
-    --text-faint: #64748b;
+    --border:     rgba(17, 18, 24, 0.10);
+    --hover:      rgba(17, 18, 24, 0.045);
+    --input-bg:   #f1f2f4;
+    --text:       #14151a;
+    --text-muted: #4b4d57;
+    --text-faint: #6b6e78;
   }
   html.dark {
-    --app-bg:     #0a0e17;
-    --surface:    #1f2937;
-    --surface-2:  #0e1422;
-    --nav-bg:     #0c1120;
+    --app-bg:     #0b0c11;
+    --surface:    #17181e;
+    --surface-2:  #101116;
+    --nav-bg:     #0e1016;
     --border:     rgba(255, 255, 255, 0.07);
     --hover:      rgba(255, 255, 255, 0.05);
     --input-bg:   rgba(0, 0, 0, 0.22);
-    --text:       #f8fafc;
-    --text-muted: #94a3b8;
-    --text-faint: #64748b;
+    --text:       #f6f6f7;
+    --text-muted: #9a9ca6;
+    --text-faint: #6b6e78;
   }
 }
 
@@ -59,8 +59,8 @@
    Unlayered so it overrides the Tailwind `bg-[var(--input-bg)]` utility. */
 html.dark select,
 html.dark select option {
-  background-color: #334155;
-  color: #f8fafc;
+  background-color: #26272e;
+  color: #f6f6f7;
 }
 
 /* ── First-load splash overlay ──
@@ -70,7 +70,7 @@ html.dark select option {
   position: fixed;
   inset: 0;
   z-index: 2147483647;
-  background: #0a0e17 url('/splash/cape-town.jpg') center / contain no-repeat;
+  background: #0b0c11 url('/splash/cape-town.jpg') center / contain no-repeat;
   pointer-events: none;
   animation: motivSplashOut 2.1s ease-in forwards;
 }

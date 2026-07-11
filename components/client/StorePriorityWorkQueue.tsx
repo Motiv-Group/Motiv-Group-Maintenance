@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import type { StoreManagerTicket } from '@/lib/health/data'
 import { Card } from '@/components/exec/ui'
+import { AddInfoModal } from '@/components/client/AddInfoModal'
 import { formatDate, humanizeDuration, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
 import { categoryVisual } from '@/lib/categoryVisual'
 
@@ -207,12 +208,18 @@ function MetricButton({
 }
 
 function QueueRow({ ticket, storeName, nowMs }: { ticket: StoreManagerTicket; storeName: string; nowMs: number }) {
-  const overdueMs = ticket.overdue ? Math.max(0, nowMs - new Date(ticket.dueAt).getTime()) : 0
   const dueMs = Math.max(0, new Date(ticket.dueAt).getTime() - nowMs)
-  const cta = ticket.status === 'info_requested' ? 'Add Info' : 'View Ticket'
+  const ticketUrl = `/client/tickets/${ticket.id}`
+  const needsInfo = ticket.status === 'info_requested'
+  // The CTA sits above the whole-row link (z-20) so its click opens the modal /
+  // navigates on its own instead of triggering the row's "view ticket" link.
+  const ctaCls = 'relative z-20 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-blue-500/60 px-4 py-2 text-sm font-bold text-blue-600 transition hover:bg-blue-500/10 dark:text-blue-300 lg:w-40'
 
   return (
-    <Link href={`/client/tickets/${ticket.id}`} className="grid gap-4 border-b border-[var(--border)] px-4 py-4 transition last:border-b-0 hover:bg-[var(--hover)] lg:grid-cols-[1fr_180px_1.1fr_160px] lg:items-center">
+    <div className="relative grid gap-4 border-b border-[var(--border)] px-4 py-4 transition last:border-b-0 hover:bg-[var(--hover)] lg:grid-cols-[1fr_180px_1.1fr_160px] lg:items-center">
+      {/* The whole row (except the CTA island) links to the ticket. */}
+      <Link href={ticketUrl} aria-label={`View ${ticket.category || ticket.title} ticket`} className="absolute inset-0 z-10" />
+
       <div className="flex min-w-0 items-center gap-3">
         <CategoryIcon category={ticket.category ?? ticket.title} />
         <div className="min-w-0">
@@ -223,8 +230,8 @@ function QueueRow({ ticket, storeName, nowMs }: { ticket: StoreManagerTicket; st
 
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className={`inline-flex min-w-[68px] justify-center rounded-md px-2 py-1 text-[10px] font-bold ${priorityBadgeClass(ticket)}`}>{priorityLabel(ticket)}</span>
-          <span className={`inline-flex min-w-[68px] justify-center rounded-md px-2 py-1 text-[10px] font-bold ${clientStatusBadgeClass(ticket)}`}>{clientStatusLabel(ticket)}</span>
+          <span className={`inline-flex w-[92px] justify-center rounded-md px-2 py-1 text-[10px] font-bold ${priorityBadgeClass(ticket)}`}>{priorityLabel(ticket)}</span>
+          <span className={`inline-flex w-[92px] justify-center rounded-md px-2 py-1 text-[10px] font-bold ${clientStatusBadgeClass(ticket)}`}>{clientStatusLabel(ticket)}</span>
         </div>
         <p className="mt-1.5 truncate text-sm text-[var(--text-muted)]">{ticket.supplierAssigned ? 'Supplier assigned' : 'No supplier assigned'}</p>
       </div>
@@ -243,10 +250,24 @@ function QueueRow({ ticket, storeName, nowMs }: { ticket: StoreManagerTicket; st
         )}
       </div>
 
-      <span className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-blue-500/60 px-4 py-2 text-sm font-bold text-blue-600 dark:text-blue-300">
-        {cta} <ArrowRight size={15} />
-      </span>
-    </Link>
+      <div className="flex lg:justify-end">
+        {needsInfo ? (
+          <AddInfoModal
+            ticketId={ticket.id}
+            title={ticket.title}
+            description={ticket.description ?? ''}
+            category={ticket.category ?? 'General'}
+            impact={ticket.operationalImpact ?? 'none'}
+            photoUrls={ticket.photoUrls}
+            docUrls={ticket.infoDocUrls}
+            requestReason={ticket.infoRequestReason}
+            trigger={open => <button type="button" onClick={open} className={ctaCls}>Add Info <ArrowRight size={15} /></button>}
+          />
+        ) : (
+          <Link href={ticketUrl} className={ctaCls}>View Ticket <ArrowRight size={15} /></Link>
+        )}
+      </div>
+    </div>
   )
 }
 

@@ -9,7 +9,7 @@ import { clearCollapseState } from '@/lib/collapse-state'
 import { Input } from '@/components/ui/Input'
 import { PasswordInput } from '@/components/ui/PasswordInput'
 import { Button } from '@/components/ui/Button'
-import { MotivLogo } from '@/components/ui/MotivLogo'
+import { MotivLockup } from '@/components/ui/MotivLockup'
 
 interface LoginForm {
   email: string
@@ -84,8 +84,8 @@ export default function LoginPage() {
   // Always dark — force the dark class on this page's wrapper regardless of theme
   if (forwarding) {
     return (
-      <div className="dark min-h-screen bg-gray-950 flex flex-col items-center justify-center gap-4">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#C6A35D]" />
+      <div className="dark min-h-screen bg-[#0b0c11] flex flex-col items-center justify-center gap-4">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
         <p className="text-sm text-gray-400">Completing your invite…</p>
       </div>
     )
@@ -93,15 +93,15 @@ export default function LoginPage() {
 
   return (
     <div className="dark">
-      <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center px-4">
+      <div className="min-h-screen bg-[#0b0c11] flex flex-col items-center justify-center px-4">
         <div className="w-full max-w-sm sm:max-w-md">
 
           {/* Logo — larger and centred */}
           <div className="flex items-center justify-center mb-10">
-            <MotivLogo height={120} />
+            <MotivLockup height={150} />
           </div>
 
-          <div className="bg-gray-900 rounded-2xl shadow-xl border border-gray-700 p-6 sm:p-10">
+          <div className="bg-[#17181e] rounded-2xl shadow-xl border border-white/10 p-6 sm:p-10">
             <h1 className="text-xl sm:text-2xl font-semibold text-white mb-1">Welcome back</h1>
             <p className="text-sm text-gray-400 mb-6">Log in to your account.</p>
 
@@ -123,7 +123,7 @@ export default function LoginPage() {
               />
 
               <div className="text-right -mt-1">
-                <Link href="/auth/forgot-password" className="text-xs text-[#C6A35D] hover:underline">
+                <Link href="/auth/forgot-password" className="text-xs text-blue-600 dark:text-blue-400 hover:underline">
                   Forgot password?
                 </Link>
               </div>
@@ -141,7 +141,7 @@ export default function LoginPage() {
 
             <p className="mt-4 text-center text-sm text-gray-400">
               New here?{' '}
-              <Link href="/auth/signup" className="text-brand-300 hover:underline font-medium">
+              <Link href="/auth/signup" className="text-blue-600 dark:text-blue-400 hover:underline font-medium">
                 Create an account
               </Link>
             </p>

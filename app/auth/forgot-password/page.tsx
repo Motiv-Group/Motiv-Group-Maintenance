@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { isValidEmail } from '@/lib/csv'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
-import { MotivLogo } from '@/components/ui/MotivLogo'
+import { MotivLockup } from '@/components/ui/MotivLockup'
 import { MailCheck } from 'lucide-react'
 
 export default function ForgotPasswordPage() {
@@ -31,21 +31,21 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="dark">
-      <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center px-4">
+      <div className="min-h-screen bg-[#0b0c11] flex flex-col items-center justify-center px-4">
         <div className="w-full max-w-sm">
           <div className="flex items-center justify-center mb-10">
-            <MotivLogo height={100} />
+            <MotivLockup height={120} />
           </div>
 
-          <div className="bg-gray-900 rounded-2xl shadow-xl border border-gray-700 p-6 sm:p-8">
+          <div className="bg-[#17181e] rounded-2xl shadow-xl border border-white/10 p-6 sm:p-8">
             {sent ? (
               <div className="text-center space-y-3">
-                <MailCheck size={36} className="mx-auto text-[#C6A35D]" />
+                <MailCheck size={36} className="mx-auto text-emerald-500" />
                 <h1 className="text-xl font-semibold text-white">Check your email</h1>
                 <p className="text-sm text-gray-400">
                   If an account exists for <span className="text-gray-200">{email}</span>, we&apos;ve sent a link to reset your password.
                 </p>
-                <Link href="/auth/login" className="inline-block text-sm text-[#C6A35D] hover:underline font-medium mt-2">
+                <Link href="/auth/login" className="inline-block text-sm text-blue-600 dark:text-blue-400 hover:underline font-medium mt-2">
                   Back to login
                 </Link>
               </div>
@@ -64,14 +64,14 @@ export default function ForgotPasswordPage() {
                     onChange={e => { setEmail(e.target.value); if (err) setErr('') }}
                     error={err || undefined}
                   />
-                  <Button type="submit" loading={loading} className="w-full bg-[#C6A35D] hover:bg-[#b8954f] text-white border-[#C6A35D] focus:ring-[#C6A35D]" size="lg" disabled={!email.trim()}>
+                  <Button type="submit" loading={loading} className="w-full bg-blue-600 hover:bg-blue-500 text-white border-blue-600 focus:ring-blue-500" size="lg" disabled={!email.trim()}>
                     Send reset link
                   </Button>
                 </form>
 
                 <p className="mt-4 text-center text-sm text-gray-400">
                   Remembered it?{' '}
-                  <Link href="/auth/login" className="text-[#C6A35D] hover:underline font-medium">Log in</Link>
+                  <Link href="/auth/login" className="text-blue-600 dark:text-blue-400 hover:underline font-medium">Log in</Link>
                 </p>
               </>
             )}

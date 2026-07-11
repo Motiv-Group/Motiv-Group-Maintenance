@@ -1,6 +1,18 @@
 import 'server-only'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
+
+// Region/store switcher: an RM/SM with more than one region/store works one at a
+// time, chosen via a cookie the client sets. Returns the active id + the data
+// scope narrowed to it (falls back to the first if the cookie is missing/invalid,
+// so a user can never scope to a region/store they don't own).
+async function pickActive(allIds: string[], cookieName: string): Promise<{ activeId: string | null; scopedIds: string[] }> {
+  if (allIds.length <= 1) return { activeId: allIds[0] ?? null, scopedIds: allIds }
+  const c = (await cookies()).get(cookieName)?.value
+  const activeId = c && allIds.includes(c) ? c : allIds[0]
+  return { activeId, scopedIds: [activeId] }
+}
 
 export interface ExecContext { userId: string; companyId: string; fullName: string | null }
 
@@ -23,9 +35,10 @@ export async function requireSupplierV3(): Promise<SupplierContext> {
   return { userId: user.id, companyId: profile.company_id ?? null, supplierIds: (links ?? []).map(l => l.supplier_id), fullName: profile.full_name ?? null }
 }
 
-export interface StoreContext { userId: string; companyId: string; storeIds: string[]; fullName: string | null }
+export interface StoreContext { userId: string; companyId: string; storeIds: string[]; allStoreIds: string[]; activeStoreId: string | null; fullName: string | null }
 
-/** Gate a v3 store-manager page + return their store scope. */
+/** Gate a v3 store-manager page + return their store scope (narrowed to the
+ *  active store when they manage more than one — see the `motiv_store` cookie). */
 export async function requireStoreManagerV3(): Promise<StoreContext> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -36,10 +49,12 @@ export async function requireStoreManagerV3(): Promise<StoreContext> {
   ])
   if (profile?.role !== 'store_manager') redirect('/auth/login')
   if (!profile?.company_id) redirect('/auth/login')
-  return { userId: user.id, companyId: profile.company_id, storeIds: (links ?? []).map(l => l.store_id), fullName: profile.full_name ?? null }
+  const allStoreIds = (links ?? []).map(l => l.store_id)
+  const { activeId, scopedIds } = await pickActive(allStoreIds, 'motiv_store')
+  return { userId: user.id, companyId: profile.company_id, storeIds: scopedIds, allStoreIds, activeStoreId: activeId, fullName: profile.full_name ?? null }
 }
 
-export interface RegionalContext { userId: string; companyId: string; regionIds: string[]; fullName: string | null }
+export interface RegionalContext { userId: string; companyId: string; regionIds: string[]; allRegionIds: string[]; activeRegionId: string | null; fullName: string | null }
 
 /** Gate a v3 regional-manager DATA page + return their region scope. A signed-up
  *  but not-yet-approved RM (no company) is sent to the /regional landing, which
@@ -56,11 +71,14 @@ export async function requireRegionalV3(): Promise<RegionalContext> {
   if (profile?.role !== 'regional_manager') redirect('/auth/login')
   if (!profile?.company_id) redirect('/regional')
   if (!links?.length) redirect('/regional')
-  return { userId: user.id, companyId: profile.company_id, regionIds: links.map(l => l.region_id), fullName: profile.full_name ?? null }
+  const allRegionIds = links.map(l => l.region_id)
+  const { activeId, scopedIds } = await pickActive(allRegionIds, 'motiv_region')
+  return { userId: user.id, companyId: profile.company_id, regionIds: scopedIds, allRegionIds, activeRegionId: activeId, fullName: profile.full_name ?? null }
 }
 
 export interface RegionalUser {
   userId: string; role: string; companyId: string | null; regionIds: string[]
+  allRegionIds: string[]; activeRegionId: string | null
   fullName: string | null; requestedRegionCode: string | null
 }
 
@@ -76,9 +94,11 @@ export async function requireRegionalUser(): Promise<RegionalUser> {
     supabase.from('regional_users').select('region_id').eq('user_id', user.id),
   ])
   if (profile?.role !== 'regional_manager') redirect('/auth/login')
+  const allRegionIds = (links ?? []).map(l => l.region_id)
+  const { activeId, scopedIds } = await pickActive(allRegionIds, 'motiv_region')
   return {
     userId: user.id, role: profile.role, companyId: profile.company_id ?? null,
-    regionIds: (links ?? []).map(l => l.region_id), fullName: profile.full_name ?? null,
+    regionIds: scopedIds, allRegionIds, activeRegionId: activeId, fullName: profile.full_name ?? null,
     requestedRegionCode: profile.requested_region_code ?? null,
   }
 }

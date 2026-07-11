@@ -8,16 +8,18 @@ import { storeLabel } from '@/lib/utils'
 export const dynamic = 'force-dynamic'
 
 export default async function ClientLayout({ children }: { children: React.ReactNode }) {
-  const { fullName, storeIds } = await requireStoreManagerV3()
+  const { fullName, allStoreIds, activeStoreId } = await requireStoreManagerV3()
   const unreadCount = await getUnreadCount()
-  let storeName: string | null = null
-  if (storeIds[0]) {
+  // All of the SM's stores → the sidebar switcher (chip when only one).
+  let storeOptions: { id: string; label: string }[] = []
+  if (allStoreIds.length) {
     const admin = createAdminClient()
-    const { data: store } = await admin.from('stores').select('name, sub_store').eq('id', storeIds[0]).maybeSingle()
-    if (store) storeName = storeLabel((store as any).name, (store as any).sub_store)
+    const { data } = await admin.from('stores').select('id, name, sub_store').in('id', allStoreIds)
+    storeOptions = (data ?? []).map((s: any) => ({ id: s.id, label: storeLabel(s.name, s.sub_store) })).sort((a, b) => a.label.localeCompare(b.label))
   }
   return (
-    <ExecChrome userName={fullName} variant="store" unreadCount={unreadCount} contextLabel={storeName}>
+    <ExecChrome userName={fullName} variant="store" unreadCount={unreadCount}
+      contextOptions={storeOptions} activeContextId={activeStoreId} contextCookie="motiv_store">
       <RealtimeRefresh tables={['tickets', 'quotes', 'notifications']} />
       {children}
     </ExecChrome>
