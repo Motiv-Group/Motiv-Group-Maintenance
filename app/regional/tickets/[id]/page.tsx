@@ -745,29 +745,33 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
   const quotesTabList = [...acceptedQuotes, ...reviewQuotes]
   const acceptedQuoteIds = new Set(acceptedQuotes.map(q => q.id))
   const quotesContent = quotesTabList.length > 0 ? (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {quotesTabList.map(q => {
         const isApproved = acceptedQuoteIds.has(q.id)
+        // Collapsible card (like the History quotes) — summary row + expandable
+        // detail. The approved quote opens by default; the rest stay collapsed.
         return (
-          <div key={q.id} className="rounded-xl ring-1 ring-[var(--border)] p-4 space-y-2">
-            <div className="flex items-center justify-between gap-2">
+          <details key={q.id} open={isApproved} className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
+            <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
               <span className="text-sm font-semibold text-[var(--text)] min-w-0 truncate">{q.supplierName}</span>
               <span className="flex items-center gap-2 shrink-0">
-                <span className="text-base font-bold text-[var(--text)]">{formatCurrency(q.amount)}</span>
+                <span className="text-sm text-[var(--text)] tabular-nums">{formatCurrency(q.amount)}</span>
                 <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 ${isApproved ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' : 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D]'}`}>{isApproved ? 'Approved' : 'Received'}</span>
               </span>
+            </summary>
+            <div className="border-t border-[var(--border)] p-4 space-y-2">
+              <p className="text-[11px] text-[var(--text-faint)]">Received {formatDateTime(q.createdAt)}{q.amountInclVat ? ` · incl VAT ${formatCurrency(q.amountInclVat)}` : ''}</p>
+              {q.proposedScheduleAt && (
+                <div className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-500/10 ring-1 ring-indigo-500/30 px-2.5 py-1 text-[13px]">
+                  <CalendarClock size={14} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
+                  <span className="text-[var(--text-muted)]">Proposed visit</span>
+                  <span className="font-semibold text-[var(--text)]">{formatDateTime(q.proposedScheduleAt)}</span>
+                </div>
+              )}
+              {q.description && <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{q.description}</p>}
+              {q.fileUrl && <ViewTrackedLink ticketId={t.id} itemType="quote" itemLabel={`${q.supplierName}'s quote`} href={q.fileUrl} className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"><FileText size={14} /> View attachment</ViewTrackedLink>}
             </div>
-            <p className="text-[11px] text-[var(--text-faint)]">Received {formatDateTime(q.createdAt)}{q.amountInclVat ? ` · incl VAT ${formatCurrency(q.amountInclVat)}` : ''}</p>
-            {q.proposedScheduleAt && (
-              <div className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-500/10 ring-1 ring-indigo-500/30 px-2.5 py-1 text-[13px]">
-                <CalendarClock size={14} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
-                <span className="text-[var(--text-muted)]">Proposed visit</span>
-                <span className="font-semibold text-[var(--text)]">{formatDateTime(q.proposedScheduleAt)}</span>
-              </div>
-            )}
-            {q.description && <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{q.description}</p>}
-            {q.fileUrl && <ViewTrackedLink ticketId={t.id} itemType="quote" itemLabel={`${q.supplierName}'s quote`} href={q.fileUrl} className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"><FileText size={14} /> View attachment</ViewTrackedLink>}
-          </div>
+          </details>
         )
       })}
     </div>
@@ -876,6 +880,9 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
           {nextAction.msg && <p className="mt-1 text-sm font-bold text-[var(--text)]">{nextAction.msg}</p>}
           {nextAction.sub && <p className="mt-0.5 text-sm text-[var(--text-muted)]">{nextAction.sub}</p>}
         </div>
+
+        {/* SLA breach — shown here in the action block (not as a separate banner). */}
+        {breached && <BreachReason nextAction={sla.nextAction} dueAt={sla.nextActionDueAt} owner={breachOwner} />}
 
         {/* Snag-fix schedule awaiting approval — compact row → pop-up (approve/decline). */}
         <RmReviewPanel heading="Snag" items={snagReviewItems} />
@@ -1045,7 +1052,6 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
           <p className="text-sm text-[var(--text-muted)]">{t.cancellation_reason || `This ticket was ${t.status === 'declined' ? 'declined' : 'cancelled'}.`}</p>
         </div>
       )}
-      {breached && <BreachReason nextAction={sla.nextAction} dueAt={sla.nextActionDueAt} owner={breachOwner} />}
       {/* Dispute — while a dispute is live it sits ABOVE the Actions (needs the RM's
           attention); once done it moves below the Actions as history (see after the
           Actions card). */}

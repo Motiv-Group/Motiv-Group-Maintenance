@@ -475,13 +475,13 @@ export function RmQuotePanel({ ticketId, rows, canReQuote }: { ticketId: string;
   return (
     <div className="space-y-2">
       <p className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Suppliers &amp; quotes</p>
-      {/* One grouped list — suppliers stacked under each other (no per-supplier box)
-          so it stays compact even with several invited. */}
-      <div className="rounded-xl ring-1 ring-[var(--border)] bg-[var(--surface)] divide-y divide-[var(--border)]">
+      {/* Bare stacked rows (no box) — suppliers listed under each other, split by a
+          thin divider, to take as little space as possible. */}
+      <div className="divide-y divide-[var(--border)]">
         {rows.map(r => {
           const m = PANEL_META[r.kind]
           return (
-            <div key={r.supplierId} className="px-3 py-2">
+            <div key={r.supplierId} className="py-2">
               <div className="flex items-center justify-between gap-2">
                 <span className="flex items-center gap-2 min-w-0">
                   <i className={`w-2.5 h-2.5 rounded-full shrink-0 ${m.dot}`} />
@@ -579,9 +579,9 @@ export function RmReviewPanel({ heading, items }: {
   return (
     <div className="space-y-2">
       {heading && <p className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">{heading}</p>}
-      <div className="rounded-xl ring-1 ring-[var(--border)] bg-[var(--surface)] divide-y divide-[var(--border)]">
+      <div className="divide-y divide-[var(--border)]">
         {items.map(it => (
-          <button key={it.id} type="button" onClick={() => setOpenId(it.id)} className="w-full px-3 py-2 flex items-center justify-between gap-2 text-left transition hover:bg-[var(--hover)]">
+          <button key={it.id} type="button" onClick={() => setOpenId(it.id)} className="w-full py-2 flex items-center justify-between gap-2 text-left transition hover:bg-[var(--hover)]">
             <span className="flex items-center gap-2 min-w-0">
               <i className={`w-2.5 h-2.5 rounded-full shrink-0 ${it.dot}`} />
               <span className="min-w-0">
