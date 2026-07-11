@@ -141,8 +141,12 @@ function QueueRow({ ticket, nowMs }: { ticket: RegionalTicketRow; nowMs: number 
   const slaMs = new Date(slaDeadline).getTime() - nowMs
   const breached = ticket.overdue || ticket.breached || slaMs <= 0
   const meta = rmStatusMeta(ticket.status)
+  // A new ticket's next step is to assign a supplier — the CTA jumps straight to
+  // the detail page with the assign picker auto-opened (?assign=1).
+  const assignable = needsAssignment(ticket)
+  const href = assignable ? `/regional/tickets/${ticket.id}?assign=1` : `/regional/tickets/${ticket.id}`
   return (
-    <Link href={`/regional/tickets/${ticket.id}`} className="grid gap-4 border-b border-[var(--border)] px-4 py-4 transition last:border-b-0 hover:bg-[var(--hover)] lg:grid-cols-[1fr_200px_1.1fr_160px] lg:items-center">
+    <Link href={href} className="grid gap-4 border-b border-[var(--border)] px-4 py-4 transition last:border-b-0 hover:bg-[var(--hover)] lg:grid-cols-[1fr_200px_1.1fr_160px] lg:items-center">
       <div className="flex min-w-0 items-center gap-3">
         <CategoryIcon category={ticket.category ?? ticket.title} />
         <div className="min-w-0">
@@ -172,8 +176,8 @@ function QueueRow({ ticket, nowMs }: { ticket: RegionalTicketRow; nowMs: number 
         )}
       </div>
 
-      <span className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-blue-500/60 px-4 py-2 text-sm font-bold text-blue-600 dark:text-blue-300">
-        View Ticket <ArrowRight size={15} />
+      <span className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-bold ${assignable ? 'bg-blue-600 text-white' : 'border border-blue-500/60 text-blue-600 dark:text-blue-300'}`}>
+        {assignable ? <><UserPlus size={15} /> Assign supplier</> : <>View Ticket <ArrowRight size={15} /></>}
       </span>
     </Link>
   )

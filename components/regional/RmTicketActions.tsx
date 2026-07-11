@@ -1,7 +1,7 @@
 'use client'
 
 // RM ticket-page custom actions for the competitive-quoting model.
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Search, Pencil, CalendarClock, Plus, ImagePlus, X, FileText } from 'lucide-react'
 import { StarInput, Stars } from '@/components/ui/Stars'
@@ -40,6 +40,12 @@ type SupplierChoice = { id: string; name: string; avgRating?: number; ratingCoun
 export function AssignSuppliersButton({ ticketId, suppliers, motivSuppliers = [], declinedSupplierIds = [], awaitingById = {} }: { ticketId: string; suppliers: SupplierChoice[]; motivSuppliers?: SupplierChoice[]; declinedSupplierIds?: string[]; awaitingById?: Record<string, 'invited' | 'quoted'> }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
+  // Auto-open when deep-linked from the Today queue's "Assign supplier" action
+  // (?assign=1) — the new-ticket next step opens straight into the picker.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time client-only deep-link (?assign=1) read from window.location after mount; cannot run during SSR render
+    if (new URLSearchParams(window.location.search).get('assign') === '1') setOpen(true)
+  }, [])
   const [tab, setTab] = useState<'mine' | 'motiv'>('mine')
   const [q, setQ] = useState('')
   const [sel, setSel] = useState<Set<string>>(new Set())
@@ -72,12 +78,12 @@ export function AssignSuppliersButton({ ticketId, suppliers, motivSuppliers = []
     doAssign()
   }
 
-  const tabCls = (on: boolean) => `flex-1 py-1.5 rounded-lg text-xs font-semibold transition ${on ? 'bg-[#C6A35D] text-[#0a0e17]' : 'ring-1 ring-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--hover)]'}`
+  const tabCls = (on: boolean) => `flex-1 py-1.5 rounded-lg text-xs font-semibold transition ${on ? 'bg-emerald-600 text-white' : 'ring-1 ring-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--hover)]'}`
   return (
     <>
-      <button onClick={() => setOpen(true)} className="flex-1 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition">Assign supplier</button>
+      <button onClick={() => setOpen(true)} className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition">Assign supplier</button>
       {open && (
-        <Modal title="Assign suppliers" onClose={() => setOpen(false)}>
+        <Modal title="Assign suppliers" maxWidth="max-w-2xl" onClose={() => setOpen(false)}>
           <p className="text-xs text-[var(--text-muted)]">Search and select one or more suppliers to invite to quote — from your own list or the Motiv directory.</p>
           {/* Switch directories; the selection carries across both. */}
           <div className="flex gap-2">
@@ -104,8 +110,8 @@ export function AssignSuppliersButton({ ticketId, suppliers, motivSuppliers = []
                 )
               }
               return (
-                <label key={s.id} className={`flex items-center gap-2 text-sm px-2 py-2 rounded-lg cursor-pointer ${sel.has(s.id) ? 'bg-[#C6A35D]/10' : 'hover:bg-[var(--hover)]'}`}>
-                  <input type="checkbox" checked={sel.has(s.id)} onChange={() => toggle(s.id)} className="accent-[#C6A35D] w-4 h-4" />
+                <label key={s.id} className={`flex items-center gap-2 text-sm px-2 py-2 rounded-lg cursor-pointer ${sel.has(s.id) ? 'bg-emerald-500/10' : 'hover:bg-[var(--hover)]'}`}>
+                  <input type="checkbox" checked={sel.has(s.id)} onChange={() => toggle(s.id)} className="accent-emerald-600 w-4 h-4" />
                   <span className="truncate text-[var(--text)] flex-1 min-w-0">{s.name}{declinedSet.has(s.id) && <span className="ml-1.5 text-[10px] font-semibold text-red-500">· declined before</span>}</span>
                   <span className="shrink-0"><Stars value={s.avgRating ?? 5} count={s.ratingCount} size={12} /></span>
                 </label>
@@ -457,7 +463,7 @@ export function RmAddWorkForm({ ticketId, description, photoUrls, title, categor
 
   return (
     <>
-      <button onClick={() => setOpen(true)} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition">
+      <button onClick={() => setOpen(true)} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold transition">
         <Plus size={16} /> Add extra work
       </button>
       {open && (

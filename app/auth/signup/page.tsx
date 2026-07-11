@@ -71,12 +71,12 @@ export default function SignupPage() {
         <div className="w-full max-w-md">
           <div className="flex items-center justify-center mb-8"><MotivLockup height={92} /></div>
           <div className="bg-slate-50 dark:bg-[#1f2027] rounded-2xl shadow-sm border border-gray-200 dark:border-white/10 p-6 sm:p-8 text-center">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#C6A35D]/10"><Mail size={24} className="text-[#C6A35D]" /></div>
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10"><Mail size={24} className="text-emerald-500" /></div>
             <h1 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Check your email</h1>
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">We&apos;ve sent a verification link to</p>
             <p className="text-sm font-medium text-gray-900 dark:text-white mb-5 break-all">{sentTo}</p>
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Click the link in that email to activate your account, then log in. Check your spam folder if it doesn&apos;t arrive within a minute.</p>
-            <Link href="/auth/login" className="inline-block w-full rounded-xl bg-[#C6A35D] px-4 py-3 text-center font-medium text-[#0a0e17] hover:opacity-90 transition-opacity">Go to login</Link>
+            <Link href="/auth/login" className="inline-block w-full rounded-xl bg-blue-600 hover:bg-blue-500 px-4 py-3 text-center font-medium text-white transition-colors">Go to login</Link>
           </div>
         </div>
       </div>
@@ -100,10 +100,10 @@ export default function SignupPage() {
             ] as const).map(opt => (
               <button key={opt.value} type="button" onClick={() => { setChoice(opt.value); setError('') }}
                 className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 text-center transition-all ${
-                  choice === opt.value ? 'border-[#C6A35D] bg-[#C6A35D]/10' : 'border-gray-200 dark:border-white/10 hover:border-[#C6A35D]/60'
+                  choice === opt.value ? 'border-emerald-500 bg-emerald-500/10' : 'border-gray-200 dark:border-white/10 hover:border-emerald-500/60'
                 }`}>
-                <opt.icon size={20} className="text-[#C6A35D]" />
-                <span className={`text-sm font-medium ${choice === opt.value ? 'text-[#C6A35D]' : 'text-gray-700 dark:text-gray-300'}`}>{opt.label}</span>
+                <opt.icon size={20} className={choice === opt.value ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400'} />
+                <span className={`text-sm font-medium ${choice === opt.value ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-700 dark:text-gray-300'}`}>{opt.label}</span>
                 <span className="text-xs text-gray-400">{opt.desc}</span>
               </button>
             ))}
@@ -112,7 +112,7 @@ export default function SignupPage() {
           {choice === 'supplier' ? (
             <div className="space-y-4">
               <p className="text-sm text-gray-500 dark:text-gray-400">Suppliers register with their company and trade details. Continue to the supplier onboarding to set up your account.</p>
-              <Link href="/auth/supplier-onboard" className="flex items-center justify-center gap-2 w-full rounded-xl bg-[#C6A35D] px-4 py-3 font-medium text-[#0a0e17] hover:opacity-90 transition-opacity">
+              <Link href="/auth/supplier-onboard" className="flex items-center justify-center gap-2 w-full rounded-xl bg-blue-600 hover:bg-blue-500 px-4 py-3 font-medium text-white transition-colors">
                 Continue as Supplier <ArrowRight size={16} />
               </Link>
             </div>
@@ -141,7 +141,7 @@ export default function SignupPage() {
 
           <p className="mt-4 text-center text-sm text-gray-500 dark:text-gray-400">
             Already have an account?{' '}
-            <Link href="/auth/login" className="text-[#C6A35D] hover:underline font-medium">Log in</Link>
+            <Link href="/auth/login" className="text-blue-600 dark:text-blue-400 hover:underline font-medium">Log in</Link>
           </p>
           <p className="mt-2 text-center text-xs text-gray-400">Store, Regional Manager &amp; Executive accounts are set up by invitation.</p>
         </div>

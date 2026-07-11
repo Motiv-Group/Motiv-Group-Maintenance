@@ -85,7 +85,7 @@ export default function LoginPage() {
   if (forwarding) {
     return (
       <div className="dark min-h-screen bg-[#0b0c11] flex flex-col items-center justify-center gap-4">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#C6A35D]" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
         <p className="text-sm text-gray-400">Completing your invite…</p>
       </div>
     )
@@ -123,7 +123,7 @@ export default function LoginPage() {
               />
 
               <div className="text-right -mt-1">
-                <Link href="/auth/forgot-password" className="text-xs text-[#C6A35D] hover:underline">
+                <Link href="/auth/forgot-password" className="text-xs text-blue-600 dark:text-blue-400 hover:underline">
                   Forgot password?
                 </Link>
               </div>
@@ -141,7 +141,7 @@ export default function LoginPage() {
 
             <p className="mt-4 text-center text-sm text-gray-400">
               New here?{' '}
-              <Link href="/auth/signup" className="text-brand-300 hover:underline font-medium">
+              <Link href="/auth/signup" className="text-blue-600 dark:text-blue-400 hover:underline font-medium">
                 Create an account
               </Link>
             </p>

@@ -51,7 +51,7 @@ export default function ResetPasswordPage() {
                 <h1 className="text-xl font-semibold text-white">Password updated</h1>
                 <p className="text-sm text-gray-400">You can now log in with your new password.</p>
                 <Link href="/auth/login" className="inline-block mt-2">
-                  <Button className="bg-[#C6A35D] hover:bg-[#b8954f] text-white border-[#C6A35D] focus:ring-[#C6A35D]">Go to login</Button>
+                  <Button className="bg-blue-600 hover:bg-blue-500 text-white border-blue-600 focus:ring-blue-500">Go to login</Button>
                 </Link>
               </div>
             ) : (
@@ -81,13 +81,13 @@ export default function ResetPasswordPage() {
                     </div>
                   )}
 
-                  <Button type="submit" loading={loading} className="w-full bg-[#C6A35D] hover:bg-[#b8954f] text-white border-[#C6A35D] focus:ring-[#C6A35D]" size="lg">
+                  <Button type="submit" loading={loading} className="w-full bg-blue-600 hover:bg-blue-500 text-white border-blue-600 focus:ring-blue-500" size="lg">
                     Update password
                   </Button>
                 </form>
 
                 <p className="mt-4 text-center text-sm text-gray-400">
-                  <Link href="/auth/login" className="text-[#C6A35D] hover:underline font-medium">Back to login</Link>
+                  <Link href="/auth/login" className="text-blue-600 dark:text-blue-400 hover:underline font-medium">Back to login</Link>
                 </p>
               </>
             )}

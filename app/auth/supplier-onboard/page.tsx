@@ -20,7 +20,7 @@ import { Truck, ArrowLeft, ArrowRight, Check, FileText } from 'lucide-react'
 
 type Step = 1 | 2 | 3
 
-const inputCls = 'w-full px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#C6A35D]/50 focus:border-[#C6A35D]/70'
+const inputCls = 'w-full px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/70'
 
 export default function SupplierOnboardPage() {
   const router = useRouter()
@@ -121,7 +121,7 @@ export default function SupplierOnboardPage() {
   if (checking) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-[#0b0c11] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#C6A35D]" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
       </div>
     )
   }
@@ -132,7 +132,7 @@ export default function SupplierOnboardPage() {
         <div className="text-center space-y-4">
           <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Invite link problem</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">{invalid}</p>
-          <Link href="/auth/login" className="inline-block rounded-xl bg-[#C6A35D] px-5 py-2.5 font-medium text-[#0a0e17] hover:opacity-90 transition-opacity">Go to login</Link>
+          <Link href="/auth/login" className="inline-block rounded-xl bg-blue-600 hover:bg-blue-500 px-5 py-2.5 font-medium text-white transition-colors">Go to login</Link>
         </div>
       </Shell>
     )
@@ -141,7 +141,7 @@ export default function SupplierOnboardPage() {
   return (
     <Shell>
       <div className="flex items-center gap-2 mb-1">
-        <Truck size={20} className="text-[#C6A35D]" />
+        <Truck size={20} className="text-blue-600 dark:text-blue-400" />
         <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Supplier registration</h1>
       </div>
       <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
@@ -153,7 +153,7 @@ export default function SupplierOnboardPage() {
         {([1, 2, 3] as const).map(s => (
           <div key={s} className="flex items-center gap-2 flex-1">
             <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-              s < step ? 'bg-emerald-500 text-white' : s === step ? 'bg-[#C6A35D] text-[#0a0e17]' : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
+              s < step ? 'bg-emerald-500 text-white' : s === step ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
             }`}>{s < step ? <Check size={14} /> : s}</div>
             <span className={`text-xs ${s === step ? 'font-semibold text-gray-900 dark:text-white' : 'text-gray-400'} hidden sm:block`}>
               {s === 1 ? 'Account' : s === 2 ? 'Business details' : 'Agreement'}
@@ -188,8 +188,8 @@ export default function SupplierOnboardPage() {
                 <button key={t} type="button" onClick={() => toggleTrade(t)}
                   className={`px-3 py-1.5 rounded-full text-sm border transition ${
                     trades.has(t)
-                      ? 'bg-[#C6A35D] text-[#0a0e17] border-[#C6A35D] font-medium'
-                      : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-[#C6A35D]/60'
+                      ? 'bg-emerald-600 text-white border-emerald-600 font-medium'
+                      : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-emerald-500/60'
                   }`}>
                   {t}
                 </button>
@@ -200,7 +200,7 @@ export default function SupplierOnboardPage() {
           <div className="rounded-xl border border-gray-200 dark:border-white/10 p-3.5">
             <label className="flex items-center justify-between gap-3 cursor-pointer">
               <span className="text-sm font-medium text-gray-900 dark:text-white">VAT registered?</span>
-              <input type="checkbox" checked={vatRegistered} onChange={e => setVatRegistered(e.target.checked)} className="h-5 w-5 accent-[#C6A35D]" />
+              <input type="checkbox" checked={vatRegistered} onChange={e => setVatRegistered(e.target.checked)} className="h-5 w-5 accent-emerald-600" />
             </label>
             {vatRegistered && (
               <div className="mt-3">
@@ -226,7 +226,7 @@ export default function SupplierOnboardPage() {
               <li>Sustained SLA breaches or material breach can suspend or remove your account.</li>
             </ul>
             <p>
-              Read the full agreement: <Link href="/sla" target="_blank" className="text-[#C6A35D] underline">Supplier Service Level Agreement</Link>.
+              Read the full agreement: <Link href="/sla" target="_blank" className="text-blue-600 dark:text-blue-400 underline">Supplier Service Level Agreement</Link>.
               Your acceptance is recorded electronically (name, version, date, time).
             </p>
           </div>
@@ -236,9 +236,9 @@ export default function SupplierOnboardPage() {
           </L>
 
           <label className="flex items-start gap-3 cursor-pointer rounded-xl border border-gray-200 dark:border-white/10 p-3.5">
-            <input type="checkbox" checked={slaAgreed} onChange={e => setSlaAgreed(e.target.checked)} className="mt-0.5 h-5 w-5 accent-[#C6A35D]" />
+            <input type="checkbox" checked={slaAgreed} onChange={e => setSlaAgreed(e.target.checked)} className="mt-0.5 h-5 w-5 accent-emerald-600" />
             <span className="text-sm text-gray-700 dark:text-gray-300">
-              I have read and agree to the <Link href="/sla" target="_blank" className="text-[#C6A35D] underline">Service Level Agreement</Link> (v{SLA_VERSION}) on behalf of {companyName.trim() || 'my company'}.
+              I have read and agree to the <Link href="/sla" target="_blank" className="text-blue-600 dark:text-blue-400 underline">Service Level Agreement</Link> (v{SLA_VERSION}) on behalf of {companyName.trim() || 'my company'}.
             </span>
           </label>
         </div>
@@ -255,19 +255,19 @@ export default function SupplierOnboardPage() {
         ) : <span />}
         {step < 3 ? (
           <button type="button" onClick={next}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-[#C6A35D] px-5 py-2.5 text-sm font-semibold text-[#0a0e17] hover:opacity-90 transition-opacity">
+            className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors">
             Continue <ArrowRight size={15} />
           </button>
         ) : (
           <button type="button" onClick={submit} disabled={loading}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-[#C6A35D] px-5 py-2.5 text-sm font-semibold text-[#0a0e17] hover:opacity-90 transition-opacity disabled:opacity-60">
+            className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors disabled:opacity-60">
             {loading ? 'Creating your account…' : 'Sign & create account'}
           </button>
         )}
       </div>
 
       <p className="mt-4 text-center text-sm text-gray-500 dark:text-gray-400">
-        Already have an account? <Link href="/auth/login" className="text-[#C6A35D] hover:underline font-medium">Log in</Link>
+        Already have an account? <Link href="/auth/login" className="text-blue-600 dark:text-blue-400 hover:underline font-medium">Log in</Link>
       </p>
     </Shell>
   )
