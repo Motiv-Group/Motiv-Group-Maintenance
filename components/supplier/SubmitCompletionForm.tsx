@@ -29,6 +29,7 @@ export function SubmitCompletionForm({ ticketId, evidenceRequested = false, requ
   const [err, setErr] = useState('')
   const [dragPoc, setDragPoc] = useState(false)
   const [dragCoc, setDragCoc] = useState(false)
+  const [preview, setPreview] = useState<string | null>(null)
 
   const previews = useMemo(() => photos.map(f => URL.createObjectURL(f)), [photos])
   useEffect(() => () => previews.forEach(URL.revokeObjectURL), [previews])
@@ -76,6 +77,7 @@ export function SubmitCompletionForm({ ticketId, evidenceRequested = false, requ
   }
 
   return (
+    <>
     <div className="rounded-2xl bg-[var(--surface)] ring-1 ring-[var(--border)] p-5 sm:p-6 space-y-5">
       <h2 className="flex items-center gap-2 text-lg font-bold text-[var(--text)]"><CheckCircle2 size={20} className="text-emerald-500" /> Submit COC &amp; POC for Sign-off</h2>
       {!requireBoth && <p className="text-sm text-[var(--text-muted)]">Add the COC and/or completion photos — at least one is required.</p>}
@@ -118,11 +120,17 @@ export function SubmitCompletionForm({ ticketId, evidenceRequested = false, requ
           <p className="text-[11px] text-[var(--text-faint)] text-center mt-2">{remaining} of {MAX_PHOTOS} slots remaining · drag &amp; drop also works</p>
 
           {photos.length > 0 && (
-            <div className="mt-3 space-y-1">
+            <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
               {photos.map((f, i) => (
-                <div key={i} className="flex items-center justify-between gap-2">
-                  <a href={previews[i]} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 dark:text-blue-400 underline truncate min-w-0">Photo {i + 1} — {f.name}</a>
-                  <button type="button" onClick={() => setPhotos(p => p.filter((_, j) => j !== i))} className="shrink-0 text-[var(--text-faint)] hover:text-red-500"><X size={14} /></button>
+                <div key={i} className="relative aspect-square overflow-hidden rounded-lg border border-[var(--border)]">
+                  <button type="button" onClick={() => setPreview(previews[i])} className="block h-full w-full" title={`View ${f.name}`}>
+                    {/* eslint-disable-next-line @next/next/no-img-element -- ephemeral blob: preview URL */}
+                    <img src={previews[i]} alt={`Photo ${i + 1}`} className="h-full w-full object-cover" />
+                  </button>
+                  <button type="button" onClick={() => setPhotos(p => p.filter((_, j) => j !== i))} title="Remove photo"
+                    className="absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-full bg-black/60 text-white transition hover:bg-red-500">
+                    <X size={13} />
+                  </button>
                 </div>
               ))}
             </div>
@@ -143,5 +151,15 @@ export function SubmitCompletionForm({ ticketId, evidenceRequested = false, requ
         <button onClick={() => { setOpen(false); setErr('') }} disabled={busy} className="py-3 rounded-xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm font-semibold disabled:opacity-50 hover:bg-[var(--hover)]">Cancel</button>
       </div>
     </div>
+
+    {/* Tap-to-view lightbox */}
+    {preview && (
+      <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onClick={() => setPreview(null)}>
+        {/* eslint-disable-next-line @next/next/no-img-element -- ephemeral blob: preview URL; next/image can't optimize it */}
+        <img src={preview} alt="Photo preview" className="max-h-full max-w-full rounded-lg" />
+        <button type="button" onClick={() => setPreview(null)} className="absolute top-4 right-4 p-2 rounded-full bg-white/10 text-white hover:bg-white/20" title="Close"><X size={22} /></button>
+      </div>
+    )}
+    </>
   )
 }

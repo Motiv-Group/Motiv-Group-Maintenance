@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import { redirect } from 'next/navigation'
-import { ClipboardCheck, FileText, Calendar } from 'lucide-react'
+import { ClipboardCheck, FileText, Calendar, Clock } from 'lucide-react'
 import { SubmitCompletionForm } from '@/components/supplier/SubmitCompletionForm'
 import { BackLink } from '@/components/ui/BackLink'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
@@ -97,8 +97,8 @@ function SignoffCard({ s, snag, ticketId, collapsible = false, title, reason }: 
         <div>
           <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Proof of completion</div>
           <div className="flex flex-wrap gap-x-4 gap-y-1">
-            {before.map((u, j) => <ViewTrackedLink key={`b${j}`} ticketId={ticketId} itemType="photo" itemLabel={`Completion before photo ${j + 1}`} href={u} className="text-sm text-[#C6A35D] underline hover:text-amber-500">Before {j + 1}</ViewTrackedLink>)}
-            {after.map((u, j) => <ViewTrackedLink key={`a${j}`} ticketId={ticketId} itemType="photo" itemLabel={`Completion after photo ${j + 1}`} href={u} className="text-sm text-[#C6A35D] underline hover:text-amber-500">After {j + 1}</ViewTrackedLink>)}
+            {before.map((u, j) => <ViewTrackedLink key={`b${j}`} ticketId={ticketId} itemType="photo" itemLabel={`Completion before photo ${j + 1}`} href={u} className="text-sm text-blue-600 dark:text-blue-400 hover:underline">Before {j + 1}</ViewTrackedLink>)}
+            {after.map((u, j) => <ViewTrackedLink key={`a${j}`} ticketId={ticketId} itemType="photo" itemLabel={`Completion after photo ${j + 1}`} href={u} className="text-sm text-blue-600 dark:text-blue-400 hover:underline">After {j + 1}</ViewTrackedLink>)}
             {!before.length && !after.length && <span className="text-sm text-[var(--text-faint)]">No photos uploaded</span>}
           </div>
         </div>
@@ -106,8 +106,8 @@ function SignoffCard({ s, snag, ticketId, collapsible = false, title, reason }: 
           <div>
             <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Certificate of Completion</div>
             <div className="flex flex-wrap gap-x-4 gap-y-1">
-              {s.coc_url && <ViewTrackedLink ticketId={ticketId} itemType="coc" itemLabel="Completion COC" href={s.coc_url} className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View COC</ViewTrackedLink>}
-              {s.invoice_url && <ViewTrackedLink ticketId={ticketId} itemType="invoice" itemLabel="Completion invoice" href={s.invoice_url} className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View invoice</ViewTrackedLink>}
+              {s.coc_url && <ViewTrackedLink ticketId={ticketId} itemType="coc" itemLabel="Completion COC" href={s.coc_url} className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"><FileText size={14} /> View COC</ViewTrackedLink>}
+              {s.invoice_url && <ViewTrackedLink ticketId={ticketId} itemType="invoice" itemLabel="Completion invoice" href={s.invoice_url} className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"><FileText size={14} /> View invoice</ViewTrackedLink>}
             </div>
           </div>
         )}
@@ -363,6 +363,37 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
     return n ? `Submission #${n} · ${what}` : what
   }
 
+  // The supplier's single most important pending step — the "Next action" signpost
+  // that mirrors the RM/SM ticket. The real controls live in the forms/callouts
+  // below; this just tells the supplier (or reassures them) what's next. `act` =
+  // needs the supplier, `wait` = waiting on the client, `done`/`closed` = finished.
+  // Where a standing coloured callout below already states the situation, the
+  // signpost line is left blank so it isn't said twice.
+  const nextAction: { mode: 'act' | 'wait' | 'done' | 'closed'; msg: string; sub: string } = (() => {
+    if (t.status === 'completed') return { mode: 'done', msg: 'Job complete', sub: 'The completion certificate and proof of completion have been approved and signed off. No further action is needed.' }
+    if (t.status === 'cancelled' || t.status === 'declined') return { mode: 'closed', msg: `Ticket ${t.status}`, sub: t.cancellation_reason || 'No further action needed.' }
+    // Commercial phase — a quote can be (re)submitted with the form below. The
+    // RM-requested re-quote case has its own standing callout stating the reason.
+    if (canSubmitQuote) return { mode: 'act', msg: 'Submit a quote', sub: reQuoteByRm ? '' : 'Review the job and send the client your quote below.' }
+    // Quote submitted, still competing — the standing amber "under review" callout
+    // below carries the message, so the signpost line is blank.
+    if (!awarded && latestQuote?.status === 'pending') return { mode: 'wait', msg: '', sub: '' }
+    // From here the supplier is awarded the job. An open dispute pauses the snag /
+    // evidence step — the standing red callout below states it, so the signpost is blank.
+    if (awarded && openDispute) return { mode: 'wait', msg: '', sub: '' }
+    if (awarded && (t.status === 'accepted' || t.status === 'scheduled')) return { mode: 'act', msg: 'Mark the job in progress', sub: 'Your quote was approved — start the job and mark it in progress below.' }
+    if (awarded && t.status === 'snag') return { mode: 'act', msg: 'Accept and schedule the snag fix', sub: 'The completion was snagged — accept the snag and propose a date to carry out the corrective work.' }
+    if (awarded && t.status === 'snag_assigned') return latestSnag?.schedule_status === 'agreed'
+      ? { mode: 'act', msg: 'Start the snag fix', sub: 'The snag-fix date is approved — start the corrective work below.' }
+      : { mode: 'wait', msg: '', sub: '' }
+    if (awarded && t.status === 'evidence_requested') return { mode: 'act', msg: 'Add the requested evidence', sub: '' }
+    if (awarded && ['in_progress', 'snag_in_progress', 'snag_resolved'].includes(t.status)) return { mode: 'act', msg: 'Upload the COC & POC', sub: 'Once the work is done, upload the certificate of completion and proof-of-completion photos below.' }
+    if (awarded && t.status === 'submitted_for_signoff') return { mode: 'wait', msg: '', sub: '' }
+    if (awarded && t.status === 'variation_review') return { mode: 'wait', msg: '', sub: '' }
+    if (awarded && (t.status === 'approved_closeout' || t.status === 'vo_declined')) return { mode: 'act', msg: 'Raise any variation orders', sub: 'The COC & POC were approved — raise a variation order for extra work, or confirm there are none below.' }
+    return { mode: 'wait', msg: rmStatusMeta(supplierStatus).label, sub: 'No action needed from you right now.' }
+  })()
+
   return (
     <div className="space-y-5">
       <BackLink fallbackHref="/supplier/tickets" label="Back to tickets" />
@@ -475,13 +506,20 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
         </div>
       ) : (
         <Card className="p-5 space-y-3">
-          <h2 className="text-sm font-bold text-[var(--text)]">Next step</h2>
+          <div>
+            <h2 className="text-sm font-bold text-[var(--text)]">Next action</h2>
+            {nextAction.msg && <p className="mt-1 text-sm font-bold text-[var(--text)]">{nextAction.msg}</p>}
+            {nextAction.sub && <p className="mt-0.5 text-sm text-[var(--text-muted)]">{nextAction.sub}</p>}
+          </div>
           {/* The decline reason now lives in the Quotes block (on the declined quote);
               the Next step only prompts for the revised quote. */}
           {reQuoteByRm && canSubmitQuote && (
-            <div className="rounded-lg bg-[#C6A35D]/10 ring-1 ring-[#C6A35D]/30 p-3 space-y-0.5">
-              <p className="text-sm font-bold text-amber-700 dark:text-[#C6A35D]">The regional manager requested a re-quote</p>
-              <p className="text-sm text-[var(--text-muted)]">Your previous quote request for this ticket was declined. Please submit a new quote below.</p>
+            <div className="rounded-lg bg-amber-500/10 ring-1 ring-amber-500/30 p-3 flex items-start gap-2.5">
+              <Clock size={16} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
+              <div className="space-y-0.5">
+                <p className="text-sm font-bold text-amber-700 dark:text-amber-400">The regional manager requested a re-quote</p>
+                <p className="text-sm text-[var(--text-muted)]">Your previous quote request for this ticket was declined. Please submit a new quote below.</p>
+              </div>
             </div>
           )}
           {canSubmitQuote && <SendQuoteForm ticketId={t.id} competitive priority={t.priority} createdAt={t.created_at} />}
@@ -512,7 +550,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
           {awarded && t.status === 'snag_assigned' && (
             latestSnag?.schedule_status === 'agreed'
               ? <StartSnagButton ticketId={t.id} />
-              : <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 text-sm text-[var(--text-muted)]">Snag fix proposed{latestSnag?.scheduled_at ? ` for ${formatDateTime(latestSnag.scheduled_at)}` : ''} — awaiting the manager&apos;s approval before you can start.</div>
+              : <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 flex items-start gap-2.5"><Clock size={16} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" /><p className="text-sm text-[var(--text-muted)]">Snag fix proposed{latestSnag?.scheduled_at ? ` for ${formatDateTime(latestSnag.scheduled_at)}` : ''} — awaiting the manager&apos;s approval before you can start.</p></div>
           )}
           {awarded && ['in_progress', 'snag_resolved', 'snag_in_progress', 'evidence_requested'].includes(t.status) && (
             <div className="space-y-3">
@@ -533,10 +571,16 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
             </div>
           )}
           {awarded && t.status === 'variation_review' && (
-            <div className="rounded-xl bg-purple-500/10 ring-1 ring-purple-500/30 p-3.5 text-sm text-[var(--text-muted)]">Variation order submitted — awaiting approval from the regional manager.</div>
+            <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 flex items-start gap-2.5">
+              <Clock size={16} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
+              <p className="text-sm text-[var(--text-muted)]">Variation order submitted — awaiting approval from the regional manager.</p>
+            </div>
           )}
           {awarded && t.status === 'submitted_for_signoff' && (
-            <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 text-sm text-[var(--text-muted)]">COC &amp; POC submitted — awaiting the regional manager&apos;s approval.</div>
+            <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 flex items-start gap-2.5">
+              <Clock size={16} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
+              <p className="text-sm text-[var(--text-muted)]">COC &amp; POC submitted — awaiting the regional manager&apos;s approval.</p>
+            </div>
           )}
           {/* Close-out stage → the supplier may raise a variation order for extra work;
               otherwise the RM does the final close-out. On a declined VO the supplier
@@ -557,8 +601,9 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
           <WorkflowActions ticketId={t.id} status={supplierStatus} role="supplier" exclude={['schedule', 'submit_completion', 'require_assessment', 'request_quote', 'submit_variation', 'start_work', 'accept_snag', 'start_snag', 'submit_quote']} />
           {/* Quote submitted and awaiting the manager's decision — reassure the supplier. */}
           {!awarded && latestQuote?.status === 'pending' && (
-            <div className="rounded-xl bg-[#C6A35D]/10 ring-1 ring-[#C6A35D]/30 p-3.5 text-sm text-[var(--text-muted)]">
-              Your quote has been submitted and is under review. We&apos;ll notify you as soon as the regional manager has responded — no action is needed from you in the meantime.
+            <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 flex items-start gap-2.5">
+              <Clock size={16} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
+              <p className="text-sm text-[var(--text-muted)]">Your quote has been submitted and is under review. We&apos;ll notify you as soon as the regional manager has responded — no action is needed from you in the meantime.</p>
             </div>
           )}
           {/* Opt out of the job (before award) — separated from the primary actions */}
@@ -577,7 +622,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
             return (
               <div key={i} className={`rounded-xl ring-1 ${st.ring} ${st.bg} overflow-hidden`}>
                 <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-[var(--border)]">
-                  <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)] min-w-0"><FileText size={15} className="text-[#C6A35D] shrink-0" /><span className="truncate">{arr.length > 1 ? `Variation #${arr.length - i}` : 'Variation order'}</span></span>
+                  <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)] min-w-0"><FileText size={15} className="text-blue-600 dark:text-blue-400 shrink-0" /><span className="truncate">{arr.length > 1 ? `Variation #${arr.length - i}` : 'Variation order'}</span></span>
                   <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 shrink-0 ${st.badge}`}>{st.label}</span>
                 </div>
                 <div className="p-4 space-y-2">
@@ -593,7 +638,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
                   )}
                   {Array.isArray(v.file_urls) && v.file_urls.length > 0 && (
                     <div className="flex flex-wrap gap-x-3 gap-y-1 pt-0.5">
-                      {v.file_urls.map((u: string, j: number) => <ViewTrackedLink key={j} ticketId={t.id} itemType="attachment" itemLabel={`${arr.length > 1 ? `Variation #${arr.length - i}` : 'Variation order'} attachment ${j + 1}`} href={u} className="inline-flex items-center gap-1 text-[11px] font-medium text-[#C6A35D] hover:underline"><FileText size={12} /> Attachment {j + 1}</ViewTrackedLink>)}
+                      {v.file_urls.map((u: string, j: number) => <ViewTrackedLink key={j} ticketId={t.id} itemType="attachment" itemLabel={`${arr.length > 1 ? `Variation #${arr.length - i}` : 'Variation order'} attachment ${j + 1}`} href={u} className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:underline"><FileText size={12} /> Attachment {j + 1}</ViewTrackedLink>)}
                     </div>
                   )}
                 </div>

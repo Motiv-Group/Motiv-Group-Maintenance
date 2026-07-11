@@ -5,7 +5,9 @@
 // hours). The Submit COC & POC flow lives on its own page (/complete).
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Calendar, X, Wrench, Plus, PlayCircle } from 'lucide-react'
+import { Calendar, Wrench, Plus, PlayCircle } from 'lucide-react'
+import { Modal } from '@/components/ui/Modal'
+import { DrawerHeader } from '@/components/exec/Drawer'
 import { SchedulePicker } from '@/components/ui/SchedulePicker'
 import { SendQuoteForm } from '@/components/admin/SendQuoteForm'
 import { createClient } from '@/lib/supabase/client'
@@ -13,21 +15,6 @@ import { createClient } from '@/lib/supabase/client'
 async function transition(ticketId: string, body: Record<string, unknown>) {
   const res = await fetch(`/api/tickets/${ticketId}/transition`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
   if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Something went wrong')
-}
-
-// Centered pop-up (mirrors the RM "Request more info" modal) for supplier actions.
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-[var(--surface-2)] ring-1 ring-[var(--border)] rounded-2xl p-5 max-w-md w-full space-y-3 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between gap-2">
-          <p className="font-semibold text-[var(--text)]">{title}</p>
-          <button onClick={onClose} className="p-1 -m-1 text-[var(--text-faint)] hover:text-[var(--text)]"><X size={18} /></button>
-        </div>
-        {children}
-      </div>
-    </div>
-  )
 }
 
 // Decline the work (before award) — a pop-up with preset reasons + free-text
@@ -58,18 +45,23 @@ export function DeclineWorkButton({ ticketId }: { ticketId: string }) {
     <>
       <button type="button" onClick={() => setOpen(true)} className="w-full py-2.5 rounded-xl ring-1 ring-red-500/40 text-red-600 dark:text-red-400 text-sm font-semibold hover:bg-red-500/10 transition">Decline work</button>
       {open && (
-        <Modal title="Decline this work" onClose={() => { if (!busy) setOpen(false) }}>
-          <p className="text-xs text-[var(--text-muted)]">The manager is notified and the job goes to other suppliers. This can&apos;t be undone.</p>
-          <select autoFocus className={input} value={reason} onChange={e => { setReason(e.target.value); setErr('') }}>
-            <option value="">— Choose a reason —</option>
-            {DECLINE_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
-          </select>
-          {reason === 'Other' && <textarea className={`${input} min-h-[80px]`} placeholder="Tell the manager why…" value={other} onChange={e => setOther(e.target.value)} />}
-          {err && <p className="text-xs text-red-500">{err}</p>}
-          <div className="flex gap-2">
-            <button onClick={submit} disabled={busy} className="flex-1 py-2 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-500 disabled:opacity-50">{busy ? 'Declining…' : 'Decline work'}</button>
-            <button onClick={() => setOpen(false)} disabled={busy} className="flex-1 py-2 rounded-xl ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm disabled:opacity-50">Cancel</button>
-          </div>
+        <Modal onClose={() => setOpen(false)} maxWidth="max-w-md">
+          {close => (
+            <>
+              <DrawerHeader onClose={close} title={<p className="font-semibold text-[var(--text)]">Decline this work</p>} />
+              <p className="text-xs text-[var(--text-muted)]">The manager is notified and the job goes to other suppliers. This can&apos;t be undone.</p>
+              <select autoFocus className={input} value={reason} onChange={e => { setReason(e.target.value); setErr('') }}>
+                <option value="">— Choose a reason —</option>
+                {DECLINE_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+              {reason === 'Other' && <textarea className={`${input} min-h-[80px]`} placeholder="Tell the manager why…" value={other} onChange={e => setOther(e.target.value)} />}
+              {err && <p className="text-xs text-red-500">{err}</p>}
+              <div className="flex gap-2">
+                <button onClick={submit} disabled={busy} className="flex-1 py-2 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-500 disabled:opacity-50">{busy ? 'Declining…' : 'Decline work'}</button>
+                <button onClick={close} disabled={busy} className="flex-1 py-2 rounded-xl ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm disabled:opacity-50">Cancel</button>
+              </div>
+            </>
+          )}
         </Modal>
       )}
     </>
@@ -97,13 +89,15 @@ export function AcceptSnagCard({ ticketId, priority, createdAt }: { ticketId: st
         <Calendar size={15} /> Accept snag &amp; schedule fix
       </button>
       {open && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setOpen(false)}>
-          <div className="bg-[var(--surface-2)] ring-1 ring-[var(--border)] rounded-2xl p-5 max-w-sm w-full space-y-3" onClick={e => e.stopPropagation()}>
-            <p className="font-semibold text-[var(--text)]">Schedule the snag fix</p>
-            {err && <p className="text-xs text-red-500">{err}</p>}
-            <SchedulePicker priority={priority} createdAt={createdAt} busy={busy} onConfirm={doAccept} onCancel={() => setOpen(false)} />
-          </div>
-        </div>
+        <Modal onClose={() => setOpen(false)} maxWidth="max-w-sm">
+          {close => (
+            <>
+              <DrawerHeader onClose={close} title={<p className="font-semibold text-[var(--text)]">Schedule the snag fix</p>} />
+              {err && <p className="text-xs text-red-500">{err}</p>}
+              <SchedulePicker priority={priority} createdAt={createdAt} busy={busy} onConfirm={doAccept} onCancel={close} />
+            </>
+          )}
+        </Modal>
       )}
     </>
   )
@@ -119,23 +113,25 @@ export function AssignTechnicianButton({ technicians = [] }: { technicians?: { i
         <Wrench size={15} /> Assign technician
       </button>
       {open && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setOpen(false)}>
-          <div className="bg-[var(--surface-2)] ring-1 ring-[var(--border)] rounded-2xl p-5 max-w-sm w-full space-y-3" onClick={e => e.stopPropagation()}>
-            <p className="font-semibold text-[var(--text)]">Assign a technician</p>
-            {technicians.length ? (
-              <select value={techId} onChange={e => setTechId(e.target.value)} className="w-full px-3 py-2 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm outline-none focus:ring-emerald-500/40">
-                <option value="">— Select a technician —</option>
-                {technicians.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-              </select>
-            ) : (
-              <p className="text-xs text-[var(--text-muted)]">No technicians yet — add them under the <span className="text-blue-600 dark:text-blue-400">Technicians</span> tab.</p>
-            )}
-            <div className="flex gap-2">
-              <button disabled={!techId} onClick={() => setOpen(false)} className="flex-1 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold disabled:opacity-50">Assign</button>
-              <button onClick={() => setOpen(false)} className="flex-1 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm">Cancel</button>
-            </div>
-          </div>
-        </div>
+        <Modal onClose={() => setOpen(false)} maxWidth="max-w-sm">
+          {close => (
+            <>
+              <DrawerHeader onClose={close} title={<p className="font-semibold text-[var(--text)]">Assign a technician</p>} />
+              {technicians.length ? (
+                <select value={techId} onChange={e => setTechId(e.target.value)} className="w-full px-3 py-2 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm outline-none focus:ring-emerald-500/40">
+                  <option value="">— Select a technician —</option>
+                  {technicians.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              ) : (
+                <p className="text-xs text-[var(--text-muted)]">No technicians yet — add them under the <span className="text-blue-600 dark:text-blue-400">Technicians</span> tab.</p>
+              )}
+              <div className="flex gap-2">
+                <button disabled={!techId} onClick={close} className="flex-1 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold disabled:opacity-50">Assign</button>
+                <button onClick={close} className="flex-1 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm">Cancel</button>
+              </div>
+            </>
+          )}
+        </Modal>
       )}
     </>
   )
@@ -273,38 +269,40 @@ export function ScheduleJobCard({ ticketId, priority, createdAt, technicians = [
         <Calendar size={15} /> Schedule job
       </button>
       {open && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => { setOpen(false); setPendingIso(null) }}>
-          <div className="bg-[var(--surface-2)] ring-1 ring-[var(--border)] rounded-2xl p-5 max-w-sm w-full space-y-3" onClick={e => e.stopPropagation()}>
-            <p className="font-semibold text-[var(--text)]">Schedule the job</p>
-            {pendingIso ? (
-              <div className="space-y-2">
-                <p className="text-sm text-[var(--text)]">No technician is assigned for this job. Schedule without one?</p>
-                {err && <p className="text-xs text-red-500">{err}</p>}
-                <div className="flex gap-2">
-                  <button onClick={() => doSchedule(pendingIso)} disabled={busy} className="flex-1 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-500 disabled:opacity-50">{busy ? 'Scheduling…' : 'Yes, schedule'}</button>
-                  <button onClick={() => setPendingIso(null)} disabled={busy} className="flex-1 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm disabled:opacity-50">Back</button>
+        <Modal onClose={() => { setOpen(false); setPendingIso(null) }} maxWidth="max-w-sm">
+          {close => (
+            <>
+              <DrawerHeader onClose={close} title={<p className="font-semibold text-[var(--text)]">Schedule the job</p>} />
+              {pendingIso ? (
+                <div className="space-y-2">
+                  <p className="text-sm text-[var(--text)]">No technician is assigned for this job. Schedule without one?</p>
+                  {err && <p className="text-xs text-red-500">{err}</p>}
+                  <div className="flex gap-2">
+                    <button onClick={() => doSchedule(pendingIso)} disabled={busy} className="flex-1 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-500 disabled:opacity-50">{busy ? 'Scheduling…' : 'Yes, schedule'}</button>
+                    <button onClick={() => setPendingIso(null)} disabled={busy} className="flex-1 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm disabled:opacity-50">Back</button>
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <>
-                {/* Assign a technician (from your roster) */}
-                <div>
-                  <label className="block text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Technician</label>
-                  {technicians.length ? (
-                    <select value={techId} onChange={e => setTechId(e.target.value)} className="w-full px-3 py-2 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm outline-none focus:ring-emerald-500/40">
-                      <option value="">— Unassigned —</option>
-                      {technicians.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                    </select>
-                  ) : (
-                    <p className="text-xs text-[var(--text-muted)]">No technicians yet — add them under the <span className="text-blue-600 dark:text-blue-400">Technicians</span> tab.</p>
-                  )}
-                </div>
-                {err && <p className="text-xs text-red-500">{err}</p>}
-                <SchedulePicker priority={priority} createdAt={createdAt} busy={busy} onConfirm={confirm} onCancel={() => setOpen(false)} />
-              </>
-            )}
-          </div>
-        </div>
+              ) : (
+                <>
+                  {/* Assign a technician (from your roster) */}
+                  <div>
+                    <label className="block text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Technician</label>
+                    {technicians.length ? (
+                      <select value={techId} onChange={e => setTechId(e.target.value)} className="w-full px-3 py-2 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm outline-none focus:ring-emerald-500/40">
+                        <option value="">— Unassigned —</option>
+                        {technicians.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                      </select>
+                    ) : (
+                      <p className="text-xs text-[var(--text-muted)]">No technicians yet — add them under the <span className="text-blue-600 dark:text-blue-400">Technicians</span> tab.</p>
+                    )}
+                  </div>
+                  {err && <p className="text-xs text-red-500">{err}</p>}
+                  <SchedulePicker priority={priority} createdAt={createdAt} busy={busy} onConfirm={confirm} onCancel={close} />
+                </>
+              )}
+            </>
+          )}
+        </Modal>
       )}
     </>
   )
