@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { Store, Plus, User, Mail, Phone, Ticket, MoreVertical, Pencil, Power, RotateCcw, Trash2, X, ChevronDown, Archive } from 'lucide-react'
+import { Store, Plus, User, Mail, Phone, MapPin, Ticket, MoreVertical, Pencil, Power, RotateCcw, Trash2, X, ChevronDown, Archive, ArrowRight } from 'lucide-react'
 import type { StoreCard } from '@/lib/health/data'
 import { formatCurrency, formatDateTime } from '@/lib/utils'
 import { isValidEmail, isValidPhone } from '@/lib/csv'
@@ -171,7 +171,7 @@ export function RegionalStores({ stores, archived = [] }: { stores: StoreCard[];
         </Card>
       )}
 
-      {open && selected && <Modal onClose={() => setOpen(false)}>{close => <Detail s={selected} onClose={close} />}</Modal>}
+      {open && selected && <Modal onClose={() => setOpen(false)} maxWidth="max-w-2xl">{close => <Detail s={selected} onClose={close} />}</Modal>}
 
       {actionTarget && (
         <StoreActionsModal
@@ -346,54 +346,84 @@ function EditStoreModal({ storeId, onClose, onSaved }: { storeId: string; onClos
   )
 }
 
+/** One contact line: clickable (mail/tel/maps) when a value exists, else hidden. */
+function ContactRow({ icon: Icon, label, value, href, external }: { icon: React.ElementType; label: string; value: string | null | undefined; href: string | null; external?: boolean }) {
+  if (!value) return null
+  const inner = (
+    <>
+      <Icon size={16} className="mt-0.5 shrink-0 text-[var(--text-faint)] group-hover:text-blue-600 dark:group-hover:text-blue-400" />
+      <span className="min-w-0"><span className="block text-[11px] uppercase tracking-wide text-[var(--text-faint)]">{label}</span><span className="block break-words text-sm font-medium text-[var(--text)] group-hover:text-blue-600 dark:group-hover:text-blue-400">{value}</span></span>
+    </>
+  )
+  return href
+    ? <a href={href} {...(external ? { target: '_blank', rel: 'noreferrer' } : {})} className="group -mx-2 flex items-start gap-2.5 rounded-lg px-2 py-1.5 transition hover:bg-[var(--hover)]">{inner}</a>
+    : <div className="flex items-start gap-2.5 px-0 py-1.5">{inner}</div>
+}
+
 function Detail({ s, onClose }: { s: StoreCard; onClose?: () => void }) {
+  const recommended = s.finalStatus === 'controlled' ? 'Store controlled — keep it up.' : `Resolve: ${s.mainIssue}.`
   return (
     <div className="space-y-4">
-      <DrawerHeader onClose={onClose} title={<div className="flex items-center gap-2 flex-wrap"><Store size={18} className="text-[#C6A35D] shrink-0" /><h3 className="text-lg font-bold text-[var(--text)]">{s.storeName}</h3>{s.branchCode && <span className="font-mono text-xs text-[var(--text-faint)]">{s.branchCode}</span>}<Pill status={s.finalStatus} /></div>} />
-      <div><div className={`text-3xl font-bold ${STATUS_TEXT[s.finalStatus]}`}>{s.finalHealthScore}%</div><p className="text-xs text-[var(--text-muted)] mt-1">Open {s.openTickets} · Overdue {s.overdueTickets} · Pending approvals {s.pendingDecisions}</p></div>
+      <DrawerHeader onClose={onClose} title={<div className="flex items-center gap-2 flex-wrap"><Store size={18} className="text-blue-600 dark:text-blue-400 shrink-0" /><h3 className="text-lg font-bold text-[var(--text)]">{s.storeName}</h3>{s.branchCode && <span className="font-mono text-xs text-[var(--text-faint)]">{s.branchCode}</span>}<Pill status={s.finalStatus} /></div>} />
 
-      {/* Store manager contact */}
-      <div className="rounded-xl ring-1 ring-[var(--border)] bg-[var(--surface)] p-3 space-y-2">
-        <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Store Manager</div>
-        {s.sm ? (
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2 text-sm text-[var(--text)]"><User size={14} className="text-[var(--text-faint)] shrink-0" />{s.sm.name ?? 'Unnamed'}</div>
-            {s.sm.email && <a href={`mailto:${s.sm.email}`} className="flex items-center gap-2 text-sm text-[var(--text)] hover:text-[#C6A35D]"><Mail size={14} className="text-[var(--text-faint)] shrink-0" /><span className="truncate">{s.sm.email}</span></a>}
-            {s.sm.phone && <a href={`tel:${s.sm.phone}`} className="flex items-center gap-2 text-sm text-[var(--text)] hover:text-[#C6A35D]"><Phone size={14} className="text-[var(--text-faint)] shrink-0" />{s.sm.phone}</a>}
+      {/* Health hero — donut + score + top-line */}
+      <div className="flex items-center gap-4 rounded-xl bg-[var(--surface)] ring-1 ring-[var(--border)] p-4">
+        <Donut value={s.finalHealthScore} status={s.finalStatus} size={92} label="Health" />
+        <div className="min-w-0">
+          <div className={`text-2xl font-bold leading-none ${STATUS_TEXT[s.finalStatus]}`}>{s.finalHealthScore}%</div>
+          <p className="mt-1.5 text-xs text-[var(--text-muted)]">Open {s.openTickets} · Overdue {s.overdueTickets} · Pending {s.pendingDecisions}</p>
+          <p className="mt-1 text-xs text-[var(--text-faint)]">{s.regionName}</p>
+        </div>
+      </div>
+
+      {/* Store manager — full contact, all clickable */}
+      <div className="rounded-xl ring-1 ring-[var(--border)] bg-[var(--surface)] p-4">
+        <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-faint)]"><User size={13} /> Store Manager</div>
+        {s.sm?.name || s.sm?.email || s.sm?.phone || s.location ? (
+          <div className="space-y-0.5">
+            {s.sm?.name && <p className="mb-1 text-base font-bold text-[var(--text)]">{s.sm.name}</p>}
+            <ContactRow icon={Mail} label="Email" value={s.sm?.email} href={s.sm?.email ? `mailto:${s.sm.email}` : null} />
+            <ContactRow icon={Phone} label="Phone" value={s.sm?.phone} href={s.sm?.phone ? `tel:${s.sm.phone}` : null} />
+            <ContactRow icon={MapPin} label="Location" value={s.location} href={s.location ? `https://maps.google.com/?q=${encodeURIComponent(s.location)}` : null} external />
           </div>
         ) : (
           <p className="text-sm text-[var(--text-faint)]">No store manager on record.</p>
         )}
       </div>
 
-      {/* Summary grid — matches the Suppliers-pane stat cards (raised surface) */}
-      <div className="grid grid-cols-2 gap-2">
+      {/* Summary stats */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {[
           { label: 'Open', value: String(s.openTickets) },
           { label: 'Overdue', value: String(s.overdueTickets) },
-          { label: 'Pending approvals', value: String(s.pendingDecisions) },
-          { label: 'Cost exposure', value: formatCurrency(s.costExposure) },
+          { label: 'Approvals', value: String(s.pendingDecisions) },
+          { label: 'Exposure', value: formatCurrency(s.costExposure) },
         ].map(c => (
           <div key={c.label} className="rounded-xl bg-[var(--surface)] ring-1 ring-[var(--border)] p-3">
-            <div className="text-xl font-bold text-[var(--text)]">{c.value}</div>
+            <div className="text-lg font-bold text-[var(--text)]">{c.value}</div>
             <div className="text-[11px] text-[var(--text-faint)]">{c.label}</div>
           </div>
         ))}
       </div>
 
-      <div className="rounded-xl bg-[var(--surface)] ring-1 ring-[var(--border)] p-3">
-        <div className="flex items-center gap-4">
-          <Donut value={s.finalHealthScore} status={s.finalStatus} size={104} />
-          <div className="flex-1"><BreakdownList rows={[
-            { label: 'Operational Risk', value: s.breakdown.operationalRisk, max: 30 }, { label: 'SLA Performance', value: s.breakdown.sla, max: 20 },
-            { label: 'Ticket Load', value: s.breakdown.ticketLoad, max: 15 }, { label: 'Repeat Defects', value: s.breakdown.repeatDefect, max: 15 },
-            { label: 'Commercial Impact', value: s.breakdown.commercialBlocker, max: 10 }, { label: 'Data Quality', value: s.breakdown.dataQuality, max: 10 },
-          ]} /></div>
-        </div>
+      {/* Health breakdown */}
+      <div className="rounded-xl bg-[var(--surface)] ring-1 ring-[var(--border)] p-4">
+        <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-faint)]">Health breakdown</div>
+        <BreakdownList rows={[
+          { label: 'Operational Risk', value: s.breakdown.operationalRisk, max: 30 }, { label: 'SLA Performance', value: s.breakdown.sla, max: 20 },
+          { label: 'Ticket Load', value: s.breakdown.ticketLoad, max: 15 }, { label: 'Repeat Defects', value: s.breakdown.repeatDefect, max: 15 },
+          { label: 'Commercial Impact', value: s.breakdown.commercialBlocker, max: 10 }, { label: 'Data Quality', value: s.breakdown.dataQuality, max: 10 },
+        ]} />
       </div>
-      <div><div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Recommended Action</div><p className="text-xs text-[var(--text)]">{s.finalStatus === 'controlled' ? 'Store controlled — maintain.' : `Resolve: ${s.mainIssue}.`}</p></div>
-      <Link href={`/regional/tickets?store=${encodeURIComponent(s.storeName)}`} className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl bg-[#C6A35D] hover:bg-[#b8954f] text-[#0a0e17] text-sm font-semibold transition">
-        <Ticket size={15} /> View Store Tickets
+
+      {/* Recommended action */}
+      <div className="rounded-xl bg-blue-500/5 ring-1 ring-blue-500/20 p-3">
+        <div className="text-[11px] font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-400">Recommended action</div>
+        <p className="mt-1 text-sm text-[var(--text)]">{recommended}</p>
+      </div>
+
+      <Link href={`/regional/tickets?store=${encodeURIComponent(s.storeName)}`} className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-blue-500">
+        <Ticket size={16} /> View store tickets <ArrowRight size={15} />
       </Link>
     </div>
   )
