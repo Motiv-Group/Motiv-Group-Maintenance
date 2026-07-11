@@ -23,7 +23,9 @@ const isActive = (s: string) => !INACTIVE.has(s)
 
 // Each KPI card counts (and filters the queue to) one slice of the RM's work.
 const QUOTE_STATUSES = new Set(['quoted', 'quote_revision'])                              // waiting on the RM to approve
-const SIGNOFF_STATUSES = new Set(['submitted_for_signoff', 'snag_resolved', 'approved_closeout']) // completed work awaiting sign-off
+// COC submitted & still in the sign-off pipeline (not completed) — every such
+// ticket lands here EXCEPT active snags, which have their own KPI below.
+const SIGNOFF_STATUSES = new Set(['submitted_for_signoff', 'evidence_requested', 'snag_resolved', 'approved_closeout', 'pending_sign_off'])
 const SNAG_STATUSES = new Set(['snag', 'snag_assigned', 'snag_in_progress'])              // open snags
 const needsAssignment = (t: RegionalTicketRow) => !t.supplierAssigned && (t.status === 'open' || t.status === 'info_requested')
 const slaAtRisk = (t: RegionalTicketRow) => t.breached || t.overdue

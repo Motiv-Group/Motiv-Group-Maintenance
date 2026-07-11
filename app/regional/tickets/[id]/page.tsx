@@ -526,7 +526,9 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
   // below; this just tells the RM (or reassures them) what's next. `act` = needs
   // the RM, `wait` = waiting on someone else, `done`/`closed` = finished.
   const nextAction: { mode: 'act' | 'wait' | 'done' | 'closed'; msg: string; sub: string } = (() => {
-    if (t.status === 'completed') return { mode: 'done', msg: 'This job is complete', sub: 'The completion has been approved and signed off.' }
+    // Completed — the standing green callout below carries the message; the
+    // signpost line is blank so it isn't said twice.
+    if (t.status === 'completed') return { mode: 'done', msg: '', sub: '' }
     if (t.status === 'cancelled' || t.status === 'declined') return { mode: 'closed', msg: `Ticket ${t.status}`, sub: t.cancellation_reason || 'No further action needed.' }
     if (openDispute) return { mode: 'act', msg: 'Resolve the open dispute', sub: 'A dispute is paused on this ticket — review the thread and resolve it in the Dispute section.' }
     if (snagAwaitingApproval) return { mode: 'act', msg: 'Approve the snag-fix date', sub: 'The supplier proposed a date to carry out the corrective work — approve it below.' }
@@ -965,6 +967,14 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
             <div className="rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/30 p-3.5 text-sm text-[var(--text-muted)]">COC &amp; POC approved. The supplier can still raise a variation order for extra work — otherwise finalise the close-out below once they confirm there are none.</div>
             <CloseOutButton ticketId={t.id} voConfirmed={!!t.vo_none_confirmed_at} />
           </>
+        )}
+
+        {/* Completed — positive close-out callout (no action left). */}
+        {t.status === 'completed' && (
+          <div className="rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/30 p-3.5 flex items-start gap-2.5">
+            <CheckCircle2 size={16} className="text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+            <p className="text-sm text-[var(--text-muted)]">This ticket is <span className="font-semibold text-[var(--text)]">complete</span> — the completion certificate and proof of completion have been approved and signed off. No further action is needed.</p>
+          </div>
         )}
 
         <WorkflowActions
