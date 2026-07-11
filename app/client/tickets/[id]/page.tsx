@@ -71,6 +71,13 @@ function buildSmTimeline(t: any, events: EventRow[], views: ViewRow[]): Timeline
   if (t.status === 'info_requested' && t.info_request_reason && !events.some(e => e.to_status === 'info_requested')) {
     out.push({ label: 'Your manager requested more information', at: t.updated_at ?? t.created_at })
   }
+  // The SM's (or their manager's) edit to the ticket details is recorded on the
+  // ticket row (edited_at), not as a status event, so add it explicitly.
+  if (t.edited_at && +new Date(t.edited_at) > +new Date(t.created_at)) {
+    const who = t.edited_by && t.edited_by !== t.created_by ? 'Your manager updated the ticket' : 'You edited the ticket'
+    const note = typeof t.edit_note === 'string' && t.edit_note.trim() ? ` — ${t.edit_note.trim()}` : ''
+    out.push({ label: `${who}${note}`, at: t.edited_at })
+  }
 
   for (const v of views) {
     const verb = v.item_type === 'photo' || v.item_type === 'photos' ? 'viewed' : 'opened'
