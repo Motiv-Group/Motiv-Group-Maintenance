@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { Globe2, Map as MapIcon, Store, Truck, Gavel, Bell, Settings, LogOut, FileBarChart, LayoutDashboard, Ticket, ClipboardCheck, AlertTriangle, ReceiptText, BarChart2, Users, CalendarClock, CheckCircle2 } from 'lucide-react'
+import { Globe2, Map as MapIcon, Store, Truck, Gavel, Bell, Settings, LogOut, FileBarChart, LayoutDashboard, Ticket, ClipboardCheck, AlertTriangle, ReceiptText, BarChart2, Users, CalendarClock, CheckCircle2, Network, ScrollText, Database, Triangle, Mail, Zap, ShieldAlert } from 'lucide-react'
 import { MotivLogo } from '@/components/ui/MotivLogo'
 import { ContextSwitcher } from '@/components/ui/ContextSwitcher'
 import { SwipeNav } from '@/components/ui/SwipeNav'
@@ -52,12 +52,30 @@ const INDIVIDUAL_TABS: ChromeTab[] = [
   // the tab label must match, not the internal "tickets" term.
   { href: '/individual/tickets', label: 'Jobs',      icon: Ticket },
 ]
+// Platform-admin: the business tabs go on the mobile bottom-nav; the full set
+// (business + infra/provider panels) fills the desktop sidebar.
+const ADMIN_TABS: ChromeTab[] = [
+  { href: '/admin',           label: 'Overview',  icon: LayoutDashboard },
+  { href: '/admin/accounts',  label: 'Accounts',  icon: Users },
+  { href: '/admin/hierarchy', label: 'Hierarchy', icon: Network },
+  { href: '/admin/suppliers', label: 'Suppliers', icon: Truck },
+  { href: '/admin/audit',     label: 'Audit',     icon: ScrollText },
+]
+const ADMIN_DESKTOP_TABS: ChromeTab[] = [
+  ...ADMIN_TABS,
+  { href: '/admin/supabase', label: 'Supabase', icon: Database },
+  { href: '/admin/vercel',   label: 'Vercel',   icon: Triangle },
+  { href: '/admin/resend',   label: 'Resend',   icon: Mail },
+  { href: '/admin/upstash',  label: 'Upstash',  icon: Zap },
+  { href: '/admin/sentry',   label: 'Sentry',   icon: ShieldAlert },
+]
 const VARIANTS = {
   exec:     { tabs: EXEC_TABS, roleLabel: 'Executive', base: '/executive', reports: true },
   regional: { tabs: REGIONAL_TABS, roleLabel: 'Regional Manager', base: '/regional', reports: true },
   store:    { tabs: STORE_TABS, roleLabel: 'Store Manager', base: '/client', reports: false },
   supplier: { tabs: SUPPLIER_TABS, roleLabel: 'Supplier', base: '/supplier', reports: false },
   individual: { tabs: INDIVIDUAL_TABS, roleLabel: 'Individual', base: '/individual', reports: false },
+  admin:    { tabs: ADMIN_TABS, roleLabel: 'System Admin', base: '/admin', reports: false },
 } as const
 
 export function ExecChrome({
@@ -71,8 +89,11 @@ export function ExecChrome({
   const initial = (userName ?? roleLabel).trim().charAt(0).toUpperCase()
   const isStore = variant === 'store'
   const isRegional = variant === 'regional'
-  // Store + Regional get the desktop left sidebar (top bar + bottom nav hide on lg).
-  const hasSidebar = isStore || isRegional
+  const isSupplier = variant === 'supplier'
+  const isAdmin = variant === 'admin'
+  // Store, Regional, Supplier + Admin get the desktop left sidebar (top bar +
+  // bottom nav hide on lg). Admin's sidebar carries the full tab set incl. infra.
+  const hasSidebar = isStore || isRegional || isSupplier || isAdmin
   // Nav bars are always deep navy (brand-600) in both light and dark mode,
   // matching the Settings Navbar — so icons/labels use light tones on navy.
   const iconBtn = 'p-2 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 transition-colors'
@@ -91,10 +112,10 @@ export function ExecChrome({
           contextOptions={contextOptions}
           activeContextId={activeContextId}
           contextCookie={contextCookie}
-          ContextIcon={isStore ? Store : MapIcon}
+          ContextIcon={isStore ? Store : isSupplier ? Truck : isAdmin ? LayoutDashboard : MapIcon}
           unreadCount={unreadCount}
           initial={initial}
-          tabs={isStore ? STORE_DESKTOP_TABS : tabs}
+          tabs={isStore ? STORE_DESKTOP_TABS : isAdmin ? ADMIN_DESKTOP_TABS : tabs}
           home={home}
           notificationsHref={`${base}/notifications`}
           isActive={(href) => isStore
