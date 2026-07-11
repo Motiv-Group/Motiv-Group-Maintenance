@@ -187,6 +187,7 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
           <div className="space-y-3">
             <InfoRow label="Category" value={t.category ?? 'General'} />
             <InfoRow label="Priority" value={priorityValue} />
+            <InfoRow label="Logged" value={formatDateTime(t.created_at)} />
             <div>
               <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Description</div>
               <p className="text-sm text-[var(--text)] mt-0.5 whitespace-pre-line">{t.description}</p>

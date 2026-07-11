@@ -534,6 +534,26 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
   const NaIcon = nextAction.mode === 'done' ? CheckCircle2 : nextAction.mode === 'closed' ? XCircle : nextAction.mode === 'wait' ? Loader2 : ClipboardCheck
   const naColor = nextAction.mode === 'done' ? 'text-emerald-500' : nextAction.mode === 'closed' ? 'text-[var(--text-faint)]' : nextAction.mode === 'wait' ? 'text-blue-500' : 'text-[#C6A35D]'
 
+  // Every image on the ticket, aggregated into one bottom gallery (SM-style),
+  // grouped + labelled by source so the before/after and submission context
+  // survives. Documents (COC/invoice/VO PDFs) stay as links in their own cards;
+  // the completion before/after ALSO remain in the sign-off card for in-context
+  // review — so a few images intentionally appear in both places.
+  const photoGroups: { label: string; urls: string[] }[] = []
+  if (Array.isArray(t.photo_urls) && t.photo_urls.length) photoGroups.push({ label: 'Logged photos', urls: t.photo_urls as string[] })
+  for (const s of [...allSignoffs].sort((a, b) => +new Date(a.created_at) - +new Date(b.created_at))) {
+    const n = submissionNo.get(s.id)
+    const before = ((s.before_urls ?? []) as string[]).filter(Boolean)
+    const after = ((s.after_urls ?? []) as string[]).filter(Boolean)
+    if (before.length) photoGroups.push({ label: `Completion #${n} · Before`, urls: before })
+    if (after.length) photoGroups.push({ label: `Completion #${n} · After`, urls: after })
+  }
+  const progressPhotoUrls = supplierUpdates
+    .map(u => { const m = String(u.body).match(/^📷\s*Progress photo:\s*(\S+)/); return m ? m[1] : null })
+    .filter((x): x is string => !!x)
+  if (progressPhotoUrls.length) photoGroups.push({ label: 'Supplier progress', urls: progressPhotoUrls })
+  const totalPhotos = photoGroups.reduce((n, g) => n + g.urls.length, 0)
+
   return (
     <div className="space-y-5">
       <BackLink fallbackHref="/regional/tickets" label="Back to tickets" />
@@ -541,8 +561,8 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
       {/* Header — reference, title, priority + status, progress stepper (SM flavor). */}
       <Card className="p-5 space-y-5">
         <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            {t.job_ref && <p className="text-[11px] font-mono font-semibold tracking-wide text-[var(--text-faint)] mb-0.5">{t.job_ref}</p>}
+          <div className="min-w-0 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            {t.job_ref && <span className="font-mono text-sm font-semibold text-[var(--text-faint)]">{t.job_ref}</span>}
             <h1 className="text-lg font-bold text-[var(--text)]">{t.title}</h1>
           </div>
           <div className="flex flex-col items-end gap-2 shrink-0">
@@ -618,13 +638,6 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
               )
             })()}
           </div>
-
-          {Array.isArray(t.photo_urls) && t.photo_urls.length > 0 && (
-            <div>
-              <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Photos</div>
-              <PhotoThumbs urls={t.photo_urls as string[]} ticketId={t.id} />
-            </div>
-          )}
 
           {t.info_request_reason && <p className="text-xs text-amber-600 dark:text-amber-400">Info requested: {t.info_request_reason}</p>}
           {/* Scheduled visit — hidden once a snag fix is in play (that callout replaces it). */}
@@ -990,6 +1003,20 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
           <ol className="space-y-2.5">
             {supplierUpdates.map((u, i) => <SupplierUpdateItem key={i} u={u} ticketId={t.id} />)}
           </ol>
+        </CollapsibleSection>
+      )}
+      {/* Photos — every image on the ticket in one place (SM-style), grouped by
+          source. Completion before/after also stay in the sign-off card above. */}
+      {totalPhotos > 0 && (
+        <CollapsibleSection id="ticket-photos" title="Photos" defaultOpen badge={<span className="text-[11px] text-[var(--text-faint)]">{totalPhotos} photo{totalPhotos === 1 ? '' : 's'}</span>}>
+          <div className="space-y-4">
+            {photoGroups.map((g, i) => (
+              <div key={i} className="space-y-1.5">
+                <p className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">{g.label}</p>
+                <PhotoThumbs urls={g.urls} ticketId={t.id} label={g.label} />
+              </div>
+            ))}
+          </div>
         </CollapsibleSection>
       )}
       <AuditTrail ticket={{
