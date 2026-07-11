@@ -190,24 +190,24 @@ export function DistributionLegend({ counts }: { counts: Counts }) {
 }
 
 /** RAGC health bands as coloured blocks (Controlled / Attention / At Risk / Critical). */
-export function RagBlocks({ counts, total, unitLabel = 'estate' }: { counts: Counts; total?: number; unitLabel?: string }) {
+export function RagBlocks({ counts, total, unitLabel = 'estate', hrefFor }: { counts: Counts; total?: number; unitLabel?: string; hrefFor?: (status: HealthStatus) => string }) {
   const t = total ?? (counts.controlled + counts.attention + counts.at_risk + counts.critical)
   const pct = (n: number) => (t > 0 ? Math.round((n / t) * 100) : 0)
-  const blocks = [
-    { label: 'Controlled', value: counts.controlled, cls: 'bg-emerald-500/10 ring-emerald-500/30 text-emerald-600 dark:text-emerald-400' },
-    { label: 'Attention',  value: counts.attention,  cls: 'bg-[#C6A35D]/10 ring-[#C6A35D]/30 text-amber-600 dark:text-[#C6A35D]' },
-    { label: 'At Risk',    value: counts.at_risk,    cls: 'bg-red-500/10 ring-red-500/30 text-red-600 dark:text-red-400' },
-    { label: 'Critical',   value: counts.critical,   cls: 'bg-red-900/15 ring-red-800/40 text-red-700 dark:text-red-300' },
+  const blocks: { k: HealthStatus; label: string; value: number; cls: string }[] = [
+    { k: 'controlled', label: 'Controlled', value: counts.controlled, cls: 'bg-emerald-500/10 ring-emerald-500/30 text-emerald-600 dark:text-emerald-400' },
+    { k: 'attention',  label: 'Attention',  value: counts.attention,  cls: 'bg-[#C6A35D]/10 ring-[#C6A35D]/30 text-amber-600 dark:text-[#C6A35D]' },
+    { k: 'at_risk',    label: 'At Risk',    value: counts.at_risk,    cls: 'bg-red-500/10 ring-red-500/30 text-red-600 dark:text-red-400' },
+    { k: 'critical',   label: 'Critical',   value: counts.critical,   cls: 'bg-red-900/15 ring-red-800/40 text-red-700 dark:text-red-300' },
   ]
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-      {blocks.map(b => (
-        <div key={b.label} className={`rounded-xl ring-1 p-3 ${b.cls}`}>
-          <div className="text-2xl font-bold leading-none">{b.value}</div>
-          <div className="text-[11px] font-semibold mt-1">{b.label}</div>
-          <div className="text-[10px] opacity-70">{pct(b.value)}% of {unitLabel}</div>
-        </div>
-      ))}
+      {blocks.map(b => {
+        const inner = <><div className="text-2xl font-bold leading-none">{b.value}</div><div className="text-[11px] font-semibold mt-1">{b.label}</div><div className="text-[10px] opacity-70">{pct(b.value)}% of {unitLabel}</div></>
+        const base = `rounded-xl ring-1 p-3 ${b.cls}`
+        return hrefFor
+          ? <Link key={b.label} href={hrefFor(b.k)} className={`${base} block transition hover:brightness-125`}>{inner}</Link>
+          : <div key={b.label} className={base}>{inner}</div>
+      })}
     </div>
   )
 }

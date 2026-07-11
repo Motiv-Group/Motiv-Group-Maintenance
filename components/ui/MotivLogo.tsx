@@ -20,9 +20,9 @@ export function MotivLogo({ height = 32, className = '' }: MotivLogoProps) {
   const wordW = Math.round(wordH * (549 / 86))  // wordmark aspect 549×86
 
   return (
-    <span className={`inline-flex items-center ${className}`} style={{ gap: Math.round(height * 0.26) }}>
+    <span className={`inline-flex items-end ${className}`} style={{ gap: Math.round(height * 0.42) }}>
       <Image src="/brand/motiv-symbol.png" alt="" width={symW} height={height} priority unoptimized draggable={false} className="object-contain" />
-      <Image src="/brand/motiv-wordmark.png" alt="Motiv" width={wordW} height={wordH} priority unoptimized draggable={false} className="object-contain" />
+      <Image src="/brand/motiv-wordmark.png" alt="Motiv" width={wordW} height={wordH} priority unoptimized draggable={false} className="mb-[2px] object-contain" />
     </span>
   )
 }

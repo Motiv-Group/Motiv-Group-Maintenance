@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Store, Plus, User, Mail, Phone, Ticket, MoreVertical, Pencil, Power, RotateCcw, Trash2, X, ChevronDown, Archive } from 'lucide-react'
 import type { StoreCard } from '@/lib/health/data'
@@ -12,6 +12,7 @@ import { DrawerHeader } from '@/components/exec/Drawer'
 import { Modal } from '@/components/ui/Modal'
 
 const fmtK = (n: number) => n ? (n >= 1000 ? `R ${(n / 1000).toFixed(0)}K` : formatCurrency(n)) : 'R 0'
+const RAG_LABEL: Record<string, string> = { controlled: 'Controlled', attention: 'Attention', at_risk: 'At Risk', critical: 'Critical' }
 
 export interface ArchivedStore { id: string; name: string; deactivatedAt: string | null }
 type ActionTarget = { id: string; name: string; archived: boolean }
@@ -27,6 +28,10 @@ export function RegionalStores({ stores, archived = [] }: { stores: StoreCard[];
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null)
   const selected = stores.find(s => s.storeId === selId) ?? null
   const ranked = [...stores].sort((a, b) => a.finalHealthScore - b.finalHealthScore)
+  // Health-status filter deep-linked from the dashboard's distribution block.
+  const searchParams = useSearchParams()
+  const statusFilter = searchParams.get('status')
+  const shown = statusFilter ? ranked.filter(s => s.finalStatus === statusFilter) : ranked
 
   // Deep-link from the dashboard "Stores Requiring Attention" list — open the
   // store's side panel directly (?store=<id>).
@@ -76,7 +81,12 @@ export function RegionalStores({ stores, archived = [] }: { stores: StoreCard[];
         </div>
       )}
 
-      <SectionCard title="Store Ranking — highest attention first">
+      <SectionCard title="Store Ranking — highest attention first"
+        action={statusFilter ? (
+          <Link href="/regional/stores" className="inline-flex items-center gap-1.5 rounded-full bg-[var(--surface-2)] px-2.5 py-1 text-xs font-medium text-[var(--text-muted)] ring-1 ring-[var(--border)] hover:text-[var(--text)]">
+            {RAG_LABEL[statusFilter] ?? statusFilter} <X size={13} />
+          </Link>
+        ) : undefined}>
           {/* Desktop / tablet — full table */}
           <div className="hidden md:block overflow-x-auto -mx-1">
             <table className="w-full text-sm min-w-[760px]">
@@ -85,7 +95,7 @@ export function RegionalStores({ stores, archived = [] }: { stores: StoreCard[];
                 <th className="px-2 text-center">Open</th><th className="px-2 text-center">Overdue</th><th className="px-2 text-center">Approvals</th><th className="px-2">Exposure</th><th className="px-2">Main Driver</th><th className="px-2 w-8"></th>
               </tr></thead>
               <tbody>
-                {ranked.map((s, i) => (
+                {shown.map((s, i) => (
                   <tr key={s.storeId} onClick={() => { setSelId(s.storeId); setOpen(true) }} className={`border-b border-[var(--border)] cursor-pointer hover:bg-[var(--hover)] ${selId === s.storeId ? 'bg-[var(--hover)]' : ''}`}>
                     <td className="py-2.5 px-2 text-[var(--text-faint)]">{i + 1}</td><td className="px-2 text-[var(--text)]">{s.storeName}{s.branchCode && <span className="ml-1.5 font-mono text-[11px] text-[var(--text-faint)]">{s.branchCode}</span>}</td>
                     <td className={`px-2 font-semibold ${STATUS_TEXT[s.finalStatus]}`}>{s.finalHealthScore}%</td><td className="px-2"><Pill status={s.finalStatus} /></td>
@@ -97,14 +107,14 @@ export function RegionalStores({ stores, archived = [] }: { stores: StoreCard[];
                     </td>
                   </tr>
                 ))}
-                {!stores.length && <tr><td colSpan={10} className="py-6 text-center text-[var(--text-faint)]">No stores in your region.</td></tr>}
+                {!shown.length && <tr><td colSpan={10} className="py-6 text-center text-[var(--text-faint)]">{statusFilter ? `No ${RAG_LABEL[statusFilter] ?? statusFilter} stores.` : 'No stores in your region.'}</td></tr>}
               </tbody>
             </table>
           </div>
 
           {/* Phone — stacked cards, tap to open detail (no horizontal scroll) */}
           <ul className="md:hidden space-y-2">
-            {ranked.map((s, i) => (
+            {shown.map((s, i) => (
               <li key={s.storeId} className="relative">
                 <button onClick={() => { setSelId(s.storeId); setOpen(true) }} className="w-full text-left rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3 pr-10 hover:bg-[var(--hover)] transition">
                   <div className="flex items-start justify-between gap-3">
@@ -129,7 +139,7 @@ export function RegionalStores({ stores, archived = [] }: { stores: StoreCard[];
                 </div>
               </li>
             ))}
-            {!stores.length && <li className="py-6 text-center text-[var(--text-faint)] text-sm">No stores in your region.</li>}
+            {!shown.length && <li className="py-6 text-center text-[var(--text-faint)] text-sm">{statusFilter ? `No ${RAG_LABEL[statusFilter] ?? statusFilter} stores.` : 'No stores in your region.'}</li>}
           </ul>
       </SectionCard>
 

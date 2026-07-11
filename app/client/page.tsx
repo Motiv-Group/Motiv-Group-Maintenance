@@ -108,13 +108,13 @@ function QuickLogPanel() {
           </span>
           <div className="min-w-0">
             <h2 className="text-lg font-bold text-[var(--text)] sm:text-xl">Report a problem in under 60 seconds</h2>
-            <p className="mt-1 text-sm text-[var(--text-muted)]">Choose issue, add a photo, and submit. We&apos;ll take it from there.</p>
+            <p className="mt-1 text-sm text-[var(--text-muted)]">Tell us what&apos;s wrong — we&apos;ll take it from there.</p>
             <div className="mt-5 hidden max-w-xl items-center gap-3 text-xs text-[var(--text-muted)] sm:flex">
-              <Step n="1" label="Choose issue" />
+              <Step n="1" label="Describe the issue" />
               <span className="h-px flex-1 border-t border-dashed border-slate-300 dark:border-slate-500" />
-              <Step n="2" label="Add photo" />
+              <Step n="2" label="Add photos" />
               <span className="h-px flex-1 border-t border-dashed border-slate-300 dark:border-slate-500" />
-              <Step n="3" label="Submit" />
+              <Step n="3" label="Review & send" />
             </div>
           </div>
         </div>
