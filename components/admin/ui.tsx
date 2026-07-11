@@ -10,7 +10,7 @@ import { pctOf } from '@/lib/admin/limits'
 import type { ProviderResult, ProviderStatus } from '@/lib/admin/types'
 
 const STATUS_DOT: Record<ProviderStatus, string> = {
-  ok: 'bg-emerald-500', degraded: 'bg-[#C6A35D]', unconfigured: 'bg-slate-400', error: 'bg-red-500',
+  ok: 'bg-emerald-500', degraded: 'bg-amber-500', unconfigured: 'bg-slate-400', error: 'bg-red-500',
 }
 const STATUS_WORD: Record<ProviderStatus, string> = {
   ok: 'Live', degraded: 'Partial', unconfigured: 'Not configured', error: 'Error',
@@ -101,7 +101,7 @@ export function UsageBar({
 }: { value: number | null; limit: number; unitLabel?: string }) {
   const pct = pctOf(value, limit)
   if (pct == null) return <div className="text-[11px] text-[var(--text-faint)]">Usage unavailable</div>
-  const color = pct >= 90 ? 'bg-red-500' : pct >= 75 ? 'bg-[#C6A35D]' : 'bg-emerald-500'
+  const color = pct >= 90 ? 'bg-red-500' : pct >= 75 ? 'bg-amber-500' : 'bg-emerald-500'
   return (
     <div className="space-y-1">
       <div className="h-1.5 rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden">
@@ -119,7 +119,7 @@ export function UsageBar({
 export function Notice({ variant = 'info', children }: { variant?: 'info' | 'warn' | 'error'; children: ReactNode }) {
   const map = {
     info:  { cls: 'bg-blue-500/10 ring-blue-500/30 text-blue-700 dark:text-blue-300', icon: <InfoIcon size={14} /> },
-    warn:  { cls: 'bg-[#C6A35D]/10 ring-[#C6A35D]/30 text-amber-700 dark:text-[#C6A35D]', icon: <AlertTriangle size={14} /> },
+    warn:  { cls: 'bg-amber-500/10 ring-amber-500/30 text-amber-700 dark:text-amber-400', icon: <AlertTriangle size={14} /> },
     error: { cls: 'bg-red-500/10 ring-red-500/30 text-red-700 dark:text-red-300', icon: <XCircle size={14} /> },
   }[variant]
   return (
