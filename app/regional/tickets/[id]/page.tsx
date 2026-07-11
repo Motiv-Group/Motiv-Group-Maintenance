@@ -543,6 +543,9 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
     if (t.status === 'evidence_requested') return { mode: 'wait', msg: '', sub: '' }
     if (SNAG_WAIT_MSG[t.status]) return { mode: 'wait', msg: '', sub: '' }
     if (t.status === 'vo_declined') return { mode: 'wait', msg: 'Waiting on the supplier', sub: 'You declined the variation order — the supplier can revise it or message you.' }
+    // Quote approved / job awarded (accepted or scheduled) — the standing callout
+    // below carries the message; the signpost line is blank so it isn't said twice.
+    if (['accepted', 'scheduled'].includes(t.status)) return { mode: 'wait', msg: '', sub: '' }
     // In progress — the standing "…on site or en route…" callout below carries the
     // message; the signpost line is intentionally blank to avoid saying it twice.
     if (t.status === 'in_progress') return { mode: 'wait', msg: '', sub: '' }
@@ -935,6 +938,15 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
 
         {/* Variation order awaiting approval — compact row → pop-up (approve/decline). */}
         <RmReviewPanel heading="Variation order" items={voReviewItems} />
+
+        {/* Quote approved / job awarded — a positive callout while we wait for the
+            supplier to start (not shown while a proposed visit time needs accepting). */}
+        {['accepted', 'scheduled'].includes(t.status) && !(t.status === 'scheduled' && t.schedule_status === 'proposed' && t.scheduled_at) && (
+          <div className="rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/30 p-3.5 flex items-start gap-2.5">
+            <CheckCircle2 size={16} className="text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+            <p className="text-sm text-[var(--text-muted)]">The quote has been approved and <span className="font-semibold text-[var(--text)]">{nameById.get(t.supplier_id ?? '') ?? 'the supplier'}</span> awarded the job. The ticket will move to <span className="font-semibold text-[var(--text)]">In progress</span> once they start work on site.</p>
+          </div>
+        )}
 
         {t.status === 'in_progress' && (
           <div className="rounded-xl bg-[#C6A35D]/10 ring-1 ring-[#C6A35D]/30 p-3.5 text-sm text-[var(--text-muted)]">Work in progress — the supplier is on site or en route to attend to the job. The completion certificate and proof-of-completion photos will follow once the work is done.</div>
