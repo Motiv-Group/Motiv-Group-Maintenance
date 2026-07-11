@@ -19,10 +19,13 @@ export default async function RegionalNewTicketPage() {
   const suppliers = ((suppliersRaw ?? []) as any[]).map(s => ({ id: s.id, name: s.company_name }))
 
   return (
-    <div className="space-y-5">
+    <div className="max-w-xl mx-auto space-y-5">
       <BackLink fallbackHref="/regional/tickets" label="Back to tickets" />
-      <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><PlusCircle className="text-emerald-600 dark:text-emerald-400" size={22} /> Log a Ticket</h1>
-      <Card className="p-5">
+      <div>
+        <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><PlusCircle className="text-emerald-600 dark:text-emerald-400" size={22} /> Log a Ticket</h1>
+        <p className="text-sm text-[var(--text-muted)] mt-0.5">Pick the store, then a few quick steps.</p>
+      </div>
+      <Card className="p-5 sm:p-6 space-y-6">
         <RmNewTicketForm stores={stores} suppliers={suppliers} />
       </Card>
     </div>
