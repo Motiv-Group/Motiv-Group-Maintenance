@@ -24,10 +24,10 @@ function Labeled({ label, children }: { label: string; children: React.ReactNode
   )
 }
 
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+function Modal({ title, onClose, children, maxWidth = 'max-w-md' }: { title: string; onClose: () => void; children: React.ReactNode; maxWidth?: string }) {
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-[var(--surface-2)] ring-1 ring-[var(--border)] rounded-2xl p-5 max-w-md w-full space-y-3 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+      <div className={`bg-[var(--surface-2)] ring-1 ring-[var(--border)] rounded-2xl p-5 ${maxWidth} w-full space-y-3 max-h-[85vh] overflow-y-auto`} onClick={e => e.stopPropagation()}>
         <p className="font-semibold text-[var(--text)]">{title}</p>
         {children}
       </div>
@@ -461,9 +461,9 @@ export function RmAddWorkForm({ ticketId, description, photoUrls, title, categor
         <Plus size={16} /> Add extra work
       </button>
       {open && (
-        <Modal title="Add extra work to this ticket" onClose={() => { if (!busy) { setOpen(false); setErr('') } }}>
+        <Modal title="Add extra work to this ticket" maxWidth="max-w-2xl" onClose={() => { if (!busy) { setOpen(false); setErr('') } }}>
           <p className="text-xs text-[var(--text-muted)]">Extra scope you know of — added to the ticket brief before a supplier is assigned.</p>
-          <textarea autoFocus className={`${input} min-h-[90px]`} placeholder="Describe the extra work needed…" value={text} onChange={e => { setText(e.target.value); setErr('') }} />
+          <textarea autoFocus className={`${input} min-h-[160px]`} placeholder="Describe the extra work needed…" value={text} onChange={e => { setText(e.target.value); setErr('') }} />
           <label className="flex items-center justify-center gap-2 py-2.5 rounded-lg ring-1 ring-[var(--border)] text-sm text-[var(--text)] transition cursor-pointer hover:border-[#C6A35D] hover:bg-[var(--hover)]">
             <ImagePlus size={15} /> Add photos <span className="text-[var(--text-faint)]">(optional)</span>
             <input type="file" accept="image/*" multiple className="hidden" onChange={e => setFiles(p => [...p, ...Array.from(e.target.files ?? [])].slice(0, 5))} />
@@ -480,7 +480,7 @@ export function RmAddWorkForm({ ticketId, description, photoUrls, title, categor
           )}
           {err && <p className="text-xs text-red-500">{err}</p>}
           <div className="flex gap-2">
-            <button onClick={submit} disabled={busy} className="flex-1 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Adding…' : 'Add to ticket'}</button>
+            <button onClick={submit} disabled={busy} className="flex-1 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Adding…' : 'Add to ticket'}</button>
             <button onClick={() => { setOpen(false); setErr('') }} disabled={busy} className="flex-1 py-2 rounded-xl ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm disabled:opacity-50">Cancel</button>
           </div>
         </Modal>

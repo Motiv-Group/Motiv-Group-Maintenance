@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Camera } from 'lucide-react'
 import { Card } from '@/components/exec/ui'
 import { PhotoThumbs } from '@/components/ui/PhotoThumbs'
@@ -10,7 +10,7 @@ import type { TimelineEvent, TimelineTone } from '@/lib/ticket-timeline'
 
 type PhotoGroup = { label: string; urls: string[] }
 type Update = { body: string; created_at: string }
-type Tab = 'photos' | 'activity' | 'timeline'
+type Tab = 'photos' | 'activity' | 'timeline' | 'history'
 
 // Dot colour per event tone — mirrors the app's status palette (matches the old
 // AuditTrail dots) so the timeline reads at a glance.
@@ -28,12 +28,13 @@ const DOT_TONE: Record<TimelineTone, string> = {
  *  ticket, grouped by source), Activity (supplier updates/progress notes) and
  *  the full Timeline (status changes, edits, attachments/photos viewed, …). */
 export function RmTicketTabs({
-  ticketId, photoGroups, updates, timeline,
+  ticketId, photoGroups, updates, timeline, history,
 }: {
   ticketId: string
   photoGroups: PhotoGroup[]
   updates: Update[]
   timeline: TimelineEvent[]
+  history?: ReactNode
 }) {
   const totalPhotos = photoGroups.reduce((n, g) => n + g.urls.length, 0)
   const [tab, setTab] = useState<Tab>(totalPhotos ? 'photos' : 'timeline')
@@ -41,6 +42,7 @@ export function RmTicketTabs({
     { key: 'photos', label: `Photos${totalPhotos ? ` (${totalPhotos})` : ''}` },
     { key: 'activity', label: `Activity${updates.length ? ` (${updates.length})` : ''}` },
     { key: 'timeline', label: 'Timeline' },
+    ...(history ? [{ key: 'history' as Tab, label: 'History' }] : []),
   ]
 
   return (
@@ -104,6 +106,10 @@ export function RmTicketTabs({
             ))}
           </ol>
         ) : <p className="text-sm text-[var(--text-faint)]">No history yet.</p>
+      )}
+
+      {tab === 'history' && (
+        history ?? <p className="text-sm text-[var(--text-faint)]">Nothing archived yet.</p>
       )}
     </Card>
   )
