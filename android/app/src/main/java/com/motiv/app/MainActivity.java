@@ -29,11 +29,11 @@ public class MainActivity extends BridgeActivity {
         super.onCreate(savedInstanceState);
 
         // Full-screen city image over the webview while the site loads. A random
-        // one per launch (never the same twice in a row), navy behind, then it
+        // one per launch (never the same twice in a row), charcoal behind, then it
         // fades out to reveal the app.
         final ImageView splash = new ImageView(this);
         splash.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        splash.setBackgroundColor(Color.parseColor("#0A0E17"));
+        splash.setBackgroundColor(Color.parseColor("#0E1016"));
         splash.setImageResource(pickCity());
         addContentView(splash, new ViewGroup.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));

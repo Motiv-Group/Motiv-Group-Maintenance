@@ -31,13 +31,13 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="dark">
-      <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center px-4">
+      <div className="min-h-screen bg-[#0b0c11] flex flex-col items-center justify-center px-4">
         <div className="w-full max-w-sm">
           <div className="flex items-center justify-center mb-10">
             <MotivLogo height={100} />
           </div>
 
-          <div className="bg-gray-900 rounded-2xl shadow-xl border border-gray-700 p-6 sm:p-8">
+          <div className="bg-[#17181e] rounded-2xl shadow-xl border border-white/10 p-6 sm:p-8">
             {sent ? (
               <div className="text-center space-y-3">
                 <MailCheck size={36} className="mx-auto text-[#C6A35D]" />

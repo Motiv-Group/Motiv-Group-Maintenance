@@ -4,8 +4,8 @@
   "description": "Maintenance ticketing & quoting",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0a0e17",
-  "theme_color": "#0a0e17",
+  "background_color": "#0e1016",
+  "theme_color": "#0e1016",
   "icons": [
     { "src": "/logo.png", "sizes": "any", "type": "image/png", "purpose": "any maskable" }
   ]

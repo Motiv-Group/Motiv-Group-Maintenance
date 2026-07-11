@@ -84,7 +84,7 @@ export default function LoginPage() {
   // Always dark — force the dark class on this page's wrapper regardless of theme
   if (forwarding) {
     return (
-      <div className="dark min-h-screen bg-gray-950 flex flex-col items-center justify-center gap-4">
+      <div className="dark min-h-screen bg-[#0b0c11] flex flex-col items-center justify-center gap-4">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#C6A35D]" />
         <p className="text-sm text-gray-400">Completing your invite…</p>
       </div>
@@ -93,7 +93,7 @@ export default function LoginPage() {
 
   return (
     <div className="dark">
-      <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center px-4">
+      <div className="min-h-screen bg-[#0b0c11] flex flex-col items-center justify-center px-4">
         <div className="w-full max-w-sm sm:max-w-md">
 
           {/* Logo — larger and centred */}
@@ -101,7 +101,7 @@ export default function LoginPage() {
             <MotivLogo height={120} />
           </div>
 
-          <div className="bg-gray-900 rounded-2xl shadow-xl border border-gray-700 p-6 sm:p-10">
+          <div className="bg-[#17181e] rounded-2xl shadow-xl border border-white/10 p-6 sm:p-10">
             <h1 className="text-xl sm:text-2xl font-semibold text-white mb-1">Welcome back</h1>
             <p className="text-sm text-gray-400 mb-6">Log in to your account.</p>
 

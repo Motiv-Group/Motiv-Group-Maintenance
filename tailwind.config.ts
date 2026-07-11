@@ -21,14 +21,17 @@ const config: Config = {
       },
       colors: {
         brand: {
+          // 50–400 = warm gold/cream accent (kept). 500–900 = the app chrome,
+          // retuned from navy to a neutral warm-charcoal so the gradient MOTIV
+          // logo reads clean + premium (600 is the nav / login / splash surface).
           50:  '#f8f5ed',
           100: '#e8dfc4',
           300: '#c9b99a',
           400: '#b5a07d',
-          500: '#1a3347',
-          600: '#0d1f2d',
-          700: '#0a1922',
-          900: '#060f15',
+          500: '#1b1d24',
+          600: '#0e1016',
+          700: '#090a0e',
+          900: '#050608',
         },
       },
     },

@@ -120,7 +120,7 @@ export default function SupplierOnboardPage() {
 
   if (checking) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-[#0b0c11] flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#C6A35D]" />
       </div>
     )
@@ -197,7 +197,7 @@ export default function SupplierOnboardPage() {
             </div>
           </L>
 
-          <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-3.5">
+          <div className="rounded-xl border border-gray-200 dark:border-white/10 p-3.5">
             <label className="flex items-center justify-between gap-3 cursor-pointer">
               <span className="text-sm font-medium text-gray-900 dark:text-white">VAT registered?</span>
               <input type="checkbox" checked={vatRegistered} onChange={e => setVatRegistered(e.target.checked)} className="h-5 w-5 accent-[#C6A35D]" />
@@ -213,7 +213,7 @@ export default function SupplierOnboardPage() {
 
       {step === 3 && (
         <div className="space-y-4">
-          <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-4 max-h-64 overflow-y-auto text-sm text-gray-600 dark:text-gray-300 space-y-2">
+          <div className="rounded-xl border border-gray-200 dark:border-white/10 p-4 max-h-64 overflow-y-auto text-sm text-gray-600 dark:text-gray-300 space-y-2">
             <p className="font-semibold text-gray-900 dark:text-white flex items-center gap-1.5"><FileText size={15} /> Service Level Agreement — key commitments (v{SLA_VERSION})</p>
             <ul className="list-disc pl-5 space-y-1">
               <li>Respond, attend and resolve jobs within the P1–P4 priority windows measured by the platform.</li>
@@ -235,7 +235,7 @@ export default function SupplierOnboardPage() {
             <input className={inputCls} value={signedName} onChange={e => setSignedName(e.target.value)} placeholder="Full name" required />
           </L>
 
-          <label className="flex items-start gap-3 cursor-pointer rounded-xl border border-gray-200 dark:border-gray-700 p-3.5">
+          <label className="flex items-start gap-3 cursor-pointer rounded-xl border border-gray-200 dark:border-white/10 p-3.5">
             <input type="checkbox" checked={slaAgreed} onChange={e => setSlaAgreed(e.target.checked)} className="mt-0.5 h-5 w-5 accent-[#C6A35D]" />
             <span className="text-sm text-gray-700 dark:text-gray-300">
               I have read and agree to the <Link href="/sla" target="_blank" className="text-[#C6A35D] underline">Service Level Agreement</Link> (v{SLA_VERSION}) on behalf of {companyName.trim() || 'my company'}.
@@ -275,10 +275,10 @@ export default function SupplierOnboardPage() {
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col items-center justify-center px-4 py-12">
+    <div className="min-h-screen bg-gray-50 dark:bg-[#0b0c11] flex flex-col items-center justify-center px-4 py-12">
       <div className="w-full max-w-md">
         <div className="flex items-center justify-center mb-8"><MotivLogo height={72} /></div>
-        <div className="bg-slate-50 dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 sm:p-8">
+        <div className="bg-slate-50 dark:bg-[#1f2027] rounded-2xl shadow-sm border border-gray-200 dark:border-white/10 p-6 sm:p-8">
           {children}
         </div>
       </div>

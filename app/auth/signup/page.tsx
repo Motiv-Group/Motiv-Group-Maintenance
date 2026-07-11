@@ -67,10 +67,10 @@ export default function SignupPage() {
 
   if (sentTo) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col items-center justify-center px-4 py-12">
+      <div className="min-h-screen bg-gray-50 dark:bg-[#0b0c11] flex flex-col items-center justify-center px-4 py-12">
         <div className="w-full max-w-md">
           <div className="flex items-center justify-center mb-8"><MotivLogo height={72} /></div>
-          <div className="bg-slate-50 dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 sm:p-8 text-center">
+          <div className="bg-slate-50 dark:bg-[#1f2027] rounded-2xl shadow-sm border border-gray-200 dark:border-white/10 p-6 sm:p-8 text-center">
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#C6A35D]/10"><Mail size={24} className="text-[#C6A35D]" /></div>
             <h1 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Check your email</h1>
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">We&apos;ve sent a verification link to</p>
@@ -84,11 +84,11 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col items-center justify-center px-4 py-12">
+    <div className="min-h-screen bg-gray-50 dark:bg-[#0b0c11] flex flex-col items-center justify-center px-4 py-12">
       <div className="w-full max-w-md">
         <div className="flex items-center justify-center mb-8"><MotivLogo height={72} /></div>
 
-        <div className="bg-slate-50 dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 sm:p-8">
+        <div className="bg-slate-50 dark:bg-[#1f2027] rounded-2xl shadow-sm border border-gray-200 dark:border-white/10 p-6 sm:p-8">
           <h1 className="text-xl font-semibold text-gray-900 dark:text-white mb-1">Create your account</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">Choose the type of account to get started.</p>
 
@@ -100,7 +100,7 @@ export default function SignupPage() {
             ] as const).map(opt => (
               <button key={opt.value} type="button" onClick={() => { setChoice(opt.value); setError('') }}
                 className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 text-center transition-all ${
-                  choice === opt.value ? 'border-[#C6A35D] bg-[#C6A35D]/10' : 'border-gray-200 dark:border-gray-700 hover:border-[#C6A35D]/60'
+                  choice === opt.value ? 'border-[#C6A35D] bg-[#C6A35D]/10' : 'border-gray-200 dark:border-white/10 hover:border-[#C6A35D]/60'
                 }`}>
                 <opt.icon size={20} className="text-[#C6A35D]" />
                 <span className={`text-sm font-medium ${choice === opt.value ? 'text-[#C6A35D]' : 'text-gray-700 dark:text-gray-300'}`}>{opt.label}</span>
