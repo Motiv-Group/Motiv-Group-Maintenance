@@ -17,11 +17,12 @@ import { WorkflowActions } from '@/components/workflow/WorkflowActions'
 import { RmPipeline } from '@/components/regional/RmPipeline'
 import { AssignSuppliersButton, RequestInfoButton, RmEditTicketForm, SupplierStatusList, QuoteReviewCard, CancelTicketCard, ApproveSignoffCard, ReQuoteButton, AcceptScheduleCard, AcceptSnagScheduleCard, VariationReviewCard, RmAddWorkForm, RequestEvidenceButton, RaiseSnagButton, CloseOutButton } from '@/components/regional/RmTicketActions'
 import { DueDate } from '@/components/workflow/DueDate'
-import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { EditedLine } from '@/components/ui/EditedLine'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
-import { PhotoThumbs } from '@/components/ui/PhotoThumbs'
-import { AuditTrail } from '@/components/ui/AuditTrail'
+import { RmTicketTabs } from '@/components/regional/RmTicketTabs'
+import { buildTicketTimeline } from '@/lib/ticket-timeline'
+import { priorityBadgeClass, priorityLabel } from '@/components/client/ticketBadges'
+import type { StoreManagerTicket } from '@/lib/health/data'
 import { CollapsibleSection } from '@/components/ui/CollapsibleSection'
 import { MarkTicketSeen } from '@/components/ui/MarkTicketSeen'
 import { DisputeThread } from '@/components/dispute/DisputeBox'
@@ -552,7 +553,31 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
     .map(u => { const m = String(u.body).match(/^📷\s*Progress photo:\s*(\S+)/); return m ? m[1] : null })
     .filter((x): x is string => !!x)
   if (progressPhotoUrls.length) photoGroups.push({ label: 'Supplier progress', urls: progressPhotoUrls })
-  const totalPhotos = photoGroups.reduce((n, g) => n + g.urls.length, 0)
+
+  // Full life-of-ticket timeline (status changes, edits, attachments/photos
+  // viewed, quotes, sign-offs, disputes…) for the bottom "Timeline" tab.
+  const timelineItems = buildTicketTimeline({
+    createdAt: t.created_at, status: t.status, updatedAt: t.updated_at,
+    quoteRequestedAt: t.first_quote_requested_at ?? t.quote_requested_at,
+    quoteRequests: ((requestRows ?? []) as any[]).map(r => ({ at: r.requested_at, supplierName: r.supplier_id ? (nameById.get(r.supplier_id) ?? null) : null })),
+    quoteSubmittedAt: t.quote_submitted_at,
+    quoteApprovedAt: t.quote_decision_status === 'approved' ? t.quote_decided_at : null,
+    scheduledAt: t.scheduled_at, completedAt: t.completed_at,
+    editedAt: t.edited_at, editedByName: editorName, editNote: t.edit_note, cancellationReason: t.cancellation_reason,
+    infoRequestedAt: t.info_requested_at, infoAddedAt: t.info_added_at, infoRequestReason: t.info_request_reason,
+    snagScheduledAt,
+    snagAcceptedAt: latestSnag?.assigned_at ?? null,
+    snagProposedAt: latestSnag?.assigned_at ?? null, snagApprovedAt: latestSnag?.schedule_agreed_at ?? null,
+    snagDeclinedAt: declinedSnag?.schedule_declined_at ?? null, snagDeclineReason: declinedSnag?.schedule_decline_reason ?? null,
+    snagScheduleEvents: (snagEventRows ?? []) as any[],
+    workStartedAt: t.attended_at ?? null,
+    quotes: ((quotes ?? []) as any[]).map(q => ({ ...q, supplierName: nameById.get(q.supplier_id) ?? 'Supplier' })),
+    variations: (variations ?? []) as any[],
+    disputes: disputes.map(d => ({ origin: d.origin, status: d.status, outcome: d.outcome, created_at: d.created_at, resolved_at: d.resolved_at, reason: d.resolution_note })),
+    disputeMessages: disputeMsgs.map((m: any) => ({ author_role: m.author_role, body: m.body, created_at: m.created_at })),
+    signoffs: allSignoffs, updates: (updates ?? []) as any[], views: (viewRows ?? []) as any[],
+    supplierDeclines,
+  })
 
   return (
     <div className="space-y-5">
@@ -565,78 +590,159 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
             {t.job_ref && <span className="font-mono text-sm font-semibold text-[var(--text-faint)]">{t.job_ref}</span>}
             <h1 className="text-lg font-bold text-[var(--text)]">{t.title}</h1>
           </div>
-          <div className="flex flex-col items-end gap-2 shrink-0">
-            <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 justify-items-end">
-              <PriorityBadge priority={t.priority} className="w-full text-center" />
-              {(() => {
-                const sm = rmStatusMeta(t.status)
-                // An open dispute overrides the badge with "Dispute" (the snag/evidence
-                // step is paused). Otherwise: a ticket where every supplier declined is
-                // back at 'open' and reads "New"; "Info added" reads like an "Info
-                // requested" badge (amber); the fresh answer is highlighted red in the
-                // description until the RM acts.
-                const label = openDispute ? 'Dispute' : rmInfoAdded ? 'Info added' : sm.label
-                const cls = openDispute ? 'bg-red-500/15 text-red-700 dark:text-red-400' : rmInfoAdded ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : sm.cls
-                return <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${cls}`}>{label}</span>
-              })()}
-            </div>
+          {/* Priority + status badges — same form factor as the SM ticket detail. */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className={`inline-flex w-[92px] justify-center rounded-md px-2 py-1 text-[10px] font-bold ${priorityBadgeClass({ priority: t.priority } as StoreManagerTicket)}`}>{priorityLabel({ priority: t.priority } as StoreManagerTicket)}</span>
+            {(() => {
+              const sm = rmStatusMeta(t.status)
+              // An open dispute overrides the badge with "Dispute" (the snag/evidence
+              // step is paused). Otherwise: a ticket where every supplier declined is
+              // back at 'open' and reads "New"; "Info added" reads like an "Info
+              // requested" badge (amber); the fresh answer is highlighted red in the
+              // description until the RM acts.
+              const label = openDispute ? 'Dispute' : rmInfoAdded ? 'Info added' : sm.label
+              const cls = openDispute ? 'bg-red-500/15 text-red-700 dark:text-red-400' : rmInfoAdded ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : sm.cls
+              return <span className={`inline-flex w-[92px] justify-center rounded-md px-2 py-1 text-[10px] font-bold ${cls}`}>{label}</span>
+            })()}
           </div>
         </div>
 
         <RmPipeline status={t.status} />
       </Card>
 
-      {/* Two columns: Next action · Ticket information (SM flavor). */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        {/* Next action — the RM's single most important pending step. */}
-        <Card className="p-5">
-          <h2 className="text-sm font-bold text-[var(--text)] mb-3">Next action</h2>
-          <div className="flex items-start gap-3">
-            <NaIcon size={22} className={`${naColor} shrink-0 ${nextAction.mode === 'wait' ? 'animate-spin' : ''}`} />
-            <div className="min-w-0">
-              <p className="text-sm font-bold text-[var(--text)]">{nextAction.msg}</p>
-              <p className="mt-0.5 text-sm text-[var(--text-muted)]">{nextAction.sub}</p>
-            </div>
+      {/* Next action — the RM's most important pending step + the controls to take
+          it (the primary actions live right here now). */}
+      <Card className="p-5 space-y-4">
+        <div className="flex items-start gap-3">
+          <NaIcon size={22} className={`${naColor} shrink-0 ${nextAction.mode === 'wait' ? 'animate-spin' : ''}`} />
+          <div className="min-w-0">
+            <h2 className="text-sm font-bold text-[var(--text)]">Next action</h2>
+            <p className="mt-1 text-sm font-bold text-[var(--text)]">{nextAction.msg}</p>
+            <p className="mt-0.5 text-sm text-[var(--text-muted)]">{nextAction.sub}</p>
           </div>
-          {nextAction.mode === 'act' && (
-            <p className="mt-4 flex items-center gap-1.5 rounded-lg bg-[#C6A35D]/10 px-3 py-2.5 text-xs text-[var(--text-muted)] ring-1 ring-[#C6A35D]/20">
-              <ClipboardCheck size={14} className="shrink-0 text-[#C6A35D]" /> Take this step in the highlighted section below.
-            </p>
-          )}
-        </Card>
+        </div>
 
-        {/* Ticket information */}
+        {snagAwaitingApproval && latestSnag?.scheduled_at && <AcceptSnagScheduleCard ticketId={t.id} scheduledAt={latestSnag.scheduled_at} />}
+
+        {SNAG_WAIT_MSG[t.status] && !snagAwaitingApproval && !openDispute && (t.status !== 'snag_assigned' || latestSnag?.schedule_status === 'agreed') && (
+          <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 flex items-start gap-2.5">
+            <Clock size={16} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
+            <p className="text-sm text-[var(--text-muted)]">{SNAG_WAIT_MSG[t.status]}{latestSnag?.description ? ` Snag raised: “${latestSnag.description}”.` : ''} The full submission is in the Archive below.</p>
+          </div>
+        )}
+
+        {t.status === 'evidence_requested' && !openDispute && (
+          <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 flex items-start gap-2.5">
+            <Clock size={16} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
+            <p className="text-sm text-[var(--text-muted)]">Awaiting the supplier to provide the additional evidence requested on the completion (COC &amp; POC).{t.evidence_request_reason ? ` Requested: “${t.evidence_request_reason}”.` : ''}</p>
+          </div>
+        )}
+
+        {t.status === 'vo_declined' && (
+          <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 flex items-start gap-2.5">
+            <Clock size={16} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
+            <p className="text-sm text-[var(--text-muted)]">You declined the variation order. Awaiting the supplier&apos;s response — they can submit a revised variation order or message you before the job proceeds.</p>
+          </div>
+        )}
+
+        {awaitingSupplierQuotes && (
+          <div className="rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/30 p-3.5 flex items-start gap-2.5">
+            <CheckCircle2 size={16} className="text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+            <p className="text-sm text-[var(--text-muted)]">Supplier{activeSupplierRows.filter(r => r.status === 'invited').length === 1 ? '' : 's'} assigned — awaiting their quote{activeSupplierRows.filter(r => r.status === 'invited').length === 1 ? '' : 's'}.</p>
+          </div>
+        )}
+
+        {canAssign && <RmAddWorkForm ticketId={t.id} description={t.description ?? ''} photoUrls={Array.isArray(t.photo_urls) ? t.photo_urls : []} title={t.title} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} />}
+
+        {!isTerminal && (canAssign || canCancel) && (
+          <div className="flex gap-2">
+            {canAssignSupplier && <AssignSuppliersButton ticketId={t.id} suppliers={supplierList} motivSuppliers={motivSupplierList} declinedSupplierIds={declinedSupplierIds} awaitingById={engagedSupplierIds} />}
+            {['open', 'info_requested'].includes(t.status) && <RequestInfoButton ticketId={t.id} />}
+            {canCancel && <CancelTicketCard ticketId={t.id} />}
+          </div>
+        )}
+
+        {t.status === 'submitted_for_signoff' && <ApproveSignoffCard ticketId={t.id} />}
+        {t.status === 'submitted_for_signoff' && (
+          <div className="flex gap-2">
+            <RequestEvidenceButton ticketId={t.id} />
+            <RaiseSnagButton ticketId={t.id} />
+          </div>
+        )}
+
+        {t.status === 'scheduled' && t.schedule_status === 'proposed' && t.scheduled_at && <AcceptScheduleCard ticketId={t.id} scheduledAt={t.scheduled_at} />}
+
+        {t.status === 'variation_review' && <VariationReviewCard ticketId={t.id} />}
+
+        {['accepted', 'scheduled'].includes(t.status) && (
+          <div className="rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/30 p-3.5 flex items-start gap-2.5">
+            <CheckCircle2 size={16} className="text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+            <p className="text-sm text-[var(--text-muted)]"><span className="font-semibold text-[var(--text)]">{nameById.get(t.supplier_id ?? '') ?? 'The supplier'}</span> has been awarded the job. They&apos;ll let you know when they&apos;re on their way or on site by marking the ticket in progress.</p>
+          </div>
+        )}
+
+        {t.status === 'in_progress' && (
+          <div className="rounded-xl bg-[#C6A35D]/10 ring-1 ring-[#C6A35D]/30 p-3.5 text-sm text-[var(--text-muted)]">Work in progress — the supplier is on site or en route to attend to the job. The completion certificate and proof-of-completion photos will follow once the work is done.</div>
+        )}
+
+        {(t.status === 'approved_closeout' || t.status === 'vo_declined') && (
+          <>
+            <div className="rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/30 p-3.5 text-sm text-[var(--text-muted)]">COC &amp; POC approved. The supplier can still raise a variation order for extra work — otherwise finalise the close-out below once they confirm there are none.</div>
+            <CloseOutButton ticketId={t.id} voConfirmed={!!t.vo_none_confirmed_at} />
+          </>
+        )}
+
+        <WorkflowActions
+          ticketId={t.id} status={t.status} role="regional_manager"
+          suppliers={supplierList}
+          exclude={['validate', 'reject', 'request_info', 'request_quote', 'require_assessment', 'approve_quote', 'reject_quote', 'request_revision', 'proceed_no_quote', 'schedule', 'approve', 'assign_snag', 'accept_schedule', 'approve_snag', 'decline_snag_schedule', 'approve_variation', 'reject_variation', 'request_evidence', 'raise_snag', 'close_out']}
+        />
+      </Card>
+
+      {/* Ticket information — details + description (left) · logged/due + edit (right). */}
         <Card className="p-5 space-y-4">
           <h2 className="text-sm font-bold text-[var(--text)]">Ticket information</h2>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-            <DetailItem label="Store" value={storeName} />
-            <DetailItem label="Category" value={t.category ?? 'General'} />
-            <DetailItem label="Operational Impact" value={OPERATIONAL_IMPACT_LABELS[t.operational_impact ?? 'none'] ?? 'No operational impact'} />
-            <DetailItem label="Logged" value={formatDateTime(t.created_at)} />
-            <DueDate dueAt={dueAt} overdue={overdue} now={now.toISOString()} />
-          </div>
+          <div className="grid gap-x-6 gap-y-4 lg:grid-cols-2">
+            {/* Left — store details + the description. */}
+            <div className="space-y-4">
+              <DetailItem label="Store" value={storeName} />
+              <DetailItem label="Category" value={t.category ?? 'General'} />
+              <DetailItem label="Operational Impact" value={OPERATIONAL_IMPACT_LABELS[t.operational_impact ?? 'none'] ?? 'No operational impact'} />
+              <div>
+                <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Description</div>
+                {(() => {
+                  // Appended segments highlight red until the RM moves the ticket on: the
+                  // store manager's answer ("— Added info: …") and the RM's own extra scope
+                  // ("— Extra Work: …"). The base description text is white.
+                  const parts = String(t.description ?? '').split(/(\n\n— (?:Added info|Extra Work): )/)
+                  const segs: JSX.Element[] = []
+                  for (let i = 1; i < parts.length; i += 2) {
+                    const sep = parts[i], seg = parts[i + 1] ?? ''
+                    const hot = sep.includes('Extra Work') ? canAssign : rmInfoAdded
+                    segs.push(<span key={i} className={hot ? 'text-red-600 dark:text-red-400 font-medium' : 'text-[var(--text)]'}>{`${sep}${seg}`}</span>)
+                  }
+                  return (
+                    <p className="text-sm whitespace-pre-line text-[var(--text)]">
+                      <span>{parts[0]}</span>
+                      {segs}
+                    </p>
+                  )
+                })()}
+              </div>
+            </div>
 
-          <div>
-            <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Description</div>
-            {(() => {
-              // Two kinds of appended segment are highlighted red until the RM moves the
-              // ticket on: the store manager's answer ("— Added info: …", red while the
-              // info is freshly added) and the RM's own extra scope ("— Extra Work: …",
-              // red until a supplier is assigned / re-assigned). Everything else is muted.
-              const parts = String(t.description ?? '').split(/(\n\n— (?:Added info|Extra Work): )/)
-              const segs: JSX.Element[] = []
-              for (let i = 1; i < parts.length; i += 2) {
-                const sep = parts[i], seg = parts[i + 1] ?? ''
-                const hot = sep.includes('Extra Work') ? canAssign : rmInfoAdded
-                segs.push(<span key={i} className={hot ? 'text-red-600 dark:text-red-400 font-medium' : 'text-[var(--text-muted)]'}>{`${sep}${seg}`}</span>)
-              }
-              return (
-                <p className="text-sm whitespace-pre-line">
-                  <span className="text-[var(--text-muted)]">{parts[0]}</span>
-                  {segs}
-                </p>
-              )
-            })()}
+            {/* Right — logged / due, with Edit ticket bottom-aligned to the last line
+                of the description. */}
+            <div className="flex flex-col gap-4">
+              <DetailItem label="Logged" value={formatDateTime(t.created_at)} />
+              <DueDate dueAt={dueAt} overdue={overdue} now={now.toISOString()} />
+              {(t.edited_at || canEdit) && (
+                <div className="mt-auto flex items-center justify-between gap-2 pt-1">
+                  <EditedLine at={t.edited_at} by={editorName} />
+                  {canEdit && <RmEditTicketForm ticketId={t.id} initial={{ title: t.title, category: t.category ?? 'General', impact: t.operational_impact ?? 'none', priority: t.priority, description: t.description }} />}
+                </div>
+              )}
+            </div>
           </div>
 
           {t.info_request_reason && <p className="text-xs text-amber-600 dark:text-amber-400">Info requested: {t.info_request_reason}</p>}
@@ -662,14 +768,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
               </div>
             </div>
           )}
-
-          {/* Last text on the left, Edit ticket on the right, on the same line. */}
-          <div className="flex items-end justify-between gap-2">
-            <EditedLine at={t.edited_at} by={editorName} />
-            {canEdit && <RmEditTicketForm ticketId={t.id} initial={{ title: t.title, category: t.category ?? 'General', impact: t.operational_impact ?? 'none', priority: t.priority, description: t.description }} />}
-          </div>
         </Card>
-      </div>
       {/* Bump this RM's "last seen" watermark on a real open (fires client-side, not on
           prefetch) so these updates read as seen next visit. */}
       <MarkTicketSeen ticketId={t.id} latestUpdateAt={supplierUpdates[0]?.created_at ?? null} />
@@ -717,102 +816,6 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
           <RmSignoffCard s={acceptedSignoff} tone="approved" ticketId={t.id} />
         </CollapsibleSection>
       )}
-      <Card className="p-5 space-y-4">
-        <h2 className="text-sm font-bold text-[var(--text)]">Actions</h2>
-
-        {snagAwaitingApproval && latestSnag?.scheduled_at && <AcceptSnagScheduleCard ticketId={t.id} scheduledAt={latestSnag.scheduled_at} />}
-
-        {/* The "snag schedule is approved" copy must only show once the RM has actually
-            approved it (schedule_status 'agreed') — not while it's still proposed. */}
-        {SNAG_WAIT_MSG[t.status] && !snagAwaitingApproval && !openDispute && (t.status !== 'snag_assigned' || latestSnag?.schedule_status === 'agreed') && (
-          <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 flex items-start gap-2.5">
-            <Clock size={16} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
-            <p className="text-sm text-[var(--text-muted)]">{SNAG_WAIT_MSG[t.status]}{latestSnag?.description ? ` Snag raised: “${latestSnag.description}”.` : ''} The full submission is in the Archive below.</p>
-          </div>
-        )}
-
-        {t.status === 'evidence_requested' && !openDispute && (
-          <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 flex items-start gap-2.5">
-            <Clock size={16} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
-            <p className="text-sm text-[var(--text-muted)]">Awaiting the supplier to provide the additional evidence requested on the completion (COC &amp; POC).{t.evidence_request_reason ? ` Requested: “${t.evidence_request_reason}”.` : ''}</p>
-          </div>
-        )}
-
-        {/* Variation order declined — the supplier now owns the next step. */}
-        {t.status === 'vo_declined' && (
-          <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 flex items-start gap-2.5">
-            <Clock size={16} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
-            <p className="text-sm text-[var(--text-muted)]">You declined the variation order. Awaiting the supplier&apos;s response — they can submit a revised variation order or message you before the job proceeds.</p>
-          </div>
-        )}
-
-        {awaitingSupplierQuotes && (
-          <div className="rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/30 p-3.5 flex items-start gap-2.5">
-            <CheckCircle2 size={16} className="text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
-            <p className="text-sm text-[var(--text-muted)]">Supplier{activeSupplierRows.filter(r => r.status === 'invited').length === 1 ? '' : 's'} assigned — awaiting their quote{activeSupplierRows.filter(r => r.status === 'invited').length === 1 ? '' : 's'}.</p>
-          </div>
-        )}
-
-        {/* Add extra work — before a supplier is assigned; disappears once assigned. */}
-        {canAssign && <RmAddWorkForm ticketId={t.id} description={t.description ?? ''} photoUrls={Array.isArray(t.photo_urls) ? t.photo_urls : []} title={t.title} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} />}
-
-        {/* Primary actions — equal-size, side by side: Assign (green) · Request info (amber) · Cancel (red) */}
-        {!isTerminal && (canAssign || canCancel) && (
-          <div className="flex gap-2">
-            {canAssignSupplier && <AssignSuppliersButton ticketId={t.id} suppliers={supplierList} motivSuppliers={motivSupplierList} declinedSupplierIds={declinedSupplierIds} awaitingById={engagedSupplierIds} />}
-            {['open', 'info_requested'].includes(t.status) && <RequestInfoButton ticketId={t.id} />}
-            {canCancel && <CancelTicketCard ticketId={t.id} />}
-          </div>
-        )}
-
-        {/* Accept sign-off with a required supplier rating; send back for more
-            evidence or raise a snag — both as pop-ups (like Request more info). */}
-        {t.status === 'submitted_for_signoff' && <ApproveSignoffCard ticketId={t.id} />}
-        {t.status === 'submitted_for_signoff' && (
-          <div className="flex gap-2">
-            <RequestEvidenceButton ticketId={t.id} />
-            <RaiseSnagButton ticketId={t.id} />
-          </div>
-        )}
-
-        {/* Accept a supplier's proposed (beyond-window) visit time */}
-        {t.status === 'scheduled' && t.schedule_status === 'proposed' && t.scheduled_at && <AcceptScheduleCard ticketId={t.id} scheduledAt={t.scheduled_at} />}
-
-        {/* Variation order review — dedicated approve (confirm-over-buttons) + decline pop-up. */}
-        {t.status === 'variation_review' && <VariationReviewCard ticketId={t.id} />}
-
-        {/* Quote approved / awarded — waiting on the supplier to attend. They flag when
-            they're on their way or on site by marking the ticket in progress. */}
-        {['accepted', 'scheduled'].includes(t.status) && (
-          <div className="rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/30 p-3.5 flex items-start gap-2.5">
-            <CheckCircle2 size={16} className="text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
-            <p className="text-sm text-[var(--text-muted)]"><span className="font-semibold text-[var(--text)]">{nameById.get(t.supplier_id ?? '') ?? 'The supplier'}</span> has been awarded the job. They&apos;ll let you know when they&apos;re on their way or on site by marking the ticket in progress.</p>
-          </div>
-        )}
-
-        {/* In progress — the supplier has started; reassure the RM the job is being attended to. */}
-        {t.status === 'in_progress' && (
-          <div className="rounded-xl bg-[#C6A35D]/10 ring-1 ring-[#C6A35D]/30 p-3.5 text-sm text-[var(--text-muted)]">Work in progress — the supplier is on site or en route to attend to the job. The completion certificate and proof-of-completion photos will follow once the work is done.</div>
-        )}
-
-        {/* Close-out stage — COC/POC approved; the supplier may still raise a variation
-            order, or the RM finalises the close-out (button below). */}
-        {(t.status === 'approved_closeout' || t.status === 'vo_declined') && (
-          <>
-            <div className="rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/30 p-3.5 text-sm text-[var(--text-muted)]">COC &amp; POC approved. The supplier can still raise a variation order for extra work — otherwise finalise the close-out below once they confirm there are none.</div>
-            {/* Final close-out — greyed until the supplier confirms no further VOs. */}
-            <CloseOutButton ticketId={t.id} voConfirmed={!!t.vo_none_confirmed_at} />
-          </>
-        )}
-
-        {/* Remaining lifecycle actions (request evidence, snag, close). close_out is
-            handled by the gated CloseOutButton above. */}
-        <WorkflowActions
-          ticketId={t.id} status={t.status} role="regional_manager"
-          suppliers={supplierList}
-          exclude={['validate', 'reject', 'request_info', 'request_quote', 'require_assessment', 'approve_quote', 'reject_quote', 'request_revision', 'proceed_no_quote', 'schedule', 'approve', 'assign_snag', 'accept_schedule', 'approve_snag', 'decline_snag_schedule', 'approve_variation', 'reject_variation', 'request_evidence', 'raise_snag', 'close_out']}
-        />
-      </Card>
       {/* Resolved dispute(s) → history below the Actions once nothing is live. */}
       {!openDispute && disputeBlock}
       {/* Quotes — suppliers requested, quotes to review, the accepted quote. Open
@@ -996,51 +999,9 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
           )}
         </CollapsibleSection>
       )}
-      {/* Updates from the supplier — full history, collapsed by default. Sits just
-          above the audit trail once there's nothing new (everything here is seen). */}
-      {supplierUpdates.length > 0 && newSupplierUpdates.length === 0 && (
-        <CollapsibleSection id="ticket-updates" title="Updates from the supplier" badge={<span className="text-[11px] text-[var(--text-faint)]">{supplierUpdates.length} update{supplierUpdates.length === 1 ? '' : 's'}</span>}>
-          <ol className="space-y-2.5">
-            {supplierUpdates.map((u, i) => <SupplierUpdateItem key={i} u={u} ticketId={t.id} />)}
-          </ol>
-        </CollapsibleSection>
-      )}
-      {/* Photos — every image on the ticket in one place (SM-style), grouped by
-          source. Completion before/after also stay in the sign-off card above. */}
-      {totalPhotos > 0 && (
-        <CollapsibleSection id="ticket-photos" title="Photos" defaultOpen badge={<span className="text-[11px] text-[var(--text-faint)]">{totalPhotos} photo{totalPhotos === 1 ? '' : 's'}</span>}>
-          <div className="space-y-4">
-            {photoGroups.map((g, i) => (
-              <div key={i} className="space-y-1.5">
-                <p className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">{g.label}</p>
-                <PhotoThumbs urls={g.urls} ticketId={t.id} label={g.label} />
-              </div>
-            ))}
-          </div>
-        </CollapsibleSection>
-      )}
-      <AuditTrail ticket={{
-        createdAt: t.created_at, status: t.status, updatedAt: t.updated_at,
-        quoteRequestedAt: t.first_quote_requested_at ?? t.quote_requested_at,
-        quoteRequests: ((requestRows ?? []) as any[]).map(r => ({ at: r.requested_at, supplierName: r.supplier_id ? (nameById.get(r.supplier_id) ?? null) : null })),
-        quoteSubmittedAt: t.quote_submitted_at,
-        quoteApprovedAt: t.quote_decision_status === 'approved' ? t.quote_decided_at : null,
-        scheduledAt: t.scheduled_at, completedAt: t.completed_at,
-        editedAt: t.edited_at, editedByName: editorName, editNote: t.edit_note, cancellationReason: t.cancellation_reason,
-        infoRequestedAt: t.info_requested_at, infoAddedAt: t.info_added_at, infoRequestReason: t.info_request_reason,
-        snagScheduledAt,
-        snagAcceptedAt: latestSnag?.assigned_at ?? null,
-        snagProposedAt: latestSnag?.assigned_at ?? null, snagApprovedAt: latestSnag?.schedule_agreed_at ?? null,
-        snagDeclinedAt: declinedSnag?.schedule_declined_at ?? null, snagDeclineReason: declinedSnag?.schedule_decline_reason ?? null,
-        snagScheduleEvents: (snagEventRows ?? []) as any[],
-        workStartedAt: t.attended_at ?? null,
-        quotes: ((quotes ?? []) as any[]).map(q => ({ ...q, supplierName: nameById.get(q.supplier_id) ?? 'Supplier' })),
-        variations: (variations ?? []) as any[],
-        disputes: disputes.map(d => ({ origin: d.origin, status: d.status, outcome: d.outcome, created_at: d.created_at, resolved_at: d.resolved_at, reason: d.resolution_note })),
-        disputeMessages: disputeMsgs.map((m: any) => ({ author_role: m.author_role, body: m.body, created_at: m.created_at })),
-        signoffs: allSignoffs, updates: (updates ?? []) as any[], views: (viewRows ?? []) as any[],
-        supplierDeclines,
-      }} />
+      {/* Photos · Activity (supplier updates) · Timeline (the full audit trail —
+          status changes, edits, attachments/photos viewed, quotes, sign-offs …). */}
+      <RmTicketTabs ticketId={t.id} photoGroups={photoGroups} updates={supplierUpdates} timeline={timelineItems} />
     </div>
   );
 }

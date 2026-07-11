@@ -292,7 +292,7 @@ export function RmEditTicketForm({ ticketId, initial }: { ticketId: string; init
 
   return (
     <>
-      <button onClick={() => setOpen(true)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#C6A35D] hover:underline"><Pencil size={13} /> Edit ticket</button>
+      <button onClick={() => setOpen(true)} className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-500"><Pencil size={13} /> Edit ticket</button>
       {open && (
         <Modal title="Edit ticket" onClose={() => setOpen(false)}>
           <Labeled label="Title"><input className={input} value={title} onChange={e => setTitle(e.target.value)} placeholder="Title" /></Labeled>
@@ -457,7 +457,7 @@ export function RmAddWorkForm({ ticketId, description, photoUrls, title, categor
 
   return (
     <>
-      <button onClick={() => setOpen(true)} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl ring-1 ring-[#C6A35D]/40 text-[#C6A35D] text-sm font-semibold hover:bg-[#C6A35D]/10 transition">
+      <button onClick={() => setOpen(true)} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition">
         <Plus size={16} /> Add extra work
       </button>
       {open && (
