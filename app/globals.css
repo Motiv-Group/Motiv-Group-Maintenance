@@ -14,18 +14,18 @@
     color-scheme: dark;
   }
   body {
-    @apply bg-[#f3f4f6] text-gray-900 dark:bg-[#0b0c11] dark:text-white;
+    @apply bg-[#f0f1f4] text-gray-900 dark:bg-[#0b0c11] dark:text-white;
   }
 
   /* ── Dashboard surface palette (single source of truth for light + dark).
      The v3 command-centre UI references these vars instead of hard-coded
      navy hex, so the theme toggle works everywhere and stays readable. ── */
   :root {
-    --app-bg:     #f3f4f6;
+    --app-bg:     #f0f1f4;
     --surface:    #ffffff;
     --surface-2:  #f7f8fa;
     --nav-bg:     #ffffff;
-    --border:     rgba(17, 18, 24, 0.10);
+    --border:     rgba(17, 18, 24, 0.115);
     --hover:      rgba(17, 18, 24, 0.045);
     --input-bg:   #f1f2f4;
     --text:       #14151a;

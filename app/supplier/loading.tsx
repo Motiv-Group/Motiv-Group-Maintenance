@@ -8,7 +8,7 @@ export default function SupplierDashboardLoading() {
         <Skeleton className="h-9 w-28 rounded-xl" />
       </div>
       <SkeletonStatGrid />
-      <div className="bg-[var(--surface)] ring-1 ring-black/10 dark:ring-white/10 rounded-2xl p-4 space-y-3">
+      <div className="bg-[var(--surface)] ring-1 ring-[var(--border)] dark:ring-white/10 rounded-2xl p-4 space-y-3">
         <Skeleton className="h-4 w-48" />
         <Skeleton className="h-3 w-full rounded-full" />
         <div className="flex gap-4">

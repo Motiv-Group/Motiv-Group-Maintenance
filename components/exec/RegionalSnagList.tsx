@@ -25,7 +25,7 @@ export function RegionalSnagList({ rows }: { rows: SnagRow[] }) {
   return (
     <div className="space-y-4">
       {groups.map(([store, items]) => (
-        <details key={store} open className="group rounded-2xl bg-[var(--surface)] ring-1 ring-black/10 dark:ring-white/10 shadow-sm dark:shadow-md dark:shadow-black/20 overflow-hidden">
+        <details key={store} open className="group rounded-2xl bg-[var(--surface)] ring-1 ring-[var(--border)] dark:ring-white/10 shadow-sm dark:shadow-md dark:shadow-black/20 overflow-hidden">
           <summary className="flex items-center gap-2 px-4 py-3 cursor-pointer list-none hover:bg-[var(--hover)] transition">
             <Building2 size={15} className="text-[#C6A35D] shrink-0" />
             <span className="text-sm font-bold text-[var(--text)] truncate">{store}</span>

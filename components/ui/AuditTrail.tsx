@@ -19,7 +19,7 @@ const DOT_TONE: Record<TimelineTone, string> = {
 export function AuditTrail({ ticket }: { ticket: TimelineInput }) {
   const items = buildTicketTimeline(ticket)
   return (
-    <details className="group rounded-2xl bg-[var(--surface)] ring-1 ring-black/10 dark:ring-white/10 shadow-sm dark:shadow-md dark:shadow-black/20 overflow-hidden">
+    <details className="group rounded-2xl bg-[var(--surface)] ring-1 ring-[var(--border)] dark:ring-white/10 shadow-sm dark:shadow-md dark:shadow-black/20 overflow-hidden">
       <summary className="flex items-center justify-between gap-2 px-5 py-4 cursor-pointer list-none hover:bg-[var(--hover)] transition">
         <span className="flex items-center gap-2 text-sm font-bold text-[var(--text)]"><History size={15} className="text-[var(--text-muted)]" /> View audit trail</span>
         <span className="flex items-center gap-2">

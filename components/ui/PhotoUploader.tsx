@@ -86,7 +86,7 @@ export function PhotoUploader({ photos, previews, onAdd, onRemove, max = 5, minH
                 <button
                   type="button"
                   onClick={() => browseRef.current?.click()}
-                  className="flex items-center justify-center gap-2 py-3.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-200 hover:border-[#C6A35D] hover:text-[#C6A35D] transition-colors"
+                  className="flex items-center justify-center gap-2 py-3.5 bg-white dark:bg-gray-800 border border-[var(--border)] dark:border-gray-700 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-200 hover:border-[#C6A35D] hover:text-[#C6A35D] transition-colors"
                 >
                   <ImagePlus size={16} />
                   Browse
@@ -96,7 +96,7 @@ export function PhotoUploader({ photos, previews, onAdd, onRemove, max = 5, minH
                 <button
                   type="button"
                   onClick={() => cameraRef.current?.click()}
-                  className="flex items-center justify-center gap-2 py-3.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-200 hover:border-[#C6A35D] hover:text-[#C6A35D] transition-colors"
+                  className="flex items-center justify-center gap-2 py-3.5 bg-white dark:bg-gray-800 border border-[var(--border)] dark:border-gray-700 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-200 hover:border-[#C6A35D] hover:text-[#C6A35D] transition-colors"
                 >
                   <Camera size={16} />
                   Take Photo

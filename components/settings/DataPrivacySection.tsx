@@ -58,7 +58,7 @@ export function DataPrivacySection() {
   }
 
   return (
-    <div className="bg-slate-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
+    <div className="bg-slate-50 dark:bg-gray-800 border border-[var(--border)] dark:border-gray-700 rounded-xl p-5">
       <div className="flex items-center gap-2 mb-4">
         <ShieldCheck size={16} className="text-[#C6A35D]" />
         <h2 className="font-semibold text-gray-900 dark:text-white text-sm">Privacy &amp; your data</h2>
@@ -87,7 +87,7 @@ export function DataPrivacySection() {
           </button>
         </div>
 
-        <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+        <div className="border-t border-[var(--border)] dark:border-gray-700 pt-4">
           {!confirmOpen ? (
             <div className="flex items-center justify-between gap-3">
               <div>

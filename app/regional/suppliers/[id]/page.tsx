@@ -65,7 +65,7 @@ export default async function ContractorProfilePage(props: { params: Promise<{ i
       </div>
 
       {/* Contact details */}
-      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 space-y-3">
+      <div className="bg-white dark:bg-gray-800 border border-[var(--border)] dark:border-gray-700 rounded-xl p-4 space-y-3">
         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Contact Details</p>
 
         {contractor.full_name && (
@@ -124,7 +124,7 @@ export default async function ContractorProfilePage(props: { params: Promise<{ i
       </div>
 
       {/* Rating summary */}
-      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 space-y-3">
+      <div className="bg-white dark:bg-gray-800 border border-[var(--border)] dark:border-gray-700 rounded-xl p-4 space-y-3">
         <div className="flex items-center justify-between">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Rating</p>
           <Link

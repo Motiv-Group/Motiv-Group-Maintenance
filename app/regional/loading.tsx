@@ -10,7 +10,7 @@ export default function RegionalDashboardLoading() {
       </div>
       <SkeletonStatGrid />
       {/* Progress bar */}
-      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 space-y-3">
+      <div className="bg-white dark:bg-gray-800 border border-[var(--border)] dark:border-gray-700 rounded-xl p-4 space-y-3">
         <Skeleton className="h-4 w-48" />
         <Skeleton className="h-3 w-full rounded-full" />
         <div className="flex gap-4">

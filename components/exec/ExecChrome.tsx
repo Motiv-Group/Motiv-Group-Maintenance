@@ -228,7 +228,7 @@ function DesktopSidebar({
         {contextOptions && contextOptions.length > 0 ? (
           <ContextSwitcher options={contextOptions} activeId={activeContextId ?? null} cookieName={contextCookie ?? 'motiv_ctx'} Icon={ContextIcon} />
         ) : contextLabel ? (
-          <div className="mt-6 flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-gray-200">
+          <div className="mt-6 flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-white">
             <span className="truncate">{contextLabel}</span>
             <ContextIcon size={14} className="shrink-0 text-gray-400" />
           </div>

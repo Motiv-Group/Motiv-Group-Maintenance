@@ -161,7 +161,7 @@ export function RecentTicketsStack({
 
             {/* Top card */}
             <div
-              className="relative bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-sm group-hover:border-brand-400 dark:group-hover:border-gray-500 group-hover:shadow-md transition-all"
+              className="relative bg-white dark:bg-gray-800 border border-[var(--border)] dark:border-gray-700 rounded-xl p-4 shadow-sm group-hover:border-brand-400 dark:group-hover:border-gray-500 group-hover:shadow-md transition-all"
               style={{ zIndex: 2 }}
             >
               <TicketContent ticket={topTicket} variant={variant} />
@@ -185,7 +185,7 @@ export function RecentTicketsStack({
           <div className="space-y-2">
             {tickets.map(ticket => (
               <Link key={ticket.id} href={`${detailPath}/${ticket.id}`}>
-                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 hover:border-brand-400 dark:hover:border-gray-500 transition-colors">
+                <div className="bg-white dark:bg-gray-800 border border-[var(--border)] dark:border-gray-700 rounded-xl p-4 hover:border-brand-400 dark:hover:border-gray-500 transition-colors">
                   <TicketContent ticket={ticket} variant={variant} />
                 </div>
               </Link>

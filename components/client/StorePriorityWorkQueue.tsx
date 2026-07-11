@@ -169,7 +169,7 @@ function MetricButton({
   // green when the count is 0 (all clear), amber when there's work outstanding.
   const stateText = zero ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'
   const iconChip = zero ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 ring-emerald-500/20' : 'bg-amber-500/15 text-amber-600 dark:text-amber-400 ring-amber-500/20'
-  const stateBorder = zero ? 'border-2 border-black/10 dark:border-white/10' : 'border-2 border-amber-500/70'
+  const stateBorder = zero ? 'border-2 border-[var(--border)] dark:border-white/10' : 'border-2 border-amber-500/70'
 
   return (
     <button
