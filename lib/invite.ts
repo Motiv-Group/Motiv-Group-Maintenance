@@ -1,6 +1,7 @@
 import 'server-only'
 import { createAdminClient } from '@/lib/supabase/server'
 import { motivBrandedEmailHtml } from '@/lib/email'
+import { signAccountToken } from '@/lib/auth-token'
 
 export type InviteRole = 'regional_manager' | 'store_manager' | 'supplier' | 'executive'
 
@@ -24,30 +25,21 @@ interface InviteOpts {
  */
 export async function inviteUser(opts: InviteOpts): Promise<{ userId: string; actionLink: string | null; emailed: boolean }> {
   const admin = createAdminClient()
-  // Must be an ABSOLUTE url that is allow-listed in Supabase Auth → URL
-  // Configuration → Redirect URLs, otherwise Supabase ignores it and drops the
-  // invited user on the Site URL (logged in, no password set).
   const base = (opts.baseUrl || process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '')
-  // Suppliers land on a full onboarding form (company details + password);
-  // RMs just set a password.
-  const path = opts.role === 'supplier' ? '/auth/supplier-onboard' : '/auth/reset-password'
-  const redirectTo = `${base}${path}`
 
   const p = opts.profile ?? {}
-  const { data, error } = await admin.auth.admin.generateLink({
-    type: 'invite', email: opts.email.trim().toLowerCase(),
-    options: { data: { role: opts.role, company_id: opts.companyId, full_name: p.fullName, phone: p.phone }, redirectTo },
-  } as any)
+  // Create the (confirmed, password-less) auth user directly — the invitee sets
+  // their password via our own signed-token link, so we don't use Supabase's
+  // invite/verify/OTP flow at all.
+  const { data, error } = await admin.auth.admin.createUser({
+    email: opts.email.trim().toLowerCase(),
+    email_confirm: true,
+    user_metadata: { role: opts.role, company_id: opts.companyId, full_name: p.fullName, phone: p.phone },
+  })
   if (error || !data?.user) {
-    throw new Error(error?.message?.includes('already') ? 'That email already has an account.' : (error?.message ?? 'Invite failed'))
+    throw new Error(/already|registered|exists/i.test(error?.message ?? '') ? 'That email already has an account.' : (error?.message ?? 'Invite failed'))
   }
   const uid = data.user.id
-
-  // Admin-provisioned accounts: the inviter vouches for the address, so confirm the
-  // email up front. With "Confirm email" enabled, this lets the invitee sign in the
-  // moment they set a password (including via the copied activation link) instead of
-  // depending on the click to flip email_confirmed_at. Best-effort — never blocks.
-  await admin.auth.admin.updateUserById(uid, { email_confirm: true }).catch(() => {})
 
   // Ensure profile carries company + role + any admin-entered details (the trigger
   // seeds from metadata; enforce here so the account is complete on creation).
@@ -64,11 +56,10 @@ export async function inviteUser(opts: InviteOpts): Promise<{ userId: string; ac
   if (opts.link.storeId) await admin.from('store_users').upsert({ user_id: uid, store_id: opts.link.storeId })
   if (opts.link.supplierId) await admin.from('supplier_users').upsert({ user_id: uid, supplier_id: opts.link.supplierId })
 
-  // Link to our confirm page carrying the one-time token_hash. The page is where
-  // the password is set (server verifies the token + sets that user's password) —
-  // prefetch-safe (a scanner GET spends nothing) and session-independent.
-  const tokenHash = (data.properties as any)?.hashed_token as string | undefined
-  const actionLink = tokenHash ? `${base}/auth/confirm?token_hash=${tokenHash}&type=invite` : null
+  // Link to our confirm page carrying a signed token (uid + 1-month expiry). The
+  // page sets the password server-side by verifying THIS token → that user — no
+  // Supabase OTP, no browser session, prefetch-safe.
+  const actionLink = `${base}/auth/confirm?t=${signAccountToken(uid, Date.now())}&type=invite`
   const emailed = await sendInviteEmail(opts.email, actionLink, opts.roleLabel, base)
   return { userId: uid, actionLink, emailed }
 }

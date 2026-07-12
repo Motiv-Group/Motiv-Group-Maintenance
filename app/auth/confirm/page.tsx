@@ -13,7 +13,7 @@ import { CheckCircle2 } from 'lucide-react'
 // the password is set for the token's user, so it can never touch a logged-in
 // account (this was the earlier admin-password bug).
 export default function ConfirmPage() {
-  const [tokenHash, setTokenHash] = useState('')
+  const [token, setToken] = useState('')
   const [type, setType] = useState('invite')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -24,21 +24,21 @@ export default function ConfirmPage() {
   useEffect(() => {
     const q = new URLSearchParams(window.location.search)
     // eslint-disable-next-line react-hooks/set-state-in-effect -- read one-time confirm params from the URL on mount (client-only)
-    setTokenHash(q.get('token_hash') ?? '')
+    setToken(q.get('t') ?? '')
     setType(q.get('type') === 'recovery' ? 'recovery' : 'invite')
   }, [])
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
-    if (!tokenHash) { setError('This link is invalid. Please request a new one.'); return }
+    if (!token) { setError('This link is invalid. Please request a new one.'); return }
     if (password.length < 8) { setError('Password must be at least 8 characters.'); return }
     if (password !== confirm) { setError('Passwords do not match.'); return }
 
     setLoading(true)
     const res = await fetch('/api/auth/set-password', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tokenHash, type, password }),
+      body: JSON.stringify({ t: token, password }),
     })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) { setError(data.error ?? 'Could not set your password. Please request a new link.'); setLoading(false); return }
