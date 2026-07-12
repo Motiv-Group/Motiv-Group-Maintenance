@@ -1103,21 +1103,6 @@ revoke all on function public.reserve_upload_quota(uuid, bigint, bigint) from pu
 revoke all on function public.reserve_upload_quota(uuid, bigint, bigint) from anon, authenticated;
 grant execute on function public.reserve_upload_quota(uuid, bigint, bigint) to service_role;
 
-CREATE OR REPLACE FUNCTION public.app_can_see_ticket(t_id uuid)
- RETURNS boolean
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-  select exists (select 1 from public.tickets t where t.id = t_id
-    and t.company_id = public.app_company_id()
-    and (public.app_is_company_wide()
-      or t.region_id in (select public.app_region_ids())
-      or t.store_id  in (select public.app_store_ids())
-      or t.supplier_id in (select public.app_supplier_ids())));
-$function$
-;
-
 -- True iff the caller owns t_id AND it is a standalone/company-less ticket
 -- (Individual users). Lets owner-scoped read policies on quotes/signoffs check
 -- ownership without recursing through tickets RLS. (migration 20260706)
@@ -1191,6 +1176,23 @@ CREATE OR REPLACE FUNCTION public.app_supplier_ids()
  SET search_path TO 'public'
 AS $function$
   select supplier_id from public.supplier_users where user_id = auth.uid();
+$function$
+;
+
+-- Composite visibility helper — defined AFTER the app_* leaf helpers it calls so
+-- its SQL-language body validates on a from-scratch run.
+CREATE OR REPLACE FUNCTION public.app_can_see_ticket(t_id uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select exists (select 1 from public.tickets t where t.id = t_id
+    and t.company_id = public.app_company_id()
+    and (public.app_is_company_wide()
+      or t.region_id in (select public.app_region_ids())
+      or t.store_id  in (select public.app_store_ids())
+      or t.supplier_id in (select public.app_supplier_ids())));
 $function$
 ;
 
