@@ -223,17 +223,22 @@ function DesktopSidebar({
 
   return (
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-[260px] border-r border-white/10 bg-brand-600 text-white lg:flex lg:flex-col">
-      <div className="px-5 pt-6 pb-4">
+      <div className="px-5 pt-6">
         <Link href={home} className="inline-flex"><MotivLogo height={34} /></Link>
-        {contextOptions && contextOptions.length > 0 ? (
+      </div>
+      {/* Context chip sits in px-3 like the nav items so it's the same width. */}
+      {contextOptions && contextOptions.length > 0 ? (
+        <div className="px-3 pb-4">
           <ContextSwitcher options={contextOptions} activeId={activeContextId ?? null} cookieName={contextCookie ?? 'motiv_ctx'} Icon={ContextIcon} />
-        ) : contextLabel ? (
+        </div>
+      ) : contextLabel ? (
+        <div className="px-3 pb-4">
           <div className="mt-6 flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-white">
             <span className="truncate">{contextLabel}</span>
             <ContextIcon size={14} className="shrink-0 text-gray-400" />
           </div>
-        ) : null}
-      </div>
+        </div>
+      ) : <div className="pb-4" />}
 
       <nav className="flex-1 px-3">
         <div className="space-y-1">

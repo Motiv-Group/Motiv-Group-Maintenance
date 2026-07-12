@@ -159,7 +159,7 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
       {/* Two columns: Next action · Ticket information */}
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Next action */}
-        <Card className="p-5">
+        <Card className="p-5 h-full">
           <h2 className="text-sm font-bold text-[var(--text)] mb-3">Next action</h2>
           <div className="flex items-start gap-3">
             <NaIcon size={22} className={`${naColor} shrink-0 ${spinning ? 'animate-spin' : ''}`} />
@@ -189,7 +189,7 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
         </Card>
 
         {/* Ticket information */}
-        <Card className="p-5">
+        <Card className="p-5 h-full">
           <h2 className="text-sm font-bold text-[var(--text)] mb-3">Ticket information</h2>
           <div className="space-y-3">
             <InfoRow label="Category" value={t.category ?? 'General'} />

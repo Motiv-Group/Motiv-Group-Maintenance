@@ -885,11 +885,11 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
         <RmPipeline status={t.status} />
       </Card>
 
-      {/* Next action + Ticket information, side by side. */}
-      <div className="grid gap-4 lg:grid-cols-2 items-start">
+      {/* Next action + Ticket information, side by side — matched heights (stretch). */}
+      <div className="grid gap-4 lg:grid-cols-2 items-stretch">
       {/* Next action — the RM's most important pending step + the controls to take it
           (buttons stacked one under another). */}
-      <Card className="p-5 space-y-4">
+      <Card className="p-5 space-y-4 h-full">
         <div>
           <h2 className="text-sm font-bold text-[var(--text)]">Next action</h2>
           {nextAction.msg && <p className="mt-1 text-sm font-bold text-[var(--text)]">{nextAction.msg}</p>}
@@ -985,7 +985,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
       </Card>
 
       {/* Ticket information — details + description (left) · logged/due + edit (right). */}
-        <Card className="p-5 space-y-4">
+        <Card className="p-5 space-y-4 h-full">
           <h2 className="text-sm font-bold text-[var(--text)]">Ticket information</h2>
           <div className="grid gap-x-6 gap-y-4 lg:grid-cols-2">
             {/* Left — store details + the description. */}
