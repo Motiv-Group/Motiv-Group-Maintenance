@@ -277,7 +277,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className="dark min-h-screen bg-[#0b0c11] flex flex-col items-center justify-center px-4 py-12">
       <div className="w-full max-w-md">
-        <div className="flex items-center justify-center mb-8"><MotivLockup height={92} /></div>
+        <div className="flex items-center justify-center mb-8"><MotivLockup height={132} /></div>
         <div className="bg-slate-50 dark:bg-[#1f2027] rounded-2xl shadow-sm border border-gray-200 dark:border-white/10 p-6 sm:p-8">
           {children}
         </div>

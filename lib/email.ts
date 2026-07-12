@@ -45,8 +45,8 @@ export function motivBrandedEmailHtml(o: {
     <tr><td align="center">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e5e7eb;">
         <tr><td style="background:#0d1f2d;padding:20px 32px;">
-          <img src="${o.base}/brand/motiv-symbol.png" alt="" width="42" height="28" style="display:inline-block;vertical-align:middle;border:0;height:28px;width:42px;" />
-          <img src="${o.base}/brand/motiv-wordmark.png" alt="MOTIV" width="93" height="20" style="display:inline-block;vertical-align:middle;border:0;height:20px;width:93px;margin-left:10px;" />
+          <img src="${o.base}/brand/motiv-symbol.png" alt="" width="45" height="30" style="display:inline-block;vertical-align:bottom;border:0;height:30px;width:45px;" />
+          <img src="${o.base}/brand/motiv-wordmark.png" alt="MOTIV" width="93" height="20" style="display:inline-block;vertical-align:bottom;border:0;height:20px;width:93px;margin-left:9px;" />
         </td></tr>
         <tr><td style="padding:32px;color:#1f2937;">
           <h1 style="margin:0 0 12px;font-size:20px;font-weight:700;color:#0d1f2d;">${o.heading}</h1>

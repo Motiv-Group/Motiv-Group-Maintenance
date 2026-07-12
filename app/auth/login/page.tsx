@@ -100,7 +100,7 @@ export default function LoginPage() {
 
           {/* Logo — larger and centred */}
           <div className="flex items-center justify-center mb-10">
-            <MotivLockup height={150} />
+            <MotivLockup height={210} />
           </div>
 
           <div className="bg-[#17181e] rounded-2xl shadow-xl border border-white/10 p-6 sm:p-10">

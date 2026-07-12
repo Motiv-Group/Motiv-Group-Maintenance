@@ -69,7 +69,7 @@ export default function SignupPage() {
     return (
       <div className="dark min-h-screen bg-[#0b0c11] flex flex-col items-center justify-center px-4 py-12">
         <div className="w-full max-w-md">
-          <div className="flex items-center justify-center mb-8"><MotivLockup height={92} /></div>
+          <div className="flex items-center justify-center mb-8"><MotivLockup height={132} /></div>
           <div className="bg-slate-50 dark:bg-[#1f2027] rounded-2xl shadow-sm border border-gray-200 dark:border-white/10 p-6 sm:p-8 text-center">
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10"><Mail size={24} className="text-emerald-500" /></div>
             <h1 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Check your email</h1>
@@ -86,7 +86,7 @@ export default function SignupPage() {
   return (
     <div className="dark min-h-screen bg-[#0b0c11] flex flex-col items-center justify-center px-4 py-12">
       <div className="w-full max-w-md">
-        <div className="flex items-center justify-center mb-8"><MotivLockup height={92} /></div>
+        <div className="flex items-center justify-center mb-8"><MotivLockup height={132} /></div>
 
         <div className="bg-slate-50 dark:bg-[#1f2027] rounded-2xl shadow-sm border border-gray-200 dark:border-white/10 p-6 sm:p-8">
           <h1 className="text-xl font-semibold text-gray-900 dark:text-white mb-1">Create your account</h1>

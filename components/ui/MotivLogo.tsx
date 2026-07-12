@@ -16,13 +16,16 @@ interface MotivLogoProps {
  */
 export function MotivLogo({ height = 32, className = '' }: MotivLogoProps) {
   const symW = Math.round(height * (1536 / 1024)) // symbol aspect 1536×1024
-  const wordH = Math.round(height * 0.5)
+  // The "MOTIV" wordmark is wide (aspect 4.6), so a full-height wordmark overflows
+  // the narrow nav. Set it to ~2/3 of the symbol height and bottom-align both so the
+  // word sits on the same baseline as the "M".
+  const wordH = Math.round(height * 0.66)
   const wordW = Math.round(wordH * (701 / 151))  // wordmark aspect 701×151
 
   return (
-    <span className={`inline-flex items-end ${className}`} style={{ gap: Math.round(height * 0.42) }}>
+    <span className={`inline-flex items-end ${className}`} style={{ gap: Math.round(height * 0.24) }}>
       <Image src="/brand/motiv-symbol.png" alt="" width={symW} height={height} priority unoptimized draggable={false} className="object-contain" />
-      <Image src="/brand/motiv-wordmark.png" alt="Motiv" width={wordW} height={wordH} priority unoptimized draggable={false} className="mb-[2px] object-contain" />
+      <Image src="/brand/motiv-wordmark.png" alt="Motiv" width={wordW} height={wordH} priority unoptimized draggable={false} className="object-contain" />
     </span>
   )
 }

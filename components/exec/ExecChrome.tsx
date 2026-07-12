@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { Globe2, Map as MapIcon, Store, Truck, Gavel, Bell, Settings, LogOut, FileBarChart, LayoutDashboard, Ticket, ClipboardCheck, AlertTriangle, ReceiptText, BarChart2, Users, CalendarClock, CheckCircle2, Clock, Network, ScrollText, Database, Triangle, Mail, Zap, ShieldAlert } from 'lucide-react'
+import { Globe2, Map as MapIcon, Store, Truck, Gavel, Bell, Settings, LogOut, FileBarChart, LayoutDashboard, Ticket, ClipboardCheck, AlertTriangle, ReceiptText, BarChart2, Users, CalendarClock, CheckCircle2, Network, ScrollText, Database, Triangle, Mail, Zap, ShieldAlert } from 'lucide-react'
 import { MotivLogo } from '@/components/ui/MotivLogo'
 import { ContextSwitcher } from '@/components/ui/ContextSwitcher'
 import { SwipeNav } from '@/components/ui/SwipeNav'
@@ -14,14 +14,11 @@ type SearchParamsLike = { get(name: string): string | null }
 // (e.g. a supplier's "Pending verification" / "Verified"). Kept gentle by design.
 export type AccountStatus = { label: string; tone: 'amber' | 'emerald' }
 
-function AccountStatusPill({ status }: { status: AccountStatus }) {
-  const cls = status.tone === 'emerald' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-200'
-  const Icon = status.tone === 'emerald' ? CheckCircle2 : Clock
-  return (
-    <span className={`mt-1 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${cls}`}>
-      <Icon size={10} /> {status.label}
-    </span>
-  )
+// Verification shows as a short coloured suffix on the ROLE line ("Supplier ·
+// Verified" / "· Pending") — inline, so it never adds a row or thickens the block
+// (the name can be long and lives on its own line above).
+function statusSuffix(s: AccountStatus) {
+  return <span className={s.tone === 'emerald' ? 'text-emerald-400' : 'text-amber-300'}> · {s.tone === 'emerald' ? 'Verified' : 'Pending'}</span>
 }
 
 const EXEC_TABS: ChromeTab[] = [
@@ -143,7 +140,7 @@ export function ExecChrome({
       <div className={hasSidebar ? 'lg:pl-[260px] flex min-h-screen flex-col' : 'flex min-h-screen flex-col'}>
       <header className={`sticky top-0 z-20 bg-brand-600 border-b border-brand-700 ${hasSidebar ? 'lg:hidden' : ''}`}>
         <div className={`${wrap} mx-auto px-4 h-16 flex items-center justify-between`}>
-          <Link href={home}><MotivLogo height={36} /></Link>
+          <Link href={home}><MotivLogo height={40} /></Link>
           <div className="flex items-center gap-1">
             {reports && <Link href={`${base}/reports`} className={iconBtn} title="Reports"><FileBarChart size={18} /></Link>}
             <Link href={`${base}/notifications`} className={`relative ${iconBtn}`} title="Notifications">
@@ -159,9 +156,8 @@ export function ExecChrome({
             <div className="flex items-center gap-2 pl-2 ml-1 border-l border-white/15">
               <span className="w-8 h-8 rounded-full bg-[#C6A35D] text-[#0a0e17] font-bold flex items-center justify-center text-sm">{initial}</span>
               <div className="hidden sm:block leading-tight">
-                <div className="text-sm font-medium text-white">{userName ?? roleLabel}</div>
-                <div className="text-[11px] text-gray-300">{roleLabel}</div>
-                {accountStatus && <AccountStatusPill status={accountStatus} />}
+                <div className="text-sm font-medium text-white truncate">{userName ?? roleLabel}</div>
+                <div className="text-[11px] text-gray-300 truncate">{roleLabel}{accountStatus && statusSuffix(accountStatus)}</div>
               </div>
             </div>
           </div>
@@ -243,7 +239,7 @@ function DesktopSidebar({
   return (
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-[260px] border-r border-white/10 bg-brand-600 text-white lg:flex lg:flex-col">
       <div className="px-5 pt-6">
-        <Link href={home} className="inline-flex"><MotivLogo height={34} /></Link>
+        <Link href={home} className="inline-flex"><MotivLogo height={44} /></Link>
       </div>
       {/* Context chip sits in px-3 like the nav items so it's the same width. */}
       {contextOptions && contextOptions.length > 0 ? (
@@ -301,8 +297,7 @@ function DesktopSidebar({
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-blue-600 text-sm font-bold text-white">{initial}</span>
           <div className="min-w-0">
             <div className="truncate text-sm font-bold text-white">{user}</div>
-            <div className="truncate text-xs text-gray-400">{roleLabel}</div>
-            {accountStatus && <AccountStatusPill status={accountStatus} />}
+            <div className="truncate text-xs text-gray-400">{roleLabel}{accountStatus && statusSuffix(accountStatus)}</div>
           </div>
         </div>
       </div>

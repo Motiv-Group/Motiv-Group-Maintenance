@@ -4,6 +4,7 @@
 // (e.g. "Store At Risk"). Health block is optional — omit `status` to show just
 // the greeting (e.g. before any health score exists).
 import { Sparkles } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { Donut, STATUS_TEXT } from '@/components/exec/ui'
 import { BriefingRefresh } from '@/components/briefing/BriefingRefresh'
 import { AiBriefing } from '@/components/briefing/AiBriefing'
@@ -20,13 +21,17 @@ const HEADLINE: Record<HealthStatus, string> = {
 import type { BriefingScope } from '@/lib/briefing/facts'
 
 export function DashboardHealthHeader({
-  greeting, name, subtitle, scopePrefix,
+  greeting, name, subtitle, scopePrefix, donutLabel = 'Health', aside,
   score, status, briefingBody, briefingHeadline, briefingScope, briefingScopeId,
 }: {
   greeting: string
   name: string | null
   subtitle: string
   scopePrefix: string
+  /** Donut label under the score (e.g. "Health" / "SLA"). */
+  donutLabel?: string
+  /** Optional extra element under the greeting (e.g. a supplier's rating link). */
+  aside?: ReactNode
   score?: number
   status?: HealthStatus
   briefingBody?: string | null
@@ -40,10 +45,11 @@ export function DashboardHealthHeader({
       <div className="min-w-0 lg:w-1/2">
         <h1 className="text-2xl font-bold tracking-normal text-[var(--text)] sm:text-3xl">{greeting}, {first}</h1>
         <p className="mt-1 text-sm text-[var(--text-muted)]">{subtitle}</p>
+        {aside && <div className="mt-2.5">{aside}</div>}
       </div>
       {status && (
         <div className="flex items-center gap-4 lg:flex-1 lg:min-w-0">
-          <Donut value={score ?? 0} status={status} size={100} label="Health" />
+          <Donut value={score ?? 0} status={status} size={100} label={donutLabel} />
           <div className="min-w-0 flex-1 border-l border-[var(--border)] pl-4">
             <div className="flex items-center gap-2">
               <span className="text-sm font-bold">
