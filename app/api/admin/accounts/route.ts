@@ -78,6 +78,32 @@ export async function POST(request: Request) {
   const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '')
 
   try {
+    // Create a company on its own — no user. Executives (and everyone else) are
+    // added afterwards, and a company may have none.
+    if (action === 'create_company') {
+      const name = str(body.companyName)
+      if (!name) return bad('Company name is required.')
+      const { data: existing } = await admin.from('companies').select('id').ilike('name', name).maybeSingle()
+      if ((existing as any)?.id) return bad('A company with that name already exists — pick it from the list.')
+      const { data: company, error } = await admin.from('companies').insert({ name }).select('id, name').single()
+      if (error || !company) return bad(error?.message ?? 'Could not create company.')
+      await logAudit(admin, { actorId: user.id, companyId: company.id, action: 'admin.create_company', entityType: 'company', entityId: company.id, metadata: { name } })
+      return done({ companyId: company.id, companyName: company.name, message: `Company “${company.name}” created.` })
+    }
+
+    // Invite an Executive attached to an EXISTING company (optional — companies
+    // don't require one).
+    if (action === 'invite_executive') {
+      const companyId = str(body.companyId), fullName = str(body.full_name)
+      if (!companyId || !fullName || !body.email) return bad('Company, full name and email are required.')
+      const ce = contactError(body.email, body.phone); if (ce) return bad(ce)
+      const { data: company } = await admin.from('companies').select('id').eq('id', companyId).single()
+      if (!company) return bad('Company not found.')
+      const inv = await inviteUser({ email: body.email, role: 'executive', companyId, roleLabel: 'Executive', baseUrl: origin, link: {}, profile: { fullName, phone: normalisePhone(body.phone), address: str(body.address) } })
+      await logAudit(admin, { actorId: user.id, companyId, action: 'admin.invite_executive', entityType: 'user', entityId: inv.userId, metadata: { email: body.email } })
+      return done({ actionLink: inv.actionLink, emailed: inv.emailed, message: inv.emailed ? 'Executive invited — activation link emailed.' : 'Executive created. Email not sent — copy the activation link below.' })
+    }
+
     if (action === 'create_executive') {
       const companyName = str(body.companyName), fullName = str(body.full_name)
       if (!companyName || !fullName || !body.email) return bad('Company name, full name and email are required.')
