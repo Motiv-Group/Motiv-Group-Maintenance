@@ -399,7 +399,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
       <BackLink fallbackHref="/supplier/tickets" label="Back to tickets" />
       {/* Progress — bare, no card around it (same as RM). Hidden once this supplier
           was declined: the ticket's onward progress is no longer theirs. */}
-      {!declinedForMe && <div className="px-1 pt-1"><RmPipeline status={supplierStatus} /></div>}
+      {!declinedForMe && <div className="px-1 pt-3"><RmPipeline status={supplierStatus} /></div>}
       {/* Ticket detail — same layout as the SM view */}
       <Card className="p-5 space-y-4">
         <div className="flex items-start justify-between gap-3">

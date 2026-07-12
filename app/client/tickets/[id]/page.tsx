@@ -144,7 +144,7 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
       <BackLink fallbackHref="/client/tickets" label="Back to tickets" />
 
       {/* Header: reference, title, priority + status, stepper */}
-      <Card className="p-5 sm:p-6 space-y-5">
+      <Card className="p-5 sm:p-6 space-y-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2 min-w-0">
             {t.job_ref && <span className="font-mono text-sm font-semibold text-[var(--text-faint)]">{t.job_ref}</span>}

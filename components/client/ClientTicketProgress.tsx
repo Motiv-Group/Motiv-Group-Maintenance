@@ -29,7 +29,7 @@ export function ClientTicketProgress({ status }: { status: string }) {
         // Opaque circle bg so the connector line sits behind, not through it.
         const circle = reached
           ? 'border-blue-600 bg-blue-600 text-white'
-          : 'border-[var(--border)] bg-[var(--surface)] text-[var(--text-faint)]'
+          : 'border-[var(--text-faint)] bg-[var(--surface)] text-[var(--text-muted)]'
         const Icon = done ? Check : s.Icon
         return (
           <li key={s.key} className="relative flex-1 flex flex-col items-center">
@@ -42,7 +42,7 @@ export function ClientTicketProgress({ status }: { status: string }) {
             >
               <Icon size={15} />
             </span>
-            <span className={`mt-2 text-[11px] text-center ${current ? 'font-semibold text-[var(--text)]' : reached ? 'text-[var(--text-muted)]' : 'text-[var(--text-faint)]'}`}>{s.label}</span>
+            <span className={`mt-2 text-xs text-center ${current ? 'font-bold text-[var(--text)]' : reached ? 'font-medium text-[var(--text)]' : 'text-[var(--text-muted)]'}`}>{s.label}</span>
           </li>
         )
       })}

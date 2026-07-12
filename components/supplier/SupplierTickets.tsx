@@ -134,7 +134,29 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
     for (const t of tickets) c[t.declinedForMe ? 'closed' : bucketOfRow(t)]++
     return c
   }, [tickets])
-  const barTotal = BAR_ORDER.reduce((s, b) => s + counts[b], 0) || 1
+  // Distribution bar grouped by the four filter-intent tones (My actions → Awaiting
+  // → Critical → Completed), coloured to the group headings and filled front-to-back
+  // so "My actions" (amber) starts at the left where its heading sits. Closed/declined
+  // is excluded; overdue/breached → Critical; to-quote or missing-evidence → My actions.
+  const barSegs = useMemo(() => {
+    const g = { mine: 0, awaiting: 0, critical: 0, done: 0 }
+    for (const t of tickets) {
+      if (t.declinedForMe || t.status === 'cancelled') continue
+      const b = bucketOfRow(t)
+      if (b === 'closed') continue
+      if (t.overdue || t.breached) g.critical++
+      else if (b === 'completed') g.done++
+      else if (b === 'to_quote' || missingEvidence(t)) g.mine++
+      else g.awaiting++
+    }
+    return [
+      { key: 'mine', n: g.mine, cls: 'bg-amber-500' },
+      { key: 'awaiting', n: g.awaiting, cls: 'bg-blue-500' },
+      { key: 'critical', n: g.critical, cls: 'bg-red-500' },
+      { key: 'done', n: g.done, cls: 'bg-emerald-500' },
+    ]
+  }, [tickets])
+  const barTotal = barSegs.reduce((s, x) => s + x.n, 0) || 1
   // A supplier-side breach only counts while not yet fully overdue — once overdue
   // it moves to the Overdue pill (RM-side breaches never affect the supplier).
   const breachedCount = useMemo(() => tickets.filter(t => t.breached && !t.overdue).length, [tickets])
@@ -235,14 +257,14 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
         <p className="text-sm text-[var(--text-muted)] mt-0.5">Grouped by store. Tap the chart icon for a store overview.</p>
       </div>
 
-      {/* Distribution bar (excludes closed) */}
+      {/* Distribution bar — four intent tones, filled front-to-back (My actions first). */}
       <Card className="p-4 space-y-2">
         <div className="h-3 rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden flex">
-          {BAR_ORDER.map(b => counts[b] > 0 && <div key={b} className={`h-full ${BUCKET_BAR[b]}`} style={{ width: `${Math.round((counts[b] / barTotal) * 100)}%` }} />)}
+          {barSegs.map(x => x.n > 0 && <div key={x.key} className={`h-full ${x.cls}`} style={{ width: `${Math.round((x.n / barTotal) * 100)}%` }} />)}
         </div>
       </Card>
 
-      {/* Grouped filter tiles — My actions / Awaiting / Critical / Completed. */}
+      {/* Grouped filter badges — My actions / Awaiting / Critical / Completed. */}
       <TicketFilterTiles groups={filterGroups} active={filter} onPick={k => setFilter(f => (f === k ? null : (k as FilterKey)))} />
 
       {/* Search */}

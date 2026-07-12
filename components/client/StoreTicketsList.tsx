@@ -130,9 +130,27 @@ export function StoreTicketsList({ tickets, initialFilter = 'all', storeName = '
     ] },
   ], [counts])
 
-  // Distribution bar excludes cancelled (live work only).
-  const barTotal = counts.open + counts.scheduled + counts.in_progress + counts.completed || 1
-  const barPct = (n: number) => Math.round((n / barTotal) * 100)
+  // Distribution bar grouped by the four filter-intent tones (My actions → Awaiting
+  // → Critical → Completed), coloured to the group headings and filled front-to-back
+  // so "My actions" (amber) starts at the left where its heading sits. Cancelled is
+  // excluded; overdue → Critical; info-requested → My actions.
+  const barSegs = useMemo(() => {
+    const g = { mine: 0, awaiting: 0, critical: 0, done: 0 }
+    for (const t of tickets) {
+      if (t.status === 'cancelled') continue
+      if (t.overdue) g.critical++
+      else if (t.status === 'completed') g.done++
+      else if (t.status === 'info_requested') g.mine++
+      else g.awaiting++
+    }
+    return [
+      { key: 'mine', n: g.mine, cls: 'bg-amber-500' },
+      { key: 'awaiting', n: g.awaiting, cls: 'bg-blue-500' },
+      { key: 'critical', n: g.critical, cls: 'bg-red-500' },
+      { key: 'done', n: g.done, cls: 'bg-emerald-500' },
+    ]
+  }, [tickets])
+  const barTotal = barSegs.reduce((s, x) => s + x.n, 0) || 1
 
   return (
     <div className="space-y-5">
@@ -143,17 +161,14 @@ export function StoreTicketsList({ tickets, initialFilter = 'all', storeName = '
         <Link href="/client/tickets/new" className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-500 transition shrink-0"><PlusCircle size={16} /> Log a Ticket</Link>
       </div>
 
-      {/* Distribution bar */}
+      {/* Distribution bar — four intent tones, filled front-to-back (My actions first). */}
       <Card className="p-4 space-y-2">
         <div className="h-3 rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden flex">
-          {counts.open > 0 && <div className="h-full bg-blue-500" style={{ width: `${barPct(counts.open)}%` }} />}
-          {counts.scheduled > 0 && <div className="h-full bg-blue-500" style={{ width: `${barPct(counts.scheduled)}%` }} />}
-          {counts.in_progress > 0 && <div className="h-full bg-blue-500" style={{ width: `${barPct(counts.in_progress)}%` }} />}
-          {counts.completed > 0 && <div className="h-full bg-emerald-500" style={{ width: `${barPct(counts.completed)}%` }} />}
+          {barSegs.map(x => x.n > 0 && <div key={x.key} className={`h-full ${x.cls}`} style={{ width: `${Math.round((x.n / barTotal) * 100)}%` }} />)}
         </div>
       </Card>
 
-      {/* Grouped filter tiles — My actions / Awaiting / Critical / Completed. */}
+      {/* Grouped filter badges — My actions / Awaiting / Critical / Completed. */}
       <TicketFilterTiles groups={filterGroups} active={filter === 'all' ? null : filter} onPick={k => setFilter(f => (f === k ? 'all' : (k as Filter)))} />
 
       {/* Search */}

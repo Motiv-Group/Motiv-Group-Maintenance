@@ -859,7 +859,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
       <BackLink fallbackHref="/regional/tickets" label="Back to tickets" />
 
       {/* Header — reference, title, priority + status, progress stepper (SM flavor). */}
-      <Card className="p-5 space-y-5">
+      <Card className="p-5 space-y-6">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex flex-wrap items-center gap-x-2 gap-y-0.5">
             {t.job_ref && <span className="font-mono text-sm font-semibold text-[var(--text-faint)]">{t.job_ref}</span>}

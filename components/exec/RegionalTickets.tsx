@@ -149,7 +149,28 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
     for (const t of tickets) c[bucketOf(t.status, t.supplierAssigned)]++
     return c
   }, [tickets])
-  const barTotal = BAR_ORDER.reduce((s, b) => s + counts[b], 0) || 1
+  // Distribution bar grouped by the four filter-intent tones (My actions → Awaiting
+  // → Critical → Completed), coloured to the group headings and filled front-to-back
+  // so "My actions" (amber) starts at the left where its heading sits. Each ticket
+  // lands in exactly one segment: overdue/breached → Critical; else its status tone.
+  const barSegs = useMemo(() => {
+    const g = { mine: 0, awaiting: 0, critical: 0, done: 0 }
+    for (const t of tickets) {
+      const b = bucketOf(t.status, t.supplierAssigned)
+      if (b === 'cancelled') continue
+      if (t.overdue || t.internalBreached || t.supplierBreached) g.critical++
+      else if (b === 'completed') g.done++
+      else if (b === 'quoted' || b === 'awaiting_signoff') g.mine++
+      else g.awaiting++
+    }
+    return [
+      { key: 'mine', n: g.mine, cls: 'bg-amber-500' },
+      { key: 'awaiting', n: g.awaiting, cls: 'bg-blue-500' },
+      { key: 'critical', n: g.critical, cls: 'bg-red-500' },
+      { key: 'done', n: g.done, cls: 'bg-emerald-500' },
+    ]
+  }, [tickets])
+  const barTotal = barSegs.reduce((s, x) => s + x.n, 0) || 1
   // A breach only counts here while it's NOT yet overdue — once overdue it moves
   // to the Overdue pill (so it isn't double-counted).
   const internalBreachCount = useMemo(() => tickets.filter(t => t.internalBreached && !t.overdue).length, [tickets])
@@ -252,14 +273,14 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
         <Link href="/regional/tickets/new" className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-500 transition shrink-0"><PlusCircle size={16} /> Log a Ticket</Link>
       </div>
 
-      {/* Distribution bar (excludes cancelled) */}
+      {/* Distribution bar — four intent tones, filled front-to-back (My actions first). */}
       <Card className="p-4 space-y-2">
         <div className="h-3 rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden flex">
-          {BAR_ORDER.map(b => counts[b] > 0 && <div key={b} className={`h-full ${BUCKET_BAR[b]}`} style={{ width: `${Math.round((counts[b] / barTotal) * 100)}%` }} />)}
+          {barSegs.map(x => x.n > 0 && <div key={x.key} className={`h-full ${x.cls}`} style={{ width: `${Math.round((x.n / barTotal) * 100)}%` }} />)}
         </div>
       </Card>
 
-      {/* Grouped filter tiles — My actions / Awaiting / Critical / Completed. */}
+      {/* Grouped filter badges — My actions / Awaiting / Critical / Completed. */}
       <TicketFilterTiles groups={filterGroups} active={filter} onPick={k => setFilter(f => (f === k ? null : (k as RmFilter)))} />
 
       {/* Search */}

@@ -374,15 +374,20 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
   })
   if (!regionIds.length) return empty()
 
-  const [{ data: regionsRaw }, { data: storesRaw }, { data: ticketsRaw }, { data: suppliersRaw }] = await Promise.all([
+  const [{ data: regionsRaw }, { data: storesRaw }, { data: suppliersRaw }] = await Promise.all([
     db.from('regions').select('id, name').in('id', regionIds),
     db.from('stores').select('id, name, sub_store, branch_code, address, region_id').eq('company_id', companyId).in('region_id', regionIds).eq('active', true).is('closed_at', null),
-    db.from('tickets').select(TICKET_COLS).eq('company_id', companyId).in('region_id', regionIds),
     db.from('suppliers').select('id, company_name, active').eq('company_id', companyId),
   ])
   const regionName = new Map((regionsRaw ?? []).map((r: any) => [r.id, r.name]))
   const stores = (storesRaw ?? []) as any[]
   const storeIds = stores.map(s => s.id)
+  // Tickets are keyed off store membership (the durable store→region link), NOT the
+  // denormalised tickets.region_id — so a ticket logged BEFORE its store was linked
+  // to this region (region_id still null/stale) still surfaces for the RM.
+  const { data: ticketsRaw } = storeIds.length
+    ? await db.from('tickets').select(TICKET_COLS).eq('company_id', companyId).in('store_id', storeIds)
+    : { data: [] as any[] }
   const storeName = new Map(stores.map(s => [s.id, storeLabel(s.name, s.sub_store)]))
   const storeBranch = new Map(stores.map(s => [s.id, s.branch_code ?? null]))
   const storeAddr = new Map(stores.map(s => [s.id, s.address ?? null]))
