@@ -14,7 +14,7 @@ interface MotivLockupProps {
  * background. For the compact chrome lockup (symbol + wordmark) use MotivLogo.
  */
 export function MotivLockup({ height = 130, className = '' }: MotivLockupProps) {
-  const width = Math.round(height * (700 / 666)) // lockup aspect 700×666
+  const width = Math.round(height * (1024 / 1024)) // lockup aspect 1024×1024 (square)
   return (
     <Image
       src="/brand/motiv-lockup.png"

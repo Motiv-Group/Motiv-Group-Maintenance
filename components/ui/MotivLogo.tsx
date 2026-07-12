@@ -15,9 +15,9 @@ interface MotivLogoProps {
  * use /brand/motiv-lockup.png directly.
  */
 export function MotivLogo({ height = 32, className = '' }: MotivLogoProps) {
-  const symW = Math.round(height * (300 / 244)) // symbol aspect 300×244
+  const symW = Math.round(height * (1536 / 1024)) // symbol aspect 1536×1024
   const wordH = Math.round(height * 0.5)
-  const wordW = Math.round(wordH * (549 / 86))  // wordmark aspect 549×86
+  const wordW = Math.round(wordH * (701 / 151))  // wordmark aspect 701×151
 
   return (
     <span className={`inline-flex items-end ${className}`} style={{ gap: Math.round(height * 0.42) }}>
