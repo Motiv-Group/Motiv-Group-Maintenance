@@ -54,6 +54,8 @@ export default function LoginPage() {
     const { data, error: authError } = await supabase.auth.signInWithPassword(values)
 
     if (authError) {
+      // Surfaced to the console (not the UI) so a stuck login can be diagnosed.
+      console.warn('[login] sign-in failed:', authError.status, authError.message)
       setError(
         authError.message.toLowerCase().includes('email not confirmed')
           ? 'Please confirm your email first — check your inbox.'

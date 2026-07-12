@@ -23,11 +23,23 @@ export default function ResetPasswordPage() {
 
     setLoading(true)
     const supabase = createClient()
-    const { error: updErr } = await supabase.auth.updateUser({ password })
-    if (updErr) {
-      setError(/session|missing|expired|invalid|jwt/i.test(updErr.message)
-        ? 'Your reset link has expired or is invalid. Please request a new one.'
-        : updErr.message)
+    // The invite/recovery token lands in the URL hash; the client picks it up as
+    // a session. Send that access token to the server, which sets the password
+    // via the admin API (reliable at login, unlike client-side updateUser).
+    const { data: sessionData } = await supabase.auth.getSession()
+    const accessToken = sessionData.session?.access_token
+    if (!accessToken) {
+      setError('Your reset link has expired or is invalid. Please request a new one.')
+      setLoading(false)
+      return
+    }
+    const res = await fetch('/api/auth/set-password', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accessToken, password }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      setError(data.error ?? 'Could not set your password. Please request a new link.')
       setLoading(false)
       return
     }
