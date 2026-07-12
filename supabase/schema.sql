@@ -506,7 +506,7 @@ create table if not exists public.supplier_performance_scores (
 
 create table if not exists public.supplier_sla_acceptances (
   id           uuid not null default gen_random_uuid() primary key,
-  supplier_id  uuid references public.suppliers(id) on delete cascade,
+  supplier_id  uuid,
   user_id      uuid not null,
   sla_version  text not null,
   signed_name  text not null,
@@ -521,7 +521,7 @@ create table if not exists public.supplier_users (
 
 create table if not exists public.supplier_verification_docs (
   id           uuid not null default gen_random_uuid() primary key,
-  supplier_id  uuid not null references public.suppliers(id) on delete cascade,
+  supplier_id  uuid not null,
   uploaded_by  uuid not null,
   kind         text not null,   -- cipc | vat_cert | insurance | qualification | other
   url          text not null,   -- stored bucket path/URL; served via signed URLs
@@ -990,6 +990,8 @@ alter table public.supplier_performance_scores add foreign key (region_id) refer
 alter table public.supplier_performance_scores add foreign key (company_id) references public.companies(id);
 alter table public.supplier_users add foreign key (supplier_id) references public.suppliers(id);
 alter table public.supplier_users add foreign key (user_id) references public.user_profiles(id);
+alter table public.supplier_sla_acceptances add foreign key (supplier_id) references public.suppliers(id) on delete cascade;
+alter table public.supplier_verification_docs add foreign key (supplier_id) references public.suppliers(id) on delete cascade;
 alter table public.suppliers add foreign key (company_id) references public.companies(id);
 alter table public.ticket_blockers add foreign key (owner_id) references public.user_profiles(id);
 alter table public.ticket_blockers add foreign key (ticket_id) references public.tickets(id);
