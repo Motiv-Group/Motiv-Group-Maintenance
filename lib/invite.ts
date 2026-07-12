@@ -58,11 +58,11 @@ export async function inviteUser(opts: InviteOpts): Promise<{ userId: string; ac
   if (opts.link.supplierId) await admin.from('supplier_users').upsert({ user_id: uid, supplier_id: opts.link.supplierId })
 
   const actionLink = (data.properties as any)?.action_link ?? null
-  const emailed = await sendInviteEmail(opts.email, actionLink, opts.roleLabel)
+  const emailed = await sendInviteEmail(opts.email, actionLink, opts.roleLabel, base)
   return { userId: uid, actionLink, emailed }
 }
 
-async function sendInviteEmail(to: string, link: string | null, roleLabel: string): Promise<boolean> {
+async function sendInviteEmail(to: string, link: string | null, roleLabel: string, base: string): Promise<boolean> {
   const key = process.env.RESEND_API_KEY, from = process.env.EMAIL_FROM
   if (!key || !from || !link) return false
   try {
@@ -70,7 +70,7 @@ async function sendInviteEmail(to: string, link: string | null, roleLabel: strin
       method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         from, to, subject: `You've been invited to MOTIV as ${roleLabel}`,
-        html: inviteEmailHtml(link, roleLabel),
+        html: inviteEmailHtml(link, roleLabel, base),
       }),
     })
     return res.ok
@@ -80,13 +80,14 @@ async function sendInviteEmail(to: string, link: string | null, roleLabel: strin
 // Transactional invite email — table-based + inline styles for broad email-client
 // support (Gmail/Outlook strip <style> + classes). Navy MOTIV header, blue CTA
 // (the app's action colour), and a copy-paste fallback link.
-export function inviteEmailHtml(link: string, roleLabel: string): string {
+export function inviteEmailHtml(link: string, roleLabel: string, base: string): string {
   return `<div style="margin:0;padding:0;background:#f3f4f6;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:32px 12px;font-family:Arial,Helvetica,sans-serif;">
     <tr><td align="center">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e5e7eb;">
-        <tr><td style="background:#0d1f2d;padding:22px 32px;">
-          <span style="font-size:22px;font-weight:700;letter-spacing:3px;color:#ffffff;">MOTIV</span><span style="font-size:22px;font-weight:700;color:#C6A35D;">.</span>
+        <tr><td style="background:#0d1f2d;padding:20px 32px;">
+          <img src="${base}/brand/motiv-symbol.png" alt="" width="34" height="28" style="display:inline-block;vertical-align:middle;border:0;height:28px;width:34px;" />
+          <img src="${base}/brand/motiv-wordmark.png" alt="MOTIV" width="96" height="15" style="display:inline-block;vertical-align:middle;border:0;height:15px;width:96px;margin-left:10px;" />
         </td></tr>
         <tr><td style="padding:32px;color:#1f2937;">
           <h1 style="margin:0 0 12px;font-size:20px;font-weight:700;color:#0d1f2d;">You're invited to MOTIV</h1>
