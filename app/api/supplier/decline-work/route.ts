@@ -32,15 +32,15 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient()
   const { data: prof } = await admin.from('user_profiles').select('role, company_id').eq('id', user.id).single()
-  if (prof?.role !== 'supplier' || !prof.company_id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  // Pool/Motiv suppliers have no company_id — access is gated by the invite below.
+  if (prof?.role !== 'supplier') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   const { data: links } = await admin.from('supplier_users').select('supplier_id').eq('user_id', user.id)
   const supplierIds = (links ?? []).map(l => l.supplier_id)
   if (!supplierIds.length) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { data: ticket } = await admin.from('tickets').select('id, company_id, region_id, title, supplier_id, status, created_by').eq('id', ticketId).single()
-  // Same-company OR individual (company-null) standalone tickets; the invite check
-  // below confirms this supplier was actually invited.
-  if (!ticket || (ticket.company_id != null && ticket.company_id !== prof.company_id)) return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
+  // Access is by ASSIGNMENT, not company — the invite check below is the real gate.
+  if (!ticket) return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
 
   // The supplier's invite — decline is only offered before award (invited/quoted).
   const { data: invite } = await admin.from('ticket_suppliers').select('id, supplier_id, status').eq('ticket_id', ticketId).in('supplier_id', supplierIds).maybeSingle()

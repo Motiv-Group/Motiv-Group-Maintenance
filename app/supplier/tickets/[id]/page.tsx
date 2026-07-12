@@ -142,13 +142,13 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
   // Overlap the auth gate with the ticket fetch (admin client needs no user ctx)
   // — one round-trip wave instead of two on every detail-page load.
   const admin = createAdminClient()
-  const [{ companyId, supplierIds, userId }, { data: t }] = await Promise.all([
+  const [{ supplierIds, userId }, { data: t }] = await Promise.all([
     requireSupplierV3(),
     admin.from('tickets').select('*').eq('id', params.id).single(),
   ])
-  // Allow same-company tickets AND individual (company-null) standalone tickets; the
-  // awarded/invite check below confirms this supplier is actually on the ticket.
-  if (!t || (t.company_id != null && t.company_id !== companyId)) redirect('/supplier/tickets')
+  // Access is by ASSIGNMENT, not company (a Motiv/pool supplier works client tickets
+  // they don't belong to). The awarded/invite check below is the real gate.
+  if (!t) redirect('/supplier/tickets')
   const [{ data: store }, { data: updates }, { data: invite }, { data: myQuotes }, { data: technicianRows }, { data: signoffRows }, { data: snagRows }, { data: companyRow }, { data: variationRows }, { data: viewRows }, { data: declineRows }, { data: requoteRows }, { data: roundRows }, { data: disputeRows }, { data: disputeMsgRows }, { data: snagEventRows }, { data: disputeExtra }] = await Promise.all([
     admin.from('stores').select('name, sub_store').eq('id', t.store_id ?? '').single(),
     admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),

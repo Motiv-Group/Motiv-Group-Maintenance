@@ -38,9 +38,9 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   if (prof?.role !== 'supplier') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { data: ticket } = await admin.from('tickets').select('*').eq('id', params.id).single()
-  // Same-company tickets OR individual (company-null) standalone tickets; the invite
-  // check below confirms this supplier is actually invited to quote.
-  if (!ticket || (ticket.company_id != null && ticket.company_id !== prof.company_id)) return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
+  // Access is by ASSIGNMENT, not company: the invite check below is the real gate,
+  // so a Motiv/pool supplier can quote a client ticket they were invited to.
+  if (!ticket) return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
 
   // Which of the caller's supplier companies is invited on this ticket?
   const { data: myLinks } = await admin.from('supplier_users').select('supplier_id').eq('user_id', user.id)

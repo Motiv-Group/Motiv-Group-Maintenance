@@ -633,9 +633,10 @@ export async function assembleSupplierDashboard(companyId: string | null, suppli
   // Own tickets (awarded) + tickets where invited to quote (competitive model),
   // plus declined/closed so the supplier still sees them under the Declined filter.
   const [{ data: bySupplier }, { data: invRows }] = await Promise.all([
-    // Same-company tickets awarded to this supplier PLUS individual (company-null)
-    // standalone tickets they've been awarded — both scoped to their supplier ids.
-    db.from('tickets').select(TICKET_COLS).or(companyId ? `company_id.eq.${companyId},company_id.is.null` : 'company_id.is.null').in('supplier_id', supplierIds),
+    // Tickets awarded to this supplier — across ANY company (a Motiv/pool supplier
+    // is awarded client-company tickets they don't belong to). Scoped to their
+    // supplier ids, which is the real ownership gate.
+    db.from('tickets').select(TICKET_COLS).in('supplier_id', supplierIds),
     db.from('ticket_suppliers').select('ticket_id, status, responded_at, declined_by').in('supplier_id', supplierIds).in('status', ['invited', 'quoted', 'awarded', 'declined', 'closed']),
   ])
   const owned = (bySupplier ?? []) as any[]
