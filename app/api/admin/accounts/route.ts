@@ -139,14 +139,21 @@ export async function POST(request: Request) {
     if (action === 'invite_sm') {
       const companyId = str(body.companyId), regionId = str(body.regionId)
       const storeName = str(body.storeName), branchCode = str(body.branchCode), fullName = str(body.full_name)
-      if (!companyId || !regionId || !storeName || !branchCode || !fullName || !body.email) return bad('Company, region, store name, branch code, full name and email are required.')
+      // Region is OPTIONAL: a store can be created unassigned and linked to a
+      // region (and thus an RM) later on the Hierarchy tab.
+      if (!companyId || !storeName || !branchCode || !fullName || !body.email) return bad('Company, store name, branch code, full name and email are required.')
       const ce = contactError(body.email, body.phone); if (ce) return bad(ce)
-      const { data: region } = await admin.from('regions').select('id, company_id, region_code').eq('id', regionId).single()
-      if (!region || region.company_id !== companyId) return bad('That region is not in the selected company.')
+      let regionIdCol: string | null = null
+      let regionCodeCol: string | null = null
+      if (regionId) {
+        const { data: region } = await admin.from('regions').select('id, company_id, region_code').eq('id', regionId).single()
+        if (!region || region.company_id !== companyId) return bad('That region is not in the selected company.')
+        regionIdCol = region.id; regionCodeCol = region.region_code
+      }
       const bcode = branchCode.toUpperCase()
       const subStore = str(body.subStore) || storeName
       const { data: store, error: sErr } = await admin.from('stores')
-        .insert({ company_id: companyId, region_id: regionId, region_code: region.region_code, branch_code: bcode, name: storeName, sub_store: subStore })
+        .insert({ company_id: companyId, region_id: regionIdCol, region_code: regionCodeCol, branch_code: bcode, name: storeName, sub_store: subStore })
         .select('id').single()
       if (sErr || !store) return bad(/duplicate/i.test(sErr?.message ?? '') ? 'That branch code already exists.' : (sErr?.message ?? 'Could not create store.'))
       try {

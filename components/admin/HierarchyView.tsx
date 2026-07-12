@@ -7,14 +7,17 @@ import { Card } from '@/components/exec/ui'
 import { readCollapse, writeCollapse } from '@/lib/collapse-state'
 
 export interface RegionRef { id: string; name: string; code: string }
+interface StoreRef { id: string; name: string; subStore: string | null; branchCode: string | null; sm: { name: string; email: string } | null }
 export interface CompanyNode {
   id: string; name: string
   execs: { id: string; name: string; email: string }[]
   regions: {
     id: string; name: string; code: string
     rms: { id: string; name: string; email: string }[]
-    stores: { id: string; name: string; subStore: string | null; branchCode: string | null; sm: { name: string; email: string } | null }[]
+    stores: StoreRef[]
   }[]
+  // Stores created without a region — linked to a region (and thus an RM) here.
+  unassignedStores: StoreRef[]
 }
 
 async function act(body: Record<string, unknown>): Promise<string | null> {
@@ -36,6 +39,7 @@ function ReLinkSelect({ value, regions, onPick, label, question }: {
       <select disabled={busy} value={value} title={label}
         onChange={e => { const v = e.target.value; if (!v || v === value) return; setPending(v) }}
         className="text-[11px] rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] px-2 py-1 outline-none focus:ring-2 focus:ring-emerald-500/40 disabled:opacity-50">
+        {value === '' && <option value="" disabled>Assign to region…</option>}
         {regions.map(r => <option key={r.id} value={r.id}>{r.name} ({r.code})</option>)}
       </select>
       {target && (
@@ -82,6 +86,7 @@ function CompanyCard({ company, regions, move }: {
           <Building2 size={16} className="text-[var(--text-faint)] shrink-0" />
           <h2 className="text-sm font-bold text-[var(--text)]">{c.name}</h2>
           <span className="text-[11px] text-[var(--text-faint)]">· {c.regions.length} region{c.regions.length === 1 ? '' : 's'}</span>
+          {c.unassignedStores.length > 0 && <span className="text-[11px] font-medium text-amber-600 dark:text-amber-400">· {c.unassignedStores.length} unassigned</span>}
           <span className="ml-auto flex items-center gap-2">
             {c.execs.length > 0 && (
               <span className="hidden sm:flex items-center gap-1 text-[11px] text-[var(--text-muted)]">
@@ -124,6 +129,32 @@ function CompanyCard({ company, regions, move }: {
               </div>
             </div>
           ))}
+
+          {c.unassignedStores.length > 0 && (
+            <div className="rounded-xl ring-1 ring-amber-500/40 bg-amber-500/[0.05] p-3 mt-3 space-y-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Store size={14} className="text-amber-600 dark:text-amber-400" />
+                <span className="text-sm font-semibold text-[var(--text)]">Unassigned stores</span>
+                <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-500/15 rounded-full px-1.5 py-0.5">{c.unassignedStores.length}</span>
+                <span className="text-[11px] text-[var(--text-muted)]">— link each to a region (and its RM)</span>
+              </div>
+              <div className="space-y-1.5">
+                {c.unassignedStores.map(s => (
+                  <div key={s.id} className="flex items-center gap-2 flex-wrap text-[11px] pl-5">
+                    <Store size={12} className="text-[var(--text-faint)]" />
+                    <span className="text-[var(--text)]">{s.name}{s.subStore ? ` · ${s.subStore}` : ''}</span>
+                    {s.branchCode && <span className="font-mono text-[var(--text-faint)]">{s.branchCode}</span>}
+                    <span className="text-[var(--text-muted)]">— {s.sm ? s.sm.name : <span className="text-amber-600 dark:text-amber-400">no SM</span>}</span>
+                    <span className="ml-auto flex items-center gap-1 text-[var(--text-faint)]">Assign
+                      {regions.length
+                        ? <ReLinkSelect value="" regions={regions} label="Assign this store to a region" question={t => `Assign ${s.name} to ${t.name}?`} onPick={rid => move({ action: 'move_store', storeId: s.id, regionId: rid })} />
+                        : <span className="text-amber-600 dark:text-amber-400">add a Regional Manager first</span>}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </details>
     </Card>

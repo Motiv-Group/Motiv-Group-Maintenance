@@ -163,15 +163,12 @@ export function AddAccountForm({ companies, regions }: { companies: CompanyOpt[]
               )}
 
               {subRole === 'store_manager' && (
-                <Field label="Region" required>
-                  <select className={input} value={regionId} onChange={e => setRegionId(e.target.value)} required>
-                    <option value="">Select a region…</option>
+                <Field label="Region (optional)">
+                  <select className={input} value={regionId} onChange={e => setRegionId(e.target.value)}>
+                    <option value="">Leave unassigned — link to a region later in Hierarchy</option>
                     {companyRegions.map(r => <option key={r.id} value={r.id}>{r.name} ({r.code})</option>)}
                   </select>
                 </Field>
-              )}
-              {subRole === 'store_manager' && !companyRegions.length && (
-                <p className="text-xs text-amber-600 dark:text-amber-400">This company has no regions yet — add a Regional Manager (with a new region) first.</p>
               )}
               {subRole === 'store_manager' && (
                 <div className="grid grid-cols-2 gap-2">
