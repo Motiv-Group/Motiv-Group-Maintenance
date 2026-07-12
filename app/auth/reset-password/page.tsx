@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { PasswordInput } from '@/components/ui/PasswordInput'
@@ -14,28 +14,36 @@ export default function ResetPasswordPage() {
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState('')
   const [done, setDone]         = useState(false)
+  // The token of the account being set — read STRAIGHT from the invite/recovery
+  // link (URL hash), never from the browser session. Otherwise, if someone (e.g.
+  // an admin) is already logged in, we'd set THEIR password instead of the
+  // invitee's. Fall back to getSession() only for the login-page-redirect path
+  // that consumes the hash first.
+  const [token, setToken] = useState<string | null>(null)
+  useEffect(() => {
+    const h = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+    const at = h.get('access_token')
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- capture the invite/recovery token from the URL hash before anything consumes it
+    if (at) { setToken(at); return }
+    createClient().auth.getSession().then(({ data }) => setToken(data.session?.access_token ?? null)).catch(() => {})
+  }, [])
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
     if (password.length < 8)   { setError('Password must be at least 8 characters.'); return }
     if (password !== confirm)  { setError('Passwords do not match.'); return }
-
-    setLoading(true)
-    const supabase = createClient()
-    // The invite/recovery token lands in the URL hash; the client picks it up as
-    // a session. Send that access token to the server, which sets the password
-    // via the admin API (reliable at login, unlike client-side updateUser).
-    const { data: sessionData } = await supabase.auth.getSession()
-    const accessToken = sessionData.session?.access_token
-    if (!accessToken) {
+    if (!token) {
       setError('Your reset link has expired or is invalid. Please request a new one.')
-      setLoading(false)
       return
     }
+
+    setLoading(true)
+    // Set the password server-side via the admin API, keyed to the token from the
+    // link — so it always targets the invited/recovering user, never a logged-in one.
     const res = await fetch('/api/auth/set-password', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ accessToken, password }),
+      body: JSON.stringify({ accessToken: token, password }),
     })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) {
@@ -43,7 +51,6 @@ export default function ResetPasswordPage() {
       setLoading(false)
       return
     }
-    await supabase.auth.signOut().catch(() => {})
     setLoading(false)
     setDone(true)
   }
