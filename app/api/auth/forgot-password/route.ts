@@ -27,12 +27,12 @@ export async function POST(request: Request) {
     email,
     options: { redirectTo: `${base}/auth/reset-password` },
   } as any)
-  // Link to our anti-prefetch confirm page (hashed token) instead of the Supabase
-  // verify URL, so email scanners can't consume the one-time token before the user.
-  const props = data?.properties as any
-  const link: string | undefined = props?.hashed_token
-    ? `${base}/auth/confirm?token_hash=${props.hashed_token}&type=recovery&next=${encodeURIComponent('/auth/reset-password')}`
-    : props?.action_link
+  // Wrap the real Supabase verify URL in our anti-prefetch confirm page, so email
+  // scanners can't consume the one-time token (only the user's click forwards to it).
+  const verifyUrl = (data?.properties as any)?.action_link as string | undefined
+  const link: string | undefined = verifyUrl
+    ? `${base}/auth/confirm?type=recovery&redirect=${encodeURIComponent(verifyUrl)}`
+    : undefined
   if (error || !link) {
     // Server-side only (never leaked to the client) — helps diagnose delivery.
     console.error('[forgot-password] generateLink failed', { email, error: error?.message, hasLink: !!link })
