@@ -106,7 +106,7 @@ function TicketRow({ t }: { t: RegionalTicketRow }) {
         <div className="min-w-0">
           {t.jobRef && <p className="text-[10px] font-mono text-[var(--text-faint)]">{t.jobRef}</p>}
           <p className="truncate text-sm font-bold text-[var(--text)]">{t.category || t.title}</p>
-          <p className="truncate text-xs text-[var(--text-muted)]">{t.storeName}</p>
+          <p className="truncate text-sm text-[var(--text-muted)]">{t.storeName}</p>
         </div>
       </div>
       <div className="flex flex-col items-start gap-1 sm:items-end">
@@ -114,8 +114,8 @@ function TicketRow({ t }: { t: RegionalTicketRow }) {
           <span className={`inline-flex w-[120px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${priorityBadgeClass(t as never)}`}>{priorityLabel(t as never)}</span>
           <span className={`inline-flex w-[120px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${statusCls}`}>{statusLabel}</span>
         </div>
-        <p className={`text-xs ${action.act ? 'font-semibold text-[var(--text)]' : 'text-[var(--text-muted)]'}`}>{action.text}</p>
-        <p className="text-xs text-[var(--text-muted)]">
+        <p className={`text-sm ${action.act ? 'font-semibold text-[var(--text)]' : 'text-[var(--text-muted)]'}`}>{action.text}</p>
+        <p className="text-sm text-[var(--text-muted)]">
           {formatDateTime(t.createdAt)}
           {/* eslint-disable-next-line react-hooks/purity -- cosmetic "overdue by" / breach readout, not hydration-critical */}
           {t.overdue ? <span className="ml-1.5 font-semibold text-red-600 dark:text-red-400">· Overdue by {humanizeDuration(Date.now() - new Date(t.dueAt).getTime())}</span>
@@ -315,7 +315,7 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
                 <ChevronDown size={16} className={`mt-0.5 shrink-0 text-[var(--text-muted)] transition-transform ${isCollapsed ? '' : 'rotate-180'}`} />
                 <span className="min-w-0">
                   <span className="block text-sm font-bold text-[var(--text)] truncate">{store}{g.branchCode ? ` · ${g.branchCode}` : ''}</span>
-                  <span className="mt-0.5 block text-xs text-[var(--text-muted)]">
+                  <span className="mt-0.5 block text-sm text-[var(--text-muted)]">
                     {s.total} ticket{s.total === 1 ? '' : 's'}
                     {s.critical > 0 && <> · <span className="font-semibold text-red-600 dark:text-red-400">{s.critical} critical</span></>}
                     {s.high > 0 && <> · <span className="font-semibold text-orange-600 dark:text-orange-400">{s.high} high</span></>}
@@ -347,7 +347,7 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
                   <Link key={t.id} href={`/regional/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2.5 -mx-2 px-2 rounded-lg border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition">
                     <div className="min-w-0">
                       <p className="text-sm text-[var(--text)] truncate">{t.title}</p>
-                      <p className="text-xs text-[var(--text-muted)] truncate">{t.storeName} · {formatDateTime(t.createdAt)}</p>
+                      <p className="text-sm text-[var(--text-muted)] truncate">{t.storeName} · {formatDateTime(t.createdAt)}</p>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
                       <PriorityBadge priority={t.priority} className="w-full text-center" />
