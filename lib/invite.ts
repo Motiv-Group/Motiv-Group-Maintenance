@@ -70,14 +70,40 @@ async function sendInviteEmail(to: string, link: string | null, roleLabel: strin
       method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         from, to, subject: `You've been invited to MOTIV as ${roleLabel}`,
-        html: `<div style="font-family:sans-serif;max-width:480px;margin:0 auto">
-          <h2 style="color:#0a0e17">Welcome to MOTIV</h2>
-          <p>You've been added as <strong>${roleLabel}</strong>. Set your password to get started:</p>
-          <p><a href="${link}" style="display:inline-block;background:#C6A35D;color:#0a0e17;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:600">Set password &amp; sign in</a></p>
-          <p style="color:#666;font-size:12px">If the button doesn't work, paste this link:<br>${link}</p>
-        </div>`,
+        html: inviteEmailHtml(link, roleLabel),
       }),
     })
     return res.ok
   } catch { return false }
+}
+
+// Transactional invite email — table-based + inline styles for broad email-client
+// support (Gmail/Outlook strip <style> + classes). Navy MOTIV header, blue CTA
+// (the app's action colour), and a copy-paste fallback link.
+export function inviteEmailHtml(link: string, roleLabel: string): string {
+  return `<div style="margin:0;padding:0;background:#f3f4f6;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:32px 12px;font-family:Arial,Helvetica,sans-serif;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e5e7eb;">
+        <tr><td style="background:#0d1f2d;padding:22px 32px;">
+          <span style="font-size:22px;font-weight:700;letter-spacing:3px;color:#ffffff;">MOTIV</span><span style="font-size:22px;font-weight:700;color:#C6A35D;">.</span>
+        </td></tr>
+        <tr><td style="padding:32px;color:#1f2937;">
+          <h1 style="margin:0 0 12px;font-size:20px;font-weight:700;color:#0d1f2d;">You're invited to MOTIV</h1>
+          <p style="margin:0 0 6px;font-size:15px;line-height:1.6;color:#374151;">You've been added as <strong style="color:#0d1f2d;">${roleLabel}</strong>.</p>
+          <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#374151;">Set your password to activate your account and sign in.</p>
+          <table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="border-radius:10px;background:#2563eb;">
+            <a href="${link}" style="display:inline-block;padding:13px 28px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:10px;">Set password &amp; sign in</a>
+          </td></tr></table>
+          <p style="margin:26px 0 6px;font-size:12px;color:#6b7280;">Button not working? Copy and paste this link into your browser:</p>
+          <p style="margin:0;font-size:12px;line-height:1.5;word-break:break-all;"><a href="${link}" style="color:#2563eb;text-decoration:none;">${link}</a></p>
+        </td></tr>
+        <tr><td style="padding:18px 32px;border-top:1px solid #eef0f2;background:#fafbfc;">
+          <p style="margin:0;font-size:12px;line-height:1.5;color:#9ca3af;">This invitation was sent by MOTIV. If you weren't expecting it, you can safely ignore this email.</p>
+        </td></tr>
+      </table>
+      <p style="max-width:480px;margin:16px auto 0;font-size:11px;color:#b4b8bf;text-align:center;">© MOTIV · Maintenance &amp; ticketing</p>
+    </td></tr>
+  </table>
+</div>`
 }
