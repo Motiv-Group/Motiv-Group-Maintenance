@@ -79,7 +79,7 @@ function regionSignals(tickets: HealthTicket[], rules: SlaRuleResolver, now: Dat
 }
 
 export interface StoreManagerContact { name: string | null; email: string | null; phone: string | null }
-export interface StoreCard extends StoreHealthResult { storeName: string; branchCode: string | null; location: string | null; regionName: string; sm?: StoreManagerContact | null }
+export interface StoreCard extends StoreHealthResult { storeName: string; branchCode: string | null; location: string | null; regionName: string; sm?: StoreManagerContact | null; lastActivityAt?: string | null }
 export interface TrendDelta { dir: 'up' | 'down' | 'flat'; pct: number }
 export interface EstateTrends { openWork: TrendDelta; slaPressure: TrendDelta; cost: TrendDelta; supplierBreaches: TrendDelta }
 export interface ExposureBucket { label: string; value: number }
@@ -459,8 +459,15 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
   }
 
   const cards: StoreCard[] = stores.map(s => {
-    const res = calculateStoreHealth({ id: s.id, region_id: s.region_id }, byStore.get(s.id) ?? [], rules, now)
-    return { ...res, storeName: storeName.get(s.id) ?? 'Store', branchCode: storeBranch.get(s.id) ?? null, location: storeAddr.get(s.id) ?? null, regionName: regionName.get(s.region_id) ?? '—', sm: storeSm.get(s.id) ?? null }
+    const stTickets = byStore.get(s.id) ?? []
+    const res = calculateStoreHealth({ id: s.id, region_id: s.region_id }, stTickets, rules, now)
+    // Last activity = the store's most recent ticket touch (supplier/internal update,
+    // else the ticket's updated/created time) — powers the Stores table column.
+    const lastActivityAt = stTickets.reduce<string | null>((acc, t) => {
+      const at = (t as any).last_supplier_update_at ?? (t as any).last_internal_update_at ?? (t as any).updated_at ?? t.created_at
+      return at && (!acc || new Date(at) > new Date(acc)) ? at : acc
+    }, null)
+    return { ...res, storeName: storeName.get(s.id) ?? 'Store', branchCode: storeBranch.get(s.id) ?? null, location: storeAddr.get(s.id) ?? null, regionName: regionName.get(s.region_id) ?? '—', sm: storeSm.get(s.id) ?? null, lastActivityAt }
   })
   const portfolio = calculateRegionalPortfolioHealth('portfolio', cards, regionSignals(tickets, rules, now))
 
