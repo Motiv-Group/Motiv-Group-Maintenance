@@ -5,11 +5,12 @@
 // hours). The Submit COC & POC flow lives on its own page (/complete).
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Calendar, Wrench, Plus, PlayCircle } from 'lucide-react'
+import { Calendar, Wrench, PlayCircle } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { DrawerHeader } from '@/components/exec/Drawer'
 import { SchedulePicker } from '@/components/ui/SchedulePicker'
 import { SendQuoteForm } from '@/components/admin/SendQuoteForm'
+import { PopupForm } from '@/components/supplier/PopupForm'
 import { createClient } from '@/lib/supabase/client'
 
 async function transition(ticketId: string, body: Record<string, unknown>) {
@@ -182,7 +183,6 @@ export function SupplierVariationGate({ ticketId, priority, createdAt, variation
   status: 'approved_closeout' | 'vo_declined'; declineReason?: string | null; noVosConfirmed?: boolean
 }) {
   const router = useRouter()
-  const [showForm, setShowForm] = useState(false)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const hasVOs = variationCount > 0 || status === 'vo_declined'
@@ -213,10 +213,9 @@ export function SupplierVariationGate({ ticketId, priority, createdAt, variation
       ) : (
         <p className="text-sm text-[var(--text-muted)]">Your COC &amp; POC were approved. Raise a variation order for any extra work, or confirm there are none so the manager can close out.</p>
       )}
-      <button onClick={() => setShowForm(v => !v)} className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition flex items-center justify-center gap-1.5">
-        <Plus size={15} /> {raiseLabel}
-      </button>
-      {showForm && <SendQuoteForm ticketId={ticketId} variant="variation" competitive priority={priority} createdAt={createdAt} defaultOpen onClose={() => setShowForm(false)} />}
+      <PopupForm label={raiseLabel} tone="primary">
+        <SendQuoteForm ticketId={ticketId} variant="variation" competitive priority={priority} createdAt={createdAt} defaultOpen />
+      </PopupForm>
       {/* Confirm no further VOs → un-greys the RM's Final close-out (locked after). */}
       <button onClick={confirmNoVos} disabled={busy} className="w-full py-2.5 rounded-xl ring-1 ring-emerald-500/40 text-emerald-600 dark:text-emerald-400 text-sm font-semibold hover:bg-emerald-500/10 transition disabled:opacity-50">{busy ? 'Confirming…' : 'No further variation orders — ready for close-out'}</button>
       {err && <p className="text-xs text-red-500">{err}</p>}

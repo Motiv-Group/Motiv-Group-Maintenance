@@ -19,9 +19,9 @@ async function addEvidence(ticketId: string, kind: string, url: string) {
   if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Upload failed')
 }
 
-export function SubmitCompletionForm({ ticketId, evidenceRequested = false, requireBoth = true }: { ticketId: string; evidenceRequested?: boolean; requireBoth?: boolean }) {
+export function SubmitCompletionForm({ ticketId, evidenceRequested = false, requireBoth = true, defaultOpen = false, onClose }: { ticketId: string; evidenceRequested?: boolean; requireBoth?: boolean; defaultOpen?: boolean; onClose?: () => void }) {
   const router = useRouter()
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(defaultOpen)
   const [coc, setCoc] = useState<File | null>(null)
   const [photos, setPhotos] = useState<File[]>([])
   const [notes, setNotes] = useState('')
@@ -148,7 +148,7 @@ export function SubmitCompletionForm({ ticketId, evidenceRequested = false, requ
 
       <div className="grid grid-cols-2 gap-3">
         <button onClick={submit} disabled={busy} className="py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Submitting…' : 'Review & Submit'}</button>
-        <button onClick={() => { setOpen(false); setErr('') }} disabled={busy} className="py-3 rounded-xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm font-semibold disabled:opacity-50 hover:bg-[var(--hover)]">Cancel</button>
+        <button onClick={() => { setOpen(false); setErr(''); onClose?.() }} disabled={busy} className="py-3 rounded-xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm font-semibold disabled:opacity-50 hover:bg-[var(--hover)]">Cancel</button>
       </div>
     </div>
 

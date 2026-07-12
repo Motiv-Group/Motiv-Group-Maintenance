@@ -22,6 +22,7 @@ import { SupplierAttachments } from '@/components/workflow/SupplierAttachments'
 import { SendQuoteForm } from '@/components/admin/SendQuoteForm'
 import { QuoteSummary, type QuoteSummaryStatus } from '@/components/workflow/QuoteSummary'
 import { MarkInProgressButton, DeclineWorkButton, AcceptSnagCard, StartSnagButton, SupplierVariationGate } from '@/components/supplier/SupplierJobActions'
+import { PopupForm } from '@/components/supplier/PopupForm'
 import { RaiseDisputeButton, DisputeThread } from '@/components/dispute/DisputeBox'
 import { DueDate } from '@/components/workflow/DueDate'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
@@ -522,7 +523,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
               </div>
             </div>
           )}
-          {canSubmitQuote && <SendQuoteForm ticketId={t.id} competitive priority={t.priority} createdAt={t.created_at} />}
+          {canSubmitQuote && <PopupForm label="Upload Quote" tone="success"><SendQuoteForm defaultOpen ticketId={t.id} competitive priority={t.priority} createdAt={t.created_at} /></PopupForm>}
           {/* After the quote is approved → straight to "Mark in progress" (confirm).
               Variation orders come after the COC/POC is approved (close-out stage). */}
           {awarded && (t.status === 'accepted' || t.status === 'scheduled') && <MarkInProgressButton ticketId={t.id} />}
@@ -564,7 +565,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
                 <div className="rounded-xl bg-red-500/10 ring-1 ring-red-500/30 p-3.5 text-sm text-[var(--text-muted)]">The evidence request is paused while your dispute is under review — continue the conversation in the Dispute section above.</div>
               ) : (
                 <>
-                  <SubmitCompletionForm ticketId={t.id} evidenceRequested={t.status === 'evidence_requested'} requireBoth={t.status !== 'evidence_requested'} />
+                  <PopupForm label={t.status === 'evidence_requested' ? 'Upload more evidence' : 'Upload COC & POC'} tone="success"><SubmitCompletionForm defaultOpen ticketId={t.id} evidenceRequested={t.status === 'evidence_requested'} requireBoth={t.status !== 'evidence_requested'} /></PopupForm>
                   {t.status === 'evidence_requested' && <RaiseDisputeButton ticketId={t.id} origin="evidence" />}
                 </>
               )}
