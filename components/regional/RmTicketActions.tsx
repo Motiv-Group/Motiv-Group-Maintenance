@@ -3,7 +3,7 @@
 // RM ticket-page custom actions for the competitive-quoting model.
 import { useState, useMemo, useEffect, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, Pencil, CalendarClock, Plus, ImagePlus, X, FileText } from 'lucide-react'
+import { Search, Pencil, CalendarClock, Plus, ImagePlus, X, FileText, ChevronDown } from 'lucide-react'
 import { StarInput, Stars } from '@/components/ui/Stars'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { uploadFiles } from '@/lib/upload'
@@ -32,6 +32,41 @@ function Modal({ title, onClose, children, maxWidth = 'max-w-md' }: { title: str
         {children}
       </div>
     </div>
+  )
+}
+
+// ── "More actions" disclosure — a compact button that expands a stack of
+// secondary/destructive actions, so the Next-action block leads with one primary
+// button. Children are the secondary action components, each passed a `trigger`
+// that renders a MoreActionItem. The list stays mounted while a child's modal is
+// open (we never collapse on item click), so the modal overlay works.
+export function MoreActions({ children }: { children: ReactNode }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+        className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm font-semibold hover:bg-[var(--hover)] transition"
+      >
+        More actions <ChevronDown size={15} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && <div className="mt-2 space-y-2">{children}</div>}
+    </div>
+  )
+}
+
+/** A single row inside <MoreActions> — icon + label, tinted red for destructive. */
+export function MoreActionItem({ icon, label, onClick, tone = 'default' }: { icon?: ReactNode; label: string; onClick: () => void; tone?: 'default' | 'danger' }) {
+  const toneCls = tone === 'danger'
+    ? 'text-red-600 dark:text-red-400 ring-red-500/30 hover:bg-red-500/10'
+    : 'text-[var(--text)] ring-[var(--border)] hover:bg-[var(--hover)]'
+  return (
+    <button type="button" onClick={onClick} className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl ring-1 text-sm font-semibold transition ${toneCls}`}>
+      {icon && <span className="shrink-0">{icon}</span>}
+      {label}
+    </button>
   )
 }
 
@@ -140,7 +175,7 @@ export function AssignSuppliersButton({ ticketId, suppliers, motivSuppliers = []
 // ── Request more info (amber button → modal) ────────────────────
 const INFO_REASONS = ['Need more detail', 'Photos unclear', 'Scope unclear', 'Access details needed', 'Other']
 
-export function RequestInfoButton({ ticketId }: { ticketId: string }) {
+export function RequestInfoButton({ ticketId, trigger }: { ticketId: string; trigger?: (open: () => void) => ReactNode }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [preset, setPreset] = useState('')
@@ -160,7 +195,9 @@ export function RequestInfoButton({ ticketId }: { ticketId: string }) {
   const input = 'w-full px-3 py-2 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm'
   return (
     <>
-      <button onClick={() => setOpen(true)} className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold transition">Request more info</button>
+      {trigger ? trigger(() => setOpen(true)) : (
+        <button onClick={() => setOpen(true)} className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold transition">Request more info</button>
+      )}
       {open && (
         <Modal title="Request more information" onClose={() => setOpen(false)}>
           <p className="text-xs text-[var(--text-muted)]">The store manager will see this message and can edit + resubmit the ticket.</p>
@@ -713,8 +750,8 @@ function SignoffReviewBody({ ticketId, s }: { ticketId: string; s: SignoffSubmis
 }
 
 // ── RM adds extra work to the ticket (before a supplier is assigned) ─
-export function RmAddWorkForm({ ticketId, description, photoUrls, title, category, impact }: {
-  ticketId: string; description: string; photoUrls: string[]; title: string; category: string; impact: string
+export function RmAddWorkForm({ ticketId, description, photoUrls, title, category, impact, trigger }: {
+  ticketId: string; description: string; photoUrls: string[]; title: string; category: string; impact: string; trigger?: (open: () => void) => ReactNode
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -739,9 +776,11 @@ export function RmAddWorkForm({ ticketId, description, photoUrls, title, categor
 
   return (
     <>
-      <button onClick={() => setOpen(true)} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold transition">
-        <Plus size={16} /> Add extra work
-      </button>
+      {trigger ? trigger(() => setOpen(true)) : (
+        <button onClick={() => setOpen(true)} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold transition">
+          <Plus size={16} /> Add extra work
+        </button>
+      )}
       {open && (
         <Modal title="Add extra work to this ticket" maxWidth="max-w-2xl" onClose={() => { if (!busy) { setOpen(false); setErr('') } }}>
           <p className="text-xs text-[var(--text-muted)]">Extra scope you know of — added to the ticket brief before a supplier is assigned.</p>
@@ -937,7 +976,7 @@ export function AcceptSnagScheduleCard({ ticketId, scheduledAt }: { ticketId: st
 
 // ── Cancel ticket (with reason) ─────────────────────────────────
 const CANCEL_REASONS = ['Duplicate ticket', 'Issue resolved itself', 'Not a maintenance issue', 'Store closed', 'Logged in error', 'Other']
-export function CancelTicketCard({ ticketId }: { ticketId: string }) {
+export function CancelTicketCard({ ticketId, trigger }: { ticketId: string; trigger?: (open: () => void) => ReactNode }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [reason, setReason] = useState(CANCEL_REASONS[0])
@@ -955,7 +994,9 @@ export function CancelTicketCard({ ticketId }: { ticketId: string }) {
   const input = 'w-full px-3 py-2 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm'
   return (
     <>
-      <button onClick={() => setOpen(true)} className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition">Cancel ticket</button>
+      {trigger ? trigger(() => setOpen(true)) : (
+        <button onClick={() => setOpen(true)} className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition">Cancel ticket</button>
+      )}
       {open && (
         <Modal title="Cancel this ticket?" onClose={() => setOpen(false)}>
           <p className="text-sm text-[var(--text-muted)]">Choose a reason — the store manager will be notified.</p>

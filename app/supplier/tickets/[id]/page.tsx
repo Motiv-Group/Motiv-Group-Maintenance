@@ -399,13 +399,13 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
       <BackLink fallbackHref="/supplier/tickets" label="Back to tickets" />
       {/* Progress — bare, no card around it (same as RM). Hidden once this supplier
           was declined: the ticket's onward progress is no longer theirs. */}
-      {!declinedForMe && <div className="px-1 pt-3"><RmPipeline status={supplierStatus} /></div>}
+      {!declinedForMe && <div className="px-1 pt-4"><RmPipeline status={supplierStatus} /></div>}
       {/* Ticket detail — same layout as the SM view */}
       <Card className="p-5 space-y-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             {t.job_ref && <p className="text-[11px] font-mono font-semibold tracking-wide text-[var(--text-faint)] mb-0.5">{t.job_ref}</p>}
-            <h1 className="text-lg font-bold text-[var(--text)]">{t.title}</h1>
+            <h1 className="text-lg font-bold text-[var(--text)]">{t.category || t.title}</h1>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end">
             <PriorityBadge priority={t.priority} className="w-full text-center" />

@@ -49,11 +49,11 @@ export function RmPipeline({ status }: { status: string }) {
           const label = isSnagStep ? 'Snag' : s.label
           return (
             <div key={s.label} className={isLast ? 'flex items-start' : 'flex items-start flex-1'}>
-              <div className="flex flex-col items-center gap-1.5 w-14 sm:w-16">
-                <div className={`h-5 w-5 rounded-full transition ${reached ? dot : 'bg-slate-300 dark:bg-white/20'} ${isCurrent ? `ring-4 ${ring}` : reached ? '' : 'ring-1 ring-black/5 dark:ring-white/10'}`} />
-                <span className={`text-[11px] text-center leading-tight ${isCurrent ? `${text} font-bold` : reached ? 'font-medium text-[var(--text)]' : 'text-[var(--text-muted)]'}`}>{label}</span>
+              <div className="flex flex-col items-center gap-1.5 w-14 sm:w-[74px]">
+                <div className={`rounded-full transition ${isCurrent ? 'h-6 w-6' : 'h-5 w-5'} ${reached ? dot : 'bg-slate-300 dark:bg-white/25'} ${isCurrent ? `ring-4 ${ring}` : reached ? '' : 'ring-1 ring-black/10 dark:ring-white/15'}`} />
+                <span className={`text-center leading-tight ${isCurrent ? `text-xs sm:text-[13px] ${text} font-bold` : reached ? 'text-[11px] sm:text-xs font-medium text-[var(--text)]' : 'text-[11px] sm:text-xs text-[var(--text-muted)]'}`}>{label}</span>
               </div>
-              {!isLast && <div className={`flex-1 h-1 mt-2 rounded-full ${i < idx ? s.dot : 'bg-slate-200 dark:bg-white/12'}`} />}
+              {!isLast && <div className={`flex-1 h-1 mt-[9px] rounded-full ${i < idx ? s.dot : 'bg-slate-200 dark:bg-white/15'}`} />}
             </div>
           )
         })}
