@@ -28,8 +28,12 @@ export default async function SupplierOverviewPage() {
   const d = await assembleSupplierDashboard(companyId, supplierIds)
   const perf = d.perf
   const briefingScopeId = supplierIds.slice().sort().join(',')
-  const briefing = companyId
-    ? await getDailyBriefing({ companyId, scope: 'supplier', scopeId: briefingScopeId, role: 'supplier', facts: supplierFacts(d) })
+  // Standalone (self-signup) suppliers have no client company, so key the daily
+  // briefing cache on their own supplier id (a non-null UUID, no companies FK) — this
+  // gives verified standalone suppliers the same AI overview as company-linked ones.
+  const briefingCacheKey = companyId ?? supplierIds[0]
+  const briefing = briefingCacheKey
+    ? await getDailyBriefing({ companyId: briefingCacheKey, scope: 'supplier', scopeId: briefingScopeId, role: 'supplier', facts: supplierFacts(d) })
     : null
   const greeting = (() => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening' })()
 
