@@ -873,9 +873,17 @@ alter table public.repeat_defect_groups add primary key (id);
 alter table public.report_exports add primary key (id);
 alter table public.reports add primary key (id);
 alter table public.roles add primary key (key);
--- Lookup rows referenced by user_profiles.role FK. 'individual' seeded 20260720
--- (general-public self-signup role).
-insert into public.roles (key, label) values ('individual', 'Individual')
+-- Lookup rows referenced by the user_profiles.role FK. All app roles must exist
+-- here or setting that role fails the FK. ('client' is the legacy store-manager
+-- alias; 'individual' is the general-public self-signup role, seeded 20260720.)
+insert into public.roles (key, label) values
+  ('store_manager',    'Store Manager'),
+  ('regional_manager', 'Regional Manager'),
+  ('supplier',         'Supplier'),
+  ('executive',        'Executive'),
+  ('individual',       'Individual'),
+  ('system_admin',     'System Admin'),
+  ('client',           'Client (legacy)')
 on conflict (key) do nothing;
 alter table public.signoff_rounds add primary key (id);
 alter table public.signoffs add primary key (id);
@@ -1275,6 +1283,14 @@ begin
   return new;
 end $function$
 ;
+
+-- Fire handle_new_user on every new auth signup. This trigger lives on the AUTH
+-- schema, so it is not captured by the public-schema export — declared here to
+-- keep schema.sql self-sufficient for a fresh project (without it, signups never
+-- get a user_profiles row).
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created after insert on auth.users
+  for each row execute function public.handle_new_user();
 
 CREATE OR REPLACE FUNCTION public.set_updated_at()
  RETURNS trigger
