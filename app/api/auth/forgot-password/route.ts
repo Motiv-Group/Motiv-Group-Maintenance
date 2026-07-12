@@ -28,8 +28,12 @@ export async function POST(request: Request) {
     options: { redirectTo: `${base}/auth/reset-password` },
   } as any)
   const link = (data?.properties as any)?.action_link as string | undefined
-  if (!error && link) {
-    await sendEmail({ to: email, subject: 'Reset your MOTIV password', html: passwordResetEmailHtml(link, base) })
+  if (error || !link) {
+    // Server-side only (never leaked to the client) — helps diagnose delivery.
+    console.error('[forgot-password] generateLink failed', { email, error: error?.message, hasLink: !!link })
+    return ok
   }
+  const sent = await sendEmail({ to: email, subject: 'Reset your MOTIV password', html: passwordResetEmailHtml(link, base) })
+  if (!sent) console.error('[forgot-password] sendEmail returned false (Resend not configured or rejected)', { email })
   return ok
 }
