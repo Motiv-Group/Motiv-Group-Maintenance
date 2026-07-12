@@ -64,7 +64,12 @@ export async function inviteUser(opts: InviteOpts): Promise<{ userId: string; ac
   if (opts.link.storeId) await admin.from('store_users').upsert({ user_id: uid, store_id: opts.link.storeId })
   if (opts.link.supplierId) await admin.from('supplier_users').upsert({ user_id: uid, supplier_id: opts.link.supplierId })
 
-  const actionLink = (data.properties as any)?.action_link ?? null
+  // Link to our anti-prefetch confirm page (using the hashed token) rather than
+  // the Supabase verify URL, so email scanners can't consume the one-time token.
+  const props = data.properties as any
+  const actionLink = props?.hashed_token
+    ? `${base}/auth/confirm?token_hash=${props.hashed_token}&type=invite&next=${encodeURIComponent(path)}`
+    : (props?.action_link ?? null)
   const emailed = await sendInviteEmail(opts.email, actionLink, opts.roleLabel, base)
   return { userId: uid, actionLink, emailed }
 }
