@@ -43,6 +43,12 @@ export async function inviteUser(opts: InviteOpts): Promise<{ userId: string; ac
   }
   const uid = data.user.id
 
+  // Admin-provisioned accounts: the inviter vouches for the address, so confirm the
+  // email up front. With "Confirm email" enabled, this lets the invitee sign in the
+  // moment they set a password (including via the copied activation link) instead of
+  // depending on the click to flip email_confirmed_at. Best-effort — never blocks.
+  await admin.auth.admin.updateUserById(uid, { email_confirm: true }).catch(() => {})
+
   // Ensure profile carries company + role + any admin-entered details (the trigger
   // seeds from metadata; enforce here so the account is complete on creation).
   await admin.from('user_profiles').upsert({
