@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
 import { isValidEmail } from '@/lib/csv'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
@@ -20,10 +19,11 @@ export default function ForgotPasswordPage() {
     if (!isValidEmail(email)) { setErr('Enter a valid email address'); return }
     setErr('')
     setLoading(true)
-    const supabase = createClient()
-    // Don't reveal whether the email exists — always show the same result.
-    await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: `${window.location.origin}/auth/callback?next=/auth/reset-password`,
+    // Our API generates the recovery link and sends the branded email via Resend
+    // (from hello@motivgroup.co.za). Always the same result — no email disclosure.
+    await fetch('/api/auth/forgot-password', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.trim() }),
     }).catch(() => {})
     setLoading(false)
     setSent(true)

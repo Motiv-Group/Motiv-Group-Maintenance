@@ -33,6 +33,54 @@ export async function sendEmail({ to, subject, html, text }: SendEmailArgs): Pro
   }
 }
 
+// ── Branded transactional template ──────────────────────────────────────────
+// Table-based + inline styles for broad email-client support (Gmail/Outlook strip
+// <style> + classes). Navy MOTIV header (brand logo), blue CTA (the app's action
+// colour), copy-paste fallback link, footer. Shared by the invite + reset emails.
+export function motivBrandedEmailHtml(o: {
+  base: string; heading: string; lead: string; sub?: string; ctaLabel: string; link: string; footerNote: string
+}): string {
+  return `<div style="margin:0;padding:0;background:#f3f4f6;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:32px 12px;font-family:Arial,Helvetica,sans-serif;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e5e7eb;">
+        <tr><td style="background:#0d1f2d;padding:20px 32px;">
+          <img src="${o.base}/brand/motiv-symbol.png" alt="" width="34" height="28" style="display:inline-block;vertical-align:middle;border:0;height:28px;width:34px;" />
+          <img src="${o.base}/brand/motiv-wordmark.png" alt="MOTIV" width="96" height="15" style="display:inline-block;vertical-align:middle;border:0;height:15px;width:96px;margin-left:10px;" />
+        </td></tr>
+        <tr><td style="padding:32px;color:#1f2937;">
+          <h1 style="margin:0 0 12px;font-size:20px;font-weight:700;color:#0d1f2d;">${o.heading}</h1>
+          <p style="margin:0 0 ${o.sub ? '6px' : '24px'};font-size:15px;line-height:1.6;color:#374151;">${o.lead}</p>
+          ${o.sub ? `<p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#374151;">${o.sub}</p>` : ''}
+          <table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="border-radius:10px;background:#2563eb;">
+            <a href="${o.link}" style="display:inline-block;padding:13px 28px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:10px;">${o.ctaLabel}</a>
+          </td></tr></table>
+          <p style="margin:26px 0 6px;font-size:12px;color:#6b7280;">Button not working? Copy and paste this link into your browser:</p>
+          <p style="margin:0;font-size:12px;line-height:1.5;word-break:break-all;"><a href="${o.link}" style="color:#2563eb;text-decoration:none;">${o.link}</a></p>
+        </td></tr>
+        <tr><td style="padding:18px 32px;border-top:1px solid #eef0f2;background:#fafbfc;">
+          <p style="margin:0;font-size:12px;line-height:1.5;color:#9ca3af;">${o.footerNote}</p>
+        </td></tr>
+      </table>
+      <p style="max-width:480px;margin:16px auto 0;font-size:11px;color:#b4b8bf;text-align:center;">© MOTIV · Maintenance &amp; ticketing</p>
+    </td></tr>
+  </table>
+</div>`
+}
+
+/** Branded password-reset email (sent via our Resend sender, not Supabase). */
+export function passwordResetEmailHtml(link: string, base: string): string {
+  return motivBrandedEmailHtml({
+    base,
+    heading: 'Reset your password',
+    lead: 'We received a request to reset the password for your MOTIV account.',
+    sub: 'Click below to choose a new password.',
+    ctaLabel: 'Reset password',
+    link,
+    footerNote: "If you didn't request this, you can safely ignore this email — your password won't change.",
+  })
+}
+
 interface StoreInviteArgs {
   managerName: string
   loginUrl:    string
