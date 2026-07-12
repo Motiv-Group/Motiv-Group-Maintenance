@@ -101,7 +101,7 @@ export function SettingsChrome({
                 <button type="submit" className={iconBtn} title="Log out"><LogOut size={17} /></button>
               </form>
               <div className="flex items-center gap-2 pl-2 ml-1 border-l border-white/15">
-                <span className="w-8 h-8 rounded-full bg-[#C6A35D] text-[#0a0e17] font-bold flex items-center justify-center text-sm">{initial}</span>
+                <span className="w-8 h-8 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-sm">{initial}</span>
               </div>
             </div>
           </div>
@@ -116,7 +116,7 @@ export function SettingsChrome({
               const on = isActive(href)
               return (
                 <Link key={href} href={href} aria-current={on ? 'page' : undefined}
-                  className={`flex flex-col items-center justify-center gap-1 flex-1 text-[11px] font-medium transition-colors ${on ? 'text-[#C6A35D]' : 'text-gray-400 hover:text-gray-200'}`}>
+                  className={`flex flex-col items-center justify-center gap-1 flex-1 text-[11px] font-medium transition-colors ${on ? 'text-blue-300' : 'text-gray-400 hover:text-gray-200'}`}>
                   <Icon size={22} strokeWidth={on ? 2.4 : 1.8} />
                   {short}
                 </Link>

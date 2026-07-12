@@ -42,7 +42,7 @@ export default function AppearanceSettingsPage() {
             onClick={toggle}
             className="flex items-center gap-2 px-4 py-2 rounded-lg border border-[var(--border)] text-sm font-medium text-[var(--text)] hover:bg-[var(--hover)] transition-colors"
           >
-            {theme === 'dark' ? <Sun size={16} className="text-[#C6A35D]" /> : <Moon size={16} className="text-[#C6A35D]" />}
+            {theme === 'dark' ? <Sun size={16} className="text-blue-600 dark:text-blue-400" /> : <Moon size={16} className="text-blue-600 dark:text-blue-400" />}
             {theme === 'dark' ? 'Light mode' : 'Dark mode'}
           </button>
         </div>
@@ -51,7 +51,7 @@ export default function AppearanceSettingsPage() {
       <Card className="p-5 space-y-3">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2">
-            <Monitor size={16} className="mt-0.5 shrink-0 text-[#C6A35D]" />
+            <Monitor size={16} className="mt-0.5 shrink-0 text-blue-600 dark:text-blue-400" />
             <div>
               <p className="text-sm text-[var(--text)]">Content width</p>
               <p className="text-xs text-[var(--text-faint)] mt-0.5">How much of the screen the app fills on desktop.</p>
@@ -63,7 +63,7 @@ export default function AppearanceSettingsPage() {
           type="range" min={MIN} max={MAX} step={1} value={width}
           onChange={e => apply(Number(e.target.value))}
           aria-label="Content width"
-          className="w-full cursor-pointer accent-[#C6A35D]"
+          className="w-full cursor-pointer accent-blue-600"
         />
         <div className="flex justify-between text-[11px] text-[var(--text-faint)]">
           <span>{MIN}% · narrow</span><span>Default {DEFAULT}%</span><span>{MAX}% · wide</span>
