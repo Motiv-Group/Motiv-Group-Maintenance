@@ -66,6 +66,8 @@ export function StorePriorityWorkQueue({
         (URGENCY_RANK[String(a.priority)] ?? 9) - (URGENCY_RANK[String(b.priority)] ?? 9)
         || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       )
+      // Cap the queue at the top 5 — the rest live behind "View all tickets".
+      .slice(0, 5)
   }, [activeTickets, filter, todayVisitIds])
 
   return (

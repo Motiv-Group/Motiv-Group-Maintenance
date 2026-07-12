@@ -51,7 +51,9 @@ export function RegionalPriorityWorkQueue({ tickets, generatedAt, suppliers = []
       .filter(t => matchesFilter(t, filter))
       .sort((a, b) =>
         (URGENCY_RANK[String(a.priority)] ?? 9) - (URGENCY_RANK[String(b.priority)] ?? 9)
-        || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+        || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      // Cap the queue at the top 5 — the rest live behind "View all tickets".
+      .slice(0, 5),
     [activeTickets, filter])
 
   return (
