@@ -98,8 +98,10 @@ export function ExecChrome({
   // matching the Settings Navbar — so icons/labels use light tones on navy.
   const iconBtn = 'p-2 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 transition-colors'
   // All roles share the same content width so the chrome (header, main, nav) is
-  // consistent and margins stay tight on wide screens.
-  const wrap = 'max-w-[1700px]'
+  // consistent. On desktop the content fills --content-width of the available width
+  // (default 90%, user-configurable 70–95% in Settings → Appearance); mobile stays
+  // full-width (relying on the px padding) so nothing is squeezed.
+  const wrap = 'max-w-none lg:max-w-[var(--content-width)]'
   const mainWrap = wrap
 
   return (

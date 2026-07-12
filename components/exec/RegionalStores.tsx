@@ -21,7 +21,7 @@ const bucketOf = (st: string): Bucket => st === 'controlled' ? 'healthy' : st ==
 const BUCKET_META: Record<Bucket, { label: string; badge: string; bar: string; text: string; tab: string }> = {
   critical:  { label: 'Critical',  badge: 'bg-red-500/15 text-red-700 dark:text-red-400 ring-red-500/30',              bar: '#ef4444', text: 'text-red-600 dark:text-red-400',    tab: 'bg-red-500/15 text-red-700 dark:text-red-400 ring-red-500/40' },
   attention: { label: 'Attention', badge: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D] ring-[#C6A35D]/30',      bar: '#C6A35D', text: 'text-amber-600 dark:text-[#C6A35D]', tab: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D] ring-[#C6A35D]/40' },
-  healthy:   { label: 'Healthy',   badge: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 ring-emerald-500/30', bar: '#10b981', text: 'text-emerald-600 dark:text-emerald-400', tab: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 ring-emerald-500/40' },
+  healthy:   { label: 'Controlled', badge: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 ring-emerald-500/30', bar: '#10b981', text: 'text-emerald-600 dark:text-emerald-400', tab: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 ring-emerald-500/40' },
 }
 
 // Compact "time since" for the Last Activity column.
@@ -183,19 +183,20 @@ export function RegionalStores({ stores, archived = [], companyName = '' }: { st
         </div>
       )}
 
-      {/* Status bucket tabs */}
+      {/* Status bucket tabs — always colour-coded (All blue · Critical red · Attention
+          amber · Controlled green); the active tab gets a thicker ring + bold. */}
       <div className="flex flex-wrap gap-2">
         {([
-          { key: 'all', label: 'All', n: counts.all, on: 'bg-blue-500/15 text-blue-700 dark:text-blue-400 ring-blue-500/40' },
-          { key: 'critical', label: 'Critical', n: counts.critical, on: BUCKET_META.critical.tab },
-          { key: 'attention', label: 'Attention', n: counts.attention, on: BUCKET_META.attention.tab },
-          { key: 'healthy', label: 'Healthy', n: counts.healthy, on: BUCKET_META.healthy.tab },
+          { key: 'all', label: 'All', n: counts.all, tint: 'bg-blue-500/15 text-blue-700 dark:text-blue-400', ring: 'ring-blue-500/40' },
+          { key: 'critical', label: 'Critical', n: counts.critical, tint: 'bg-red-500/15 text-red-700 dark:text-red-400', ring: 'ring-red-500/40' },
+          { key: 'attention', label: 'Attention', n: counts.attention, tint: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D]', ring: 'ring-[#C6A35D]/40' },
+          { key: 'healthy', label: 'Controlled', n: counts.healthy, tint: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400', ring: 'ring-emerald-500/40' },
         ] as const).map(t => {
           const active = bucket === t.key
           return (
             <button key={t.key} onClick={() => setBucket(t.key)} aria-pressed={active}
-              className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold ring-1 transition ${active ? t.on : 'text-[var(--text-muted)] ring-[var(--border)] hover:bg-[var(--hover)]'}`}>
-              {t.label} <span className={`rounded-md px-1.5 py-0.5 text-xs tabular-nums ${active ? 'bg-black/5 dark:bg-white/10' : 'bg-[var(--surface-2)] text-[var(--text-faint)]'}`}>{t.n}</span>
+              className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm transition ${t.tint} ${t.ring} ${active ? 'font-bold ring-2' : 'font-semibold ring-1 opacity-80 hover:opacity-100'}`}>
+              {t.label} <span className="rounded-md bg-black/10 px-1.5 py-0.5 text-xs tabular-nums dark:bg-white/10">{t.n}</span>
             </button>
           )
         })}
@@ -211,7 +212,7 @@ export function RegionalStores({ stores, archived = [], companyName = '' }: { st
               className="w-full rounded-xl bg-[var(--input-bg)] py-2 pl-9 pr-3 text-sm text-[var(--text)] ring-1 ring-[var(--border)] placeholder-[var(--text-faint)] focus:outline-none focus:ring-2 focus:ring-[#C6A35D]/40" />
           </div>
           <Select ariaLabel="Filter by status" value={bucket} onChange={v => setBucket(v as 'all' | Bucket)}>
-            <option value="all">Status</option><option value="critical">Critical</option><option value="attention">Attention</option><option value="healthy">Healthy</option>
+            <option value="all">Status</option><option value="critical">Critical</option><option value="attention">Attention</option><option value="healthy">Controlled</option>
           </Select>
           <Select ariaLabel="Filter by SLA" value={sla} onChange={v => setSla(v as typeof sla)}>
             <option value="all">SLA</option><option value="overdue">Has overdue</option><option value="ok">No overdue</option>
@@ -230,13 +231,13 @@ export function RegionalStores({ stores, archived = [], companyName = '' }: { st
             <thead><tr className="border-b border-[var(--border)] text-left text-[11px] uppercase tracking-wide text-[var(--text-faint)]">
               <th className="px-3 py-2.5 font-medium">#</th><th className="px-3 font-medium">Store</th><th className="px-3 font-medium">Health</th><th className="px-3 font-medium">Status</th>
               <th className="px-3 text-center font-medium">Open</th><th className="px-3 text-center font-medium">Overdue</th><th className="px-3 text-center font-medium">Approvals</th>
-              <th className="px-3 font-medium">Exposure</th><th className="px-3 font-medium">Last Activity</th><th className="px-3 font-medium">Main Driver</th><th className="px-3 text-right font-medium">Action</th>
+              <th className="px-3 font-medium">Exposure</th><th className="px-3 font-medium">Last Activity</th><th className="px-3 font-medium">Main Driver</th>
             </tr></thead>
             <tbody>
               {pageRows.map((s, i) => {
                 const m = BUCKET_META[bucketOf(s.finalStatus)]
                 return (
-                  <tr key={s.storeId} className="border-b border-[var(--border)] last:border-0 transition hover:bg-[var(--hover)]">
+                  <tr key={s.storeId} onClick={() => { setSelId(s.storeId); setOpen(true) }} className="cursor-pointer border-b border-[var(--border)] last:border-0 transition hover:bg-[var(--hover)]">
                     <td className="px-3 py-3 text-[var(--text-faint)] tabular-nums">{(curPage - 1) * perPage + i + 1}</td>
                     <td className="px-3">
                       <p className="font-semibold text-[var(--text)]">{s.storeName}</p>
@@ -253,16 +254,10 @@ export function RegionalStores({ stores, archived = [], companyName = '' }: { st
                     <td className="px-3 whitespace-nowrap text-[var(--text)] tabular-nums">{formatCurrency(s.costExposure)}</td>
                     <td className="px-3 whitespace-nowrap text-[var(--text-muted)]">{relativeTime(s.lastActivityAt, nowMs)}</td>
                     <td className="max-w-[180px] truncate px-3 text-xs text-[var(--text-muted)]">{s.mainIssue}</td>
-                    <td className="px-3">
-                      <div className="flex items-center justify-end gap-1">
-                        <button onClick={() => { setSelId(s.storeId); setOpen(true) }} className="inline-flex items-center gap-1 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-semibold text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] hover:text-[var(--text)]">View store <ChevronRight size={13} /></button>
-                        {kebab({ id: s.storeId, name: s.storeName, archived: false })}
-                      </div>
-                    </td>
                   </tr>
                 )
               })}
-              {!pageRows.length && <tr><td colSpan={11} className="py-8 text-center text-[var(--text-faint)]">No stores match.</td></tr>}
+              {!pageRows.length && <tr><td colSpan={10} className="py-8 text-center text-[var(--text-faint)]">No stores match.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -346,7 +341,7 @@ export function RegionalStores({ stores, archived = [], companyName = '' }: { st
         </Card>
       )}
 
-      {open && selected && <Modal onClose={() => setOpen(false)} maxWidth="max-w-2xl">{close => <Detail s={selected} onClose={close} />}</Modal>}
+      {open && selected && <Modal onClose={() => setOpen(false)} maxWidth="max-w-2xl">{close => <Detail s={selected} onClose={close} onManage={() => { setOpen(false); setActionTarget({ id: selected.storeId, name: selected.storeName, archived: false }) }} />}</Modal>}
 
       {actionTarget && (
         <StoreActionsModal
@@ -642,13 +637,15 @@ function ContactRow({ icon: Icon, label, value, href, external }: { icon: React.
     : <div className="flex items-start gap-2.5 px-0 py-1.5">{inner}</div>
 }
 
-function Detail({ s, onClose }: { s: StoreCard; onClose?: () => void }) {
+function Detail({ s, onClose, onManage }: { s: StoreCard; onClose?: () => void; onManage?: () => void }) {
   const recommended = s.finalStatus === 'controlled' ? 'Store controlled — keep it up.' : `Resolve: ${s.mainIssue}.`
   // Prefer the store's street address; fall back to its region so a location always shows.
   const loc = s.location || (s.regionName && s.regionName !== '—' ? s.regionName : null)
   return (
     <div className="space-y-4">
-      <DrawerHeader onClose={onClose} title={<div className="flex items-center gap-2 flex-wrap"><Store size={18} className="text-blue-600 dark:text-blue-400 shrink-0" /><h3 className="text-lg font-bold text-[var(--text)]">{s.storeName}</h3>{s.branchCode && <span className="font-mono text-xs text-[var(--text-faint)]">{s.branchCode}</span>}<Pill status={s.finalStatus} /></div>} />
+      <DrawerHeader onClose={onClose} title={<div className="flex items-center gap-2 flex-wrap"><Store size={18} className="text-blue-600 dark:text-blue-400 shrink-0" /><h3 className="text-lg font-bold text-[var(--text)]">{s.storeName}</h3>{s.branchCode && <span className="font-mono text-xs text-[var(--text-faint)]">{s.branchCode}</span>}<Pill status={s.finalStatus} /></div>}>
+        {onManage && <button type="button" onClick={onManage} aria-label="Manage store" title="Manage store" className="p-1.5 rounded-lg text-[var(--text-faint)] hover:text-[var(--text)] hover:bg-[var(--hover)] transition"><MoreVertical size={16} /></button>}
+      </DrawerHeader>
 
       {/* Health hero — donut + score + top-line */}
       <div className="flex items-center gap-4 rounded-xl bg-[var(--surface)] ring-1 ring-[var(--border)] p-4">

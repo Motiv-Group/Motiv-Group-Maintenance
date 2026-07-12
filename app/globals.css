@@ -21,6 +21,10 @@
      The v3 command-centre UI references these vars instead of hard-coded
      navy hex, so the theme toggle works everywhere and stays readable. ── */
   :root {
+    /* Desktop content width (share of the available width the main column fills).
+       Default 90%; user-configurable 70–95% via Settings → Appearance. The blocking
+       script in app/layout.tsx overrides this from localStorage before paint. */
+    --content-width: 90%;
     --app-bg:     #f0f1f4;
     --surface:    #ffffff;
     --surface-2:  #f7f8fa;
