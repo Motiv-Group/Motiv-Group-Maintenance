@@ -126,7 +126,7 @@ export function StoreTicketsList({ tickets, initialFilter = 'all', storeName = '
     ] },
     { tone: 'closed', label: 'Completed & closed', tiles: [
       { key: 'completed', label: 'Completed', count: counts.completed, icon: <CheckCircle2 size={16} /> },
-      { key: 'cancelled', label: 'Cancelled', count: counts.cancelled, icon: <XCircle size={16} /> },
+      { key: 'cancelled', label: 'Cancelled', count: counts.cancelled, icon: <XCircle size={16} />, tone: 'neutral' },
     ] },
   ], [counts])
 

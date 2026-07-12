@@ -224,10 +224,15 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
     requireRegionalV3(),
     admin.from('tickets').select('*').eq('id', params.id).single(),
   ])
-  if (!t || !t.region_id || !regionIds.includes(t.region_id)) redirect('/regional/tickets')
+  if (!t) redirect('/regional/tickets')
+  // Authorise by the ticket's STORE being in one of the RM's regions (the durable
+  // store→region link) rather than the denormalised tickets.region_id — so a ticket
+  // logged before its store was linked to the region (region_id still null/stale)
+  // still opens for the RM instead of bouncing back to the list.
+  const { data: store } = await admin.from('stores').select('name, sub_store, region_id, company_id').eq('id', t.store_id ?? '').maybeSingle()
+  if (!store || store.company_id !== companyId || !store.region_id || !regionIds.includes(store.region_id)) redirect('/regional/tickets')
 
-  const [{ data: store }, { data: quotes }, { data: updates }, { data: signoffs }, { data: suppliers }, { data: variations }, { data: snags }, { data: invites }, { data: ratingRows }, { data: roundRows }] = await Promise.all([
-    admin.from('stores').select('name, sub_store').eq('id', t.store_id ?? '').single(),
+  const [{ data: quotes }, { data: updates }, { data: signoffs }, { data: suppliers }, { data: variations }, { data: snags }, { data: invites }, { data: ratingRows }, { data: roundRows }] = await Promise.all([
     admin.from('quotes').select('id, supplier_id, amount, amount_incl_vat, description, file_url, status, valid_until, proposed_schedule_at, decline_reason, created_at, updated_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('signoffs').select('id, status, before_urls, after_urls, coc_url, invoice_url, notes, reject_reason, reviewed_at, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),

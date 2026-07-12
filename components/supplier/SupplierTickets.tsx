@@ -184,8 +184,8 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
     ] },
     { tone: 'closed', label: 'Completed & closed', tiles: [
       { key: 'completed', label: 'Completed', count: counts.completed, icon: <CheckCircle2 size={16} /> },
-      { key: 'declined', label: 'Declined', count: declinedCount, icon: <XCircle size={16} /> },
-      { key: 'cancelled', label: 'Cancelled', count: cancelledCount, icon: <Ban size={16} /> },
+      { key: 'declined', label: 'Declined', count: declinedCount, icon: <XCircle size={16} />, tone: 'neutral' },
+      { key: 'cancelled', label: 'Cancelled', count: cancelledCount, icon: <Ban size={16} />, tone: 'neutral' },
     ] },
   ], [counts, breachedCount, overdueCount, declinedCount, cancelledCount, evidenceCount])
 
