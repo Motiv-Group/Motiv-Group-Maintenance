@@ -3,7 +3,7 @@
 // RM ticket-page custom actions for the competitive-quoting model.
 import { useState, useMemo, useEffect, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, Pencil, CalendarClock, Plus, ImagePlus, X, FileText, ChevronDown } from 'lucide-react'
+import { Search, Pencil, CalendarClock, Plus, ImagePlus, X, FileText, ChevronDown, MessageSquare, XCircle } from 'lucide-react'
 import { StarInput, Stars } from '@/components/ui/Stars'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { uploadFiles } from '@/lib/upload'
@@ -53,6 +53,46 @@ export function MoreActions({ children }: { children: ReactNode }) {
         More actions <ChevronDown size={15} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && <div className="mt-2 space-y-2">{children}</div>}
+    </div>
+  )
+}
+
+// The RM Next-action cluster: one primary button (Assign supplier) + a "More
+// actions" disclosure holding the secondary/destructive actions. Lives in a CLIENT
+// component so the per-action `trigger` render-props are created client-side — a
+// Server Component may not pass functions to Client Components. The server page
+// passes only serializable props (ids, flags, arrays).
+export function RmTicketActionBar({ ticketId, status, canAssign, canAssignSupplier, canCancel, suppliers, motivSuppliers, declinedSupplierIds, awaitingById, description, photoUrls, title, category, impact }: {
+  ticketId: string
+  status: string
+  canAssign: boolean
+  canAssignSupplier: boolean
+  canCancel: boolean
+  suppliers: SupplierChoice[]
+  motivSuppliers: SupplierChoice[]
+  declinedSupplierIds: string[]
+  awaitingById: Record<string, 'invited' | 'quoted'>
+  description: string
+  photoUrls: string[]
+  title: string
+  category: string
+  impact: string
+}) {
+  const showRequestInfo = ['open', 'info_requested'].includes(status)
+  return (
+    <div className="space-y-2">
+      {canAssignSupplier && (
+        <AssignSuppliersButton ticketId={ticketId} suppliers={suppliers} motivSuppliers={motivSuppliers} declinedSupplierIds={declinedSupplierIds} awaitingById={awaitingById}
+          trigger={open => <button onClick={open} className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition">Assign supplier</button>} />
+      )}
+      <MoreActions>
+        {canAssign && <RmAddWorkForm ticketId={ticketId} description={description} photoUrls={photoUrls} title={title} category={category} impact={impact}
+          trigger={open => <MoreActionItem icon={<Plus size={16} />} label="Add extra work" onClick={open} />} />}
+        {showRequestInfo && <RequestInfoButton ticketId={ticketId}
+          trigger={open => <MoreActionItem icon={<MessageSquare size={16} />} label="Request more info" onClick={open} />} />}
+        {canCancel && <CancelTicketCard ticketId={ticketId}
+          trigger={open => <MoreActionItem icon={<XCircle size={16} />} label="Cancel ticket" tone="danger" onClick={open} />} />}
+      </MoreActions>
     </div>
   )
 }

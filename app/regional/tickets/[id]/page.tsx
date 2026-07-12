@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { redirect } from 'next/navigation'
 import { BackLink } from '@/components/ui/BackLink'
-import { CheckCircle2, FileText, Calendar, CalendarClock, Clock, MessageSquare, Camera, Plus, XCircle } from 'lucide-react'
+import { CheckCircle2, FileText, Calendar, CalendarClock, Clock, MessageSquare, Camera } from 'lucide-react'
 import { createAdminClient } from '@/lib/supabase/server'
 import { signedUrl } from '@/lib/storage'
 import { requireRegionalV3 } from '@/lib/health/guard'
@@ -15,7 +15,7 @@ import { BreachReason } from '@/components/workflow/BreachReason'
 import { Card } from '@/components/exec/ui'
 import { WorkflowActions } from '@/components/workflow/WorkflowActions'
 import { RmPipeline } from '@/components/regional/RmPipeline'
-import { AssignSuppliersButton, RequestInfoButton, RmEditTicketForm, RmQuotePanel, RmReviewPanel, CancelTicketCard, ApproveSignoffCard, ReQuoteButton, AcceptScheduleCard, AcceptSnagScheduleCard, VariationReviewCard, RmAddWorkForm, RequestEvidenceButton, RaiseSnagButton, CloseOutButton, MoreActions, MoreActionItem } from '@/components/regional/RmTicketActions'
+import { RmEditTicketForm, RmQuotePanel, RmReviewPanel, ApproveSignoffCard, ReQuoteButton, AcceptScheduleCard, AcceptSnagScheduleCard, VariationReviewCard, RequestEvidenceButton, RaiseSnagButton, CloseOutButton, RmTicketActionBar } from '@/components/regional/RmTicketActions'
 import { EditedLine } from '@/components/ui/EditedLine'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { RmTicketTabs } from '@/components/regional/RmTicketTabs'
@@ -934,23 +934,13 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
         {!isTerminal && !awarded && quotePanelRows.length > 0 && <RmQuotePanel ticketId={t.id} rows={quotePanelRows} canReQuote={canReQuote} />}
 
         {/* Primary action leads (Assign supplier); everything secondary/destructive —
-            add extra work, request more info, cancel — lives behind "More actions" so
-            the block stays uncluttered. */}
+            add extra work, request more info, cancel — lives behind "More actions".
+            It's a client component so its per-action trigger render-props are created
+            client-side (a Server Component can't pass functions to Client Components). */}
         {!isTerminal && (canAssign || canCancel) && (
-          <div className="space-y-2">
-            {canAssignSupplier && (
-              <AssignSuppliersButton ticketId={t.id} suppliers={supplierList} motivSuppliers={motivSupplierList} declinedSupplierIds={declinedSupplierIds} awaitingById={engagedSupplierIds}
-                trigger={open => <button onClick={open} className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition">Assign supplier</button>} />
-            )}
-            <MoreActions>
-              {canAssign && <RmAddWorkForm ticketId={t.id} description={t.description ?? ''} photoUrls={Array.isArray(t.photo_urls) ? t.photo_urls : []} title={t.title} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'}
-                trigger={open => <MoreActionItem icon={<Plus size={16} />} label="Add extra work" onClick={open} />} />}
-              {['open', 'info_requested'].includes(t.status) && <RequestInfoButton ticketId={t.id}
-                trigger={open => <MoreActionItem icon={<MessageSquare size={16} />} label="Request more info" onClick={open} />} />}
-              {canCancel && <CancelTicketCard ticketId={t.id}
-                trigger={open => <MoreActionItem icon={<XCircle size={16} />} label="Cancel ticket" tone="danger" onClick={open} />} />}
-            </MoreActions>
-          </div>
+          <RmTicketActionBar ticketId={t.id} status={t.status} canAssign={canAssign} canAssignSupplier={canAssignSupplier} canCancel={canCancel}
+            suppliers={supplierList} motivSuppliers={motivSupplierList} declinedSupplierIds={declinedSupplierIds} awaitingById={engagedSupplierIds}
+            description={t.description ?? ''} photoUrls={Array.isArray(t.photo_urls) ? t.photo_urls : []} title={t.title} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} />
         )}
 
         {/* Completion (COC & POC) under review — compact row → pop-up with the full
