@@ -38,7 +38,7 @@ const STORE_DESKTOP_TABS: ChromeTab[] = [
   { href: '/client/tickets?status=completed', label: 'Completed', icon: CheckCircle2 },
 ]
 const SUPPLIER_TABS: ChromeTab[] = [
-  { href: '/supplier',         label: 'Dashboard',   icon: LayoutDashboard },
+  { href: '/supplier',         label: 'Today',       icon: LayoutDashboard },
   { href: '/supplier/tickets', label: 'Tickets',     icon: Ticket },
   { href: '/supplier/quotes',  label: 'Quotes',      icon: ReceiptText },
   { href: '/supplier/signoff', label: 'Signoff',     icon: ClipboardCheck },

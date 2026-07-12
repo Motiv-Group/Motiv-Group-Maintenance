@@ -215,8 +215,12 @@ export async function POST(request: Request) {
       if (!store || !region) return bad('Store or region not found.')
       if (store.company_id !== region.company_id) return bad('A store can only move between regions of its own company.')
       await admin.from('stores').update({ region_id: regionId, region_code: region.region_code }).eq('id', storeId)
+      // Re-home the store's existing tickets to the new region too, so the region's
+      // RM sees the store's history (region_id was set at ticket-creation time and
+      // would otherwise be stale/null for a store that had no region).
+      await admin.from('tickets').update({ region_id: regionId }).eq('store_id', storeId)
       await logAudit(admin, { actorId: user.id, companyId: store.company_id, action: 'admin.move_store', entityType: 'store', entityId: storeId, metadata: { regionId } })
-      revalidatePath('/admin/hierarchy')
+      revalidatePath('/admin/hierarchy'); revalidatePath('/regional/tickets'); revalidatePath('/regional')
       return NextResponse.json({ ok: true, message: 'Store moved.' })
     }
 

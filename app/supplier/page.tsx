@@ -16,46 +16,43 @@ import { supplierFacts } from '@/lib/briefing/facts'
 export default async function SupplierOverviewPage() {
   const { companyId, supplierIds, fullName } = await requireSupplierV3()
 
-  // Standalone (self-signup) suppliers have no client company. Pending ones see
-  // the under-review + verification-docs card; verified ones a "you're live"
-  // state until Motiv-pool work reaches them via the normal ticket pages.
+  // Standalone (self-signup) suppliers have no client company. PENDING ones see
+  // the under-review + verification-docs card; VERIFIED ones fall through to the
+  // full dashboard (their Motiv-pool work — assembleSupplierDashboard handles a
+  // null company).
+  let displayName = fullName ?? 'Supplier'
   if (!companyId) {
     const admin = createAdminClient()
     const { data: supRow } = await admin.from('suppliers')
       .select('company_name, verification_status, is_motiv').in('id', supplierIds).limit(1).maybeSingle()
+    displayName = (supRow as any)?.company_name ?? displayName
     const pending = (supRow as any)?.verification_status !== 'verified' && !(supRow as any)?.is_motiv
-    return (
-      <div className="space-y-5">
-        <div>
-          <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><Truck className="text-blue-600 dark:text-blue-400" size={22} /> {(supRow as any)?.company_name ?? fullName ?? 'Supplier'}</h1>
-          <p className="text-sm text-[var(--text-muted)] mt-0.5">
-            {pending ? 'Welcome to Motiv — your registration is being reviewed.' : 'You are live in the Motiv supplier pool.'}
-          </p>
+    if (pending) {
+      return (
+        <div className="space-y-5">
+          <div>
+            <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><Truck className="text-blue-600 dark:text-blue-400" size={22} /> {displayName}</h1>
+            <p className="text-sm text-[var(--text-muted)] mt-0.5">Welcome to Motiv — your registration is being reviewed.</p>
+          </div>
+          <VerificationCard />
         </div>
-        {pending
-          ? <VerificationCard />
-          : (
-            <Card className="p-5">
-              <p className="text-sm text-[var(--text-muted)]">
-                You&apos;re verified ✅ — job invitations will appear under <Link href="/supplier/tickets" className="text-blue-600 dark:text-blue-400 hover:underline">Tickets</Link> and
-                you&apos;ll be notified the moment a client assigns you work.
-              </p>
-            </Card>
-          )}
-      </div>
-    )
+      )
+    }
+    // verified standalone → real dashboard below (companyId stays null)
   }
 
   const d = await assembleSupplierDashboard(companyId, supplierIds)
   const perf = d.perf
   const briefingScopeId = supplierIds.slice().sort().join(',')
-  const briefing = await getDailyBriefing({ companyId, scope: 'supplier', scopeId: briefingScopeId, role: 'supplier', facts: supplierFacts(d) })
+  const briefing = companyId
+    ? await getDailyBriefing({ companyId, scope: 'supplier', scopeId: briefingScopeId, role: 'supplier', facts: supplierFacts(d) })
+    : null
 
   return (
     <div className="space-y-5">
       <div>
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><Truck className="text-blue-600 dark:text-blue-400" size={22} /> {fullName ?? 'Supplier'}</h1>
+          <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><Truck className="text-blue-600 dark:text-blue-400" size={22} /> {displayName}</h1>
           <Link href="/supplier/reviews" className="inline-flex items-center gap-2 shrink-0 rounded-full bg-[var(--surface-2)] ring-1 ring-[#C6A35D]/40 px-4 py-1.5 hover:bg-[var(--hover)] transition" title="View your reviews">
             <Star size={17} className="fill-amber-400 text-amber-400 shrink-0" />
             <span className="text-sm font-bold text-[var(--text)]">{d.rating.avg.toFixed(1)} / 5</span>
