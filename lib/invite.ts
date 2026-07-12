@@ -64,12 +64,11 @@ export async function inviteUser(opts: InviteOpts): Promise<{ userId: string; ac
   if (opts.link.storeId) await admin.from('store_users').upsert({ user_id: uid, store_id: opts.link.storeId })
   if (opts.link.supplierId) await admin.from('supplier_users').upsert({ user_id: uid, supplier_id: opts.link.supplierId })
 
-  // Wrap the real Supabase verify URL in our anti-prefetch confirm page, so email
-  // scanners can't consume the one-time token (only the user's click forwards to it).
-  const verifyUrl = (data.properties as any)?.action_link as string | undefined
-  const actionLink = verifyUrl
-    ? `${base}/auth/confirm?type=invite&redirect=${encodeURIComponent(verifyUrl)}`
-    : null
+  // Link to our confirm page carrying the one-time token_hash. The page is where
+  // the password is set (server verifies the token + sets that user's password) —
+  // prefetch-safe (a scanner GET spends nothing) and session-independent.
+  const tokenHash = (data.properties as any)?.hashed_token as string | undefined
+  const actionLink = tokenHash ? `${base}/auth/confirm?token_hash=${tokenHash}&type=invite` : null
   const emailed = await sendInviteEmail(opts.email, actionLink, opts.roleLabel, base)
   return { userId: uid, actionLink, emailed }
 }
