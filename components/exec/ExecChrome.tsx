@@ -3,13 +3,26 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { Globe2, Map as MapIcon, Store, Truck, Gavel, Bell, Settings, LogOut, FileBarChart, LayoutDashboard, Ticket, ClipboardCheck, AlertTriangle, ReceiptText, BarChart2, Users, CalendarClock, CheckCircle2, Network, ScrollText, Database, Triangle, Mail, Zap, ShieldAlert } from 'lucide-react'
+import { Globe2, Map as MapIcon, Store, Truck, Gavel, Bell, Settings, LogOut, FileBarChart, LayoutDashboard, Ticket, ClipboardCheck, AlertTriangle, ReceiptText, BarChart2, Users, CalendarClock, CheckCircle2, Clock, Network, ScrollText, Database, Triangle, Mail, Zap, ShieldAlert } from 'lucide-react'
 import { MotivLogo } from '@/components/ui/MotivLogo'
 import { ContextSwitcher } from '@/components/ui/ContextSwitcher'
 import { SwipeNav } from '@/components/ui/SwipeNav'
 
 interface ChromeTab { href: string; label: string; icon: React.ElementType }
 type SearchParamsLike = { get(name: string): string | null }
+// A small status pill shown under the name in the sidebar/header profile block
+// (e.g. a supplier's "Pending verification" / "Verified"). Kept gentle by design.
+export type AccountStatus = { label: string; tone: 'amber' | 'emerald' }
+
+function AccountStatusPill({ status }: { status: AccountStatus }) {
+  const cls = status.tone === 'emerald' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-200'
+  const Icon = status.tone === 'emerald' ? CheckCircle2 : Clock
+  return (
+    <span className={`mt-1 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${cls}`}>
+      <Icon size={10} /> {status.label}
+    </span>
+  )
+}
 
 const EXEC_TABS: ChromeTab[] = [
   { href: '/executive',           label: 'Dashboard', icon: Globe2 },
@@ -80,8 +93,8 @@ const VARIANTS = {
 
 export function ExecChrome({
   children, userName, variant = 'exec', unreadCount = 0, contextLabel,
-  contextOptions, activeContextId, contextCookie,
-}: { children: ReactNode; userName: string | null; variant?: keyof typeof VARIANTS; unreadCount?: number; contextLabel?: string | null; contextOptions?: { id: string; label: string }[]; activeContextId?: string | null; contextCookie?: string }) {
+  contextOptions, activeContextId, contextCookie, accountStatus = null,
+}: { children: ReactNode; userName: string | null; variant?: keyof typeof VARIANTS; unreadCount?: number; contextLabel?: string | null; contextOptions?: { id: string; label: string }[]; activeContextId?: string | null; contextCookie?: string; accountStatus?: AccountStatus | null }) {
   const { tabs, roleLabel, base, reports } = VARIANTS[variant]
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -117,6 +130,7 @@ export function ExecChrome({
           ContextIcon={isStore ? Store : isSupplier ? Truck : isAdmin ? LayoutDashboard : MapIcon}
           unreadCount={unreadCount}
           initial={initial}
+          accountStatus={accountStatus}
           tabs={isStore ? STORE_DESKTOP_TABS : isAdmin ? ADMIN_DESKTOP_TABS : tabs}
           home={home}
           notificationsHref={`${base}/notifications`}
@@ -147,6 +161,7 @@ export function ExecChrome({
               <div className="hidden sm:block leading-tight">
                 <div className="text-sm font-medium text-white">{userName ?? roleLabel}</div>
                 <div className="text-[11px] text-gray-300">{roleLabel}</div>
+                {accountStatus && <AccountStatusPill status={accountStatus} />}
               </div>
             </div>
           </div>
@@ -202,6 +217,7 @@ function DesktopSidebar({
   ContextIcon,
   unreadCount,
   initial,
+  accountStatus,
   tabs,
   home,
   notificationsHref,
@@ -216,6 +232,7 @@ function DesktopSidebar({
   ContextIcon: React.ElementType
   unreadCount: number
   initial: string
+  accountStatus?: AccountStatus | null
   tabs: ChromeTab[]
   home: string
   notificationsHref: string
@@ -285,6 +302,7 @@ function DesktopSidebar({
           <div className="min-w-0">
             <div className="truncate text-sm font-bold text-white">{user}</div>
             <div className="truncate text-xs text-gray-400">{roleLabel}</div>
+            {accountStatus && <AccountStatusPill status={accountStatus} />}
           </div>
         </div>
       </div>

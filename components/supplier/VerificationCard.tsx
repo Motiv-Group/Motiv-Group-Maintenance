@@ -20,11 +20,12 @@ interface Doc { id: string; kind: string; url: string; uploadedAt: string }
 
 export function VerificationCard() {
   const [docs, setDocs] = useState<Doc[]>([])
+  const [verified, setVerified] = useState(false)
   const [busyKind, setBusyKind] = useState<string | null>(null)
   const [error, setError] = useState('')
 
   useEffect(() => {
-    fetch('/api/supplier/verification-docs').then(r => r.json()).then(d => setDocs(d.docs ?? [])).catch(() => {})
+    fetch('/api/supplier/verification-docs').then(r => r.json()).then(d => { setDocs(d.docs ?? []); setVerified(!!d.verified) }).catch(() => {})
   }, [])
 
   async function upload(kind: string, file: File) {
@@ -37,7 +38,7 @@ export function VerificationCard() {
       })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Could not save the document')
       const d = await fetch('/api/supplier/verification-docs').then(r => r.json())
-      setDocs(d.docs ?? [])
+      setDocs(d.docs ?? []); setVerified(!!d.verified)
     } catch (e: any) {
       setError(e.message ?? 'Upload failed — try again.')
     } finally {
@@ -48,14 +49,15 @@ export function VerificationCard() {
   const has = (kind: string) => docs.some(d => d.kind === kind)
 
   return (
-    <Card className="p-5 space-y-4 ring-1 ring-amber-500/30">
+    <Card className={`p-5 space-y-4 ring-1 ${verified ? 'ring-emerald-500/30' : 'ring-amber-500/30'}`}>
       <div className="flex items-start gap-3">
-        <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-500"><ShieldCheck size={18} /></span>
+        <span className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${verified ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-500' : 'bg-amber-500/15 text-amber-600 dark:text-amber-500'}`}><ShieldCheck size={18} /></span>
         <div>
-          <h2 className="font-semibold text-[var(--text)]">Your account is under review</h2>
+          <h2 className="font-semibold text-[var(--text)]">{verified ? 'Your account is verified' : 'Your account is under review'}</h2>
           <p className="text-sm text-[var(--text-muted)] mt-0.5">
-            Motiv verifies every supplier before work is assigned. Upload the documents below to speed
-            up your approval — you&apos;ll get a notification the moment you&apos;re live.
+            {verified
+              ? <>You&apos;re all set and can be assigned work. Keep these documents current — replace any that expire.</>
+              : <>Motiv verifies every supplier before work is assigned. Upload the documents below to speed up your approval — you&apos;ll be notified the moment you&apos;re live. You can keep using the app while you wait.</>}
           </p>
         </div>
       </div>

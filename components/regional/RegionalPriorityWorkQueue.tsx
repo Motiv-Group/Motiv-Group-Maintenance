@@ -191,6 +191,7 @@ function QueueRow({ ticket, nowMs, suppliers, motivSuppliers }: { ticket: Region
             trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}><ClipboardCheck size={15} /> Sign-Off</button>} />
         ) : assignable ? (
           <AssignSuppliersButton ticketId={ticket.id} suppliers={suppliers} motivSuppliers={motivSuppliers}
+            awaitingById={ticket.engagedSupplierIds} declinedSupplierIds={ticket.declinedSupplierIds}
             trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}>Assign supplier</button>} />
         ) : (
           <Link href={ticketUrl} className={ctaCls}>View Ticket <ArrowRight size={15} /></Link>
@@ -235,16 +236,35 @@ function priorityBadgeClass(p: string): string {
   return 'bg-slate-500/15 text-slate-600 dark:text-slate-300'
 }
 
+// The RM's next step per ticket status — short, professional, and covering every
+// state (no generic fallback for a real status). Mirrors the ticket-detail
+// "Next action" wording so the queue and the ticket page always agree.
 function nextStep(t: RegionalTicketRow): string {
-  const s = t.status
-  if (!t.supplierAssigned && (s === 'open' || s === 'info_requested')) return 'Assign a supplier / request a quote'
-  if (s === 'info_requested') return 'Waiting on the store for more info'
-  if (s === 'quoted' || s === 'quote_revision') return 'Review & approve the quote'
-  if (s === 'variation_review') return 'Review the variation order'
-  if (s === 'accepted') return 'Approved — awaiting scheduling'
-  if (s === 'scheduled' || s === 'snag_assigned') return 'Supplier visit is scheduled'
-  if (s === 'in_progress' || s === 'snag_in_progress') return 'Supplier is working on this ticket'
-  if (['submitted_for_signoff', 'snag_resolved', 'approved_closeout', 'evidence_requested'].includes(s)) return 'Review & sign off the completed work'
-  if (s === 'snag') return 'Snag raised — awaiting supplier'
-  return 'Track progress on this ticket'
+  if (t.disputed) return 'Resolve the open dispute'
+  switch (t.status) {
+    case 'open': return t.infoAdded ? 'Review the added information' : t.supplierAssigned ? 'Awaiting quotes from suppliers' : 'Assign a supplier to request quotes'
+    case 'info_requested': return t.infoAdded ? 'Review the added information' : "Awaiting the store's response"
+    case 'suppliers_declined': return 'Re-assign a supplier'
+    case 'assigned':
+    case 'quote_requested':
+    case 'assessment': return 'Awaiting quotes from suppliers'
+    case 'quoted':
+    case 'quote_revision': return 'Review & approve the quote'
+    case 'variation_review': return 'Review the variation order'
+    case 'accepted': return 'Approved — awaiting scheduling'
+    case 'scheduled': return 'Supplier visit scheduled'
+    case 'in_progress': return 'Supplier is working on this ticket'
+    case 'submitted_for_signoff':
+    case 'pending_sign_off':
+    case 'snag_resolved': return 'Review & sign off the work'
+    case 'evidence_requested': return 'Awaiting evidence from the supplier'
+    case 'snag':
+    case 'snag_assigned':
+    case 'snag_in_progress': return 'Snag in progress'
+    case 'approved_closeout': return 'Finalise the close-out'
+    case 'completed': return 'Completed'
+    case 'cancelled':
+    case 'declined': return 'Closed'
+    default: return 'Track progress on this ticket'
+  }
 }

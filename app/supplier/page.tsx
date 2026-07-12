@@ -1,12 +1,11 @@
 export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
-import { Truck, Star, Sparkles } from 'lucide-react'
+import { Truck, Star, Sparkles, Clock } from 'lucide-react'
 import { requireSupplierV3 } from '@/lib/health/guard'
 import { assembleSupplierDashboard } from '@/lib/health/data'
 import { Card, Donut, Pill } from '@/components/exec/ui'
 import { BriefingRefresh } from '@/components/briefing/BriefingRefresh'
-import { VerificationCard } from '@/components/supplier/VerificationCard'
 import { SupplierPriorityWorkQueue } from '@/components/supplier/SupplierPriorityWorkQueue'
 import { AiBriefing } from '@/components/briefing/AiBriefing'
 import { createAdminClient } from '@/lib/supabase/server'
@@ -21,24 +20,17 @@ export default async function SupplierOverviewPage() {
   // full dashboard (their Motiv-pool work — assembleSupplierDashboard handles a
   // null company).
   let displayName = fullName ?? 'Supplier'
+  // Standalone (self-signup) suppliers have no client company. PENDING ones can now
+  // browse the whole dashboard while they wait — a gentle note points them to the
+  // verification-docs uploader (moved to Settings → Account). VERIFIED ones just see
+  // the dashboard (assembleSupplierDashboard handles a null company).
+  let pending = false
   if (!companyId) {
     const admin = createAdminClient()
     const { data: supRow } = await admin.from('suppliers')
       .select('company_name, verification_status, is_motiv').in('id', supplierIds).limit(1).maybeSingle()
     displayName = (supRow as any)?.company_name ?? displayName
-    const pending = (supRow as any)?.verification_status !== 'verified' && !(supRow as any)?.is_motiv
-    if (pending) {
-      return (
-        <div className="space-y-5">
-          <div>
-            <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><Truck className="text-blue-600 dark:text-blue-400" size={22} /> {displayName}</h1>
-            <p className="text-sm text-[var(--text-muted)] mt-0.5">Welcome to Motiv — your registration is being reviewed.</p>
-          </div>
-          <VerificationCard />
-        </div>
-      )
-    }
-    // verified standalone → real dashboard below (companyId stays null)
+    pending = (supRow as any)?.verification_status !== 'verified' && !(supRow as any)?.is_motiv
   }
 
   const d = await assembleSupplierDashboard(companyId, supplierIds)
@@ -50,6 +42,12 @@ export default async function SupplierOverviewPage() {
 
   return (
     <div className="space-y-5">
+      {pending && (
+        <Link href="/settings" className="flex items-start gap-2.5 rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 px-3.5 py-3 transition hover:bg-amber-500/15">
+          <Clock size={16} className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-500" />
+          <p className="text-sm text-[var(--text-muted)]"><span className="font-semibold text-[var(--text)]">Your account is under review.</span> Feel free to look around while you wait — upload your verification documents in <span className="font-semibold text-[var(--text)]">Settings → Account</span> to speed up approval.</p>
+        </Link>
+      )}
       <div>
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><Truck className="text-blue-600 dark:text-blue-400" size={22} /> {displayName}</h1>

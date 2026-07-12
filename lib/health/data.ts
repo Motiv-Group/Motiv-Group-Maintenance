@@ -347,6 +347,11 @@ export interface RegionalTicketRow {
   supplierAssigned: boolean
   // An open supplier↔RM dispute (snag / evidence) — the badge reads "Dispute".
   disputed: boolean
+  // Suppliers already on this ticket (invited/quoted) and those who declined it —
+  // so the "Assign supplier" picker (from the Today queue) can grey out the ones
+  // already engaged and flag the ones who declined before.
+  engagedSupplierIds: Record<string, 'invited' | 'quoted'>
+  declinedSupplierIds: string[]
 }
 export interface RegionalDashboardData {
   portfolio: RegionalHealthResult
@@ -400,6 +405,19 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
   // Tickets with an OPEN dispute → the badge reads "Dispute" everywhere.
   const { data: openDisputeRows } = ticketIds.length ? await db.from('ticket_disputes').select('ticket_id').eq('status', 'open').in('ticket_id', ticketIds) : { data: [] as any[] }
   const disputedIds = new Set<string>(((openDisputeRows ?? []) as any[]).map(d => d.ticket_id))
+  // Suppliers on each ticket — invited/quoted (already engaged) vs declined/closed —
+  // so the Today queue's "Assign supplier" picker can grey out the engaged ones and
+  // flag the ones who declined this ticket before.
+  const { data: ticketSupplierRows } = ticketIds.length ? await db.from('ticket_suppliers').select('ticket_id, supplier_id, status').in('ticket_id', ticketIds) : { data: [] as any[] }
+  const engagedByTicket = new Map<string, Record<string, 'invited' | 'quoted'>>()
+  const declinedByTicket = new Map<string, string[]>()
+  for (const r of (ticketSupplierRows ?? []) as any[]) {
+    if (r.status === 'invited' || r.status === 'quoted') {
+      const m = engagedByTicket.get(r.ticket_id) ?? {}; m[r.supplier_id] = r.status; engagedByTicket.set(r.ticket_id, m)
+    } else if (r.status === 'declined' || r.status === 'closed') {
+      const a = declinedByTicket.get(r.ticket_id) ?? []; a.push(r.supplier_id); declinedByTicket.set(r.ticket_id, a)
+    }
+  }
   const firstQuoteAt = new Map<string, string>(); const acceptedQuoteAt = new Map<string, string>()
   // Region-wide quote value totals (R) by status, for the RM "Quote Value" KPI.
   let acceptedQuoteValue = 0, pendingQuoteValue = 0
@@ -437,6 +455,8 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
       infoAdded: t.status === 'open' && !!(t as any).info_request_reason,
       supplierAssigned: !!(t as any).supplier_id,
       disputed: disputedIds.has(t.id),
+      engagedSupplierIds: engagedByTicket.get(t.id) ?? {},
+      declinedSupplierIds: declinedByTicket.get(t.id) ?? [],
       }
     })
 
