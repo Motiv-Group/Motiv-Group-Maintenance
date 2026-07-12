@@ -28,8 +28,8 @@ export default async function AdminAccountsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2">
-          <UsersRound className="text-blue-600 dark:text-blue-400" size={22} /> Accounts
-          <InfoTip title="Accounts" align="left">Create Executive, Regional Manager and Store Manager accounts by invitation. Each gets an email set-password link. Executives own a company; RMs manage a region; SMs run a store. Suppliers and Individuals self-register.</InfoTip>
+          <UsersRound className="text-blue-600 dark:text-blue-400" size={22} /> Create accounts
+          <InfoTip title="Create accounts" align="left">Pick a company first, then add people under it. Choose “＋ New company” to create a company and its Executive owner; pick an existing company to add a Regional Manager or Store Manager. Each gets an email set-password link. Suppliers and Individuals self-register.</InfoTip>
         </h1>
         <p className="text-sm text-[var(--text-muted)] mt-0.5">Invite the store hierarchy. Individuals and suppliers self-register from the sign-up page.</p>
       </div>

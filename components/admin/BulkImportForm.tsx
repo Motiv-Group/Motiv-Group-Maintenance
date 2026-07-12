@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Upload, CheckCircle2, XCircle } from 'lucide-react'
+import { Upload, CheckCircle2, XCircle, ChevronDown } from 'lucide-react'
 import { Card } from '@/components/exec/ui'
 
 type Role = 'executive' | 'regional_manager' | 'store_manager'
@@ -28,6 +28,7 @@ function parseCsv(text: string): Record<string, string>[] {
 
 export function BulkImportForm() {
   const router = useRouter()
+  const [open, setOpen] = useState(false)
   const [role, setRole] = useState<Role>('store_manager')
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
@@ -52,9 +53,14 @@ export function BulkImportForm() {
   const failCount = results?.filter(r => !r.ok).length ?? 0
 
   return (
-    <Card className="p-5 space-y-4">
-      <h2 className="text-sm font-bold text-[var(--text)] flex items-center gap-2"><Upload size={15} className="text-[var(--text-muted)]" /> Bulk import (CSV)</h2>
+    <Card className="p-5">
+      <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open} className="w-full flex items-center justify-between gap-2 text-left">
+        <h2 className="text-sm font-bold text-[var(--text)] flex items-center gap-2"><Upload size={15} className="text-[var(--text-muted)]" /> Bulk import (CSV)</h2>
+        <span className="flex items-center gap-1.5 text-xs text-[var(--text-faint)]">Add many at once <ChevronDown size={16} className={`transition-transform ${open ? 'rotate-180' : ''}`} /></span>
+      </button>
 
+      {open && (
+      <div className="mt-4 space-y-4">
       <div className="grid grid-cols-3 gap-2">
         {ROLES.map(r => (
           <button key={r.value} type="button" onClick={() => { setRole(r.value); setResults(null); setErr('') }}
@@ -94,6 +100,8 @@ export function BulkImportForm() {
             ))}
           </div>
         </div>
+      )}
+      </div>
       )}
     </Card>
   )
