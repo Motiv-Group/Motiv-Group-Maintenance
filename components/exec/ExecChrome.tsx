@@ -140,7 +140,7 @@ export function ExecChrome({
       <div className={hasSidebar ? 'lg:pl-[260px] flex min-h-screen flex-col' : 'flex min-h-screen flex-col'}>
       <header className={`sticky top-0 z-20 bg-brand-600 border-b border-brand-700 ${hasSidebar ? 'lg:hidden' : ''}`}>
         <div className={`${wrap} mx-auto px-4 h-16 flex items-center justify-between`}>
-          <Link href={home}><MotivLogo height={40} /></Link>
+          <Link href={home}><MotivLogo height={46} /></Link>
           <div className="flex items-center gap-1">
             {reports && <Link href={`${base}/reports`} className={iconBtn} title="Reports"><FileBarChart size={18} /></Link>}
             <Link href={`${base}/notifications`} className={`relative ${iconBtn}`} title="Notifications">
@@ -239,7 +239,7 @@ function DesktopSidebar({
   return (
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-[260px] border-r border-white/10 bg-brand-600 text-white lg:flex lg:flex-col">
       <div className="px-5 pt-6">
-        <Link href={home} className="inline-flex"><MotivLogo height={44} /></Link>
+        <Link href={home} className="inline-flex"><MotivLogo height={52} /></Link>
       </div>
       {/* Context chip sits in px-3 like the nav items so it's the same width. */}
       {contextOptions && contextOptions.length > 0 ? (

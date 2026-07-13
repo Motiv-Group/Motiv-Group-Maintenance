@@ -43,7 +43,7 @@ export function SettingsChrome({
       {/* Desktop sidebar */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-[260px] border-r border-white/10 bg-brand-600 text-white lg:flex lg:flex-col">
         <div className="px-5 pt-6 pb-4">
-          <Link href={roleHome} className="inline-flex"><MotivLogo height={44} /></Link>
+          <Link href={roleHome} className="inline-flex"><MotivLogo height={52} /></Link>
           <Link href={roleHome} className="mt-6 flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-gray-200 transition hover:bg-white/[0.08]">
             <ArrowLeft size={14} className="shrink-0 text-gray-400" /> Back to Dashboard
           </Link>
@@ -94,7 +94,7 @@ export function SettingsChrome({
         {/* Mobile top bar */}
         <header className="sticky top-0 z-20 bg-brand-600 border-b border-brand-700 lg:hidden">
           <div className="max-w-[1700px] mx-auto px-4 h-16 flex items-center justify-between">
-            <Link href={roleHome}><MotivLogo height={40} /></Link>
+            <Link href={roleHome}><MotivLogo height={46} /></Link>
             <div className="flex items-center gap-1">
               <Link href={roleHome} className={iconBtn} title="Back to Dashboard"><ArrowLeft size={18} /></Link>
               <form action="/auth/logout" method="post" className="contents">
