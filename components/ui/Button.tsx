@@ -20,7 +20,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       // (navy 'primary' is near-invisible on the dark auth background). The
       // disabled state is an explicit neutral, not a dimmed blue, so an
       // incomplete form reads clearly as disabled. (Key kept as `gold`.)
-      gold:      'bg-blue-600 text-white font-semibold shadow-sm hover:bg-blue-500 focus:ring-blue-500 disabled:opacity-100 disabled:bg-[#1c1f27] disabled:text-gray-500 disabled:shadow-none',
+      gold:      'bg-blue-600 text-white font-semibold shadow-sm hover:bg-blue-500 focus:ring-blue-500 disabled:opacity-100 disabled:bg-[#1c1f27] disabled:text-gray-400 disabled:shadow-none',
     }
 
     const sizes = {

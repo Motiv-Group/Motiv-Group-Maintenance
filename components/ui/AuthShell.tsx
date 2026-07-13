@@ -34,13 +34,12 @@ export function AuthShell({
           className={`relative w-full ${maxWidth === 'md' ? 'max-w-md' : 'max-w-sm sm:max-w-md'}`}
           style={raise ? { transform: `translateY(-${raise}px)` } : undefined}
         >
-          {/* Logo — the asset is padding-trimmed, so a normal small margin gives a
-              tight, tidy gap between it and the card. */}
-          <div className="flex items-center justify-center mb-3">
+          {/* Logo — sits ~32-40px above the card; the two read as one centred group. */}
+          <div className="flex items-center justify-center mb-8">
             <MotivLockup height={logoHeight} />
           </div>
 
-          <div className="rounded-2xl border border-white/15 bg-[#181a21] p-6 shadow-2xl shadow-black/50 ring-1 ring-white/5 sm:p-8">
+          <div className="rounded-2xl border border-white/15 bg-[#181a21] p-7 shadow-2xl shadow-black/50 ring-1 ring-white/5 sm:p-8">
             {children}
           </div>
         </div>

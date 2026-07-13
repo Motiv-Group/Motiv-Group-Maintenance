@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { useForm } from 'react-hook-form'
 import { createClient } from '@/lib/supabase/client'
 import { clearCollapseState } from '@/lib/collapse-state'
+import { isValidEmail } from '@/lib/csv'
 import { Input } from '@/components/ui/Input'
 import { PasswordInput } from '@/components/ui/PasswordInput'
 import { Button } from '@/components/ui/Button'
@@ -123,7 +124,7 @@ export default function LoginPage() {
   }
 
   return (
-    <AuthShell logoHeight={186} raise={40}>
+    <AuthShell logoHeight={186} maxWidth="md">
       <h1 className="text-xl sm:text-2xl font-semibold text-white mb-1">Welcome back</h1>
       <p className="text-sm text-gray-300 mb-6">Sign in to continue to your workspace.</p>
 
@@ -138,7 +139,10 @@ export default function LoginPage() {
           placeholder="you@example.com"
           autoComplete="email"
           error={errors.email?.message}
-          {...register('email', { required: 'Email is required' })}
+          {...register('email', {
+            required: 'Email is required',
+            validate: v => isValidEmail(v) || 'Enter a valid email address',
+          })}
         />
         <PasswordInput
           id="password"
