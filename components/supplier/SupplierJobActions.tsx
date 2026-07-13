@@ -4,7 +4,6 @@
 // (date + 1-hour time slot, capped by the ticket priority window and operating
 // hours). The Submit COC & POC flow lives on its own page (/complete).
 import { useState } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Calendar, Wrench, PlayCircle, XCircle, X, FileText, Ticket, MapPin, Info, ArrowRight } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
@@ -13,6 +12,7 @@ import { SchedulePicker } from '@/components/ui/SchedulePicker'
 import { SendQuoteForm } from '@/components/admin/SendQuoteForm'
 import { PopupForm } from '@/components/supplier/PopupForm'
 import { MoreMenu, MoreActionItem } from '@/components/regional/RmTicketActions'
+import { QuoteSummary, type QuoteSummaryData, type QuoteSchedule } from '@/components/workflow/QuoteSummary'
 import { createClient } from '@/lib/supabase/client'
 import { formatDateTime } from '@/lib/utils'
 
@@ -140,7 +140,7 @@ export function SupplierQuoteBar({ ticketId, priority, createdAt, canDecline = f
         )}
       </div>
       {quoteOpen && (
-        <Modal onClose={() => setQuoteOpen(false)} maxWidth="max-w-2xl">
+        <Modal onClose={() => setQuoteOpen(false)} maxWidth="max-w-3xl">
           {close => <div><SendQuoteForm defaultOpen competitive ticketId={ticketId} priority={priority} createdAt={createdAt} onClose={close} /></div>}
         </Modal>
       )}
@@ -151,18 +151,24 @@ export function SupplierQuoteBar({ ticketId, priority, createdAt, canDecline = f
 
 // Quote-submitted "Next action" actions: a primary "View my quotes" + a "More"
 // dropdown holding Decline work (the supplier can still opt out after quoting).
-export function SupplierQuoteSubmittedActions({ ticketId, canDecline = false, decline }: { ticketId: string; canDecline?: boolean; decline?: DeclineDetails }) {
+export function SupplierQuoteSubmittedActions({ ticketId, canDecline = false, decline, quote, schedule }: { ticketId: string; canDecline?: boolean; decline?: DeclineDetails; quote?: QuoteSummaryData | null; schedule?: QuoteSchedule | null }) {
   const [declineOpen, setDeclineOpen] = useState(false)
+  const [quoteOpen, setQuoteOpen] = useState(false)
   return (
     <>
       <div className="flex items-center gap-2">
-        <Link href="/supplier/quotes" className={`${canDecline ? 'flex-1' : 'w-full'} inline-flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-blue-600 dark:text-blue-400 ring-1 ring-blue-500/50 transition hover:bg-blue-500/10`}>View my quotes <ArrowRight size={15} /></Link>
+        <button type="button" onClick={() => setQuoteOpen(true)} className={`${canDecline ? 'flex-1' : 'w-full'} inline-flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-blue-600 dark:text-blue-400 ring-1 ring-blue-500/50 transition hover:bg-blue-500/10`}>View my quote <ArrowRight size={15} /></button>
         {canDecline && (
           <MoreMenu>
             <MoreActionItem icon={<XCircle size={16} />} label="Decline work" tone="danger" onClick={() => setDeclineOpen(true)} />
           </MoreMenu>
         )}
       </div>
+      {quoteOpen && quote && (
+        <Modal onClose={() => setQuoteOpen(false)} maxWidth="max-w-4xl">
+          {() => <QuoteSummary quote={quote} status="pending" title="Your submitted quote" schedule={schedule} ticketId={ticketId} />}
+        </Modal>
+      )}
       {declineOpen && <DeclineWorkButton ticketId={ticketId} defaultOpen onClose={() => setDeclineOpen(false)} {...decline} />}
     </>
   )

@@ -706,7 +706,9 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
                 <Info size={16} className="mt-0.5 shrink-0 text-blue-600 dark:text-blue-400" />
                 <p className="text-sm text-[var(--text-muted)]">You will be notified of any updates on this ticket.</p>
               </div>
-              <SupplierQuoteSubmittedActions ticketId={t.id} canDecline={canDecline} decline={declineDetails} />
+              <SupplierQuoteSubmittedActions ticketId={t.id} canDecline={canDecline} decline={declineDetails}
+                quote={latestQuote ? { id: latestQuote.id, amount: latestQuote.amount, amountInclVat: latestQuote.amount_incl_vat ?? null, description: latestQuote.description ?? null, fileUrl: latestQuote.file_url ?? null, validUntil: latestQuote.valid_until ?? null, createdAt: latestQuote.created_at } : null}
+                schedule={latestQuote?.proposed_schedule_at ? { at: latestQuote.proposed_schedule_at, proposed: true, audience: 'supplier' } : null} />
             </div>
           )}
           {/* Opt out of the job (before award). When the quote bar / submitted block is

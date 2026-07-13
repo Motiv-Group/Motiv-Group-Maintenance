@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { Search, Pencil, CalendarClock, Plus, Camera, Info, X, FileText, ChevronDown, ChevronLeft, ChevronRight, MessageSquare, XCircle, Send, AlertCircle, Trash2 } from 'lucide-react'
 import { StarInput, Stars } from '@/components/ui/Stars'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
+import { QuoteSummary } from '@/components/workflow/QuoteSummary'
 import { uploadFiles } from '@/lib/upload'
 import { formatCurrency, formatDateTime } from '@/lib/utils'
 
@@ -715,21 +716,14 @@ export function RmQuotePanel({ ticketId, rows, canReQuote }: { ticketId: string;
       </div>
 
       {active?.quote && (
-        <Modal title={`${active.name}'s quote`} maxWidth="max-w-2xl" onClose={() => setOpenId(null)}>
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-sm font-semibold text-[var(--text)] truncate">{active.name}</span>
-            <span className="text-lg font-bold text-[var(--text)] shrink-0">{formatCurrency(active.quote.amount)}</span>
-          </div>
-          <p className="text-[11px] text-[var(--text-faint)]">Received {formatDateTime(active.quote.createdAt)}{active.quote.amountInclVat ? ` · incl VAT ${formatCurrency(active.quote.amountInclVat)}` : ''}</p>
-          {active.quote.proposedScheduleAt && (
-            <div className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-500/10 ring-1 ring-indigo-500/30 px-2.5 py-1 text-[13px]">
-              <CalendarClock size={14} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
-              <span className="text-[var(--text-muted)]">Proposed visit</span>
-              <span className="font-semibold text-[var(--text)]">{formatDateTime(active.quote.proposedScheduleAt)}</span>
-            </div>
-          )}
-          {active.quote.description && <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{active.quote.description}</p>}
-          {active.quote.fileUrl && <ViewTrackedLink ticketId={ticketId} itemType="quote" itemLabel={`${active.name}'s quote`} href={active.quote.fileUrl} className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"><FileText size={14} /> View attachment</ViewTrackedLink>}
+        <Modal title="Review quote" maxWidth="max-w-3xl" onClose={() => setOpenId(null)}>
+          <QuoteSummary
+            quote={{ id: active.quote.id, supplierName: active.name, amount: active.quote.amount, amountInclVat: active.quote.amountInclVat, description: active.quote.description, fileUrl: active.quote.fileUrl, validUntil: active.quote.validUntil ?? null, createdAt: active.quote.createdAt }}
+            status={active.kind === 'accepted' ? 'accepted' : active.kind === 'declined' ? 'declined' : 'pending'}
+            title={`${active.name}'s quote`}
+            schedule={active.quote.proposedScheduleAt ? { at: active.quote.proposedScheduleAt, proposed: true, audience: 'rm' } : null}
+            ticketId={ticketId} declineReason={active.declineReason}
+          />
 
           {active.kind === 'received' && (
             mode === 'decline' ? (

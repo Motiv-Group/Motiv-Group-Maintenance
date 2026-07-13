@@ -1,6 +1,7 @@
-// Read-only quote view — the professional "submitted/accepted quote" card shared
-// by the RM and supplier ticket pages. Pure/server-safe (no client hooks).
-import { CheckCircle2, FileText, Clock, XCircle, CalendarClock } from 'lucide-react'
+// Read-only quote view — the "submitted / accepted quote" card shared by the RM,
+// supplier, individual and client ticket pages (tabs + pop-ups). Pure/server-safe.
+import type { ReactNode } from 'react'
+import { CheckCircle2, FileText, XCircle, ChevronDown, Calendar } from 'lucide-react'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils'
 
@@ -19,20 +20,29 @@ export interface QuoteSummaryData {
   declinedAt?: string | null
 }
 
-const TONE: Record<QuoteSummaryStatus, { ring: string; bg: string; head: string; badge: string; badgeText: string; label: string; icon: typeof CheckCircle2; iconCls: string }> = {
-  accepted: { ring: 'ring-emerald-500/40', bg: 'bg-emerald-500/5', head: 'bg-emerald-500/10 border-emerald-500/20', badge: 'bg-emerald-500/15', badgeText: 'text-emerald-700 dark:text-emerald-400', label: 'Approved', icon: CheckCircle2, iconCls: 'text-emerald-500' },
-  awarded:  { ring: 'ring-emerald-500/40', bg: 'bg-emerald-500/5', head: 'bg-emerald-500/10 border-emerald-500/20', badge: 'bg-emerald-500/15', badgeText: 'text-emerald-700 dark:text-emerald-400', label: 'Awarded', icon: CheckCircle2, iconCls: 'text-emerald-500' },
-  pending:  { ring: 'ring-[#C6A35D]/40', bg: 'bg-[#C6A35D]/5', head: 'bg-[#C6A35D]/10 border-[#C6A35D]/20', badge: 'bg-[#C6A35D]/15', badgeText: 'text-amber-700 dark:text-[#C6A35D]', label: 'Under review', icon: Clock, iconCls: 'text-[#C6A35D]' },
-  // Neutral card (not red) — the red "Declined" pill + reason box inside carry the
-  // status, and stand out against the plain card instead of blending into red-on-red.
-  declined: { ring: 'ring-[var(--border)]', bg: '', head: 'border-[var(--border)]', badge: 'bg-red-500/15', badgeText: 'text-red-700 dark:text-red-400', label: 'Declined', icon: XCircle, iconCls: 'text-[var(--text-faint)]' },
+const BADGE: Record<QuoteSummaryStatus, { label: string; cls: string }> = {
+  accepted: { label: 'Approved',     cls: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' },
+  awarded:  { label: 'Awarded',      cls: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' },
+  pending:  { label: 'Under review', cls: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D]' },
+  declined: { label: 'Declined',     cls: 'bg-red-500/15 text-red-700 dark:text-red-400' },
 }
 
-function Item({ label, value }: { label: string; value: string }) {
+const LABEL = 'text-[11px] font-semibold uppercase tracking-wide text-[var(--text-faint)]'
+
+/** Best-effort attachment filename from a (possibly signed) storage URL. */
+function fileName(url: string): string {
+  try { return decodeURIComponent((url.split('?')[0].split('/').pop() || '').trim()) || 'Quote' } catch { return 'Quote' }
+}
+
+function DateItem({ label, value, proposed }: { label: string; value: string; proposed?: boolean }) {
   return (
     <div>
-      <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">{label}</div>
-      <div className="text-sm text-[var(--text)] mt-0.5">{value}</div>
+      <div className={LABEL}>{label}</div>
+      <div className="mt-1 flex items-center gap-1.5 text-sm text-[var(--text)]">
+        <Calendar size={14} className="shrink-0 text-[var(--text-faint)]" />
+        <span>{value}</span>
+        {proposed && <span className="text-[11px] text-amber-600 dark:text-amber-400">(proposed)</span>}
+      </div>
     </div>
   )
 }
@@ -40,25 +50,32 @@ function Item({ label, value }: { label: string; value: string }) {
 export interface QuoteSchedule { at: string; proposed?: boolean; technician?: string | null; audience?: 'rm' | 'supplier' }
 
 export function QuoteSummary({ quote, status, title, schedule, collapsible = false, declineReason, ticketId }: { quote: QuoteSummaryData; status: QuoteSummaryStatus; title?: string; schedule?: QuoteSchedule | null; collapsible?: boolean; declineReason?: string | null; ticketId?: string }) {
-  const tone = TONE[status]
-  const Icon = tone.icon
+  const badge = BADGE[status]
+  const Icon = status === 'declined' ? XCircle : CheckCircle2
+  const iconCls = status === 'declined' ? 'text-[var(--text-faint)]' : 'text-emerald-500'
 
   const heading = (
     <>
-      <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)] min-w-0">
-        <Icon size={15} className={`${tone.iconCls} shrink-0`} />
-        <span className="truncate">{title ?? quote.supplierName ?? 'Quote'}</span>
+      <span className="flex min-w-0 items-center gap-2">
+        <Icon size={17} className={`shrink-0 ${iconCls}`} />
+        <span className="truncate text-sm font-bold text-[var(--text)]">{title ?? quote.supplierName ?? 'Quote'}</span>
       </span>
-      <span className="flex items-center gap-2 shrink-0">
-        {/* Show the amount up-front when collapsed so it reads at a glance (matches
-            the RM's collapsible declined-quote row). */}
-        {collapsible && <span className="text-sm text-[var(--text)] tabular-nums">{formatCurrency(quote.amount)}</span>}
-        <span className={`text-[10px] font-semibold uppercase tracking-wide ${tone.badgeText} ${tone.badge} rounded-full px-2 py-0.5`}>{tone.label}</span>
+      <span className="flex shrink-0 items-center gap-2.5">
+        <span className="text-base font-bold tabular-nums text-[var(--text)]">{formatCurrency(quote.amount)}</span>
+        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${badge.cls}`}>{badge.label}</span>
+        {collapsible && <ChevronDown size={16} className="text-[var(--text-faint)] transition-transform group-open:rotate-180" />}
       </span>
     </>
   )
 
-  const details = (
+  const attName = quote.fileUrl ? fileName(quote.fileUrl) : null
+  const fileLink = (label: ReactNode, className: string) => quote.fileUrl && (
+    ticketId
+      ? <ViewTrackedLink ticketId={ticketId} itemType="quote" itemLabel={`${title ?? quote.supplierName ?? 'Quote'} attachment`} href={quote.fileUrl} className={className}>{label}</ViewTrackedLink>
+      : <a href={quote.fileUrl} target="_blank" rel="noopener noreferrer" className={className}>{label}</a>
+  )
+
+  const body = (
     <>
       {status === 'declined' && declineReason && (
         <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3">
@@ -66,55 +83,68 @@ export function QuoteSummary({ quote, status, title, schedule, collapsible = fal
           <p className="text-sm font-medium text-red-700 dark:text-red-400">{declineReason}</p>
         </div>
       )}
-      <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-        <Item label="Excl. VAT" value={formatCurrency(quote.amount)} />
-        <Item label="Incl. VAT" value={quote.amountInclVat ? formatCurrency(quote.amountInclVat) : '—'} />
-        <Item label="Submitted" value={formatDateTime(quote.createdAt)} />
-        <Item label="Valid until" value={quote.validUntil ? formatDate(quote.validUntil) : 'N/A'} />
-        {status === 'declined' && quote.declinedAt && <Item label="Declined" value={formatDateTime(quote.declinedAt)} />}
-      </div>
-      {schedule && (
-        <div className="flex items-center gap-2 text-sm flex-wrap">
-          <CalendarClock size={15} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
-          <span className="text-[var(--text-muted)]">Scheduled visit</span>
-          <span className="font-semibold text-[var(--text)]">{formatDateTime(schedule.at)}{schedule.technician ? ` · ${schedule.technician}` : ''}</span>
-          {schedule.proposed && <span className="text-[11px] text-amber-600 dark:text-amber-400">(proposed)</span>}
+
+      <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Pricing */}
+        <div>
+          <div className={LABEL}>Pricing</div>
+          <div className="mt-1.5">
+            <div className="text-[11px] text-[var(--text-faint)]">Excl. VAT</div>
+            <div className="text-sm font-semibold text-[var(--text)]">{formatCurrency(quote.amount)}</div>
+          </div>
+          <div className="mt-2 border-t border-[var(--border)] pt-2">
+            <div className="text-[11px] text-[var(--text-faint)]">Incl. VAT</div>
+            <div className="text-sm font-semibold text-[var(--text)]">{quote.amountInclVat ? formatCurrency(quote.amountInclVat) : '—'}</div>
+          </div>
         </div>
-      )}
+
+        {/* Submitted + proposed visit */}
+        <div className="space-y-3">
+          <DateItem label="Submitted" value={formatDateTime(quote.createdAt)} />
+          {schedule && <DateItem label="Proposed visit" value={`${formatDateTime(schedule.at)}${schedule.technician ? ` · ${schedule.technician}` : ''}`} proposed={schedule.proposed} />}
+        </div>
+
+        {/* Valid until + declined */}
+        <div className="space-y-3">
+          <DateItem label="Valid until" value={quote.validUntil ? formatDate(quote.validUntil) : 'N/A'} />
+          {status === 'declined' && quote.declinedAt && <DateItem label="Declined" value={formatDateTime(quote.declinedAt)} />}
+        </div>
+
+        {/* Attachment */}
+        <div>
+          <div className={LABEL}>Attachment</div>
+          <div className="mt-1.5">
+            {attName
+              ? fileLink(<span className="inline-flex items-center gap-1.5"><FileText size={14} className="shrink-0" /><span className="truncate">{attName}</span></span>, 'inline-flex max-w-full items-center text-sm font-medium text-blue-600 hover:underline dark:text-blue-400')
+              : <span className="text-sm text-[var(--text-faint)]">—</span>}
+          </div>
+        </div>
+      </div>
+
       {quote.description && (
         <div>
-          <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Description</div>
-          <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{quote.description}</p>
+          <div className={LABEL}>Scope of work</div>
+          <p className="mt-1 text-sm text-[var(--text-muted)] whitespace-pre-line">{quote.description}</p>
         </div>
       )}
-      {quote.fileUrl && (
-        // When a ticketId is supplied the open is recorded for the audit trail.
-        ticketId
-          ? <ViewTrackedLink ticketId={ticketId} itemType="quote" itemLabel={`${title ?? 'Quote'} attachment`} href={quote.fileUrl} className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View attached quote</ViewTrackedLink>
-          : <a href={quote.fileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View attached quote</a>
-      )}
+
+      {quote.fileUrl && fileLink('View full quote →', 'inline-flex items-center gap-1 text-sm font-semibold text-blue-600 hover:underline dark:text-blue-400')}
     </>
   )
 
-  // Superseded / declined quotes fold away behind a summary row so the current
-  // quote stays prominent — same pattern the RM page uses for not-selected quotes.
   if (collapsible) {
     return (
-      <details className={`rounded-xl ring-1 ${tone.ring} ${tone.bg} overflow-hidden`}>
-        <summary className={`flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition`}>
-          {heading}
-        </summary>
-        <div className={`p-4 space-y-3 border-t ${tone.head}`}>{details}</div>
+      <details className="group overflow-hidden rounded-xl bg-[var(--surface)] ring-1 ring-[var(--border)]">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 transition hover:bg-[var(--hover)]">{heading}</summary>
+        <div className="space-y-4 border-t border-[var(--border)] px-4 py-4">{body}</div>
       </details>
     )
   }
 
   return (
-    <div className={`rounded-xl ring-1 ${tone.ring} ${tone.bg} overflow-hidden`}>
-      <div className={`flex items-center justify-between gap-2 px-4 py-2.5 border-b ${tone.head}`}>
-        {heading}
-      </div>
-      <div className="p-4 space-y-3">{details}</div>
+    <div className="overflow-hidden rounded-xl bg-[var(--surface)] ring-1 ring-[var(--border)]">
+      <div className="flex items-center justify-between gap-3 border-b border-[var(--border)] px-4 py-3">{heading}</div>
+      <div className="space-y-4 px-4 py-4">{body}</div>
     </div>
   )
 }

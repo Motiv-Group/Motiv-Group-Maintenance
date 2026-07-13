@@ -206,7 +206,7 @@ function SubmitQuoteCta({ ticket, className }: { ticket: SupplierTicketRow; clas
     <>
       <button type="button" onClick={() => setOpen(true)} className={className}>Submit quote</button>
       {open && (
-        <Modal onClose={() => setOpen(false)} maxWidth="max-w-2xl">
+        <Modal onClose={() => setOpen(false)} maxWidth="max-w-3xl">
           {close => <div><SendQuoteForm defaultOpen competitive ticketId={ticket.id} priority={String(ticket.priority)} createdAt={ticket.createdAt} onClose={close} /></div>}
         </Modal>
       )}
