@@ -6,7 +6,7 @@ import { requireSupplierV3 } from '@/lib/health/guard'
 import { assembleSupplierDashboard, type SupplierTicketRow } from '@/lib/health/data'
 import { PersistentDetails } from '@/components/ui/PersistentDetails'
 import { priorityBadgeClass, priorityLabel } from '@/components/client/ticketBadges'
-import { rmStatusMeta, formatDateTime } from '@/lib/utils'
+import { supplierStatusMeta, formatDateTime } from '@/lib/utils'
 
 const SNAG_STATUSES = ['snag', 'snag_assigned', 'snag_resolved', 'snag_in_progress']
 
@@ -43,7 +43,7 @@ export default async function SupplierSnagPage() {
             </summary>
             <div className="border-t border-[var(--border)] px-3">
               {rows.map(t => {
-                const sm = rmStatusMeta(t.status)
+                const sm = supplierStatusMeta(t.status)
                 return (
                   <Link key={t.id} href={`/supplier/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2.5 -mx-0 px-1 rounded-lg border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition">
                     <div className="min-w-0">

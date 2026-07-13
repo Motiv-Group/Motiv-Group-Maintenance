@@ -3,7 +3,7 @@
 // RM ticket-page custom actions for the competitive-quoting model.
 import { useState, useMemo, useEffect, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, Pencil, CalendarClock, Plus, Camera, Info, X, FileText, ChevronDown, ChevronLeft, ChevronRight, MessageSquare, XCircle, Send } from 'lucide-react'
+import { Search, Pencil, CalendarClock, Plus, Camera, Info, X, FileText, ChevronDown, ChevronLeft, ChevronRight, MessageSquare, XCircle, Send, AlertCircle, Trash2 } from 'lucide-react'
 import { StarInput, Stars } from '@/components/ui/Stars'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { uploadFiles } from '@/lib/upload'
@@ -14,21 +14,14 @@ async function post(url: string, body: unknown): Promise<void> {
   if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Something went wrong')
 }
 
-/** Field heading above an input/select/textarea. */
-function Labeled({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="block text-xs font-medium text-[var(--text-muted)] mb-1">{label}</label>
-      {children}
-    </div>
-  )
-}
-
-function Modal({ title, onClose, children, maxWidth = 'max-w-md' }: { title: string; onClose: () => void; children: React.ReactNode; maxWidth?: string }) {
+function Modal({ title, onClose, children, maxWidth = 'max-w-md' }: { title: ReactNode; onClose: () => void; children: React.ReactNode; maxWidth?: string }) {
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div className={`bg-[var(--surface-2)] ring-1 ring-[var(--border)] rounded-2xl p-5 ${maxWidth} w-full space-y-3 max-h-[85vh] overflow-y-auto`} onClick={e => e.stopPropagation()}>
-        <p className="font-semibold text-[var(--text)]">{title}</p>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 text-base font-bold text-[var(--text)]">{title}</div>
+          <button type="button" onClick={onClose} aria-label="Close" className="shrink-0 -m-1 rounded-lg p-1.5 text-[var(--text-faint)] transition hover:bg-[var(--hover)] hover:text-[var(--text)]"><X size={18} /></button>
+        </div>
         {children}
       </div>
     </div>
@@ -36,11 +29,9 @@ function Modal({ title, onClose, children, maxWidth = 'max-w-md' }: { title: str
 }
 
 // ── "More" dropdown — a compact button (sits next to the primary action) that
-// drops a floating menu of secondary/destructive actions, so the Next-action block
-// leads with one primary button. Children are the secondary action components, each
-// passed a `trigger` that renders a MoreActionItem. The menu is toggled with the
-// `hidden` class (not unmounted) so a child's modal stays mounted after its item is
-// clicked and the menu closes. `fullWidth` when there's no primary button beside it.
+// drops a floating menu of secondary/destructive actions. It ONLY renders the menu
+// buttons; the actual modals live as siblings in RmTicketActionBar driven by lifted
+// state, so opening one is instant and doesn't depend on the menu staying mounted.
 export function MoreMenu({ children, fullWidth = false }: { children: ReactNode; fullWidth?: boolean }) {
   const [open, setOpen] = useState(false)
   return (
@@ -54,32 +45,35 @@ export function MoreMenu({ children, fullWidth = false }: { children: ReactNode;
       >
         More <ChevronDown size={15} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
-      {/* Outside-click catcher (below the menu, above the page). */}
-      {open && <button aria-hidden tabIndex={-1} onClick={() => setOpen(false)} className="fixed inset-0 z-10 cursor-default" />}
-      {/* Kept in the DOM (hidden, not unmounted) so an item's modal survives the menu closing. */}
-      <div
-        role="menu"
-        onClick={() => setOpen(false)}
-        className={`absolute right-0 z-20 mt-2 w-64 max-w-[calc(100vw-2.5rem)] rounded-xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] shadow-lg shadow-black/20 p-1.5 space-y-0.5 ${open ? '' : 'hidden'}`}
-      >
-        {children}
-      </div>
+      {open && (
+        <>
+          {/* Outside-click catcher (below the menu, above the page). */}
+          <button aria-hidden tabIndex={-1} onClick={() => setOpen(false)} className="fixed inset-0 z-10 cursor-default" />
+          <div role="menu" onClick={() => setOpen(false)} className="absolute right-0 z-20 mt-2 w-64 max-w-[calc(100vw-2.5rem)] rounded-xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] shadow-lg shadow-black/20 p-1.5 space-y-0.5">
+            {children}
+          </div>
+        </>
+      )}
     </div>
   )
 }
 
+type ActionKey = 'addwork' | 'info' | 'edit' | 'cancel'
+
 // The RM Next-action cluster: one primary button (Assign supplier) + a "More"
 // dropdown holding the secondary/destructive actions (add extra work, request info,
-// edit, cancel). Lives in a CLIENT component so the per-action `trigger` render-props
-// are created client-side — a Server Component may not pass functions to Client
-// Components. The server page passes only serializable props (ids, flags, arrays).
-export function RmTicketActionBar({ ticketId, status, canAssign, canAssignSupplier, canCancel, canEdit, suppliers, motivSuppliers, declinedSupplierIds, awaitingById, description, photoUrls, title, category, impact, priority }: {
+// edit, cancel). The dropdown items just set which modal is active; the modals are
+// rendered as SIBLINGS (mounted only when active) so they open instantly — the
+// previous approach kept them inside the collapsing menu, which felt laggy/buggy.
+// Client component (a Server Component may not pass the click handlers).
+export function RmTicketActionBar({ ticketId, status, canAssign, canAssignSupplier, canCancel, canEdit, jobRef, suppliers, motivSuppliers, declinedSupplierIds, awaitingById, description, photoUrls, title, category, impact, priority }: {
   ticketId: string
   status: string
   canAssign: boolean
   canAssignSupplier: boolean
   canCancel: boolean
   canEdit: boolean
+  jobRef?: string | null
   suppliers: SupplierChoice[]
   motivSuppliers: SupplierChoice[]
   declinedSupplierIds: string[]
@@ -91,29 +85,35 @@ export function RmTicketActionBar({ ticketId, status, canAssign, canAssignSuppli
   impact: string
   priority: string
 }) {
+  const [active, setActive] = useState<ActionKey | null>(null)
+  const done = () => setActive(null)
   const showRequestInfo = ['open', 'info_requested'].includes(status)
   const hasPrimary = canAssignSupplier
   const hasMenu = canAssign || showRequestInfo || canEdit || canCancel
   const primaryCls = `${hasMenu ? 'flex-1' : 'w-full'} py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition`
   return (
-    <div className={`flex items-center gap-2 ${hasPrimary && hasMenu ? '' : 'flex-col'}`}>
-      {hasPrimary && (
-        <AssignSuppliersButton ticketId={ticketId} suppliers={suppliers} motivSuppliers={motivSuppliers} declinedSupplierIds={declinedSupplierIds} awaitingById={awaitingById}
-          trigger={open => <button onClick={open} className={primaryCls}>Assign supplier</button>} />
-      )}
-      {hasMenu && (
-        <MoreMenu fullWidth={!hasPrimary}>
-          {canAssign && <RmAddWorkForm ticketId={ticketId} description={description} photoUrls={photoUrls} title={title} category={category} impact={impact}
-            trigger={open => <MoreActionItem icon={<Plus size={16} />} label="Add extra work" onClick={open} />} />}
-          {showRequestInfo && <RequestInfoButton ticketId={ticketId}
-            trigger={open => <MoreActionItem icon={<MessageSquare size={16} />} label="Request more info" onClick={open} />} />}
-          {canEdit && <RmEditTicketForm ticketId={ticketId} initial={{ title, category, impact, priority, description }}
-            trigger={open => <MoreActionItem icon={<Pencil size={16} />} label="Edit ticket" onClick={open} />} />}
-          {canCancel && <CancelTicketCard ticketId={ticketId}
-            trigger={open => <MoreActionItem icon={<XCircle size={16} />} label="Cancel ticket" tone="danger" onClick={open} />} />}
-        </MoreMenu>
-      )}
-    </div>
+    <>
+      <div className={`flex items-center gap-2 ${hasPrimary && hasMenu ? '' : 'flex-col'}`}>
+        {hasPrimary && (
+          <AssignSuppliersButton ticketId={ticketId} suppliers={suppliers} motivSuppliers={motivSuppliers} declinedSupplierIds={declinedSupplierIds} awaitingById={awaitingById}
+            trigger={open => <button onClick={open} className={primaryCls}>Assign supplier</button>} />
+        )}
+        {hasMenu && (
+          <MoreMenu fullWidth={!hasPrimary}>
+            {canAssign && <MoreActionItem icon={<Plus size={16} />} label="Add extra work" onClick={() => setActive('addwork')} />}
+            {showRequestInfo && <MoreActionItem icon={<MessageSquare size={16} />} label="Request more info" onClick={() => setActive('info')} />}
+            {canEdit && <MoreActionItem icon={<Pencil size={16} />} label="Edit ticket" onClick={() => setActive('edit')} />}
+            {canCancel && <MoreActionItem icon={<XCircle size={16} />} label="Cancel ticket" tone="danger" onClick={() => setActive('cancel')} />}
+          </MoreMenu>
+        )}
+      </div>
+
+      {/* Action modals — mounted only while active, so they appear instantly. */}
+      {active === 'addwork' && <RmAddWorkForm defaultOpen onClose={done} ticketId={ticketId} description={description} photoUrls={photoUrls} title={title} category={category} impact={impact} />}
+      {active === 'info' && <RequestInfoButton defaultOpen onClose={done} ticketId={ticketId} />}
+      {active === 'edit' && <RmEditTicketForm defaultOpen onClose={done} ticketId={ticketId} initial={{ title, category, impact, priority, description }} />}
+      {active === 'cancel' && <CancelTicketCard defaultOpen onClose={done} ticketId={ticketId} jobRef={jobRef} />}
+    </>
   )
 }
 
@@ -308,46 +308,58 @@ export function AssignSuppliersButton({ ticketId, suppliers, motivSuppliers = []
 // nothing specific, a neutral "please review" note goes to the store manager.
 const INFO_REASONS = ['Need more detail', 'Photos unclear', 'Scope unclear', 'Access details needed']
 
-export function RequestInfoButton({ ticketId, trigger }: { ticketId: string; trigger?: (open: () => void) => ReactNode }) {
+const MAX_INFO_MSG = 1000
+export function RequestInfoButton({ ticketId, defaultOpen = false, onClose, trigger }: { ticketId: string; defaultOpen?: boolean; onClose?: () => void; trigger?: (open: () => void) => ReactNode }) {
   const router = useRouter()
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(defaultOpen)
   const [preset, setPreset] = useState('')
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  const close = () => { setOpen(false); onClose?.() }
 
   async function submit() {
     // Nothing required — build the note from whatever was given, else a default.
     const reason = [preset, message.trim()].filter(Boolean).join(' — ') || 'Please review the ticket and add any missing detail.'
     setBusy(true); setErr('')
-    try { await post(`/api/tickets/${ticketId}/transition`, { action: 'request_info', reason }); setPreset(''); setMessage(''); setOpen(false); setBusy(false); router.refresh() }
+    try { await post(`/api/tickets/${ticketId}/transition`, { action: 'request_info', reason }); setPreset(''); setMessage(''); close(); setBusy(false); router.refresh() }
     catch (e: any) { setErr(e.message); setBusy(false) }
   }
 
   const input = 'w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)]'
   return (
     <>
-      {trigger ? trigger(() => setOpen(true)) : (
+      {trigger ? trigger(() => setOpen(true)) : (!defaultOpen &&
         <button onClick={() => setOpen(true)} className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold transition">Request more info</button>
       )}
       {open && (
-        <Modal title="Request more information" onClose={() => { if (!busy) setOpen(false) }}>
-          <p className="-mt-1 text-sm text-[var(--text-muted)]">The store manager sees your request and can edit and resubmit the ticket.</p>
+        <Modal maxWidth="max-w-lg" title="Request more information" onClose={() => { if (!busy) close() }}>
+          <p className="-mt-1 text-sm text-[var(--text-muted)]">The store manager will see this message and can respond.</p>
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-[var(--text)]">Reason <span className="font-normal text-[var(--text-faint)]">(optional)</span></label>
+            <label className="mb-1.5 block text-sm font-medium text-[var(--text)]">What do you need more information about? <span className="font-normal text-[var(--text-faint)]">(optional)</span></label>
             <select autoFocus className={input} value={preset} onChange={e => setPreset(e.target.value)}>
-              <option value="">— Choose a reason —</option>
+              <option value="">Select a reason</option>
               {INFO_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
             </select>
           </div>
           <div>
             <label className="mb-1.5 block text-sm font-medium text-[var(--text)]">Your message to the store manager <span className="font-normal text-[var(--text-faint)]">(optional)</span></label>
-            <textarea className={`${input} min-h-[100px]`} placeholder="Add any detail about what you need from the store…" value={message} onChange={e => setMessage(e.target.value)} />
+            <div className="relative">
+              <textarea maxLength={MAX_INFO_MSG} className={`${input} min-h-[110px] pb-7`} placeholder="Type your message…" value={message} onChange={e => setMessage(e.target.value.slice(0, MAX_INFO_MSG))} />
+              <span className="pointer-events-none absolute bottom-2.5 right-3 text-[11px] tabular-nums text-[var(--text-faint)]">{message.length} / {MAX_INFO_MSG}</span>
+            </div>
+          </div>
+          <div className="flex items-start gap-2.5 rounded-xl bg-blue-500/10 ring-1 ring-blue-500/25 px-3.5 py-3">
+            <Info size={16} className="mt-0.5 shrink-0 text-blue-600 dark:text-blue-400" />
+            <div>
+              <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">What happens next?</p>
+              <p className="text-sm text-[var(--text-muted)]">The store manager is notified of your request. Once they respond, you can continue with the ticket.</p>
+            </div>
           </div>
           {err && <p className="text-xs text-red-500">{err}</p>}
           <div className="flex gap-2">
-            <button onClick={() => setOpen(false)} disabled={busy} className="flex-1 py-2.5 rounded-xl ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm font-medium disabled:opacity-50">Cancel</button>
-            <button disabled={busy} onClick={submit} className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Sending…' : 'Send request'}</button>
+            <button onClick={close} disabled={busy} className="flex-1 py-2.5 rounded-xl ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm font-medium disabled:opacity-50">Cancel</button>
+            <button disabled={busy} onClick={submit} className="flex flex-1 items-center justify-center gap-2 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold disabled:opacity-50"><Send size={15} /> {busy ? 'Sending…' : 'Send request'}</button>
           </div>
         </Modal>
       )}
@@ -452,9 +464,13 @@ const IMPACTS = [
 ]
 const PRIORITIES = [{ v: 'P1', label: 'Urgent' }, { v: 'P2', label: 'High' }, { v: 'P3', label: 'Medium' }, { v: 'P4', label: 'Low' }]
 
-export function RmEditTicketForm({ ticketId, initial, trigger }: { ticketId: string; initial: { title: string; category: string; impact: string; priority: string; description: string }; trigger?: (open: () => void) => ReactNode }) {
+const MAX_EDIT_DESC = 2000
+function ReqLabel({ label, children }: { label: string; children: ReactNode }) {
+  return <div><label className="mb-1.5 block text-sm font-medium text-[var(--text)]">{label} <span className="text-red-500">*</span></label>{children}</div>
+}
+export function RmEditTicketForm({ ticketId, initial, defaultOpen = false, onClose, trigger }: { ticketId: string; initial: { title: string; category: string; impact: string; priority: string; description: string }; defaultOpen?: boolean; onClose?: () => void; trigger?: (open: () => void) => ReactNode }) {
   const router = useRouter()
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(defaultOpen)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [title, setTitle] = useState(initial.title)
@@ -462,6 +478,7 @@ export function RmEditTicketForm({ ticketId, initial, trigger }: { ticketId: str
   const [impact, setImpact] = useState(initial.impact || 'none')
   const [priority, setPriority] = useState(initial.priority || 'P3')
   const [description, setDescription] = useState(initial.description)
+  const close = () => { setOpen(false); onClose?.() }
   const input = 'w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm'
 
   async function save() {
@@ -469,28 +486,33 @@ export function RmEditTicketForm({ ticketId, initial, trigger }: { ticketId: str
     try {
       const res = await fetch(`/api/tickets/${ticketId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, description, category, operational_impact: impact, priority }) })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to save')
-      setBusy(false); setOpen(false); router.refresh()   // reset busy so a second edit isn't stuck on "Saving…"
+      setBusy(false); close(); router.refresh()   // reset busy so a second edit isn't stuck on "Saving…"
     } catch (e: any) { setErr(e.message); setBusy(false) }
   }
 
   return (
     <>
-      {trigger ? trigger(() => setOpen(true)) : (
+      {trigger ? trigger(() => setOpen(true)) : (!defaultOpen &&
         <button onClick={() => setOpen(true)} className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-500"><Pencil size={13} /> Edit ticket</button>
       )}
       {open && (
-        <Modal title="Edit ticket" onClose={() => setOpen(false)}>
-          <Labeled label="Title"><input className={input} value={title} onChange={e => setTitle(e.target.value)} placeholder="Title" /></Labeled>
-          <div className="grid grid-cols-2 gap-2">
-            <Labeled label="Category"><select className={input} value={category} onChange={e => setCategory(e.target.value)}>{CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select></Labeled>
-            <Labeled label="Priority"><select className={input} value={priority} onChange={e => setPriority(e.target.value)}>{PRIORITIES.map(p => <option key={p.v} value={p.v}>{p.label}</option>)}</select></Labeled>
+        <Modal maxWidth="max-w-lg" title="Edit ticket" onClose={() => { if (!busy) close() }}>
+          <ReqLabel label="Title"><input className={input} value={title} onChange={e => setTitle(e.target.value)} placeholder="Title" /></ReqLabel>
+          <div className="grid grid-cols-2 gap-3">
+            <ReqLabel label="Category"><select className={input} value={category} onChange={e => setCategory(e.target.value)}>{CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select></ReqLabel>
+            <ReqLabel label="Priority"><select className={input} value={priority} onChange={e => setPriority(e.target.value)}>{PRIORITIES.map(p => <option key={p.v} value={p.v}>{p.label}</option>)}</select></ReqLabel>
           </div>
-          <Labeled label="Operational Impact"><select className={input} value={impact} onChange={e => setImpact(e.target.value)}>{IMPACTS.map(i => <option key={i.v} value={i.v}>{i.label}</option>)}</select></Labeled>
-          <Labeled label="Description"><textarea className={`${input} min-h-[90px]`} value={description} onChange={e => setDescription(e.target.value)} placeholder="Description" /></Labeled>
+          <ReqLabel label="Operational Impact"><select className={input} value={impact} onChange={e => setImpact(e.target.value)}>{IMPACTS.map(i => <option key={i.v} value={i.v}>{i.label}</option>)}</select></ReqLabel>
+          <ReqLabel label="Description">
+            <div className="relative">
+              <textarea maxLength={MAX_EDIT_DESC} className={`${input} min-h-[120px] pb-7`} value={description} onChange={e => setDescription(e.target.value.slice(0, MAX_EDIT_DESC))} placeholder="Description" />
+              <span className="pointer-events-none absolute bottom-2.5 right-3 text-[11px] tabular-nums text-[var(--text-faint)]">{description.length} / {MAX_EDIT_DESC}</span>
+            </div>
+          </ReqLabel>
           {err && <p className="text-xs text-red-500">{err}</p>}
-          <div className="flex gap-2">
-            <button disabled={busy} onClick={save} className="flex-1 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Saving…' : 'Save'}</button>
-            <button onClick={() => setOpen(false)} className="flex-1 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold">Cancel</button>
+          <div className="flex gap-2 pt-1">
+            <button onClick={close} disabled={busy} className="flex-1 py-2.5 rounded-xl ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm font-medium disabled:opacity-50">Cancel</button>
+            <button disabled={busy} onClick={save} className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Saving…' : 'Save changes'}</button>
           </div>
         </Modal>
       )}
@@ -892,15 +914,16 @@ function SignoffReviewBody({ ticketId, s }: { ticketId: string; s: SignoffSubmis
 // ── RM adds extra work to the ticket (before a supplier is assigned) ─
 const MAX_WORK_CHARS = 1000
 const MAX_WORK_PHOTOS = 5
-export function RmAddWorkForm({ ticketId, description, photoUrls, title, category, impact, trigger }: {
-  ticketId: string; description: string; photoUrls: string[]; title: string; category: string; impact: string; trigger?: (open: () => void) => ReactNode
+export function RmAddWorkForm({ ticketId, description, photoUrls, title, category, impact, defaultOpen = false, onClose, trigger }: {
+  ticketId: string; description: string; photoUrls: string[]; title: string; category: string; impact: string; defaultOpen?: boolean; onClose?: () => void; trigger?: (open: () => void) => ReactNode
 }) {
   const router = useRouter()
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(defaultOpen)
   const [text, setText] = useState('')
   const [files, setFiles] = useState<File[]>([])
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  const close = () => { setOpen(false); onClose?.() }
   const input = 'w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)]'
 
   // Object-URL thumbnails for the selected photos; revoked when the set changes.
@@ -917,19 +940,19 @@ export function RmAddWorkForm({ ticketId, description, photoUrls, title, categor
       // The ticket endpoint is PATCH-only — POSTing here was the "something went wrong".
       const res = await fetch(`/api/tickets/${ticketId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, description: newDescription, category, operational_impact: impact, photo_urls: [...photoUrls, ...newUrls], edit_note: 'added extra work' }) })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to add the extra work.')
-      setBusy(false); setOpen(false); setText(''); setFiles([]); router.refresh()
+      setBusy(false); setText(''); setFiles([]); close(); router.refresh()
     } catch (e: any) { setErr(e.message); setBusy(false) }
   }
 
   return (
     <>
-      {trigger ? trigger(() => setOpen(true)) : (
+      {trigger ? trigger(() => setOpen(true)) : (!defaultOpen &&
         <button onClick={() => setOpen(true)} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold transition">
           <Plus size={16} /> Add extra work
         </button>
       )}
       {open && (
-        <Modal title="Add extra work to this ticket" maxWidth="max-w-2xl" onClose={() => { if (!busy) { setOpen(false); setErr('') } }}>
+        <Modal title="Add extra work to this ticket" maxWidth="max-w-2xl" onClose={() => { if (!busy) { setErr(''); close() } }}>
           <p className="-mt-1 text-sm text-[var(--text-muted)]">Add any additional scope or tasks you want the supplier to include in their quote.</p>
 
           {/* Description + live character counter */}
@@ -972,7 +995,7 @@ export function RmAddWorkForm({ ticketId, description, photoUrls, title, categor
 
           {err && <p className="text-xs text-red-500">{err}</p>}
           <div className="flex gap-2">
-            <button onClick={() => { setOpen(false); setErr('') }} disabled={busy} className="flex-1 py-2.5 rounded-xl ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm font-medium disabled:opacity-50">Cancel</button>
+            <button onClick={() => { setErr(''); close() }} disabled={busy} className="flex-1 py-2.5 rounded-xl ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm font-medium disabled:opacity-50">Cancel</button>
             <button onClick={submit} disabled={busy} className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Adding…' : 'Add to ticket'}</button>
           </div>
         </Modal>
@@ -1147,36 +1170,64 @@ export function AcceptSnagScheduleCard({ ticketId, scheduledAt }: { ticketId: st
 
 // ── Cancel ticket (with reason) ─────────────────────────────────
 const CANCEL_REASONS = ['Duplicate ticket', 'Issue resolved itself', 'Not a maintenance issue', 'Store closed', 'Logged in error', 'Other']
-export function CancelTicketCard({ ticketId, trigger }: { ticketId: string; trigger?: (open: () => void) => ReactNode }) {
+const MAX_CANCEL_NOTE = 500
+export function CancelTicketCard({ ticketId, jobRef, defaultOpen = false, onClose, trigger }: { ticketId: string; jobRef?: string | null; defaultOpen?: boolean; onClose?: () => void; trigger?: (open: () => void) => ReactNode }) {
   const router = useRouter()
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(defaultOpen)
   const [reason, setReason] = useState(CANCEL_REASONS[0])
-  const [other, setOther] = useState('')
+  const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  const close = () => { setOpen(false); onClose?.() }
 
   async function cancel() {
     setBusy(true); setErr('')
-    const finalReason = reason === 'Other' ? (other.trim() || 'Other') : reason
-    try { await post(`/api/tickets/${ticketId}/transition`, { action: 'reject', reason: finalReason }); setOpen(false); setBusy(false); router.refresh() }
+    // Note is optional context appended to the required reason.
+    const finalReason = [reason, note.trim()].filter(Boolean).join(' — ')
+    try { await post(`/api/tickets/${ticketId}/transition`, { action: 'reject', reason: finalReason }); close(); setBusy(false); router.refresh() }
     catch (e: any) { setErr(e.message); setBusy(false) }
   }
 
-  const input = 'w-full px-3 py-2 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm'
+  const input = 'w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)]'
   return (
     <>
-      {trigger ? trigger(() => setOpen(true)) : (
+      {trigger ? trigger(() => setOpen(true)) : (!defaultOpen &&
         <button onClick={() => setOpen(true)} className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition">Cancel ticket</button>
       )}
       {open && (
-        <Modal title="Cancel this ticket?" onClose={() => setOpen(false)}>
-          <p className="text-sm text-[var(--text-muted)]">Choose a reason — the store manager will be notified.</p>
-          <select className={input} value={reason} onChange={e => setReason(e.target.value)}>{CANCEL_REASONS.map(r => <option key={r} value={r}>{r}</option>)}</select>
-          {reason === 'Other' && <textarea className={`${input} min-h-[60px]`} placeholder="Reason…" value={other} onChange={e => setOther(e.target.value)} />}
+        <Modal maxWidth="max-w-lg" onClose={() => { if (!busy) close() }} title={
+          <span className="flex items-center gap-2.5">
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-red-500/15 text-red-600 dark:text-red-400"><AlertCircle size={18} /></span>
+            <span className="text-lg font-bold text-[var(--text)]">Cancel ticket{jobRef ? ` ${jobRef}` : ''}?</span>
+          </span>
+        }>
+          <div className="space-y-0.5 border-b border-[var(--border)] pb-3 text-sm text-[var(--text-muted)]">
+            <p>This will close the ticket and notify the store manager.</p>
+            <p>Any outstanding quote requests will be withdrawn.</p>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-[var(--text)]">Reason <span className="text-red-500">*</span></label>
+            <select className={input} value={reason} onChange={e => setReason(e.target.value)}>{CANCEL_REASONS.map(r => <option key={r} value={r}>{r}</option>)}</select>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-[var(--text)]">Additional note <span className="font-normal text-[var(--text-faint)]">(optional)</span></label>
+            <div className="relative">
+              <textarea maxLength={MAX_CANCEL_NOTE} className={`${input} min-h-[110px] pb-7`} placeholder="Explain why the ticket is being cancelled…" value={note} onChange={e => setNote(e.target.value.slice(0, MAX_CANCEL_NOTE))} />
+              <span className="pointer-events-none absolute bottom-2.5 right-3 text-[11px] tabular-nums text-[var(--text-faint)]">{note.length} / {MAX_CANCEL_NOTE}</span>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-2.5 rounded-xl bg-red-500/[0.07] ring-1 ring-red-500/30 px-3.5 py-3">
+            <Info size={16} className="mt-0.5 shrink-0 text-red-600 dark:text-red-400" />
+            <p className="text-sm text-[var(--text-muted)]"><span className="text-[var(--text)]">This action <span className="font-semibold text-red-600 dark:text-red-400">cannot be undone</span>.</span> If this ticket was created by mistake, consider creating a new ticket instead.</p>
+          </div>
+
           {err && <p className="text-xs text-red-500">{err}</p>}
-          <div className="flex gap-2">
-            <button disabled={busy} onClick={cancel} className="flex-1 py-2 rounded-xl bg-red-600 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Cancelling…' : 'Confirm cancel'}</button>
-            <button onClick={() => setOpen(false)} className="flex-1 py-2 rounded-xl ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm">Keep ticket</button>
+          <div className="flex gap-2 pt-1">
+            <button onClick={close} disabled={busy} className="flex-1 py-2.5 rounded-xl ring-1 ring-[var(--border)] text-[var(--text)] text-sm font-medium transition hover:bg-[var(--hover)] disabled:opacity-50">Keep ticket</button>
+            <button disabled={busy} onClick={cancel} className="flex flex-1 items-center justify-center gap-2 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition disabled:opacity-50"><Trash2 size={16} /> {busy ? 'Cancelling…' : 'Cancel ticket'}</button>
           </div>
         </Modal>
       )}

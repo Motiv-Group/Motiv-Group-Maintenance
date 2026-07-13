@@ -13,7 +13,7 @@ import { CategoryIcon, priorityBadgeClass, priorityLabel } from '@/components/cl
 import { Modal } from '@/components/ui/Modal'
 import { DrawerHeader } from '@/components/exec/Drawer'
 import { readCollapse, writeCollapse, readCollapseSet, writeCollapseSet } from '@/lib/collapse-state'
-import { rmStatusMeta, formatDateTime, humanizeDuration, urgencyCountCls } from '@/lib/utils'
+import { supplierStatusMeta, formatDateTime, humanizeDuration, urgencyCountCls } from '@/lib/utils'
 
 type Bucket = 'to_quote' | 'quoted' | 'approved' | 'scheduled' | 'in_progress' | 'signoff' | 'completed' | 'closed'
 function bucketOf(s: string): Bucket {
@@ -81,7 +81,7 @@ function milestone(t: SupplierTicketRow): { label: string; at: string } | null {
 // `showStore` adds a Company · Branch eyebrow — used in flat sections (SLA
 // breached, archive). In store groups the heading already shows it, so it's off.
 function TicketRow({ t, company, showStore }: { t: SupplierTicketRow; company?: string; showStore?: boolean }) {
-  const sm = rmStatusMeta(myStatus(t))
+  const sm = supplierStatusMeta(myStatus(t))
   const m = milestone(t)
   // Dispute/declined force a red status badge; otherwise the rmStatusMeta class.
   const statusCls = t.declinedForMe || t.disputed ? 'bg-red-500/15 text-red-700 dark:text-red-400' : sm.cls
@@ -201,7 +201,7 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
       // Tickets where this supplier was declined (and not re-invited) only show under Declined / Cancelled.
       if (filter !== 'declined' && filter !== 'cancelled' && t.declinedForMe) return false
       if (!terms.length) return true
-      const hay = `${t.title} ${t.storeName} ${t.branchCode ?? ''} ${rmStatusMeta(myStatus(t)).label}`.toLowerCase()
+      const hay = `${t.title} ${t.storeName} ${t.branchCode ?? ''} ${supplierStatusMeta(myStatus(t)).label}`.toLowerCase()
       return terms.every(w => hay.includes(w))
     })
   }, [tickets, q, filter])
@@ -317,7 +317,7 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
           {archiveOpen && (
             <div className="px-1" onClick={e => e.stopPropagation()}>
               {archived.map(t => {
-                const sm = rmStatusMeta(myStatus(t))
+                const sm = supplierStatusMeta(myStatus(t))
                 return (
                   <Link key={t.id} href={`/supplier/tickets/${t.id}`} className="grid gap-3 border-b border-[var(--border)] px-2 py-3 last:border-0 transition hover:bg-[var(--hover)] sm:grid-cols-[1fr_auto] sm:items-center">
                     <div className="flex min-w-0 items-center gap-3">

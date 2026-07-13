@@ -943,7 +943,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
             It's a client component so its per-action trigger render-props are created
             client-side (a Server Component can't pass functions to Client Components). */}
         {!isTerminal && (canAssign || canCancel) && (
-          <RmTicketActionBar ticketId={t.id} status={t.status} canAssign={canAssign} canAssignSupplier={canAssignSupplier} canCancel={canCancel} canEdit={canEdit}
+          <RmTicketActionBar ticketId={t.id} status={t.status} canAssign={canAssign} canAssignSupplier={canAssignSupplier} canCancel={canCancel} canEdit={canEdit} jobRef={t.job_ref}
             suppliers={supplierList} motivSuppliers={motivSupplierList} declinedSupplierIds={declinedSupplierIds} awaitingById={engagedSupplierIds}
             description={t.description ?? ''} photoUrls={Array.isArray(t.photo_urls) ? t.photo_urls : []} title={t.title} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} priority={t.priority} />
         )}

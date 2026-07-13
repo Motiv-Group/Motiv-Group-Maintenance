@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { useDropzone } from 'react-dropzone'
-import { UploadCloud, X, FileText, Loader2, Calendar, Sparkles, Check, Clock, AlertTriangle, AlertCircle } from 'lucide-react'
+import { UploadCloud, X, FileText, Loader2, Calendar, Sparkles, Check, Clock, AlertTriangle, AlertCircle, Lock } from 'lucide-react'
 import { SchedulePicker } from '@/components/ui/SchedulePicker'
 import { Modal } from '@/components/ui/Modal'
 import { DrawerHeader } from '@/components/exec/Drawer'
@@ -709,6 +709,12 @@ export function SendQuoteForm({
             Cancel
           </button>
         </div>
+
+        {!isVariation && (
+          <p className="flex items-center justify-center gap-1.5 pt-1 text-[11px] text-[var(--text-faint)]">
+            <Lock size={12} /> Quotes are secure and only visible to authorised users.
+          </p>
+        )}
       </form>
     </div>
   )

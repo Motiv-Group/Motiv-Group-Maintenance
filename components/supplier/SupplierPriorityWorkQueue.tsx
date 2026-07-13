@@ -12,7 +12,9 @@ import { AlertCircle, AlertOctagon, AlertTriangle, ArrowRight, CalendarClock, Ch
 import type { SupplierTicketRow } from '@/lib/health/data'
 import { Card } from '@/components/exec/ui'
 import { CategoryIcon } from '@/components/client/ticketBadges'
-import { rmStatusMeta, formatDate, formatDateTime, humanizeDuration, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
+import { Modal } from '@/components/ui/Modal'
+import { SendQuoteForm } from '@/components/admin/SendQuoteForm'
+import { supplierStatusMeta, formatDate, formatDateTime, humanizeDuration, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
 
 type QueueFilter = 'all' | 'to_quote' | 'attend' | 'evidence' | 'snags' | 'sla'
 type Tone = 'red' | 'purple' | 'gold' | 'green' | 'orange' | 'blue'
@@ -138,7 +140,7 @@ function QueueRow({ ticket, nowMs, company }: { ticket: SupplierTicketRow; nowMs
   const slaMs = new Date(slaDeadline).getTime() - nowMs
   const breached = ticket.overdue || ticket.breached || slaMs <= 0
   const status = myStatus(ticket)
-  const meta = rmStatusMeta(status)
+  const meta = supplierStatusMeta(status)
   const statusCls = ticket.disputed ? 'bg-red-500/15 text-red-700 dark:text-red-400' : meta.cls
   const statusLabel = ticket.disputed ? 'Dispute' : meta.label
   const ticketUrl = `/supplier/tickets/${ticket.id}`
@@ -188,9 +190,27 @@ function QueueRow({ ticket, nowMs, company }: { ticket: SupplierTicketRow; nowMs
       </div>
 
       <div className="flex lg:justify-end">
-        <Link href={ticketUrl} className={ctaCls}>{cta} {cta === 'View Ticket' && <ArrowRight size={15} />}</Link>
+        {toQuote(ticket)
+          ? <SubmitQuoteCta ticket={ticket} className={ctaCls} />
+          : <Link href={ticketUrl} className={ctaCls}>{cta} {cta === 'View Ticket' && <ArrowRight size={15} />}</Link>}
       </div>
     </div>
+  )
+}
+
+// "Submit quote" opens the full quote-upload pop-up in place (same SendQuoteForm as
+// the ticket detail), so the supplier can quote straight from the Today queue.
+function SubmitQuoteCta({ ticket, className }: { ticket: SupplierTicketRow; className: string }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} className={className}>Submit quote</button>
+      {open && (
+        <Modal onClose={() => setOpen(false)} maxWidth="max-w-2xl">
+          {close => <div><SendQuoteForm defaultOpen competitive ticketId={ticket.id} priority={String(ticket.priority)} createdAt={ticket.createdAt} onClose={close} /></div>}
+        </Modal>
+      )}
+    </>
   )
 }
 

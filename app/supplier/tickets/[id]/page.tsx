@@ -28,7 +28,7 @@ import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { EditedLine } from '@/components/ui/EditedLine'
 import { AuditTrail } from '@/components/ui/AuditTrail'
 import { DetailTabs } from '@/components/ui/DetailTabs'
-import { formatCurrency, formatDateTime, rmStatusMeta, storeLabel, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
+import { formatCurrency, formatDateTime, supplierStatusMeta, storeLabel, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
 
 // Shown when the RM declined a quote without typing a reason.
 const DEFAULT_DECLINE_REASON = 'Thank you for your submission. Although your quotation was not selected for this request, we value your participation and look forward to inviting you to future opportunities.'
@@ -375,7 +375,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
     if (awarded && t.status === 'submitted_for_signoff') return { mode: 'wait', msg: '', sub: '' }
     if (awarded && t.status === 'variation_review') return { mode: 'wait', msg: '', sub: '' }
     if (awarded && (t.status === 'approved_closeout' || t.status === 'vo_declined')) return { mode: 'act', msg: 'Raise any variation orders', sub: 'The COC & POC were approved — raise a variation order for extra work, or confirm there are none below.' }
-    return { mode: 'wait', msg: rmStatusMeta(supplierStatus).label, sub: 'No action needed from you right now.' }
+    return { mode: 'wait', msg: supplierStatusMeta(supplierStatus).label, sub: 'No action needed from you right now.' }
   })()
 
   // ── Lower tabbed section (mirrors the RM ticket detail). Each tab's content, or
@@ -565,7 +565,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
           <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end">
             <PriorityBadge priority={t.priority} className="w-full text-center" />
             {(() => {
-              const sm = rmStatusMeta(supplierStatus)
+              const sm = supplierStatusMeta(supplierStatus)
               // An open dispute (awarded supplier) overrides the badge with "Dispute" —
               // the snag/evidence step is paused until the manager resolves it.
               const disputing = awarded && !!openDispute
