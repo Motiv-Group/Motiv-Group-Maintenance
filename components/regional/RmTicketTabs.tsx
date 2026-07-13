@@ -6,6 +6,7 @@ import { Card } from '@/components/exec/ui'
 import { PhotoThumbs } from '@/components/ui/PhotoThumbs'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { formatDateTime } from '@/lib/utils'
+import { TicketTimeline } from '@/components/ui/TicketTimeline'
 import type { TimelineEvent } from '@/lib/ticket-timeline'
 
 type PhotoGroup = { label: string; urls: string[] }
@@ -101,26 +102,7 @@ export function RmTicketTabs({
         ) : <p className="text-sm text-[var(--text-faint)]">No updates from the supplier yet.</p>
       )}
 
-      {tab === 'timeline' && (
-        timeline.length ? (
-          // Same look & feel as the store-manager Timeline (dot + connecting line),
-          // but the RM also sees who acted — who viewed a photo/attachment, edits, etc.
-          <ol className="space-y-4">
-            {timeline.map((e, i) => (
-              <li key={i} className="flex gap-3">
-                <div className="flex flex-col items-center">
-                  <span className={`mt-1 h-2.5 w-2.5 rounded-full ${i === timeline.length - 1 ? 'bg-blue-500' : 'bg-[var(--text-faint)]'}`} />
-                  {i < timeline.length - 1 && <span className="mt-1 w-px flex-1 bg-[var(--border)]" />}
-                </div>
-                <div className="min-w-0 pb-1">
-                  <p className="text-sm font-medium text-[var(--text)]">{e.label}</p>
-                  <p className="text-[11px] text-[var(--text-faint)]">{e.who ? `${e.who} · ` : ''}{formatDateTime(e.at)}</p>
-                </div>
-              </li>
-            ))}
-          </ol>
-        ) : <p className="text-sm text-[var(--text-faint)]">No history yet.</p>
-      )}
+      {tab === 'timeline' && <TicketTimeline items={timeline} />}
 
       {tab === 'history' && (
         history ?? <p className="text-sm text-[var(--text-faint)]">Nothing archived yet.</p>

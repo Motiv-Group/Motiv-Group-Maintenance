@@ -5,12 +5,13 @@
 // hours). The Submit COC & POC flow lives on its own page (/complete).
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Calendar, Wrench, PlayCircle } from 'lucide-react'
+import { Calendar, Wrench, PlayCircle, XCircle } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { DrawerHeader } from '@/components/exec/Drawer'
 import { SchedulePicker } from '@/components/ui/SchedulePicker'
 import { SendQuoteForm } from '@/components/admin/SendQuoteForm'
 import { PopupForm } from '@/components/supplier/PopupForm'
+import { MoreMenu, MoreActionItem } from '@/components/regional/RmTicketActions'
 import { createClient } from '@/lib/supabase/client'
 
 async function transition(ticketId: string, body: Record<string, unknown>) {
@@ -21,13 +22,14 @@ async function transition(ticketId: string, body: Record<string, unknown>) {
 // Decline the work (before award) — a pop-up with preset reasons + free-text
 // "Other". Sets the supplier's invite to declined and notifies the RM.
 const DECLINE_REASONS = ['Fully booked / no capacity', 'Outside our service area', 'Not our trade / speciality', 'Pricing not viable', 'Other']
-export function DeclineWorkButton({ ticketId }: { ticketId: string }) {
+export function DeclineWorkButton({ ticketId, defaultOpen = false, onClose }: { ticketId: string; defaultOpen?: boolean; onClose?: () => void }) {
   const router = useRouter()
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(defaultOpen)
   const [reason, setReason] = useState('')
   const [other, setOther] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  const close = () => { setOpen(false); onClose?.() }
   const input = 'w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)]'
 
   async function submit() {
@@ -38,18 +40,18 @@ export function DeclineWorkButton({ ticketId }: { ticketId: string }) {
     try {
       const res = await fetch('/api/supplier/decline-work', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticketId, reason: finalReason }) })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed')
-      router.refresh()
+      close(); router.refresh()
     } catch (e: any) { setErr(e.message); setBusy(false) }
   }
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className="w-full py-2.5 rounded-xl ring-1 ring-red-500/40 text-red-600 dark:text-red-400 text-sm font-semibold hover:bg-red-500/10 transition">Decline work</button>
+      {!defaultOpen && <button type="button" onClick={() => setOpen(true)} className="w-full py-2.5 rounded-xl ring-1 ring-red-500/40 text-red-600 dark:text-red-400 text-sm font-semibold hover:bg-red-500/10 transition">Decline work</button>}
       {open && (
-        <Modal onClose={() => setOpen(false)} maxWidth="max-w-md">
-          {close => (
+        <Modal onClose={() => { if (!busy) close() }} maxWidth="max-w-md">
+          {dismiss => (
             <>
-              <DrawerHeader onClose={close} title={<p className="font-semibold text-[var(--text)]">Decline this work</p>} />
+              <DrawerHeader onClose={dismiss} title={<p className="font-semibold text-[var(--text)]">Decline this work</p>} />
               <p className="text-xs text-[var(--text-muted)]">The manager is notified and the job goes to other suppliers. This can&apos;t be undone.</p>
               <select autoFocus className={input} value={reason} onChange={e => { setReason(e.target.value); setErr('') }}>
                 <option value="">— Choose a reason —</option>
@@ -59,12 +61,38 @@ export function DeclineWorkButton({ ticketId }: { ticketId: string }) {
               {err && <p className="text-xs text-red-500">{err}</p>}
               <div className="flex gap-2">
                 <button onClick={submit} disabled={busy} className="flex-1 py-2 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-500 disabled:opacity-50">{busy ? 'Declining…' : 'Decline work'}</button>
-                <button onClick={close} disabled={busy} className="flex-1 py-2 rounded-xl ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm disabled:opacity-50">Cancel</button>
+                <button onClick={dismiss} disabled={busy} className="flex-1 py-2 rounded-xl ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm disabled:opacity-50">Cancel</button>
               </div>
             </>
           )}
         </Modal>
       )}
+    </>
+  )
+}
+
+// Quote-phase action bar (mirrors the RM's): a primary "Upload Quote" button + a
+// "More" dropdown holding the secondary actions (Decline work). The action modals
+// render as siblings driven by lifted state, so they open instantly.
+export function SupplierQuoteBar({ ticketId, priority, createdAt, canDecline = false }: { ticketId: string; priority: string; createdAt: string; canDecline?: boolean }) {
+  const [quoteOpen, setQuoteOpen] = useState(false)
+  const [declineOpen, setDeclineOpen] = useState(false)
+  return (
+    <>
+      <div className="flex items-center gap-2">
+        <button type="button" onClick={() => setQuoteOpen(true)} className={`${canDecline ? 'flex-1' : 'w-full'} py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition`}>Upload Quote</button>
+        {canDecline && (
+          <MoreMenu>
+            <MoreActionItem icon={<XCircle size={16} />} label="Decline work" tone="danger" onClick={() => setDeclineOpen(true)} />
+          </MoreMenu>
+        )}
+      </div>
+      {quoteOpen && (
+        <Modal onClose={() => setQuoteOpen(false)} maxWidth="max-w-2xl">
+          {close => <div><SendQuoteForm defaultOpen competitive ticketId={ticketId} priority={priority} createdAt={createdAt} onClose={close} /></div>}
+        </Modal>
+      )}
+      {declineOpen && <DeclineWorkButton ticketId={ticketId} defaultOpen onClose={() => setDeclineOpen(false)} />}
     </>
   )
 }

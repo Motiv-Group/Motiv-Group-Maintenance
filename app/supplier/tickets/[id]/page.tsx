@@ -19,14 +19,14 @@ import { Card } from '@/components/exec/ui'
 import { WorkflowActions } from '@/components/workflow/WorkflowActions'
 import { RmPipeline } from '@/components/regional/RmPipeline'
 import { SupplierAttachments } from '@/components/workflow/SupplierAttachments'
-import { SendQuoteForm } from '@/components/admin/SendQuoteForm'
 import { QuoteSummary, type QuoteSummaryStatus } from '@/components/workflow/QuoteSummary'
-import { MarkInProgressButton, DeclineWorkButton, AcceptSnagCard, StartSnagButton, SupplierVariationGate } from '@/components/supplier/SupplierJobActions'
+import { MarkInProgressButton, DeclineWorkButton, AcceptSnagCard, StartSnagButton, SupplierVariationGate, SupplierQuoteBar } from '@/components/supplier/SupplierJobActions'
 import { PopupForm } from '@/components/supplier/PopupForm'
 import { RaiseDisputeButton, DisputeThread } from '@/components/dispute/DisputeBox'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { EditedLine } from '@/components/ui/EditedLine'
-import { AuditTrail } from '@/components/ui/AuditTrail'
+import { buildTicketTimeline, rmFriendlyLabel } from '@/lib/ticket-timeline'
+import { TicketTimeline } from '@/components/ui/TicketTimeline'
 import { DetailTabs } from '@/components/ui/DetailTabs'
 import { formatCurrency, formatDateTime, supplierStatusMeta, storeLabel, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
 
@@ -525,16 +525,19 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
         )}
       </div>)
     : null
-  const timelineTab = !awarded
-    ? (<AuditTrail ticket={{
+  // Full life-of-ticket timeline — same shared layout as the RM detail (dot +
+  // connecting line, friendly SM-style voice). Built from the same audit inputs
+  // that used to feed AuditTrail.
+  const supplierTimelineInput = !awarded
+    ? {
         createdAt: t.created_at, startAt: trailStartAt,
         quoteRequestedAt: (invite as any)?.invited_at ?? t.quote_requested_at,
         quoteRequests: myQuoteRequests.map(at => ({ at })),
         quoteSubmittedAt: latestQuote?.created_at ?? null,
         quotes: (myQuotes ?? []) as any[], supplierDeclines: myDeclines, views: (viewRows ?? []) as any[],
         supplierDeclinedAt: declinedForMe ? ((invite as any)?.responded_at ?? latestQuote?.updated_at ?? t.updated_at) : null,
-      }} />)
-    : (<AuditTrail ticket={{
+      }
+    : {
         createdAt: t.created_at, status: t.status, updatedAt: t.updated_at, startAt: trailStartAt,
         quoteRequestedAt: t.quote_requested_at, quoteRequests: myQuoteRequests.map(at => ({ at })),
         quoteSubmittedAt: latestQuote?.created_at ?? t.quote_submitted_at,
@@ -549,7 +552,9 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
         disputes: disputes.map(d => ({ origin: d.origin, status: d.status, outcome: d.outcome, created_at: d.created_at, resolved_at: d.resolved_at, reason: d.resolution_note })),
         disputeMessages: disputeMsgs.map((m: any) => ({ author_role: m.author_role, body: m.body, created_at: m.created_at })),
         supplierDeclines: myDeclines, signoffs: (signoffRows ?? []) as any[], updates: (updates ?? []) as any[], views: (viewRows ?? []) as any[],
-      }} />)
+      }
+  const timelineItems = buildTicketTimeline(supplierTimelineInput).map(e => ({ ...e, label: rmFriendlyLabel(e), who: null }))
+  const timelineTab = <TicketTimeline items={timelineItems} />
 
   return (
     <div className="space-y-5">
@@ -577,7 +582,6 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
         </div>
         {!declinedForMe && <RmPipeline status={supplierStatus} />}
       </Card>
-      {!declinedForMe && breached && <BreachReason action={nextAction.sub || nextAction.msg || 'This job is overdue — take the next action to get it back on track.'} dueAt={sla.nextActionDueAt} nowMs={now.getTime()} />}
       {/* Off the ticket → no "Next step", just why this quote request was declined. */}
       {declinedForMe ? (
         <div className="rounded-2xl bg-red-500/10 ring-1 ring-red-500/40 p-5 space-y-1">
@@ -592,9 +596,12 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
           <div>
             <h2 className="text-sm font-bold text-[var(--text)]">Next action</h2>
             {nextAction.msg && <p className="mt-1 text-sm font-bold text-[var(--text)]">{nextAction.msg}</p>}
-            {/* When breached the instruction moves into the red callout above. */}
+            {/* When breached the instruction moves into the red callout below. */}
             {nextAction.sub && !breached && <p className="mt-0.5 text-sm text-[var(--text-muted)]">{nextAction.sub}</p>}
           </div>
+
+          {/* SLA breach — concise callout inside the action block (same as the RM). */}
+          {breached && <BreachReason action={nextAction.sub || nextAction.msg || 'This job is overdue — take the next action to get it back on track.'} dueAt={sla.nextActionDueAt} nowMs={now.getTime()} />}
           {/* The decline reason now lives in the Quotes block (on the declined quote);
               the Next step only prompts for the revised quote. */}
           {reQuoteByRm && canSubmitQuote && (
@@ -606,7 +613,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
               </div>
             </div>
           )}
-          {canSubmitQuote && <PopupForm label="Upload Quote" tone="success"><SendQuoteForm defaultOpen ticketId={t.id} competitive priority={t.priority} createdAt={t.created_at} /></PopupForm>}
+          {canSubmitQuote && <SupplierQuoteBar ticketId={t.id} priority={t.priority} createdAt={t.created_at} canDecline={canDecline} />}
           {/* After the quote is approved → straight to "Mark in progress" (confirm).
               Variation orders come after the COC/POC is approved (close-out stage). */}
           {awarded && (t.status === 'accepted' || t.status === 'scheduled') && <MarkInProgressButton ticketId={t.id} />}
@@ -690,8 +697,10 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
               <p className="text-sm text-[var(--text-muted)]">Your quote has been submitted and is under review. We&apos;ll notify you as soon as the regional manager has responded — no action is needed from you in the meantime.</p>
             </div>
           )}
-          {/* Opt out of the job (before award) — separated from the primary actions */}
-          {canDecline && <div className="pt-1"><DeclineWorkButton ticketId={t.id} /></div>}
+          {/* Opt out of the job (before award). When the quote bar is showing it already
+              carries Decline work in its "More" menu, so only render it standalone here
+              for the (rare) states where the supplier can decline but not quote. */}
+          {canDecline && !canSubmitQuote && <div className="pt-1"><DeclineWorkButton ticketId={t.id} /></div>}
         </Card>
         {/* Ticket information — aligned label→value rows, then description + callouts. */}
         <Card className="p-5 space-y-4 h-full">
