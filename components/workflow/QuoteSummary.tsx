@@ -42,10 +42,10 @@ function DateItem({ label, value, proposed }: { label: string; value: string; pr
   return (
     <div>
       <div className={LABEL}>{label}</div>
-      <div className="mt-1 flex items-center gap-1.5 text-sm text-[var(--text)]">
+      <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm text-[var(--text)]">
         <Calendar size={14} className="shrink-0 text-[var(--text-faint)]" />
-        <span>{value}</span>
-        {proposed && <span className="text-[11px] text-amber-600 dark:text-amber-400">(proposed)</span>}
+        <span className="whitespace-nowrap">{value}</span>
+        {proposed && <span className="whitespace-nowrap text-[11px] text-amber-600 dark:text-amber-400">(proposed)</span>}
       </div>
     </div>
   )
@@ -114,12 +114,12 @@ export function QuoteSummary({ quote, status, title, schedule, collapsible = fal
           {status === 'declined' && quote.declinedAt && <DateItem label="Declined" value={formatDateTime(quote.declinedAt)} />}
         </div>
 
-        {/* Attachment */}
-        <div>
+        {/* Attachment — chip that truncates to its column, never overflowing */}
+        <div className="min-w-0">
           <div className={LABEL}>Attachment</div>
           <div className="mt-1.5">
             {attName
-              ? fileLink(<span className="inline-flex min-w-0 items-center gap-1.5"><FileText size={14} className="shrink-0" /><span className="truncate">{attName}</span></span>, 'inline-flex max-w-[240px] items-center text-sm font-medium text-blue-600 hover:underline dark:text-blue-400')
+              ? fileLink(<><FileText size={14} className="shrink-0" /><span className="min-w-0 truncate">{attName}</span></>, 'inline-flex max-w-full min-w-0 items-center gap-1.5 rounded-lg bg-blue-500/10 px-2.5 py-1.5 text-sm font-medium text-blue-600 ring-1 ring-blue-500/25 transition hover:bg-blue-500/15 dark:text-blue-400')
               : <span className="text-sm text-[var(--text-faint)]">—</span>}
           </div>
         </div>

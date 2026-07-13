@@ -690,7 +690,7 @@ export function RmQuotePanel({ ticketId, rows, canReQuote }: { ticketId: string;
               <div className="flex items-center justify-between gap-2">
                 <label className={`flex items-center gap-2 min-w-0 ${isReceived ? 'cursor-pointer' : ''}`}>
                   {isReceived
-                    ? <input type="radio" name={`rmq-${ticketId}`} checked={selectedId === r.supplierId} onChange={() => setSelectedId(r.supplierId)} className="h-4 w-4 shrink-0 accent-emerald-600" />
+                    ? <input type="radio" name={`rmq-${ticketId}`} checked={selectedId === r.supplierId} onChange={() => setSelectedId(r.supplierId)} onClick={() => { if (selectedId === r.supplierId) setSelectedId(null) }} className="h-4 w-4 shrink-0 accent-emerald-600" />
                     : <i className={`w-2.5 h-2.5 rounded-full shrink-0 ${m.dot}`} />}
                   <span className="min-w-0">
                     <span className="block truncate text-sm text-[var(--text)]">{r.name}</span>
@@ -725,7 +725,7 @@ export function RmQuotePanel({ ticketId, rows, canReQuote }: { ticketId: string;
       )}
 
       {active?.quote && (
-        <Modal title="Review quote" maxWidth="max-w-3xl" onClose={() => setOpenId(null)}>
+        <Modal title="Review quote" maxWidth="max-w-5xl" onClose={() => setOpenId(null)}>
           <QuoteSummary
             quote={{ id: active.quote.id, supplierName: active.name, amount: active.quote.amount, amountInclVat: active.quote.amountInclVat, description: active.quote.description, fileUrl: active.quote.fileUrl, validUntil: active.quote.validUntil ?? null, createdAt: active.quote.createdAt }}
             status={active.kind === 'accepted' ? 'accepted' : active.kind === 'declined' ? 'declined' : 'pending'}
@@ -889,7 +889,7 @@ export function QuoteComparison({ ticketId, rows, onClose }: { ticketId: string;
                 <span className="flex shrink-0 items-start gap-3">
                   <span className="text-right"><span className="block text-lg font-bold tabular-nums text-[var(--text)]">{formatCurrency(q.amount)}</span><span className="block text-[11px] text-[var(--text-faint)]">excl VAT</span>{q.amountInclVat != null && <span className="block text-[11px] text-[var(--text-faint)]">{formatCurrency(q.amountInclVat)} incl VAT</span>}</span>
                   {q.fileUrl && <FileText size={16} className="mt-0.5 text-emerald-600 dark:text-emerald-400" />}
-                  <input type="radio" name="qc" checked={on} onChange={() => setSelectedId(r.supplierId)} className="mt-1 h-4 w-4 accent-emerald-600" />
+                  <input type="radio" name="qc" checked={on} onChange={() => setSelectedId(r.supplierId)} onClick={() => { if (selectedId === r.supplierId) setSelectedId(null) }} className="mt-1 h-4 w-4 accent-emerald-600" />
                 </span>
               </label>
               <div className="mx-4 grid grid-cols-2 gap-x-4 gap-y-2 border-t border-[var(--border)] py-3">
@@ -955,7 +955,7 @@ export function QuoteReviewButton({ ticketId, trigger }: { ticketId: string; tri
     <>
       {trigger(() => setOpen(true))}
       {open && (
-        <Modal title="Review supplier quotes" maxWidth="max-w-3xl" onClose={() => setOpen(false)}>
+        <Modal title="Review supplier quotes" maxWidth="max-w-5xl" onClose={() => setOpen(false)}>
           {loading ? <p className="py-4 text-center text-sm text-[var(--text-faint)]">Loading…</p>
             : err ? <p className="text-sm text-red-500">{err}</p>
             : data ? (data.rows.length ? <QuoteComparison ticketId={ticketId} rows={data.rows} onClose={() => setOpen(false)} /> : <p className="text-sm text-[var(--text-faint)]">No quotes yet.</p>)
