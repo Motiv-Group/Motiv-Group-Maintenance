@@ -5,7 +5,7 @@
 // the ticket priority (CategoryIcon). All amounts are excl. VAT.
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { ReceiptText, Search, ChevronDown, ChevronLeft, ChevronRight, ChevronRight as Chev, Download, Info, Calendar } from 'lucide-react'
+import { ReceiptText, Search, ChevronDown, ChevronLeft, ChevronRight, ChevronRight as Chev, Info, Calendar } from 'lucide-react'
 import { Card } from '@/components/exec/ui'
 import { CategoryIcon } from '@/components/client/ticketBadges'
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils'
@@ -26,12 +26,23 @@ const STATUS: Record<QuoteKind, { label: string; badge: string; tab: string; rin
 }
 const ORDER: QuoteKind[] = ['requested', 'pending', 'accepted', 'declined']
 
+// Ticket priority (engine P1–P4) → badge label/colour + sort rank (P1 = most urgent).
+const PRIO: Record<string, { label: string; cls: string; rank: number }> = {
+  P1: { label: 'Urgent', cls: 'bg-red-500/15 text-red-700 dark:text-red-400',        rank: 0 },
+  P2: { label: 'High',   cls: 'bg-orange-500/15 text-orange-700 dark:text-orange-400', rank: 1 },
+  P3: { label: 'Medium', cls: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',    rank: 2 },
+  P4: { label: 'Low',    cls: 'bg-slate-500/15 text-slate-600 dark:text-slate-300',    rank: 3 },
+}
+const rankOf = (p: string) => PRIO[p]?.rank ?? 9
+// Shared badge geometry so the priority + status pills are exactly the same size.
+const BADGE = 'inline-flex items-center justify-center rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide min-w-[96px]'
+
 const SEL = 'appearance-none rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm pl-9 pr-8 py-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/40'
 
 export function SupplierQuotesTable({ items }: { items: SupplierQuoteItem[] }) {
   const [tab, setTab] = useState<'all' | QuoteKind>('all')
   const [q, setQ] = useState('')
-  const [sort, setSort] = useState<'newest' | 'oldest' | 'high' | 'low'>('newest')
+  const [sort, setSort] = useState<'urgent' | 'newest' | 'oldest' | 'high' | 'low'>('urgent')
   const [perPage, setPerPage] = useState(10)
   const [page, setPage] = useState(1)
 
@@ -45,6 +56,7 @@ export function SupplierQuotesTable({ items }: { items: SupplierQuoteItem[] }) {
       return true
     })
     const cmp: Record<string, (a: SupplierQuoteItem, b: SupplierQuoteItem) => number> = {
+      urgent: (a, b) => rankOf(a.priority) - rankOf(b.priority) || +new Date(b.at) - +new Date(a.at),
       newest: (a, b) => +new Date(b.at) - +new Date(a.at),
       oldest: (a, b) => +new Date(a.at) - +new Date(b.at),
       high: (a, b) => (b.amount ?? -1) - (a.amount ?? -1),
@@ -60,15 +72,6 @@ export function SupplierQuotesTable({ items }: { items: SupplierQuoteItem[] }) {
   const lastShown = Math.min(curPage * perPage, filtered.length)
   const reset = () => setPage(1)
 
-  function exportCsv() {
-    const head = ['Store', 'Ticket', 'Category', 'Priority', 'Status', 'Request/Submitted', 'Proposed visit', 'Valid until', 'Amount excl VAT', 'Amount incl VAT']
-    const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`
-    const body = filtered.map(i => [i.storeName, i.jobRef ?? '', i.category ?? '', i.priority, STATUS[i.kind].label, i.at, i.proposedVisit ?? '', i.validUntil ?? '', i.amount ?? '', i.amountInclVat ?? ''].map(esc).join(','))
-    const csv = [head.map(esc).join(','), ...body].join('\r\n')
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
-    const a = document.createElement('a'); a.href = url; a.download = 'quotes.csv'; a.click(); URL.revokeObjectURL(url)
-  }
-
   return (
     <div className="space-y-5">
       {/* Header */}
@@ -78,7 +81,6 @@ export function SupplierQuotesTable({ items }: { items: SupplierQuoteItem[] }) {
           <p className="mt-0.5 text-sm text-[var(--text-muted)]">View and manage quote requests and the quotes you have submitted.</p>
           <p className="mt-1.5 flex items-center gap-1.5 text-sm text-[var(--text-muted)]"><Info size={14} className="text-blue-600 dark:text-blue-400" /> All amounts are excl. VAT.</p>
         </div>
-        <button onClick={exportCsv} className="flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-semibold text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] hover:text-[var(--text)]"><Download size={15} /> Export quotes</button>
       </div>
 
       {/* Status tabs */}
@@ -87,7 +89,7 @@ export function SupplierQuotesTable({ items }: { items: SupplierQuoteItem[] }) {
           const active = tab === t.k
           return (
             <button key={t.k} onClick={() => { setTab(t.k); reset() }} aria-pressed={active}
-              className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm transition ${t.tint} ${t.ring} ${active ? 'font-bold ring-2' : 'font-semibold ring-1 opacity-80 hover:opacity-100'}`}>
+              className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm transition ${t.k === 'all' ? '' : 'min-w-[172px] justify-center'} ${t.tint} ${t.ring} ${active ? 'font-bold ring-2' : 'font-semibold ring-1 opacity-80 hover:opacity-100'}`}>
               {t.label} <span className="rounded-md bg-black/10 px-1.5 py-0.5 text-xs tabular-nums dark:bg-white/10">{count(t.k)}</span>
             </button>
           )
@@ -105,7 +107,7 @@ export function SupplierQuotesTable({ items }: { items: SupplierQuoteItem[] }) {
           <div className="relative">
             <ChevronDown size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
             <select aria-label="Sort" value={sort} onChange={e => { setSort(e.target.value as typeof sort); reset() }} className={SEL}>
-              <option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="high">Amount: high</option><option value="low">Amount: low</option>
+              <option value="urgent">Most urgent first</option><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="high">Amount: high</option><option value="low">Amount: low</option>
             </select>
             <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
           </div>
@@ -134,7 +136,12 @@ export function SupplierQuotesTable({ items }: { items: SupplierQuoteItem[] }) {
                   <td className="px-3 text-[var(--text)]">{i.proposedVisit ? <span className="flex items-center gap-1.5"><Calendar size={13} className="text-[var(--text-faint)]" /> {formatDateTime(i.proposedVisit)}</span> : <span className="text-[var(--text-faint)]">–</span>}</td>
                   <td className="px-3 text-[var(--text)]">{i.validUntil ? <span className="flex items-center gap-1.5"><Calendar size={13} className="text-[var(--text-faint)]" /> {formatDate(i.validUntil)}</span> : <span className="text-[var(--text-faint)]">–</span>}</td>
                   <td className="px-3">{i.amount != null ? <><span className="block font-semibold tabular-nums text-[var(--text)]">{formatCurrency(i.amount)}</span>{i.amountInclVat != null && <span className="block text-[11px] text-[var(--text-faint)]">{formatCurrency(i.amountInclVat)} incl VAT</span>}</> : <span className="text-[var(--text-faint)]">–</span>}</td>
-                  <td className="px-3"><span className={`inline-flex rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${STATUS[i.kind].badge}`}>{i.declinedLabel ?? STATUS[i.kind].label}</span></td>
+                  <td className="px-3">
+                    <div className="flex w-fit flex-col items-stretch gap-1">
+                      {PRIO[i.priority] && <span className={`${BADGE} ${PRIO[i.priority].cls}`}>{PRIO[i.priority].label}</span>}
+                      <span className={`${BADGE} ${STATUS[i.kind].badge}`}>{i.declinedLabel ?? STATUS[i.kind].label}</span>
+                    </div>
+                  </td>
                   <td className="px-3 text-right"><Link href={`/supplier/tickets/${i.ticketId}`} aria-label="Open ticket" className="inline-flex rounded-lg p-1.5 text-[var(--text-faint)] transition group-hover:text-[var(--text)]"><Chev size={16} /></Link></td>
                 </tr>
               ))}
@@ -153,7 +160,10 @@ export function SupplierQuotesTable({ items }: { items: SupplierQuoteItem[] }) {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-2">
                       <p className="truncate text-sm font-semibold text-[var(--text)]">{i.storeName}</p>
-                      <span className={`shrink-0 rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${STATUS[i.kind].badge}`}>{i.declinedLabel ?? STATUS[i.kind].label}</span>
+                      <span className="flex w-fit shrink-0 flex-col items-stretch gap-1">
+                        {PRIO[i.priority] && <span className={`${BADGE} ${PRIO[i.priority].cls}`}>{PRIO[i.priority].label}</span>}
+                        <span className={`${BADGE} ${STATUS[i.kind].badge}`}>{i.declinedLabel ?? STATUS[i.kind].label}</span>
+                      </span>
                     </div>
                     <p className="truncate text-[11px] text-[var(--text-faint)]">{[i.jobRef, i.category].filter(Boolean).join(' · ')}</p>
                     <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px] text-[var(--text-muted)]">
