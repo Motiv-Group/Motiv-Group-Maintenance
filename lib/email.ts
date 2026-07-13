@@ -33,13 +33,27 @@ export async function sendEmail({ to, subject, html, text }: SendEmailArgs): Pro
   }
 }
 
+/** Escape untrusted text before dropping it into an email's HTML body. */
+export function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+}
+
 // ── Branded transactional template ──────────────────────────────────────────
 // Table-based + inline styles for broad email-client support (Gmail/Outlook strip
 // <style> + classes). Navy MOTIV header (brand logo), blue CTA (the app's action
 // colour), copy-paste fallback link, footer. Shared by the invite + reset emails.
+// Optional `note` renders a quoted personal-message block (blue rule) above the
+// CTA — used to carry the inviter's own words. `note` is plain text; escape it here.
 export function motivBrandedEmailHtml(o: {
   base: string; heading: string; lead: string; sub?: string; ctaLabel: string; link: string; footerNote: string
+  note?: string; noteLabel?: string
 }): string {
+  const noteBlock = o.note && o.note.trim()
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;"><tr><td style="border-left:3px solid #2563eb;background:#f8fafc;border-radius:0 8px 8px 0;padding:12px 16px;">
+            ${o.noteLabel ? `<p style="margin:0 0 4px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#94a3b8;">${escapeHtml(o.noteLabel)}</p>` : ''}
+            <p style="margin:0;font-size:14px;line-height:1.6;color:#374151;white-space:pre-line;">${escapeHtml(o.note.trim())}</p>
+          </td></tr></table>`
+    : ''
   return `<div style="margin:0;padding:0;background:#f3f4f6;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:32px 12px;font-family:Arial,Helvetica,sans-serif;">
     <tr><td align="center">
@@ -52,6 +66,7 @@ export function motivBrandedEmailHtml(o: {
           <h1 style="margin:0 0 12px;font-size:20px;font-weight:700;color:#0d1f2d;">${o.heading}</h1>
           <p style="margin:0 0 ${o.sub ? '6px' : '24px'};font-size:15px;line-height:1.6;color:#374151;">${o.lead}</p>
           ${o.sub ? `<p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#374151;">${o.sub}</p>` : ''}
+          ${noteBlock}
           <table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="border-radius:10px;background:#2563eb;">
             <a href="${o.link}" style="display:inline-block;padding:13px 28px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:10px;">${o.ctaLabel}</a>
           </td></tr></table>
@@ -163,32 +178,44 @@ export function supplierAddedNoticeEmail({ companyName, addedBy, loginUrl }: { c
   return { subject, html, text }
 }
 
-/** Build the supplier invite email — a reusable onboarding link (custom token). */
-export function supplierInviteEmail({ link, companyName }: { link: string; companyName: string }): { subject: string; html: string; text: string } {
+/** Build the supplier invite email — a reusable onboarding link (custom token).
+ *  Uses the shared branded MOTIV template (same look as the RM/SM invites), and
+ *  carries the inviter's optional personal message. `inviterCompany` is the client
+ *  company doing the inviting; `message` is the RM's free-text note. */
+export function supplierInviteEmail(
+  { link, base, inviterCompany, message }: { link: string; base: string; inviterCompany?: string | null; message?: string | null },
+): { subject: string; html: string; text: string } {
   const subject = `You've been invited to MOTIV as a supplier`
+  const inviter = (inviterCompany ?? '').trim()
+  const lead = inviter
+    ? `<strong style="color:#0d1f2d;">${escapeHtml(inviter)}</strong> has invited you to join <strong style="color:#0d1f2d;">MOTIV</strong> as a supplier.`
+    : `You've been invited to join <strong style="color:#0d1f2d;">MOTIV</strong> as a supplier.`
+
+  const html = motivBrandedEmailHtml({
+    base,
+    heading: "You're invited to MOTIV",
+    lead,
+    sub: 'Set up your account — choose a password and confirm your company details — to start receiving work.',
+    note: message ?? undefined,
+    noteLabel: inviter ? `Message from ${inviter}` : 'Message',
+    ctaLabel: 'Set up my account',
+    link,
+    footerNote: "This invitation link stays valid until you finish signing up. If you weren't expecting it, you can safely ignore this email.",
+  })
+
   const text = [
     `Hi,`,
     ``,
-    `${companyName} has been added to MOTIV as a supplier.`,
+    inviter ? `${inviter} has invited you to join MOTIV as a supplier.` : `You've been invited to join MOTIV as a supplier.`,
     `Open the link below to set up your account — choose your password and confirm your company details:`,
     ``,
     link,
+    ...(message && message.trim() ? ['', `Message: ${message.trim()}`] : []),
     ``,
     `This link stays valid until you complete sign-up.`,
     ``,
     `— Motiv`,
   ].join('\n')
-
-  const html = `
-  <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:480px;margin:0 auto;color:#0f172a">
-    <h2 style="color:#1e293b;margin:0 0 12px">Welcome to MOTIV</h2>
-    <p style="margin:0 0 16px"><strong>${companyName}</strong> has been added as a supplier. Set up your account — choose a password and confirm your company details.</p>
-    <p style="margin:0 0 20px">
-      <a href="${link}" style="display:inline-block;background:#C6A35D;color:#0a0e17;text-decoration:none;padding:12px 20px;border-radius:10px;font-weight:600">Set up my account</a>
-    </p>
-    <p style="margin:0 0 8px;color:#64748b;font-size:12px">If the button doesn't work, paste this link:<br>${link}</p>
-    <p style="margin:0;color:#64748b;font-size:12px">This link stays valid until you finish signing up.</p>
-  </div>`
 
   return { subject, html, text }
 }

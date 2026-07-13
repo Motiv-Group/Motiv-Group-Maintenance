@@ -359,7 +359,7 @@ export interface RegionalDashboardData {
   attentionStores: StoreCard[]
   ticketActions: RegionalTicketAction[]
   tickets: RegionalTicketRow[]
-  suppliers: { id: string; name: string; perf: SupplierPerformance; open: number; overdue: number; costExposure: number; avgRating: number; ratingCount: number }[]
+  suppliers: { id: string; name: string; category: string | null; contactName: string | null; phone: string | null; email: string | null; perf: SupplierPerformance; open: number; overdue: number; costExposure: number; avgRating: number; ratingCount: number }[]
   quoteTotals: { accepted: number; pending: number; voPending: number }
   signoffsPending: number
   snagsOpen: number
@@ -382,7 +382,7 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
   const [{ data: regionsRaw }, { data: storesRaw }, { data: suppliersRaw }] = await Promise.all([
     db.from('regions').select('id, name').in('id', regionIds),
     db.from('stores').select('id, name, sub_store, branch_code, address, region_id').eq('company_id', companyId).in('region_id', regionIds).eq('active', true).is('closed_at', null),
-    db.from('suppliers').select('id, company_name, active').eq('company_id', companyId),
+    db.from('suppliers').select('id, company_name, active, contact_name, email, phone, trade, trades').eq('company_id', companyId),
   ])
   const regionName = new Map((regionsRaw ?? []).map((r: any) => [r.id, r.name]))
   const stores = (storesRaw ?? []) as any[]
@@ -534,7 +534,9 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
       const act = ts.filter(t => isActive(t.status))
       const overdue = act.filter(t => { const x = computeTicketSla(t, rules(t.priority), now); return x.supplierBreached || x.internalBreached }).length
       const ra = ratingAgg.get(s.id)
-      return { id: s.id, name: s.company_name ?? 'Supplier', perf: calculateSupplierPerformance(s.id, ts, rules, now), open: act.length, overdue, costExposure: act.reduce((sum: number, t: HealthTicket) => sum + (t.quote_value ?? 0), 0), avgRating: ra ? ra.sum / ra.n : 5, ratingCount: ra ? ra.n : 0 }
+      const trades: string[] = Array.isArray(s.trades) ? s.trades.filter(Boolean) : []
+      const category = trades.length ? trades.join(', ') : (s.trade ?? null)
+      return { id: s.id, name: s.company_name ?? 'Supplier', category, contactName: s.contact_name ?? null, phone: s.phone ?? null, email: s.email ?? null, perf: calculateSupplierPerformance(s.id, ts, rules, now), open: act.length, overdue, costExposure: act.reduce((sum: number, t: HealthTicket) => sum + (t.quote_value ?? 0), 0), avgRating: ra ? ra.sum / ra.n : 5, ratingCount: ra ? ra.n : 0 }
     })
     .sort((a, b) => a.perf.performanceScore - b.perf.performanceScore)
 
