@@ -44,16 +44,18 @@ export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
             id={id}
             type={show ? 'text' : 'password'}
             className={cn(
-              'w-full rounded-lg text-sm transition-colors focus:outline-none pr-10',
+              // Right padding lives in each branch (asymmetric) so it always clears
+              // the eye toggle — a shared pr-* would be overridden by the branch's px-*.
+              'w-full rounded-lg text-sm transition-colors focus:outline-none',
               auth
                 ? cn(
                     // gray-400 placeholder clears WCAG 4.5:1 on the #20222b field.
-                    'px-4 py-3 border bg-[#20222b] text-white placeholder:text-gray-400',
+                    'pl-4 pr-11 py-3 border bg-[#20222b] text-white placeholder:text-gray-400',
                     'focus:ring-2 focus:ring-blue-500 focus:border-blue-500/60',
                     error ? 'border-red-500/70' : 'border-[#343742]'
                   )
                 : cn(
-                    'px-3 py-2 border shadow-sm placeholder-gray-400',
+                    'pl-3 pr-10 py-2 border shadow-sm placeholder-gray-400',
                     'bg-white dark:bg-gray-700 text-gray-900 dark:text-white',
                     'focus:ring-2 focus:ring-brand-500 focus:border-transparent',
                     error ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'

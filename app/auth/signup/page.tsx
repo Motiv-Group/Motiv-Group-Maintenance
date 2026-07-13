@@ -94,7 +94,7 @@ export default function SignupPage() {
   }
 
   return (
-    <AuthShell maxWidth="lg" logoHeight={138}>
+    <AuthShell maxWidth="lg" logoHeight={138} logoGap={6}>
       <h1 className="text-xl font-semibold text-white mb-1">Create your account</h1>
       <p className="text-sm text-gray-300 mb-5">Choose the type of account to get started.</p>
 
@@ -108,18 +108,21 @@ export default function SignupPage() {
             className={`flex flex-col items-center gap-1.5 p-3.5 rounded-xl border-2 text-center transition-all ${
               choice === opt.value ? 'border-emerald-500 bg-emerald-500/10' : 'border-white/10 hover:border-emerald-500/60'
             }`}>
-            <opt.icon size={22} className={choice === opt.value ? 'text-emerald-400' : 'text-gray-300'} />
-            <span className={`text-sm font-semibold ${choice === opt.value ? 'text-emerald-400' : 'text-gray-200'}`}>{opt.label}</span>
-            <span className="text-[13px] leading-snug text-gray-300">{opt.desc}</span>
+            <opt.icon size={22} className={choice === opt.value ? 'text-emerald-400' : 'text-gray-200'} />
+            <span className={`text-sm font-semibold ${choice === opt.value ? 'text-emerald-400' : 'text-gray-100'}`}>{opt.label}</span>
+            <span className="text-[13px] leading-snug text-gray-200">{opt.desc}</span>
           </button>
         ))}
       </div>
 
       {/* Invitation notice — placed by the selector so it's not missed. */}
-      <p className="mb-5 rounded-lg border border-white/10 bg-white/[0.03] px-3.5 py-2.5 text-[13px] leading-snug text-gray-300">
-        Store, Regional Manager &amp; Executive accounts are set up by invitation. To request access, email{' '}
-        <a href="mailto:info@motivgroup.co.za?subject=Motiv%20account%20access%20request" className="font-medium text-blue-400 hover:text-blue-300 hover:underline">info@motivgroup.co.za</a>.
-      </p>
+      <div className="mb-5 rounded-lg border border-white/10 bg-white/[0.03] px-3.5 py-3">
+        <p className="text-[13px] font-semibold text-gray-100">Need a management account?</p>
+        <p className="mt-0.5 text-[13px] leading-snug text-gray-200">
+          Store Managers, Regional Managers and Executives receive an invitation from their administrator. Request access at{' '}
+          <a href="mailto:info@motivgroup.co.za?subject=Motiv%20account%20access%20request" className="font-medium text-blue-400 hover:text-blue-300 hover:underline">info@motivgroup.co.za</a>.
+        </p>
+      </div>
 
       {choice === 'supplier' ? (
         <div className="space-y-4">
@@ -150,13 +153,12 @@ export default function SignupPage() {
             {/* eslint-enable react-hooks/incompatible-library */}
           </div>
 
-          {/* Live password requirements */}
+          {/* Live password requirements — a check per rule, muted grey until met
+              then green (the icon inherits the row colour). */}
           <ul className="flex flex-wrap gap-x-4 gap-y-1 -mt-1">
             {pwChecks.map(c => (
-              <li key={c.label} className={`flex items-center gap-1.5 text-xs transition-colors ${c.ok ? 'text-emerald-400' : 'text-gray-400'}`}>
-                {c.ok
-                  ? <Check size={13} strokeWidth={3} className="shrink-0" />
-                  : <span className="inline-block h-3 w-3 shrink-0 rounded-full border border-gray-500" />}
+              <li key={c.label} className={`flex items-center gap-1.5 text-xs transition-colors ${c.ok ? 'text-emerald-400' : 'text-gray-300'}`}>
+                <Check size={13} strokeWidth={3} className="shrink-0" />
                 {c.label}
               </li>
             ))}

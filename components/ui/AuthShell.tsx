@@ -15,14 +15,17 @@ export function AuthShell({
   logoHeight = 120,
   maxWidth = 'sm',
   raise = 0,
+  logoGap = 20,
 }: {
   children: ReactNode
   logoHeight?: number
   maxWidth?: 'sm' | 'md' | 'lg'
   /** Shift the whole logo+card module up by this many px (balance on tall screens). */
   raise?: number
+  /** Gap (px) between the logo and the card. */
+  logoGap?: number
 }) {
-  const widthClass = maxWidth === 'lg' ? 'max-w-[460px]' : maxWidth === 'md' ? 'max-w-md' : 'max-w-sm sm:max-w-md'
+  const widthClass = maxWidth === 'lg' ? 'max-w-[480px]' : maxWidth === 'md' ? 'max-w-md' : 'max-w-sm sm:max-w-md'
   return (
     <div className="dark">
       <div className="relative min-h-screen bg-[#0b0c11] flex flex-col items-center justify-center px-4 py-10">
@@ -36,7 +39,7 @@ export function AuthShell({
           style={raise ? { transform: `translateY(-${raise}px)` } : undefined}
         >
           {/* Logo — a tight gap above the card; the two read as one centred group. */}
-          <div className="flex items-center justify-center mb-5">
+          <div className="flex items-center justify-center" style={{ marginBottom: logoGap }}>
             <MotivLockup height={logoHeight} />
           </div>
 
