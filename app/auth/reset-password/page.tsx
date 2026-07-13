@@ -5,7 +5,8 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { PasswordInput } from '@/components/ui/PasswordInput'
 import { Button } from '@/components/ui/Button'
-import { MotivLockup } from '@/components/ui/MotivLockup'
+import { AuthShell } from '@/components/ui/AuthShell'
+import { AuthError } from '@/components/ui/AuthBits'
 import { CheckCircle2 } from 'lucide-react'
 
 export default function ResetPasswordPage() {
@@ -56,63 +57,53 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <div className="dark">
-      <div className="min-h-screen bg-[#0b0c11] flex flex-col items-center justify-center px-4">
-        <div className="w-full max-w-sm">
-          <div className="flex items-center justify-center mb-10">
-            <MotivLockup height={168} />
-          </div>
-
-          <div className="bg-[#17181e] rounded-2xl shadow-xl border border-white/10 p-6 sm:p-8">
-            {done ? (
-              <div className="text-center space-y-3">
-                <CheckCircle2 size={36} className="mx-auto text-green-500" />
-                <h1 className="text-xl font-semibold text-white">Password updated</h1>
-                <p className="text-sm text-gray-400">You can now log in with your new password.</p>
-                <Link href="/auth/login" className="inline-block mt-2">
-                  <Button className="bg-blue-600 hover:bg-blue-500 text-white border-blue-600 focus:ring-blue-500">Go to login</Button>
-                </Link>
-              </div>
-            ) : (
-              <>
-                <h1 className="text-xl font-semibold text-white mb-1">Set a new password</h1>
-                <p className="text-sm text-gray-400 mb-6">Choose a new password for your account.</p>
-
-                <form onSubmit={submit} className="space-y-4">
-                  <PasswordInput
-                    id="password"
-                    label="New Password"
-                    placeholder="Minimum 8 characters"
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                  />
-                  <PasswordInput
-                    id="confirm"
-                    label="Confirm Password"
-                    placeholder="Repeat your password"
-                    value={confirm}
-                    onChange={e => setConfirm(e.target.value)}
-                  />
-
-                  {error && (
-                    <div className="bg-red-900/20 border border-red-800 text-red-400 text-sm rounded-lg px-4 py-3">
-                      {error}
-                    </div>
-                  )}
-
-                  <Button type="submit" loading={loading} className="w-full bg-blue-600 hover:bg-blue-500 text-white border-blue-600 focus:ring-blue-500" size="lg">
-                    Update password
-                  </Button>
-                </form>
-
-                <p className="mt-4 text-center text-sm text-gray-400">
-                  <Link href="/auth/login" className="text-blue-600 dark:text-blue-400 hover:underline font-medium">Back to login</Link>
-                </p>
-              </>
-            )}
-          </div>
+    <AuthShell>
+      {done ? (
+        <div className="text-center space-y-3">
+          <CheckCircle2 size={36} className="mx-auto text-green-500" />
+          <h1 className="text-xl font-semibold text-white">Password updated</h1>
+          <p className="text-sm text-gray-400">You can now log in with your new password.</p>
+          <Link href="/auth/login" className="inline-block mt-2">
+            <Button className="bg-blue-600 hover:bg-blue-500 text-white border-blue-600 focus:ring-blue-500">Go to login</Button>
+          </Link>
         </div>
-      </div>
-    </div>
+      ) : (
+        <>
+          <h1 className="text-xl font-semibold text-white mb-1">Set a new password</h1>
+          <p className="text-sm text-gray-400 mb-6">Choose a new password for your account.</p>
+
+          <form onSubmit={submit} onChange={() => { if (error) setError('') }} className="space-y-4">
+            <PasswordInput
+              id="password"
+              tone="auth"
+              label="New password"
+              placeholder="Minimum 8 characters"
+              autoComplete="new-password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+            />
+            <PasswordInput
+              id="confirm"
+              tone="auth"
+              label="Confirm password"
+              placeholder="Repeat your password"
+              autoComplete="new-password"
+              value={confirm}
+              onChange={e => setConfirm(e.target.value)}
+            />
+
+            <AuthError message={error} />
+
+            <Button type="submit" loading={loading} className="w-full bg-blue-600 hover:bg-blue-500 text-white border-blue-600 focus:ring-blue-500" size="lg">
+              Update password
+            </Button>
+          </form>
+
+          <p className="mt-4 text-center text-sm text-gray-400">
+            <Link href="/auth/login" className="text-blue-400 hover:text-blue-300 hover:underline font-medium">Back to login</Link>
+          </p>
+        </>
+      )}
+    </AuthShell>
   )
 }
