@@ -30,7 +30,9 @@ export default function LoginPage() {
   const [forwarding, setForwarding] = useState(false)
   const [remember, setRemember] = useState(true)
 
-  const { register, handleSubmit, setValue, formState: { errors } } = useForm<LoginForm>()
+  // mode:'onChange' makes formState.isValid reactive so we can gate the submit
+  // button on the required fields being filled (both registered as required).
+  const { register, handleSubmit, setValue, formState: { errors, isValid } } = useForm<LoginForm>({ mode: 'onChange' })
 
   // Prefill a remembered email address (remember defaults to true already).
   // Wrapped in try/catch like the write path — localStorage throws when the
@@ -40,7 +42,8 @@ export default function LoginPage() {
     if (typeof window === 'undefined') return
     try {
       const saved = window.localStorage.getItem(REMEMBER_KEY)
-      if (saved) setValue('email', saved)
+      // shouldValidate so a prefilled email counts toward isValid immediately.
+      if (saved) setValue('email', saved, { shouldValidate: true })
     } catch { /* storage disabled — ignore */ }
   }, [setValue])
 
@@ -163,7 +166,7 @@ export default function LoginPage() {
 
         <AuthError message={error} />
 
-        <Button type="submit" variant="gold" loading={loading} className="w-full" size="lg">
+        <Button type="submit" variant="gold" loading={loading} disabled={!isValid} className="w-full" size="lg">
           Log in
         </Button>
       </form>

@@ -1,7 +1,7 @@
 'use client'
 
-import { forwardRef, useState, type InputHTMLAttributes } from 'react'
-import { Eye, EyeOff } from 'lucide-react'
+import { forwardRef, useState, type InputHTMLAttributes, type KeyboardEvent, type FocusEvent } from 'react'
+import { Eye, EyeOff, TriangleAlert } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface PasswordInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> {
@@ -12,9 +12,18 @@ interface PasswordInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>,
 }
 
 export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
-  ({ className, label, error, id, tone = 'default', ...props }, ref) => {
+  ({ className, label, error, id, tone = 'default', onKeyUp, onKeyDown, onFocus, onBlur, ...props }, ref) => {
     const [show, setShow] = useState(false)
+    // Caps-Lock hint: getModifierState is only available on key/mouse events, so
+    // we sample it on key up/down while the field is focused. It stays until the
+    // key toggles it off or the field loses focus.
+    const [capsOn, setCapsOn] = useState(false)
+    const [focused, setFocused] = useState(false)
     const auth = tone === 'auth'
+
+    const sampleCaps = (e: KeyboardEvent<HTMLInputElement>) => {
+      if (typeof e.getModifierState === 'function') setCapsOn(e.getModifierState('CapsLock'))
+    }
 
     return (
       <div className="w-full">
@@ -51,6 +60,10 @@ export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
                   ),
               className
             )}
+            onKeyDown={e => { sampleCaps(e); onKeyDown?.(e) }}
+            onKeyUp={e => { sampleCaps(e); onKeyUp?.(e) }}
+            onFocus={e => { setFocused(true); onFocus?.(e) }}
+            onBlur={(e: FocusEvent<HTMLInputElement>) => { setFocused(false); setCapsOn(false); onBlur?.(e) }}
             {...props}
           />
           <button
@@ -66,6 +79,11 @@ export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
             {show ? <EyeOff size={16} /> : <Eye size={16} />}
           </button>
         </div>
+        {capsOn && focused && (
+          <p role="status" className="mt-1 flex items-center gap-1 text-xs text-amber-500 dark:text-amber-400">
+            <TriangleAlert size={13} className="shrink-0" /> Caps Lock is on
+          </p>
+        )}
         {error && <p className={cn('mt-1 text-xs', auth ? 'text-red-400' : 'text-red-600')}>{error}</p>}
       </div>
     )
