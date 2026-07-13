@@ -63,8 +63,11 @@ const MONEY = String.raw`R?\s?(?:ZAR)?\s?(-?\d[\d .,]*\d|\d)(?![\d., ]*%)`
 // "15%" rate tokens so we land on the real money figure that follows.
 const GAP = String.raw`(?:[^\d\n]|\d{1,3}\s*%){0,40}?`
 
+// \W{0,4} (not \s+) between the word and "excl/incl" so bracketed labels like
+// "Sub-total (ex VAT)" and "Total (incl VAT)" are matched too.
 const EXCL_LABELS = [
-  'total\\s+excl(?:uding)?\\.?\\s*(?:vat)?',
+  'sub[\\s-]?total\\W{0,6}ex',      // "Sub-total (ex VAT)"
+  'total\\W{0,4}excl(?:uding)?\\.?\\s*(?:vat)?',
   'total\\s+before\\s+vat',
   'sub[\\s-]?total',
   'nett?\\s+total',
@@ -80,7 +83,7 @@ const VAT_LABELS = [
 ]
 
 const INCL_LABELS = [
-  'total\\s+incl(?:uding)?\\.?\\s*(?:vat)?',
+  'total\\W{0,4}incl(?:uding)?\\.?\\s*(?:vat)?',   // "Total (incl VAT)"
   'grand\\s+total',
   'total\\s+zar',
   'total\\s+due',

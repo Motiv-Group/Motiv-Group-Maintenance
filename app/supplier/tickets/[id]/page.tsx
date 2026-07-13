@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import { redirect } from 'next/navigation'
-import { ClipboardCheck, FileText, Calendar, Clock } from 'lucide-react'
+import { ClipboardCheck, FileText, Calendar, Clock, CheckCircle2, Info } from 'lucide-react'
 import { SubmitCompletionForm } from '@/components/supplier/SubmitCompletionForm'
 import { BackLink } from '@/components/ui/BackLink'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
@@ -20,7 +20,7 @@ import { WorkflowActions } from '@/components/workflow/WorkflowActions'
 import { RmPipeline } from '@/components/regional/RmPipeline'
 import { SupplierAttachments } from '@/components/workflow/SupplierAttachments'
 import { QuoteSummary, type QuoteSummaryStatus } from '@/components/workflow/QuoteSummary'
-import { MarkInProgressButton, DeclineWorkButton, AcceptSnagCard, StartSnagButton, SupplierVariationGate, SupplierQuoteBar } from '@/components/supplier/SupplierJobActions'
+import { MarkInProgressButton, DeclineWorkButton, AcceptSnagCard, StartSnagButton, SupplierVariationGate, SupplierQuoteBar, SupplierQuoteSubmittedActions } from '@/components/supplier/SupplierJobActions'
 import { PopupForm } from '@/components/supplier/PopupForm'
 import { RaiseDisputeButton, DisputeThread } from '@/components/dispute/DisputeBox'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
@@ -228,6 +228,8 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
   const now = new Date()
   const dueAt = deriveDueDates(t as HealthTicket, rules(t.priority as Priority)).resolutionDue
   const overdue = isActive(t.status) && now.getTime() > new Date(dueAt).getTime()
+  // Shared detail bundle for the "Decline quote request" pop-up.
+  const declineDetails = { jobRef: t.job_ref, title: t.category ?? t.title, storeName: store?.name ?? null, dueAt }
   // Supplier-side SLA breach + the pending action that ran past its deadline.
   const sla = computeTicketSla(t as HealthTicket, rules(t.priority as Priority), now)
   const breached = isActive(t.status) && sla.supplierBreached
@@ -616,7 +618,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
               </div>
             </div>
           )}
-          {canSubmitQuote && <SupplierQuoteBar ticketId={t.id} priority={t.priority} createdAt={t.created_at} canDecline={canDecline} />}
+          {canSubmitQuote && <SupplierQuoteBar ticketId={t.id} priority={t.priority} createdAt={t.created_at} canDecline={canDecline} decline={declineDetails} />}
           {/* After the quote is approved → straight to "Mark in progress" (confirm).
               Variation orders come after the COC/POC is approved (close-out stage). */}
           {awarded && (t.status === 'accepted' || t.status === 'scheduled') && <MarkInProgressButton ticketId={t.id} />}
@@ -693,17 +695,25 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
           {/* Scoped to this supplier's own state so a non-awarded supplier never sees
               actions triggered by another supplier's progress. */}
           <WorkflowActions ticketId={t.id} status={supplierStatus} role="supplier" exclude={['schedule', 'submit_completion', 'require_assessment', 'request_quote', 'submit_variation', 'start_work', 'accept_snag', 'start_snag', 'submit_quote']} />
-          {/* Quote submitted and awaiting the manager's decision — reassure the supplier. */}
+          {/* Quote submitted and awaiting the manager's decision. */}
           {!awarded && latestQuote?.status === 'pending' && (
-            <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 flex items-start gap-2.5">
-              <Clock size={16} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
-              <p className="text-sm text-[var(--text-muted)]">Your quote has been submitted and is under review. We&apos;ll notify you as soon as the regional manager has responded — no action is needed from you in the meantime.</p>
+            <div className="space-y-4">
+              <div>
+                <p className="flex items-center gap-2 text-base font-bold text-[var(--text)]"><CheckCircle2 size={18} className="shrink-0 text-emerald-500" /> Quote submitted</p>
+                <p className="mt-1 text-sm text-[var(--text-muted)]">Thank you! Your quote has been submitted to the regional manager for review.</p>
+              </div>
+              <div className="flex items-start gap-2.5 rounded-xl bg-blue-500/10 ring-1 ring-blue-500/25 px-3.5 py-3">
+                <Info size={16} className="mt-0.5 shrink-0 text-blue-600 dark:text-blue-400" />
+                <p className="text-sm text-[var(--text-muted)]">You will be notified of any updates on this ticket.</p>
+              </div>
+              <SupplierQuoteSubmittedActions ticketId={t.id} canDecline={canDecline} decline={declineDetails} />
             </div>
           )}
-          {/* Opt out of the job (before award). When the quote bar is showing it already
-              carries Decline work in its "More" menu, so only render it standalone here
-              for the (rare) states where the supplier can decline but not quote. */}
-          {canDecline && !canSubmitQuote && <div className="pt-1"><DeclineWorkButton ticketId={t.id} /></div>}
+          {/* Opt out of the job (before award). When the quote bar / submitted block is
+              showing it already carries Decline work in its "More" menu, so only render
+              it standalone for the (rare) states where the supplier can decline but has
+              neither the quote bar nor the submitted block. */}
+          {canDecline && !canSubmitQuote && !(latestQuote?.status === 'pending') && <div className="pt-1"><DeclineWorkButton ticketId={t.id} {...declineDetails} /></div>}
         </Card>
         {/* Ticket information — aligned label→value rows, then description + callouts. */}
         <Card className="p-5 space-y-4 h-full">

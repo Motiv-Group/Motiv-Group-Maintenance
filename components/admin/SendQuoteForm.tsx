@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { useDropzone } from 'react-dropzone'
-import { UploadCloud, X, FileText, Loader2, Calendar, Sparkles, Check, Clock, AlertTriangle, AlertCircle, Lock } from 'lucide-react'
+import { UploadCloud, X, FileText, Loader2, Calendar, Sparkles, Check, Clock, AlertTriangle, AlertCircle, Lock, ChevronDown } from 'lucide-react'
 import { SchedulePicker } from '@/components/ui/SchedulePicker'
 import { Modal } from '@/components/ui/Modal'
 import { DrawerHeader } from '@/components/exec/Drawer'
@@ -160,12 +160,12 @@ export function SendQuoteForm({
       : undefined,
   })
 
-  // Raised slate field on the card, emerald focus accent — matches the SM/RM wizard.
-  const field = 'w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-[var(--text)] placeholder-[var(--text-faint)] focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500/60'
-  // Emerald selection tile (idle → active), shared by the N/A + valid-until toggles.
-  const tile = (active: boolean) => `inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border transition ${active
-    ? 'border-emerald-500 bg-emerald-500/10 text-[var(--text)] ring-2 ring-emerald-500/30'
-    : 'border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/60 text-[var(--text-muted)] hover:border-emerald-500/60'}`
+  // Dark, squared field (matches the app's input style + image spec).
+  const field = 'w-full px-3.5 py-2.5 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] placeholder-[var(--text-faint)] focus:outline-none focus:ring-2 focus:ring-blue-500/40'
+  // Green selection tile (idle → active), shared by the N/A + valid-until toggles.
+  const tile = (active: boolean) => `inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium ring-1 transition ${active
+    ? 'ring-emerald-500 bg-emerald-500/10 text-[var(--text)]'
+    : 'ring-[var(--border)] bg-[var(--input-bg)] text-[var(--text-muted)] hover:ring-emerald-500/60'}`
 
   /**
    * Apply a parse result to the form. NEVER overwrites a field the supplier has
@@ -378,7 +378,7 @@ export function SendQuoteForm({
         onClick={() => setOpen(true)}
         className={`w-full py-2.5 rounded-xl text-sm font-semibold text-white transition ${isVariation
           ? 'bg-blue-600 hover:bg-blue-500'
-          : 'bg-emerald-600 hover:bg-emerald-500'}`}
+          : 'bg-green-700 hover:bg-green-600'}`}
       >
         {isEdit ? 'Edit Quote' : isVariation ? 'Raise Variation Order' : 'Upload Quote'}
       </button>
@@ -438,11 +438,12 @@ export function SendQuoteForm({
                 // Removing the quote clears the whole form so the next file
                 // populates fresh (parse only fills still-empty fields).
                 onClick={() => {
+                  // Removing the attachment clears EVERY field so the next file fills fresh.
                   if (filePreview) URL.revokeObjectURL(filePreview)
                   setFilePreview(null); setFile(null)
                   setAutofilled(false); setNeedAmount(false); setParseError(false)
-                  setValidNA(false); setWarrantyNA(false)
-                  reset({ amount: undefined as any, amount_incl_vat: '', description: '', valid_until: '' })
+                  setValidNA(false); setWarrantyNA(false); setSchedule(''); setError('')
+                  reset({ amount: undefined as any, amount_incl_vat: '', description: '', valid_until: '', warranty: '' })
                 }}
                 className="p-1 text-[var(--text-faint)] hover:text-red-500 rounded transition-colors"
               >
@@ -646,24 +647,19 @@ export function SendQuoteForm({
         {wantsSchedule && (
           <div>
             <label className="block text-sm font-medium text-[var(--text)] mb-1.5">Proposed start date &amp; time <span className="text-red-500">*</span></label>
-            <button type="button" onClick={() => setPickOpen(true)}
-              className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl border text-sm text-[var(--text)] transition ${schedule
-                ? 'border-emerald-500 bg-emerald-500/10 ring-2 ring-emerald-500/30'
-                : 'border-amber-500/50 bg-amber-500/10 hover:border-amber-500'}`}>
+            <button type="button" onClick={() => setPickOpen(true)} className={`${field} flex items-center justify-between gap-2 text-left`}>
               <span className="flex items-center gap-2">
-                {schedule
-                  ? <Check size={15} className="text-emerald-500" />
-                  : <Clock size={15} className="text-amber-600 dark:text-amber-500" />}
-                {schedule ? formatDateTime(schedule) : 'Set proposed start'}
+                <Calendar size={16} className="shrink-0 text-[var(--text-faint)]" />
+                <span className={schedule ? 'text-[var(--text)]' : 'text-[var(--text-faint)]'}>{schedule ? formatDateTime(schedule) : 'Select date & time'}</span>
               </span>
-              <span className={`text-xs font-semibold ${schedule ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}`}>{schedule ? 'Change' : 'Select'}</span>
+              <ChevronDown size={16} className="shrink-0 text-[var(--text-faint)]" />
             </button>
             <p className="text-xs text-[var(--text-muted)] mt-1">The job schedules to this time once the quote is approved.</p>
             {pickOpen && (
               <Modal onClose={() => setPickOpen(false)} maxWidth="max-w-sm">
                 {close => (
                   <>
-                    <DrawerHeader onClose={close} title={<h3 className="text-base font-bold text-[var(--text)]">Propose a start date &amp; time</h3>} />
+                    <DrawerHeader onClose={close} title={<span className="flex items-center gap-2"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-blue-500/15 text-blue-600 dark:text-blue-400"><Calendar size={15} /></span><span className="text-base font-bold text-[var(--text)]">Set proposed start date &amp; time</span></span>} />
                     <SchedulePicker priority={priority} createdAt={createdAt ?? new Date().toISOString()} busy={false}
                       onConfirm={iso => { setSchedule(iso); close(); setError('') }} onCancel={close} />
                   </>
@@ -684,7 +680,7 @@ export function SendQuoteForm({
           <div className="rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] p-3 space-y-2">
             <p className="text-sm text-[var(--text)]">{isVariation ? 'Submit this variation order to the manager?' : 'Send this quote to the manager?'} Please double-check the amount and details first.</p>
             <div className="flex gap-2">
-              <button type="button" onClick={() => doSubmit(confirmVals)} disabled={loading} className={`px-3 py-2 rounded-lg text-white text-sm font-semibold transition disabled:opacity-50 ${isVariation ? 'bg-blue-600 hover:bg-blue-500' : 'bg-emerald-600 hover:bg-emerald-500'}`}>{loading ? 'Submitting…' : isVariation ? 'Yes, submit variation order' : 'Yes, send quote'}</button>
+              <button type="button" onClick={() => doSubmit(confirmVals)} disabled={loading} className={`px-3 py-2 rounded-lg text-white text-sm font-semibold transition disabled:opacity-50 ${isVariation ? 'bg-blue-600 hover:bg-blue-500' : 'bg-green-700 hover:bg-green-600'}`}>{loading ? 'Submitting…' : isVariation ? 'Yes, submit variation order' : 'Yes, send quote'}</button>
               <button type="button" onClick={() => setConfirmVals(null)} className="px-3 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm">Back</button>
             </div>
           </div>
@@ -696,7 +692,7 @@ export function SendQuoteForm({
             disabled={loading || uploading || parsing}
             className={`flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold text-white transition disabled:opacity-50 ${isVariation
               ? 'bg-blue-600 hover:bg-blue-500'
-              : 'bg-emerald-600 hover:bg-emerald-500'}`}
+              : 'bg-green-700 hover:bg-green-600'}`}
           >
             {uploading ? (
               <><Loader2 size={14} className="animate-spin" /> Uploading…</>

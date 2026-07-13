@@ -4,8 +4,9 @@
 // (date + 1-hour time slot, capped by the ticket priority window and operating
 // hours). The Submit COC & POC flow lives on its own page (/complete).
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Calendar, Wrench, PlayCircle, XCircle } from 'lucide-react'
+import { Calendar, Wrench, PlayCircle, XCircle, X, FileText, Ticket, MapPin, Info, ArrowRight } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { DrawerHeader } from '@/components/exec/Drawer'
 import { SchedulePicker } from '@/components/ui/SchedulePicker'
@@ -13,29 +14,35 @@ import { SendQuoteForm } from '@/components/admin/SendQuoteForm'
 import { PopupForm } from '@/components/supplier/PopupForm'
 import { MoreMenu, MoreActionItem } from '@/components/regional/RmTicketActions'
 import { createClient } from '@/lib/supabase/client'
+import { formatDateTime } from '@/lib/utils'
+
+// Shared detail bundle for the decline pop-up's "Request details" card.
+interface DeclineDetails { jobRef?: string | null; title?: string | null; storeName?: string | null; dueAt?: string | null }
 
 async function transition(ticketId: string, body: Record<string, unknown>) {
   const res = await fetch(`/api/tickets/${ticketId}/transition`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
   if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Something went wrong')
 }
 
-// Decline the work (before award) — a pop-up with preset reasons + free-text
-// "Other". Sets the supplier's invite to declined and notifies the RM.
-const DECLINE_REASONS = ['Fully booked / no capacity', 'Outside our service area', 'Not our trade / speciality', 'Pricing not viable', 'Other']
-export function DeclineWorkButton({ ticketId, defaultOpen = false, onClose }: { ticketId: string; defaultOpen?: boolean; onClose?: () => void }) {
+// Decline the quote request (before award) — a pop-up with the request details, a
+// required reason + optional note. Sets the supplier's invite to declined + notifies
+// the RM. `defaultOpen` renders it straight in a modal (no trigger button).
+const DECLINE_REASONS = ['Unable to meet the deadline', 'Outside our service area', 'Work is outside our expertise', 'No availability', 'Insufficient information', 'Other (please specify)']
+const MAX_DECLINE_NOTE = 250
+export function DeclineWorkButton({ ticketId, jobRef, title, storeName, dueAt, defaultOpen = false, onClose }: { ticketId: string; defaultOpen?: boolean; onClose?: () => void } & DeclineDetails) {
   const router = useRouter()
   const [open, setOpen] = useState(defaultOpen)
   const [reason, setReason] = useState('')
-  const [other, setOther] = useState('')
+  const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const close = () => { setOpen(false); onClose?.() }
-  const input = 'w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)]'
+  const input = 'w-full px-3 py-2.5 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)]'
 
   async function submit() {
-    if (!reason) { setErr('Choose a reason.'); return }
-    const finalReason = reason === 'Other' ? other.trim() : reason
-    if (!finalReason) { setErr('Tell the manager why.'); return }
+    if (!reason) { setErr('Choose a reason for declining.'); return }
+    // Note is optional context appended to the required reason.
+    const finalReason = [reason, note.trim()].filter(Boolean).join(' — ')
     setBusy(true); setErr('')
     try {
       const res = await fetch('/api/supplier/decline-work', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticketId, reason: finalReason }) })
@@ -44,24 +51,69 @@ export function DeclineWorkButton({ ticketId, defaultOpen = false, onClose }: { 
     } catch (e: any) { setErr(e.message); setBusy(false) }
   }
 
+  const detailTitle = [title, storeName].filter(Boolean).join(' – ') || 'Quote request'
   return (
     <>
       {!defaultOpen && <button type="button" onClick={() => setOpen(true)} className="w-full py-2.5 rounded-xl ring-1 ring-red-500/40 text-red-600 dark:text-red-400 text-sm font-semibold hover:bg-red-500/10 transition">Decline work</button>}
       {open && (
-        <Modal onClose={() => { if (!busy) close() }} maxWidth="max-w-md">
+        <Modal onClose={() => { if (!busy) close() }} maxWidth="max-w-3xl">
           {dismiss => (
             <>
-              <DrawerHeader onClose={dismiss} title={<p className="font-semibold text-[var(--text)]">Decline this work</p>} />
-              <p className="text-xs text-[var(--text-muted)]">The manager is notified and the job goes to other suppliers. This can&apos;t be undone.</p>
-              <select autoFocus className={input} value={reason} onChange={e => { setReason(e.target.value); setErr('') }}>
-                <option value="">— Choose a reason —</option>
-                {DECLINE_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
-              </select>
-              {reason === 'Other' && <textarea className={`${input} min-h-[80px]`} placeholder="Tell the manager why…" value={other} onChange={e => setOther(e.target.value)} />}
+              <div className="flex items-start justify-between gap-3">
+                <span className="flex items-center gap-3">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-red-500/15 text-red-600 dark:text-red-400"><XCircle size={22} /></span>
+                  <h3 className="text-xl font-bold text-[var(--text)]">Decline quote request?</h3>
+                </span>
+                <button type="button" onClick={dismiss} aria-label="Close" className="shrink-0 -m-1 rounded-lg p-1.5 text-[var(--text-faint)] transition hover:bg-[var(--hover)] hover:text-[var(--text)]"><X size={20} /></button>
+              </div>
+              <div className="space-y-0.5 text-sm text-[var(--text-muted)]">
+                <p>The regional manager will be notified and this request may be sent to other suppliers.</p>
+                <p>You will no longer be able to submit a quote unless you are invited again.</p>
+              </div>
+
+              {/* Request details */}
+              <div className="rounded-xl bg-[var(--surface)] ring-1 ring-[var(--border)] p-4">
+                <div className="flex items-start gap-3">
+                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[var(--surface-2)] text-[var(--text-faint)]"><FileText size={18} /></span>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-faint)]">Request details</p>
+                    <p className="text-base font-bold text-[var(--text)]">{detailTitle}</p>
+                    <div className="mt-1.5 flex flex-wrap gap-x-5 gap-y-1 text-xs text-[var(--text-muted)]">
+                      {jobRef && <span className="inline-flex items-center gap-1.5"><Ticket size={13} /> TICKET: <span className="font-medium text-[var(--text)]">{jobRef}</span></span>}
+                      {dueAt && <span className="inline-flex items-center gap-1.5"><Calendar size={13} /> DUE DATE: <span className="font-medium text-[var(--text)]">{formatDateTime(dueAt)}</span></span>}
+                      {storeName && <span className="inline-flex items-center gap-1.5"><MapPin size={13} /> LOCATION: <span className="font-medium text-[var(--text)]">{storeName}</span></span>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-[var(--text)]">Reason for declining <span className="text-red-500">*</span></label>
+                  <select autoFocus className={input} value={reason} onChange={e => { setReason(e.target.value); setErr('') }}>
+                    <option value="">— Select a reason —</option>
+                    {DECLINE_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-[var(--text)]">Please provide more details</label>
+                    <div className="relative">
+                      <textarea maxLength={MAX_DECLINE_NOTE} className={`${input} min-h-[100px] pb-7`} placeholder="Add details (optional)" value={note} onChange={e => setNote(e.target.value.slice(0, MAX_DECLINE_NOTE))} />
+                      <span className="pointer-events-none absolute bottom-2.5 right-3 text-[11px] tabular-nums text-[var(--text-faint)]">{note.length} / {MAX_DECLINE_NOTE}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2.5 rounded-xl bg-blue-500/10 ring-1 ring-blue-500/25 px-3.5 py-3">
+                    <Info size={15} className="mt-0.5 shrink-0 text-blue-600 dark:text-blue-400" />
+                    <p className="text-sm text-[var(--text-muted)]">Declining helps us route work to available suppliers. Thank you for your response.</p>
+                  </div>
+                </div>
+              </div>
+
               {err && <p className="text-xs text-red-500">{err}</p>}
               <div className="flex gap-2">
-                <button onClick={submit} disabled={busy} className="flex-1 py-2 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-500 disabled:opacity-50">{busy ? 'Declining…' : 'Decline work'}</button>
-                <button onClick={dismiss} disabled={busy} className="flex-1 py-2 rounded-xl ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm disabled:opacity-50">Cancel</button>
+                <button type="button" onClick={dismiss} disabled={busy} className="flex-1 py-2.5 rounded-xl ring-1 ring-[var(--border)] text-[var(--text)] text-sm font-medium transition hover:bg-[var(--hover)] disabled:opacity-50">Cancel</button>
+                <button type="button" onClick={submit} disabled={busy} className="flex flex-1 items-center justify-center gap-2 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition disabled:opacity-50"><XCircle size={16} /> {busy ? 'Declining…' : 'Decline request'}</button>
               </div>
             </>
           )}
@@ -74,7 +126,7 @@ export function DeclineWorkButton({ ticketId, defaultOpen = false, onClose }: { 
 // Quote-phase action bar (mirrors the RM's): a primary "Upload Quote" button + a
 // "More" dropdown holding the secondary actions (Decline work). The action modals
 // render as siblings driven by lifted state, so they open instantly.
-export function SupplierQuoteBar({ ticketId, priority, createdAt, canDecline = false }: { ticketId: string; priority: string; createdAt: string; canDecline?: boolean }) {
+export function SupplierQuoteBar({ ticketId, priority, createdAt, canDecline = false, decline }: { ticketId: string; priority: string; createdAt: string; canDecline?: boolean; decline?: DeclineDetails }) {
   const [quoteOpen, setQuoteOpen] = useState(false)
   const [declineOpen, setDeclineOpen] = useState(false)
   return (
@@ -92,7 +144,26 @@ export function SupplierQuoteBar({ ticketId, priority, createdAt, canDecline = f
           {close => <div><SendQuoteForm defaultOpen competitive ticketId={ticketId} priority={priority} createdAt={createdAt} onClose={close} /></div>}
         </Modal>
       )}
-      {declineOpen && <DeclineWorkButton ticketId={ticketId} defaultOpen onClose={() => setDeclineOpen(false)} />}
+      {declineOpen && <DeclineWorkButton ticketId={ticketId} defaultOpen onClose={() => setDeclineOpen(false)} {...decline} />}
+    </>
+  )
+}
+
+// Quote-submitted "Next action" actions: a primary "View my quotes" + a "More"
+// dropdown holding Decline work (the supplier can still opt out after quoting).
+export function SupplierQuoteSubmittedActions({ ticketId, canDecline = false, decline }: { ticketId: string; canDecline?: boolean; decline?: DeclineDetails }) {
+  const [declineOpen, setDeclineOpen] = useState(false)
+  return (
+    <>
+      <div className="flex items-center gap-2">
+        <Link href="/supplier/quotes" className={`${canDecline ? 'flex-1' : 'w-full'} inline-flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-blue-600 dark:text-blue-400 ring-1 ring-blue-500/50 transition hover:bg-blue-500/10`}>View my quotes <ArrowRight size={15} /></Link>
+        {canDecline && (
+          <MoreMenu>
+            <MoreActionItem icon={<XCircle size={16} />} label="Decline work" tone="danger" onClick={() => setDeclineOpen(true)} />
+          </MoreMenu>
+        )}
+      </div>
+      {declineOpen && <DeclineWorkButton ticketId={ticketId} defaultOpen onClose={() => setDeclineOpen(false)} {...decline} />}
     </>
   )
 }

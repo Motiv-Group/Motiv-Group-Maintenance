@@ -60,10 +60,18 @@ export default async function SupplierOverviewPage() {
         briefingScope="supplier"
         briefingScopeId={briefingScopeId}
         aside={
-          <Link href="/supplier/reviews" className="inline-flex items-center gap-2 rounded-full bg-[var(--surface-2)] ring-1 ring-[var(--border)] px-3.5 py-1.5 transition hover:bg-[var(--hover)]" title="View your reviews">
-            <Star size={16} className="shrink-0 fill-amber-400 text-amber-400" />
-            <span className="text-sm font-bold text-[var(--text)]">{d.rating.avg.toFixed(1)} / 5</span>
-            <span className="text-xs text-[var(--text-muted)]">{d.rating.count ? `(${d.rating.count} review${d.rating.count !== 1 ? 's' : ''})` : '(new)'}</span>
+          <Link href="/supplier/reviews" className="inline-flex items-center gap-2.5 rounded-full bg-[var(--surface-2)] ring-1 ring-[var(--border)] px-3.5 py-1.5 transition hover:bg-[var(--hover)]" title="View your reviews">
+            <span className="inline-flex items-center gap-1.5">
+              <Star size={15} className="shrink-0 fill-amber-400 text-amber-400" />
+              <span className="text-sm font-bold text-[var(--text)]">{d.rating.avg.toFixed(1)}</span>
+              <span className="text-xs text-[var(--text-faint)]">/5</span>
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+              {d.rating.count ? `${d.rating.count} review${d.rating.count !== 1 ? 's' : ''}` : 'new'}
+            </span>
+            <span className="h-3.5 w-px bg-[var(--border)]" />
+            <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">View reviews →</span>
           </Link>
         }
       />

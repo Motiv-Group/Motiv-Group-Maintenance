@@ -6,7 +6,7 @@
 // propose a slot outside the suggested window (sent to the RM to accept). No
 // external dependency.
 import { useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, Calendar, Clock, CalendarClock } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Clock, CalendarClock, Info, Star, ArrowLeft, Lock } from 'lucide-react'
 
 const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const WINDOW_H: Record<string, number> = { P1: 8, P2: 24, P3: 72, P4: 168 }
@@ -107,59 +107,69 @@ export function SchedulePicker({ priority, createdAt, onConfirm, onCancel, busy 
   }
   const canConfirm = useCustom ? customValid : !!(day && slot)
 
+  const maxFmt = max.toLocaleString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Johannesburg' })
+  const confirmLabel = useCustom
+    ? (customValid && customDate ? `Use ${customDate.toLocaleString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Johannesburg' })}` : 'Pick a date & time')
+    : (day && slot ? `Set ${day.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', timeZone: 'Africa/Johannesburg' })} ${fmtSlot(slot)}` : 'Pick a date & time')
+
   return (
     <div className="space-y-3">
-      <p className="text-xs text-[var(--text-muted)]">
-        {P_LABEL[priority] ?? ''} priority — schedule by{' '}
-        <span className="font-semibold text-[var(--text)]">{max.toLocaleString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Johannesburg' })}</span>. Mon–Sat, 06:00–22:00.
-      </p>
-      {suggested && !useCustom && (
-        <p className="text-[11px] text-[#C6A35D]">Suggested: {suggested.day.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', timeZone: 'Africa/Johannesburg' })} {fmtSlot(suggested.slot)} — earliest slot that meets the deadline.</p>
-      )}
+      {/* Priority + deadline banner */}
+      <div className="flex items-start gap-2.5 rounded-xl bg-blue-500/10 ring-1 ring-blue-500/25 px-3.5 py-2.5">
+        <Info size={15} className="mt-0.5 shrink-0 text-blue-600 dark:text-blue-400" />
+        <p className="text-sm text-[var(--text-muted)]"><span className="font-semibold text-[var(--text)]">{P_LABEL[priority] ?? ''} priority</span> — schedule by <span className="font-semibold text-[var(--text)]">{maxFmt}</span>. Mon–Sat, 06:00–22:00.</p>
+      </div>
 
-      {!useCustom && (
+      {!useCustom ? (
         <>
-          {/* Month nav */}
-          <div className="flex items-center justify-between">
-            <button type="button" disabled={!canPrev} onClick={() => shiftMonth(-1)} className="p-1.5 rounded-lg text-[var(--text-muted)] hover:bg-[var(--hover)] disabled:opacity-30 disabled:cursor-not-allowed"><ChevronLeft size={16} /></button>
-            <span className="text-sm font-semibold text-[var(--text)] flex items-center gap-1.5"><Calendar size={14} className="text-[#C6A35D]" /> {MONTHS[view.getMonth()]} {view.getFullYear()}</span>
-            <button type="button" disabled={!canNext} onClick={() => shiftMonth(1)} className="p-1.5 rounded-lg text-[var(--text-muted)] hover:bg-[var(--hover)] disabled:opacity-30 disabled:cursor-not-allowed"><ChevronRight size={16} /></button>
+          {suggested && (
+            <p className="flex items-center gap-1.5 text-sm text-[var(--text-muted)]">
+              <Star size={14} className="shrink-0 fill-amber-400 text-amber-400" /> Suggested: <span className="font-medium text-[var(--text)]">{suggested.day.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', timeZone: 'Africa/Johannesburg' })} {fmtSlot(suggested.slot)}</span> — earliest slot that meets the deadline.
+            </p>
+          )}
+
+          {/* Calendar card */}
+          <div className="rounded-xl ring-1 ring-[var(--border)] p-3">
+            <div className="flex items-center justify-between">
+              <button type="button" disabled={!canPrev} onClick={() => shiftMonth(-1)} className="p-1.5 rounded-lg text-[var(--text-muted)] hover:bg-[var(--hover)] disabled:opacity-30 disabled:cursor-not-allowed"><ChevronLeft size={16} /></button>
+              <span className="text-sm font-semibold text-[var(--text)]">{MONTHS[view.getMonth()]} {view.getFullYear()}</span>
+              <button type="button" disabled={!canNext} onClick={() => shiftMonth(1)} className="p-1.5 rounded-lg text-[var(--text-muted)] hover:bg-[var(--hover)] disabled:opacity-30 disabled:cursor-not-allowed"><ChevronRight size={16} /></button>
+            </div>
+            <div className="mt-2 grid grid-cols-7 gap-1 text-center">
+              {DOW.map(d => <div key={d} className="py-1 text-[10px] font-semibold text-[var(--text-faint)]">{d.toUpperCase()}</div>)}
+              {cells.map((d, i) => {
+                if (!d) return <div key={`b${i}`} />
+                const disabled = dayDisabled(d)
+                const selected = day && d.toDateString() === day.toDateString()
+                const isToday = d.toDateString() === now.toDateString()
+                return (
+                  <button key={d.toISOString()} type="button" disabled={disabled} onClick={() => { setDay(d); setSlot(null) }}
+                    className={`relative aspect-square rounded-lg text-sm transition ${
+                      selected ? 'bg-blue-600 font-bold text-white'
+                      : disabled ? 'cursor-not-allowed text-[var(--text-faint)] opacity-40'
+                      : 'text-[var(--text)] ring-1 ring-transparent hover:ring-[var(--border)] hover:bg-[var(--hover)]'}`}>
+                    {d.getDate()}
+                    {isToday && !selected && <span className="absolute bottom-1 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-blue-500" />}
+                  </button>
+                )
+              })}
+            </div>
           </div>
 
-          {/* Day grid */}
-          <div className="grid grid-cols-7 gap-1 text-center">
-            {DOW.map(d => <div key={d} className="text-[10px] font-semibold text-[var(--text-faint)] py-1">{d}</div>)}
-            {cells.map((d, i) => {
-              if (!d) return <div key={`b${i}`} />
-              const disabled = dayDisabled(d)
-              const selected = day && d.toDateString() === day.toDateString()
-              return (
-                <button key={d.toISOString()} type="button" disabled={disabled}
-                  onClick={() => { setDay(d); setSlot(null) }}
-                  className={`aspect-square rounded-lg text-sm transition ${
-                    selected ? 'bg-[#C6A35D] text-[#0a0e17] font-bold'
-                    : disabled ? 'text-[var(--text-faint)] opacity-40 cursor-not-allowed'
-                    : 'text-[var(--text)] hover:bg-[var(--hover)]'}`}>
-                  {d.getDate()}
-                </button>
-              )
-            })}
-          </div>
-
-          {/* Time slots */}
+          {/* Available times card */}
           {day && (
-            <div>
-              <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5 flex items-center gap-1.5"><Clock size={12} /> Pick a time</div>
-              <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5">
+            <div className="rounded-xl ring-1 ring-[var(--border)] p-3">
+              <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-faint)]"><Clock size={12} /> Available times <span className="normal-case font-normal">(Africa/Johannesburg)</span></div>
+              <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-6">
                 {SLOTS.map(s => {
                   const disabled = slotDisabled(s)
                   const selected = !!slot && slot.h === s.h && slot.m === s.m
                   return (
                     <button key={`${s.h}:${s.m}`} type="button" disabled={disabled} onClick={() => setSlot(s)}
-                      className={`py-1.5 rounded-lg text-xs font-medium border transition ${
-                        selected ? 'bg-[#C6A35D] text-[#0a0e17] border-[#C6A35D]'
-                        : disabled ? 'text-[var(--text-faint)] opacity-40 border-[var(--border)] cursor-not-allowed'
-                        : 'text-[var(--text)] border-[var(--border)] hover:border-[#C6A35D]'}`}>
+                      className={`rounded-lg py-1.5 text-xs font-medium ring-1 transition ${
+                        selected ? 'bg-blue-600 text-white ring-blue-600'
+                        : disabled ? 'cursor-not-allowed text-[var(--text-faint)] opacity-40 ring-[var(--border)]'
+                        : 'text-[var(--text)] ring-[var(--border)] hover:ring-blue-500'}`}>
                       {fmtSlot(s)}
                     </button>
                   )
@@ -167,35 +177,42 @@ export function SchedulePicker({ priority, createdAt, onConfirm, onCancel, busy 
               </div>
             </div>
           )}
+
+          {/* Custom escape hatch — a row that switches to the custom picker. */}
+          <button type="button" onClick={() => setUseCustom(true)} className="flex w-full items-center justify-between gap-2 rounded-xl ring-1 ring-[var(--border)] px-3.5 py-3 text-left transition hover:bg-[var(--hover)]">
+            <span className="flex items-center gap-2.5">
+              <CalendarClock size={16} className="shrink-0 text-[var(--text-faint)]" />
+              <span><span className="block text-sm font-semibold text-[var(--text)]">Set a custom date &amp; time</span><span className="block text-[11px] text-[var(--text-muted)]">Choose any date and time outside the suggested slots.</span></span>
+            </span>
+            <ChevronRight size={16} className="shrink-0 text-[var(--text-faint)]" />
+          </button>
+        </>
+      ) : (
+        <>
+          <p className="text-sm text-[var(--text-muted)]">Choose any date and time that works best.</p>
+          <div>
+            <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-faint)]"><CalendarClock size={12} /> Custom date &amp; time (SA)</div>
+            <input type="datetime-local" value={custom} min={toLocalInput(now)} onChange={e => setCustom(e.target.value)}
+              className="w-full rounded-lg bg-[var(--input-bg)] px-3 py-2.5 text-sm text-[var(--text)] ring-1 ring-[var(--border)] outline-none focus:ring-2 focus:ring-blue-500/40" />
+            {custom && !customValid && <p className="mt-1 text-[11px] text-red-500">Pick a future date and time.</p>}
+          </div>
+          <div className="flex items-start gap-2.5 rounded-xl bg-blue-500/10 ring-1 ring-blue-500/25 px-3.5 py-2.5">
+            <Info size={15} className="mt-0.5 shrink-0 text-blue-600 dark:text-blue-400" />
+            <p className="text-sm text-[var(--text-muted)]">A time past the deadline will be sent to the manager to accept.</p>
+          </div>
+          <button type="button" onClick={() => setUseCustom(false)} className="flex items-center gap-1.5 text-sm text-[var(--text-muted)] transition hover:text-[var(--text)]"><ArrowLeft size={15} /> Back to suggested slots</button>
         </>
       )}
 
-      {/* Custom date & time — for when the suggested slots don't work. May fall
-          outside the SLA window; it goes to the manager to accept. */}
-      {useCustom && (
-        <div>
-          <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5 flex items-center gap-1.5"><CalendarClock size={12} /> Custom date &amp; time (SA)</div>
-          <input type="datetime-local" value={custom} min={toLocalInput(now)} onChange={e => setCustom(e.target.value)}
-            className="w-full px-3 py-2.5 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm outline-none focus:ring-[#C6A35D]/40" />
-          {custom && !customValid && <p className="text-[11px] text-red-500 mt-1">Pick a future date and time.</p>}
-          <p className="text-[11px] text-[var(--text-faint)] mt-1">A time past the deadline will be sent to the manager to accept.</p>
-        </div>
-      )}
-
-      <button type="button" onClick={() => { setUseCustom(v => !v) }}
-        className="text-[11px] font-medium text-[#C6A35D] hover:underline">
-        {useCustom ? '← Back to suggested slots' : "None of these work? Pick a custom date & time"}
-      </button>
-
       <div className="flex gap-2 pt-1">
         <button type="button" disabled={busy || !canConfirm} onClick={confirm}
-          className="flex-1 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold disabled:opacity-50">
-          {busy ? 'Scheduling…'
-            : useCustom ? (customValid && customDate ? `Schedule ${customDate.toLocaleString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Johannesburg' })}` : 'Pick a date & time')
-            : day && slot ? `Schedule ${day.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', timeZone: 'Africa/Johannesburg' })} ${fmtSlot(slot)}` : 'Pick a date & time'}
+          className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:opacity-50">
+          <CalendarClock size={15} /> {busy ? 'Scheduling…' : confirmLabel}
         </button>
-        <button type="button" onClick={onCancel} className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold">Cancel</button>
+        <button type="button" onClick={onCancel} className="flex-1 rounded-xl py-2.5 text-sm font-medium text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)]">Cancel</button>
       </div>
+
+      <p className="flex items-center justify-center gap-1.5 text-[11px] text-[var(--text-faint)]"><Lock size={12} /> The job will be scheduled to this time once the quote is approved.</p>
     </div>
   )
 }

@@ -183,8 +183,8 @@ async function llmDescribe(text: string, today: string): Promise<{ description: 
 // ─── Images (photos, or rendered scanned-PDF pages) ───────────────────────────
 const VISION_PROMPT = (today: string) => `You read South African maintenance / shopfitting quotes from images. Today is ${today}.
 Return ONLY a JSON object with these keys:
-- "amount": the TOTAL EXCLUDING VAT as a plain number (look for "Subtotal", "Total Excl VAT", "Total before VAT", "Nett"). null if you cannot read it clearly.
-- "amount_incl_vat": the TOTAL INCLUDING VAT as a plain number (look for "Total Incl VAT", "Grand Total", "Total Due", "TOTAL ZAR"). null if there is no VAT total.
+- "amount": the TOTAL EXCLUDING VAT as a plain number (look for "Subtotal", "Sub-total (ex VAT)", "Total Excl VAT", "Total before VAT", "Nett"). null if you cannot read it clearly.
+- "amount_incl_vat": the TOTAL INCLUDING VAT as a plain number (look for "Total (incl VAT)", "Total Incl VAT", "Grand Total", "Total Due", "TOTAL ZAR"). null if there is no VAT total.
 - "description": a 1–3 sentence summary of the scope of work. null if unreadable.
 - "valid_until": quote expiry as ISO YYYY-MM-DD, or null.
 - "confidence": "high" ONLY if the amounts are clearly legible and you are certain they are correct; otherwise "low".
