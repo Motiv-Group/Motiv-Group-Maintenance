@@ -18,10 +18,11 @@ export function AuthShell({
 }: {
   children: ReactNode
   logoHeight?: number
-  maxWidth?: 'sm' | 'md'
+  maxWidth?: 'sm' | 'md' | 'lg'
   /** Shift the whole logo+card module up by this many px (balance on tall screens). */
   raise?: number
 }) {
+  const widthClass = maxWidth === 'lg' ? 'max-w-[460px]' : maxWidth === 'md' ? 'max-w-md' : 'max-w-sm sm:max-w-md'
   return (
     <div className="dark">
       <div className="relative min-h-screen bg-[#0b0c11] flex flex-col items-center justify-center px-4 py-10">
@@ -31,7 +32,7 @@ export function AuthShell({
           className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_45%_at_50%_26%,rgba(255,255,255,0.055),transparent_72%)]"
         />
         <div
-          className={`relative w-full ${maxWidth === 'md' ? 'max-w-md' : 'max-w-sm sm:max-w-md'}`}
+          className={`relative w-full ${widthClass}`}
           style={raise ? { transform: `translateY(-${raise}px)` } : undefined}
         >
           {/* Logo — a tight gap above the card; the two read as one centred group. */}
