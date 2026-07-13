@@ -130,7 +130,7 @@ export default function LoginPage() {
 
       {/* Clearing the error on any field change keeps it from lingering while the
           user corrects their details. */}
-      <form onSubmit={handleSubmit(onSubmit)} onChange={() => { if (error) setError('') }} className="space-y-4">
+      <form onSubmit={handleSubmit(onSubmit)} onChange={() => { if (error) setError('') }} className="space-y-3">
         <Input
           id="email"
           type="email"

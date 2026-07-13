@@ -34,8 +34,8 @@ export function AuthShell({
           className={`relative w-full ${maxWidth === 'md' ? 'max-w-md' : 'max-w-sm sm:max-w-md'}`}
           style={raise ? { transform: `translateY(-${raise}px)` } : undefined}
         >
-          {/* Logo — sits ~32-40px above the card; the two read as one centred group. */}
-          <div className="flex items-center justify-center mb-8">
+          {/* Logo — a tight gap above the card; the two read as one centred group. */}
+          <div className="flex items-center justify-center mb-5">
             <MotivLockup height={logoHeight} />
           </div>
 

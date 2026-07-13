@@ -82,7 +82,7 @@ export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
         {/* Auth fields reserve a single fixed-height message row (error takes
             priority over the Caps-Lock hint) so nothing below ever shifts. */}
         {auth ? (
-          <p role="status" className="mt-1 flex min-h-[18px] items-center gap-1 text-xs leading-tight">
+          <p role="status" className="mt-0.5 flex min-h-[16px] items-center gap-1 text-xs leading-tight">
             {error
               ? <span className="text-red-400">{error}</span>
               : capsOn && focused

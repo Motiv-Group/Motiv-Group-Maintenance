@@ -54,7 +54,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         {/* Auth fields reserve a fixed-height message row so validation text never
             shifts the card/controls; default tone renders only when present. */}
         {auth
-          ? <p className="mt-1 min-h-[18px] text-xs leading-tight text-red-400">{error ?? ''}</p>
+          ? <p className="mt-0.5 min-h-[16px] text-xs leading-tight text-red-400">{error ?? ''}</p>
           : (error && <p className="mt-1 text-xs text-red-600">{error}</p>)}
       </div>
     )
