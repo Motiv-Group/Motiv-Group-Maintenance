@@ -15,7 +15,7 @@ import { rmStatusMeta, formatDate, formatDateTime, humanizeDuration, PRIORITY_LE
 
 type QueueFilter = 'all' | 'assign' | 'quotes' | 'signoff' | 'sla' | 'snags'
 type Tone = 'red' | 'purple' | 'gold' | 'green' | 'orange' | 'blue'
-type SupplierChoice = { id: string; name: string; avgRating?: number; ratingCount?: number }
+type SupplierChoice = { id: string; name: string; avgRating?: number; ratingCount?: number; category?: string | null }
 
 const URGENCY_RANK: Record<string, number> = { urgent: 0, P1: 0, high: 1, P2: 1, medium: 2, P3: 2, low: 3, P4: 3 }
 const INACTIVE = new Set(['completed', 'cancelled', 'declined'])

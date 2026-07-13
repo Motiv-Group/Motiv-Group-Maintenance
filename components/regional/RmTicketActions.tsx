@@ -3,7 +3,7 @@
 // RM ticket-page custom actions for the competitive-quoting model.
 import { useState, useMemo, useEffect, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, Pencil, CalendarClock, Plus, ImagePlus, X, FileText, ChevronDown, MessageSquare, XCircle } from 'lucide-react'
+import { Search, Pencil, CalendarClock, Plus, Camera, Info, X, FileText, ChevronDown, ChevronLeft, ChevronRight, MessageSquare, XCircle, Send } from 'lucide-react'
 import { StarInput, Stars } from '@/components/ui/Stars'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { uploadFiles } from '@/lib/upload'
@@ -131,8 +131,15 @@ export function MoreActionItem({ icon, label, onClick, tone = 'default' }: { ico
   )
 }
 
-// ── Assign suppliers (button → modal with search + multi-select) ─
-type SupplierChoice = { id: string; name: string; avgRating?: number; ratingCount?: number }
+// ── Assign suppliers (button → modal: searchable, sortable, paginated table) ─
+type SupplierChoice = { id: string; name: string; avgRating?: number; ratingCount?: number; category?: string | null }
+
+// Up-to-3-letter monogram from the supplier name (avatar fallback).
+function supInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  return parts.length ? parts.slice(0, 3).map(p => p[0]!.toUpperCase()).join('') : '?'
+}
+
 export function AssignSuppliersButton({ ticketId, suppliers, motivSuppliers = [], declinedSupplierIds = [], awaitingById = {}, trigger }: { ticketId: string; suppliers: SupplierChoice[]; motivSuppliers?: SupplierChoice[]; declinedSupplierIds?: string[]; awaitingById?: Record<string, 'invited' | 'quoted'>; trigger?: (open: () => void) => ReactNode }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -144,6 +151,9 @@ export function AssignSuppliersButton({ ticketId, suppliers, motivSuppliers = []
   }, [])
   const [tab, setTab] = useState<'mine' | 'motiv'>('mine')
   const [q, setQ] = useState('')
+  const [sort, setSort] = useState<'rating' | 'name'>('rating')
+  const [page, setPage] = useState(1)
+  const perPage = 10
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
@@ -156,11 +166,24 @@ export function AssignSuppliersButton({ ticketId, suppliers, motivSuppliers = []
   const activeList = tab === 'motiv' ? motivSuppliers : suppliers
   const shown = useMemo(() => {
     const term = q.trim().toLowerCase()
+    const cmp = sort === 'name'
+      ? (a: SupplierChoice, b: SupplierChoice) => a.name.localeCompare(b.name)
+      : (a: SupplierChoice, b: SupplierChoice) => (b.avgRating ?? 5) - (a.avgRating ?? 5) || a.name.localeCompare(b.name)
     return [...activeList]
-      .filter(s => !term || s.name.toLowerCase().includes(term))
-      .sort((a, b) => (sel.has(b.id) ? 1 : 0) - (sel.has(a.id) ? 1 : 0) || a.name.localeCompare(b.name))
-  }, [activeList, q, sel])
+      .filter(s => !term || `${s.name} ${s.category ?? ''}`.toLowerCase().includes(term))
+      // Selected rows float to the top so they stay visible across pages/sorts.
+      .sort((a, b) => (sel.has(b.id) ? 1 : 0) - (sel.has(a.id) ? 1 : 0) || cmp(a, b))
+  }, [activeList, q, sort, sel])
   const reselected = useMemo(() => [...sel].filter(id => declinedSet.has(id)), [sel, declinedSet])
+
+  // Reset to page 1 whenever the visible set changes.
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- keep pagination in range as tab/search/sort change
+  useEffect(() => { setPage(1) }, [tab, q, sort])
+  const totalPages = Math.max(1, Math.ceil(shown.length / perPage))
+  const curPage = Math.min(page, totalPages)
+  const pageRows = shown.slice((curPage - 1) * perPage, curPage * perPage)
+  const firstShown = shown.length ? (curPage - 1) * perPage + 1 : 0
+  const lastShown = Math.min(curPage * perPage, shown.length)
 
   async function doAssign() {
     setBusy(true); setErr('')
@@ -174,58 +197,105 @@ export function AssignSuppliersButton({ ticketId, suppliers, motivSuppliers = []
     doAssign()
   }
 
-  const tabCls = (on: boolean) => `flex-1 py-1.5 rounded-lg text-xs font-semibold transition ${on ? 'bg-emerald-600 text-white' : 'ring-1 ring-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--hover)]'}`
+  const tabCls = (on: boolean) => `flex-1 py-2 rounded-lg text-sm font-semibold transition ${on ? 'bg-emerald-600 text-white' : 'ring-1 ring-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--hover)]'}`
   return (
     <>
       {trigger ? trigger(() => setOpen(true)) : (
         <button onClick={() => setOpen(true)} className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition">Assign supplier</button>
       )}
       {open && (
-        <Modal title="Assign suppliers" maxWidth="max-w-2xl" onClose={() => setOpen(false)}>
-          <p className="text-xs text-[var(--text-muted)]">Search and select one or more suppliers to invite to quote — from your own list or the Motiv directory.</p>
-          {/* Switch directories; the selection carries across both. */}
+        <Modal title="Assign suppliers" maxWidth="max-w-3xl" onClose={() => { if (!busy) setOpen(false) }}>
+          <p className="-mt-1 text-sm text-[var(--text-muted)]">Select one or more suppliers to send a quote request for this ticket.</p>
+
+          {/* Directory tabs — selection carries across both. */}
           <div className="flex gap-2">
             <button onClick={() => setTab('mine')} className={tabCls(tab === 'mine')}>My suppliers ({suppliers.length})</button>
-            <button onClick={() => setTab('motiv')} className={tabCls(tab === 'motiv')}>Motiv suppliers ({motivSuppliers.length})</button>
+            <button onClick={() => setTab('motiv')} className={tabCls(tab === 'motiv')}>MOTIV directory ({motivSuppliers.length})</button>
           </div>
+
+          {/* Search */}
           <div className="relative">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
-            <input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="Search suppliers…"
-              className="w-full pl-9 pr-3 py-2 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)]" />
+            <input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="Search by name or category…"
+              className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)] focus:outline-none focus:ring-2 focus:ring-blue-500/40" />
           </div>
-          <div className="space-y-1 max-h-64 overflow-y-auto">
-            {shown.map(s => {
-              // Already invited / already quoted on this ticket → not selectable
-              // (re-inviting them is a no-op); show what we're waiting on instead.
+
+          {/* Count + sort */}
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs text-[var(--text-muted)]">{shown.length} supplier{shown.length === 1 ? '' : 's'} found</span>
+            <label className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+              Sort by
+              <div className="relative">
+                <select value={sort} onChange={e => setSort(e.target.value as 'rating' | 'name')} className="appearance-none rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-xs pl-2.5 pr-7 py-1.5 cursor-pointer focus:outline-none">
+                  <option value="rating">Rating</option><option value="name">Name</option>
+                </select>
+                <ChevronDown size={13} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
+              </div>
+            </label>
+          </div>
+
+          {/* Supplier rows */}
+          <div className="min-h-[220px] divide-y divide-[var(--border)] rounded-xl ring-1 ring-[var(--border)]">
+            {pageRows.map(s => {
+              // Already invited / already quoted on this ticket → not selectable.
               const awaiting = awaitingById[s.id]
               if (awaiting) {
                 return (
-                  <div key={s.id} className="flex items-center gap-2 text-sm px-2 py-2 rounded-lg opacity-60 cursor-not-allowed">
-                    <span className="w-4 h-4 shrink-0" aria-hidden />
-                    <span className="truncate text-[var(--text-muted)] flex-1 min-w-0">{s.name}</span>
-                    <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400 bg-amber-500/15 rounded-full px-2 py-0.5">{awaiting === 'quoted' ? 'Quoted' : 'Awaiting quote'}</span>
+                  <div key={s.id} className="flex items-center gap-3 px-3 py-2.5 opacity-60">
+                    <span className="w-4 shrink-0" aria-hidden />
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--surface-2)] text-[11px] font-bold text-[var(--text-muted)]">{supInitials(s.name)}</span>
+                    <span className="min-w-0 flex-1"><span className="block truncate text-sm text-[var(--text-muted)]">{s.name}</span>{s.category && <span className="block truncate text-[11px] text-[var(--text-faint)]">{s.category}</span>}</span>
+                    <span className="shrink-0 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400">{awaiting === 'quoted' ? 'Quoted' : 'Awaiting quote'}</span>
                   </div>
                 )
               }
+              const on = sel.has(s.id)
               return (
-                <label key={s.id} className={`flex items-center gap-2 text-sm px-2 py-2 rounded-lg cursor-pointer ${sel.has(s.id) ? 'bg-emerald-500/10' : 'hover:bg-[var(--hover)]'}`}>
-                  <input type="checkbox" checked={sel.has(s.id)} onChange={() => toggle(s.id)} className="accent-emerald-600 w-4 h-4" />
-                  <span className="truncate text-[var(--text)] flex-1 min-w-0">{s.name}{declinedSet.has(s.id) && <span className="ml-1.5 text-[10px] font-semibold text-red-500">· declined before</span>}</span>
-                  <span className="shrink-0"><Stars value={s.avgRating ?? 5} count={s.ratingCount} size={12} /></span>
+                <label key={s.id} className={`flex cursor-pointer items-center gap-3 px-3 py-2.5 transition ${on ? 'bg-emerald-500/10' : 'hover:bg-[var(--hover)]'}`}>
+                  <input type="checkbox" checked={on} onChange={() => toggle(s.id)} className="h-4 w-4 shrink-0 accent-emerald-600" />
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-blue-600/15 text-[11px] font-bold text-blue-700 dark:text-blue-300">{supInitials(s.name)}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-[var(--text)]">{s.name}{declinedSet.has(s.id) && <span className="ml-1.5 text-[10px] font-semibold text-red-500">· declined before</span>}</span>
+                    {s.category && <span className="block truncate text-[11px] text-[var(--text-muted)]">{s.category}</span>}
+                  </span>
+                  <span className="shrink-0"><Stars value={s.avgRating ?? 5} count={s.ratingCount} size={13} /></span>
                 </label>
               )
             })}
-            {!shown.length && <p className="text-sm text-[var(--text-faint)] px-2 py-2">{tab === 'motiv' ? 'No Motiv suppliers available.' : 'No matching suppliers.'}</p>}
+            {!pageRows.length && <p className="px-3 py-10 text-center text-sm text-[var(--text-faint)]">{tab === 'motiv' ? 'No MOTIV directory suppliers available.' : 'No matching suppliers.'}</p>}
           </div>
+
+          {/* Pagination */}
+          {shown.length > perPage && (
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[11px] text-[var(--text-faint)] tabular-nums">{firstShown}–{lastShown} of {shown.length}</span>
+              <div className="flex items-center gap-1.5">
+                <button type="button" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={curPage <= 1} aria-label="Previous page" className="rounded-lg p-1.5 text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-40"><ChevronLeft size={15} /></button>
+                <span className="text-xs text-[var(--text-muted)] tabular-nums px-1">Page {curPage} / {totalPages}</span>
+                <button type="button" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={curPage >= totalPages} aria-label="Next page" className="rounded-lg p-1.5 text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-40"><ChevronRight size={15} /></button>
+              </div>
+            </div>
+          )}
+
           {confirmReinvite && (
             <div className="rounded-lg bg-amber-500/10 ring-1 ring-amber-500/40 p-3">
               <p className="text-sm text-[var(--text)]"><span className="font-semibold">{reselected.map(id => nameById.get(id) ?? 'Supplier').join(', ')}</span> declined the previous quote request for this ticket. Send it to them again?</p>
             </div>
           )}
           {err && <p className="text-xs text-red-500">{err}</p>}
-          <div className="flex gap-2">
-            <button disabled={busy} onClick={assign} className="flex-1 py-2 rounded-xl bg-green-600 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Assigning…' : confirmReinvite ? 'Yes, send again' : `Assign${sel.size ? ` (${sel.size})` : ''}`}</button>
-            <button onClick={() => { confirmReinvite ? setConfirmReinvite(false) : setOpen(false) }} className="flex-1 py-2 rounded-xl ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm">{confirmReinvite ? 'Back' : 'Cancel'}</button>
+
+          {/* Footer — selection summary + actions */}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border)] pt-3">
+            <p className="flex items-center gap-2 text-sm">
+              <span className={`grid h-6 w-6 place-items-center rounded-full ${sel.size ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-[var(--surface-2)] text-[var(--text-faint)]'}`}><Send size={13} /></span>
+              <span className="text-[var(--text-muted)]">{sel.size ? <><span className="font-semibold text-[var(--text)]">{sel.size} selected</span> · they&apos;ll be notified to quote</> : 'No suppliers selected'}</span>
+            </p>
+            <div className="flex gap-2">
+              <button onClick={() => { confirmReinvite ? setConfirmReinvite(false) : setOpen(false) }} disabled={busy} className="rounded-xl px-4 py-2.5 text-sm font-medium text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-50">{confirmReinvite ? 'Back' : 'Cancel'}</button>
+              <button disabled={busy || !sel.size} onClick={assign} className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50">
+                <Send size={15} /> {busy ? 'Sending…' : confirmReinvite ? 'Yes, send again' : `Send quote request${sel.size ? ` (${sel.size})` : ''}`}
+              </button>
+            </div>
           </div>
         </Modal>
       )}
@@ -234,43 +304,50 @@ export function AssignSuppliersButton({ ticketId, suppliers, motivSuppliers = []
 }
 
 // ── Request more info (amber button → modal) ────────────────────
-const INFO_REASONS = ['Need more detail', 'Photos unclear', 'Scope unclear', 'Access details needed', 'Other']
+// Reason quick-pick + free-text message are BOTH optional — if the RM sends
+// nothing specific, a neutral "please review" note goes to the store manager.
+const INFO_REASONS = ['Need more detail', 'Photos unclear', 'Scope unclear', 'Access details needed']
 
 export function RequestInfoButton({ ticketId, trigger }: { ticketId: string; trigger?: (open: () => void) => ReactNode }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [preset, setPreset] = useState('')
-  const [other, setOther] = useState('')
+  const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
 
   async function submit() {
-    if (!preset) { setErr('Choose a reason.'); return }
-    const reason = preset === 'Other' ? other.trim() : preset
-    if (!reason) { setErr('Tell the store what you need.'); return }
+    // Nothing required — build the note from whatever was given, else a default.
+    const reason = [preset, message.trim()].filter(Boolean).join(' — ') || 'Please review the ticket and add any missing detail.'
     setBusy(true); setErr('')
-    try { await post(`/api/tickets/${ticketId}/transition`, { action: 'request_info', reason }); setPreset(''); setOther(''); setOpen(false); setBusy(false); router.refresh() }
+    try { await post(`/api/tickets/${ticketId}/transition`, { action: 'request_info', reason }); setPreset(''); setMessage(''); setOpen(false); setBusy(false); router.refresh() }
     catch (e: any) { setErr(e.message); setBusy(false) }
   }
 
-  const input = 'w-full px-3 py-2 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm'
+  const input = 'w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)]'
   return (
     <>
       {trigger ? trigger(() => setOpen(true)) : (
         <button onClick={() => setOpen(true)} className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold transition">Request more info</button>
       )}
       {open && (
-        <Modal title="Request more information" onClose={() => setOpen(false)}>
-          <p className="text-xs text-[var(--text-muted)]">The store manager will see this message and can edit + resubmit the ticket.</p>
-          <select autoFocus className={input} value={preset} onChange={e => setPreset(e.target.value)}>
-            <option value="">— Choose a reason —</option>
-            {INFO_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
-          </select>
-          {preset === 'Other' && <textarea className={`${input} min-h-[80px]`} placeholder="What do you need from the store?" value={other} onChange={e => setOther(e.target.value)} />}
+        <Modal title="Request more information" onClose={() => { if (!busy) setOpen(false) }}>
+          <p className="-mt-1 text-sm text-[var(--text-muted)]">The store manager sees your request and can edit and resubmit the ticket.</p>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-[var(--text)]">Reason <span className="font-normal text-[var(--text-faint)]">(optional)</span></label>
+            <select autoFocus className={input} value={preset} onChange={e => setPreset(e.target.value)}>
+              <option value="">— Choose a reason —</option>
+              {INFO_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-[var(--text)]">Your message to the store manager <span className="font-normal text-[var(--text-faint)]">(optional)</span></label>
+            <textarea className={`${input} min-h-[100px]`} placeholder="Add any detail about what you need from the store…" value={message} onChange={e => setMessage(e.target.value)} />
+          </div>
           {err && <p className="text-xs text-red-500">{err}</p>}
           <div className="flex gap-2">
-            <button disabled={busy} onClick={submit} className="flex-1 py-2 rounded-xl bg-green-600 hover:bg-green-500 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Sending…' : 'Send request'}</button>
-            <button onClick={() => setOpen(false)} className="flex-1 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-semibold">Cancel</button>
+            <button onClick={() => setOpen(false)} disabled={busy} className="flex-1 py-2.5 rounded-xl ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm font-medium disabled:opacity-50">Cancel</button>
+            <button disabled={busy} onClick={submit} className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Sending…' : 'Send request'}</button>
           </div>
         </Modal>
       )}
@@ -813,6 +890,8 @@ function SignoffReviewBody({ ticketId, s }: { ticketId: string; s: SignoffSubmis
 }
 
 // ── RM adds extra work to the ticket (before a supplier is assigned) ─
+const MAX_WORK_CHARS = 1000
+const MAX_WORK_PHOTOS = 5
 export function RmAddWorkForm({ ticketId, description, photoUrls, title, category, impact, trigger }: {
   ticketId: string; description: string; photoUrls: string[]; title: string; category: string; impact: string; trigger?: (open: () => void) => ReactNode
 }) {
@@ -824,11 +903,16 @@ export function RmAddWorkForm({ ticketId, description, photoUrls, title, categor
   const [err, setErr] = useState('')
   const input = 'w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)]'
 
+  // Object-URL thumbnails for the selected photos; revoked when the set changes.
+  const previews = useMemo(() => files.map(f => URL.createObjectURL(f)), [files])
+  useEffect(() => () => previews.forEach(URL.revokeObjectURL), [previews])
+  const addFiles = (list: FileList | null) => setFiles(p => [...p, ...Array.from(list ?? []).filter(f => f.type.startsWith('image/'))].slice(0, MAX_WORK_PHOTOS))
+
   async function submit() {
-    if (!text.trim()) { setErr('Describe the extra work.'); return }
+    if (!text.trim()) { setErr('Describe the extra work needed.'); return }
     setBusy(true); setErr('')
     try {
-      const { urls: newUrls } = await uploadFiles(files.filter(f => f.type.startsWith('image/')), 'ticket-photos')
+      const { urls: newUrls } = await uploadFiles(files, 'ticket-photos')
       const newDescription = `${description}\n\n— Extra Work: ${text.trim()}`
       // The ticket endpoint is PATCH-only — POSTing here was the "something went wrong".
       const res = await fetch(`/api/tickets/${ticketId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, description: newDescription, category, operational_impact: impact, photo_urls: [...photoUrls, ...newUrls], edit_note: 'added extra work' }) })
@@ -846,26 +930,50 @@ export function RmAddWorkForm({ ticketId, description, photoUrls, title, categor
       )}
       {open && (
         <Modal title="Add extra work to this ticket" maxWidth="max-w-2xl" onClose={() => { if (!busy) { setOpen(false); setErr('') } }}>
-          <p className="text-xs text-[var(--text-muted)]">Extra scope you know of — added to the ticket brief before a supplier is assigned.</p>
-          <textarea autoFocus className={`${input} min-h-[160px]`} placeholder="Describe the extra work needed…" value={text} onChange={e => { setText(e.target.value); setErr('') }} />
-          <label className="flex items-center justify-center gap-2 py-2.5 rounded-lg ring-1 ring-[var(--border)] text-sm text-[var(--text)] transition cursor-pointer hover:border-[#C6A35D] hover:bg-[var(--hover)]">
-            <ImagePlus size={15} /> Add photos <span className="text-[var(--text-faint)]">(optional)</span>
-            <input type="file" accept="image/*" multiple className="hidden" onChange={e => setFiles(p => [...p, ...Array.from(e.target.files ?? [])].slice(0, 5))} />
-          </label>
-          {files.length > 0 && (
-            <ul className="space-y-1">
+          <p className="-mt-1 text-sm text-[var(--text-muted)]">Add any additional scope or tasks you want the supplier to include in their quote.</p>
+
+          {/* Description + live character counter */}
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-[var(--text)]">Describe the extra work needed <span className="text-red-500">*</span></label>
+            <div className="relative">
+              <textarea autoFocus maxLength={MAX_WORK_CHARS} className={`${input} min-h-[150px] pb-7`} placeholder="e.g. Install an additional shut-off valve and pressure-test the line…" value={text} onChange={e => { setText(e.target.value.slice(0, MAX_WORK_CHARS)); setErr('') }} />
+              <span className="pointer-events-none absolute bottom-2.5 right-3 text-[11px] tabular-nums text-[var(--text-faint)]">{text.length} / {MAX_WORK_CHARS}</span>
+            </div>
+          </div>
+
+          {/* Photo grid — dashed upload tile + image thumbnails with remove */}
+          <div>
+            <p className="mb-2 text-sm font-medium text-[var(--text)]">Add photos <span className="font-normal text-[var(--text-faint)]">(optional)</span></p>
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+              {files.length < MAX_WORK_PHOTOS && (
+                <label className="flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-[var(--border)] p-2 text-center text-[var(--text-muted)] transition hover:border-blue-500 hover:bg-[var(--hover)]">
+                  <Camera size={20} className="text-[var(--text-faint)]" />
+                  <span className="text-[11px] font-medium leading-tight">Upload photos</span>
+                  <span className="text-[10px] leading-tight text-[var(--text-faint)]">PNG, JPG up to 10MB</span>
+                  <input type="file" accept="image/*" multiple className="hidden" onChange={e => { addFiles(e.target.files); e.currentTarget.value = '' }} />
+                </label>
+              )}
               {files.map((f, i) => (
-                <li key={i} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)]">
-                  <FileText size={14} className="text-[#C6A35D] shrink-0" /><span className="text-xs text-[var(--text)] truncate flex-1">{f.name}</span>
-                  <button type="button" onClick={() => setFiles(p => p.filter((_, j) => j !== i))} className="p-0.5 text-[var(--text-faint)] hover:text-red-500"><X size={14} /></button>
-                </li>
+                <div key={i} className="group relative aspect-square overflow-hidden rounded-xl ring-1 ring-[var(--border)]">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- local object-URL preview, not a remote asset */}
+                  <img src={previews[i]} alt={f.name} className="h-full w-full object-cover" />
+                  <button type="button" onClick={() => setFiles(p => p.filter((_, j) => j !== i))} aria-label="Remove photo" className="absolute right-1.5 top-1.5 grid h-6 w-6 place-items-center rounded-full bg-black/60 text-white transition hover:bg-black/80"><X size={13} /></button>
+                </div>
               ))}
-            </ul>
-          )}
+            </div>
+            <p className="mt-2 text-xs text-[var(--text-faint)]">{files.length} of {MAX_WORK_PHOTOS} photos added</p>
+          </div>
+
+          {/* Info callout */}
+          <div className="flex items-start gap-2.5 rounded-xl bg-blue-500/10 ring-1 ring-blue-500/25 px-3.5 py-3">
+            <Info size={16} className="mt-0.5 shrink-0 text-blue-600 dark:text-blue-400" />
+            <p className="text-sm text-[var(--text-muted)]">This extra work will be included in the quote request sent to the supplier.</p>
+          </div>
+
           {err && <p className="text-xs text-red-500">{err}</p>}
           <div className="flex gap-2">
-            <button onClick={submit} disabled={busy} className="flex-1 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Adding…' : 'Add to ticket'}</button>
-            <button onClick={() => { setOpen(false); setErr('') }} disabled={busy} className="flex-1 py-2 rounded-xl ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm disabled:opacity-50">Cancel</button>
+            <button onClick={() => { setOpen(false); setErr('') }} disabled={busy} className="flex-1 py-2.5 rounded-xl ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm font-medium disabled:opacity-50">Cancel</button>
+            <button onClick={submit} disabled={busy} className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Adding…' : 'Add to ticket'}</button>
           </div>
         </Modal>
       )}

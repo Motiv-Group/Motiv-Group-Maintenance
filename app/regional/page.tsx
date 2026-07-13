@@ -40,11 +40,11 @@ export default async function RegionalOverviewPage() {
   // Motiv-curated suppliers the RM can also invite from the Today queue's in-place
   // assign picker (company suppliers come from the dashboard payload already).
   const admin = createAdminClient()
-  const { data: motivRaw } = await admin.from('suppliers').select('id, company_name').eq('is_motiv', true).eq('active', true).order('company_name')
+  const { data: motivRaw } = await admin.from('suppliers').select('id, company_name, trade, trades').eq('is_motiv', true).eq('active', true).order('company_name')
   const companySupplierIds = new Set(data.suppliers.map(s => s.id))
-  const motivSuppliers = ((motivRaw ?? []) as { id: string; company_name: string }[])
+  const motivSuppliers = ((motivRaw ?? []) as { id: string; company_name: string; trade: string | null; trades: string[] | null }[])
     .filter(s => !companySupplierIds.has(s.id))
-    .map(s => ({ id: s.id, name: s.company_name }))
+    .map(s => ({ id: s.id, name: s.company_name, category: Array.isArray(s.trades) && s.trades.filter(Boolean).length ? s.trades.filter(Boolean).join(', ') : (s.trade ?? null) }))
   const briefingScopeId = regionIds.slice().sort().join(',')
   const briefing = await getDailyBriefing({ companyId, scope: 'region', scopeId: briefingScopeId, role: 'regional_manager', facts: regionFacts(data) })
   return <RegionalOverview data={data} name={fullName} briefing={briefing} briefingScopeId={briefingScopeId} motivSuppliers={motivSuppliers} />

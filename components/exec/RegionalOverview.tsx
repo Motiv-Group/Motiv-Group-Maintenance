@@ -10,7 +10,7 @@ import { Stars } from '@/components/ui/Stars'
 import type { Briefing } from '@/lib/briefing/facts'
 import { formatCurrency, humanizeDuration } from '@/lib/utils'
 
-export function RegionalOverview({ data, name, briefing, briefingScopeId, motivSuppliers = [] }: { data: RegionalDashboardData; name: string | null; briefing?: Briefing; briefingScopeId?: string; motivSuppliers?: { id: string; name: string; avgRating?: number; ratingCount?: number }[] }) {
+export function RegionalOverview({ data, name, briefing, briefingScopeId, motivSuppliers = [] }: { data: RegionalDashboardData; name: string | null; briefing?: Briefing; briefingScopeId?: string; motivSuppliers?: { id: string; name: string; avgRating?: number; ratingCount?: number; category?: string | null }[] }) {
   const p = data.portfolio
   const greeting = (() => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening' })()
 
@@ -20,7 +20,7 @@ export function RegionalOverview({ data, name, briefing, briefingScopeId, motivS
   // Items awaiting the RM's approval action (quotes + variation orders to review).
   const awaitingApproval = data.tickets.filter(t => ['quoted', 'quote_revision', 'variation_review'].includes(t.status)).length
   // Company suppliers for the Today queue's in-place "Assign supplier" picker.
-  const assignSuppliers = data.suppliers.map(s => ({ id: s.id, name: s.name, avgRating: s.avgRating, ratingCount: s.ratingCount }))
+  const assignSuppliers = data.suppliers.map(s => ({ id: s.id, name: s.name, avgRating: s.avgRating, ratingCount: s.ratingCount, category: s.category }))
 
   return (
     <div className="space-y-5">
