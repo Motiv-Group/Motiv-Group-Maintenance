@@ -122,7 +122,7 @@ export default function LoginPage() {
   }
 
   return (
-    <AuthShell logoHeight={176}>
+    <AuthShell logoHeight={300}>
       <h1 className="text-xl sm:text-2xl font-semibold text-white mb-1">Welcome back</h1>
       <p className="text-sm text-gray-400 mb-6">Sign in to continue to your workspace.</p>
 
