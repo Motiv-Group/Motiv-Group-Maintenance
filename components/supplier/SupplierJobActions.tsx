@@ -80,7 +80,7 @@ export function SupplierQuoteBar({ ticketId, priority, createdAt, canDecline = f
   return (
     <>
       <div className="flex items-center gap-2">
-        <button type="button" onClick={() => setQuoteOpen(true)} className={`${canDecline ? 'flex-1' : 'w-full'} py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition`}>Upload Quote</button>
+        <button type="button" onClick={() => setQuoteOpen(true)} className={`${canDecline ? 'flex-1' : 'w-full'} py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition`}>Upload Quote</button>
         {canDecline && (
           <MoreMenu>
             <MoreActionItem icon={<XCircle size={16} />} label="Decline work" tone="danger" onClick={() => setDeclineOpen(true)} />

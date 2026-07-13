@@ -385,11 +385,13 @@ export function SendQuoteForm({
     )
   }
 
-  return (
-    <div className="rounded-2xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] p-5 space-y-4">
-      <h3 className="font-semibold text-[var(--text)]">
-        {isEdit ? 'Edit Quote' : isVariation ? 'Raise Variation Order' : 'Send Quote'}
-      </h3>
+  const title = isEdit ? 'Edit Quote' : isVariation ? 'Raise Variation Order' : 'Send Quote'
+  const inner = (
+    <>
+      <div className="flex items-start justify-between gap-3">
+        <h3 className="text-xl font-bold text-[var(--text)]">{title}</h3>
+        <button type="button" onClick={handleClose} aria-label="Close" className="shrink-0 -m-1 rounded-lg p-1.5 text-[var(--text-faint)] transition hover:bg-[var(--hover)] hover:text-[var(--text)]"><X size={20} /></button>
+      </div>
       {isVariation && (
         <p className="text-xs text-[var(--text-muted)]">
           For extra materials or work needed to complete the job. This is sent to the regional manager for approval before work continues.
@@ -546,13 +548,17 @@ export function SendQuoteForm({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-[var(--text)] mb-1">Description</label>
-          <textarea
-            className={`${field} resize-none`}
-            rows={3}
-            placeholder="Describe what the quote covers..."
-            {...register('description', { required: 'Description is required' })}
-          />
+          <label className="block text-sm font-medium text-[var(--text)] mb-1">Description <span className="text-red-500">*</span></label>
+          <div className="relative">
+            <textarea
+              maxLength={2000}
+              className={`${field} resize-none pb-7`}
+              rows={3}
+              placeholder="Describe what the quote covers..."
+              {...register('description', { required: 'Description is required' })}
+            />
+            <span className="pointer-events-none absolute bottom-2.5 right-3 text-[11px] tabular-nums text-[var(--text-faint)]">{watch('description')?.length ?? 0} / 2000</span>
+          </div>
           {errors.description && <p className="mt-1 text-xs text-red-500">{errors.description.message}</p>}
         </div>
 
@@ -568,18 +574,15 @@ export function SendQuoteForm({
             className={`${field} resize-none disabled:opacity-50`}
             {...register('warranty')}
           />
-          <div className="flex items-center gap-2 mt-1.5">
-            <button
-              type="button"
-              aria-pressed={warrantyNA}
-              onClick={() => { setWarrantyNA(v => !v); if (!warrantyNA) setValue('warranty', ''); setError('') }}
-              className={tile(warrantyNA)}
-            >
-              {warrantyNA && <Check size={13} className="text-emerald-500" />}
-              N/A
-            </button>
-            <span className="text-xs text-[var(--text-faint)]">No warranty? Describe it manually, or select N/A.</span>
-          </div>
+          <label className="mt-2 flex cursor-pointer select-none items-center gap-2 text-sm text-[var(--text-muted)]">
+            <input
+              type="checkbox"
+              checked={warrantyNA}
+              onChange={e => { setWarrantyNA(e.target.checked); if (e.target.checked) setValue('warranty', ''); setError('') }}
+              className="h-4 w-4 accent-blue-600"
+            />
+            No warranty? Select this option
+          </label>
         </div>
 
         {/* Valid Until — quotes only (a variation order has no validity date) */}
@@ -716,6 +719,11 @@ export function SendQuoteForm({
           </p>
         )}
       </form>
-    </div>
+    </>
   )
+  // In a modal (defaultOpen) the shared Modal already supplies the card + padding,
+  // so render bare to avoid a double card; standalone keeps its own card.
+  return defaultOpen
+    ? <div className="space-y-4">{inner}</div>
+    : <div className="rounded-2xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] p-5 space-y-4">{inner}</div>
 }

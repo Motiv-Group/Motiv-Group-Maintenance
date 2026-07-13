@@ -25,7 +25,7 @@ import { PopupForm } from '@/components/supplier/PopupForm'
 import { RaiseDisputeButton, DisputeThread } from '@/components/dispute/DisputeBox'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { EditedLine } from '@/components/ui/EditedLine'
-import { buildTicketTimeline, rmFriendlyLabel } from '@/lib/ticket-timeline'
+import { buildTicketTimeline } from '@/lib/ticket-timeline'
 import { TicketTimeline } from '@/components/ui/TicketTimeline'
 import { DetailTabs } from '@/components/ui/DetailTabs'
 import { formatCurrency, formatDateTime, supplierStatusMeta, storeLabel, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
@@ -553,7 +553,10 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
         disputeMessages: disputeMsgs.map((m: any) => ({ author_role: m.author_role, body: m.body, created_at: m.created_at })),
         supplierDeclines: myDeclines, signoffs: (signoffRows ?? []) as any[], updates: (updates ?? []) as any[], views: (viewRows ?? []) as any[],
       }
-  const timelineItems = buildTicketTimeline(supplierTimelineInput).map(e => ({ ...e, label: rmFriendlyLabel(e), who: null }))
+  // Default (neutral) labels + actor — the RM-voice rmFriendlyLabel says "You
+  // requested quotes", which is wrong from the supplier's side (the client/RM
+  // requested them). The default labels read "Quote requested" with the actor.
+  const timelineItems = buildTicketTimeline(supplierTimelineInput)
   const timelineTab = <TicketTimeline items={timelineItems} />
 
   return (
