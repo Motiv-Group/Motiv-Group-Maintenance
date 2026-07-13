@@ -631,6 +631,7 @@ export async function assembleStoreManagerDashboard(companyId: string, storeIds:
 // ============================================================
 export interface SupplierTicketRow {
   id: string; storeName: string; branchCode: string | null; title: string; category: string | null; priority: Priority; status: string
+  jobRef: string | null; description: string | null
   ageDays: number; createdAt: string; slaLabel: string; nextActionDueAt: string | null
   acknowledged: boolean; evidenceRequired: boolean; beforeUploaded: boolean; afterUploaded: boolean; cocUploaded: boolean
   active: boolean; breached: boolean
@@ -645,7 +646,7 @@ export interface SupplierTicketRow {
   // An open dispute on their awarded job — the badge reads "Dispute".
   disputed: boolean
 }
-export interface SupplierQuoteRow { id: string; ticketId: string; ticketTitle: string; ticketStatus: string; storeName: string; branchCode: string | null; amount: number; amountInclVat: number | null; status: string; createdAt: string }
+export interface SupplierQuoteRow { id: string; ticketId: string; ticketTitle: string; ticketStatus: string; storeName: string; branchCode: string | null; amount: number; amountInclVat: number | null; status: string; createdAt: string; category: string | null; priority: Priority; jobRef: string | null; description: string | null; validUntil: string | null; proposedScheduleAt: string | null }
 export interface SupplierSignoffRow { id: string; ticketId: string; ticketTitle: string; storeName: string; branchCode: string | null; status: string; createdAt: string }
 export interface SupplierDashboardData {
   perf: SupplierPerformance
@@ -699,7 +700,7 @@ export async function assembleSupplierDashboard(companyId: string | null, suppli
   const titleOf = new Map(tickets.map(t => [t.id, t.title ?? 'Ticket']))
 
   const [{ data: quotesRaw }, { data: signoffsRaw }, { data: ratingRows }, { data: companyRow }] = await Promise.all([
-    db.from('quotes').select('id, ticket_id, amount, amount_incl_vat, status, created_at, updated_at').in('supplier_id', supplierIds).order('created_at', { ascending: false }),
+    db.from('quotes').select('id, ticket_id, amount, amount_incl_vat, status, created_at, updated_at, valid_until, proposed_schedule_at').in('supplier_id', supplierIds).order('created_at', { ascending: false }),
     db.from('signoffs').select('id, ticket_id, status, created_at').in('supplier_id', supplierIds).order('created_at', { ascending: false }),
     db.from('ratings').select('score').in('supplier_id', supplierIds),
     companyId ? db.from('companies').select('name').eq('id', companyId).maybeSingle() : Promise.resolve({ data: null as { name: string } | null }),
@@ -761,6 +762,7 @@ export async function assembleSupplierDashboard(companyId: string | null, suppli
     const approvedAt = (raw.quote_decision_status === 'approved' ? raw.quote_decided_at : null) ?? acceptedQuoteAt.get(t.id) ?? null
     rows.push({
       id: t.id, storeName: storeName.get(t.store_id) ?? (raw.company_id ? 'Store' : 'Individual'), branchCode: storeBranch.get(t.store_id) ?? null, title: t.title ?? 'Ticket', category: (t as any).category ?? null, priority: t.priority, status: t.status,
+      jobRef: raw.job_ref ?? null, description: raw.description ?? null,
       ageDays: Math.floor((now.getTime() - new Date(t.created_at).getTime()) / DAY), createdAt: t.created_at, slaLabel: lbl, nextActionDueAt: sla.nextActionDueAt,
       acknowledged: !!t.first_response_at, evidenceRequired: !!t.evidence_required,
       beforeUploaded: !!t.before_photo_uploaded, afterUploaded: !!t.after_photo_uploaded, cocUploaded: !!t.completion_certificate_uploaded,
@@ -787,7 +789,7 @@ export async function assembleSupplierDashboard(companyId: string | null, suppli
     company: (companyRow as any)?.name ?? '',
     kpis: { open, overdue, dueToday, pendingQuotes, awaitingSignoff, evidenceMissing, scheduled },
     tickets: rows,
-    quotes: (quotesRaw ?? []).map((q: any) => ({ id: q.id, ticketId: q.ticket_id, ticketTitle: titleOf.get(q.ticket_id) ?? 'Ticket', ticketStatus: rawById.get(q.ticket_id)?.status ?? '', storeName: storeName.get(storeOf(q.ticket_id)) ?? (rawById.get(q.ticket_id)?.company_id ? 'Store' : 'Individual'), branchCode: storeBranch.get(storeOf(q.ticket_id)) ?? null, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, status: q.status, createdAt: q.created_at })),
+    quotes: (quotesRaw ?? []).map((q: any) => { const rq: any = rawById.get(q.ticket_id) ?? {}; return { id: q.id, ticketId: q.ticket_id, ticketTitle: titleOf.get(q.ticket_id) ?? 'Ticket', ticketStatus: rq.status ?? '', storeName: storeName.get(storeOf(q.ticket_id)) ?? (rq.company_id ? 'Store' : 'Individual'), branchCode: storeBranch.get(storeOf(q.ticket_id)) ?? null, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, status: q.status, createdAt: q.created_at, category: rq.category ?? null, priority: rq.priority, jobRef: rq.job_ref ?? null, description: rq.description ?? null, validUntil: q.valid_until ?? null, proposedScheduleAt: q.proposed_schedule_at ?? null } }),
     signoffs: (signoffsRaw ?? []).map((s: any) => ({ id: s.id, ticketId: s.ticket_id, ticketTitle: titleOf.get(s.ticket_id) ?? 'Ticket', storeName: storeName.get(storeOf(s.ticket_id)) ?? (rawById.get(s.ticket_id)?.company_id ? 'Store' : 'Individual'), branchCode: storeBranch.get(storeOf(s.ticket_id)) ?? null, status: s.status, createdAt: s.created_at })),
     rating,
     generatedAt: now.toISOString(),
