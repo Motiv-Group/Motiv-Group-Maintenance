@@ -9,22 +9,22 @@ import { formatCurrency, formatDateTime } from '@/lib/utils'
 
 // Pill (badge) classes per quote state — incl. the synthetic "requested".
 const STATUS_BADGE: Record<string, string> = {
-  requested: 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-400',
-  pending: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D]',
+  requested: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
+  pending: 'bg-blue-500/15 text-blue-700 dark:text-blue-400',
   accepted: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
-  declined: 'bg-red-500/15 text-red-700 dark:text-red-400',
-  revision_requested: 'bg-blue-500/15 text-blue-700 dark:text-blue-400',
+  declined: 'bg-gray-500/15 text-gray-600 dark:text-gray-400',
+  revision_requested: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
 }
 const STATUS_LABEL: Record<string, string> = { requested: 'Quote requested', pending: 'Pending', accepted: 'Approved', declined: 'Declined', revision_requested: 'Revision requested' }
 // Uniform badge size so the VAT + status pills line up.
 const BADGE = 'inline-flex items-center justify-center w-full text-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide'
 
 const FILTERS: { key: string; label: string; active: string; inactive: string }[] = [
-  { key: 'all', label: 'All', active: 'bg-slate-800 text-white border-slate-800 dark:bg-white dark:text-[#0a0e17] dark:border-white', inactive: 'text-[var(--text-muted)] border-[var(--border)] hover:border-slate-400' },
-  { key: 'requested', label: 'Quote requested', active: 'bg-cyan-500 text-white border-cyan-500', inactive: 'text-cyan-600 dark:text-cyan-400 border-cyan-500/40 hover:border-cyan-400' },
-  { key: 'pending', label: 'Pending', active: 'bg-[#C6A35D] text-[#0a0e17] border-[#C6A35D]', inactive: 'text-amber-600 dark:text-[#C6A35D] border-[#C6A35D]/40 hover:border-[#C6A35D]' },
-  { key: 'accepted', label: 'Approved', active: 'bg-emerald-500 text-white border-emerald-500', inactive: 'text-emerald-600 dark:text-emerald-400 border-emerald-500/40 hover:border-emerald-400' },
-  { key: 'declined', label: 'Declined', active: 'bg-red-500 text-white border-red-500', inactive: 'text-red-600 dark:text-red-400 border-red-500/40 hover:border-red-400' },
+  { key: 'all', label: 'All', active: 'bg-gray-500 text-white', inactive: 'bg-gray-500/15 text-gray-600 dark:text-gray-400' },
+  { key: 'requested', label: 'Quote requested', active: 'bg-amber-500 text-white', inactive: 'bg-amber-500/15 text-amber-700 dark:text-amber-400' },
+  { key: 'pending', label: 'Pending', active: 'bg-blue-500 text-white', inactive: 'bg-blue-500/15 text-blue-700 dark:text-blue-400' },
+  { key: 'accepted', label: 'Approved', active: 'bg-emerald-500 text-white', inactive: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' },
+  { key: 'declined', label: 'Declined', active: 'bg-gray-500 text-white', inactive: 'bg-gray-500/15 text-gray-600 dark:text-gray-400' },
 ]
 // Submitted quotes whose ticket is past the quoting/decision phase belong in Sign-off /
 // archive, not here — EXCEPT declined ones, which the supplier should still see.
@@ -68,6 +68,7 @@ export default async function SupplierQuotesPage(props: { searchParams?: Promise
 
   const all = [...requestedItems, ...quoteItems, ...declinedRequestItems]
   const shown = active === 'all' ? all : all.filter(i => i.status === active)
+  const filterCount = (key: string) => key === 'all' ? all.length : all.filter(i => i.status === key).length
 
   const byStore = new Map<string, QItem[]>()
   for (const i of shown) { const a = byStore.get(i.storeName) ?? []; a.push(i); byStore.set(i.storeName, a) }
@@ -82,11 +83,12 @@ export default async function SupplierQuotesPage(props: { searchParams?: Promise
         <p className="text-sm text-[var(--text-muted)] mt-0.5">Quote requests and the quotes you have submitted, grouped by store. Tap one to open its ticket. Amounts are excl VAT.</p></div>
 
       {/* Status filter */}
-      <div className="flex flex-wrap gap-2">
+      <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
         {FILTERS.map(f => (
           <Link key={f.key} href={f.key === 'all' ? '/supplier/quotes' : `/supplier/quotes?status=${f.key}`}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition ${active === f.key ? f.active : f.inactive}`}>
-            {f.label}
+            aria-pressed={active === f.key}
+            className={`rounded-md px-3 py-1.5 text-xs font-semibold transition text-center ${active === f.key ? f.active : f.inactive}`}>
+            {f.label} <span className="opacity-70">{filterCount(f.key)}</span>
           </Link>
         ))}
       </div>
@@ -99,11 +101,11 @@ export default async function SupplierQuotesPage(props: { searchParams?: Promise
       )}
 
       {groups.map(([store, items]) => (
-        <PersistentDetails key={store} persistKey={`supplier-quotes-${store}`} className="group rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
+        <PersistentDetails key={store} persistKey={`supplier-quotes-${store}`} className="group rounded-2xl bg-[var(--surface)] ring-1 ring-[var(--border)] dark:ring-white/10 shadow-sm overflow-hidden">
           <summary className="flex items-center gap-3 px-4 py-3 cursor-pointer list-none hover:bg-[var(--hover)] transition">
-            <Building2 size={16} className="text-[#C6A35D] shrink-0" />
+            <Building2 size={16} className="text-amber-600 dark:text-amber-500 shrink-0" />
             <span className="flex-1 min-w-0 text-sm font-bold text-[var(--text)] truncate">{[d.company, store].filter(Boolean).join(' · ')}{items[0].branchCode ? ` · ${items[0].branchCode}` : ''}</span>
-            <span className="text-[11px] font-semibold text-[var(--text-muted)] bg-black/5 dark:bg-white/10 rounded-full px-2 py-0.5 shrink-0">{items.length} quote{items.length !== 1 ? 's' : ''}</span>
+            <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 bg-slate-500/15 rounded-full px-2 py-0.5 shrink-0">{items.length} quote{items.length !== 1 ? 's' : ''}</span>
             <ChevronDown size={16} className="text-[var(--text-faint)] shrink-0 group-open:hidden" />
             <ChevronUp size={16} className="text-[var(--text-faint)] shrink-0 hidden group-open:block" />
           </summary>

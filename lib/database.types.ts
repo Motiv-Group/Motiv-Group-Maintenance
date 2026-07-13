@@ -2074,7 +2074,15 @@ export interface Database {
           ip?: string | null
           accepted_at?: string
         }
-        Relationships: []
+        Relationships: [
+        {
+          foreignKeyName: "supplier_sla_acceptances_supplier_id_fkey"
+          columns: ["supplier_id"]
+          isOneToOne: false
+          referencedRelation: "suppliers"
+          referencedColumns: ["id"]
+        }
+      ]
       }
       supplier_users: {
         Row: {
@@ -2131,7 +2139,15 @@ export interface Database {
           url?: string
           uploaded_at?: string
         }
-        Relationships: []
+        Relationships: [
+        {
+          foreignKeyName: "supplier_verification_docs_supplier_id_fkey"
+          columns: ["supplier_id"]
+          isOneToOne: false
+          referencedRelation: "suppliers"
+          referencedColumns: ["id"]
+        }
+      ]
       }
       suppliers: {
         Row: {

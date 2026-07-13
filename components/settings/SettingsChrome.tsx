@@ -43,7 +43,7 @@ export function SettingsChrome({
       {/* Desktop sidebar */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-[260px] border-r border-white/10 bg-brand-600 text-white lg:flex lg:flex-col">
         <div className="px-5 pt-6 pb-4">
-          <Link href={roleHome} className="inline-flex"><MotivLogo height={34} /></Link>
+          <Link href={roleHome} className="inline-flex"><MotivLogo height={52} /></Link>
           <Link href={roleHome} className="mt-6 flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-gray-200 transition hover:bg-white/[0.08]">
             <ArrowLeft size={14} className="shrink-0 text-gray-400" /> Back to Dashboard
           </Link>
@@ -94,14 +94,14 @@ export function SettingsChrome({
         {/* Mobile top bar */}
         <header className="sticky top-0 z-20 bg-brand-600 border-b border-brand-700 lg:hidden">
           <div className="max-w-[1700px] mx-auto px-4 h-16 flex items-center justify-between">
-            <Link href={roleHome}><MotivLogo height={36} /></Link>
+            <Link href={roleHome}><MotivLogo height={46} /></Link>
             <div className="flex items-center gap-1">
               <Link href={roleHome} className={iconBtn} title="Back to Dashboard"><ArrowLeft size={18} /></Link>
               <form action="/auth/logout" method="post" className="contents">
                 <button type="submit" className={iconBtn} title="Log out"><LogOut size={17} /></button>
               </form>
               <div className="flex items-center gap-2 pl-2 ml-1 border-l border-white/15">
-                <span className="w-8 h-8 rounded-full bg-[#C6A35D] text-[#0a0e17] font-bold flex items-center justify-center text-sm">{initial}</span>
+                <span className="w-8 h-8 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-sm">{initial}</span>
               </div>
             </div>
           </div>
@@ -116,7 +116,7 @@ export function SettingsChrome({
               const on = isActive(href)
               return (
                 <Link key={href} href={href} aria-current={on ? 'page' : undefined}
-                  className={`flex flex-col items-center justify-center gap-1 flex-1 text-[11px] font-medium transition-colors ${on ? 'text-[#C6A35D]' : 'text-gray-400 hover:text-gray-200'}`}>
+                  className={`flex flex-col items-center justify-center gap-1 flex-1 text-[11px] font-medium transition-colors ${on ? 'text-blue-300' : 'text-gray-400 hover:text-gray-200'}`}>
                   <Icon size={22} strokeWidth={on ? 2.4 : 1.8} />
                   {short}
                 </Link>

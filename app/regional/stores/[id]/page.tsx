@@ -25,7 +25,7 @@ function TicketRow({ ticket, storeName }: { ticket: Ticket; storeName?: string }
 
   return (
     <Link href={`/regional/tickets/${ticket.id}`}>
-      <div className="bg-slate-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 hover:border-brand-400 dark:hover:border-gray-400 transition-colors">
+      <div className="bg-slate-50 dark:bg-gray-800 border border-[var(--border)] dark:border-gray-700 rounded-xl px-4 py-3 hover:border-brand-400 dark:hover:border-gray-400 transition-colors">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             {((ticket as any).job_ref ?? formatJobId((ticket as any).job_number)) && (
@@ -66,7 +66,7 @@ function CollapsibleSection({
   // We use a details/summary element for zero-JS collapsing on a server component page
   return (
     <details className="group">
-      <summary className="flex items-center justify-between cursor-pointer list-none bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700/60 transition-colors">
+      <summary className="flex items-center justify-between cursor-pointer list-none bg-gray-50 dark:bg-gray-800 border border-[var(--border)] dark:border-gray-700 rounded-xl px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700/60 transition-colors">
         <span className={`flex items-center gap-2 font-semibold text-sm ${colorClass}`}>
           {icon}
           {title}
@@ -176,7 +176,7 @@ export default async function RegionalStoreDetailPage(props: { params: Promise<{
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 
         {/* Store contact */}
-        <div className="order-1 sm:order-none bg-slate-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 space-y-2">
+        <div className="order-1 sm:order-none bg-slate-50 dark:bg-gray-800 border border-[var(--border)] dark:border-gray-700 rounded-xl p-4 space-y-2">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Store Contact</p>
           {store.full_name && (
             <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
@@ -211,7 +211,7 @@ export default async function RegionalStoreDetailPage(props: { params: Promise<{
         </div>
 
         {/* Ticket summary */}
-        <div className="order-2 sm:order-none bg-slate-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
+        <div className="order-2 sm:order-none bg-slate-50 dark:bg-gray-800 border border-[var(--border)] dark:border-gray-700 rounded-xl p-4">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3 text-center">Ticket Summary</p>
           <div className="grid grid-cols-3 gap-3 text-center">
             {[
@@ -231,7 +231,7 @@ export default async function RegionalStoreDetailPage(props: { params: Promise<{
         </div>
 
         {/* Quote overview (merged: totals + awaiting approval) */}
-        <div className="order-4 sm:order-none bg-slate-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
+        <div className="order-4 sm:order-none bg-slate-50 dark:bg-gray-800 border border-[var(--border)] dark:border-gray-700 rounded-xl p-4">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Quote Overview</p>
           <div className="space-y-3">
             {/* Accepted value — own line */}
@@ -282,7 +282,7 @@ export default async function RegionalStoreDetailPage(props: { params: Promise<{
 
         {/* Budget allowance (Capex) — clickable, opens edit page */}
         <Link href={`/regional/stores/${params.id}/budget`} className="order-3 sm:order-none group block">
-          <div className="bg-slate-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 h-full hover:border-brand-400 dark:hover:border-gray-400 transition-colors">
+          <div className="bg-slate-50 dark:bg-gray-800 border border-[var(--border)] dark:border-gray-700 rounded-xl p-4 h-full hover:border-brand-400 dark:hover:border-gray-400 transition-colors">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Budget Allowance (Capex)</p>
             {store.capex_budget != null ? (
               <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatCurrency(store.capex_budget)}</p>
@@ -387,7 +387,7 @@ export default async function RegionalStoreDetailPage(props: { params: Promise<{
             const acceptedQuote = ((t as any).quotes ?? []).find((q: any) => q.status === 'accepted')
             return (
               <Link key={t.id} href={`/regional/tickets/${t.id}`}>
-                <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 flex items-center justify-between gap-3 hover:border-brand-400 dark:hover:border-gray-400 transition-colors">
+                <div className="bg-gray-50 dark:bg-gray-800/50 border border-[var(--border)] dark:border-gray-700 rounded-xl px-4 py-3 flex items-center justify-between gap-3 hover:border-brand-400 dark:hover:border-gray-400 transition-colors">
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">{t.title}</p>
                     {isCompleted && acceptedQuote && (

@@ -58,9 +58,9 @@ export function DataPrivacySection() {
   }
 
   return (
-    <div className="bg-slate-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
+    <div className="bg-slate-50 dark:bg-gray-800 border border-[var(--border)] dark:border-gray-700 rounded-xl p-5">
       <div className="flex items-center gap-2 mb-4">
-        <ShieldCheck size={16} className="text-[#C6A35D]" />
+        <ShieldCheck size={16} className="text-blue-600 dark:text-blue-400" />
         <h2 className="font-semibold text-gray-900 dark:text-white text-sm">Privacy &amp; your data</h2>
       </div>
 
@@ -82,12 +82,12 @@ export function DataPrivacySection() {
             disabled={exporting}
             className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-60"
           >
-            <Download size={16} className="text-[#C6A35D]" />
+            <Download size={16} className="text-blue-600 dark:text-blue-400" />
             {exporting ? 'Preparing…' : 'Download'}
           </button>
         </div>
 
-        <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+        <div className="border-t border-[var(--border)] dark:border-gray-700 pt-4">
           {!confirmOpen ? (
             <div className="flex items-center justify-between gap-3">
               <div>

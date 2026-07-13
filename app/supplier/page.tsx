@@ -1,242 +1,75 @@
 export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
-import { Truck, ClipboardList, Clock, ReceiptText, ClipboardCheck, AlertTriangle, Timer, Star, Sparkles, Camera, Calendar } from 'lucide-react'
+import { Star, Clock } from 'lucide-react'
 import { requireSupplierV3 } from '@/lib/health/guard'
-import { assembleSupplierDashboard, type SupplierTicketRow } from '@/lib/health/data'
-import { Card, SectionCard, KpiRow, Donut, Pill, type Kpi } from '@/components/exec/ui'
-import { CollapsibleCard } from '@/components/ui/CollapsibleCard'
-import { PriorityBadge } from '@/components/ui/PriorityBadge'
-import { BriefingRefresh } from '@/components/briefing/BriefingRefresh'
-import { VerificationCard } from '@/components/supplier/VerificationCard'
+import { assembleSupplierDashboard } from '@/lib/health/data'
+import { DashboardHealthHeader } from '@/components/exec/DashboardHealthHeader'
+import { SupplierPriorityWorkQueue } from '@/components/supplier/SupplierPriorityWorkQueue'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getDailyBriefing } from '@/lib/briefing/generate'
 import { supplierFacts } from '@/lib/briefing/facts'
-import { formatCurrency, formatDateTime, humanizeDuration, rmStatusMeta } from '@/lib/utils'
-
-const QUOTE_TONE: Record<string, string> = { pending: 'text-[#C6A35D]', accepted: 'text-emerald-600 dark:text-emerald-400', declined: 'text-red-600 dark:text-red-400' }
-
-// Stages where the supplier still owes completion evidence (COC + POC), with the
-// nudge shown in the "Evidence to Upload" block. Mirrors where SubmitCompletionForm
-// appears on the supplier ticket page.
-const EVIDENCE_STAGE: Record<string, string> = {
-  in_progress: 'Submit COC & POC',
-  evidence_requested: 'More evidence requested',
-  snag_in_progress: 'Re-upload COC & POC (snag fix)',
-  snag_resolved: 'Re-upload COC & POC',
-}
-
-// Isolation: the status THIS supplier should see — never another supplier's progress
-// (e.g. "Quoted" because someone else quoted). Mirrors myStatus in SupplierTickets.
-function myStatus(t: SupplierTicketRow): string {
-  if (t.awardedToMe || t.declinedForMe) return t.status
-  return t.quotedByMe ? 'quoted' : 'quote_requested'
-}
-
-// One date matching the ticket's current stage: approved → requested → assigned.
-function milestone(t: SupplierTicketRow): { label: string; at: string } | null {
-  // A declined supplier never shows the ticket's onward milestones (those were another supplier).
-  if (t.declinedForMe) {
-    if (t.declinedAt) return { label: 'Declined', at: t.declinedAt }
-    if (t.quoteSubmittedAt) return { label: 'Quoted', at: t.quoteSubmittedAt }
-    if (t.quoteRequestedAt) return { label: 'Quote requested', at: t.quoteRequestedAt }
-    return null
-  }
-  if (t.quoteApprovedAt) return { label: 'Quote approved', at: t.quoteApprovedAt }
-  if (t.quoteSubmittedAt) return { label: 'Quoted', at: t.quoteSubmittedAt }
-  if (t.quoteRequestedAt) return { label: 'Quote requested', at: t.quoteRequestedAt }
-  if (t.assignedAt) return { label: 'Assigned', at: t.assignedAt }
-  return null
-}
-
-// Shared ticket row: company + branch, then title, then the stage-matched date.
-function TicketRow({ t, company }: { t: SupplierTicketRow; company?: string }) {
-  const sm = rmStatusMeta(myStatus(t))
-  const m = milestone(t)
-  return (
-    <Link href={`/supplier/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] -mx-2 px-2 rounded transition">
-      <div className="min-w-0">
-        <p className="text-sm font-medium text-[var(--text)] truncate">{t.isIndividual ? 'Individual' : [company, t.storeName].filter(Boolean).join(' · ')}</p>
-        <p className="text-[11px] text-[var(--text-muted)] truncate">{t.title}</p>
-        <p className="text-[11px] text-[var(--text-faint)]">Logged {formatDateTime(t.createdAt)}</p>
-        {m && <p className={`text-[11px] font-medium ${sm.text}`}>{m.label} · {formatDateTime(m.at)}</p>}
-        {/* eslint-disable-next-line react-hooks/purity -- Date.now in a server-component render runs once server-side — no hydration */}
-        {t.overdue && <p className="text-[11px] font-semibold text-red-600 dark:text-red-400">Overdue by {humanizeDuration(Date.now() - new Date(t.dueAt).getTime())}</p>}
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
-        <PriorityBadge priority={t.priority} className="w-full text-center" />
-        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${t.disputed ? 'bg-red-500/15 text-red-700 dark:text-red-400' : sm.cls}`}>{t.disputed ? 'Dispute' : sm.label}</span>
-      </div>
-    </Link>
-  )
-}
 
 export default async function SupplierOverviewPage() {
   const { companyId, supplierIds, fullName } = await requireSupplierV3()
 
-  // Standalone (self-signup) suppliers have no client company. Pending ones see
-  // the under-review + verification-docs card; verified ones a "you're live"
-  // state until Motiv-pool work reaches them via the normal ticket pages.
+  // Standalone (self-signup) suppliers have no client company. PENDING ones can now
+  // browse the whole dashboard while they wait — a gentle note points them to the
+  // verification-docs uploader (moved to Settings → Account). VERIFIED ones just see
+  // the dashboard (assembleSupplierDashboard handles a null company).
+  let pending = false
   if (!companyId) {
     const admin = createAdminClient()
     const { data: supRow } = await admin.from('suppliers')
-      .select('company_name, verification_status, is_motiv').in('id', supplierIds).limit(1).maybeSingle()
-    const pending = (supRow as any)?.verification_status !== 'verified' && !(supRow as any)?.is_motiv
-    return (
-      <div className="space-y-5">
-        <div>
-          <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><Truck className="text-[#C6A35D]" size={22} /> {(supRow as any)?.company_name ?? fullName ?? 'Supplier'}</h1>
-          <p className="text-sm text-[var(--text-muted)] mt-0.5">
-            {pending ? 'Welcome to Motiv — your registration is being reviewed.' : 'You are live in the Motiv supplier pool.'}
-          </p>
-        </div>
-        {pending
-          ? <VerificationCard />
-          : (
-            <Card className="p-5">
-              <p className="text-sm text-[var(--text-muted)]">
-                You&apos;re verified ✅ — job invitations will appear under <Link href="/supplier/tickets" className="text-[#C6A35D] underline">Tickets</Link> and
-                you&apos;ll be notified the moment a client assigns you work.
-              </p>
-            </Card>
-          )}
-      </div>
-    )
+      .select('verification_status, is_motiv').in('id', supplierIds).limit(1).maybeSingle()
+    pending = (supRow as any)?.verification_status !== 'verified' && !(supRow as any)?.is_motiv
   }
 
   const d = await assembleSupplierDashboard(companyId, supplierIds)
-  const k = d.kpis
   const perf = d.perf
-  const company = d.company
-  const quoteRequested = d.tickets.filter(t => !t.declinedForMe && myStatus(t) === 'quote_requested').length
-  // Submitted quotes awaiting the client's decision (matches the Quotes-tab Pending filter).
-  const pendingDecision = d.quotes.filter(q => q.status === 'pending').length
-  // Overdue = past the final resolution deadline (subset of SLA-breached).
-  const overdueCount = d.tickets.filter(t => !t.declinedForMe && t.overdue).length
   const briefingScopeId = supplierIds.slice().sort().join(',')
-  const briefing = await getDailyBriefing({ companyId, scope: 'supplier', scopeId: briefingScopeId, role: 'supplier', facts: supplierFacts(d) })
-
-  const kpis: Kpi[] = [
-    { label: 'Overdue', value: overdueCount, icon: <Timer size={13} />, tone: 'bad', actionable: true, href: '/supplier/tickets?filter=overdue' },
-    { label: 'SLA Breached', value: k.overdue, icon: <AlertTriangle size={13} />, tone: 'bad', actionable: true, href: '/supplier/tickets?filter=breached' },
-    { label: 'Due Today', value: k.dueToday, icon: <Clock size={13} />, tone: 'warn', actionable: true, href: '/supplier/tickets' },
-    { label: 'Quote requested', value: quoteRequested, icon: <ClipboardList size={13} />, tone: 'info', actionable: true, href: '/supplier/tickets?filter=to_quote' },
-    { label: 'Pending Quotes', value: pendingDecision, icon: <ReceiptText size={13} />, tone: 'warn', actionable: true, href: '/supplier/quotes?status=pending' },
-    { label: 'Job Scheduled', value: k.scheduled, icon: <Calendar size={13} />, tone: 'info', actionable: true, href: '/supplier/tickets?filter=scheduled' },
-    { label: 'Pending Sign-off', value: k.awaitingSignoff, icon: <ClipboardCheck size={13} />, tone: 'warn', actionable: true, href: '/supplier/signoff?status=awaiting' },
-  ]
-
-  // Tickets where this supplier was declined (and not re-invited) are out of their
-  // active work — kept off the dashboard blocks (they live under the Declined filter).
-  const needsAction = d.tickets.filter(t => !t.declinedForMe && t.active && (t.slaLabel === 'Breached' || t.slaLabel === 'At risk' || !t.acknowledged)).slice(0, 6)
-  // Jobs that still need COC & POC uploaded — by stage (work done / evidence asked / snag fix).
-  const evidenceTodo = d.tickets.filter(t => !t.declinedForMe && t.active && EVIDENCE_STAGE[t.status]).slice(0, 6)
-  const recentTickets = [...d.tickets].filter(t => !t.declinedForMe && t.status !== 'completed').sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)).slice(0, 8)
-  // Recent quotes exclude completed tickets; pending sign-off shows only jobs still awaiting a decision.
-  const recentQuotes = d.quotes.filter(q => q.ticketStatus !== 'completed').slice(0, 5)
-  const pendingSignoffs = d.signoffs.filter(s => ['submitted', 'awaiting_regional', 'awaiting_store'].includes(s.status)).slice(0, 5)
+  // Standalone (self-signup) suppliers have no client company, so key the daily
+  // briefing cache on their own supplier id (a non-null UUID, no companies FK) — this
+  // gives verified standalone suppliers the same AI overview as company-linked ones.
+  const briefingCacheKey = companyId ?? supplierIds[0]
+  const briefing = briefingCacheKey
+    ? await getDailyBriefing({ companyId: briefingCacheKey, scope: 'supplier', scopeId: briefingScopeId, role: 'supplier', facts: supplierFacts(d) })
+    : null
+  const greeting = (() => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening' })()
 
   return (
     <div className="space-y-5">
-      <div>
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><Truck className="text-teal-600 dark:text-teal-400" size={22} /> {fullName ?? 'Supplier'}</h1>
-          <Link href="/supplier/reviews" className="inline-flex items-center gap-2 shrink-0 rounded-full bg-[var(--surface-2)] ring-1 ring-[#C6A35D]/40 px-4 py-1.5 hover:bg-[var(--hover)] transition" title="View your reviews">
-            <Star size={17} className="fill-amber-400 text-amber-400 shrink-0" />
+      {pending && (
+        <Link href="/settings" className="flex items-start gap-2.5 rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 px-3.5 py-3 transition hover:bg-amber-500/15">
+          <Clock size={16} className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-500" />
+          <p className="text-sm text-[var(--text-muted)]"><span className="font-semibold text-[var(--text)]">Your account is under review.</span> Feel free to look around while you wait — upload your verification documents in <span className="font-semibold text-[var(--text)]">Settings → Account</span> to speed up approval.</p>
+        </Link>
+      )}
+      {/* Page header — greeting (left) + SLA donut + AI briefing (right), same as the
+          RM / SM homes. The supplier's rating link sits under the greeting. */}
+      <DashboardHealthHeader
+        greeting={greeting}
+        name={fullName}
+        subtitle="Your assigned work, quotes, sign-offs and performance."
+        scopePrefix="Your SLA"
+        donutLabel="SLA"
+        score={perf.performanceScore}
+        status={perf.band}
+        briefingBody={briefing?.body}
+        briefingHeadline={briefing?.headline}
+        briefingScope="supplier"
+        briefingScopeId={briefingScopeId}
+        aside={
+          <Link href="/supplier/reviews" className="inline-flex items-center gap-2 rounded-full bg-[var(--surface-2)] ring-1 ring-[var(--border)] px-3.5 py-1.5 transition hover:bg-[var(--hover)]" title="View your reviews">
+            <Star size={16} className="shrink-0 fill-amber-400 text-amber-400" />
             <span className="text-sm font-bold text-[var(--text)]">{d.rating.avg.toFixed(1)} / 5</span>
-            <span className="text-xs text-amber-600 dark:text-amber-400/80">{d.rating.count ? `(${d.rating.count} review${d.rating.count !== 1 ? 's' : ''})` : '(new)'}</span>
+            <span className="text-xs text-[var(--text-muted)]">{d.rating.count ? `(${d.rating.count} review${d.rating.count !== 1 ? 's' : ''})` : '(new)'}</span>
           </Link>
-        </div>
-        <p className="text-sm text-[var(--text-muted)] mt-0.5">Your assigned work, quotes, sign-offs and performance.</p>
-      </div>
+        }
+      />
 
-      {/* SLA health hero — donut + AI summary inside (matches RM / SM / Executive) */}
-      <Card className="p-6">
-        <div className="flex flex-col sm:flex-row items-center gap-6">
-          <Donut value={perf.performanceScore} status={perf.band} size={140} label="SLA" />
-          <div className="flex-1 min-w-0 w-full space-y-3 text-center sm:text-left">
-            <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
-              <h2 className="text-lg font-bold text-[var(--text)]">SLA Health</h2>
-              <Pill status={perf.band} />
-              <span className="ml-auto"><BriefingRefresh scope="supplier" scopeId={briefingScopeId} /></span>
-            </div>
-            {briefing?.body && (
-              <div className="flex items-start gap-2 justify-center sm:justify-start text-left">
-                <span className="shrink-0 mt-0.5 inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wide text-[#C6A35D] bg-[#C6A35D]/10 rounded-full px-1.5 py-0.5"><Sparkles size={10} /> AI</span>
-                <p className="text-sm text-[var(--text-muted)] leading-relaxed">{briefing.body}</p>
-              </div>
-            )}
-          </div>
-        </div>
-      </Card>
-
-      <KpiRow kpis={kpis} />
-
-      {/* Row 1: Needs your action · Recent quotes */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <SectionCard title="Needs Your Action" icon={<AlertTriangle size={15} className="text-amber-600 dark:text-amber-500" />} action={<Link href="/supplier/tickets" className="text-xs text-[#C6A35D] hover:underline">All</Link>}>
-          {needsAction.map(t => {
-            const sm = rmStatusMeta(myStatus(t)); const m = milestone(t)
-            return (
-            <Link key={t.id} href={`/supplier/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] -mx-2 px-2 rounded">
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-[var(--text)] truncate">{t.isIndividual ? 'Individual' : [company, t.storeName].filter(Boolean).join(' · ')}</p>
-                <p className="text-[11px] text-[var(--text-muted)] truncate">{t.title}</p>
-                <p className="text-[11px] text-[var(--text-faint)]">Logged {formatDateTime(t.createdAt)}</p>
-                {m && <p className={`text-[11px] font-medium ${sm.text}`}>{m.label} · {formatDateTime(m.at)}</p>}
-              </div>
-              <div className="flex flex-col items-end gap-1 shrink-0">
-                <PriorityBadge priority={t.priority} />
-                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${t.disputed ? 'bg-red-500/15 text-red-700 dark:text-red-400' : sm.cls}`}>{t.disputed ? 'Dispute' : sm.label}</span>
-              </div>
-            </Link>
-          ) })}
-          {!needsAction.length && <p className="text-sm text-[var(--text-faint)]">Nothing needs action right now.</p>}
-        </SectionCard>
-        <SectionCard title="Recent Quotes" icon={<ReceiptText size={15} className="text-amber-600 dark:text-amber-500" />} action={<Link href="/supplier/quotes" className="text-xs text-[#C6A35D] hover:underline">All</Link>}>
-          {recentQuotes.map(q => (
-            <Link key={q.id} href={`/supplier/tickets/${q.ticketId}`} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] -mx-2 px-2 rounded">
-              <div className="min-w-0"><p className="text-sm font-medium text-[var(--text)] truncate">{[company, q.storeName].filter(Boolean).join(' · ')}</p><p className="text-[11px] text-[var(--text-muted)] truncate">{q.ticketTitle}</p><p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(q.createdAt)}</p></div>
-              <span className="flex flex-col items-end shrink-0"><span className="text-sm text-[var(--text)]">{formatCurrency(q.amount)}</span><span className="text-[10px] text-[var(--text-faint)]">excl VAT</span><span className={`text-[11px] capitalize ${QUOTE_TONE[q.status] ?? 'text-[var(--text-muted)]'}`}>{q.status === 'accepted' ? 'Approved' : q.status}</span></span>
-            </Link>
-          ))}
-          {!recentQuotes.length && <p className="text-sm text-[var(--text-faint)]">No active quotes.</p>}
-        </SectionCard>
-      </div>
-
-      {/* Row 2: Evidence to upload · Pending sign-off */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <SectionCard title="Evidence to Upload" icon={<Camera size={15} className="text-sky-600 dark:text-sky-400" />} action={<Link href="/supplier/tickets?filter=evidence" className="text-xs text-[#C6A35D] hover:underline">All</Link>}>
-          {evidenceTodo.map(t => (
-            <Link key={t.id} href={`/supplier/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] -mx-2 px-2 rounded">
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-[var(--text)] truncate">{t.isIndividual ? 'Individual' : [company, t.storeName].filter(Boolean).join(' · ')}</p>
-                <p className="text-[11px] text-[var(--text-muted)] truncate">{t.title}</p>
-                <p className="text-[11px] text-[var(--text-faint)]">Logged {formatDateTime(t.createdAt)}</p>
-              </div>
-              <span className="text-[11px] font-medium text-amber-600 dark:text-amber-500 shrink-0 text-right max-w-[7.5rem]">{EVIDENCE_STAGE[t.status]}</span>
-            </Link>
-          ))}
-          {!evidenceTodo.length && <p className="text-sm text-[var(--text-faint)]">No evidence outstanding.</p>}
-        </SectionCard>
-        <SectionCard title="Pending Sign-off" icon={<ClipboardCheck size={15} className="text-emerald-600 dark:text-emerald-400" />} action={<Link href="/supplier/signoff" className="text-xs text-[#C6A35D] hover:underline">All</Link>}>
-          {pendingSignoffs.map(s => (
-            <Link key={s.id} href={`/supplier/tickets/${s.ticketId}`} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] -mx-2 px-2 rounded">
-              <div className="min-w-0"><p className="text-sm font-medium text-[var(--text)] truncate">{[company, s.storeName].filter(Boolean).join(' · ')}</p><p className="text-[11px] text-[var(--text-muted)] truncate">{s.ticketTitle}</p><p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(s.createdAt)}</p></div>
-              <span className="text-[11px] text-[var(--text-muted)] capitalize shrink-0">{s.status.replace(/_/g, ' ')}</span>
-            </Link>
-          ))}
-          {!pendingSignoffs.length && <p className="text-sm text-[var(--text-faint)]">Nothing awaiting sign-off.</p>}
-        </SectionCard>
-      </div>
-
-      {/* Recent tickets — moved to the bottom, collapsible (whole header bar toggles;
-          remembers its state across navigation, like the RM / SM recent lists). */}
-      <CollapsibleCard persistKey="supplier-recent-open" header={<h2 className="text-sm font-bold text-[var(--text)] flex items-center gap-2"><ClipboardList size={15} className="text-blue-600 dark:text-blue-400" /> Recent Tickets</h2>}>
-        {recentTickets.map(t => <TicketRow key={t.id} t={t} company={company} />)}
-        {!recentTickets.length && <p className="text-sm text-[var(--text-faint)]">No tickets yet.</p>}
-        {recentTickets.length > 0 && <Link href="/supplier/tickets" className="mt-3 inline-block text-xs text-[#C6A35D] hover:underline">View all tickets →</Link>}
-      </CollapsibleCard>
+      {/* Filtering KPI cards + phase-aware priority queue (matches SM / RM). */}
+      <SupplierPriorityWorkQueue tickets={d.tickets} generatedAt={d.generatedAt} company={d.company} />
     </div>
   )
 }

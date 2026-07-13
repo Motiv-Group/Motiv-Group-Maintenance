@@ -8,7 +8,8 @@ import { isValidEmail, isValidPhone } from '@/lib/csv'
 import { TRADES } from '@/lib/trades'
 import { SLA_VERSION } from '@/lib/sla'
 import { PasswordInput } from '@/components/ui/PasswordInput'
-import { MotivLockup } from '@/components/ui/MotivLockup'
+import { AuthShell } from '@/components/ui/AuthShell'
+import { AuthError } from '@/components/ui/AuthBits'
 import { Truck, ArrowLeft, ArrowRight, Check, FileText } from 'lucide-react'
 
 // Supplier onboarding wizard — 3 steps, two entry paths:
@@ -20,7 +21,9 @@ import { Truck, ArrowLeft, ArrowRight, Check, FileText } from 'lucide-react'
 
 type Step = 1 | 2 | 3
 
-const inputCls = 'w-full px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/70'
+// Matches the shared auth field (Input tone="auth"): softened dark, neutral
+// border, blue focus ring.
+const inputCls = 'w-full px-3.5 py-2.5 rounded-lg border bg-[#20222b] text-white placeholder:text-gray-400 border-[#343742] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500/60'
 
 export default function SupplierOnboardPage() {
   const router = useRouter()
@@ -128,23 +131,23 @@ export default function SupplierOnboardPage() {
 
   if (invalid) {
     return (
-      <Shell>
+      <AuthShell maxWidth="md" logoHeight={100}>
         <div className="text-center space-y-4">
-          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Invite link problem</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">{invalid}</p>
+          <h1 className="text-xl font-semibold text-white">Invite link problem</h1>
+          <p className="text-sm text-gray-400">{invalid}</p>
           <Link href="/auth/login" className="inline-block rounded-xl bg-blue-600 hover:bg-blue-500 px-5 py-2.5 font-medium text-white transition-colors">Go to login</Link>
         </div>
-      </Shell>
+      </AuthShell>
     )
   }
 
   return (
-    <Shell>
+    <AuthShell maxWidth="md" logoHeight={100}>
       <div className="flex items-center gap-2 mb-1">
-        <Truck size={20} className="text-blue-600 dark:text-blue-400" />
-        <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Supplier registration</h1>
+        <Truck size={20} className="text-blue-400" />
+        <h1 className="text-xl font-semibold text-white">Supplier registration</h1>
       </div>
-      <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
+      <p className="text-sm text-gray-400 mb-5">
         {token ? 'You were invited to join Motiv as a supplier.' : 'Register your trade company on Motiv. Your account is reviewed before you receive work.'}
       </p>
 
@@ -164,23 +167,24 @@ export default function SupplierOnboardPage() {
       </div>
 
       {step === 1 && (
-        <div className="space-y-4">
-          <L label="Email Address">
-            <input type="email" className={`${inputCls} ${emailLocked ? 'opacity-60 cursor-not-allowed' : ''}`} value={email}
+        // Clearing the error on any field edit mirrors the login/signup pages.
+        <div className="space-y-4" onChange={() => { if (error) setError('') }}>
+          <L label="Email Address" htmlFor="onboard-email">
+            <input id="onboard-email" type="email" className={`${inputCls} ${emailLocked ? 'opacity-60 cursor-not-allowed' : ''}`} value={email}
               onChange={e => setEmail(e.target.value)} placeholder="you@company.co.za" disabled={emailLocked} required />
             {emailLocked && <p className="text-[11px] text-gray-400 mt-1">Locked to your invite.</p>}
           </L>
-          <PasswordInput id="password" label="Password" placeholder="Minimum 8 characters" value={password} onChange={e => setPassword(e.target.value)} />
-          <PasswordInput id="confirm" label="Confirm Password" placeholder="Repeat your password" value={confirm} onChange={e => setConfirm(e.target.value)} />
+          <PasswordInput id="password" tone="auth" label="Password" placeholder="Minimum 8 characters" value={password} onChange={e => setPassword(e.target.value)} />
+          <PasswordInput id="confirm" tone="auth" label="Confirm Password" placeholder="Repeat your password" value={confirm} onChange={e => setConfirm(e.target.value)} />
         </div>
       )}
 
       {step === 2 && (
-        <div className="space-y-4">
-          <L label="Company Name"><input className={inputCls} value={companyName} onChange={e => setCompanyName(e.target.value)} placeholder="e.g. Jozi Electrical Services (Pty) Ltd" required /></L>
-          <L label="Contact Person"><input className={inputCls} value={contactName} onChange={e => setContactName(e.target.value)} placeholder="Full name" required /></L>
-          <L label="Phone Number"><input type="tel" className={inputCls} value={phone} onChange={e => setPhone(e.target.value)} placeholder="+27 71 234 5678" required /></L>
-          <L label="Business Address"><input className={inputCls} value={address} onChange={e => setAddress(e.target.value)} placeholder="Street, suburb, city" /></L>
+        <div className="space-y-4" onChange={() => { if (error) setError('') }}>
+          <L label="Company Name" htmlFor="onboard-company"><input id="onboard-company" className={inputCls} value={companyName} onChange={e => setCompanyName(e.target.value)} placeholder="e.g. Jozi Electrical Services (Pty) Ltd" required /></L>
+          <L label="Contact Person" htmlFor="onboard-contact"><input id="onboard-contact" className={inputCls} value={contactName} onChange={e => setContactName(e.target.value)} placeholder="Full name" required /></L>
+          <L label="Phone Number" htmlFor="onboard-phone"><input id="onboard-phone" type="tel" className={inputCls} value={phone} onChange={e => setPhone(e.target.value)} placeholder="+27 71 234 5678" required /></L>
+          <L label="Business Address" htmlFor="onboard-address"><input id="onboard-address" className={inputCls} value={address} onChange={e => setAddress(e.target.value)} placeholder="Street, suburb, city" /></L>
 
           <L label="Trades" hint="(select all that apply)">
             <div className="flex flex-wrap gap-2">
@@ -204,7 +208,9 @@ export default function SupplierOnboardPage() {
             </label>
             {vatRegistered && (
               <div className="mt-3">
-                <input className={inputCls} value={vatNumber} onChange={e => setVatNumber(e.target.value)} placeholder="VAT number — 10 digits, starts with 4" inputMode="numeric" />
+                <L label="VAT number" htmlFor="onboard-vat">
+                  <input id="onboard-vat" className={inputCls} value={vatNumber} onChange={e => setVatNumber(e.target.value)} placeholder="VAT number — 10 digits, starts with 4" inputMode="numeric" />
+                </L>
               </div>
             )}
           </div>
@@ -212,7 +218,7 @@ export default function SupplierOnboardPage() {
       )}
 
       {step === 3 && (
-        <div className="space-y-4">
+        <div className="space-y-4" onChange={() => { if (error) setError('') }}>
           <div className="rounded-xl border border-gray-200 dark:border-white/10 p-4 max-h-64 overflow-y-auto text-sm text-gray-600 dark:text-gray-300 space-y-2">
             <p className="font-semibold text-gray-900 dark:text-white flex items-center gap-1.5"><FileText size={15} /> Service Level Agreement — key commitments (v{SLA_VERSION})</p>
             <ul className="list-disc pl-5 space-y-1">
@@ -231,8 +237,8 @@ export default function SupplierOnboardPage() {
             </p>
           </div>
 
-          <L label="Type your full name as signature">
-            <input className={inputCls} value={signedName} onChange={e => setSignedName(e.target.value)} placeholder="Full name" required />
+          <L label="Type your full name as signature" htmlFor="onboard-signature">
+            <input id="onboard-signature" className={inputCls} value={signedName} onChange={e => setSignedName(e.target.value)} placeholder="Full name" required />
           </L>
 
           <label className="flex items-start gap-3 cursor-pointer rounded-xl border border-gray-200 dark:border-white/10 p-3.5">
@@ -244,7 +250,7 @@ export default function SupplierOnboardPage() {
         </div>
       )}
 
-      {error && <div className="mt-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm rounded-lg px-4 py-3">{error}</div>}
+      {error && <div className="mt-4"><AuthError message={error} /></div>}
 
       <div className="mt-6 flex items-center justify-between gap-3">
         {step > 1 ? (
@@ -266,30 +272,17 @@ export default function SupplierOnboardPage() {
         )}
       </div>
 
-      <p className="mt-4 text-center text-sm text-gray-500 dark:text-gray-400">
-        Already have an account? <Link href="/auth/login" className="text-blue-600 dark:text-blue-400 hover:underline font-medium">Log in</Link>
+      <p className="mt-4 text-center text-sm text-gray-400">
+        Already have an account? <Link href="/auth/login" className="text-blue-400 hover:text-blue-300 hover:underline font-medium">Log in</Link>
       </p>
-    </Shell>
+    </AuthShell>
   )
 }
 
-function Shell({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="dark min-h-screen bg-[#0b0c11] flex flex-col items-center justify-center px-4 py-12">
-      <div className="w-full max-w-md">
-        <div className="flex items-center justify-center mb-8"><MotivLockup height={92} /></div>
-        <div className="bg-slate-50 dark:bg-[#1f2027] rounded-2xl shadow-sm border border-gray-200 dark:border-white/10 p-6 sm:p-8">
-          {children}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function L({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+function L({ label, hint, htmlFor, children }: { label: string; hint?: string; htmlFor?: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+      <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-300 mb-1.5">
         {label}{hint && <span className="text-gray-400 font-normal"> {hint}</span>}
       </label>
       {children}

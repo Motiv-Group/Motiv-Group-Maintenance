@@ -79,7 +79,7 @@ function regionSignals(tickets: HealthTicket[], rules: SlaRuleResolver, now: Dat
 }
 
 export interface StoreManagerContact { name: string | null; email: string | null; phone: string | null }
-export interface StoreCard extends StoreHealthResult { storeName: string; branchCode: string | null; location: string | null; regionName: string; sm?: StoreManagerContact | null }
+export interface StoreCard extends StoreHealthResult { storeName: string; branchCode: string | null; location: string | null; regionName: string; sm?: StoreManagerContact | null; lastActivityAt?: string | null }
 export interface TrendDelta { dir: 'up' | 'down' | 'flat'; pct: number }
 export interface EstateTrends { openWork: TrendDelta; slaPressure: TrendDelta; cost: TrendDelta; supplierBreaches: TrendDelta }
 export interface ExposureBucket { label: string; value: number }
@@ -347,6 +347,11 @@ export interface RegionalTicketRow {
   supplierAssigned: boolean
   // An open supplier↔RM dispute (snag / evidence) — the badge reads "Dispute".
   disputed: boolean
+  // Suppliers already on this ticket (invited/quoted) and those who declined it —
+  // so the "Assign supplier" picker (from the Today queue) can grey out the ones
+  // already engaged and flag the ones who declined before.
+  engagedSupplierIds: Record<string, 'invited' | 'quoted'>
+  declinedSupplierIds: string[]
 }
 export interface RegionalDashboardData {
   portfolio: RegionalHealthResult
@@ -374,15 +379,20 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
   })
   if (!regionIds.length) return empty()
 
-  const [{ data: regionsRaw }, { data: storesRaw }, { data: ticketsRaw }, { data: suppliersRaw }] = await Promise.all([
+  const [{ data: regionsRaw }, { data: storesRaw }, { data: suppliersRaw }] = await Promise.all([
     db.from('regions').select('id, name').in('id', regionIds),
     db.from('stores').select('id, name, sub_store, branch_code, address, region_id').eq('company_id', companyId).in('region_id', regionIds).eq('active', true).is('closed_at', null),
-    db.from('tickets').select(TICKET_COLS).eq('company_id', companyId).in('region_id', regionIds),
     db.from('suppliers').select('id, company_name, active').eq('company_id', companyId),
   ])
   const regionName = new Map((regionsRaw ?? []).map((r: any) => [r.id, r.name]))
   const stores = (storesRaw ?? []) as any[]
   const storeIds = stores.map(s => s.id)
+  // Tickets are keyed off store membership (the durable store→region link), NOT the
+  // denormalised tickets.region_id — so a ticket logged BEFORE its store was linked
+  // to this region (region_id still null/stale) still surfaces for the RM.
+  const { data: ticketsRaw } = storeIds.length
+    ? await db.from('tickets').select(TICKET_COLS).eq('company_id', companyId).in('store_id', storeIds)
+    : { data: [] as any[] }
   const storeName = new Map(stores.map(s => [s.id, storeLabel(s.name, s.sub_store)]))
   const storeBranch = new Map(stores.map(s => [s.id, s.branch_code ?? null]))
   const storeAddr = new Map(stores.map(s => [s.id, s.address ?? null]))
@@ -395,6 +405,19 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
   // Tickets with an OPEN dispute → the badge reads "Dispute" everywhere.
   const { data: openDisputeRows } = ticketIds.length ? await db.from('ticket_disputes').select('ticket_id').eq('status', 'open').in('ticket_id', ticketIds) : { data: [] as any[] }
   const disputedIds = new Set<string>(((openDisputeRows ?? []) as any[]).map(d => d.ticket_id))
+  // Suppliers on each ticket — invited/quoted (already engaged) vs declined/closed —
+  // so the Today queue's "Assign supplier" picker can grey out the engaged ones and
+  // flag the ones who declined this ticket before.
+  const { data: ticketSupplierRows } = ticketIds.length ? await db.from('ticket_suppliers').select('ticket_id, supplier_id, status').in('ticket_id', ticketIds) : { data: [] as any[] }
+  const engagedByTicket = new Map<string, Record<string, 'invited' | 'quoted'>>()
+  const declinedByTicket = new Map<string, string[]>()
+  for (const r of (ticketSupplierRows ?? []) as any[]) {
+    if (r.status === 'invited' || r.status === 'quoted') {
+      const m = engagedByTicket.get(r.ticket_id) ?? {}; m[r.supplier_id] = r.status; engagedByTicket.set(r.ticket_id, m)
+    } else if (r.status === 'declined' || r.status === 'closed') {
+      const a = declinedByTicket.get(r.ticket_id) ?? []; a.push(r.supplier_id); declinedByTicket.set(r.ticket_id, a)
+    }
+  }
   const firstQuoteAt = new Map<string, string>(); const acceptedQuoteAt = new Map<string, string>()
   // Region-wide quote value totals (R) by status, for the RM "Quote Value" KPI.
   let acceptedQuoteValue = 0, pendingQuoteValue = 0
@@ -432,6 +455,8 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
       infoAdded: t.status === 'open' && !!(t as any).info_request_reason,
       supplierAssigned: !!(t as any).supplier_id,
       disputed: disputedIds.has(t.id),
+      engagedSupplierIds: engagedByTicket.get(t.id) ?? {},
+      declinedSupplierIds: declinedByTicket.get(t.id) ?? [],
       }
     })
 
@@ -454,8 +479,15 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
   }
 
   const cards: StoreCard[] = stores.map(s => {
-    const res = calculateStoreHealth({ id: s.id, region_id: s.region_id }, byStore.get(s.id) ?? [], rules, now)
-    return { ...res, storeName: storeName.get(s.id) ?? 'Store', branchCode: storeBranch.get(s.id) ?? null, location: storeAddr.get(s.id) ?? null, regionName: regionName.get(s.region_id) ?? '—', sm: storeSm.get(s.id) ?? null }
+    const stTickets = byStore.get(s.id) ?? []
+    const res = calculateStoreHealth({ id: s.id, region_id: s.region_id }, stTickets, rules, now)
+    // Last activity = the store's most recent ticket touch (supplier/internal update,
+    // else the ticket's updated/created time) — powers the Stores table column.
+    const lastActivityAt = stTickets.reduce<string | null>((acc, t) => {
+      const at = (t as any).last_supplier_update_at ?? (t as any).last_internal_update_at ?? (t as any).updated_at ?? t.created_at
+      return at && (!acc || new Date(at) > new Date(acc)) ? at : acc
+    }, null)
+    return { ...res, storeName: storeName.get(s.id) ?? 'Store', branchCode: storeBranch.get(s.id) ?? null, location: storeAddr.get(s.id) ?? null, regionName: regionName.get(s.region_id) ?? '—', sm: storeSm.get(s.id) ?? null, lastActivityAt }
   })
   const portfolio = calculateRegionalPortfolioHealth('portfolio', cards, regionSignals(tickets, rules, now))
 
@@ -596,7 +628,7 @@ export async function assembleStoreManagerDashboard(companyId: string, storeIds:
 // SUPPLIER DASHBOARD (own assigned tickets only)
 // ============================================================
 export interface SupplierTicketRow {
-  id: string; storeName: string; branchCode: string | null; title: string; priority: Priority; status: string
+  id: string; storeName: string; branchCode: string | null; title: string; category: string | null; priority: Priority; status: string
   ageDays: number; createdAt: string; slaLabel: string; nextActionDueAt: string | null
   acknowledged: boolean; evidenceRequired: boolean; beforeUploaded: boolean; afterUploaded: boolean; cocUploaded: boolean
   active: boolean; breached: boolean
@@ -633,9 +665,10 @@ export async function assembleSupplierDashboard(companyId: string | null, suppli
   // Own tickets (awarded) + tickets where invited to quote (competitive model),
   // plus declined/closed so the supplier still sees them under the Declined filter.
   const [{ data: bySupplier }, { data: invRows }] = await Promise.all([
-    // Same-company tickets awarded to this supplier PLUS individual (company-null)
-    // standalone tickets they've been awarded — both scoped to their supplier ids.
-    db.from('tickets').select(TICKET_COLS).or(companyId ? `company_id.eq.${companyId},company_id.is.null` : 'company_id.is.null').in('supplier_id', supplierIds),
+    // Tickets awarded to this supplier — across ANY company (a Motiv/pool supplier
+    // is awarded client-company tickets they don't belong to). Scoped to their
+    // supplier ids, which is the real ownership gate.
+    db.from('tickets').select(TICKET_COLS).in('supplier_id', supplierIds),
     db.from('ticket_suppliers').select('ticket_id, status, responded_at, declined_by').in('supplier_id', supplierIds).in('status', ['invited', 'quoted', 'awarded', 'declined', 'closed']),
   ])
   const owned = (bySupplier ?? []) as any[]
@@ -725,7 +758,7 @@ export async function assembleSupplierDashboard(companyId: string | null, suppli
       : sla.supplierBreached ? 'Breached' : sla.supplierStatus === 'paused' ? 'Paused (internal)' : sla.atRisk ? 'At risk' : sla.supplierStatus === 'not_started' ? 'Not started' : 'Running'
     const approvedAt = (raw.quote_decision_status === 'approved' ? raw.quote_decided_at : null) ?? acceptedQuoteAt.get(t.id) ?? null
     rows.push({
-      id: t.id, storeName: storeName.get(t.store_id) ?? (raw.company_id ? 'Store' : 'Individual'), branchCode: storeBranch.get(t.store_id) ?? null, title: t.title ?? 'Ticket', priority: t.priority, status: t.status,
+      id: t.id, storeName: storeName.get(t.store_id) ?? (raw.company_id ? 'Store' : 'Individual'), branchCode: storeBranch.get(t.store_id) ?? null, title: t.title ?? 'Ticket', category: (t as any).category ?? null, priority: t.priority, status: t.status,
       ageDays: Math.floor((now.getTime() - new Date(t.created_at).getTime()) / DAY), createdAt: t.created_at, slaLabel: lbl, nextActionDueAt: sla.nextActionDueAt,
       acknowledged: !!t.first_response_at, evidenceRequired: !!t.evidence_required,
       beforeUploaded: !!t.before_photo_uploaded, afterUploaded: !!t.after_photo_uploaded, cocUploaded: !!t.completion_certificate_uploaded,

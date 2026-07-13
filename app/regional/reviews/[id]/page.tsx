@@ -75,7 +75,7 @@ export default async function ContractorReviewsPage(props: { params: Promise<{ i
       ) : (
         <div className="space-y-3">
           {reviews.map((r: any) => (
-            <div key={r.id} className="bg-slate-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 space-y-2">
+            <div key={r.id} className="bg-slate-50 dark:bg-gray-800 border border-[var(--border)] dark:border-gray-700 rounded-xl p-4 space-y-2">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-gray-900 dark:text-white truncate">

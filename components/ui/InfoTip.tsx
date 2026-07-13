@@ -36,7 +36,7 @@ export function InfoTip({
         aria-label={title ? `Info: ${title}` : 'More information'}
         aria-expanded={open}
         onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(o => !o) }}
-        className="text-[var(--text-faint)] hover:text-[#C6A35D] focus:text-[#C6A35D] transition-colors focus:outline-none"
+        className="text-[var(--text-faint)] hover:text-blue-600 dark:hover:text-blue-400 focus:text-blue-600 dark:focus:text-blue-400 transition-colors focus:outline-none"
       >
         <Info size={size} />
       </button>

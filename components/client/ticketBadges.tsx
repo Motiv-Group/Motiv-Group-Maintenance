@@ -5,9 +5,24 @@ import { categoryVisual } from '@/lib/categoryVisual'
 import { PRIORITY_LEVEL_LABELS } from '@/lib/utils'
 import type { StoreManagerTicket } from '@/lib/health/data'
 
-export function CategoryIcon({ category, className = 'h-14 w-14', iconSize = 22 }: { category?: string | null; className?: string; iconSize?: number }) {
+// Category-icon chip: the GLYPH comes from the category, but the COLOUR follows
+// the ticket's PRIORITY (urgent=red, high=orange, medium=amber, low=slate) when a
+// priority is given — so a row's icon reads its urgency at a glance. Falls back to
+// the category colour when no priority is passed.
+function priorityChip(priority?: string | null): string | null {
+  if (!priority) return null
+  const p = String(priority)
+  if (p === 'urgent' || p === 'P1') return 'bg-red-500/15 text-red-600 dark:text-red-400'
+  if (p === 'high' || p === 'P2') return 'bg-orange-500/15 text-orange-600 dark:text-orange-400'
+  if (p === 'medium' || p === 'P3') return 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
+  if (p === 'low' || p === 'P4') return 'bg-slate-500/15 text-slate-600 dark:text-slate-300'
+  return null
+}
+
+export function CategoryIcon({ category, priority, className = 'h-14 w-14', iconSize = 22 }: { category?: string | null; priority?: string | null; className?: string; iconSize?: number }) {
   const { Icon, badgeClass } = categoryVisual(category)
-  return <span className={`grid shrink-0 place-items-center rounded-full ${className} ${badgeClass}`}><Icon size={iconSize} /></span>
+  const chip = priorityChip(priority) ?? badgeClass
+  return <span className={`grid shrink-0 place-items-center rounded-full ${className} ${chip}`}><Icon size={iconSize} /></span>
 }
 
 export function priorityLabel(ticket: StoreManagerTicket): string {
@@ -36,13 +51,13 @@ export function clientStatusLabel(ticket: StoreManagerTicket): string {
 }
 
 export function clientStatusBadgeClass(ticket: StoreManagerTicket): string {
+  // 4-tone status language (mirrors rmStatusMeta): amber = your input is needed,
+  // blue = new / in-flight, green = completed, grey = cancelled/declined.
   if (ticket.infoAdded || ticket.status === 'info_requested') return 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
   switch (ticket.status) {
-    case 'in_progress': return 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D]'
     case 'completed':   return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
-    case 'scheduled':   return 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-400'
-    case 'cancelled':   return 'bg-slate-500/15 text-slate-600 dark:text-slate-300'
-    default:            return 'bg-blue-500/15 text-blue-600 dark:text-blue-400' // open / New
+    case 'cancelled':   return 'bg-gray-500/15 text-gray-600 dark:text-gray-400'
+    default:            return 'bg-blue-500/15 text-blue-700 dark:text-blue-400' // open / scheduled / in progress / New
   }
 }
 
@@ -51,8 +66,8 @@ export function clientStatusBadgeClass(ticket: StoreManagerTicket): string {
 export function TicketBadges({ ticket, className = '' }: { ticket: StoreManagerTicket; className?: string }) {
   return (
     <div className={`flex items-center gap-1.5 ${className}`}>
-      <span className={`inline-flex w-[92px] justify-center rounded-md px-2 py-1 text-[10px] font-bold ${priorityBadgeClass(ticket)}`}>{priorityLabel(ticket)}</span>
-      <span className={`inline-flex w-[92px] justify-center rounded-md px-2 py-1 text-[10px] font-bold ${clientStatusBadgeClass(ticket)}`}>{clientStatusLabel(ticket)}</span>
+      <span className={`inline-flex w-[120px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${priorityBadgeClass(ticket)}`}>{priorityLabel(ticket)}</span>
+      <span className={`inline-flex w-[120px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${clientStatusBadgeClass(ticket)}`}>{clientStatusLabel(ticket)}</span>
     </div>
   )
 }

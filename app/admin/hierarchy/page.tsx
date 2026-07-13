@@ -23,7 +23,15 @@ export default async function AdminHierarchyPage() {
   const smByStore = new Map<string, any>()
   for (const s of ((su ?? []) as any[])) { const p = prof.get(s.user_id); if (p?.role === 'store_manager' && !smByStore.has(s.store_id)) smByStore.set(s.store_id, p) }
   const storesByRegion = new Map<string, any[]>()
-  for (const s of ((stores ?? []) as any[])) { if (!s.region_id) continue; const a = storesByRegion.get(s.region_id) ?? []; a.push(s); storesByRegion.set(s.region_id, a) }
+  const unassignedByCompany = new Map<string, any[]>()
+  for (const s of ((stores ?? []) as any[])) {
+    if (!s.region_id) { const a = unassignedByCompany.get(s.company_id) ?? []; a.push(s); unassignedByCompany.set(s.company_id, a); continue }
+    const a = storesByRegion.get(s.region_id) ?? []; a.push(s); storesByRegion.set(s.region_id, a)
+  }
+  const storeNode = (s: any) => {
+    const sm = smByStore.get(s.id)
+    return { id: s.id, name: s.name, subStore: s.sub_store ?? null, branchCode: s.branch_code ?? null, sm: sm ? { name: sm.full_name ?? '—', email: sm.email ?? '' } : null }
+  }
   const regionsByCompany = new Map<string, any[]>()
   for (const r of ((regions ?? []) as any[])) { const a = regionsByCompany.get(r.company_id) ?? []; a.push(r); regionsByCompany.set(r.company_id, a) }
 
@@ -33,11 +41,9 @@ export default async function AdminHierarchyPage() {
     regions: (regionsByCompany.get(c.id) ?? []).map(r => ({
       id: r.id, name: r.name, code: r.region_code,
       rms: (rmByRegion.get(r.id) ?? []).map(u => ({ id: u.id, name: u.full_name ?? '—', email: u.email ?? '' })),
-      stores: (storesByRegion.get(r.id) ?? []).map(s => {
-        const sm = smByStore.get(s.id)
-        return { id: s.id, name: s.name, subStore: s.sub_store ?? null, branchCode: s.branch_code ?? null, sm: sm ? { name: sm.full_name ?? '—', email: sm.email ?? '' } : null }
-      }),
+      stores: (storesByRegion.get(r.id) ?? []).map(storeNode),
     })),
+    unassignedStores: (unassignedByCompany.get(c.id) ?? []).map(storeNode),
   }))
   const regionRefs: Record<string, RegionRef[]> = {}
   for (const [cid, rs] of regionsByCompany.entries()) regionRefs[cid] = rs.map(r => ({ id: r.id, name: r.name, code: r.region_code }))
@@ -46,7 +52,7 @@ export default async function AdminHierarchyPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2">
-          <Network className="text-[#C6A35D]" size={22} /> Hierarchy
+          <Network className="text-blue-600 dark:text-blue-400" size={22} /> Hierarchy
           <InfoTip title="Hierarchy" align="left">Company → Executives, Regions → Regional Managers and Stores → Store Managers. Move a store to another region (re-links its SM under that region&apos;s RM), or reassign an RM to a region.</InfoTip>
         </h1>
         <p className="text-sm text-[var(--text-muted)] mt-0.5">Which store belongs to which company, and who manages what. Move stores or reassign managers to re-link the tree.</p>

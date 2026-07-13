@@ -16,11 +16,19 @@ const BodySchema = z.object({
 export async function GET() {
   const ctx = await supplierCtx()
   if (!ctx) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  const { data } = await ctx.admin.from('supplier_verification_docs')
-    .select('id, kind, url, uploaded_at').in('supplier_id', ctx.supplierIds).order('uploaded_at', { ascending: true })
+  const [{ data }, { data: sup }] = await Promise.all([
+    ctx.admin.from('supplier_verification_docs')
+      .select('id, kind, url, uploaded_at').in('supplier_id', ctx.supplierIds).order('uploaded_at', { ascending: true }),
+    ctx.admin.from('suppliers').select('verification_status, is_motiv').in('id', ctx.supplierIds).limit(1).maybeSingle(),
+  ])
   const rows = (data ?? []) as { id: string; kind: string; url: string; uploaded_at: string }[]
   const signed = await signManyUrls(rows.map(r => r.url))
-  return NextResponse.json({ docs: rows.map((r, i) => ({ id: r.id, kind: r.kind, url: signed[i] ?? r.url, uploadedAt: r.uploaded_at })) })
+  const verified = (sup as any)?.verification_status === 'verified' || (sup as any)?.is_motiv === true
+  return NextResponse.json({
+    verificationStatus: (sup as any)?.verification_status ?? null,
+    verified,
+    docs: rows.map((r, i) => ({ id: r.id, kind: r.kind, url: signed[i] ?? r.url, uploadedAt: r.uploaded_at })),
+  })
 }
 
 // POST /api/supplier/verification-docs — record an uploaded verification document.

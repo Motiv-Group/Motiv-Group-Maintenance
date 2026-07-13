@@ -15,8 +15,7 @@ import { BreachReason } from '@/components/workflow/BreachReason'
 import { Card } from '@/components/exec/ui'
 import { WorkflowActions } from '@/components/workflow/WorkflowActions'
 import { RmPipeline } from '@/components/regional/RmPipeline'
-import { AssignSuppliersButton, RequestInfoButton, RmEditTicketForm, RmQuotePanel, RmReviewPanel, CancelTicketCard, ApproveSignoffCard, ReQuoteButton, AcceptScheduleCard, AcceptSnagScheduleCard, VariationReviewCard, RmAddWorkForm, RequestEvidenceButton, RaiseSnagButton, CloseOutButton } from '@/components/regional/RmTicketActions'
-import { DueDate } from '@/components/workflow/DueDate'
+import { RmEditTicketForm, RmQuotePanel, RmReviewPanel, ApproveSignoffCard, ReQuoteButton, AcceptScheduleCard, AcceptSnagScheduleCard, VariationReviewCard, RequestEvidenceButton, RaiseSnagButton, CloseOutButton, RmTicketActionBar } from '@/components/regional/RmTicketActions'
 import { EditedLine } from '@/components/ui/EditedLine'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { RmTicketTabs } from '@/components/regional/RmTicketTabs'
@@ -26,7 +25,7 @@ import type { StoreManagerTicket } from '@/lib/health/data'
 import { CollapsibleSection } from '@/components/ui/CollapsibleSection'
 import { MarkTicketSeen } from '@/components/ui/MarkTicketSeen'
 import { DisputeThread } from '@/components/dispute/DisputeBox'
-import { formatCurrency, formatDateTime, formatDate, rmStatusMeta, storeLabel, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
+import { formatCurrency, formatDateTime, formatDate, rmStatusMeta, storeLabel, OPERATIONAL_IMPACT_LABELS, humanizeDuration } from '@/lib/utils'
 
 // Professional "what we're waiting on" copy while a snag works its way through.
 const SNAG_WAIT_MSG: Record<string, string> = {
@@ -225,10 +224,15 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
     requireRegionalV3(),
     admin.from('tickets').select('*').eq('id', params.id).single(),
   ])
-  if (!t || !t.region_id || !regionIds.includes(t.region_id)) redirect('/regional/tickets')
+  if (!t) redirect('/regional/tickets')
+  // Authorise by the ticket's STORE being in one of the RM's regions (the durable
+  // store→region link) rather than the denormalised tickets.region_id — so a ticket
+  // logged before its store was linked to the region (region_id still null/stale)
+  // still opens for the RM instead of bouncing back to the list.
+  const { data: store } = await admin.from('stores').select('name, sub_store, region_id, company_id').eq('id', t.store_id ?? '').maybeSingle()
+  if (!store || store.company_id !== companyId || !store.region_id || !regionIds.includes(store.region_id)) redirect('/regional/tickets')
 
-  const [{ data: store }, { data: quotes }, { data: updates }, { data: signoffs }, { data: suppliers }, { data: variations }, { data: snags }, { data: invites }, { data: ratingRows }, { data: roundRows }] = await Promise.all([
-    admin.from('stores').select('name, sub_store').eq('id', t.store_id ?? '').single(),
+  const [{ data: quotes }, { data: updates }, { data: signoffs }, { data: suppliers }, { data: variations }, { data: snags }, { data: invites }, { data: ratingRows }, { data: roundRows }] = await Promise.all([
     admin.from('quotes').select('id, supplier_id, amount, amount_incl_vat, description, file_url, status, valid_until, proposed_schedule_at, decline_reason, created_at, updated_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('signoffs').select('id, status, before_urls, after_urls, coc_url, invoice_url, notes, reject_reason, reviewed_at, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
@@ -859,15 +863,15 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
       <BackLink fallbackHref="/regional/tickets" label="Back to tickets" />
 
       {/* Header — reference, title, priority + status, progress stepper (SM flavor). */}
-      <Card className="p-5 space-y-5">
+      <Card className="p-5 space-y-7">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex flex-wrap items-center gap-x-2 gap-y-0.5">
             {t.job_ref && <span className="font-mono text-sm font-semibold text-[var(--text-faint)]">{t.job_ref}</span>}
-            <h1 className="text-lg font-bold text-[var(--text)]">{t.title}</h1>
+            <h1 className="text-lg font-bold text-[var(--text)]">{t.category || t.title}</h1>
           </div>
           {/* Priority + status badges — same form factor as the SM ticket detail. */}
           <div className="flex items-center gap-1.5 shrink-0">
-            <span className={`inline-flex w-[92px] justify-center rounded-md px-2 py-1 text-[10px] font-bold ${priorityBadgeClass({ priority: t.priority } as StoreManagerTicket)}`}>{priorityLabel({ priority: t.priority } as StoreManagerTicket)}</span>
+            <span className={`inline-flex w-[120px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${priorityBadgeClass({ priority: t.priority } as StoreManagerTicket)}`}>{priorityLabel({ priority: t.priority } as StoreManagerTicket)}</span>
             {(() => {
               const sm = rmStatusMeta(t.status)
               // An open dispute overrides the badge with "Dispute" (the snag/evidence
@@ -877,7 +881,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
               // description until the RM acts.
               const label = openDispute ? 'Dispute' : rmInfoAdded ? 'Info added' : sm.label
               const cls = openDispute ? 'bg-red-500/15 text-red-700 dark:text-red-400' : rmInfoAdded ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : sm.cls
-              return <span className={`inline-flex w-[92px] justify-center rounded-md px-2 py-1 text-[10px] font-bold ${cls}`}>{label}</span>
+              return <span className={`inline-flex w-[120px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${cls}`}>{label}</span>
             })()}
           </div>
         </div>
@@ -885,11 +889,11 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
         <RmPipeline status={t.status} />
       </Card>
 
-      {/* Next action + Ticket information, side by side. */}
-      <div className="grid gap-4 lg:grid-cols-2 items-start">
+      {/* Next action + Ticket information, side by side — matched heights (stretch). */}
+      <div className="grid gap-4 lg:grid-cols-2 items-stretch">
       {/* Next action — the RM's most important pending step + the controls to take it
           (buttons stacked one under another). */}
-      <Card className="p-5 space-y-4">
+      <Card className="p-5 space-y-4 h-full">
         <div>
           <h2 className="text-sm font-bold text-[var(--text)]">Next action</h2>
           {nextAction.msg && <p className="mt-1 text-sm font-bold text-[var(--text)]">{nextAction.msg}</p>}
@@ -929,15 +933,14 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
             a quote is awarded the approved quote lives in the Quotes tab. */}
         {!isTerminal && !awarded && quotePanelRows.length > 0 && <RmQuotePanel ticketId={t.id} rows={quotePanelRows} canReQuote={canReQuote} />}
 
-        {/* Primary actions — two per row: Add extra work · Request more info,
-            then Assign supplier · Cancel ticket. */}
+        {/* Primary action leads (Assign supplier); everything secondary/destructive —
+            add extra work, request more info, cancel — lives behind "More actions".
+            It's a client component so its per-action trigger render-props are created
+            client-side (a Server Component can't pass functions to Client Components). */}
         {!isTerminal && (canAssign || canCancel) && (
-          <div className="grid grid-cols-2 gap-2">
-            {canAssign && <RmAddWorkForm ticketId={t.id} description={t.description ?? ''} photoUrls={Array.isArray(t.photo_urls) ? t.photo_urls : []} title={t.title} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} />}
-            {['open', 'info_requested'].includes(t.status) && <RequestInfoButton ticketId={t.id} />}
-            {canAssignSupplier && <AssignSuppliersButton ticketId={t.id} suppliers={supplierList} motivSuppliers={motivSupplierList} declinedSupplierIds={declinedSupplierIds} awaitingById={engagedSupplierIds} />}
-            {canCancel && <CancelTicketCard ticketId={t.id} />}
-          </div>
+          <RmTicketActionBar ticketId={t.id} status={t.status} canAssign={canAssign} canAssignSupplier={canAssignSupplier} canCancel={canCancel}
+            suppliers={supplierList} motivSuppliers={motivSupplierList} declinedSupplierIds={declinedSupplierIds} awaitingById={engagedSupplierIds}
+            description={t.description ?? ''} photoUrls={Array.isArray(t.photo_urls) ? t.photo_urls : []} title={t.title} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} />
         )}
 
         {/* Completion (COC & POC) under review — compact row → pop-up with the full
@@ -984,51 +987,54 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
         />
       </Card>
 
-      {/* Ticket information — details + description (left) · logged/due + edit (right). */}
-        <Card className="p-5 space-y-4">
+      {/* Ticket information — aligned label→value rows, then full-width description. */}
+        <Card className="p-5 space-y-4 h-full">
           <h2 className="text-sm font-bold text-[var(--text)]">Ticket information</h2>
-          <div className="grid gap-x-6 gap-y-4 lg:grid-cols-2">
-            {/* Left — store details + the description. */}
-            <div className="space-y-4">
-              <DetailItem label="Store" value={storeName} />
-              <DetailItem label="Category" value={t.category ?? 'General'} />
-              <DetailItem label="Operational Impact" value={OPERATIONAL_IMPACT_LABELS[t.operational_impact ?? 'none'] ?? 'No operational impact'} />
-              <div>
-                <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Description</div>
-                {(() => {
-                  // Appended segments highlight red until the RM moves the ticket on: the
-                  // store manager's answer ("— Added info: …") and the RM's own extra scope
-                  // ("— Extra Work: …"). The base description text is white.
-                  const parts = String(t.description ?? '').split(/(\n\n— (?:Added info|Extra Work): )/)
-                  const segs: JSX.Element[] = []
-                  for (let i = 1; i < parts.length; i += 2) {
-                    const sep = parts[i], seg = parts[i + 1] ?? ''
-                    const hot = sep.includes('Extra Work') ? canAssign : rmInfoAdded
-                    segs.push(<span key={i} className={hot ? 'text-red-600 dark:text-red-400 font-medium' : 'text-[var(--text)]'}>{`${sep}${seg}`}</span>)
-                  }
-                  return (
-                    <p className="text-sm whitespace-pre-line text-[var(--text)]">
-                      <span>{parts[0]}</span>
-                      {segs}
-                    </p>
-                  )
-                })()}
-              </div>
-            </div>
+          <dl className="grid grid-cols-[max-content_1fr] items-baseline gap-x-6 gap-y-2.5 text-sm">
+            <dt className="text-[var(--text-muted)]">Store</dt>
+            <dd className="font-medium text-[var(--text)]">{storeName}</dd>
+            <dt className="text-[var(--text-muted)]">Category</dt>
+            <dd className="font-medium text-[var(--text)]">{t.category ?? 'General'}</dd>
+            <dt className="text-[var(--text-muted)]">Operational impact</dt>
+            <dd className="font-medium text-[var(--text)]">{OPERATIONAL_IMPACT_LABELS[t.operational_impact ?? 'none'] ?? 'No operational impact'}</dd>
+            <dt className="text-[var(--text-muted)]">Logged</dt>
+            <dd className="font-medium text-[var(--text)]">{formatDateTime(t.created_at)}</dd>
+            <dt className="text-[var(--text-muted)]">Due</dt>
+            <dd className={`font-medium ${overdue ? 'text-red-600 dark:text-red-400' : 'text-[var(--text)]'}`}>
+              {formatDateTime(dueAt)}
+              {overdue && <span className="ml-1.5 text-[11px] font-semibold">· Overdue by {humanizeDuration(Math.max(0, now.getTime() - new Date(dueAt).getTime()))}</span>}
+            </dd>
+          </dl>
 
-            {/* Right — logged / due, with Edit ticket bottom-aligned to the last line
-                of the description. */}
-            <div className="flex flex-col gap-4">
-              <DetailItem label="Logged" value={formatDateTime(t.created_at)} />
-              <DueDate dueAt={dueAt} overdue={overdue} now={now.toISOString()} />
-              {(t.edited_at || canEdit) && (
-                <div className="mt-auto flex items-center justify-between gap-2 pt-1">
-                  <EditedLine at={t.edited_at} by={editorName} />
-                  {canEdit && <RmEditTicketForm ticketId={t.id} initial={{ title: t.title, category: t.category ?? 'General', impact: t.operational_impact ?? 'none', priority: t.priority, description: t.description }} />}
-                </div>
-              )}
-            </div>
+          {/* Description — full width beneath the detail rows. */}
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Description</div>
+            {(() => {
+              // Appended segments highlight red until the RM moves the ticket on: the
+              // store manager's answer ("— Added info: …") and the RM's own extra scope
+              // ("— Extra Work: …"). The base description text is white.
+              const parts = String(t.description ?? '').split(/(\n\n— (?:Added info|Extra Work): )/)
+              const segs: JSX.Element[] = []
+              for (let i = 1; i < parts.length; i += 2) {
+                const sep = parts[i], seg = parts[i + 1] ?? ''
+                const hot = sep.includes('Extra Work') ? canAssign : rmInfoAdded
+                segs.push(<span key={i} className={hot ? 'text-red-600 dark:text-red-400 font-medium' : 'text-[var(--text)]'}>{`${sep}${seg}`}</span>)
+              }
+              return (
+                <p className="text-sm whitespace-pre-line text-[var(--text)]">
+                  <span>{parts[0]}</span>
+                  {segs}
+                </p>
+              )
+            })()}
           </div>
+
+          {(t.edited_at || canEdit) && (
+            <div className="flex items-center justify-between gap-2 pt-1">
+              <EditedLine at={t.edited_at} by={editorName} />
+              {canEdit && <RmEditTicketForm ticketId={t.id} initial={{ title: t.title, category: t.category ?? 'General', impact: t.operational_impact ?? 'none', priority: t.priority, description: t.description }} />}
+            </div>
+          )}
 
           {t.info_request_reason && <p className="text-xs text-amber-600 dark:text-amber-400">Info requested: {t.info_request_reason}</p>}
           {/* Scheduled visit — hidden once a snag fix is in play (that callout replaces it). */}

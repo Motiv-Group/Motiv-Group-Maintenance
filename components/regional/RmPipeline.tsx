@@ -39,20 +39,21 @@ export function RmPipeline({ status }: { status: string }) {
       <div className="flex items-start">
         {STAGES.map((s, i) => {
           const reached = i <= idx
+          const isCurrent = i === idx
           const isLast = i === STAGES.length - 1
           // The active step turns into a red "Snag" marker while a snag is open.
-          const isSnagStep = snagged && i === idx
+          const isSnagStep = snagged && isCurrent
           const dot = isSnagStep ? 'bg-red-500' : s.dot
-          const ring = isSnagStep ? 'ring-red-500/30' : s.ring
+          const ring = isSnagStep ? 'ring-red-500/40' : s.ring
           const text = isSnagStep ? 'text-red-600 dark:text-red-400' : s.text
           const label = isSnagStep ? 'Snag' : s.label
           return (
             <div key={s.label} className={isLast ? 'flex items-start' : 'flex items-start flex-1'}>
-              <div className="flex flex-col items-center gap-1 w-12 sm:w-16">
-                <div className={`w-3.5 h-3.5 rounded-full transition ${reached ? dot : 'bg-white/10'} ${i === idx ? `ring-4 ${ring}` : ''}`} />
-                <span className={`text-[9px] text-center leading-tight ${i === idx ? `${text} font-semibold` : reached ? 'text-[var(--text-muted)]' : 'text-[var(--text-faint)]'}`}>{label}</span>
+              <div className="flex flex-col items-center gap-1.5 w-14 sm:w-[74px]">
+                <div className={`rounded-full transition ${isCurrent ? 'h-6 w-6' : 'h-5 w-5'} ${reached ? dot : 'bg-slate-300 dark:bg-white/25'} ${isCurrent ? `ring-4 ${ring}` : reached ? '' : 'ring-1 ring-black/10 dark:ring-white/15'}`} />
+                <span className={`text-center leading-tight ${isCurrent ? `text-xs sm:text-[13px] ${text} font-bold` : reached ? 'text-[11px] sm:text-xs font-medium text-[var(--text)]' : 'text-[11px] sm:text-xs text-[var(--text-muted)]'}`}>{label}</span>
               </div>
-              {!isLast && <div className={`flex-1 h-0.5 mt-[7px] rounded ${i < idx ? s.dot : 'bg-white/10'}`} />}
+              {!isLast && <div className={`flex-1 h-1 mt-[9px] rounded-full ${i < idx ? s.dot : 'bg-slate-200 dark:bg-white/15'}`} />}
             </div>
           )
         })}

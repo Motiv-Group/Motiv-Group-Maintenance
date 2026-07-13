@@ -4,10 +4,10 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { useDropzone } from 'react-dropzone'
-import { UploadCloud, X, FileText, Loader2, Calendar, Sparkles } from 'lucide-react'
-import { Input } from '@/components/ui/Input'
-import { Button } from '@/components/ui/Button'
+import { UploadCloud, X, FileText, Loader2, Calendar, Sparkles, Check, Clock, AlertTriangle, AlertCircle } from 'lucide-react'
 import { SchedulePicker } from '@/components/ui/SchedulePicker'
+import { Modal } from '@/components/ui/Modal'
+import { DrawerHeader } from '@/components/exec/Drawer'
 import { uploadFiles } from '@/lib/upload'
 import { formatDateTime } from '@/lib/utils'
 
@@ -159,6 +159,13 @@ export function SendQuoteForm({
         }
       : undefined,
   })
+
+  // Raised slate field on the card, emerald focus accent — matches the SM/RM wizard.
+  const field = 'w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-[var(--text)] placeholder-[var(--text-faint)] focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500/60'
+  // Emerald selection tile (idle → active), shared by the N/A + valid-until toggles.
+  const tile = (active: boolean) => `inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border transition ${active
+    ? 'border-emerald-500 bg-emerald-500/10 text-[var(--text)] ring-2 ring-emerald-500/30'
+    : 'border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/60 text-[var(--text-muted)] hover:border-emerald-500/60'}`
 
   /**
    * Apply a parse result to the form. NEVER overwrites a field the supplier has
@@ -366,32 +373,34 @@ export function SendQuoteForm({
 
   if (!open) {
     return (
-      <Button
+      <button
+        type="button"
         onClick={() => setOpen(true)}
-        className={`w-full ${isVariation
-          ? 'bg-[#C6A35D] hover:bg-[#b8954f] text-white border-[#C6A35D] focus:ring-[#C6A35D]'
-          : 'bg-green-600 hover:bg-green-700 text-white border-green-600 focus:ring-green-500'}`}
+        className={`w-full py-2.5 rounded-xl text-sm font-semibold text-white transition ${isVariation
+          ? 'bg-blue-600 hover:bg-blue-500'
+          : 'bg-emerald-600 hover:bg-emerald-500'}`}
       >
         {isEdit ? 'Edit Quote' : isVariation ? 'Raise Variation Order' : 'Upload Quote'}
-      </Button>
+      </button>
     )
   }
 
   return (
-    <div className="bg-slate-50 dark:bg-gray-800 border border-brand-200 dark:border-gray-700 rounded-xl p-5 space-y-4">
-      <h3 className="font-semibold text-gray-900 dark:text-white">
+    <div className="rounded-2xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] p-5 space-y-4">
+      <h3 className="font-semibold text-[var(--text)]">
         {isEdit ? 'Edit Quote' : isVariation ? 'Raise Variation Order' : 'Send Quote'}
       </h3>
       {isVariation && (
-        <p className="text-xs text-gray-500 dark:text-gray-400">
+        <p className="text-xs text-[var(--text-muted)]">
           For extra materials or work needed to complete the job. This is sent to the regional manager for approval before work continues.
         </p>
       )}
 
       {/* Supplier responsibility disclaimer */}
-      <div className="px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 rounded-lg">
-        <p className="text-xs text-amber-700 dark:text-amber-300">
-          ⚠ It is your responsibility to verify all amounts and details are correct before submitting — whether auto-filled from the document or entered manually.
+      <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 flex items-start gap-2.5">
+        <AlertTriangle size={16} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
+        <p className="text-xs text-amber-700 dark:text-amber-400">
+          It is your responsibility to verify all amounts and details are correct before submitting — whether auto-filled from the document or entered manually.
         </p>
       </div>
 
@@ -399,28 +408,28 @@ export function SendQuoteForm({
 
         {/* File upload — first so PDF parse runs before user edits fields */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label className="block text-sm font-medium text-[var(--text)] mb-1">
             Attachment <span className="text-red-500">*</span>{' '}
-            <span className="text-gray-400 font-normal">(PDF, Excel, image or Word, max 10 MB)</span>
+            <span className="text-[var(--text-faint)] font-normal">(PDF, Excel, image or Word, max 10 MB)</span>
           </label>
           {file ? (
-            <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg">
-              <FileText size={18} className="text-brand-600 shrink-0" />
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600">
+              <FileText size={18} className="text-blue-600 dark:text-blue-400 shrink-0" />
               <a
                 href={filePreview ?? '#'}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-sm text-brand-600 dark:text-brand-400 truncate flex-1 hover:underline"
+                className="text-sm text-blue-600 dark:text-blue-400 truncate flex-1 hover:underline"
                 title="View attachment"
               >
                 {file.name}
               </a>
               {parsing ? (
-                <span className="flex items-center gap-1 text-xs text-brand-600 shrink-0">
+                <span className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 shrink-0">
                   <Loader2 size={12} className="animate-spin" /> Reading…
                 </span>
               ) : (
-                <span className="text-xs text-gray-400 shrink-0">{(file.size / 1024).toFixed(0)} KB</span>
+                <span className="text-xs text-[var(--text-faint)] shrink-0">{(file.size / 1024).toFixed(0)} KB</span>
               )}
               <button
                 type="button"
@@ -433,7 +442,7 @@ export function SendQuoteForm({
                   setValidNA(false); setWarrantyNA(false)
                   reset({ amount: undefined as any, amount_incl_vat: '', description: '', valid_until: '' })
                 }}
-                className="p-1 text-gray-400 hover:text-red-500 rounded transition-colors"
+                className="p-1 text-[var(--text-faint)] hover:text-red-500 rounded transition-colors"
               >
                 <X size={16} />
               </button>
@@ -442,28 +451,28 @@ export function SendQuoteForm({
             <>
             {existingFileUrl && (
               <a href={existingFileUrl} target="_blank" rel="noopener noreferrer"
-                className="mb-2 inline-flex items-center gap-1.5 text-xs text-brand-600 dark:text-brand-400 hover:underline">
+                className="mb-2 inline-flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline">
                 <FileText size={13} /> View current attachment — drop a new file below to replace
               </a>
             )}
             <div
               {...getRootProps()}
-              className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
+              className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${
                 isDragActive
-                  ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20'
-                  : 'border-gray-300 dark:border-gray-600 hover:border-brand-400 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                  ? 'border-blue-500 bg-blue-500/10'
+                  : 'border-[var(--border)] hover:border-emerald-500/60 hover:bg-[var(--hover)]'
               }`}
             >
               <input {...getInputProps()} />
-              <UploadCloud size={28} className={`mx-auto mb-2 ${isDragActive ? 'text-brand-500' : 'text-gray-400'}`} />
+              <UploadCloud size={28} className={`mx-auto mb-2 ${isDragActive ? 'text-blue-500' : 'text-[var(--text-faint)]'}`} />
               {isDragActive ? (
-                <p className="text-sm text-brand-600 font-medium">Drop it here…</p>
+                <p className="text-sm text-blue-600 dark:text-blue-400 font-medium">Drop it here…</p>
               ) : (
                 <>
-                  <p className="text-sm text-gray-600 dark:text-gray-300">
-                    Drag & drop a file, or <span className="text-brand-600 font-medium">browse</span>
+                  <p className="text-sm text-[var(--text-muted)]">
+                    Drag &amp; drop a file, or <span className="text-blue-600 dark:text-blue-400 font-medium">browse</span>
                   </p>
-                  <p className="text-xs text-gray-400 mt-1">PDF, Excel or photo auto-fills fields · Word also accepted · max 10 MB</p>
+                  <p className="text-xs text-[var(--text-faint)] mt-1">PDF, Excel or photo auto-fills fields · Word also accepted · max 10 MB</p>
                 </>
               )}
             </div>
@@ -473,9 +482,9 @@ export function SendQuoteForm({
 
         {/* Auto-fill banner */}
         {autofilled && !parsing && (
-          <div className="flex items-center gap-2 px-3 py-2 bg-brand-50 dark:bg-brand-900/20 border border-brand-200 dark:border-brand-800/40 rounded-lg">
-            <Sparkles size={14} className="text-brand-600 dark:text-brand-400 shrink-0" />
-            <p className="text-xs text-brand-700 dark:text-brand-300">
+          <div className="rounded-xl bg-blue-500/10 ring-1 ring-blue-500/30 p-3.5 flex items-start gap-2.5">
+            <Sparkles size={16} className="text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+            <p className="text-xs text-blue-700 dark:text-blue-400">
               Fields auto-filled from your file — please review and adjust if needed.
             </p>
           </div>
@@ -483,95 +492,100 @@ export function SendQuoteForm({
 
         {/* Amount needs manual entry — context read, but amount not confidently found */}
         {needAmount && !parsing && (
-          <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 rounded-lg">
-            <p className="text-xs text-amber-700 dark:text-amber-300">
-              ⚠️ Couldn&apos;t read the amount with confidence — please enter the amount(s) manually.
+          <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 flex items-start gap-2.5">
+            <AlertTriangle size={16} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
+            <p className="text-xs text-amber-700 dark:text-amber-400">
+              Couldn&apos;t read the amount with confidence — please enter the amount(s) manually.
             </p>
           </div>
         )}
 
         {/* Parse error banner */}
         {parseError && !parsing && (
-          <div className="flex items-center gap-2 px-3 py-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800/40 rounded-lg">
-            <p className="text-xs text-yellow-700 dark:text-yellow-300">
+          <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 flex items-start gap-2.5">
+            <AlertTriangle size={16} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
+            <p className="text-xs text-amber-700 dark:text-amber-400">
               {parseError === 'scanned'
-                ? '⚠️ Could not read this PDF automatically. Please fill in manually.'
-                : '⚠️ Could not auto-fill fields from this file. Please fill in manually.'}
+                ? 'Could not read this PDF automatically. Please fill in manually.'
+                : 'Could not auto-fill fields from this file. Please fill in manually.'}
             </p>
           </div>
         )}
 
         <div>
           <div className="grid grid-cols-2 gap-3 items-start">
-            <Input
-              id="amount"
-              type="number"
-              step="0.01"
-              label="Excl. VAT (R) *"
-              placeholder="0.00"
-              error={errors.amount?.message}
-              {...register('amount', { required: 'Required', min: { value: 1, message: 'Must be > 0' } })}
-            />
-            <Input
-              id="amount_incl_vat"
-              type="number"
-              step="0.01"
-              label="Incl. VAT (R)"
-              placeholder="0.00"
-              error={errors.amount_incl_vat?.message}
-              {...register('amount_incl_vat', {
-                min: { value: 1, message: 'Must be > 0' },
-                setValueAs: v => v === '' ? '' : Number(v),
-              })}
-            />
+            <div>
+              <label htmlFor="amount" className="block text-sm font-medium text-[var(--text)] mb-1">Excl. VAT (R) *</label>
+              <input
+                id="amount"
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                className={field}
+                {...register('amount', { required: 'Required', min: { value: 1, message: 'Must be > 0' } })}
+              />
+              {errors.amount && <p className="mt-1 text-xs text-red-500">{errors.amount.message}</p>}
+            </div>
+            <div>
+              <label htmlFor="amount_incl_vat" className="block text-sm font-medium text-[var(--text)] mb-1">Incl. VAT (R)</label>
+              <input
+                id="amount_incl_vat"
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                className={field}
+                {...register('amount_incl_vat', {
+                  min: { value: 1, message: 'Must be > 0' },
+                  setValueAs: v => v === '' ? '' : Number(v),
+                })}
+              />
+              {errors.amount_incl_vat && <p className="mt-1 text-xs text-red-500">{errors.amount_incl_vat.message}</p>}
+            </div>
           </div>
-          <p className="mt-1 text-xs text-gray-400">Incl. VAT — leave blank if supplier not VAT-registered</p>
+          <p className="mt-1 text-xs text-[var(--text-faint)]">Incl. VAT — leave blank if supplier not VAT-registered</p>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+          <label className="block text-sm font-medium text-[var(--text)] mb-1">Description</label>
           <textarea
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
+            className={`${field} resize-none`}
             rows={3}
             placeholder="Describe what the quote covers..."
             {...register('description', { required: 'Description is required' })}
           />
-          {errors.description && <p className="mt-1 text-xs text-red-600">{errors.description.message}</p>}
+          {errors.description && <p className="mt-1 text-xs text-red-500">{errors.description.message}</p>}
         </div>
 
         {/* Warranty / Guarantee — on quotes AND variation orders, required (manual text or N/A) */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label className="block text-sm font-medium text-[var(--text)] mb-1">
             Warranty / Guarantee <span className="text-red-500">*</span>
           </label>
           <textarea
             rows={2}
             disabled={warrantyNA}
             placeholder="e.g. 12-month workmanship guarantee, 2-year parts warranty…"
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none disabled:opacity-50"
+            className={`${field} resize-none disabled:opacity-50`}
             {...register('warranty')}
           />
           <div className="flex items-center gap-2 mt-1.5">
-            {/* N/A active state matches the "Valid until" selected colour (gold). */}
             <button
               type="button"
+              aria-pressed={warrantyNA}
               onClick={() => { setWarrantyNA(v => !v); if (!warrantyNA) setValue('warranty', ''); setError('') }}
-              className={`inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-                warrantyNA
-                  ? 'bg-[#C6A35D] text-white border-[#C6A35D]'
-                  : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-[#C6A35D]'
-              }`}
+              className={tile(warrantyNA)}
             >
+              {warrantyNA && <Check size={13} className="text-emerald-500" />}
               N/A
             </button>
-            <span className="text-xs text-gray-400">No warranty? Describe it manually, or select N/A.</span>
+            <span className="text-xs text-[var(--text-faint)]">No warranty? Describe it manually, or select N/A.</span>
           </div>
         </div>
 
         {/* Valid Until — quotes only (a variation order has no validity date) */}
         {!isVariation && (
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+          <label className="block text-sm font-medium text-[var(--text)] mb-1.5">
             Valid Until <span className="text-red-500">*</span>
           </label>
           <div className="flex flex-wrap gap-2 mb-2">
@@ -583,14 +597,11 @@ export function SendQuoteForm({
                 <button
                   key={p.label}
                   type="button"
+                  aria-pressed={isActive}
                   onClick={() => { setValue('valid_until', val); setValidNA(false) }}
-                  className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-                    isActive
-                      ? 'bg-[#C6A35D] text-white border-[#C6A35D]'
-                      : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-[#C6A35D]'
-                  }`}
+                  className={tile(isActive)}
                 >
-                  <Calendar size={11} />
+                  {isActive ? <Check size={11} className="text-emerald-500" /> : <Calendar size={11} />}
                   {p.label}
                 </button>
               )
@@ -599,23 +610,21 @@ export function SendQuoteForm({
             {/* N/A option */}
             <button
               type="button"
+              aria-pressed={validNA}
               onClick={() => { setValidNA(true); setValue('valid_until', '') }}
-              className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-                validNA
-                  ? 'bg-gray-600 text-white border-gray-600'
-                  : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-gray-400'
-              }`}
+              className={tile(validNA)}
             >
+              {validNA && <Check size={11} className="text-emerald-500" />}
               N/A
             </button>
           </div>
 
           {validNA ? (
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">No expiry date — quote has no valid-until.</p>
+            <p className="text-xs text-[var(--text-muted)] mt-2">No expiry date — quote has no valid-until.</p>
           ) : watch('valid_until') ? (
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+            <p className="text-xs text-[var(--text-muted)] mt-2">
               Valid until:{' '}
-              <span className="font-medium text-gray-700 dark:text-gray-200">
+              <span className="font-medium text-[var(--text)]">
                 {new Date(watch('valid_until') + 'T00:00:00').toLocaleDateString('en-ZA', {
                   day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Africa/Johannesburg',
                 })}
@@ -633,53 +642,72 @@ export function SendQuoteForm({
             Uses the same picker as post-acceptance scheduling, bounded by urgency. */}
         {wantsSchedule && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Proposed start date &amp; time <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-medium text-[var(--text)] mb-1.5">Proposed start date &amp; time <span className="text-red-500">*</span></label>
             <button type="button" onClick={() => setPickOpen(true)}
-              className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg border border-amber-400 dark:border-[#C6A35D]/60 bg-amber-50 dark:bg-[#C6A35D]/10 text-sm text-gray-900 dark:text-[var(--text)] hover:border-amber-500 transition">
-              <span className="flex items-center gap-2"><Calendar size={15} className="text-amber-600 dark:text-[#C6A35D]" />{schedule ? formatDateTime(schedule) : 'Set proposed start'}</span>
-              <span className="text-xs text-amber-700 dark:text-[#C6A35D] font-semibold">{schedule ? 'Change' : 'Select'}</span>
+              className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl border text-sm text-[var(--text)] transition ${schedule
+                ? 'border-emerald-500 bg-emerald-500/10 ring-2 ring-emerald-500/30'
+                : 'border-amber-500/50 bg-amber-500/10 hover:border-amber-500'}`}>
+              <span className="flex items-center gap-2">
+                {schedule
+                  ? <Check size={15} className="text-emerald-500" />
+                  : <Clock size={15} className="text-amber-600 dark:text-amber-500" />}
+                {schedule ? formatDateTime(schedule) : 'Set proposed start'}
+              </span>
+              <span className={`text-xs font-semibold ${schedule ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}`}>{schedule ? 'Change' : 'Select'}</span>
             </button>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">The job schedules to this time once the quote is approved.</p>
+            <p className="text-xs text-[var(--text-muted)] mt-1">The job schedules to this time once the quote is approved.</p>
             {pickOpen && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setPickOpen(false)}>
-                <div className="absolute inset-0 bg-black/50" />
-                <div className="relative w-full max-w-sm rounded-2xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] p-5" onClick={e => e.stopPropagation()}>
-                  <p className="text-sm font-bold text-[var(--text)] mb-3">Propose a start date &amp; time</p>
-                  <SchedulePicker priority={priority} createdAt={createdAt ?? new Date().toISOString()} busy={false}
-                    onConfirm={iso => { setSchedule(iso); setPickOpen(false); setError('') }} onCancel={() => setPickOpen(false)} />
-                </div>
-              </div>
+              <Modal onClose={() => setPickOpen(false)} maxWidth="max-w-sm">
+                {close => (
+                  <>
+                    <DrawerHeader onClose={close} title={<h3 className="text-base font-bold text-[var(--text)]">Propose a start date &amp; time</h3>} />
+                    <SchedulePicker priority={priority} createdAt={createdAt ?? new Date().toISOString()} busy={false}
+                      onConfirm={iso => { setSchedule(iso); close(); setError('') }} onCancel={close} />
+                  </>
+                )}
+              </Modal>
             )}
           </div>
         )}
 
         {error && (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm rounded-lg px-4 py-3">
-            {error}
+          <div className="rounded-xl bg-red-500/10 ring-1 ring-red-500/30 p-3.5 flex items-start gap-2.5">
+            <AlertCircle size={16} className="text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+            <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
           </div>
         )}
 
         {confirmVals && (
-          <div className="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 p-3 space-y-2">
-            <p className="text-sm text-amber-800 dark:text-amber-200">{isVariation ? 'Submit this variation order to the manager?' : 'Send this quote to the manager?'} Please double-check the amount and details first.</p>
+          <div className="rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] p-3 space-y-2">
+            <p className="text-sm text-[var(--text)]">{isVariation ? 'Submit this variation order to the manager?' : 'Send this quote to the manager?'} Please double-check the amount and details first.</p>
             <div className="flex gap-2">
-              <button type="button" onClick={() => doSubmit(confirmVals)} disabled={loading} className="px-3 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-semibold disabled:opacity-50">{loading ? 'Submitting…' : isVariation ? 'Yes, submit variation order' : 'Yes, send quote'}</button>
-              <button type="button" onClick={() => setConfirmVals(null)} className="px-3 py-2 rounded-lg ring-1 ring-gray-300 dark:ring-gray-600 text-gray-600 dark:text-gray-300 text-sm">Back</button>
+              <button type="button" onClick={() => doSubmit(confirmVals)} disabled={loading} className={`px-3 py-2 rounded-lg text-white text-sm font-semibold transition disabled:opacity-50 ${isVariation ? 'bg-blue-600 hover:bg-blue-500' : 'bg-emerald-600 hover:bg-emerald-500'}`}>{loading ? 'Submitting…' : isVariation ? 'Yes, submit variation order' : 'Yes, send quote'}</button>
+              <button type="button" onClick={() => setConfirmVals(null)} className="px-3 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm">Back</button>
             </div>
           </div>
         )}
 
         <div className="flex gap-2">
-          <Button type="submit" loading={loading} className={`flex-1 ${isVariation
-            ? 'bg-[#C6A35D] hover:bg-[#b8954f] text-white border-[#C6A35D] focus:ring-[#C6A35D]'
-            : 'bg-green-600 hover:bg-green-700 text-white border-green-600 focus:ring-green-500'}`} disabled={uploading || parsing}>
+          <button
+            type="submit"
+            disabled={loading || uploading || parsing}
+            className={`flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold text-white transition disabled:opacity-50 ${isVariation
+              ? 'bg-blue-600 hover:bg-blue-500'
+              : 'bg-emerald-600 hover:bg-emerald-500'}`}
+          >
             {uploading ? (
-              <><Loader2 size={14} className="animate-spin mr-1.5" /> Uploading…</>
+              <><Loader2 size={14} className="animate-spin" /> Uploading…</>
+            ) : loading ? (
+              <><Loader2 size={14} className="animate-spin" /> {isVariation ? 'Submitting…' : 'Sending…'}</>
             ) : isEdit ? 'Update Quote' : isVariation ? 'Submit Variation Order' : 'Send Quote'}
-          </Button>
-          <Button type="button" variant="danger" onClick={handleClose} className="flex-1">
+          </button>
+          <button
+            type="button"
+            onClick={handleClose}
+            className="flex-1 py-2.5 rounded-xl ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm font-semibold transition hover:bg-[var(--hover)]"
+          >
             Cancel
-          </Button>
+          </button>
         </div>
       </form>
     </div>

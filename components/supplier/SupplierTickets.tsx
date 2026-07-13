@@ -5,11 +5,13 @@
 // stats. Mirrors the RM tickets tab, tailored to the supplier's lifecycle.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Ticket, Search, ChevronDown, BarChart3, X } from 'lucide-react'
+import { Ticket, Search, ChevronDown, BarChart3, Store, ReceiptText, Camera, FileText, CheckCircle2, Calendar, Loader2, ClipboardCheck, AlertTriangle, Clock, XCircle, Ban } from 'lucide-react'
+import { TicketFilterTiles, type FilterGroup } from '@/components/ui/TicketFilterTiles'
 import type { SupplierTicketRow, SupplierQuoteRow } from '@/lib/health/data'
 import { Card, Donut } from '@/components/exec/ui'
-import { PriorityBadge } from '@/components/ui/PriorityBadge'
-import { SlideOver } from '@/components/ui/SlideOver'
+import { CategoryIcon, priorityBadgeClass, priorityLabel } from '@/components/client/ticketBadges'
+import { Modal } from '@/components/ui/Modal'
+import { DrawerHeader } from '@/components/exec/Drawer'
 import { readCollapse, writeCollapse, readCollapseSet, writeCollapseSet } from '@/lib/collapse-state'
 import { rmStatusMeta, formatDateTime, humanizeDuration, urgencyCountCls } from '@/lib/utils'
 
@@ -25,7 +27,7 @@ function bucketOf(s: string): Bucket {
   return 'closed'   // declined / cancelled
 }
 const BUCKET_LABEL: Record<Bucket, string> = { to_quote: 'Quote requested', quoted: 'Quoted', approved: 'Quote approved', scheduled: 'Job scheduled', in_progress: 'In Progress', signoff: 'Sign-off', completed: 'Completed', closed: 'Closed' }
-const BUCKET_BAR: Record<Bucket, string> = { to_quote: 'bg-cyan-500', quoted: 'bg-violet-500', approved: 'bg-teal-500', scheduled: 'bg-indigo-500', in_progress: 'bg-[#C6A35D]', signoff: 'bg-orange-500', completed: 'bg-emerald-500', closed: 'bg-red-500' }
+const BUCKET_BAR: Record<Bucket, string> = { to_quote: 'bg-amber-500', quoted: 'bg-blue-500', approved: 'bg-blue-500', scheduled: 'bg-blue-500', in_progress: 'bg-blue-500', signoff: 'bg-blue-500', completed: 'bg-emerald-500', closed: 'bg-gray-500' }
 const BAR_ORDER: Bucket[] = ['to_quote', 'quoted', 'approved', 'scheduled', 'in_progress', 'signoff', 'completed']
 
 // Isolation: the status THIS supplier should see. Until awarded, they only ever see
@@ -54,22 +56,9 @@ function groupCountCls(rows: SupplierTicketRow[]): string {
   return urgencyCountCls(active.map(t => t.priority))
 }
 
-type FilterKey = 'all' | 'breached' | 'overdue' | 'evidence' | 'declined' | 'cancelled' | Bucket
-const PILLS: { key: FilterKey; label: string; active: string; inactive: string }[] = [
-  { key: 'all', label: 'All', active: 'bg-slate-800 text-white border-slate-800 dark:bg-white dark:text-[#0a0e17] dark:border-white', inactive: 'text-[var(--text-muted)] border-[var(--border)] hover:border-slate-400' },
-  { key: 'breached', label: 'SLA Breached', active: 'bg-red-600 text-white border-red-600', inactive: 'text-red-600 dark:text-red-400 border-red-500/50 hover:border-red-500' },
-  { key: 'overdue', label: 'Overdue', active: 'bg-red-500 text-white border-red-500', inactive: 'text-red-600 dark:text-red-400 border-red-500/40 hover:border-red-400' },
-  { key: 'evidence', label: 'Missing Evidence', active: 'bg-amber-500 text-white border-amber-500', inactive: 'text-amber-600 dark:text-amber-500 border-amber-500/50 hover:border-amber-500' },
-  { key: 'to_quote', label: 'Quote requested', active: 'bg-cyan-500 text-white border-cyan-500', inactive: 'text-cyan-600 dark:text-cyan-400 border-cyan-500/40 hover:border-cyan-400' },
-  { key: 'quoted', label: 'Quoted', active: 'bg-violet-500 text-white border-violet-500', inactive: 'text-violet-600 dark:text-violet-400 border-violet-500/40 hover:border-violet-400' },
-  { key: 'approved', label: 'Quote approved', active: 'bg-teal-500 text-white border-teal-500', inactive: 'text-teal-600 dark:text-teal-400 border-teal-500/40 hover:border-teal-400' },
-  { key: 'scheduled', label: 'Job scheduled', active: 'bg-indigo-500 text-white border-indigo-500', inactive: 'text-indigo-600 dark:text-indigo-400 border-indigo-500/40 hover:border-indigo-400' },
-  { key: 'in_progress', label: 'In Progress', active: 'bg-[#C6A35D] text-[#0a0e17] border-[#C6A35D]', inactive: 'text-amber-600 dark:text-[#C6A35D] border-[#C6A35D]/40 hover:border-[#C6A35D]' },
-  { key: 'signoff', label: 'Sign-off', active: 'bg-orange-500 text-white border-orange-500', inactive: 'text-orange-600 dark:text-orange-400 border-orange-500/40 hover:border-orange-400' },
-  { key: 'completed', label: 'Completed', active: 'bg-emerald-500 text-white border-emerald-500', inactive: 'text-emerald-600 dark:text-emerald-400 border-emerald-500/40 hover:border-emerald-400' },
-  { key: 'declined', label: 'Declined', active: 'bg-red-500 text-white border-red-500', inactive: 'text-red-600 dark:text-red-400 border-red-500/40 hover:border-red-400' },
-  { key: 'cancelled', label: 'Cancelled', active: 'bg-gray-500 text-white border-gray-500', inactive: 'text-gray-600 dark:text-gray-400 border-gray-500/40 hover:border-gray-400' },
-]
+type FilterKey = 'breached' | 'overdue' | 'evidence' | 'declined' | 'cancelled' | Bucket
+// Valid deep-link (?filter=) keys — the bucket keys plus the extra slices.
+const SUPPLIER_FILTER_KEYS = new Set<string>(['to_quote', 'quoted', 'approved', 'scheduled', 'in_progress', 'signoff', 'completed', 'closed', 'breached', 'overdue', 'evidence', 'declined', 'cancelled'])
 
 function milestone(t: SupplierTicketRow): { label: string; at: string } | null {
   // A declined supplier must never see the ticket's "Quote approved" (that was
@@ -94,19 +83,29 @@ function milestone(t: SupplierTicketRow): { label: string; at: string } | null {
 function TicketRow({ t, company, showStore }: { t: SupplierTicketRow; company?: string; showStore?: boolean }) {
   const sm = rmStatusMeta(myStatus(t))
   const m = milestone(t)
+  // Dispute/declined force a red status badge; otherwise the rmStatusMeta class.
+  const statusCls = t.declinedForMe || t.disputed ? 'bg-red-500/15 text-red-700 dark:text-red-400' : sm.cls
+  const statusLabel = t.disputed ? 'Dispute' : t.declinedForMe ? (t.declinedBy === 'supplier' ? 'Declined (you)' : t.declinedBy === 'regional_manager' ? 'Declined (Client)' : 'Declined') : sm.label
   return (
-    <Link href={`/supplier/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2.5 -mx-2 px-2 rounded-lg border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition">
-      <div className="min-w-0">
-        {showStore && <p className="text-[10px] text-[var(--text-faint)] truncate">{t.isIndividual ? 'Individual' : [company, t.storeName].filter(Boolean).join(' · ')}</p>}
-        <p className="text-sm text-[var(--text)] truncate">{t.title}</p>
-        <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(t.createdAt)}</p>
-        {/* eslint-disable-next-line react-hooks/purity -- Date.now() drives a relative "overdue by" display; cosmetic elapsed-time readout, not a hydration-correctness concern */}
-        {t.overdue && <p className="text-[11px] font-semibold text-red-600 dark:text-red-400">Overdue by {humanizeDuration(Date.now() - new Date(t.dueAt).getTime())}</p>}
-        {m && <p className={`text-[11px] font-medium ${m.label.startsWith('Declined') ? 'text-red-600 dark:text-red-400' : sm.text}`}>{m.label} · {formatDateTime(m.at)}</p>}
+    <Link href={`/supplier/tickets/${t.id}`} className="grid gap-3 border-b border-[var(--border)] px-2 py-3 last:border-0 transition hover:bg-[var(--hover)] sm:grid-cols-[1fr_auto] sm:items-center">
+      <div className="flex min-w-0 items-center gap-3">
+        <CategoryIcon category={t.category ?? t.title} priority={t.priority} className="h-11 w-11" iconSize={18} />
+        <div className="min-w-0">
+          {showStore && <p className="text-[10px] text-[var(--text-faint)] truncate">{t.isIndividual ? 'Individual' : [company, t.storeName].filter(Boolean).join(' · ')}</p>}
+          <p className="truncate text-sm font-bold text-[var(--text)]">{t.title}</p>
+          {m && <p className={`text-sm font-medium ${m.label.startsWith('Declined') ? 'text-red-600 dark:text-red-400' : sm.text}`}>{m.label} · {formatDateTime(m.at)}</p>}
+        </div>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
-        <PriorityBadge priority={t.priority} className="w-full text-center" />
-        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${t.declinedForMe || t.disputed ? 'bg-red-500/15 text-red-700 dark:text-red-400' : sm.cls}`}>{t.disputed ? 'Dispute' : t.declinedForMe ? (t.declinedBy === 'supplier' ? 'Declined (you)' : t.declinedBy === 'regional_manager' ? 'Declined (Client)' : 'Declined') : sm.label}</span>
+      <div className="flex flex-col items-start gap-1 sm:items-end">
+        <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
+          <span className={`inline-flex w-[120px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${priorityBadgeClass(t as never)}`}>{priorityLabel(t as never)}</span>
+          <span className={`inline-flex w-[120px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${statusCls}`}>{statusLabel}</span>
+        </div>
+        <p className="text-sm text-[var(--text-muted)]">
+          {formatDateTime(t.createdAt)}
+          {/* eslint-disable-next-line react-hooks/purity -- Date.now() drives a relative "overdue by" display; cosmetic elapsed-time readout, not a hydration-correctness concern */}
+          {t.overdue && <span className="ml-1.5 font-semibold text-red-600 dark:text-red-400">· Overdue by {humanizeDuration(Date.now() - new Date(t.dueAt).getTime())}</span>}
+        </p>
       </div>
     </Link>
   )
@@ -114,7 +113,7 @@ function TicketRow({ t, company, showStore }: { t: SupplierTicketRow; company?: 
 
 export function SupplierTickets({ tickets, quotes, company }: { tickets: SupplierTicketRow[]; quotes: SupplierQuoteRow[]; company: string }) {
   const [q, setQ] = useState('')
-  const [filter, setFilter] = useState<FilterKey>('all')
+  const [filter, setFilter] = useState<FilterKey | null>(null)
   // Store groups start collapsed; the set tracks which the user has expanded.
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [panelStore, setPanelStore] = useState<string | null>(null)
@@ -125,7 +124,7 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reads window.location (client-only) after mount to apply deep-linked ?store=; cannot run during SSR render
     if (s) setPanelStore(s)
     const f = params.get('filter')
-    if (f && PILLS.some(p => p.key === f)) setFilter(f as FilterKey)
+    if (f && SUPPLIER_FILTER_KEYS.has(f)) setFilter(f as FilterKey)
   }, [])
 
   const counts = useMemo(() => {
@@ -135,7 +134,29 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
     for (const t of tickets) c[t.declinedForMe ? 'closed' : bucketOfRow(t)]++
     return c
   }, [tickets])
-  const barTotal = BAR_ORDER.reduce((s, b) => s + counts[b], 0) || 1
+  // Distribution bar grouped by the four filter-intent tones (My actions → Awaiting
+  // → Critical → Completed), coloured to the group headings and filled front-to-back
+  // so "My actions" (amber) starts at the left where its heading sits. Closed/declined
+  // is excluded; overdue/breached → Critical; to-quote or missing-evidence → My actions.
+  const barSegs = useMemo(() => {
+    const g = { mine: 0, awaiting: 0, critical: 0, done: 0 }
+    for (const t of tickets) {
+      if (t.declinedForMe || t.status === 'cancelled') continue
+      const b = bucketOfRow(t)
+      if (b === 'closed') continue
+      if (t.overdue || t.breached) g.critical++
+      else if (b === 'completed') g.done++
+      else if (b === 'to_quote' || missingEvidence(t)) g.mine++
+      else g.awaiting++
+    }
+    return [
+      { key: 'mine', n: g.mine, cls: 'bg-amber-500' },
+      { key: 'awaiting', n: g.awaiting, cls: 'bg-blue-500' },
+      { key: 'critical', n: g.critical, cls: 'bg-red-500' },
+      { key: 'done', n: g.done, cls: 'bg-emerald-500' },
+    ]
+  }, [tickets])
+  const barTotal = barSegs.reduce((s, x) => s + x.n, 0) || 1
   // A supplier-side breach only counts while not yet fully overdue — once overdue
   // it moves to the Overdue pill (RM-side breaches never affect the supplier).
   const breachedCount = useMemo(() => tickets.filter(t => t.breached && !t.overdue).length, [tickets])
@@ -143,6 +164,30 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
   const declinedCount = useMemo(() => tickets.filter(t => t.declinedForMe).length, [tickets])
   const cancelledCount = useMemo(() => tickets.filter(t => t.status === 'cancelled').length, [tickets])
   const evidenceCount = useMemo(() => tickets.filter(missingEvidence).length, [tickets])
+
+  // Filters grouped by intent (My actions / Awaiting / Critical / Completed).
+  const filterGroups: FilterGroup[] = useMemo(() => [
+    { tone: 'mine', label: 'My actions (requiring response)', tiles: [
+      { key: 'to_quote', label: 'Quote requested', count: counts.to_quote, icon: <ReceiptText size={16} /> },
+      { key: 'evidence', label: 'Missing evidence', count: evidenceCount, icon: <Camera size={16} /> },
+    ] },
+    { tone: 'awaiting', label: 'Awaiting action (from others)', tiles: [
+      { key: 'quoted', label: 'Quoted', count: counts.quoted, icon: <FileText size={16} /> },
+      { key: 'approved', label: 'Quote approved', count: counts.approved, icon: <CheckCircle2 size={16} /> },
+      { key: 'scheduled', label: 'Job scheduled', count: counts.scheduled, icon: <Calendar size={16} /> },
+      { key: 'in_progress', label: 'In progress', count: counts.in_progress, icon: <Loader2 size={16} /> },
+      { key: 'signoff', label: 'Sign-off', count: counts.signoff, icon: <ClipboardCheck size={16} /> },
+    ] },
+    { tone: 'critical', label: 'Critical & overdue', tiles: [
+      { key: 'breached', label: 'SLA breached', count: breachedCount, icon: <AlertTriangle size={16} /> },
+      { key: 'overdue', label: 'Overdue', count: overdueCount, icon: <Clock size={16} /> },
+    ] },
+    { tone: 'closed', label: 'Completed & closed', tiles: [
+      { key: 'completed', label: 'Completed', count: counts.completed, icon: <CheckCircle2 size={16} /> },
+      { key: 'declined', label: 'Declined', count: declinedCount, icon: <XCircle size={16} />, tone: 'neutral' },
+      { key: 'cancelled', label: 'Cancelled', count: cancelledCount, icon: <Ban size={16} />, tone: 'neutral' },
+    ] },
+  ], [counts, breachedCount, overdueCount, declinedCount, cancelledCount, evidenceCount])
 
   const shown = useMemo(() => {
     const terms = q.toLowerCase().split(/\s+/).filter(Boolean)
@@ -152,7 +197,7 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
       else if (filter === 'declined') { if (!t.declinedForMe) return false }
       else if (filter === 'cancelled') { if (t.status !== 'cancelled') return false }
       else if (filter === 'evidence') { if (!missingEvidence(t)) return false }
-      else if (filter !== 'all' && bucketOfRow(t) !== filter) return false
+      else if (filter !== null && bucketOfRow(t) !== filter) return false
       // Tickets where this supplier was declined (and not re-invited) only show under Declined / Cancelled.
       if (filter !== 'declined' && filter !== 'cancelled' && t.declinedForMe) return false
       if (!terms.length) return true
@@ -163,9 +208,9 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
 
   // Under "All": breached pins to the top, completed drops into the Archive, the
   // rest groups by store. Everything is ordered newest → most urgent.
-  const breachedRows = useMemo(() => filter === 'all' ? shown.filter(t => t.breached && !t.overdue).sort(byDateThenUrgency) : [], [shown, filter])
-  const liveShown = useMemo(() => (filter === 'all' ? shown.filter(t => !(t.breached && !t.overdue) && bucketOfRow(t) !== 'completed') : shown).slice().sort(byDateThenUrgency), [shown, filter])
-  const archived = useMemo(() => (filter === 'all' ? shown.filter(t => bucketOfRow(t) === 'completed') : []).slice().sort(byDateThenUrgency), [shown, filter])
+  const breachedRows = useMemo(() => filter === null ? shown.filter(t => t.breached && !t.overdue).sort(byDateThenUrgency) : [], [shown, filter])
+  const liveShown = useMemo(() => (filter === null ? shown.filter(t => !(t.breached && !t.overdue) && bucketOfRow(t) !== 'completed') : shown).slice().sort(byDateThenUrgency), [shown, filter])
+  const archived = useMemo(() => (filter === null ? shown.filter(t => bucketOfRow(t) === 'completed') : []).slice().sort(byDateThenUrgency), [shown, filter])
   const [archiveOpen, setArchiveOpen] = useState(false)
   const [breachedOpen, setBreachedOpen] = useState(false)
 
@@ -188,7 +233,7 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
   // are visible immediately — runs once, only for the deep-link (not manual clicks).
   const didAutoExpand = useRef(false)
   useEffect(() => {
-    if (didAutoExpand.current || filter === 'all') return
+    if (didAutoExpand.current || filter === null) return
     if (!new URLSearchParams(window.location.search).get('filter')) return
     didAutoExpand.current = true
     const names = groups.map(([s]) => s)
@@ -212,25 +257,15 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
         <p className="text-sm text-[var(--text-muted)] mt-0.5">Grouped by store. Tap the chart icon for a store overview.</p>
       </div>
 
-      {/* Distribution bar (excludes closed) */}
+      {/* Distribution bar — four intent tones, filled front-to-back (My actions first). */}
       <Card className="p-4 space-y-2">
         <div className="h-3 rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden flex">
-          {BAR_ORDER.map(b => counts[b] > 0 && <div key={b} className={`h-full ${BUCKET_BAR[b]}`} style={{ width: `${Math.round((counts[b] / barTotal) * 100)}%` }} />)}
+          {barSegs.map(x => x.n > 0 && <div key={x.key} className={`h-full ${x.cls}`} style={{ width: `${Math.round((x.n / barTotal) * 100)}%` }} />)}
         </div>
       </Card>
 
-      {/* Filter pills — above the search */}
-      <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
-        {PILLS.map(p => {
-          const n = p.key === 'all' ? tickets.length : p.key === 'breached' ? breachedCount : p.key === 'overdue' ? overdueCount : p.key === 'declined' ? declinedCount : p.key === 'cancelled' ? cancelledCount : p.key === 'evidence' ? evidenceCount : counts[p.key]
-          const on = filter === p.key
-          return (
-            <button key={p.key} onClick={() => setFilter(p.key)} className={`px-3 py-1.5 rounded-full text-xs font-medium border transition text-center ${on ? p.active : p.inactive}`}>
-              {p.label} <span className="opacity-70">{n}</span>
-            </button>
-          )
-        })}
-      </div>
+      {/* Grouped filter badges — My actions / Awaiting / Critical / Completed. */}
+      <TicketFilterTiles groups={filterGroups} active={filter} onPick={k => setFilter(f => (f === k ? null : (k as FilterKey)))} />
 
       {/* Search */}
       <div className="relative">
@@ -239,8 +274,8 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
           className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)] outline-none focus:ring-[#C6A35D]/40" />
       </div>
 
-      {/* SLA breached — pinned at the top under the All filter, collapsible */}
-      {filter === 'all' && breachedRows.length > 0 && (
+      {/* SLA breached — pinned at the top when no filter is active, collapsible */}
+      {filter === null && breachedRows.length > 0 && (
         <Card className="p-3 ring-1 ring-red-500/40 cursor-pointer hover:ring-red-500/60 transition" onClick={toggleBreached} role="button" tabIndex={0} aria-expanded={breachedOpen} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleBreached() } }}>
           <div className="w-full flex items-center gap-2">
             <ChevronDown size={16} className={`shrink-0 text-red-500 transition-transform ${breachedOpen ? 'rotate-180' : ''}`} />
@@ -263,7 +298,7 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
                 <span className="text-sm font-bold text-[var(--text)] truncate">{groupIndividual ? 'Individual' : <>{[company, store].filter(Boolean).join(' · ')}{g.branchCode ? ` · ${g.branchCode}` : ''}</>}</span>
                 <span className={`text-[11px] font-medium rounded-full px-2 py-0.5 shrink-0 ${groupCountCls(g.rows)}`}>{g.rows.length}</span>
               </span>
-              <button onClick={e => { e.stopPropagation(); setPanelStore(store) }} title="Store overview" className="shrink-0 -m-1 p-1.5 rounded-lg text-[var(--text-faint)] hover:text-[#C6A35D] hover:bg-[#C6A35D]/10 transition"><BarChart3 size={16} /></button>
+              <button onClick={e => { e.stopPropagation(); setPanelStore(store) }} title="Store overview" className="shrink-0 -m-1 p-1.5 rounded-lg text-[var(--text-faint)] hover:text-blue-600 hover:bg-blue-500/10 transition"><BarChart3 size={16} /></button>
             </div>
             {!isCollapsed && <div className="px-1" onClick={e => e.stopPropagation()}>{g.rows.map(t => <TicketRow key={t.id} t={t} />)}</div>}
           </Card>
@@ -284,15 +319,20 @@ export function SupplierTickets({ tickets, quotes, company }: { tickets: Supplie
               {archived.map(t => {
                 const sm = rmStatusMeta(myStatus(t))
                 return (
-                  <Link key={t.id} href={`/supplier/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2.5 -mx-2 px-2 rounded-lg border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition">
-                    <div className="min-w-0">
-                      <p className="text-[10px] text-[var(--text-faint)] truncate">{t.isIndividual ? 'Individual' : [company, t.storeName].filter(Boolean).join(' · ')}</p>
-                      <p className="text-sm text-[var(--text)] truncate">{t.title}</p>
-                      <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(t.createdAt)}</p>
+                  <Link key={t.id} href={`/supplier/tickets/${t.id}`} className="grid gap-3 border-b border-[var(--border)] px-2 py-3 last:border-0 transition hover:bg-[var(--hover)] sm:grid-cols-[1fr_auto] sm:items-center">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <CategoryIcon category={t.category ?? t.title} priority={t.priority} className="h-11 w-11" iconSize={18} />
+                      <div className="min-w-0">
+                        <p className="text-[10px] text-[var(--text-faint)] truncate">{t.isIndividual ? 'Individual' : [company, t.storeName].filter(Boolean).join(' · ')}</p>
+                        <p className="truncate text-sm font-bold text-[var(--text)]">{t.title}</p>
+                        <p className="text-xs text-[var(--text-muted)]">{formatDateTime(t.createdAt)}</p>
+                      </div>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
-                      <PriorityBadge priority={t.priority} className="w-full text-center" />
-                      <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${sm.cls}`}>{sm.label}</span>
+                    <div className="flex flex-col items-start gap-1 sm:items-end">
+                      <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
+                        <span className={`inline-flex w-[120px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${priorityBadgeClass(t as never)}`}>{priorityLabel(t as never)}</span>
+                        <span className={`inline-flex w-[120px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${sm.cls}`}>{sm.label}</span>
+                      </div>
                     </div>
                   </Link>
                 )
@@ -328,18 +368,24 @@ function StorePanel({ store, company, rows, quotes, onClose }: { store: string; 
   const Stat = ({ label, value, tone = '' }: { label: string; value: number | string; tone?: string }) => (
     <div className="rounded-xl bg-[var(--surface)] ring-1 ring-[var(--border)] p-3">
       <div className={`text-xl font-bold ${tone || 'text-[var(--text)]'}`}>{value}</div>
-      <div className="text-[11px] text-[var(--text-faint)]">{label}</div>
+      <div className="text-xs text-[var(--text-muted)]">{label}</div>
     </div>
   )
 
   return (
-    <SlideOver onClose={onClose}>
+    <Modal onClose={onClose} maxWidth="max-w-2xl">
       {close => (
         <>
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">{company && !panelIndividual && <p className="text-[10px] text-[var(--text-faint)] truncate">{company}</p>}<h2 className="text-lg font-bold text-[var(--text)] truncate">{store}</h2><p className="text-xs text-[var(--text-muted)]">{total} ticket{total === 1 ? '' : 's'}</p></div>
-          <button onClick={close} className="shrink-0 -m-1 p-1.5 rounded-lg text-[var(--text-faint)] hover:text-[var(--text)] hover:bg-[var(--hover)]"><X size={18} /></button>
-        </div>
+        <DrawerHeader onClose={close} title={
+          <div className="min-w-0">
+            {company && !panelIndividual && <p className="text-[10px] text-[var(--text-faint)] truncate">{company}</p>}
+            <div className="flex items-center gap-2 flex-wrap">
+              <Store size={18} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
+              <h3 className="text-lg font-bold text-[var(--text)]">{store}</h3>
+              <span className="text-xs text-[var(--text-muted)]">{total} ticket{total === 1 ? '' : 's'}</span>
+            </div>
+          </div>
+        } />
 
         {/* SLA donut */}
         <div className="flex items-center gap-4">
@@ -376,6 +422,6 @@ function StorePanel({ store, company, rows, quotes, onClose }: { store: string; 
         </div>
         </>
       )}
-    </SlideOver>
+    </Modal>
   )
 }

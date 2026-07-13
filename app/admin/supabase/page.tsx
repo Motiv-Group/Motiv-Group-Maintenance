@@ -89,7 +89,7 @@ export default async function SupabaseAdminPage() {
                 </thead>
                 <tbody>
                   {d.tables.map((t) => (
-                    <tr key={t.table} className="border-b border-[var(--border)] last:border-0">
+                    <tr key={t.table} className="border-b border-[var(--border)] last:border-0 transition hover:bg-[var(--hover)]">
                       <td className="py-2 px-2 font-mono text-[13px] text-[var(--text)]">{t.table}</td>
                       <td className="px-2 text-right text-[var(--text-muted)] tabular-nums">{formatNumber(t.rows)}</td>
                       <td className="px-2 text-right text-[var(--text-muted)] tabular-nums">{t.bytes == null ? '—' : formatBytes(t.bytes)}</td>

@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic'
 import { UsersRound } from 'lucide-react'
 import { requireMasterAdmin } from '@/lib/health/guard'
 import { createAdminClient } from '@/lib/supabase/server'
-import { Card } from '@/components/exec/ui'
+import { SectionCard } from '@/components/exec/ui'
 import { InfoTip } from '@/components/ui/InfoTip'
 import { AddAccountForm, type CompanyOpt, type RegionOpt } from '@/components/admin/AddAccountForm'
 import { BulkImportForm } from '@/components/admin/BulkImportForm'
@@ -28,8 +28,8 @@ export default async function AdminAccountsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2">
-          <UsersRound className="text-[#C6A35D]" size={22} /> Accounts
-          <InfoTip title="Accounts" align="left">Create Executive, Regional Manager and Store Manager accounts by invitation. Each gets an email set-password link. Executives own a company; RMs manage a region; SMs run a store. Suppliers and Individuals self-register.</InfoTip>
+          <UsersRound className="text-blue-600 dark:text-blue-400" size={22} /> Create accounts
+          <InfoTip title="Create accounts" align="left">Pick a company first, then add people under it. Choose “＋ New company” to create a company on its own; pick an existing company to add an Executive (optional), Regional Manager or Store Manager. Each account gets an email set-password link. Suppliers and Individuals self-register.</InfoTip>
         </h1>
         <p className="text-sm text-[var(--text-muted)] mt-0.5">Invite the store hierarchy. Individuals and suppliers self-register from the sign-up page.</p>
       </div>
@@ -38,17 +38,16 @@ export default async function AdminAccountsPage() {
 
       <BulkImportForm />
 
-      <Card className="p-5 space-y-4">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="text-sm font-bold text-[var(--text)]">Existing accounts</h2>
-          <span className="text-xs text-[var(--text-muted)]">{rows.length} total</span>
-        </div>
+      <SectionCard
+        title="Existing accounts"
+        action={<span className="text-xs text-[var(--text-muted)]">{rows.length} total</span>}
+      >
         <div className="overflow-x-auto -mx-1">
           <table className="w-full text-sm min-w-[560px]">
             <thead><tr className="text-left text-[11px] text-[var(--text-faint)] border-b border-[var(--border)]"><th className="py-2 px-2">Name</th><th className="px-2">Email</th><th className="px-2">Role</th><th className="px-2">Company</th></tr></thead>
             <tbody>
               {rows.map(u => (
-                <tr key={u.id} className="border-b border-[var(--border)] last:border-0">
+                <tr key={u.id} className="border-b border-[var(--border)] last:border-0 transition hover:bg-[var(--hover)]">
                   <td className="py-2.5 px-2 text-[var(--text)]">{u.full_name ?? '—'}</td>
                   <td className="px-2 text-[var(--text-muted)] truncate max-w-[220px]">{u.email ?? '—'}</td>
                   <td className="px-2 text-[var(--text-muted)]">{roleLabel(u.role)}</td>
@@ -59,7 +58,7 @@ export default async function AdminAccountsPage() {
             </tbody>
           </table>
         </div>
-      </Card>
+      </SectionCard>
     </div>
   )
 }

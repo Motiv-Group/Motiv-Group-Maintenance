@@ -43,7 +43,7 @@ export function StoreBudgetForm({
   }
 
   return (
-    <div className="bg-slate-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5 space-y-4 max-w-md">
+    <div className="bg-slate-50 dark:bg-gray-800 border border-[var(--border)] dark:border-gray-700 rounded-xl p-5 space-y-4 max-w-md">
       <div>
         <Input
           id="capex_budget"

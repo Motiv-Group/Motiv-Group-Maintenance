@@ -50,7 +50,7 @@ export function Navbar({ role }: { role: NavRole }) {
     <nav className="bg-brand-600 border-b border-brand-700 sticky top-0 z-10">
       <div className="max-w-6xl mx-auto px-4 flex items-center justify-between h-16">
         <Link href={base} className="shrink-0">
-          <MotivLogo height={40} />
+          <MotivLogo height={46} />
         </Link>
 
         <div className="flex items-center gap-0.5 shrink-0">

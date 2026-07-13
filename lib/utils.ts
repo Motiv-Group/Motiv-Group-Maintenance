@@ -69,34 +69,36 @@ export const STATUS_LABELS: Record<TicketStatus, string> = {
 
 // One distinct hue per status, kept consistent across badges, bars and
 // legends app-wide so no two statuses can be visually confused.
+// 4-tone status colours (mirrors rmStatusMeta): blue = new / passive in-flight,
+// amber = needs action now, red = snag / bad, green = completed, grey = closed.
 export const STATUS_COLORS: Record<TicketStatus, string> = {
-  open:        'bg-blue-100    text-blue-700    dark:bg-blue-950    dark:text-blue-400',
-  info_requested:   'bg-slate-100  text-slate-700  dark:bg-slate-900   dark:text-slate-300',
-  assigned:         'bg-teal-100   text-teal-700   dark:bg-teal-950    dark:text-teal-400',
-  assessment:       'bg-cyan-100   text-cyan-700   dark:bg-cyan-950    dark:text-cyan-400',
-  quote_requested:  'bg-cyan-100   text-cyan-700   dark:bg-cyan-950    dark:text-cyan-400',
-  quoted:      'bg-cyan-100    text-cyan-700    dark:bg-cyan-950    dark:text-cyan-400',
-  quote_revision:   'bg-amber-100  text-amber-700  dark:bg-amber-950   dark:text-amber-400',
-  accepted:    'bg-teal-100    text-teal-700    dark:bg-teal-950    dark:text-teal-400',
-  scheduled:        'bg-indigo-100 text-indigo-700 dark:bg-indigo-950  dark:text-indigo-400',
-  in_progress: 'bg-amber-100   text-amber-700   dark:bg-amber-950   dark:text-amber-400',
-  variation_review: 'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-400',
-  vo_declined:      'bg-red-100    text-red-700    dark:bg-red-950    dark:text-red-400',
-  submitted_for_signoff: 'bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-400',
-  evidence_requested:    'bg-amber-100  text-amber-700  dark:bg-amber-950   dark:text-amber-400',
-  snag:             'bg-red-100    text-red-700    dark:bg-red-950    dark:text-red-400',
-  snag_assigned:    'bg-pink-100   text-pink-700   dark:bg-pink-950    dark:text-pink-400',
-  snag_resolved:    'bg-teal-100   text-teal-700   dark:bg-teal-950    dark:text-teal-400',
-  approved_closeout:'bg-green-100  text-green-700  dark:bg-green-950   dark:text-green-400',
-  suppliers_declined: 'bg-red-100   text-red-700    dark:bg-red-950    dark:text-red-400',
-  completed:   'bg-green-100   text-green-700   dark:bg-green-950   dark:text-green-400',
-  declined:    'bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-950 dark:text-fuchsia-400',
-  cancelled:   'bg-gray-100    text-gray-600    dark:bg-gray-800    dark:text-gray-400',
+  open:             'bg-blue-500/15 text-blue-700 dark:text-blue-400',
+  info_requested:   'bg-blue-500/15 text-blue-700 dark:text-blue-400',
+  assigned:         'bg-blue-500/15 text-blue-700 dark:text-blue-400',
+  assessment:       'bg-blue-500/15 text-blue-700 dark:text-blue-400',
+  quote_requested:  'bg-blue-500/15 text-blue-700 dark:text-blue-400',
+  quoted:           'bg-amber-500/15 text-amber-700 dark:text-amber-400',
+  quote_revision:   'bg-amber-500/15 text-amber-700 dark:text-amber-400',
+  accepted:         'bg-blue-500/15 text-blue-700 dark:text-blue-400',
+  scheduled:        'bg-blue-500/15 text-blue-700 dark:text-blue-400',
+  in_progress:      'bg-blue-500/15 text-blue-700 dark:text-blue-400',
+  variation_review: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
+  vo_declined:      'bg-blue-500/15 text-blue-700 dark:text-blue-400',
+  submitted_for_signoff: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
+  evidence_requested:    'bg-blue-500/15 text-blue-700 dark:text-blue-400',
+  snag:             'bg-red-500/15 text-red-700 dark:text-red-400',
+  snag_assigned:    'bg-red-500/15 text-red-700 dark:text-red-400',
+  snag_resolved:    'bg-amber-500/15 text-amber-700 dark:text-amber-400',
+  approved_closeout:'bg-amber-500/15 text-amber-700 dark:text-amber-400',
+  suppliers_declined: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
+  completed:        'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
+  declined:         'bg-gray-500/15 text-gray-600 dark:text-gray-400',
+  cancelled:        'bg-gray-500/15 text-gray-600 dark:text-gray-400',
   // legacy
-  variation_pending: 'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-400',
-  variation_accepted: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-400',
-  pending_sign_off:  'bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-400',
-  snag_in_progress: 'bg-pink-100   text-pink-700   dark:bg-pink-950   dark:text-pink-400',
+  variation_pending: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
+  variation_accepted: 'bg-blue-500/15 text-blue-700 dark:text-blue-400',
+  pending_sign_off:  'bg-amber-500/15 text-amber-700 dark:text-amber-400',
+  snag_in_progress: 'bg-red-500/15 text-red-700 dark:text-red-400',
 }
 
 export const QUOTE_STATUS_LABELS: Record<QuoteStatus, string> = {
@@ -230,41 +232,42 @@ export function composeTicketTitle(category: string | null | undefined, descript
  * the commercial/execution phase so the overview updates as the ticket moves.
  */
 export function rmStatusMeta(status: string): { label: string; cls: string; text: string } {
-  const cyanT = 'text-cyan-700 dark:text-cyan-400', violetT = 'text-violet-700 dark:text-violet-400'
-  const goldT = 'text-amber-700 dark:text-[#C6A35D]', orangeT = 'text-orange-700 dark:text-orange-400'
-  const blueT = 'text-blue-700 dark:text-blue-400', tealT = 'text-teal-700 dark:text-teal-400'
+  // 4-tone status language (shared with clientStatusBadgeClass, the filter pills and
+  // the distribution bars): BLUE = new / passive-in-flight (waiting on someone else),
+  // AMBER = needs the manager's action now, RED = snag / bad, GREEN = completed,
+  // GREY = cancelled / declined.
+  const blueT = 'text-blue-700 dark:text-blue-400', amberT = 'text-amber-700 dark:text-amber-400'
   const redT = 'text-red-700 dark:text-red-400', greenT = 'text-emerald-700 dark:text-emerald-400', grayT = 'text-gray-600 dark:text-gray-400'
-  const indigoT = 'text-indigo-700 dark:text-indigo-400', purpleT = 'text-purple-700 dark:text-purple-400'
-  const cyan = `bg-cyan-500/15 ${cyanT}`, violet = `bg-violet-500/15 ${violetT}`, gold = `bg-[#C6A35D]/15 ${goldT}`, orange = `bg-orange-500/15 ${orangeT}`, indigo = `bg-indigo-500/15 ${indigoT}`, purple = `bg-purple-500/15 ${purpleT}`
+  const blue = `bg-blue-500/15 ${blueT}`, amber = `bg-amber-500/15 ${amberT}`, red = `bg-red-500/15 ${redT}`, green = `bg-emerald-500/15 ${greenT}`, gray = `bg-gray-500/15 ${grayT}`
   const M: Record<string, { label: string; cls: string; text: string }> = {
-    open:                  { label: 'New',               cls: `bg-blue-500/15 ${blueT}`, text: blueT },
-    info_requested:        { label: 'Info requested',    cls: 'bg-amber-500/15 text-amber-700 dark:text-amber-400', text: 'text-amber-700 dark:text-amber-400' },
-    assigned:              { label: 'Quote requested',   cls: cyan, text: cyanT },
-    quote_requested:       { label: 'Quote requested',   cls: cyan, text: cyanT },
-    assessment:            { label: 'Assessment',        cls: cyan, text: cyanT },
-    quoted:                { label: 'Quoted',            cls: violet, text: violetT },
-    quote_revision:        { label: 'Quoted',            cls: violet, text: violetT },
-    accepted:              { label: 'Approved',          cls: `bg-teal-500/15 ${tealT}`, text: tealT },
-    scheduled:             { label: 'Job scheduled',     cls: indigo, text: indigoT },
-    in_progress:           { label: 'In progress',       cls: gold, text: goldT },
-    variation_review:      { label: 'Quoted VO',         cls: purple, text: purpleT },
-    vo_declined:           { label: 'VO declined',       cls: `bg-red-500/15 ${redT}`, text: redT },
-    submitted_for_signoff: { label: 'Awaiting sign-off', cls: orange, text: orangeT },
-    evidence_requested:    { label: 'Sign-off info',     cls: 'bg-amber-500/15 text-amber-700 dark:text-amber-400', text: 'text-amber-700 dark:text-amber-400' },
-    snag:                  { label: 'Snag',              cls: `bg-red-500/15 ${redT}`, text: redT },
-    snag_assigned:         { label: 'Snag scheduled',    cls: indigo, text: indigoT },
-    snag_resolved:         { label: 'Awaiting sign-off', cls: orange, text: orangeT },
-    approved_closeout:     { label: 'Close-out',         cls: orange, text: orangeT },
-    suppliers_declined:    { label: 'Declined (Supplier)', cls: `bg-red-500/15 ${redT}`, text: redT },
-    completed:             { label: 'Completed',         cls: `bg-emerald-500/15 ${greenT}`, text: greenT },
-    cancelled:             { label: 'Cancelled',         cls: `bg-gray-500/15 ${grayT}`, text: grayT },
-    declined:              { label: 'Declined',          cls: `bg-gray-500/15 ${grayT}`, text: grayT },
+    open:                  { label: 'New',               cls: blue,  text: blueT },
+    info_requested:        { label: 'Info requested',    cls: blue,  text: blueT },
+    assigned:              { label: 'Quote requested',   cls: blue,  text: blueT },
+    quote_requested:       { label: 'Quote requested',   cls: blue,  text: blueT },
+    assessment:            { label: 'Assessment',        cls: blue,  text: blueT },
+    quoted:                { label: 'Quoted',            cls: amber, text: amberT },
+    quote_revision:        { label: 'Quoted',            cls: amber, text: amberT },
+    accepted:              { label: 'Approved',          cls: blue,  text: blueT },
+    scheduled:             { label: 'Job scheduled',     cls: blue,  text: blueT },
+    in_progress:           { label: 'In progress',       cls: blue,  text: blueT },
+    variation_review:      { label: 'Quoted VO',         cls: amber, text: amberT },
+    vo_declined:           { label: 'VO declined',       cls: blue,  text: blueT },
+    submitted_for_signoff: { label: 'Awaiting sign-off', cls: amber, text: amberT },
+    evidence_requested:    { label: 'Sign-off info',     cls: blue,  text: blueT },
+    snag:                  { label: 'Snag',              cls: red,   text: redT },
+    snag_assigned:         { label: 'Snag scheduled',    cls: red,   text: redT },
+    snag_resolved:         { label: 'Awaiting sign-off', cls: amber, text: amberT },
+    approved_closeout:     { label: 'Close-out',         cls: amber, text: amberT },
+    suppliers_declined:    { label: 'Declined (Supplier)', cls: amber, text: amberT },
+    completed:             { label: 'Completed',         cls: green, text: greenT },
+    cancelled:             { label: 'Cancelled',         cls: gray,  text: grayT },
+    declined:              { label: 'Declined',          cls: gray,  text: grayT },
     // legacy
-    pending_sign_off:      { label: 'Awaiting sign-off', cls: orange, text: orangeT },
-    snag_in_progress:      { label: 'Snag',              cls: `bg-red-500/15 ${redT}`, text: redT },
-    variation_accepted:    { label: 'In progress',       cls: gold, text: goldT },
+    pending_sign_off:      { label: 'Awaiting sign-off', cls: amber, text: amberT },
+    snag_in_progress:      { label: 'Snag',              cls: red,   text: redT },
+    variation_accepted:    { label: 'In progress',       cls: blue,  text: blueT },
   }
-  return M[status] ?? { label: status, cls: `bg-gray-500/15 ${grayT}`, text: grayT }
+  return M[status] ?? { label: status, cls: gray, text: grayT }
 }
 
 /** Human-readable ticket reference, e.g. JOB-00042. */

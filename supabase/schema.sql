@@ -506,7 +506,7 @@ create table if not exists public.supplier_performance_scores (
 
 create table if not exists public.supplier_sla_acceptances (
   id           uuid not null default gen_random_uuid() primary key,
-  supplier_id  uuid references public.suppliers(id) on delete cascade,
+  supplier_id  uuid,
   user_id      uuid not null,
   sla_version  text not null,
   signed_name  text not null,
@@ -521,7 +521,7 @@ create table if not exists public.supplier_users (
 
 create table if not exists public.supplier_verification_docs (
   id           uuid not null default gen_random_uuid() primary key,
-  supplier_id  uuid not null references public.suppliers(id) on delete cascade,
+  supplier_id  uuid not null,
   uploaded_by  uuid not null,
   kind         text not null,   -- cipc | vat_cert | insurance | qualification | other
   url          text not null,   -- stored bucket path/URL; served via signed URLs
@@ -873,9 +873,17 @@ alter table public.repeat_defect_groups add primary key (id);
 alter table public.report_exports add primary key (id);
 alter table public.reports add primary key (id);
 alter table public.roles add primary key (key);
--- Lookup rows referenced by user_profiles.role FK. 'individual' seeded 20260720
--- (general-public self-signup role).
-insert into public.roles (key, label) values ('individual', 'Individual')
+-- Lookup rows referenced by the user_profiles.role FK. All app roles must exist
+-- here or setting that role fails the FK. ('client' is the legacy store-manager
+-- alias; 'individual' is the general-public self-signup role, seeded 20260720.)
+insert into public.roles (key, label) values
+  ('store_manager',    'Store Manager'),
+  ('regional_manager', 'Regional Manager'),
+  ('supplier',         'Supplier'),
+  ('executive',        'Executive'),
+  ('individual',       'Individual'),
+  ('system_admin',     'System Admin'),
+  ('client',           'Client (legacy)')
 on conflict (key) do nothing;
 alter table public.signoff_rounds add primary key (id);
 alter table public.signoffs add primary key (id);
@@ -990,6 +998,8 @@ alter table public.supplier_performance_scores add foreign key (region_id) refer
 alter table public.supplier_performance_scores add foreign key (company_id) references public.companies(id);
 alter table public.supplier_users add foreign key (supplier_id) references public.suppliers(id);
 alter table public.supplier_users add foreign key (user_id) references public.user_profiles(id);
+alter table public.supplier_sla_acceptances add foreign key (supplier_id) references public.suppliers(id) on delete cascade;
+alter table public.supplier_verification_docs add foreign key (supplier_id) references public.suppliers(id) on delete cascade;
 alter table public.suppliers add foreign key (company_id) references public.companies(id);
 alter table public.ticket_blockers add foreign key (owner_id) references public.user_profiles(id);
 alter table public.ticket_blockers add foreign key (ticket_id) references public.tickets(id);
@@ -1101,21 +1111,6 @@ revoke all on function public.reserve_upload_quota(uuid, bigint, bigint) from pu
 revoke all on function public.reserve_upload_quota(uuid, bigint, bigint) from anon, authenticated;
 grant execute on function public.reserve_upload_quota(uuid, bigint, bigint) to service_role;
 
-CREATE OR REPLACE FUNCTION public.app_can_see_ticket(t_id uuid)
- RETURNS boolean
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-  select exists (select 1 from public.tickets t where t.id = t_id
-    and t.company_id = public.app_company_id()
-    and (public.app_is_company_wide()
-      or t.region_id in (select public.app_region_ids())
-      or t.store_id  in (select public.app_store_ids())
-      or t.supplier_id in (select public.app_supplier_ids())));
-$function$
-;
-
 -- True iff the caller owns t_id AND it is a standalone/company-less ticket
 -- (Individual users). Lets owner-scoped read policies on quotes/signoffs check
 -- ownership without recursing through tickets RLS. (migration 20260706)
@@ -1189,6 +1184,23 @@ CREATE OR REPLACE FUNCTION public.app_supplier_ids()
  SET search_path TO 'public'
 AS $function$
   select supplier_id from public.supplier_users where user_id = auth.uid();
+$function$
+;
+
+-- Composite visibility helper — defined AFTER the app_* leaf helpers it calls so
+-- its SQL-language body validates on a from-scratch run.
+CREATE OR REPLACE FUNCTION public.app_can_see_ticket(t_id uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select exists (select 1 from public.tickets t where t.id = t_id
+    and t.company_id = public.app_company_id()
+    and (public.app_is_company_wide()
+      or t.region_id in (select public.app_region_ids())
+      or t.store_id  in (select public.app_store_ids())
+      or t.supplier_id in (select public.app_supplier_ids())));
 $function$
 ;
 
@@ -1271,6 +1283,14 @@ begin
   return new;
 end $function$
 ;
+
+-- Fire handle_new_user on every new auth signup. This trigger lives on the AUTH
+-- schema, so it is not captured by the public-schema export — declared here to
+-- keep schema.sql self-sufficient for a fresh project (without it, signups never
+-- get a user_profiles row).
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created after insert on auth.users
+  for each row execute function public.handle_new_user();
 
 CREATE OR REPLACE FUNCTION public.set_updated_at()
  RETURNS trigger

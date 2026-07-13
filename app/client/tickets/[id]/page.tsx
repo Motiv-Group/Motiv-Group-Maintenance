@@ -71,6 +71,13 @@ function buildSmTimeline(t: any, events: EventRow[], views: ViewRow[]): Timeline
   if (t.status === 'info_requested' && t.info_request_reason && !events.some(e => e.to_status === 'info_requested')) {
     out.push({ label: 'Your manager requested more information', at: t.updated_at ?? t.created_at })
   }
+  // The SM's (or their manager's) edit to the ticket details is recorded on the
+  // ticket row (edited_at), not as a status event, so add it explicitly.
+  if (t.edited_at && +new Date(t.edited_at) > +new Date(t.created_at)) {
+    const who = t.edited_by && t.edited_by !== t.created_by ? 'Your manager updated the ticket' : 'You edited the ticket'
+    const note = typeof t.edit_note === 'string' && t.edit_note.trim() ? ` — ${t.edit_note.trim()}` : ''
+    out.push({ label: `${who}${note}`, at: t.edited_at })
+  }
 
   for (const v of views) {
     const verb = v.item_type === 'photo' || v.item_type === 'photos' ? 'viewed' : 'opened'
@@ -137,11 +144,11 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
       <BackLink fallbackHref="/client/tickets" label="Back to tickets" />
 
       {/* Header: reference, title, priority + status, stepper */}
-      <Card className="p-5 sm:p-6 space-y-5">
+      <Card className="p-5 sm:p-6 space-y-7">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2 min-w-0">
             {t.job_ref && <span className="font-mono text-sm font-semibold text-[var(--text-faint)]">{t.job_ref}</span>}
-            <h1 className="text-xl font-bold text-[var(--text)]">{t.title}</h1>
+            <h1 className="text-xl font-bold text-[var(--text)]">{t.category || t.title}</h1>
           </div>
           <TicketBadges ticket={badgeTicket} className="shrink-0" />
         </div>
@@ -152,7 +159,7 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
       {/* Two columns: Next action · Ticket information */}
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Next action */}
-        <Card className="p-5">
+        <Card className="p-5 h-full">
           <h2 className="text-sm font-bold text-[var(--text)] mb-3">Next action</h2>
           <div className="flex items-start gap-3">
             <NaIcon size={22} className={`${naColor} shrink-0 ${spinning ? 'animate-spin' : ''}`} />
@@ -182,7 +189,7 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
         </Card>
 
         {/* Ticket information */}
-        <Card className="p-5">
+        <Card className="p-5 h-full">
           <h2 className="text-sm font-bold text-[var(--text)] mb-3">Ticket information</h2>
           <div className="space-y-3">
             <InfoRow label="Category" value={t.category ?? 'General'} />

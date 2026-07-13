@@ -5,7 +5,7 @@ import { AlertTriangle, Building2, ChevronDown, ChevronUp } from 'lucide-react'
 import { requireSupplierV3 } from '@/lib/health/guard'
 import { assembleSupplierDashboard, type SupplierTicketRow } from '@/lib/health/data'
 import { PersistentDetails } from '@/components/ui/PersistentDetails'
-import { PriorityBadge } from '@/components/ui/PriorityBadge'
+import { priorityBadgeClass, priorityLabel } from '@/components/client/ticketBadges'
 import { rmStatusMeta, formatDateTime } from '@/lib/utils'
 
 const SNAG_STATUSES = ['snag', 'snag_assigned', 'snag_resolved', 'snag_in_progress']
@@ -22,7 +22,7 @@ export default async function SupplierSnagPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><AlertTriangle className="text-amber-500" size={22} /> Snags</h1>
+        <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><AlertTriangle className="text-amber-600 dark:text-amber-500" size={22} /> Snags</h1>
         <p className="text-sm text-[var(--text-muted)] mt-0.5">Jobs the manager raised a snag on — re-work or re-upload required. Tap a ticket to action it.</p>
       </div>
 
@@ -33,9 +33,9 @@ export default async function SupplierSnagPage() {
         </div>
       ) : (
         groups.map(([store, rows]) => (
-          <PersistentDetails key={store} persistKey={`supplier-snag-${store}`} className="group rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
+          <PersistentDetails key={store} persistKey={`supplier-snag-${store}`} className="group rounded-2xl bg-[var(--surface)] ring-1 ring-[var(--border)] dark:ring-white/10 shadow-sm overflow-hidden">
             <summary className="flex items-center gap-3 px-4 py-3 cursor-pointer list-none hover:bg-[var(--hover)] transition">
-              <Building2 size={16} className="text-amber-500 shrink-0" />
+              <Building2 size={16} className="text-amber-600 dark:text-amber-500 shrink-0" />
               <span className="flex-1 min-w-0 text-sm font-bold text-[var(--text)] truncate">{[d.company, store].filter(Boolean).join(' · ')}{rows[0].branchCode ? ` · ${rows[0].branchCode}` : ''}</span>
               <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-500/15 rounded-full px-2 py-0.5 shrink-0">{rows.length} snag{rows.length !== 1 ? 's' : ''}</span>
               <ChevronDown size={16} className="text-[var(--text-faint)] shrink-0 group-open:hidden" />
@@ -50,9 +50,9 @@ export default async function SupplierSnagPage() {
                       <p className="text-sm text-[var(--text)] truncate">{t.title}</p>
                       <p className="text-[11px] text-[var(--text-faint)]">Logged {formatDateTime(t.createdAt)}</p>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
-                      <PriorityBadge priority={t.priority} className="w-full text-center" />
-                      <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${sm.cls}`}>{sm.label}</span>
+                    <div className="flex flex-wrap items-center justify-end gap-1.5 shrink-0">
+                      <span className={`inline-flex w-[120px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${priorityBadgeClass(t as never)}`}>{priorityLabel(t as never)}</span>
+                      <span className={`inline-flex w-[120px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${sm.cls}`}>{sm.label}</span>
                     </div>
                   </Link>
                 )

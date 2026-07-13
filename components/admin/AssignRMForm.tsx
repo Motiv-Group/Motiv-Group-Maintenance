@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Users, CheckCircle, Search, X } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
+import { Users, Check, CheckCircle, Search, X } from 'lucide-react'
+import { Card } from '@/components/exec/ui'
 
 interface RM {
   id: string
@@ -50,74 +50,81 @@ export function AssignRMForm({ storeId, currentRmId, currentRmName, regionalMana
   }
 
   return (
-    <div className="bg-slate-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 space-y-3">
+    <Card className="p-4 space-y-3">
       <div className="flex items-center gap-2">
-        <Users size={15} className="text-brand-600" />
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Regional Manager</p>
+        <Users size={15} className="text-[var(--text-faint)]" />
+        <p className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wide">Regional Manager</p>
       </div>
 
       {currentRmId ? (
-        <div className="flex items-center justify-between bg-brand-50 dark:bg-brand-900/20 border border-brand-200 dark:border-brand-800 rounded-lg px-3 py-2">
-          <div>
-            <p className="text-sm font-medium text-brand-800 dark:text-brand-300">{currentRmName ?? 'Assigned'}</p>
-            <p className="text-xs text-brand-600 dark:text-brand-400">Currently assigned</p>
+        <div className="flex items-center justify-between gap-2 rounded-lg bg-emerald-500/10 ring-1 ring-emerald-500/30 px-3 py-2">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-[var(--text)] truncate">{currentRmName ?? 'Assigned'}</p>
+            <p className="text-xs text-[var(--text-muted)]">Currently assigned</p>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
+          <button
+            type="button"
             onClick={() => assign(null)}
-            loading={removing}
-            className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+            disabled={removing}
+            className="inline-flex items-center gap-1 shrink-0 rounded-lg px-2.5 py-1.5 text-sm font-semibold ring-1 ring-red-500/40 text-red-600 dark:text-red-400 transition hover:bg-red-500/10 disabled:opacity-50"
           >
-            <X size={14} className="mr-1" /> Remove
-          </Button>
+            <X size={14} /> {removing ? 'Removing…' : 'Remove'}
+          </button>
         </div>
       ) : (
-        <p className="text-sm text-gray-400 italic">No regional manager assigned.</p>
+        <p className="text-sm text-[var(--text-faint)] italic">No regional manager assigned.</p>
       )}
 
       <div className="space-y-2">
         <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
           <input
             value={search}
             onChange={e => { setSearch(e.target.value); setSelected(null) }}
-            placeholder="Search regional manager by name..."
-            className="w-full pl-8 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+            placeholder="Search regional manager by name…"
+            className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)] outline-none focus:ring-[#C6A35D]/40"
           />
         </div>
 
         {filtered.length > 0 && (
-          <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-            {filtered.map(rm => (
-              <button
-                key={rm.id}
-                type="button"
-                onClick={() => { setSelected(rm); setSearch(rm.full_name ?? rm.company_name ?? '') }}
-                className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 last:border-0 text-gray-900 dark:text-white"
-              >
-                {rm.full_name ?? 'Unnamed'}{rm.company_name ? ` — ${rm.company_name}` : ''}
-              </button>
-            ))}
+          <div className="space-y-1">
+            {filtered.map(rm => {
+              const isSel = selected?.id === rm.id
+              return (
+                <button
+                  key={rm.id}
+                  type="button"
+                  onClick={() => { setSelected(rm); setSearch(rm.full_name ?? rm.company_name ?? '') }}
+                  className={`w-full flex items-center justify-between gap-2 text-left px-3 py-2 text-sm rounded-lg border transition ${
+                    isSel
+                      ? 'border-emerald-500 bg-emerald-500/10 ring-2 ring-emerald-500/30 text-[var(--text)]'
+                      : 'border-[var(--border)] text-[var(--text)] hover:bg-[var(--hover)]'
+                  }`}
+                >
+                  <span className="truncate">{rm.full_name ?? 'Unnamed'}{rm.company_name ? ` — ${rm.company_name}` : ''}</span>
+                  {isSel && <Check size={16} className="shrink-0 text-emerald-500" />}
+                </button>
+              )
+            })}
           </div>
         )}
       </div>
 
       <div className="flex items-center gap-2">
-        <Button
+        <button
+          type="button"
           onClick={() => selected && assign(selected.id)}
-          loading={loading}
-          disabled={!selected}
-          size="sm"
+          disabled={!selected || loading}
+          className="rounded-xl bg-emerald-600 hover:bg-emerald-500 px-4 py-2 text-white text-sm font-semibold transition disabled:opacity-50"
         >
-          Assign RM
-        </Button>
+          {loading ? 'Assigning…' : 'Assign RM'}
+        </button>
         {saved && (
-          <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+          <span className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
             <CheckCircle size={14} /> Saved!
           </span>
         )}
       </div>
-    </div>
+    </Card>
   )
 }

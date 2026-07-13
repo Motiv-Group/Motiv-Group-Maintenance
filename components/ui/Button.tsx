@@ -16,9 +16,11 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       secondary: 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 focus:ring-brand-500',
       danger:    'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
       ghost:     'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 focus:ring-gray-400',
-      // Auth-screen primary action — blue (navy 'primary' is near-invisible on the
-      // dark auth background). Kept the `gold` key so the two call sites don't change.
-      gold:      'bg-blue-600 text-white hover:bg-blue-500 focus:ring-blue-500',
+      // Auth-screen primary action — confident blue with a bold white label
+      // (navy 'primary' is near-invisible on the dark auth background). The
+      // disabled state is an explicit neutral, not a dimmed blue, so an
+      // incomplete form reads clearly as disabled. (Key kept as `gold`.)
+      gold:      'bg-blue-600 text-white font-semibold shadow-sm hover:bg-blue-500 focus:ring-blue-500 disabled:opacity-100 disabled:bg-[#1c1f27] disabled:text-gray-400 disabled:shadow-none',
     }
 
     const sizes = {

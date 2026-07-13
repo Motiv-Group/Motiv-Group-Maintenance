@@ -12,8 +12,8 @@ import { formatDateTime, humanizeDuration } from '@/lib/utils'
 const STATUS_TONE: Record<string, string> = {
   open: 'bg-blue-500/15 text-blue-700 dark:text-blue-400',
   info_requested: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
-  scheduled: 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-400',
-  in_progress: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D]',
+  scheduled: 'bg-blue-500/15 text-blue-700 dark:text-blue-400',
+  in_progress: 'bg-blue-500/15 text-blue-700 dark:text-blue-400',
   completed: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
   cancelled: 'bg-gray-500/15 text-gray-600 dark:text-gray-400',
 }
@@ -57,7 +57,7 @@ export function RecentTicketsCard({ tickets }: { tickets: StoreManagerTicket[] }
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_6rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
             <PriorityBadge priority={t.priority} className="w-full text-center" />
-            <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${t.infoAdded ? 'bg-teal-500/15 text-teal-700 dark:text-teal-400' : STATUS_TONE[t.status]}`}>{t.infoAdded ? 'Info added' : STATUS_WORD[t.status]}</span>
+            <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${t.infoAdded ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : STATUS_TONE[t.status]}`}>{t.infoAdded ? 'Info added' : STATUS_WORD[t.status]}</span>
           </div>
         </Link>
       ))}</div> : <p className="text-sm text-[var(--text-faint)]">No tickets in the last 7 days.</p>)}

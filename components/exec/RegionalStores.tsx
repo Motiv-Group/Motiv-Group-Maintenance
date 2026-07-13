@@ -1,24 +1,59 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { Store, Plus, User, Mail, Phone, MapPin, Ticket, MoreVertical, Pencil, Power, RotateCcw, Trash2, X, ChevronDown, Archive, ArrowRight, Eye, EyeOff } from 'lucide-react'
+import { Store, Plus, User, Mail, Phone, MapPin, Ticket, MoreVertical, Pencil, Power, RotateCcw, Trash2, X, ChevronDown, ChevronLeft, ChevronRight, Search, Download, Archive, ArrowRight, Eye, EyeOff } from 'lucide-react'
 import type { StoreCard } from '@/lib/health/data'
 import { formatCurrency, formatDateTime } from '@/lib/utils'
 import { isValidEmail, isValidPhone, normalisePhone } from '@/lib/csv'
-import { Card, SectionCard, Pill, Donut, BreakdownList, STATUS_TEXT } from '@/components/exec/ui'
+import { Card, Pill, Donut, BreakdownList, STATUS_TEXT } from '@/components/exec/ui'
 import { DrawerHeader } from '@/components/exec/Drawer'
 import { Modal } from '@/components/ui/Modal'
-
-const fmtK = (n: number) => n ? (n >= 1000 ? `R ${(n / 1000).toFixed(0)}K` : formatCurrency(n)) : 'R 0'
-const RAG_LABEL: Record<string, string> = { controlled: 'Controlled', attention: 'Attention', at_risk: 'At Risk', critical: 'Critical' }
 
 export interface ArchivedStore { id: string; name: string; deactivatedAt: string | null }
 type ActionTarget = { id: string; name: string; archived: boolean }
 
+// The 4 engine RAG states collapse to the 3 buckets shown in the table
+// (At Risk folds into Attention). Colours/labels mirror the status tabs.
+type Bucket = 'critical' | 'attention' | 'healthy'
+const bucketOf = (st: string): Bucket => st === 'controlled' ? 'healthy' : st === 'critical' ? 'critical' : 'attention'
+const BUCKET_META: Record<Bucket, { label: string; badge: string; bar: string; text: string; tab: string }> = {
+  critical:  { label: 'Critical',  badge: 'bg-red-500/15 text-red-700 dark:text-red-400 ring-red-500/30',              bar: '#ef4444', text: 'text-red-600 dark:text-red-400',    tab: 'bg-red-500/15 text-red-700 dark:text-red-400 ring-red-500/40' },
+  attention: { label: 'Attention', badge: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D] ring-[#C6A35D]/30',      bar: '#C6A35D', text: 'text-amber-600 dark:text-[#C6A35D]', tab: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D] ring-[#C6A35D]/40' },
+  healthy:   { label: 'Controlled', badge: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 ring-emerald-500/30', bar: '#10b981', text: 'text-emerald-600 dark:text-emerald-400', tab: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 ring-emerald-500/40' },
+}
+
+// Compact "time since" for the Last Activity column.
+function relativeTime(iso: string | null | undefined, nowMs: number): string {
+  if (!iso) return '—'
+  const diff = nowMs - new Date(iso).getTime()
+  const min = Math.floor(diff / 60000)
+  if (min < 1) return 'Just now'
+  if (min < 60) return `${min}m ago`
+  const hr = Math.floor(min / 60)
+  if (hr < 24) return `${hr}h ago`
+  const day = Math.floor(hr / 24)
+  if (day === 1) return 'Yesterday'
+  if (day < 7) return `${day}d ago`
+  if (day < 35) return `${Math.floor(day / 7)}w ago`
+  return `${Math.floor(day / 30)}mo ago`
+}
+
+const SEL_CLS = 'appearance-none rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm pl-3 pr-8 py-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#C6A35D]/40'
+/** Styled native <select> with a chevron — used across the Stores toolbar + pager. */
+function Select({ value, onChange, ariaLabel, children }: { value: string; onChange: (v: string) => void; ariaLabel: string; children: React.ReactNode }) {
+  return (
+    <div className="relative">
+      <select aria-label={ariaLabel} value={value} onChange={e => onChange(e.target.value)} className={SEL_CLS}>{children}</select>
+      <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
+    </div>
+  )
+}
+
 export function RegionalStores({ stores, archived = [], companyName = '' }: { stores: StoreCard[]; archived?: ArchivedStore[]; companyName?: string }) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [selId, setSelId] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
@@ -28,20 +63,81 @@ export function RegionalStores({ stores, archived = [], companyName = '' }: { st
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null)
   const selected = stores.find(s => s.storeId === selId) ?? null
-  const ranked = [...stores].sort((a, b) => a.finalHealthScore - b.finalHealthScore)
-  // Health-status filter deep-linked from the dashboard's distribution block.
-  const searchParams = useSearchParams()
-  const statusFilter = searchParams.get('status')
-  const shown = statusFilter ? ranked.filter(s => s.finalStatus === statusFilter) : ranked
 
-  // Deep-link from the dashboard "Stores Requiring Attention" list — open the
-  // store's side panel directly (?store=<id>).
+  // Filters + table view state — all client-side over the already-loaded stores.
+  const [q, setQ] = useState('')
+  const [bucket, setBucket] = useState<'all' | Bucket>('all')
+  const [sla, setSla] = useState<'all' | 'overdue' | 'ok'>('all')
+  const [openF, setOpenF] = useState<'all' | 'none' | 'low' | 'high'>('all')
+  const [sort, setSort] = useState<'attention' | 'health' | 'open' | 'overdue' | 'exposure' | 'name'>('attention')
+  const [perPage, setPerPage] = useState(10)
+  const [page, setPage] = useState(1)
+
+  // eslint-disable-next-line react-hooks/purity -- cosmetic "last activity" relative-time readout, not hydration-critical
+  const nowMs = Date.now()
+
+  const counts = useMemo(() => {
+    const c = { all: stores.length, critical: 0, attention: 0, healthy: 0 }
+    for (const s of stores) c[bucketOf(s.finalStatus)]++
+    return c
+  }, [stores])
+
+  // Deep-links: ?status= seeds the bucket tab; ?store= opens a store's panel.
   useEffect(() => {
+    const st = searchParams.get('status')
+    const map: Record<string, 'all' | Bucket> = { controlled: 'healthy', healthy: 'healthy', attention: 'attention', at_risk: 'attention', critical: 'critical' }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time seed from the URL query on mount
+    if (st && map[st]) setBucket(map[st])
     const id = new URLSearchParams(window.location.search).get('store')
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time deep-link sync from the URL on mount; the empty-dep effect intentionally opens the panel once
     if (id && stores.some(s => s.storeId === id)) { setSelId(id); setOpen(true) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Snap back to page 1 whenever a filter/sort/page-size changes.
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- keeps pagination in range as the filtered set changes
+  useEffect(() => { setPage(1) }, [q, bucket, sla, openF, sort, perPage])
+
+  const filtered = useMemo(() => {
+    const term = q.trim().toLowerCase()
+    const rows = stores.filter(s => {
+      if (bucket !== 'all' && bucketOf(s.finalStatus) !== bucket) return false
+      if (sla === 'overdue' && s.overdueTickets === 0) return false
+      if (sla === 'ok' && s.overdueTickets > 0) return false
+      if (openF === 'none' && s.openTickets !== 0) return false
+      if (openF === 'low' && !(s.openTickets >= 1 && s.openTickets <= 3)) return false
+      if (openF === 'high' && s.openTickets < 4) return false
+      if (term && !`${s.storeName} ${s.branchCode ?? ''} ${s.mainIssue}`.toLowerCase().includes(term)) return false
+      return true
+    })
+    const cmp: Record<string, (a: StoreCard, b: StoreCard) => number> = {
+      attention: (a, b) => a.finalHealthScore - b.finalHealthScore,
+      health: (a, b) => b.finalHealthScore - a.finalHealthScore,
+      open: (a, b) => b.openTickets - a.openTickets,
+      overdue: (a, b) => b.overdueTickets - a.overdueTickets,
+      exposure: (a, b) => b.costExposure - a.costExposure,
+      name: (a, b) => a.storeName.localeCompare(b.storeName),
+    }
+    return [...rows].sort(cmp[sort])
+  }, [stores, q, bucket, sla, openF, sort])
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage))
+  const curPage = Math.min(page, totalPages)
+  const pageRows = filtered.slice((curPage - 1) * perPage, curPage * perPage)
+  const firstShown = filtered.length ? (curPage - 1) * perPage + 1 : 0
+  const lastShown = Math.min(curPage * perPage, filtered.length)
+  const pageStart = Math.max(1, Math.min(curPage - 2, totalPages - 4))
+  const pageNums: number[] = []
+  for (let p = pageStart; p <= Math.min(totalPages, pageStart + 4); p++) pageNums.push(p)
+
+  // Export the current (filtered) rows as a client-side CSV — no backend.
+  function exportCsv() {
+    const head = ['Rank', 'Store', 'Branch', 'Health %', 'Status', 'Open', 'Overdue', 'Approvals', 'Exposure', 'Last Activity', 'Main Driver']
+    const esc = (v: unknown) => `"${String(v).replace(/"/g, '""')}"`
+    const body = filtered.map((s, i) => [i + 1, s.storeName, s.branchCode ?? '', s.finalHealthScore, BUCKET_META[bucketOf(s.finalStatus)].label, s.openTickets, s.overdueTickets, s.pendingDecisions, s.costExposure, relativeTime(s.lastActivityAt, nowMs), s.mainIssue].map(esc).join(','))
+    const csv = [head.map(esc).join(','), ...body].join('\r\n')
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
+    const a = document.createElement('a'); a.href = url; a.download = 'stores.csv'; a.click(); URL.revokeObjectURL(url)
+  }
 
   async function act(action: string, storeId: string) {
     setBusy(true); setNotice(null)
@@ -68,11 +164,16 @@ export function RegionalStores({ stores, archived = [], companyName = '' }: { st
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><Store className="text-indigo-600 dark:text-indigo-400" size={22} /> Stores</h1>
-        <button onClick={() => setAddOpen(true)} className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-500 transition shrink-0">
-          <Plus size={16} /> Add Store
-        </button>
+      {/* Header — title, subtitle, Export + Add Store */}
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-[var(--text)]">Stores</h1>
+          <p className="mt-0.5 text-sm text-[var(--text-muted)]">All {counts.all} store{counts.all === 1 ? '' : 's'} ranked by highest attention first.</p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <button onClick={exportCsv} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] hover:text-[var(--text)]"><Download size={15} /> Export</button>
+          <button onClick={() => setAddOpen(true)} className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-blue-500"><Plus size={16} /> Add Store</button>
+        </div>
       </div>
 
       {notice && (
@@ -82,67 +183,135 @@ export function RegionalStores({ stores, archived = [], companyName = '' }: { st
         </div>
       )}
 
-      <SectionCard title="Store Ranking — highest attention first"
-        action={statusFilter ? (
-          <Link href="/regional/stores" className="inline-flex items-center gap-1.5 rounded-full bg-[var(--surface-2)] px-2.5 py-1 text-xs font-medium text-[var(--text-muted)] ring-1 ring-[var(--border)] hover:text-[var(--text)]">
-            {RAG_LABEL[statusFilter] ?? statusFilter} <X size={13} />
-          </Link>
-        ) : undefined}>
-          {/* Desktop / tablet — full table */}
-          <div className="hidden md:block overflow-x-auto -mx-1">
-            <table className="w-full text-sm min-w-[760px]">
-              <thead><tr className="text-left text-[11px] text-[var(--text-faint)] border-b border-[var(--border)]">
-                <th className="py-2 px-2">#</th><th className="px-2">Store</th><th className="px-2">Health</th><th className="px-2">Status</th>
-                <th className="px-2 text-center">Open</th><th className="px-2 text-center">Overdue</th><th className="px-2 text-center">Approvals</th><th className="px-2">Exposure</th><th className="px-2">Main Driver</th><th className="px-2 w-8"></th>
-              </tr></thead>
-              <tbody>
-                {shown.map((s, i) => (
-                  <tr key={s.storeId} onClick={() => { setSelId(s.storeId); setOpen(true) }} className={`border-b border-[var(--border)] cursor-pointer hover:bg-[var(--hover)] ${selId === s.storeId ? 'bg-[var(--hover)]' : ''}`}>
-                    <td className="py-2.5 px-2 text-[var(--text-faint)]">{i + 1}</td><td className="px-2 text-[var(--text)]">{s.storeName}{s.branchCode && <span className="ml-1.5 font-mono text-[11px] text-[var(--text-faint)]">{s.branchCode}</span>}</td>
-                    <td className={`px-2 font-semibold ${STATUS_TEXT[s.finalStatus]}`}>{s.finalHealthScore}%</td><td className="px-2"><Pill status={s.finalStatus} /></td>
-                    <td className="px-2 text-center text-[var(--text)]">{s.openTickets}</td><td className="px-2 text-center text-red-400">{s.overdueTickets}</td>
-                    <td className="px-2 text-center text-[var(--text)]">{s.pendingDecisions}</td><td className="px-2 text-[var(--text)] whitespace-nowrap">{fmtK(s.costExposure)}</td>
-                    <td className="px-2 text-xs text-[var(--text-muted)] max-w-[200px] truncate">{s.mainIssue}</td>
-                    <td className="px-2 text-right" onClick={e => e.stopPropagation()}>
-                      {kebab({ id: s.storeId, name: s.storeName, archived: false })}
-                    </td>
-                  </tr>
-                ))}
-                {!shown.length && <tr><td colSpan={10} className="py-6 text-center text-[var(--text-faint)]">{statusFilter ? `No ${RAG_LABEL[statusFilter] ?? statusFilter} stores.` : 'No stores in your region.'}</td></tr>}
-              </tbody>
-            </table>
-          </div>
+      {/* Status bucket tabs — always colour-coded (All blue · Critical red · Attention
+          amber · Controlled green); the active tab gets a thicker ring + bold. */}
+      <div className="flex flex-wrap gap-2">
+        {([
+          { key: 'all', label: 'All', n: counts.all, tint: 'bg-blue-500/15 text-blue-700 dark:text-blue-400', ring: 'ring-blue-500/40' },
+          { key: 'critical', label: 'Critical', n: counts.critical, tint: 'bg-red-500/15 text-red-700 dark:text-red-400', ring: 'ring-red-500/40' },
+          { key: 'attention', label: 'Attention', n: counts.attention, tint: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D]', ring: 'ring-[#C6A35D]/40' },
+          { key: 'healthy', label: 'Controlled', n: counts.healthy, tint: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400', ring: 'ring-emerald-500/40' },
+        ] as const).map(t => {
+          const active = bucket === t.key
+          return (
+            <button key={t.key} onClick={() => setBucket(t.key)} aria-pressed={active}
+              className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm transition ${t.tint} ${t.ring} ${active ? 'font-bold ring-2' : 'font-semibold ring-1 opacity-80 hover:opacity-100'}`}>
+              {t.label} <span className="rounded-md bg-black/10 px-1.5 py-0.5 text-xs tabular-nums dark:bg-white/10">{t.n}</span>
+            </button>
+          )
+        })}
+      </div>
 
-          {/* Phone — stacked cards, tap to open detail (no horizontal scroll) */}
-          <ul className="md:hidden space-y-2">
-            {shown.map((s, i) => (
+      {/* Table card — toolbar, rows, pagination */}
+      <Card className="overflow-hidden">
+        {/* Toolbar */}
+        <div className="flex flex-wrap items-center gap-2 border-b border-[var(--border)] p-3">
+          <div className="relative min-w-[180px] flex-1">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
+            <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search stores…"
+              className="w-full rounded-xl bg-[var(--input-bg)] py-2 pl-9 pr-3 text-sm text-[var(--text)] ring-1 ring-[var(--border)] placeholder-[var(--text-faint)] focus:outline-none focus:ring-2 focus:ring-[#C6A35D]/40" />
+          </div>
+          <Select ariaLabel="Filter by status" value={bucket} onChange={v => setBucket(v as 'all' | Bucket)}>
+            <option value="all">Status</option><option value="critical">Critical</option><option value="attention">Attention</option><option value="healthy">Controlled</option>
+          </Select>
+          <Select ariaLabel="Filter by SLA" value={sla} onChange={v => setSla(v as typeof sla)}>
+            <option value="all">SLA</option><option value="overdue">Has overdue</option><option value="ok">No overdue</option>
+          </Select>
+          <Select ariaLabel="Filter by open tickets" value={openF} onChange={v => setOpenF(v as typeof openF)}>
+            <option value="all">Open Tickets</option><option value="none">None (0)</option><option value="low">1–3</option><option value="high">4+</option>
+          </Select>
+          <Select ariaLabel="Sort by" value={sort} onChange={v => setSort(v as typeof sort)}>
+            <option value="attention">Sort: Attention</option><option value="health">Sort: Health</option><option value="open">Sort: Open</option><option value="overdue">Sort: Overdue</option><option value="exposure">Sort: Exposure</option><option value="name">Sort: Name</option>
+          </Select>
+        </div>
+
+        {/* Desktop / tablet — full table */}
+        <div className="hidden overflow-x-auto md:block">
+          <table className="w-full min-w-[940px] text-sm">
+            <thead><tr className="border-b border-[var(--border)] text-left text-[11px] uppercase tracking-wide text-[var(--text-faint)]">
+              <th className="px-3 py-2.5 font-medium">#</th><th className="px-3 font-medium">Store</th><th className="px-3 font-medium">Health</th><th className="px-3 font-medium">Status</th>
+              <th className="px-3 text-center font-medium">Open</th><th className="px-3 text-center font-medium">Overdue</th><th className="px-3 text-center font-medium">Approvals</th>
+              <th className="px-3 font-medium">Exposure</th><th className="px-3 font-medium">Last Activity</th><th className="px-3 font-medium">Main Driver</th>
+            </tr></thead>
+            <tbody>
+              {pageRows.map((s, i) => {
+                const m = BUCKET_META[bucketOf(s.finalStatus)]
+                return (
+                  <tr key={s.storeId} onClick={() => { setSelId(s.storeId); setOpen(true) }} className="cursor-pointer border-b border-[var(--border)] last:border-0 transition hover:bg-[var(--hover)]">
+                    <td className="px-3 py-3 text-[var(--text-faint)] tabular-nums">{(curPage - 1) * perPage + i + 1}</td>
+                    <td className="px-3">
+                      <p className="font-semibold text-[var(--text)]">{s.storeName}</p>
+                      {s.branchCode && <p className="mt-0.5 font-mono text-[11px] text-[var(--text-faint)]">{s.branchCode}</p>}
+                    </td>
+                    <td className="px-3">
+                      <div className={`font-bold ${m.text}`}>{s.finalHealthScore}%</div>
+                      <div className="mt-1 h-1.5 w-16 overflow-hidden rounded-full bg-[var(--surface-2)]"><div className="h-full rounded-full" style={{ width: `${Math.max(4, Math.min(100, s.finalHealthScore))}%`, background: m.bar }} /></div>
+                    </td>
+                    <td className="px-3"><span className={`inline-flex rounded-md px-2 py-0.5 text-xs font-semibold ring-1 ${m.badge}`}>{m.label}</span></td>
+                    <td className="px-3 text-center text-[var(--text)] tabular-nums">{s.openTickets}</td>
+                    <td className={`px-3 text-center tabular-nums ${s.overdueTickets ? 'font-semibold text-red-600 dark:text-red-400' : 'text-[var(--text-faint)]'}`}>{s.overdueTickets}</td>
+                    <td className="px-3 text-center text-[var(--text)] tabular-nums">{s.pendingDecisions}</td>
+                    <td className="px-3 whitespace-nowrap text-[var(--text)] tabular-nums">{formatCurrency(s.costExposure)}</td>
+                    <td className="px-3 whitespace-nowrap text-[var(--text-muted)]">{relativeTime(s.lastActivityAt, nowMs)}</td>
+                    <td className="max-w-[180px] truncate px-3 text-xs text-[var(--text-muted)]">{s.mainIssue}</td>
+                  </tr>
+                )
+              })}
+              {!pageRows.length && <tr><td colSpan={10} className="py-8 text-center text-[var(--text-faint)]">No stores match.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Phone — stacked cards, tap to open detail (no horizontal scroll) */}
+        <ul className="divide-y divide-[var(--border)] md:hidden">
+          {pageRows.map((s, i) => {
+            const m = BUCKET_META[bucketOf(s.finalStatus)]
+            return (
               <li key={s.storeId} className="relative">
-                <button onClick={() => { setSelId(s.storeId); setOpen(true) }} className="w-full text-left rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3 pr-10 hover:bg-[var(--hover)] transition">
+                <button onClick={() => { setSelId(s.storeId); setOpen(true) }} className="w-full p-3 pr-10 text-left transition hover:bg-[var(--hover)]">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-[var(--text)] truncate"><span className="text-[var(--text-faint)]">#{i + 1}</span> {s.storeName}{s.branchCode && <span className="ml-1.5 font-mono text-[11px] text-[var(--text-faint)]">{s.branchCode}</span>}</p>
-                      <p className="text-[11px] text-[var(--text-faint)] truncate mt-0.5">{s.mainIssue}</p>
+                      <p className="truncate text-sm font-semibold text-[var(--text)]"><span className="text-[var(--text-faint)]">#{(curPage - 1) * perPage + i + 1}</span> {s.storeName}{s.branchCode && <span className="ml-1.5 font-mono text-[11px] text-[var(--text-faint)]">{s.branchCode}</span>}</p>
+                      <p className="mt-0.5 truncate text-[11px] text-[var(--text-faint)]">{s.mainIssue}</p>
                     </div>
-                    <span className="flex flex-col items-end gap-1 shrink-0">
-                      <span className={`text-sm font-semibold ${STATUS_TEXT[s.finalStatus]}`}>{s.finalHealthScore}%</span>
-                      <Pill status={s.finalStatus} />
+                    <span className="flex shrink-0 flex-col items-end gap-1">
+                      <span className={`text-sm font-bold ${m.text}`}>{s.finalHealthScore}%</span>
+                      <span className={`inline-flex rounded-md px-2 py-0.5 text-[11px] font-semibold ring-1 ${m.badge}`}>{m.label}</span>
                     </span>
                   </div>
                   <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-[var(--text-muted)]">
                     <span>Open: <span className="text-[var(--text)]">{s.openTickets}</span></span>
-                    <span>Overdue: <span className="text-red-500">{s.overdueTickets}</span></span>
+                    <span>Overdue: <span className={s.overdueTickets ? 'text-red-500' : 'text-[var(--text)]'}>{s.overdueTickets}</span></span>
                     <span>Approvals: <span className="text-[var(--text)]">{s.pendingDecisions}</span></span>
-                    <span>Exposure: <span className="text-[var(--text)]">{fmtK(s.costExposure)}</span></span>
+                    <span>Exposure: <span className="text-[var(--text)]">{formatCurrency(s.costExposure)}</span></span>
+                    <span>Activity: <span className="text-[var(--text)]">{relativeTime(s.lastActivityAt, nowMs)}</span></span>
                   </div>
                 </button>
-                <div className="absolute top-2 right-2">
-                  {kebab({ id: s.storeId, name: s.storeName, archived: false })}
-                </div>
+                <div className="absolute right-2 top-2">{kebab({ id: s.storeId, name: s.storeName, archived: false })}</div>
               </li>
+            )
+          })}
+          {!pageRows.length && <li className="py-8 text-center text-sm text-[var(--text-faint)]">No stores match.</li>}
+        </ul>
+
+        {/* Pagination */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border)] p-3">
+          <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
+            Rows per page
+            <Select ariaLabel="Rows per page" value={String(perPage)} onChange={v => setPerPage(Number(v))}>
+              <option value="10">10</option><option value="25">25</option><option value="50">50</option>
+            </Select>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="mr-1 text-xs text-[var(--text-faint)] tabular-nums">{firstShown}–{lastShown} of {filtered.length}</span>
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={curPage <= 1} aria-label="Previous page" className="rounded-lg p-1.5 text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-40"><ChevronLeft size={15} /></button>
+            {pageNums.map(p => (
+              <button key={p} onClick={() => setPage(p)} aria-current={p === curPage} className={`min-w-8 rounded-lg px-2.5 py-1.5 text-sm font-semibold tabular-nums transition ${p === curPage ? 'bg-blue-600 text-white' : 'text-[var(--text-muted)] ring-1 ring-[var(--border)] hover:bg-[var(--hover)]'}`}>{p}</button>
             ))}
-            {!shown.length && <li className="py-6 text-center text-[var(--text-faint)] text-sm">{statusFilter ? `No ${RAG_LABEL[statusFilter] ?? statusFilter} stores.` : 'No stores in your region.'}</li>}
-          </ul>
-      </SectionCard>
+            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={curPage >= totalPages} className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-40">Next <ChevronRight size={14} /></button>
+          </div>
+        </div>
+      </Card>
 
       {/* Archive — deactivated stores, collapsible */}
       {archived.length > 0 && (
@@ -172,7 +341,7 @@ export function RegionalStores({ stores, archived = [], companyName = '' }: { st
         </Card>
       )}
 
-      {open && selected && <Modal onClose={() => setOpen(false)} maxWidth="max-w-2xl">{close => <Detail s={selected} onClose={close} />}</Modal>}
+      {open && selected && <Modal onClose={() => setOpen(false)} maxWidth="max-w-2xl">{close => <Detail s={selected} onClose={close} onManage={() => { setOpen(false); setActionTarget({ id: selected.storeId, name: selected.storeName, archived: false }) }} />}</Modal>}
 
       {actionTarget && (
         <StoreActionsModal
@@ -468,13 +637,15 @@ function ContactRow({ icon: Icon, label, value, href, external }: { icon: React.
     : <div className="flex items-start gap-2.5 px-0 py-1.5">{inner}</div>
 }
 
-function Detail({ s, onClose }: { s: StoreCard; onClose?: () => void }) {
+function Detail({ s, onClose, onManage }: { s: StoreCard; onClose?: () => void; onManage?: () => void }) {
   const recommended = s.finalStatus === 'controlled' ? 'Store controlled — keep it up.' : `Resolve: ${s.mainIssue}.`
   // Prefer the store's street address; fall back to its region so a location always shows.
   const loc = s.location || (s.regionName && s.regionName !== '—' ? s.regionName : null)
   return (
     <div className="space-y-4">
-      <DrawerHeader onClose={onClose} title={<div className="flex items-center gap-2 flex-wrap"><Store size={18} className="text-blue-600 dark:text-blue-400 shrink-0" /><h3 className="text-lg font-bold text-[var(--text)]">{s.storeName}</h3>{s.branchCode && <span className="font-mono text-xs text-[var(--text-faint)]">{s.branchCode}</span>}<Pill status={s.finalStatus} /></div>} />
+      <DrawerHeader onClose={onClose} title={<div className="flex items-center gap-2 flex-wrap"><Store size={18} className="text-blue-600 dark:text-blue-400 shrink-0" /><h3 className="text-lg font-bold text-[var(--text)]">{s.storeName}</h3>{s.branchCode && <span className="font-mono text-xs text-[var(--text-faint)]">{s.branchCode}</span>}<Pill status={s.finalStatus} /></div>}>
+        {onManage && <button type="button" onClick={onManage} aria-label="Manage store" title="Manage store" className="p-1.5 rounded-lg text-[var(--text-faint)] hover:text-[var(--text)] hover:bg-[var(--hover)] transition"><MoreVertical size={16} /></button>}
+      </DrawerHeader>
 
       {/* Health hero — donut + score + top-line */}
       <div className="flex items-center gap-4 rounded-xl bg-[var(--surface)] ring-1 ring-[var(--border)] p-4">

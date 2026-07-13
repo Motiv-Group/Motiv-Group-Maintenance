@@ -16,7 +16,7 @@ import type { StoreManagerTicket } from '@/lib/health/data'
 import { Card } from '@/components/exec/ui'
 import { AddInfoModal } from '@/components/client/AddInfoModal'
 import { formatDate, humanizeDuration, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
-import { categoryVisual } from '@/lib/categoryVisual'
+import { CategoryIcon } from '@/components/client/ticketBadges'
 
 type TodayVisit = {
   id: string
@@ -66,6 +66,8 @@ export function StorePriorityWorkQueue({
         (URGENCY_RANK[String(a.priority)] ?? 9) - (URGENCY_RANK[String(b.priority)] ?? 9)
         || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       )
+      // Cap the queue at the top 5 — the rest live behind "View all tickets".
+      .slice(0, 5)
   }, [activeTickets, filter, todayVisitIds])
 
   return (
@@ -157,35 +159,19 @@ function MetricButton({
 }: {
   active: boolean
   icon: React.ReactNode
-  tone: Tone
+  tone?: Tone
   label: string
   value: number
   sub: string
   subActive: boolean
   onClick: () => void
 }) {
-  const tones: Record<Tone, string> = {
-    red: 'bg-red-500/15 text-red-600 dark:text-red-300 ring-red-500/20',
-    purple: 'bg-purple-500/15 text-purple-600 dark:text-purple-300 ring-purple-500/20',
-    gold: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D] ring-[#C6A35D]/20',
-    green: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 ring-emerald-500/20',
-    orange: 'bg-orange-500/15 text-orange-600 dark:text-orange-400 ring-orange-500/20',
-  }
-  // Sub-line stays grey when its count is zero; takes the card's colour when
-  // there's something to flag.
-  const subTone: Record<Tone, string> = {
-    red: 'text-red-600 dark:text-red-400',
-    gold: 'text-amber-600 dark:text-[#C6A35D]',
-    green: 'text-emerald-600 dark:text-emerald-400',
-    purple: 'text-purple-600 dark:text-purple-300',
-    orange: 'text-orange-600 dark:text-orange-400',
-  }
-  const subColor = subActive ? subTone[tone] : 'text-[var(--text-faint)]'
-
-  // Green = all clear (zero), amber = has tickets that need attention.
   const zero = value === 0
-  const valueColor = zero ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'
-  const stateBorder = zero ? 'border-2 border-emerald-500/60' : 'border-2 border-amber-500/70'
+  // Icon chip, value, border and the (active) sub-line all share ONE state colour:
+  // green when the count is 0 (all clear), amber when there's work outstanding.
+  const stateText = zero ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'
+  const iconChip = zero ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 ring-emerald-500/20' : 'bg-amber-500/15 text-amber-600 dark:text-amber-400 ring-amber-500/20'
+  const stateBorder = zero ? 'border-2 border-[var(--border)] dark:border-white/10' : 'border-2 border-amber-500/70'
 
   return (
     <button
@@ -195,11 +181,11 @@ function MetricButton({
     >
       <Card className={`h-full p-4 transition hover:-translate-y-0.5 hover:ring-blue-500/30 ${stateBorder} ${active ? 'ring-blue-500/60' : ''}`}>
         <div className="flex items-center gap-4">
-          <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-full ring-1 ${tones[tone]}`}>{icon}</span>
+          <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-full ring-1 ${iconChip}`}>{icon}</span>
           <div className="min-w-0">
             <p className="truncate text-xs font-semibold text-[var(--text-muted)]">{label}</p>
-            <p className={`mt-1 text-2xl font-bold leading-none ${valueColor}`}>{value}</p>
-            <p className={`mt-1 truncate text-xs font-semibold ${subColor}`}>{sub}</p>
+            <p className={`mt-1 text-2xl font-bold leading-none ${stateText}`}>{value}</p>
+            <p className={`mt-1 truncate text-xs font-semibold ${subActive ? stateText : 'text-[var(--text-faint)]'}`}>{sub}</p>
           </div>
         </div>
       </Card>
@@ -213,15 +199,17 @@ function QueueRow({ ticket, storeName, nowMs }: { ticket: StoreManagerTicket; st
   const needsInfo = ticket.status === 'info_requested'
   // The CTA sits above the whole-row link (z-20) so its click opens the modal /
   // navigates on its own instead of triggering the row's "view ticket" link.
-  const ctaCls = 'relative z-20 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-blue-500/60 px-4 py-2 text-sm font-bold text-blue-600 transition hover:bg-blue-500/10 dark:text-blue-300 lg:w-40'
+  // Genuinely critical (P1 / urgent) tickets get a RED action button so they stand out.
+  const critical = ['P1', 'urgent'].includes(String(ticket.priority))
+  const ctaCls = `relative z-20 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-bold transition lg:w-40 ${critical ? 'border-red-500/60 bg-red-500/10 text-red-600 hover:bg-red-500/15 dark:text-red-300' : 'border-blue-500/60 text-blue-600 hover:bg-blue-500/10 dark:text-blue-300'}`
 
   return (
-    <div className="relative grid gap-4 border-b border-[var(--border)] px-4 py-4 transition last:border-b-0 hover:bg-[var(--hover)] lg:grid-cols-[1fr_180px_1.1fr_160px] lg:items-center">
+    <div className="relative grid gap-4 border-b border-[var(--border)] px-4 py-4 transition last:border-b-0 hover:bg-[var(--hover)] lg:grid-cols-[1fr_200px_1.1fr_160px] lg:items-center">
       {/* The whole row (except the CTA island) links to the ticket. */}
       <Link href={ticketUrl} aria-label={`View ${ticket.category || ticket.title} ticket`} className="absolute inset-0 z-10" />
 
       <div className="flex min-w-0 items-center gap-3">
-        <CategoryIcon category={ticket.category ?? ticket.title} />
+        <CategoryIcon category={ticket.category ?? ticket.title} priority={ticket.priority} />
         <div className="min-w-0">
           <p className="truncate text-base font-bold text-[var(--text)]">{ticket.category || ticket.title}</p>
           <p className="truncate text-sm text-[var(--text-muted)]">{storeName}</p>
@@ -229,15 +217,15 @@ function QueueRow({ ticket, storeName, nowMs }: { ticket: StoreManagerTicket; st
       </div>
 
       <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className={`inline-flex w-[92px] justify-center rounded-md px-2 py-1 text-[10px] font-bold ${priorityBadgeClass(ticket)}`}>{priorityLabel(ticket)}</span>
-          <span className={`inline-flex w-[92px] justify-center rounded-md px-2 py-1 text-[10px] font-bold ${clientStatusBadgeClass(ticket)}`}>{clientStatusLabel(ticket)}</span>
+        <div className="flex items-center gap-1.5">
+          <span className={`inline-flex w-[72px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${priorityBadgeClass(ticket)}`}>{priorityLabel(ticket)}</span>
+          <span className={`inline-flex w-[120px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${clientStatusBadgeClass(ticket)}`}>{clientStatusLabel(ticket)}</span>
         </div>
         <p className="mt-1.5 truncate text-sm text-[var(--text-muted)]">{ticket.supplierAssigned ? 'Supplier assigned' : 'No supplier assigned'}</p>
       </div>
 
       <div className="min-w-0 border-l-0 border-[var(--border)] lg:border-l lg:pl-6">
-        <p className="truncate text-xs text-[var(--text-faint)]">Next step · Logged {formatDate(ticket.createdAt)}</p>
+        <p className="truncate text-xs text-[var(--text-muted)]">Next step · Logged {formatDate(ticket.createdAt)}</p>
         <p className="truncate text-sm font-bold text-[var(--text)]">{nextStep(ticket)}</p>
         {ticket.overdue ? (
           <p className="mt-1 flex items-center gap-1.5 text-sm font-bold text-red-600 dark:text-red-400">
@@ -269,11 +257,6 @@ function QueueRow({ ticket, storeName, nowMs }: { ticket: StoreManagerTicket; st
       </div>
     </div>
   )
-}
-
-function CategoryIcon({ category }: { category?: string | null }) {
-  const { Icon, badgeClass } = categoryVisual(category)
-  return <span className={`grid h-14 w-14 shrink-0 place-items-center rounded-full ${badgeClass}`}><Icon size={22} /></span>
 }
 
 function EmptyQueue({ filter }: { filter: QueueFilter }) {

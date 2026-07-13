@@ -3,22 +3,12 @@ export const dynamic = 'force-dynamic'
 import { Banknote, Wallet, Receipt, Building2, Users, Truck, Store, Briefcase, Crown } from 'lucide-react'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireMasterAdmin } from '@/lib/health/guard'
-import { Card } from '@/components/exec/ui'
+import { SectionCard, KpiRow } from '@/components/exec/ui'
 import { InfoTip } from '@/components/ui/InfoTip'
 import { formatCurrency } from '@/lib/utils'
 
 const APP_FEE_RATE = 0.005   // 0.5% of completed quote value
 const SUB_FEE = 150          // R150 per subscriber / month (static for now)
-
-function Kpi({ label, value, hint, icon, tone = 'text-[var(--text)]' }: { label: string; value: string; hint?: string; icon: React.ReactNode; tone?: string }) {
-  return (
-    <Card className="p-4 flex flex-col gap-1.5 min-w-0">
-      <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--text-muted)]">{icon}{label}</div>
-      <div className={`text-2xl font-bold leading-none ${tone}`}>{value}</div>
-      {hint && <div className="text-[11px] text-[var(--text-faint)]">{hint}</div>}
-    </Card>
-  )
-}
 
 export default async function AdminOverviewPage() {
   // Defence in depth — middleware already gates /admin to system_admin.
@@ -59,69 +49,63 @@ export default async function AdminOverviewPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2">
-          <Crown className="text-[#C6A35D]" size={22} /> Platform Admin
+          <Crown className="text-blue-600 dark:text-blue-400" size={22} /> Platform Admin
           <InfoTip title="Platform Admin" align="left">Master-admin-only area. This tab is the business view (revenue, subscribers, suppliers). The tabs above — Supabase, Vercel, Resend, Upstash, Sentry — are the live infrastructure panels: database size, deployments, email, rate limiting and errors.</InfoTip>
         </h1>
         <p className="text-sm text-[var(--text-muted)] mt-0.5">App-wide overview across {companyCount ?? 0} compan{companyCount === 1 ? 'y' : 'ies'} — revenue, suppliers and subscribers. Infra provider health is in the tabs above.</p>
       </div>
 
       {/* Revenue summary */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Kpi label="Total App Revenue" value={formatCurrency(grandTotal)} hint="Supplier fees + subscriptions" icon={<Wallet size={13} className="text-emerald-500" />} tone="text-emerald-600 dark:text-emerald-400" />
-        <Kpi label="Supplier Fees (0.5%)" value={formatCurrency(totalFee)} hint={`of ${formatCurrency(totalQuoted)} completed`} icon={<Receipt size={13} className="text-[#C6A35D]" />} />
-        <Kpi label="Subscriptions" value={formatCurrency(subRevenue)} hint={`${subCount} × ${formatCurrency(SUB_FEE)}/mo`} icon={<Banknote size={13} className="text-blue-500" />} />
-        <Kpi label="Completed Quote Value" value={formatCurrency(totalQuoted)} hint={`${supplierRows.length} suppliers`} icon={<Briefcase size={13} className="text-violet-500" />} />
-      </div>
+      <KpiRow kpis={[
+        { label: 'Total App Revenue', value: formatCurrency(grandTotal), hint: 'Supplier fees + subscriptions', icon: <Wallet size={13} />, tone: 'good' },
+        { label: 'Supplier Fees (0.5%)', value: formatCurrency(totalFee), hint: `of ${formatCurrency(totalQuoted)} completed`, icon: <Receipt size={13} />, tone: 'info' },
+        { label: 'Subscriptions', value: formatCurrency(subRevenue), hint: `${subCount} × ${formatCurrency(SUB_FEE)}/mo`, icon: <Banknote size={13} />, tone: 'info' },
+        { label: 'Completed Quote Value', value: formatCurrency(totalQuoted), hint: `${supplierRows.length} suppliers`, icon: <Briefcase size={13} />, tone: 'good' },
+      ]} />
 
       {/* Subscribers (clients) */}
-      <Card className="p-5 space-y-4">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="text-sm font-bold text-[var(--text)] flex items-center gap-2"><Users size={15} className="text-blue-500" /> Subscribers (Clients)</h2>
-          <span className="text-xs text-[var(--text-muted)]">{subCount} active · {formatCurrency(subRevenue)}/mo</span>
+      <SectionCard
+        title="Subscribers (Clients)"
+        icon={<Users size={15} className="text-blue-500" />}
+        action={<span className="text-xs text-[var(--text-muted)]">{subCount} active · {formatCurrency(subRevenue)}/mo</span>}
+      >
+        <div className="space-y-4">
+          <KpiRow kpis={[
+            { label: 'Store Managers', value: smCount, hint: `${formatCurrency(smCount * SUB_FEE)}/mo`, icon: <Store size={13} />, tone: 'info' },
+            { label: 'Regional Managers', value: rmCount, hint: `${formatCurrency(rmCount * SUB_FEE)}/mo`, icon: <Building2 size={13} />, tone: 'info' },
+            { label: 'Executives', value: exCount, hint: `${formatCurrency(exCount * SUB_FEE)}/mo`, icon: <Crown size={13} />, tone: 'info' },
+          ]} />
+          <div className="overflow-x-auto -mx-1">
+            <table className="w-full text-sm min-w-[520px]">
+              <thead><tr className="text-left text-[11px] text-[var(--text-faint)] border-b border-[var(--border)]"><th className="py-2 px-2">Name</th><th className="px-2">Email</th><th className="px-2">Role</th><th className="px-2 text-right">Monthly</th></tr></thead>
+              <tbody>
+                {sortedSubs.map(u => (
+                  <tr key={u.id} className="border-b border-[var(--border)] last:border-0 transition hover:bg-[var(--hover)]">
+                    <td className="py-2.5 px-2 text-[var(--text)]">{u.full_name ?? '—'}</td>
+                    <td className="px-2 text-[var(--text-muted)] truncate max-w-[220px]">{u.email ?? '—'}</td>
+                    <td className="px-2 text-[var(--text-muted)]">{roleLabel(u.role)}</td>
+                    <td className="px-2 text-right text-[var(--text)] tabular-nums">{formatCurrency(SUB_FEE)}</td>
+                  </tr>
+                ))}
+                {!sortedSubs.length && <tr><td colSpan={4} className="py-6 text-center text-[var(--text-faint)]">No subscribers yet.</td></tr>}
+              </tbody>
+            </table>
+          </div>
         </div>
-        <div className="grid grid-cols-3 gap-3">
-          {[
-            { label: 'Store Managers', n: smCount, icon: <Store size={13} className="text-blue-500" /> },
-            { label: 'Regional Managers', n: rmCount, icon: <Building2 size={13} className="text-teal-500" /> },
-            { label: 'Executives', n: exCount, icon: <Crown size={13} className="text-[#C6A35D]" /> },
-          ].map(c => (
-            <div key={c.label} className="rounded-xl ring-1 ring-[var(--border)] p-3">
-              <div className="flex items-center gap-1.5 text-[11px] text-[var(--text-muted)]">{c.icon}{c.label}</div>
-              <div className="text-2xl font-bold text-[var(--text)] mt-1">{c.n}</div>
-              <div className="text-[10px] text-[var(--text-faint)]">{formatCurrency(c.n * SUB_FEE)}/mo</div>
-            </div>
-          ))}
-        </div>
-        <div className="overflow-x-auto -mx-1">
-          <table className="w-full text-sm min-w-[520px]">
-            <thead><tr className="text-left text-[11px] text-[var(--text-faint)] border-b border-[var(--border)]"><th className="py-2 px-2">Name</th><th className="px-2">Email</th><th className="px-2">Role</th><th className="px-2 text-right">Monthly</th></tr></thead>
-            <tbody>
-              {sortedSubs.map(u => (
-                <tr key={u.id} className="border-b border-[var(--border)] last:border-0">
-                  <td className="py-2.5 px-2 text-[var(--text)]">{u.full_name ?? '—'}</td>
-                  <td className="px-2 text-[var(--text-muted)] truncate max-w-[220px]">{u.email ?? '—'}</td>
-                  <td className="px-2 text-[var(--text-muted)]">{roleLabel(u.role)}</td>
-                  <td className="px-2 text-right text-[var(--text)] tabular-nums">{formatCurrency(SUB_FEE)}</td>
-                </tr>
-              ))}
-              {!sortedSubs.length && <tr><td colSpan={4} className="py-6 text-center text-[var(--text-faint)]">No subscribers yet.</td></tr>}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+      </SectionCard>
 
       {/* Suppliers */}
-      <Card className="p-5 space-y-4">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="text-sm font-bold text-[var(--text)] flex items-center gap-2"><Truck size={15} className="text-teal-500" /> Suppliers</h2>
-          <span className="text-xs text-[var(--text-muted)]">{supplierRows.length} active</span>
-        </div>
+      <SectionCard
+        title="Suppliers"
+        icon={<Truck size={15} className="text-blue-500" />}
+        action={<span className="text-xs text-[var(--text-muted)]">{supplierRows.length} active</span>}
+      >
         <div className="overflow-x-auto -mx-1">
           <table className="w-full text-sm min-w-[560px]">
             <thead><tr className="text-left text-[11px] text-[var(--text-faint)] border-b border-[var(--border)]"><th className="py-2 px-2">Supplier</th><th className="px-2 text-right">Completed Quote Value</th><th className="px-2 text-right">App Fee (0.5%)</th></tr></thead>
             <tbody>
               {supplierRows.map(s => (
-                <tr key={s.id} className="border-b border-[var(--border)] last:border-0">
+                <tr key={s.id} className="border-b border-[var(--border)] last:border-0 transition hover:bg-[var(--hover)]">
                   <td className="py-2.5 px-2 text-[var(--text)]">{s.name}</td>
                   <td className="px-2 text-right text-[var(--text)] tabular-nums whitespace-nowrap">{formatCurrency(s.quoted)}</td>
                   <td className="px-2 text-right font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums whitespace-nowrap">{formatCurrency(s.fee)}</td>
@@ -138,7 +122,7 @@ export default async function AdminOverviewPage() {
             )}
           </table>
         </div>
-      </Card>
+      </SectionCard>
     </div>
   )
 }

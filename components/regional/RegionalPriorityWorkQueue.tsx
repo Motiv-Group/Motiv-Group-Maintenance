@@ -51,7 +51,9 @@ export function RegionalPriorityWorkQueue({ tickets, generatedAt, suppliers = []
       .filter(t => matchesFilter(t, filter))
       .sort((a, b) =>
         (URGENCY_RANK[String(a.priority)] ?? 9) - (URGENCY_RANK[String(b.priority)] ?? 9)
-        || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+        || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      // Cap the queue at the top 5 — the rest live behind "View all tickets".
+      .slice(0, 5),
     [activeTickets, filter])
 
   return (
@@ -97,40 +99,26 @@ export function RegionalPriorityWorkQueue({ tickets, generatedAt, suppliers = []
   )
 }
 
-function MetricButton({ active, icon, tone, label, value, sub, subActive, onClick }: {
-  active: boolean; icon: React.ReactNode; tone: Tone; label: string; value: number; sub: string; subActive: boolean; onClick: () => void
+function MetricButton({ active, icon, label, value, sub, subActive, onClick }: {
+  active: boolean; icon: React.ReactNode; tone?: Tone; label: string; value: number; sub: string; subActive: boolean; onClick: () => void
 }) {
-  const tones: Record<Tone, string> = {
-    red: 'bg-red-500/15 text-red-600 dark:text-red-300 ring-red-500/20',
-    purple: 'bg-purple-500/15 text-purple-600 dark:text-purple-300 ring-purple-500/20',
-    gold: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D] ring-[#C6A35D]/20',
-    green: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 ring-emerald-500/20',
-    orange: 'bg-orange-500/15 text-orange-600 dark:text-orange-400 ring-orange-500/20',
-    blue: 'bg-blue-500/15 text-blue-600 dark:text-blue-300 ring-blue-500/20',
-  }
-  const subTone: Record<Tone, string> = {
-    red: 'text-red-600 dark:text-red-400',
-    gold: 'text-amber-600 dark:text-[#C6A35D]',
-    green: 'text-emerald-600 dark:text-emerald-400',
-    purple: 'text-purple-600 dark:text-purple-300',
-    orange: 'text-orange-600 dark:text-orange-400',
-    blue: 'text-blue-600 dark:text-blue-400',
-  }
-  const subColor = subActive ? subTone[tone] : 'text-[var(--text-faint)]'
   const zero = value === 0
-  const valueColor = zero ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'
-  const stateBorder = zero ? 'border-2 border-emerald-500/60' : 'border-2 border-amber-500/70'
+  // Icon chip, value, border and the (active) sub-line all share ONE state colour:
+  // green when the count is 0 (all clear), amber when there's work outstanding.
+  const stateText = zero ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'
+  const iconChip = zero ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 ring-emerald-500/20' : 'bg-amber-500/15 text-amber-600 dark:text-amber-400 ring-amber-500/20'
+  const stateBorder = zero ? 'border-2 border-[var(--border)] dark:border-white/10' : 'border-2 border-amber-500/70'
 
   return (
     <button type="button" onClick={onClick}
       className={`block rounded-2xl text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 ${active ? 'ring-2 ring-blue-500/70' : ''}`}>
       <Card className={`h-full p-4 transition hover:-translate-y-0.5 hover:ring-blue-500/30 ${stateBorder} ${active ? 'ring-blue-500/60' : ''}`}>
         <div className="flex items-center gap-4">
-          <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-full ring-1 ${tones[tone]}`}>{icon}</span>
+          <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-full ring-1 ${iconChip}`}>{icon}</span>
           <div className="min-w-0">
             <p className="truncate text-xs font-semibold text-[var(--text-muted)]">{label}</p>
-            <p className={`mt-1 text-2xl font-bold leading-none ${valueColor}`}>{value}</p>
-            <p className={`mt-1 truncate text-xs font-semibold ${subColor}`}>{sub}</p>
+            <p className={`mt-1 text-2xl font-bold leading-none ${stateText}`}>{value}</p>
+            <p className={`mt-1 truncate text-xs font-semibold ${subActive ? stateText : 'text-[var(--text-faint)]'}`}>{sub}</p>
           </div>
         </div>
       </Card>
@@ -157,14 +145,16 @@ function QueueRow({ ticket, nowMs, suppliers, motivSuppliers }: { ticket: Region
   // Same outline form-factor + size as the "View Ticket" button, so the queue's
   // CTAs are consistent. Sits above the whole-row link (z-20) so its click opens
   // the pop-up / navigates on its own.
-  const ctaCls = 'relative z-20 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-blue-500/60 px-4 py-2 text-sm font-bold text-blue-600 transition hover:bg-blue-500/10 dark:text-blue-300 lg:w-40'
+  // Genuinely critical (P1 / urgent) tickets get a RED action button so they stand out.
+  const critical = ['P1', 'urgent'].includes(String(ticket.priority))
+  const ctaCls = `relative z-20 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-bold transition lg:w-40 ${critical ? 'border-red-500/60 bg-red-500/10 text-red-600 hover:bg-red-500/15 dark:text-red-300' : 'border-blue-500/60 text-blue-600 hover:bg-blue-500/10 dark:text-blue-300'}`
   return (
     <div className="relative grid gap-4 border-b border-[var(--border)] px-4 py-4 transition last:border-b-0 hover:bg-[var(--hover)] lg:grid-cols-[1fr_200px_1.1fr_160px] lg:items-center">
       {/* The whole row (except the CTA island) links to the ticket. */}
       <Link href={ticketUrl} aria-label={`View ${ticket.category || ticket.title} ticket`} className="absolute inset-0 z-10" />
 
       <div className="flex min-w-0 items-center gap-3">
-        <CategoryIcon category={ticket.category ?? ticket.title} />
+        <CategoryIcon category={ticket.category ?? ticket.title} priority={ticket.priority} />
         <div className="min-w-0">
           <p className="truncate text-base font-bold text-[var(--text)]">{ticket.category || ticket.title}</p>
           <p className="truncate text-sm text-[var(--text-muted)]">{ticket.storeName}</p>
@@ -172,22 +162,22 @@ function QueueRow({ ticket, nowMs, suppliers, motivSuppliers }: { ticket: Region
       </div>
 
       <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className={`inline-flex w-[92px] justify-center rounded-md px-2 py-1 text-[10px] font-bold ${priorityBadgeClass(String(ticket.priority))}`}>{PRIORITY_LEVEL_LABELS[String(ticket.priority)] ?? 'Medium'}</span>
-          <span className={`inline-flex w-[92px] justify-center rounded-md px-2 py-1 text-[10px] font-bold ${meta.cls}`}>{meta.label}</span>
+        <div className="flex items-center gap-1.5">
+          <span className={`inline-flex w-[72px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${priorityBadgeClass(String(ticket.priority))}`}>{PRIORITY_LEVEL_LABELS[String(ticket.priority)] ?? 'Medium'}</span>
+          <span className={`inline-flex w-[120px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${meta.cls}`}>{meta.label}</span>
         </div>
         <p className="mt-1.5 truncate text-sm text-[var(--text-muted)]">{ticket.supplierAssigned ? 'Supplier assigned' : 'No supplier assigned'}</p>
       </div>
 
       <div className="min-w-0 border-l-0 border-[var(--border)] lg:border-l lg:pl-6">
-        <p className="truncate text-xs text-[var(--text-faint)]">Next step · Logged {formatDate(ticket.createdAt)}</p>
+        <p className="truncate text-xs text-[var(--text-muted)]">Next step · Logged {formatDate(ticket.createdAt)}</p>
         <p className="truncate text-sm font-bold text-[var(--text)]">{nextStep(ticket)}</p>
         {breached ? (
           <p className="mt-1 flex items-center gap-1.5 text-sm font-bold text-red-600 dark:text-red-400"><AlertCircle size={14} /> SLA breached</p>
         ) : (
           <>
             <p className="mt-1 flex items-center gap-1.5 text-sm text-[var(--text-muted)]"><CalendarClock size={14} /> SLA in {humanizeDuration(slaMs)}</p>
-            <p className="truncate text-[11px] text-[var(--text-faint)]">Next deadline · {formatDateTime(slaDeadline)}</p>
+            <p className="truncate text-xs text-[var(--text-muted)]">Next deadline · {formatDateTime(slaDeadline)}</p>
           </>
         )}
       </div>
@@ -201,6 +191,7 @@ function QueueRow({ ticket, nowMs, suppliers, motivSuppliers }: { ticket: Region
             trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}><ClipboardCheck size={15} /> Sign-Off</button>} />
         ) : assignable ? (
           <AssignSuppliersButton ticketId={ticket.id} suppliers={suppliers} motivSuppliers={motivSuppliers}
+            awaitingById={ticket.engagedSupplierIds} declinedSupplierIds={ticket.declinedSupplierIds}
             trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}>Assign supplier</button>} />
         ) : (
           <Link href={ticketUrl} className={ctaCls}>View Ticket <ArrowRight size={15} /></Link>
@@ -245,16 +236,35 @@ function priorityBadgeClass(p: string): string {
   return 'bg-slate-500/15 text-slate-600 dark:text-slate-300'
 }
 
+// The RM's next step per ticket status — short, professional, and covering every
+// state (no generic fallback for a real status). Mirrors the ticket-detail
+// "Next action" wording so the queue and the ticket page always agree.
 function nextStep(t: RegionalTicketRow): string {
-  const s = t.status
-  if (!t.supplierAssigned && (s === 'open' || s === 'info_requested')) return 'Assign a supplier / request a quote'
-  if (s === 'info_requested') return 'Waiting on the store for more info'
-  if (s === 'quoted' || s === 'quote_revision') return 'Review & approve the quote'
-  if (s === 'variation_review') return 'Review the variation order'
-  if (s === 'accepted') return 'Approved — awaiting scheduling'
-  if (s === 'scheduled' || s === 'snag_assigned') return 'Supplier visit is scheduled'
-  if (s === 'in_progress' || s === 'snag_in_progress') return 'Supplier is working on this ticket'
-  if (['submitted_for_signoff', 'snag_resolved', 'approved_closeout', 'evidence_requested'].includes(s)) return 'Review & sign off the completed work'
-  if (s === 'snag') return 'Snag raised — awaiting supplier'
-  return 'Track progress on this ticket'
+  if (t.disputed) return 'Resolve the open dispute'
+  switch (t.status) {
+    case 'open': return t.infoAdded ? 'Review the added information' : t.supplierAssigned ? 'Awaiting quotes from suppliers' : 'Assign a supplier to request quotes'
+    case 'info_requested': return t.infoAdded ? 'Review the added information' : "Awaiting the store's response"
+    case 'suppliers_declined': return 'Re-assign a supplier'
+    case 'assigned':
+    case 'quote_requested':
+    case 'assessment': return 'Awaiting quotes from suppliers'
+    case 'quoted':
+    case 'quote_revision': return 'Review & approve the quote'
+    case 'variation_review': return 'Review the variation order'
+    case 'accepted': return 'Approved — awaiting scheduling'
+    case 'scheduled': return 'Supplier visit scheduled'
+    case 'in_progress': return 'Supplier is working on this ticket'
+    case 'submitted_for_signoff':
+    case 'pending_sign_off':
+    case 'snag_resolved': return 'Review & sign off the work'
+    case 'evidence_requested': return 'Awaiting evidence from the supplier'
+    case 'snag':
+    case 'snag_assigned':
+    case 'snag_in_progress': return 'Snag in progress'
+    case 'approved_closeout': return 'Finalise the close-out'
+    case 'completed': return 'Completed'
+    case 'cancelled':
+    case 'declined': return 'Closed'
+    default: return 'Track progress on this ticket'
+  }
 }

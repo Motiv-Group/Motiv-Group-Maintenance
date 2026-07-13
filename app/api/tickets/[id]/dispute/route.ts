@@ -108,8 +108,9 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   const role = prof?.role
   if (!role) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   const isIndividual = role === 'individual'
-  // Everyone but an Individual must belong to a company.
-  if (!isIndividual && !prof?.company_id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  // Everyone but an Individual or a supplier (pool suppliers have no company_id;
+  // gated by the awarded-supplier check below) must belong to a company.
+  if (!isIndividual && role !== 'supplier' && !prof?.company_id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   // The dispute has two sides: the supplier, and the "resolver / client". The
   // resolver is the RM/executive — or, on a standalone Individual ticket, the
   // owner themselves (they play the resolver role).

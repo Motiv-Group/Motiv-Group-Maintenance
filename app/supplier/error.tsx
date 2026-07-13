@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 
-export default function AdminError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+export default function SupplierError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
     console.error(error)
   }, [error])
@@ -10,11 +10,12 @@ export default function AdminError({ error, reset }: { error: Error & { digest?:
   return (
     <div className="flex flex-col items-center justify-center py-20 space-y-4 text-center">
       <p className="text-3xl">⚠️</p>
-      <h2 className="text-base font-semibold text-gray-900 dark:text-white">Failed to load page</h2>
-      <p className="text-sm text-gray-500 dark:text-gray-400">Please check your connection and try again.</p>
+      <h2 className="text-base font-semibold text-[var(--text)]">Failed to load page</h2>
+      <p className="text-sm text-[var(--text-muted)]">Please check your connection and try again.</p>
       <button
+        type="button"
         onClick={reset}
-        className="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 transition-colors"
+        className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-lg transition-colors"
       >
         Retry
       </button>

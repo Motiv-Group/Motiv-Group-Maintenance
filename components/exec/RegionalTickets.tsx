@@ -5,7 +5,8 @@
 // milestone (requested → received → accepted) coloured to the status.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Ticket, Search, ChevronDown, BarChart3, Store, PlusCircle } from 'lucide-react'
+import { Ticket, Search, ChevronDown, BarChart3, Store, PlusCircle, FilePlus2, MessageSquare, Calendar, FileText, UserCheck, AlertCircle, Truck, Clock, CheckCircle2, XCircle, Loader2 } from 'lucide-react'
+import { TicketFilterTiles, type FilterGroup } from '@/components/ui/TicketFilterTiles'
 import type { RegionalTicketRow } from '@/lib/health/data'
 import { Card } from '@/components/exec/ui'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
@@ -13,7 +14,7 @@ import { CategoryIcon, priorityBadgeClass, priorityLabel } from '@/components/cl
 import { Modal } from '@/components/ui/Modal'
 import { DrawerHeader } from '@/components/exec/Drawer'
 import { readCollapse, writeCollapse, readCollapseSet, writeCollapseSet } from '@/lib/collapse-state'
-import { rmStatusMeta, formatDateTime, humanizeDuration, urgencyCountCls } from '@/lib/utils'
+import { rmStatusMeta, formatDateTime, humanizeDuration } from '@/lib/utils'
 
 type Bucket = 'open' | 'quote_requested' | 'quoted' | 'approved' | 'scheduled' | 'in_progress' | 'awaiting_signoff' | 'completed' | 'cancelled'
 // A ticket counts as "Open" only while it's still open/info-requested AND has no
@@ -30,7 +31,7 @@ function bucketOf(s: string, supplierAssigned = false): Bucket {
   return 'cancelled'
 }
 const BUCKET_LABEL: Record<Bucket, string> = { open: 'New', quote_requested: 'Quote requested', quoted: 'Quoted', approved: 'Approved', scheduled: 'Job scheduled', in_progress: 'In progress', awaiting_signoff: 'Sign-off', completed: 'Completed', cancelled: 'Cancelled' }
-const BUCKET_BAR: Record<Bucket, string> = { open: 'bg-blue-500', quote_requested: 'bg-cyan-500', quoted: 'bg-violet-500', approved: 'bg-teal-500', scheduled: 'bg-indigo-500', in_progress: 'bg-[#C6A35D]', awaiting_signoff: 'bg-orange-500', completed: 'bg-emerald-500', cancelled: 'bg-red-500' }
+const BUCKET_BAR: Record<Bucket, string> = { open: 'bg-blue-500', quote_requested: 'bg-blue-500', quoted: 'bg-amber-500', approved: 'bg-blue-500', scheduled: 'bg-blue-500', in_progress: 'bg-blue-500', awaiting_signoff: 'bg-amber-500', completed: 'bg-emerald-500', cancelled: 'bg-gray-500' }
 const BAR_ORDER: Bucket[] = ['open', 'quote_requested', 'quoted', 'approved', 'scheduled', 'in_progress', 'awaiting_signoff', 'completed']
 
 // Urgency rank (handles classic low/medium/high/urgent and engine P1–P4).
@@ -39,11 +40,14 @@ const urgency = (p: string) => URGENCY[p] ?? 5
 const byDateThenUrgency = (a: RegionalTicketRow, b: RegionalTicketRow) =>
   (+new Date(b.createdAt) - +new Date(a.createdAt)) || (urgency(a.priority) - urgency(b.priority))
 
-// Tint a store group's count badge by its most urgent active ticket (cancelled
-// tickets don't count) — shared with the SM/supplier tabs via urgencyCountCls.
-function groupCountCls(rows: RegionalTicketRow[]): string {
-  const active = rows.filter(t => bucketOf(t.status, t.supplierAssigned) !== 'cancelled')
-  return urgencyCountCls(active.map(t => t.priority))
+// Per-store summary line: total tickets, critical/high counts, and the soonest
+// SLA deadline among the store's active tickets.
+function groupSummary(rows: RegionalTicketRow[], nowMs: number) {
+  const active = rows.filter(t => !['completed', 'cancelled', 'declined'].includes(t.status))
+  const critical = rows.filter(t => ['P1', 'urgent'].includes(String(t.priority))).length
+  const high = rows.filter(t => ['P2', 'high'].includes(String(t.priority))).length
+  const upcoming = active.map(t => +new Date(t.slaDueAt ?? t.dueAt)).filter(ms => ms > nowMs)
+  return { total: rows.length, critical, high, nextSla: upcoming.length ? Math.min(...upcoming) : null }
 }
 
 // No "All" pill: a null filter means all tickets, and clicking an active pill
@@ -51,46 +55,67 @@ function groupCountCls(rows: RegionalTicketRow[]): string {
 // Cancelled. A breach that has gone fully overdue drops out of the breach pills
 // and shows only under Overdue.
 type RmFilter = 'internal_breach' | 'supplier_breach' | 'overdue' | Bucket
-// Pills styled like the SM Tickets tab: tinted when inactive, filled when selected.
-const PILLS: { key: RmFilter; label: string; active: string; inactive: string }[] = [
-  { key: 'open', label: 'New', active: 'bg-blue-500 text-white', inactive: 'bg-blue-500/15 text-blue-700 dark:text-blue-400' },
-  { key: 'quote_requested', label: 'Quote requested', active: 'bg-cyan-500 text-white', inactive: 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-400' },
-  { key: 'quoted', label: 'Quoted', active: 'bg-violet-500 text-white', inactive: 'bg-violet-500/15 text-violet-700 dark:text-violet-400' },
-  { key: 'approved', label: 'Approved', active: 'bg-teal-500 text-white', inactive: 'bg-teal-500/15 text-teal-700 dark:text-teal-400' },
-  { key: 'scheduled', label: 'Job scheduled', active: 'bg-indigo-500 text-white', inactive: 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-400' },
-  { key: 'in_progress', label: 'In progress', active: 'bg-[#C6A35D] text-[#0a0e17]', inactive: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D]' },
-  { key: 'awaiting_signoff', label: 'Sign-off', active: 'bg-orange-500 text-white', inactive: 'bg-orange-500/15 text-orange-700 dark:text-orange-400' },
-  { key: 'completed', label: 'Completed', active: 'bg-emerald-500 text-white', inactive: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' },
-  { key: 'internal_breach', label: 'Internal Breached', active: 'bg-red-600 text-white', inactive: 'bg-red-600/15 text-red-700 dark:text-red-400' },
-  { key: 'supplier_breach', label: 'Supplier Breached', active: 'bg-orange-600 text-white', inactive: 'bg-orange-600/15 text-orange-700 dark:text-orange-400' },
-  { key: 'overdue', label: 'Overdue', active: 'bg-red-500 text-white', inactive: 'bg-red-500/15 text-red-600 dark:text-red-400' },
-  { key: 'cancelled', label: 'Cancelled', active: 'bg-gray-500 text-white', inactive: 'bg-gray-500/15 text-gray-600 dark:text-gray-400' },
-]
+// Valid deep-link (?filter=) keys — the bucket keys plus the breach/overdue slices.
+const RM_FILTER_KEYS = new Set<string>(['open', 'quote_requested', 'quoted', 'approved', 'scheduled', 'in_progress', 'awaiting_signoff', 'completed', 'cancelled', 'internal_breach', 'supplier_breach', 'overdue'])
+
+// What the RM should do next on this ticket — replaces the passive
+// "Supplier assigned / No supplier assigned" line with an action cue. `act` marks
+// the states where the RM themselves must do something (shown emphasised).
+function rmRowAction(t: RegionalTicketRow): { text: string; act: boolean } {
+  if (t.disputed) return { text: 'Resolve the dispute', act: true }
+  switch (t.status) {
+    case 'open':
+    case 'info_requested': return t.supplierAssigned ? { text: 'Awaiting supplier quote', act: false } : { text: 'Assign a supplier', act: true }
+    case 'suppliers_declined': return { text: 'Re-assign a supplier', act: true }
+    case 'assigned':
+    case 'quote_requested':
+    case 'assessment': return { text: 'Awaiting supplier quote', act: false }
+    case 'quoted':
+    case 'quote_revision': return { text: 'Review & approve quote', act: true }
+    case 'variation_review': return { text: 'Review variation order', act: true }
+    case 'accepted': return { text: 'Awaiting scheduling', act: false }
+    case 'scheduled': return { text: 'Supplier visit scheduled', act: false }
+    case 'in_progress': return { text: 'Work in progress', act: false }
+    case 'submitted_for_signoff':
+    case 'pending_sign_off':
+    case 'snag_resolved': return { text: 'Review & sign off', act: true }
+    case 'evidence_requested': return { text: 'Awaiting evidence', act: false }
+    case 'snag':
+    case 'snag_assigned':
+    case 'snag_in_progress': return { text: 'Snag in progress', act: false }
+    case 'approved_closeout': return { text: 'Finalise close-out', act: true }
+    case 'completed': return { text: 'Completed', act: false }
+    case 'cancelled':
+    case 'declined': return { text: 'Closed', act: false }
+    default: return { text: 'Track progress', act: false }
+  }
+}
 
 // Row form factor matches the store-manager Tickets tab: category icon + job ref
-// + category/title + store on the left; priority + status badges, supplier line
+// + category/title + store on the left; priority + status badges, next-action line
 // and the logged date on the right. RM statuses come from rmStatusMeta.
 function TicketRow({ t }: { t: RegionalTicketRow }) {
+  const action = rmRowAction(t)
   const sm = rmStatusMeta(t.status)
-  const statusCls = t.disputed ? 'bg-red-500/15 text-red-700 dark:text-red-400' : t.infoAdded ? 'bg-teal-500/15 text-teal-700 dark:text-teal-400' : sm.cls
+  const statusCls = t.disputed ? 'bg-red-500/15 text-red-700 dark:text-red-400' : t.infoAdded ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : sm.cls
   const statusLabel = t.disputed ? 'Dispute' : t.infoAdded ? 'Info added' : sm.label
   return (
     <Link href={`/regional/tickets/${t.id}`} className="grid gap-3 border-b border-[var(--border)] px-2 py-3 last:border-0 transition hover:bg-[var(--hover)] sm:grid-cols-[1fr_auto] sm:items-center">
       <div className="flex min-w-0 items-center gap-3">
-        <CategoryIcon category={t.category ?? t.title} className="h-11 w-11" iconSize={18} />
+        <CategoryIcon category={t.category ?? t.title} priority={t.priority} className="h-11 w-11" iconSize={18} />
         <div className="min-w-0">
           {t.jobRef && <p className="text-[10px] font-mono text-[var(--text-faint)]">{t.jobRef}</p>}
           <p className="truncate text-sm font-bold text-[var(--text)]">{t.category || t.title}</p>
-          <p className="truncate text-xs text-[var(--text-muted)]">{t.storeName}</p>
+          <p className="truncate text-sm text-[var(--text-muted)]">{t.storeName}</p>
         </div>
       </div>
       <div className="flex flex-col items-start gap-1 sm:items-end">
         <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
-          <span className={`inline-flex min-w-[92px] justify-center rounded-md px-2 py-1 text-[10px] font-bold ${priorityBadgeClass(t as never)}`}>{priorityLabel(t as never)}</span>
-          <span className={`inline-flex min-w-[92px] justify-center rounded-md px-2 py-1 text-[10px] font-bold ${statusCls}`}>{statusLabel}</span>
+          <span className={`inline-flex w-[120px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${priorityBadgeClass(t as never)}`}>{priorityLabel(t as never)}</span>
+          <span className={`inline-flex w-[120px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${statusCls}`}>{statusLabel}</span>
         </div>
-        <p className="text-xs text-[var(--text-muted)]">{t.supplierAssigned ? 'Supplier assigned' : 'No supplier assigned'}</p>
-        <p className="text-[11px] text-[var(--text-faint)]">
+        <p className={`text-sm ${action.act ? 'font-semibold text-[var(--text)]' : 'text-[var(--text-muted)]'}`}>{action.text}</p>
+        <p className="text-sm text-[var(--text-muted)]">
           {formatDateTime(t.createdAt)}
           {/* eslint-disable-next-line react-hooks/purity -- cosmetic "overdue by" / breach readout, not hydration-critical */}
           {t.overdue ? <span className="ml-1.5 font-semibold text-red-600 dark:text-red-400">· Overdue by {humanizeDuration(Date.now() - new Date(t.dueAt).getTime())}</span>
@@ -116,7 +141,7 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reads window.location (client-only) after mount to apply deep-linked ?store=; cannot run during SSR render
     if (s) setPanelStore(s)
     const f = params.get('filter')
-    if (f && PILLS.some(p => p.key === f)) setFilter(f as RmFilter)
+    if (f && RM_FILTER_KEYS.has(f)) setFilter(f as RmFilter)
   }, [])
 
   const counts = useMemo(() => {
@@ -124,12 +149,57 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
     for (const t of tickets) c[bucketOf(t.status, t.supplierAssigned)]++
     return c
   }, [tickets])
-  const barTotal = BAR_ORDER.reduce((s, b) => s + counts[b], 0) || 1
+  // Distribution bar grouped by the four filter-intent tones (My actions → Awaiting
+  // → Critical → Completed), coloured to the group headings and filled front-to-back
+  // so "My actions" (amber) starts at the left where its heading sits. Each ticket
+  // lands in exactly one segment: overdue/breached → Critical; else its status tone.
+  const barSegs = useMemo(() => {
+    const g = { mine: 0, awaiting: 0, critical: 0, done: 0 }
+    for (const t of tickets) {
+      const b = bucketOf(t.status, t.supplierAssigned)
+      if (b === 'cancelled') continue
+      if (t.overdue || t.internalBreached || t.supplierBreached) g.critical++
+      else if (b === 'completed') g.done++
+      else if (b === 'quoted' || b === 'awaiting_signoff') g.mine++
+      else g.awaiting++
+    }
+    return [
+      { key: 'mine', n: g.mine, cls: 'bg-amber-500' },
+      { key: 'awaiting', n: g.awaiting, cls: 'bg-blue-500' },
+      { key: 'critical', n: g.critical, cls: 'bg-red-500' },
+      { key: 'done', n: g.done, cls: 'bg-emerald-500' },
+    ]
+  }, [tickets])
+  const barTotal = barSegs.reduce((s, x) => s + x.n, 0) || 1
   // A breach only counts here while it's NOT yet overdue — once overdue it moves
   // to the Overdue pill (so it isn't double-counted).
   const internalBreachCount = useMemo(() => tickets.filter(t => t.internalBreached && !t.overdue).length, [tickets])
   const supplierBreachCount = useMemo(() => tickets.filter(t => t.supplierBreached && !t.overdue).length, [tickets])
   const overdueCount = useMemo(() => tickets.filter(t => t.overdue).length, [tickets])
+
+  // Filters grouped by intent (My actions / Awaiting / Critical / Completed).
+  const filterGroups: FilterGroup[] = useMemo(() => [
+    { tone: 'mine', label: 'My actions (requiring response)', tiles: [
+      { key: 'quoted', label: 'Quoted', count: counts.quoted, icon: <FileText size={16} /> },
+      { key: 'awaiting_signoff', label: 'Sign-off', count: counts.awaiting_signoff, icon: <UserCheck size={16} /> },
+    ] },
+    { tone: 'awaiting', label: 'Awaiting action (from others)', tiles: [
+      { key: 'open', label: 'New', count: counts.open, icon: <FilePlus2 size={16} /> },
+      { key: 'quote_requested', label: 'Quote requested', count: counts.quote_requested, icon: <MessageSquare size={16} /> },
+      { key: 'approved', label: 'Approved', count: counts.approved, icon: <CheckCircle2 size={16} /> },
+      { key: 'scheduled', label: 'Job scheduled', count: counts.scheduled, icon: <Calendar size={16} /> },
+      { key: 'in_progress', label: 'In progress', count: counts.in_progress, icon: <Loader2 size={16} /> },
+    ] },
+    { tone: 'critical', label: 'Critical & overdue', tiles: [
+      { key: 'internal_breach', label: 'Internal Breached', count: internalBreachCount, icon: <AlertCircle size={16} /> },
+      { key: 'supplier_breach', label: 'Supplier Breached', count: supplierBreachCount, icon: <Truck size={16} /> },
+      { key: 'overdue', label: 'Overdue', count: overdueCount, icon: <Clock size={16} /> },
+    ] },
+    { tone: 'closed', label: 'Completed & closed', tiles: [
+      { key: 'completed', label: 'Completed', count: counts.completed, icon: <CheckCircle2 size={16} /> },
+      { key: 'cancelled', label: 'Cancelled', count: counts.cancelled, icon: <XCircle size={16} />, tone: 'neutral' },
+    ] },
+  ], [counts, internalBreachCount, supplierBreachCount, overdueCount])
 
   const shown = useMemo(() => {
     const terms = q.toLowerCase().split(/\s+/).filter(Boolean)
@@ -203,25 +273,15 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
         <Link href="/regional/tickets/new" className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-500 transition shrink-0"><PlusCircle size={16} /> Log a Ticket</Link>
       </div>
 
-      {/* Distribution bar (excludes cancelled) */}
+      {/* Distribution bar — four intent tones, filled front-to-back (My actions first). */}
       <Card className="p-4 space-y-2">
         <div className="h-3 rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden flex">
-          {BAR_ORDER.map(b => counts[b] > 0 && <div key={b} className={`h-full ${BUCKET_BAR[b]}`} style={{ width: `${Math.round((counts[b] / barTotal) * 100)}%` }} />)}
+          {barSegs.map(x => x.n > 0 && <div key={x.key} className={`h-full ${x.cls}`} style={{ width: `${Math.round((x.n / barTotal) * 100)}%` }} />)}
         </div>
       </Card>
 
-      {/* Filter pills — above the search. Click an active pill to deselect (= all). */}
-      <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
-        {PILLS.map(p => {
-          const n = p.key === 'internal_breach' ? internalBreachCount : p.key === 'supplier_breach' ? supplierBreachCount : p.key === 'overdue' ? overdueCount : counts[p.key as Bucket]
-          const on = filter === p.key
-          return (
-            <button key={p.key} onClick={() => setFilter(f => f === p.key ? null : p.key)} aria-pressed={on} className={`rounded-md px-3 py-1.5 text-xs font-semibold transition text-center ${on ? p.active : p.inactive}`}>
-              {p.label} <span className="opacity-70">{n}</span>
-            </button>
-          )
-        })}
-      </div>
+      {/* Grouped filter badges — My actions / Awaiting / Critical / Completed. */}
+      <TicketFilterTiles groups={filterGroups} active={filter} onPick={k => setFilter(f => (f === k ? null : (k as RmFilter)))} />
 
       {/* Search */}
       <div className="relative">
@@ -245,13 +305,23 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
       {/* Store groups */}
       {groups.map(([store, g]) => {
         const isCollapsed = !expanded.has(store)
+        // eslint-disable-next-line react-hooks/purity -- cosmetic "next SLA in" countdown, recomputed per render by design
+        const nowMs = Date.now()
+        const s = groupSummary(g.rows, nowMs)
         return (
           <Card key={store} className="p-3 cursor-pointer hover:ring-[#C6A35D]/30 transition" onClick={() => toggle(store)} role="button" tabIndex={0} aria-expanded={!isCollapsed} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(store) } }}>
-            <div className="flex items-center justify-between gap-2 mb-1">
-              <span className="flex items-center gap-2 min-w-0">
-                <ChevronDown size={16} className={`shrink-0 text-[var(--text-muted)] transition-transform ${isCollapsed ? '' : 'rotate-180'}`} />
-                <span className="text-sm font-bold text-[var(--text)] truncate">{store}{g.branchCode ? ` · ${g.branchCode}` : ''}</span>
-                <span className={`text-[11px] font-medium rounded-full px-2 py-0.5 shrink-0 ${groupCountCls(g.rows)}`}>{g.rows.length}</span>
+            <div className="flex items-start justify-between gap-2 mb-1">
+              <span className="flex items-start gap-2 min-w-0">
+                <ChevronDown size={16} className={`mt-0.5 shrink-0 text-[var(--text-muted)] transition-transform ${isCollapsed ? '' : 'rotate-180'}`} />
+                <span className="min-w-0">
+                  <span className="block text-sm font-bold text-[var(--text)] truncate">{store}{g.branchCode ? ` · ${g.branchCode}` : ''}</span>
+                  <span className="mt-0.5 block text-sm text-[var(--text-muted)]">
+                    {s.total} ticket{s.total === 1 ? '' : 's'}
+                    {s.critical > 0 && <> · <span className="font-semibold text-red-600 dark:text-red-400">{s.critical} critical</span></>}
+                    {s.high > 0 && <> · <span className="font-semibold text-orange-600 dark:text-orange-400">{s.high} high</span></>}
+                    {s.nextSla != null && <> · Next SLA in {humanizeDuration(s.nextSla - nowMs)}</>}
+                  </span>
+                </span>
               </span>
               <button onClick={e => { e.stopPropagation(); setPanelStore(store) }} title="Store overview" className="shrink-0 -m-1 p-1.5 rounded-lg text-[var(--text-faint)] hover:text-[#C6A35D] hover:bg-[#C6A35D]/10 transition"><BarChart3 size={16} /></button>
             </div>
@@ -277,7 +347,7 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
                   <Link key={t.id} href={`/regional/tickets/${t.id}`} className="flex items-center justify-between gap-2 py-2.5 -mx-2 px-2 rounded-lg border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition">
                     <div className="min-w-0">
                       <p className="text-sm text-[var(--text)] truncate">{t.title}</p>
-                      <p className="text-[11px] text-[var(--text-faint)] truncate">{t.storeName} · {formatDateTime(t.createdAt)}</p>
+                      <p className="text-sm text-[var(--text-muted)] truncate">{t.storeName} · {formatDateTime(t.createdAt)}</p>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
                       <PriorityBadge priority={t.priority} className="w-full text-center" />
@@ -309,7 +379,7 @@ function StorePanel({ store, rows, onClose }: { store: string; rows: RegionalTic
   const Stat = ({ label, value, tone = '' }: { label: string; value: number | string; tone?: string }) => (
     <div className="rounded-xl bg-[var(--surface)] ring-1 ring-[var(--border)] p-3">
       <div className={`text-xl font-bold ${tone || 'text-[var(--text)]'}`}>{value}</div>
-      <div className="text-[11px] text-[var(--text-faint)]">{label}</div>
+      <div className="text-xs text-[var(--text-muted)]">{label}</div>
     </div>
   )
 

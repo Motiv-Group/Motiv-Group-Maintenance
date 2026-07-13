@@ -23,7 +23,7 @@ export function ContextSwitcher({ options, activeId, cookieName, Icon }: {
   // Single option → static chip, matching the old sidebar context pill.
   if (options.length <= 1) {
     return (
-      <div className="mt-6 flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-gray-200">
+      <div className="mt-6 flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-white">
         <span className="truncate">{active?.label ?? '—'}</span>
         <Icon size={14} className="shrink-0 text-gray-400" />
       </div>
@@ -40,7 +40,7 @@ export function ContextSwitcher({ options, activeId, cookieName, Icon }: {
   return (
     <div className="relative mt-6">
       <button type="button" onClick={() => setOpen(o => !o)} aria-haspopup="listbox" aria-expanded={open}
-        className="flex w-full items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-gray-200 transition hover:bg-white/[0.08]">
+        className="flex w-full items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/[0.08]">
         <span className="flex min-w-0 items-center gap-2"><Icon size={14} className="shrink-0 text-gray-400" /><span className="truncate">{active?.label ?? 'Select'}</span></span>
         <ChevronsUpDown size={14} className="shrink-0 text-gray-400" />
       </button>

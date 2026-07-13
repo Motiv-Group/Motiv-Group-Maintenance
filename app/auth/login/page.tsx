@@ -6,23 +6,48 @@ import Link from 'next/link'
 import { useForm } from 'react-hook-form'
 import { createClient } from '@/lib/supabase/client'
 import { clearCollapseState } from '@/lib/collapse-state'
+import { isValidEmail } from '@/lib/csv'
 import { Input } from '@/components/ui/Input'
 import { PasswordInput } from '@/components/ui/PasswordInput'
 import { Button } from '@/components/ui/Button'
-import { MotivLockup } from '@/components/ui/MotivLockup'
+import { AuthShell } from '@/components/ui/AuthShell'
+import { AuthError, AuthFooter } from '@/components/ui/AuthBits'
+import { Check } from 'lucide-react'
 
 interface LoginForm {
   email: string
   password: string
 }
 
+// "Remember me" prefills the email next visit. Supabase already keeps the
+// session alive across restarts by default, so remembering the address is the
+// genuinely additive win for daily users — and it never touches auth/session
+// mechanics, so it can't lock anyone out.
+const REMEMBER_KEY = 'motiv:remembered-email'
+
 export default function LoginPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [forwarding, setForwarding] = useState(false)
+  const [remember, setRemember] = useState(true)
 
-  const { register, handleSubmit, formState: { errors } } = useForm<LoginForm>()
+  // mode:'onChange' makes formState.isValid reactive so we can gate the submit
+  // button on the required fields being filled (both registered as required).
+  const { register, handleSubmit, setValue, formState: { errors, isValid } } = useForm<LoginForm>({ mode: 'onChange' })
+
+  // Prefill a remembered email address (remember defaults to true already).
+  // Wrapped in try/catch like the write path — localStorage throws when the
+  // browser blocks all site data, and an unguarded throw in an effect would
+  // crash the login page.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const saved = window.localStorage.getItem(REMEMBER_KEY)
+      // shouldValidate so a prefilled email counts toward isValid immediately.
+      if (saved) setValue('email', saved, { shouldValidate: true })
+    } catch { /* storage disabled — ignore */ }
+  }, [setValue])
 
   // Supabase invite/recovery links land here (their generateLink ignores
   // redirect_to and uses the Site URL). The token arrives in the URL hash and
@@ -54,14 +79,22 @@ export default function LoginPage() {
     const { data, error: authError } = await supabase.auth.signInWithPassword(values)
 
     if (authError) {
+      // Surfaced to the console (not the UI) so a stuck login can be diagnosed.
+      console.warn('[login] sign-in failed:', authError.status, authError.message)
       setError(
         authError.message.toLowerCase().includes('email not confirmed')
           ? 'Please confirm your email first — check your inbox.'
-          : 'Invalid email or password.'
+          : 'Email or password is incorrect.'
       )
       setLoading(false)
       return
     }
+
+    // Persist / forget the email per the "Remember me" choice.
+    try {
+      if (remember) window.localStorage.setItem(REMEMBER_KEY, values.email)
+      else window.localStorage.removeItem(REMEMBER_KEY)
+    } catch { /* storage disabled — ignore */ }
 
     const { data: profile } = await supabase
       .from('user_profiles')
@@ -81,7 +114,6 @@ export default function LoginPage() {
     router.refresh()
   }
 
-  // Always dark — force the dark class on this page's wrapper regardless of theme
   if (forwarding) {
     return (
       <div className="dark min-h-screen bg-[#0b0c11] flex flex-col items-center justify-center gap-4">
@@ -92,68 +124,74 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="dark">
-      <div className="min-h-screen bg-[#0b0c11] flex flex-col items-center justify-center px-4">
-        <div className="w-full max-w-sm sm:max-w-md">
+    <AuthShell logoHeight={186} maxWidth="md">
+      <h1 className="text-xl sm:text-2xl font-semibold text-white mb-1">Welcome back</h1>
+      <p className="text-sm text-gray-300 mb-6">Sign in to continue to your workspace.</p>
 
-          {/* Logo — larger and centred */}
-          <div className="flex items-center justify-center mb-10">
-            <MotivLockup height={150} />
-          </div>
+      {/* Clearing the error on any field change keeps it from lingering while the
+          user corrects their details. */}
+      <form onSubmit={handleSubmit(onSubmit)} onChange={() => { if (error) setError('') }} className="space-y-3">
+        <Input
+          id="email"
+          type="email"
+          tone="auth"
+          label="Email address"
+          placeholder="you@example.com"
+          autoComplete="email"
+          error={errors.email?.message}
+          {...register('email', {
+            required: 'Email is required',
+            validate: v => isValidEmail(v) || 'Enter a valid email address',
+          })}
+        />
+        <PasswordInput
+          id="password"
+          tone="auth"
+          label="Password"
+          placeholder="Your password"
+          autoComplete="current-password"
+          error={errors.password?.message}
+          {...register('password', { required: 'Password is required' })}
+        />
 
-          <div className="bg-[#17181e] rounded-2xl shadow-xl border border-white/10 p-6 sm:p-10">
-            <h1 className="text-xl sm:text-2xl font-semibold text-white mb-1">Welcome back</h1>
-            <p className="text-sm text-gray-400 mb-6">Log in to your account.</p>
-
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-              <Input
-                id="email"
-                type="email"
-                label="Email Address"
-                placeholder="you@example.com"
-                error={errors.email?.message}
-                {...register('email', { required: 'Email is required' })}
+        <div className="flex items-center justify-between">
+          {/* Custom checkbox — matches the button radius + brand blue instead of
+              the browser-default control. */}
+          <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer select-none">
+            <span className="relative inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center">
+              <input
+                type="checkbox"
+                checked={remember}
+                onChange={e => setRemember(e.target.checked)}
+                className="peer absolute inset-0 z-10 m-0 cursor-pointer opacity-0"
               />
-              <PasswordInput
-                id="password"
-                label="Password"
-                placeholder="Your password"
-                error={errors.password?.message}
-                {...register('password', { required: 'Password is required' })}
-              />
-
-              <div className="text-right -mt-1">
-                <Link href="/auth/forgot-password" className="text-xs text-blue-600 dark:text-blue-400 hover:underline">
-                  Forgot password?
-                </Link>
-              </div>
-
-              {error && (
-                <div className="bg-red-900/20 border border-red-800 text-red-400 text-sm rounded-lg px-4 py-3">
-                  {error}
-                </div>
-              )}
-
-              <Button type="submit" variant="gold" loading={loading} className="w-full" size="lg">
-                Log In
-              </Button>
-            </form>
-
-            <p className="mt-4 text-center text-sm text-gray-400">
-              New here?{' '}
-              <Link href="/auth/signup" className="text-blue-600 dark:text-blue-400 hover:underline font-medium">
-                Create an account
-              </Link>
-            </p>
-
-            <p className="mt-6 text-center text-xs text-gray-500">
-              <Link href="/privacy" className="hover:underline">Privacy Policy</Link>
-              {' · '}
-              <Link href="/terms" className="hover:underline">Terms of Service</Link>
-            </p>
-          </div>
+              <span className="absolute inset-0 rounded-md border border-[#3a3d47] bg-[#20222b] transition-colors peer-checked:border-blue-500 peer-checked:bg-blue-600 peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500 peer-focus-visible:ring-offset-0" />
+              <Check size={12} strokeWidth={3.5} className="pointer-events-none relative text-white opacity-0 transition-opacity peer-checked:opacity-100" />
+            </span>
+            Remember me
+          </label>
+          <Link href="/auth/forgot-password" className="text-sm text-blue-400 hover:text-blue-300 hover:underline">
+            Forgot password?
+          </Link>
         </div>
-      </div>
-    </div>
+
+        <AuthError message={error} />
+
+        {/* Enabled = confident blue; incomplete form = clearly-neutral disabled
+            (both handled by the shared `gold` variant). */}
+        <Button type="submit" variant="gold" loading={loading} disabled={!isValid} size="lg" className="w-full">
+          Log in
+        </Button>
+      </form>
+
+      <p className="mt-5 text-center text-sm text-gray-400">
+        New to MOTIV?{' '}
+        <Link href="/auth/signup" className="text-blue-400 hover:text-blue-300 hover:underline font-medium">
+          Create an account
+        </Link>
+      </p>
+
+      <AuthFooter />
+    </AuthShell>
   )
 }

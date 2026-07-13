@@ -14,23 +14,27 @@
     color-scheme: dark;
   }
   body {
-    @apply bg-[#f3f4f6] text-gray-900 dark:bg-[#0b0c11] dark:text-white;
+    @apply bg-[#f0f1f4] text-gray-900 dark:bg-[#0b0c11] dark:text-white;
   }
 
   /* ── Dashboard surface palette (single source of truth for light + dark).
      The v3 command-centre UI references these vars instead of hard-coded
      navy hex, so the theme toggle works everywhere and stays readable. ── */
   :root {
-    --app-bg:     #f3f4f6;
+    /* Desktop content width (share of the available width the main column fills).
+       Default 90%; user-configurable 70–95% via Settings → Appearance. The blocking
+       script in app/layout.tsx overrides this from localStorage before paint. */
+    --content-width: 90%;
+    --app-bg:     #f0f1f4;
     --surface:    #ffffff;
     --surface-2:  #f7f8fa;
     --nav-bg:     #ffffff;
-    --border:     rgba(17, 18, 24, 0.10);
+    --border:     rgba(17, 18, 24, 0.115);
     --hover:      rgba(17, 18, 24, 0.045);
     --input-bg:   #f1f2f4;
     --text:       #14151a;
     --text-muted: #4b4d57;
-    --text-faint: #6b6e78;
+    --text-faint: #565a64;
   }
   html.dark {
     --app-bg:     #0b0c11;
@@ -42,7 +46,7 @@
     --input-bg:   rgba(0, 0, 0, 0.22);
     --text:       #f6f6f7;
     --text-muted: #9a9ca6;
-    --text-faint: #6b6e78;
+    --text-faint: #9498a3;
   }
 }
 

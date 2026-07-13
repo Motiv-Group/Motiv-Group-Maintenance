@@ -11,7 +11,7 @@ import { FREE_LIMITS, formatNumber } from '@/lib/admin/limits'
 function statusCls(s: string): string {
   const v = s.toLowerCase()
   if (v === 'verified') return 'ring-emerald-500/30 text-emerald-700 dark:text-emerald-400'
-  if (v === 'pending' || v === 'not_started') return 'ring-[#C6A35D]/30 text-amber-700 dark:text-[#C6A35D]'
+  if (v === 'pending' || v === 'not_started') return 'ring-amber-500/30 text-amber-700 dark:text-amber-400'
   return 'ring-red-500/30 text-red-700 dark:text-red-400'
 }
 
@@ -33,7 +33,7 @@ export default async function ResendAdminPage() {
 
       {d && (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             <StatTile
               label="Sending domains"
               icon={<Globe size={13} />}
@@ -86,7 +86,7 @@ export default async function ResendAdminPage() {
                 </thead>
                 <tbody>
                   {d.domains.map((dm: ResendDomain) => (
-                    <tr key={dm.name} className="border-b border-[var(--border)] last:border-0">
+                    <tr key={dm.name} className="border-b border-[var(--border)] last:border-0 transition hover:bg-[var(--hover)]">
                       <td className="py-2 px-2 font-mono text-[13px] text-[var(--text)]">{dm.name}</td>
                       <td className="px-2 text-[var(--text-muted)]">{dm.region ?? '—'}</td>
                       <td className="px-2 text-right">

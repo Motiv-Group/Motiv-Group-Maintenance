@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { PlusCircle, Search, Ticket, ChevronDown } from 'lucide-react'
+import { PlusCircle, Search, Ticket, ChevronDown, FilePlus2, MessageSquare, Calendar, Loader2, Clock, CheckCircle2, XCircle } from 'lucide-react'
 import type { StoreManagerTicket } from '@/lib/health/data'
 import { Card } from '@/components/exec/ui'
+import { TicketFilterTiles, type FilterGroup } from '@/components/ui/TicketFilterTiles'
 import { CategoryIcon, TicketBadges } from './ticketBadges'
 import { readCollapse, writeCollapse } from '@/lib/collapse-state'
 import { formatDate, formatDateTime, humanizeDuration, urgencyCountCls, OPERATIONAL_IMPACT_LABELS, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
@@ -20,35 +21,21 @@ const urgency = (p: string) => URGENCY[p] ?? 5
 const byDateThenUrgency = (a: StoreManagerTicket, b: StoreManagerTicket) =>
   (+new Date(b.createdAt) - +new Date(a.createdAt)) || (urgency(a.priority) - urgency(b.priority))
 
-// No "All" pill — the default (unselected) view is the collapsible status groups.
-// Open leads; Overdue sits last. Clicking the active pill returns to the groups.
-// Pills styled like the status/priority badges: tinted when inactive, filled when
-// selected.
-const PILLS: { key: Filter; label: string; active: string; inactive: string }[] = [
-  { key: 'open',           label: 'New',           active: 'bg-blue-500 text-white',     inactive: 'bg-blue-500/15 text-blue-700 dark:text-blue-400' },
-  { key: 'info_requested', label: 'Info Requested', active: 'bg-amber-500 text-white',    inactive: 'bg-amber-500/15 text-amber-700 dark:text-amber-400' },
-  { key: 'scheduled',      label: 'Job scheduled', active: 'bg-indigo-500 text-white',    inactive: 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-400' },
-  { key: 'in_progress',    label: 'In Progress',   active: 'bg-[#C6A35D] text-[#0a0e17]', inactive: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D]' },
-  { key: 'completed',      label: 'Completed',     active: 'bg-emerald-500 text-white',   inactive: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' },
-  { key: 'cancelled',      label: 'Cancelled',     active: 'bg-gray-500 text-white',      inactive: 'bg-gray-500/15 text-gray-600 dark:text-gray-400' },
-  { key: 'overdue',        label: 'Overdue',       active: 'bg-red-600 text-white',       inactive: 'bg-red-500/15 text-red-600 dark:text-red-400' },
-]
-
 function Row({ t, storeName }: { t: StoreManagerTicket; storeName: string }) {
   return (
     <Link href={`/client/tickets/${t.id}`} className="grid gap-3 border-b border-[var(--border)] px-4 py-3 last:border-0 transition hover:bg-[var(--hover)] sm:grid-cols-[1fr_auto] sm:items-center">
       <div className="flex min-w-0 items-center gap-3">
-        <CategoryIcon category={t.category ?? t.title} className="h-11 w-11" iconSize={18} />
+        <CategoryIcon category={t.category ?? t.title} priority={t.priority} className="h-11 w-11" iconSize={18} />
         <div className="min-w-0">
           {t.jobRef && <p className="text-[10px] font-mono text-[var(--text-faint)]">{t.jobRef}</p>}
           <p className="truncate text-sm font-bold text-[var(--text)]">{t.category || t.title}</p>
-          <p className="truncate text-xs text-[var(--text-muted)]">{storeName}</p>
+          <p className="truncate text-sm text-[var(--text-muted)]">{storeName}</p>
         </div>
       </div>
       <div className="flex flex-col items-start gap-1 sm:items-end">
         <TicketBadges ticket={t} />
-        <p className="text-xs text-[var(--text-muted)]">{t.supplierAssigned ? 'Supplier assigned' : 'No supplier assigned'}</p>
-        <p className="text-[11px] text-[var(--text-faint)]">
+        <p className="text-sm text-[var(--text-muted)]">{t.supplierAssigned ? 'Supplier assigned' : 'No supplier assigned'}</p>
+        <p className="text-sm text-[var(--text-muted)]">
           {formatDateTime(t.createdAt)}
           {/* eslint-disable-next-line react-hooks/purity -- cosmetic "overdue by" readout, not hydration-critical */}
           {t.overdue && <span className="ml-1.5 font-semibold text-red-600 dark:text-red-400">· Overdue by {humanizeDuration(Date.now() - new Date(t.dueAt).getTime())}</span>}
@@ -124,9 +111,46 @@ export function StoreTicketsList({ tickets, initialFilter = 'all', storeName = '
   // "All Tickets" collapsible. A specific filter → the same flat list, filtered.
   const shownSorted = useMemo(() => [...shown].sort(byDateThenUrgency), [shown])
 
-  // Distribution bar excludes cancelled (live work only).
-  const barTotal = counts.open + counts.scheduled + counts.in_progress + counts.completed || 1
-  const barPct = (n: number) => Math.round((n / barTotal) * 100)
+  // Filters grouped by intent (My actions / Awaiting / Critical / Completed).
+  const filterGroups: FilterGroup[] = useMemo(() => [
+    { tone: 'mine', label: 'My actions (requiring response)', tiles: [
+      { key: 'info_requested', label: 'Info requested', count: counts.info_requested, icon: <MessageSquare size={16} /> },
+    ] },
+    { tone: 'awaiting', label: 'Awaiting action (from others)', tiles: [
+      { key: 'open', label: 'New', count: counts.open, icon: <FilePlus2 size={16} /> },
+      { key: 'scheduled', label: 'Job scheduled', count: counts.scheduled, icon: <Calendar size={16} /> },
+      { key: 'in_progress', label: 'In progress', count: counts.in_progress, icon: <Loader2 size={16} /> },
+    ] },
+    { tone: 'critical', label: 'Critical & overdue', tiles: [
+      { key: 'overdue', label: 'Overdue', count: counts.overdue, icon: <Clock size={16} /> },
+    ] },
+    { tone: 'closed', label: 'Completed & closed', tiles: [
+      { key: 'completed', label: 'Completed', count: counts.completed, icon: <CheckCircle2 size={16} /> },
+      { key: 'cancelled', label: 'Cancelled', count: counts.cancelled, icon: <XCircle size={16} />, tone: 'neutral' },
+    ] },
+  ], [counts])
+
+  // Distribution bar grouped by the four filter-intent tones (My actions → Awaiting
+  // → Critical → Completed), coloured to the group headings and filled front-to-back
+  // so "My actions" (amber) starts at the left where its heading sits. Cancelled is
+  // excluded; overdue → Critical; info-requested → My actions.
+  const barSegs = useMemo(() => {
+    const g = { mine: 0, awaiting: 0, critical: 0, done: 0 }
+    for (const t of tickets) {
+      if (t.status === 'cancelled') continue
+      if (t.overdue) g.critical++
+      else if (t.status === 'completed') g.done++
+      else if (t.status === 'info_requested') g.mine++
+      else g.awaiting++
+    }
+    return [
+      { key: 'mine', n: g.mine, cls: 'bg-amber-500' },
+      { key: 'awaiting', n: g.awaiting, cls: 'bg-blue-500' },
+      { key: 'critical', n: g.critical, cls: 'bg-red-500' },
+      { key: 'done', n: g.done, cls: 'bg-emerald-500' },
+    ]
+  }, [tickets])
+  const barTotal = barSegs.reduce((s, x) => s + x.n, 0) || 1
 
   return (
     <div className="space-y-5">
@@ -137,29 +161,15 @@ export function StoreTicketsList({ tickets, initialFilter = 'all', storeName = '
         <Link href="/client/tickets/new" className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-500 transition shrink-0"><PlusCircle size={16} /> Log a Ticket</Link>
       </div>
 
-      {/* Distribution bar */}
+      {/* Distribution bar — four intent tones, filled front-to-back (My actions first). */}
       <Card className="p-4 space-y-2">
         <div className="h-3 rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden flex">
-          {counts.open > 0 && <div className="h-full bg-blue-500" style={{ width: `${barPct(counts.open)}%` }} />}
-          {counts.scheduled > 0 && <div className="h-full bg-indigo-500" style={{ width: `${barPct(counts.scheduled)}%` }} />}
-          {counts.in_progress > 0 && <div className="h-full bg-[#C6A35D]" style={{ width: `${barPct(counts.in_progress)}%` }} />}
-          {counts.completed > 0 && <div className="h-full bg-emerald-500" style={{ width: `${barPct(counts.completed)}%` }} />}
+          {barSegs.map(x => x.n > 0 && <div key={x.key} className={`h-full ${x.cls}`} style={{ width: `${Math.round((x.n / barTotal) * 100)}%` }} />)}
         </div>
       </Card>
 
-      {/* Filter pills — above the search */}
-      <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
-        {PILLS.map(p => {
-          const n = p.key === 'all' ? tickets.length : (counts as any)[p.key]
-          const on = filter === p.key
-          return (
-            <button key={p.key} onClick={() => setFilter(f => f === p.key ? 'all' : p.key)}
-              className={`rounded-md px-3 py-1.5 text-xs font-semibold transition text-center ${on ? p.active : p.inactive}`}>
-              {p.label} <span className="opacity-70">{n}</span>
-            </button>
-          )
-        })}
-      </div>
+      {/* Grouped filter badges — My actions / Awaiting / Critical / Completed. */}
+      <TicketFilterTiles groups={filterGroups} active={filter === 'all' ? null : filter} onPick={k => setFilter(f => (f === k ? 'all' : (k as Filter)))} />
 
       {/* Search */}
       <div className="relative">
