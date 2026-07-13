@@ -53,7 +53,7 @@ const SUPPLIER_TABS: ChromeTab[] = [
   { href: '/supplier/quotes',  label: 'Quotes',      icon: ReceiptText },
   { href: '/supplier/signoff', label: 'Signoff',     icon: ClipboardCheck },
   { href: '/supplier/snag',    label: 'Snags',       icon: AlertTriangle },
-  { href: '/supplier/technicians', label: 'Technicians', icon: Users },
+  { href: '/supplier/technicians', label: 'Field Team', icon: Users },
   { href: '/supplier/stats',   label: 'Performance', icon: BarChart2 },
 ]
 const INDIVIDUAL_TABS: ChromeTab[] = [
