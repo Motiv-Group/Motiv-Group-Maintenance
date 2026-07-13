@@ -12,7 +12,7 @@ import { MotivLockup } from '@/components/ui/MotivLockup'
  */
 export function AuthShell({
   children,
-  logoHeight = 168,
+  logoHeight = 120,
   maxWidth = 'sm',
   raise = 0,
 }: {
@@ -22,14 +22,6 @@ export function AuthShell({
   /** Shift the whole logo+card module up by this many px (balance on tall screens). */
   raise?: number
 }) {
-  // motiv-lockup.png is a 1024² square with the glyph centred inside transparent
-  // padding (~24% top, ~9% bottom of its height). Left as-is the transparent
-  // bands read as a big empty gap. Pull the card up under the bottom padding and
-  // the whole block up under the top padding — proportional to the height, so it
-  // stays tight at any logo size — leaving a small, intentional visual gap.
-  const marginTop = -Math.round(0.16 * logoHeight)
-  const marginBottom = 6 - Math.round(0.09 * logoHeight)
-
   return (
     <div className="dark">
       <div className="relative min-h-screen bg-[#0b0c11] flex flex-col items-center justify-center px-4 py-10">
@@ -42,8 +34,9 @@ export function AuthShell({
           className={`relative w-full ${maxWidth === 'md' ? 'max-w-md' : 'max-w-sm sm:max-w-md'}`}
           style={raise ? { transform: `translateY(-${raise}px)` } : undefined}
         >
-          {/* Logo — close to the card so the two read as one login module. */}
-          <div className="flex items-center justify-center" style={{ marginTop, marginBottom }}>
+          {/* Logo — the asset is padding-trimmed, so a normal small margin gives a
+              tight, tidy gap between it and the card. */}
+          <div className="flex items-center justify-center mb-3">
             <MotivLockup height={logoHeight} />
           </div>
 

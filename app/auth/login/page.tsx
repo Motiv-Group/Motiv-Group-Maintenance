@@ -123,7 +123,7 @@ export default function LoginPage() {
   }
 
   return (
-    <AuthShell logoHeight={260} raise={40}>
+    <AuthShell logoHeight={186} raise={40}>
       <h1 className="text-xl sm:text-2xl font-semibold text-white mb-1">Welcome back</h1>
       <p className="text-sm text-gray-300 mb-6">Sign in to continue to your workspace.</p>
 
@@ -173,16 +173,9 @@ export default function LoginPage() {
 
         <AuthError message={error} />
 
-        {/* Confident enabled state (brighter, bolder); a clearly-neutral disabled
-            state is reserved for the incomplete form (not just a dimmed blue). */}
-        <Button
-          type="submit"
-          variant="gold"
-          loading={loading}
-          disabled={!isValid}
-          size="lg"
-          className="w-full font-semibold text-white shadow-sm shadow-blue-950/40 disabled:opacity-100 disabled:bg-[#1c1f27] disabled:text-gray-500 disabled:shadow-none"
-        >
+        {/* Enabled = confident blue; incomplete form = clearly-neutral disabled
+            (both handled by the shared `gold` variant). */}
+        <Button type="submit" variant="gold" loading={loading} disabled={!isValid} size="lg" className="w-full">
           Log in
         </Button>
       </form>

@@ -33,7 +33,9 @@ export default function SignupPage() {
   const [error, setError] = useState('')
   const [sentTo, setSentTo] = useState<string | null>(null)
 
-  const { register, handleSubmit, watch, formState: { errors } } = useForm<SignupForm>()
+  // mode:'onChange' makes isValid reactive so the submit button can gate on the
+  // required fields being valid.
+  const { register, handleSubmit, watch, formState: { errors, isValid } } = useForm<SignupForm>({ mode: 'onChange' })
 
   async function onSubmit(values: SignupForm) {
     setLoading(true); setError('')
@@ -130,7 +132,7 @@ export default function SignupPage() {
 
           <AuthError message={error} />
 
-          <Button type="submit" variant="gold" loading={loading} className="w-full" size="lg">Create account</Button>
+          <Button type="submit" variant="gold" loading={loading} disabled={!isValid} className="w-full" size="lg">Create account</Button>
         </form>
       )}
 

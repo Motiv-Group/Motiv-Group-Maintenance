@@ -60,7 +60,7 @@ export default function ForgotPasswordPage() {
               onChange={e => { setEmail(e.target.value); if (err) setErr('') }}
               error={err || undefined}
             />
-            <Button type="submit" loading={loading} className="w-full bg-blue-600 hover:bg-blue-500 text-white border-blue-600 focus:ring-blue-500" size="lg" disabled={!email.trim()}>
+            <Button type="submit" variant="gold" loading={loading} disabled={!email.trim()} className="w-full" size="lg">
               Send reset link
             </Button>
           </form>

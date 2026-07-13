@@ -94,7 +94,7 @@ export default function ResetPasswordPage() {
 
             <AuthError message={error} />
 
-            <Button type="submit" loading={loading} className="w-full bg-blue-600 hover:bg-blue-500 text-white border-blue-600 focus:ring-blue-500" size="lg">
+            <Button type="submit" variant="gold" loading={loading} disabled={!password || !confirm} className="w-full" size="lg">
               Update password
             </Button>
           </form>

@@ -131,7 +131,7 @@ export default function SupplierOnboardPage() {
 
   if (invalid) {
     return (
-      <AuthShell maxWidth="md" logoHeight={140}>
+      <AuthShell maxWidth="md" logoHeight={100}>
         <div className="text-center space-y-4">
           <h1 className="text-xl font-semibold text-white">Invite link problem</h1>
           <p className="text-sm text-gray-400">{invalid}</p>
@@ -142,7 +142,7 @@ export default function SupplierOnboardPage() {
   }
 
   return (
-    <AuthShell maxWidth="md" logoHeight={140}>
+    <AuthShell maxWidth="md" logoHeight={100}>
       <div className="flex items-center gap-2 mb-1">
         <Truck size={20} className="text-blue-400" />
         <h1 className="text-xl font-semibold text-white">Supplier registration</h1>
