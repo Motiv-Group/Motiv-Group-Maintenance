@@ -133,7 +133,7 @@ export function RegionalSuppliersTable({ suppliers }: { suppliers: Row[] }) {
           <h1 className="flex items-center gap-2 text-2xl font-bold text-[var(--text)]"><Truck className="text-blue-600 dark:text-blue-400" size={22} /> Suppliers</h1>
           <p className="mt-0.5 text-sm text-[var(--text-muted)]">All suppliers in your company. Tap a supplier to view full details and performance.</p>
         </div>
-        <button onClick={() => setInviteOpen(true)} className="flex shrink-0 items-center gap-1.5 rounded-xl bg-red-600 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-red-500">
+        <button onClick={() => setInviteOpen(true)} className="flex shrink-0 items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-blue-500">
           <Send size={15} /> Invite
         </button>
       </div>
@@ -337,7 +337,7 @@ function InviteSupplierModal({ onClose }: { onClose: () => void }) {
     <Modal onClose={onClose} maxWidth="max-w-md">
       {close => (
         <>
-          <DrawerHeader onClose={close} title={<div className="flex items-center gap-2"><Send size={17} className="shrink-0 text-red-600 dark:text-red-400" /><h3 className="text-lg font-bold text-[var(--text)]">Invite a supplier</h3></div>} />
+          <DrawerHeader onClose={close} title={<div className="flex items-center gap-2"><Send size={17} className="shrink-0 text-blue-600 dark:text-blue-400" /><h3 className="text-lg font-bold text-[var(--text)]">Invite a supplier</h3></div>} />
           {result?.ok ? (
             <div className="space-y-4">
               <div className="rounded-xl bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-400">{result.text}</div>

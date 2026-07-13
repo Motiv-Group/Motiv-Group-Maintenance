@@ -35,39 +35,51 @@ function Modal({ title, onClose, children, maxWidth = 'max-w-md' }: { title: str
   )
 }
 
-// ── "More actions" disclosure — a compact button that expands a stack of
-// secondary/destructive actions, so the Next-action block leads with one primary
-// button. Children are the secondary action components, each passed a `trigger`
-// that renders a MoreActionItem. The list stays mounted while a child's modal is
-// open (we never collapse on item click), so the modal overlay works.
-export function MoreActions({ children }: { children: ReactNode }) {
+// ── "More" dropdown — a compact button (sits next to the primary action) that
+// drops a floating menu of secondary/destructive actions, so the Next-action block
+// leads with one primary button. Children are the secondary action components, each
+// passed a `trigger` that renders a MoreActionItem. The menu is toggled with the
+// `hidden` class (not unmounted) so a child's modal stays mounted after its item is
+// clicked and the menu closes. `fullWidth` when there's no primary button beside it.
+export function MoreMenu({ children, fullWidth = false }: { children: ReactNode; fullWidth?: boolean }) {
   const [open, setOpen] = useState(false)
   return (
-    <div>
+    <div className={`relative ${fullWidth ? '' : 'shrink-0'}`}>
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
         aria-expanded={open}
-        className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm font-semibold hover:bg-[var(--hover)] transition"
+        aria-haspopup="menu"
+        className={`${fullWidth ? 'w-full justify-center' : ''} flex items-center gap-1.5 py-2.5 px-4 rounded-xl ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm font-semibold hover:bg-[var(--hover)] transition`}
       >
-        More actions <ChevronDown size={15} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+        More <ChevronDown size={15} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
-      {open && <div className="mt-2 space-y-2">{children}</div>}
+      {/* Outside-click catcher (below the menu, above the page). */}
+      {open && <button aria-hidden tabIndex={-1} onClick={() => setOpen(false)} className="fixed inset-0 z-10 cursor-default" />}
+      {/* Kept in the DOM (hidden, not unmounted) so an item's modal survives the menu closing. */}
+      <div
+        role="menu"
+        onClick={() => setOpen(false)}
+        className={`absolute right-0 z-20 mt-2 w-64 max-w-[calc(100vw-2.5rem)] rounded-xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] shadow-lg shadow-black/20 p-1.5 space-y-0.5 ${open ? '' : 'hidden'}`}
+      >
+        {children}
+      </div>
     </div>
   )
 }
 
-// The RM Next-action cluster: one primary button (Assign supplier) + a "More
-// actions" disclosure holding the secondary/destructive actions. Lives in a CLIENT
-// component so the per-action `trigger` render-props are created client-side — a
-// Server Component may not pass functions to Client Components. The server page
-// passes only serializable props (ids, flags, arrays).
-export function RmTicketActionBar({ ticketId, status, canAssign, canAssignSupplier, canCancel, suppliers, motivSuppliers, declinedSupplierIds, awaitingById, description, photoUrls, title, category, impact }: {
+// The RM Next-action cluster: one primary button (Assign supplier) + a "More"
+// dropdown holding the secondary/destructive actions (add extra work, request info,
+// edit, cancel). Lives in a CLIENT component so the per-action `trigger` render-props
+// are created client-side — a Server Component may not pass functions to Client
+// Components. The server page passes only serializable props (ids, flags, arrays).
+export function RmTicketActionBar({ ticketId, status, canAssign, canAssignSupplier, canCancel, canEdit, suppliers, motivSuppliers, declinedSupplierIds, awaitingById, description, photoUrls, title, category, impact, priority }: {
   ticketId: string
   status: string
   canAssign: boolean
   canAssignSupplier: boolean
   canCancel: boolean
+  canEdit: boolean
   suppliers: SupplierChoice[]
   motivSuppliers: SupplierChoice[]
   declinedSupplierIds: string[]
@@ -77,34 +89,43 @@ export function RmTicketActionBar({ ticketId, status, canAssign, canAssignSuppli
   title: string
   category: string
   impact: string
+  priority: string
 }) {
   const showRequestInfo = ['open', 'info_requested'].includes(status)
+  const hasPrimary = canAssignSupplier
+  const hasMenu = canAssign || showRequestInfo || canEdit || canCancel
+  const primaryCls = `${hasMenu ? 'flex-1' : 'w-full'} py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition`
   return (
-    <div className="space-y-2">
-      {canAssignSupplier && (
+    <div className={`flex items-center gap-2 ${hasPrimary && hasMenu ? '' : 'flex-col'}`}>
+      {hasPrimary && (
         <AssignSuppliersButton ticketId={ticketId} suppliers={suppliers} motivSuppliers={motivSuppliers} declinedSupplierIds={declinedSupplierIds} awaitingById={awaitingById}
-          trigger={open => <button onClick={open} className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition">Assign supplier</button>} />
+          trigger={open => <button onClick={open} className={primaryCls}>Assign supplier</button>} />
       )}
-      <MoreActions>
-        {canAssign && <RmAddWorkForm ticketId={ticketId} description={description} photoUrls={photoUrls} title={title} category={category} impact={impact}
-          trigger={open => <MoreActionItem icon={<Plus size={16} />} label="Add extra work" onClick={open} />} />}
-        {showRequestInfo && <RequestInfoButton ticketId={ticketId}
-          trigger={open => <MoreActionItem icon={<MessageSquare size={16} />} label="Request more info" onClick={open} />} />}
-        {canCancel && <CancelTicketCard ticketId={ticketId}
-          trigger={open => <MoreActionItem icon={<XCircle size={16} />} label="Cancel ticket" tone="danger" onClick={open} />} />}
-      </MoreActions>
+      {hasMenu && (
+        <MoreMenu fullWidth={!hasPrimary}>
+          {canAssign && <RmAddWorkForm ticketId={ticketId} description={description} photoUrls={photoUrls} title={title} category={category} impact={impact}
+            trigger={open => <MoreActionItem icon={<Plus size={16} />} label="Add extra work" onClick={open} />} />}
+          {showRequestInfo && <RequestInfoButton ticketId={ticketId}
+            trigger={open => <MoreActionItem icon={<MessageSquare size={16} />} label="Request more info" onClick={open} />} />}
+          {canEdit && <RmEditTicketForm ticketId={ticketId} initial={{ title, category, impact, priority, description }}
+            trigger={open => <MoreActionItem icon={<Pencil size={16} />} label="Edit ticket" onClick={open} />} />}
+          {canCancel && <CancelTicketCard ticketId={ticketId}
+            trigger={open => <MoreActionItem icon={<XCircle size={16} />} label="Cancel ticket" tone="danger" onClick={open} />} />}
+        </MoreMenu>
+      )}
     </div>
   )
 }
 
-/** A single row inside <MoreActions> — icon + label, tinted red for destructive. */
+/** A single row inside the <MoreMenu> dropdown — icon + label, tinted red for
+ *  destructive actions. Borderless menu-row styling. */
 export function MoreActionItem({ icon, label, onClick, tone = 'default' }: { icon?: ReactNode; label: string; onClick: () => void; tone?: 'default' | 'danger' }) {
   const toneCls = tone === 'danger'
-    ? 'text-red-600 dark:text-red-400 ring-red-500/30 hover:bg-red-500/10'
-    : 'text-[var(--text)] ring-[var(--border)] hover:bg-[var(--hover)]'
+    ? 'text-red-600 dark:text-red-400 hover:bg-red-500/10'
+    : 'text-[var(--text)] hover:bg-[var(--hover)]'
   return (
-    <button type="button" onClick={onClick} className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl ring-1 text-sm font-semibold transition ${toneCls}`}>
-      {icon && <span className="shrink-0">{icon}</span>}
+    <button type="button" role="menuitem" onClick={onClick} className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium text-left transition ${toneCls}`}>
+      {icon && <span className={`shrink-0 ${tone === 'danger' ? '' : 'text-[var(--text-muted)]'}`}>{icon}</span>}
       {label}
     </button>
   )
@@ -354,7 +375,7 @@ const IMPACTS = [
 ]
 const PRIORITIES = [{ v: 'P1', label: 'Urgent' }, { v: 'P2', label: 'High' }, { v: 'P3', label: 'Medium' }, { v: 'P4', label: 'Low' }]
 
-export function RmEditTicketForm({ ticketId, initial }: { ticketId: string; initial: { title: string; category: string; impact: string; priority: string; description: string } }) {
+export function RmEditTicketForm({ ticketId, initial, trigger }: { ticketId: string; initial: { title: string; category: string; impact: string; priority: string; description: string }; trigger?: (open: () => void) => ReactNode }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -377,7 +398,9 @@ export function RmEditTicketForm({ ticketId, initial }: { ticketId: string; init
 
   return (
     <>
-      <button onClick={() => setOpen(true)} className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-500"><Pencil size={13} /> Edit ticket</button>
+      {trigger ? trigger(() => setOpen(true)) : (
+        <button onClick={() => setOpen(true)} className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-500"><Pencil size={13} /> Edit ticket</button>
+      )}
       {open && (
         <Modal title="Edit ticket" onClose={() => setOpen(false)}>
           <Labeled label="Title"><input className={input} value={title} onChange={e => setTitle(e.target.value)} placeholder="Title" /></Labeled>

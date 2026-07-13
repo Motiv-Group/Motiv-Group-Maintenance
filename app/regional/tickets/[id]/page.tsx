@@ -15,7 +15,7 @@ import { BreachReason } from '@/components/workflow/BreachReason'
 import { Card } from '@/components/exec/ui'
 import { WorkflowActions } from '@/components/workflow/WorkflowActions'
 import { RmPipeline } from '@/components/regional/RmPipeline'
-import { RmEditTicketForm, RmQuotePanel, RmReviewPanel, ApproveSignoffCard, ReQuoteButton, AcceptScheduleCard, AcceptSnagScheduleCard, VariationReviewCard, RequestEvidenceButton, RaiseSnagButton, CloseOutButton, RmTicketActionBar } from '@/components/regional/RmTicketActions'
+import { RmQuotePanel, RmReviewPanel, ApproveSignoffCard, ReQuoteButton, AcceptScheduleCard, AcceptSnagScheduleCard, VariationReviewCard, RequestEvidenceButton, RaiseSnagButton, CloseOutButton, RmTicketActionBar } from '@/components/regional/RmTicketActions'
 import { EditedLine } from '@/components/ui/EditedLine'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { RmTicketTabs } from '@/components/regional/RmTicketTabs'
@@ -392,7 +392,6 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
   // Dual-SLA result → breach reason (which pending action ran past its deadline).
   const sla = computeTicketSla(t as HealthTicket, rules(t.priority as Priority), now)
   const breached = isActive(t.status) && (sla.supplierBreached || sla.internalBreached)
-  const breachOwner = sla.delayOwner === 'supplier' ? 'Supplier' : sla.delayOwner === 'store' ? 'Store' : 'Regional Manager (internal)'
 
   // Avg star rating per supplier, so the RM sees each contractor's record when assigning.
   const ratingAgg = new Map<string, { sum: number; n: number }>()
@@ -897,11 +896,13 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
         <div>
           <h2 className="text-sm font-bold text-[var(--text)]">Next action</h2>
           {nextAction.msg && <p className="mt-1 text-sm font-bold text-[var(--text)]">{nextAction.msg}</p>}
-          {nextAction.sub && <p className="mt-0.5 text-sm text-[var(--text-muted)]">{nextAction.sub}</p>}
+          {/* When breached the instruction moves into the red callout below, so it
+              isn't said twice. */}
+          {nextAction.sub && !breached && <p className="mt-0.5 text-sm text-[var(--text-muted)]">{nextAction.sub}</p>}
         </div>
 
-        {/* SLA breach — shown here in the action block (not as a separate banner). */}
-        {breached && <BreachReason nextAction={sla.nextAction} dueAt={sla.nextActionDueAt} owner={breachOwner} />}
+        {/* SLA breach — concise callout carrying how-late + the next action. */}
+        {breached && <BreachReason action={nextAction.sub || nextAction.msg || 'This ticket is overdue — take the next action to get it back on track.'} dueAt={sla.nextActionDueAt} nowMs={now.getTime()} />}
 
         {/* Snag-fix schedule awaiting approval — compact row → pop-up (approve/decline). */}
         <RmReviewPanel heading="Snag" items={snagReviewItems} />
@@ -938,9 +939,9 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
             It's a client component so its per-action trigger render-props are created
             client-side (a Server Component can't pass functions to Client Components). */}
         {!isTerminal && (canAssign || canCancel) && (
-          <RmTicketActionBar ticketId={t.id} status={t.status} canAssign={canAssign} canAssignSupplier={canAssignSupplier} canCancel={canCancel}
+          <RmTicketActionBar ticketId={t.id} status={t.status} canAssign={canAssign} canAssignSupplier={canAssignSupplier} canCancel={canCancel} canEdit={canEdit}
             suppliers={supplierList} motivSuppliers={motivSupplierList} declinedSupplierIds={declinedSupplierIds} awaitingById={engagedSupplierIds}
-            description={t.description ?? ''} photoUrls={Array.isArray(t.photo_urls) ? t.photo_urls : []} title={t.title} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} />
+            description={t.description ?? ''} photoUrls={Array.isArray(t.photo_urls) ? t.photo_urls : []} title={t.title} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} priority={t.priority} />
         )}
 
         {/* Completion (COC & POC) under review — compact row → pop-up with the full
@@ -1029,12 +1030,9 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
             })()}
           </div>
 
-          {(t.edited_at || canEdit) && (
-            <div className="flex items-center justify-between gap-2 pt-1">
-              <EditedLine at={t.edited_at} by={editorName} />
-              {canEdit && <RmEditTicketForm ticketId={t.id} initial={{ title: t.title, category: t.category ?? 'General', impact: t.operational_impact ?? 'none', priority: t.priority, description: t.description }} />}
-            </div>
-          )}
+          {/* Editing the ticket now lives in the Next-action "More" menu; only the
+              "edited" provenance line remains here. */}
+          {t.edited_at && <div className="pt-1"><EditedLine at={t.edited_at} by={editorName} /></div>}
 
           {t.info_request_reason && <p className="text-xs text-amber-600 dark:text-amber-400">Info requested: {t.info_request_reason}</p>}
           {/* Scheduled visit — hidden once a snag fix is in play (that callout replaces it). */}

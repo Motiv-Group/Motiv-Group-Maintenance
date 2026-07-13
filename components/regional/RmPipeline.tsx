@@ -3,7 +3,7 @@
 // (rmStatusMeta), so the bar and the badge always agree. Pure/server-safe.
 
 const STAGES = [
-  { label: 'Open',              dot: 'bg-blue-500',    ring: 'ring-blue-500/30',    text: 'text-blue-600 dark:text-blue-400' },
+  { label: 'New',               dot: 'bg-blue-500',    ring: 'ring-blue-500/30',    text: 'text-blue-600 dark:text-blue-400' },
   { label: 'Quote requested',   dot: 'bg-cyan-500',    ring: 'ring-cyan-500/30',    text: 'text-cyan-600 dark:text-cyan-400' },
   { label: 'Quoted',            dot: 'bg-violet-500',  ring: 'ring-violet-500/30',  text: 'text-violet-600 dark:text-violet-400' },
   { label: 'Approved',          dot: 'bg-teal-500',    ring: 'ring-teal-500/30',    text: 'text-teal-600 dark:text-teal-400' },

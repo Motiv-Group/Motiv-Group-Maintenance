@@ -577,7 +577,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
         </div>
         {!declinedForMe && <RmPipeline status={supplierStatus} />}
       </Card>
-      {!declinedForMe && breached && <BreachReason nextAction={sla.nextAction} dueAt={sla.nextActionDueAt} owner="Supplier" />}
+      {!declinedForMe && breached && <BreachReason action={nextAction.sub || nextAction.msg || 'This job is overdue — take the next action to get it back on track.'} dueAt={sla.nextActionDueAt} nowMs={now.getTime()} />}
       {/* Off the ticket → no "Next step", just why this quote request was declined. */}
       {declinedForMe ? (
         <div className="rounded-2xl bg-red-500/10 ring-1 ring-red-500/40 p-5 space-y-1">
@@ -592,7 +592,8 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
           <div>
             <h2 className="text-sm font-bold text-[var(--text)]">Next action</h2>
             {nextAction.msg && <p className="mt-1 text-sm font-bold text-[var(--text)]">{nextAction.msg}</p>}
-            {nextAction.sub && <p className="mt-0.5 text-sm text-[var(--text-muted)]">{nextAction.sub}</p>}
+            {/* When breached the instruction moves into the red callout above. */}
+            {nextAction.sub && !breached && <p className="mt-0.5 text-sm text-[var(--text-muted)]">{nextAction.sub}</p>}
           </div>
           {/* The decline reason now lives in the Quotes block (on the declined quote);
               the Next step only prompts for the revised quote. */}
