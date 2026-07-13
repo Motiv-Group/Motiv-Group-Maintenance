@@ -25,7 +25,7 @@ export function AuthShell({
   /** Gap (px) between the logo and the card. */
   logoGap?: number
 }) {
-  const widthClass = maxWidth === 'lg' ? 'max-w-[480px]' : maxWidth === 'md' ? 'max-w-md' : 'max-w-sm sm:max-w-md'
+  const widthClass = maxWidth === 'lg' ? 'max-w-[540px]' : maxWidth === 'md' ? 'max-w-md' : 'max-w-sm sm:max-w-md'
   return (
     <div className="dark">
       <div className="relative min-h-screen bg-[#0b0c11] flex flex-col items-center justify-center px-4 py-10">

@@ -44,6 +44,7 @@ export default function SignupPage() {
     { label: '8+ characters', ok: pw.length >= 8 },
     { label: 'Uppercase letter', ok: /[A-Z]/.test(pw) },
     { label: 'Number', ok: /[0-9]/.test(pw) },
+    { label: 'Special character', ok: /[^A-Za-z0-9]/.test(pw) },
   ]
 
   async function onSubmit(values: SignupForm) {
@@ -146,7 +147,7 @@ export default function SignupPage() {
               {...register('address', { required: 'Address is required' })} />
             {/* Password feedback is the checklist below, so no inline error here. */}
             <PasswordInput id="password" tone="auth" label="Password" placeholder="Create a password" autoComplete="new-password"
-              {...register('password', { required: 'Password is required', validate: v => (v.length >= 8 && /[A-Z]/.test(v) && /[0-9]/.test(v)) || 'Meet all the requirements below' })} />
+              {...register('password', { required: 'Password is required', validate: v => (v.length >= 8 && /[A-Z]/.test(v) && /[0-9]/.test(v) && /[^A-Za-z0-9]/.test(v)) || 'Meet all the requirements below' })} />
             {/* eslint-disable react-hooks/incompatible-library -- compiler skips this component; runtime unaffected (React Compiler not enabled) */}
             <PasswordInput id="confirm_password" tone="auth" label="Confirm password" placeholder="Repeat your password" autoComplete="new-password" error={errors.confirm_password?.message}
               {...register('confirm_password', { required: 'Please confirm your password', validate: val => val === watch('password') || 'Passwords do not match' })} />
