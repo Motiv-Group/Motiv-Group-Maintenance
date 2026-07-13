@@ -114,7 +114,7 @@ export default function SignupPage() {
           </Link>
         </div>
       ) : (
-        <form onSubmit={handleSubmit(onSubmit)} onChange={() => { if (error) setError('') }} className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} onChange={() => { if (error) setError('') }} className="space-y-3">
           <Input id="full_name" tone="auth" label="Full name" placeholder="Jane Smith" autoComplete="name" error={errors.full_name?.message}
             {...register('full_name', { required: 'Full name is required' })} />
           <Input id="email" type="email" tone="auth" label="Email address" placeholder="jane@email.com" autoComplete="email" error={errors.email?.message}
