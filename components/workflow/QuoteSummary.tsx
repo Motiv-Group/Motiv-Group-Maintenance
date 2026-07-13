@@ -29,9 +29,13 @@ const BADGE: Record<QuoteSummaryStatus, { label: string; cls: string }> = {
 
 const LABEL = 'text-[11px] font-semibold uppercase tracking-wide text-[var(--text-faint)]'
 
-/** Best-effort attachment filename from a (possibly signed) storage URL. */
+/** Best-effort attachment filename from a (possibly signed) storage URL — strips
+ *  the "{timestamp}-{random}-" prefix the uploader prepends. */
 function fileName(url: string): string {
-  try { return decodeURIComponent((url.split('?')[0].split('/').pop() || '').trim()) || 'Quote' } catch { return 'Quote' }
+  try {
+    const raw = decodeURIComponent((url.split('?')[0].split('/').pop() || '').trim())
+    return raw.replace(/^\d{6,}-[a-z0-9]{4,}-/i, '') || raw || 'Quote'
+  } catch { return 'Quote' }
 }
 
 function DateItem({ label, value, proposed }: { label: string; value: string; proposed?: boolean }) {
@@ -115,7 +119,7 @@ export function QuoteSummary({ quote, status, title, schedule, collapsible = fal
           <div className={LABEL}>Attachment</div>
           <div className="mt-1.5">
             {attName
-              ? fileLink(<span className="inline-flex items-center gap-1.5"><FileText size={14} className="shrink-0" /><span className="truncate">{attName}</span></span>, 'inline-flex max-w-full items-center text-sm font-medium text-blue-600 hover:underline dark:text-blue-400')
+              ? fileLink(<span className="inline-flex min-w-0 items-center gap-1.5"><FileText size={14} className="shrink-0" /><span className="truncate">{attName}</span></span>, 'inline-flex max-w-[240px] items-center text-sm font-medium text-blue-600 hover:underline dark:text-blue-400')
               : <span className="text-sm text-[var(--text-faint)]">—</span>}
           </div>
         </div>
