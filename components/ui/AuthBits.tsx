@@ -18,9 +18,9 @@ export function AuthError({ message }: { message: string }) {
 /** Legal footer shared across the auth pages — clearer contrast + separator. */
 export function AuthFooter() {
   return (
-    <p className="mt-6 text-center text-xs text-gray-400">
+    <p className="mt-6 text-center text-xs text-gray-300">
       <Link href="/privacy" className="transition-colors hover:text-white hover:underline">Privacy Policy</Link>
-      <span className="px-1.5 text-gray-600">·</span>
+      <span className="px-1.5 text-gray-500">·</span>
       <Link href="/terms" className="transition-colors hover:text-white hover:underline">Terms of Service</Link>
     </p>
   )

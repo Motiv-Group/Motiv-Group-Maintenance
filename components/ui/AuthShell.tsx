@@ -14,10 +14,13 @@ export function AuthShell({
   children,
   logoHeight = 168,
   maxWidth = 'sm',
+  raise = 0,
 }: {
   children: ReactNode
   logoHeight?: number
   maxWidth?: 'sm' | 'md'
+  /** Shift the whole logo+card module up by this many px (balance on tall screens). */
+  raise?: number
 }) {
   // motiv-lockup.png is a 1024² square with the glyph centred inside transparent
   // padding (~24% top, ~9% bottom of its height). Left as-is the transparent
@@ -35,7 +38,10 @@ export function AuthShell({
           aria-hidden
           className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_45%_at_50%_26%,rgba(255,255,255,0.055),transparent_72%)]"
         />
-        <div className={`relative w-full ${maxWidth === 'md' ? 'max-w-md' : 'max-w-sm sm:max-w-md'}`}>
+        <div
+          className={`relative w-full ${maxWidth === 'md' ? 'max-w-md' : 'max-w-sm sm:max-w-md'}`}
+          style={raise ? { transform: `translateY(-${raise}px)` } : undefined}
+        >
           {/* Logo — close to the card so the two read as one login module. */}
           <div className="flex items-center justify-center" style={{ marginTop, marginBottom }}>
             <MotivLockup height={logoHeight} />

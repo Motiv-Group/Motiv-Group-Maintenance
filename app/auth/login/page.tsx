@@ -11,6 +11,7 @@ import { PasswordInput } from '@/components/ui/PasswordInput'
 import { Button } from '@/components/ui/Button'
 import { AuthShell } from '@/components/ui/AuthShell'
 import { AuthError, AuthFooter } from '@/components/ui/AuthBits'
+import { Check } from 'lucide-react'
 
 interface LoginForm {
   email: string
@@ -122,9 +123,9 @@ export default function LoginPage() {
   }
 
   return (
-    <AuthShell logoHeight={300}>
+    <AuthShell logoHeight={260} raise={40}>
       <h1 className="text-xl sm:text-2xl font-semibold text-white mb-1">Welcome back</h1>
-      <p className="text-sm text-gray-400 mb-6">Sign in to continue to your workspace.</p>
+      <p className="text-sm text-gray-300 mb-6">Sign in to continue to your workspace.</p>
 
       {/* Clearing the error on any field change keeps it from lingering while the
           user corrects their details. */}
@@ -150,13 +151,19 @@ export default function LoginPage() {
         />
 
         <div className="flex items-center justify-between">
+          {/* Custom checkbox — matches the button radius + brand blue instead of
+              the browser-default control. */}
           <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={remember}
-              onChange={e => setRemember(e.target.checked)}
-              className="h-4 w-4 rounded border-[#343742] bg-[#20222b] text-blue-500 accent-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0"
-            />
+            <span className="relative inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center">
+              <input
+                type="checkbox"
+                checked={remember}
+                onChange={e => setRemember(e.target.checked)}
+                className="peer absolute inset-0 z-10 m-0 cursor-pointer opacity-0"
+              />
+              <span className="absolute inset-0 rounded-md border border-[#3a3d47] bg-[#20222b] transition-colors peer-checked:border-blue-500 peer-checked:bg-blue-600 peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500 peer-focus-visible:ring-offset-0" />
+              <Check size={12} strokeWidth={3.5} className="pointer-events-none relative text-white opacity-0 transition-opacity peer-checked:opacity-100" />
+            </span>
             Remember me
           </label>
           <Link href="/auth/forgot-password" className="text-sm text-blue-400 hover:text-blue-300 hover:underline">
@@ -166,7 +173,16 @@ export default function LoginPage() {
 
         <AuthError message={error} />
 
-        <Button type="submit" variant="gold" loading={loading} disabled={!isValid} className="w-full" size="lg">
+        {/* Confident enabled state (brighter, bolder); a clearly-neutral disabled
+            state is reserved for the incomplete form (not just a dimmed blue). */}
+        <Button
+          type="submit"
+          variant="gold"
+          loading={loading}
+          disabled={!isValid}
+          size="lg"
+          className="w-full font-semibold text-white shadow-sm shadow-blue-950/40 disabled:opacity-100 disabled:bg-[#1c1f27] disabled:text-gray-500 disabled:shadow-none"
+        >
           Log in
         </Button>
       </form>
