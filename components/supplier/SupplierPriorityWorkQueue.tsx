@@ -8,12 +8,14 @@
 // quote state, never another supplier's progress.
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { AlertCircle, AlertOctagon, AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, ClipboardList, ReceiptText, Camera } from 'lucide-react'
+import { AlertCircle, AlertOctagon, AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, ClipboardList, ReceiptText, Camera, PlayCircle } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import type { SupplierTicketRow } from '@/lib/health/data'
 import { Card } from '@/components/exec/ui'
 import { CategoryIcon } from '@/components/client/ticketBadges'
 import { Modal } from '@/components/ui/Modal'
 import { SendQuoteForm } from '@/components/admin/SendQuoteForm'
+import { SubmitCompletionForm } from '@/components/supplier/SubmitCompletionForm'
 import { SupplierVariationGate } from '@/components/supplier/SupplierJobActions'
 import { supplierStatusMeta, formatDate, formatDateTime, humanizeDuration, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
 
@@ -198,6 +200,10 @@ function QueueRow({ ticket, nowMs, company }: { ticket: SupplierTicketRow; nowMs
           ? <SubmitQuoteCta ticket={ticket} className={ctaCls} />
           : closeout && !ticket.voNoneConfirmed
           ? <CloseOutCta ticket={ticket} className={ctaCls} />
+          : cta === 'Mark in progress'
+          ? <MarkInProgressCta ticket={ticket} className={ctaCls} />
+          : cta === 'Upload evidence'
+          ? <UploadEvidenceCta ticket={ticket} className={ctaCls} />
           : <Link href={ticketUrl} className={ctaCls}>{cta} {cta === 'View Ticket' && <ArrowRight size={15} />}</Link>}
       </div>
     </div>
@@ -214,6 +220,62 @@ function SubmitQuoteCta({ ticket, className }: { ticket: SupplierTicketRow; clas
       {open && (
         <Modal onClose={() => setOpen(false)} maxWidth="max-w-3xl">
           {close => <div><SendQuoteForm defaultOpen competitive ticketId={ticket.id} priority={String(ticket.priority)} createdAt={ticket.createdAt} onClose={close} /></div>}
+        </Modal>
+      )}
+    </>
+  )
+}
+
+// "Mark in progress" from the Today queue — confirm in a pop-up (start_work), no
+// navigation into the ticket.
+function MarkInProgressCta({ ticket, className }: { ticket: SupplierTicketRow; className: string }) {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  async function go(close: () => void) {
+    setBusy(true); setErr('')
+    try {
+      const res = await fetch(`/api/tickets/${ticket.id}/transition`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'start_work' }) })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Could not update the job')
+      close(); router.refresh()
+    } catch (e: any) { setErr(e.message); setBusy(false) }
+  }
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} className={className}><PlayCircle size={15} /> Mark in progress</button>
+      {open && (
+        <Modal onClose={() => setOpen(false)} maxWidth="max-w-md">
+          {close => (
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-base font-bold text-[var(--text)]">Mark this job in progress?</h3>
+                <p className="mt-1 text-sm text-[var(--text-muted)]">The store will see that the work has started. Do this once you&apos;re on your way or on site.</p>
+              </div>
+              {err && <p className="text-xs text-red-500">{err}</p>}
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setOpen(false)} disabled={busy} className="flex-1 rounded-xl py-2.5 text-sm font-medium text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-50">Cancel</button>
+                <button type="button" onClick={() => go(close)} disabled={busy} className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:opacity-50">{busy ? 'Starting…' : 'Yes, mark in progress'}</button>
+              </div>
+            </div>
+          )}
+        </Modal>
+      )}
+    </>
+  )
+}
+
+// "Upload evidence" from the Today queue — opens the COC/POC (or more-evidence)
+// uploader in a pop-up, no navigation into the ticket.
+function UploadEvidenceCta({ ticket, className }: { ticket: SupplierTicketRow; className: string }) {
+  const [open, setOpen] = useState(false)
+  const evidenceRequested = ticket.status === 'evidence_requested'
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} className={className}><Camera size={15} /> Upload evidence</button>
+      {open && (
+        <Modal onClose={() => setOpen(false)} maxWidth="max-w-2xl">
+          {close => <SubmitCompletionForm defaultOpen ticketId={ticket.id} evidenceRequested={evidenceRequested} requireBoth={!evidenceRequested} onClose={close} />}
         </Modal>
       )}
     </>
