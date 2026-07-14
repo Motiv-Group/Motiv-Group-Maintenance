@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Pencil, FileSpreadsheet, Plus, Download, ChevronRight, Search, StickyNote } from 'lucide-react'
+import { Pencil, FileSpreadsheet, Plus, Download, ChevronRight, Search, StickyNote, Trash2, AlertTriangle } from 'lucide-react'
 import { Card } from '@/components/exec/ui'
 import { Modal } from '@/components/ui/Modal'
 import { formatDate } from '@/lib/utils'
@@ -34,6 +34,7 @@ export function AdminProjectDetail({
   const [editing, setEditing] = useState(false)
   const [importing, setImporting] = useState(false)
   const [adding, setAdding] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [q, setQ] = useState('')
   const [status, setStatus] = useState<StatusFilter>('all')
   const [sort, setSort] = useState<'branch' | 'name' | 'progress' | 'end'>('branch')
@@ -97,6 +98,7 @@ export function AdminProjectDetail({
             <ActionBtn icon={<FileSpreadsheet size={14} />} label="Import" onClick={() => setImporting(true)} primary />
             <ActionBtn icon={<Plus size={14} />} label="Add store" onClick={() => setAdding(true)} />
             <ActionBtn icon={<Download size={14} />} label="Export" onClick={exportCsv} />
+            <ActionBtn icon={<Trash2 size={14} />} label="Delete" onClick={() => setDeleting(true)} danger />
           </div>
         </div>
 
@@ -213,18 +215,73 @@ export function AdminProjectDetail({
       )}
       {importing && <ImportWizard projectId={project.id} onClose={() => setImporting(false)} />}
       {adding && <AddStoreModal projectId={project.id} onClose={() => setAdding(false)} />}
+      {deleting && <DeleteProjectModal projectId={project.id} name={project.name} storeCount={summary.storeCount} onClose={() => setDeleting(false)} />}
     </div>
   )
 }
 
-function ActionBtn({ icon, label, onClick, primary }: { icon: React.ReactNode; label: string; onClick: () => void; primary?: boolean }) {
+function ActionBtn({ icon, label, onClick, primary, danger }: { icon: React.ReactNode; label: string; onClick: () => void; primary?: boolean; danger?: boolean }) {
+  const cls = danger
+    ? 'ring-1 ring-red-500/40 text-red-600 dark:text-red-400 hover:bg-red-500/10'
+    : primary
+      ? 'bg-blue-600 text-white hover:bg-blue-700'
+      : 'ring-1 ring-[var(--border)] text-[var(--text)] hover:bg-[var(--hover)]'
   return (
-    <button
-      onClick={onClick}
-      className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold ${primary ? 'bg-blue-600 text-white hover:bg-blue-700' : 'ring-1 ring-[var(--border)] text-[var(--text)] hover:bg-[var(--hover)]'}`}
-    >
+    <button onClick={onClick} className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold ${cls}`}>
       {icon} {label}
     </button>
+  )
+}
+
+function DeleteProjectModal({ projectId, name, storeCount, onClose }: { projectId: string; name: string; storeCount: number; onClose: () => void }) {
+  const router = useRouter()
+  const [confirm, setConfirm] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  async function del(close: () => void) {
+    setBusy(true)
+    setErr(null)
+    const res = await fetch(`/api/projects/${projectId}`, { method: 'DELETE' })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      setBusy(false)
+      setErr(data?.error ?? 'Delete failed')
+      return
+    }
+    close()
+    router.push('/admin/projects')
+  }
+
+  return (
+    <Modal onClose={onClose} maxWidth="max-w-md">
+      {(close) => (
+        <div className="space-y-3">
+          <h2 className="text-base font-bold text-red-600 dark:text-red-400 flex items-center gap-2"><AlertTriangle size={18} /> Delete project</h2>
+          <p className="text-sm text-[var(--text-muted)]">
+            This permanently deletes <b className="text-[var(--text)]">{name}</b>, its <b className="text-[var(--text)]">{storeCount}</b> store{storeCount === 1 ? '' : 's'}, and every uploaded photo and sign-off document. This can’t be undone.
+          </p>
+          <p className="text-xs text-[var(--text-muted)]">Type the project name to confirm:</p>
+          <input
+            className="w-full rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] px-3 py-2 text-sm text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-red-500/50"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            placeholder={name}
+          />
+          {err && <p className="text-xs text-red-500">{err}</p>}
+          <div className="flex justify-end gap-2">
+            <button onClick={close} className="rounded-lg px-4 py-2 text-sm text-[var(--text-muted)] hover:bg-[var(--hover)]">Cancel</button>
+            <button
+              onClick={() => del(close)}
+              disabled={busy || confirm.trim() !== name.trim()}
+              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-40"
+            >
+              {busy ? 'Deleting…' : 'Delete project'}
+            </button>
+          </div>
+        </div>
+      )}
+    </Modal>
   )
 }
 

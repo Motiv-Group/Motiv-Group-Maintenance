@@ -4,6 +4,7 @@ import { rateLimit } from '@/lib/rate-limit'
 import { projectAdminAuth, loadOwnedProject } from '@/lib/projects/guard'
 import { logProjectEvent } from '@/lib/projects/data'
 import { logAudit } from '@/lib/audit'
+import { bucketAndPath } from '@/lib/storage'
 import { PROJECT_STATUSES } from '@/lib/projects/types'
 
 export const dynamic = 'force-dynamic'
@@ -51,6 +52,52 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   revalidatePath('/admin/projects')
   revalidatePath(`/admin/projects/${id}`)
+  revalidatePath('/regional/projects')
+  return NextResponse.json({ ok: true })
+}
+
+// DELETE /api/projects/[id] — permanently delete a project + all its stores, files
+// and history (FK cascade). Also best-effort removes the uploaded storage objects.
+export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const auth = await projectAdminAuth()
+  if ('fail' in auth) return NextResponse.json({ error: auth.message }, { status: auth.fail })
+  const { userId, companyId, admin } = auth
+
+  if (!(await rateLimit(`projects:${userId}`, 30, 60_000)))
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+
+  const project = await loadOwnedProject(admin, companyId, id)
+  if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+
+  // Collect storage paths BEFORE the cascade removes the file rows.
+  const { data: files } = await admin.from('project_files').select('storage_path').eq('project_id', id)
+  const paths = ((files ?? []) as any[]).map((f) => f.storage_path)
+
+  const { error } = await admin.from('projects').delete().eq('id', id).eq('company_id', companyId)
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Best-effort storage cleanup (grouped by bucket). The DB rows are already gone.
+  const byBucket = new Map<string, string[]>()
+  for (const p of paths) {
+    const bp = bucketAndPath(p)
+    if (bp) {
+      const arr = byBucket.get(bp.bucket) ?? []
+      arr.push(bp.path)
+      byBucket.set(bp.bucket, arr)
+    }
+  }
+  for (const [bucket, ps] of byBucket) {
+    try {
+      await admin.storage.from(bucket).remove(ps)
+    } catch {
+      /* ignore — rows already deleted */
+    }
+  }
+
+  await logAudit(admin, { actorId: userId, companyId, action: 'project.deleted', entityType: 'project', entityId: id, metadata: { name: project.name, files: paths.length } })
+
+  revalidatePath('/admin/projects')
   revalidatePath('/regional/projects')
   return NextResponse.json({ ok: true })
 }

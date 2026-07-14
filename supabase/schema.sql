@@ -458,6 +458,10 @@ create table if not exists public.stores (
   created_at                   timestamptz not null default now(),
   updated_at                   timestamptz not null default now()
 );
+-- A company's branch_code is unique (prevents duplicate/orphan stores — see
+-- migration 20260714_stores_unique_branch). Case-insensitive.
+create unique index if not exists stores_company_branch_uidx
+  on public.stores (company_id, lower(branch_code));
 
 create table if not exists public.supplier_escalations (
   id                           uuid not null default gen_random_uuid(),
