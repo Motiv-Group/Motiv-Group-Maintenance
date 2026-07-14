@@ -93,18 +93,18 @@ function SignoffCard({ s, snag, ticketId, collapsible = false, defaultOpen = fal
   // the proof-of-completion, COC and notes.
   if (collapsible) {
     return (
-      <details open={defaultOpen} className={`rounded-xl ring-1 ${meta.ring} ${meta.bg} overflow-hidden`}>
+      <details open={defaultOpen} className={`rounded-xl bg-[var(--surface)] ring-1 ring-[var(--border)] overflow-hidden`}>
         <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">{header}</summary>
-        <div className={`p-4 space-y-4 border-t ${meta.head}`}>{body}</div>
-        {footer && <div className={`border-t ${meta.head} px-4 py-3`}>{footer}</div>}
+        <div className={`p-4 space-y-4 border-t border-[var(--border)]`}>{body}</div>
+        {footer && <div className={`border-t border-[var(--border)] px-4 py-3`}>{footer}</div>}
       </details>
     )
   }
   return (
-    <div className={`rounded-xl ring-1 ${meta.ring} ${meta.bg} overflow-hidden`}>
-      <div className={`flex items-center justify-between gap-2 px-4 py-2.5 border-b ${meta.head}`}>{header}</div>
+    <div className={`rounded-xl bg-[var(--surface)] ring-1 ring-[var(--border)] overflow-hidden`}>
+      <div className={`flex items-center justify-between gap-2 px-4 py-2.5 border-b border-[var(--border)]`}>{header}</div>
       <div className="p-4 space-y-4">{body}</div>
-      {footer && <div className={`border-t ${meta.head} px-4 py-3`}>{footer}</div>}
+      {footer && <div className={`border-t border-[var(--border)] px-4 py-3`}>{footer}</div>}
     </div>
   )
 }
