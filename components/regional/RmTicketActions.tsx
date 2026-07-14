@@ -34,7 +34,7 @@ function Modal({ title, onClose, children, maxWidth = 'max-w-md' }: { title: Rea
 // drops a floating menu of secondary/destructive actions. It ONLY renders the menu
 // buttons; the actual modals live as siblings in RmTicketActionBar driven by lifted
 // state, so opening one is instant and doesn't depend on the menu staying mounted.
-export function MoreMenu({ children, fullWidth = false, label = 'More', up = false }: { children: ReactNode; fullWidth?: boolean; label?: string; up?: boolean }) {
+export function MoreMenu({ children, fullWidth = false, label = 'More', up = false, align = 'right' }: { children: ReactNode; fullWidth?: boolean; label?: string; up?: boolean; align?: 'left' | 'right' }) {
   const [open, setOpen] = useState(false)
   return (
     <div className={`relative ${fullWidth ? '' : 'shrink-0'}`}>
@@ -53,7 +53,7 @@ export function MoreMenu({ children, fullWidth = false, label = 'More', up = fal
           <button aria-hidden tabIndex={-1} onClick={() => setOpen(false)} className="fixed inset-0 z-10 cursor-default" />
           {/* `up` opens above the trigger — used inside pop-ups where a downward menu
               would be clipped by the scrollable modal body. */}
-          <div role="menu" onClick={() => setOpen(false)} className={`absolute right-0 z-20 ${up ? 'bottom-full mb-2' : 'mt-2'} w-64 max-w-[calc(100vw-2.5rem)] rounded-xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] shadow-lg shadow-black/20 p-1.5 space-y-0.5`}>
+          <div role="menu" onClick={() => setOpen(false)} className={`absolute z-20 ${align === 'left' ? 'left-0' : 'right-0'} ${up ? 'bottom-full mb-2' : 'mt-2'} w-64 max-w-[calc(100vw-2.5rem)] rounded-xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] shadow-lg shadow-black/20 p-1.5 space-y-0.5`}>
             {children}
           </div>
         </>
@@ -857,7 +857,7 @@ export function RmCompletionReview({ ticketId, label, submittedAt, photoCount, d
       </div>
 
       {open && (
-        <Modal title="Sign off completion" maxWidth="max-w-2xl" onClose={() => setOpen(false)}>
+        <Modal title="Sign off completion" maxWidth="max-w-3xl" onClose={() => setOpen(false)}>
           <SignoffReviewPanel ticketId={ticketId} s={submission} onDone={() => setOpen(false)} />
         </Modal>
       )}
@@ -1165,7 +1165,7 @@ export function SignoffReviewPanel({ ticketId, s, onDone }: { ticketId: string; 
       {err && <p className="text-xs text-red-500">{err}</p>}
 
       <div className="flex items-center gap-2">
-        <MoreMenu label="More actions" up>
+        <MoreMenu label="More actions" up align="left">
           <MoreActionItem icon={<MessageSquare size={16} />} label="Request more evidence" onClick={() => setSub('evidence')} />
           <MoreActionItem icon={<AlertTriangle size={16} />} label="Raise a snag" tone="danger" onClick={() => setSub('snag')} />
         </MoreMenu>
