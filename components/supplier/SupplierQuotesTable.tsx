@@ -5,6 +5,7 @@
 // the ticket priority (CategoryIcon). All amounts are excl. VAT.
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { ReceiptText, Search, ChevronDown, ChevronLeft, ChevronRight, ChevronRight as Chev, Info, Calendar } from 'lucide-react'
 import { Card } from '@/components/exec/ui'
 import { CategoryIcon } from '@/components/client/ticketBadges'
@@ -42,6 +43,7 @@ const BADGE = 'inline-flex items-center justify-center rounded-md px-2 py-0.5 te
 const SEL = 'appearance-none rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm pl-9 pr-8 py-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/40'
 
 export function SupplierQuotesTable({ items }: { items: SupplierQuoteItem[] }) {
+  const router = useRouter()
   const [tab, setTab] = useState<'all' | QuoteKind>('all')
   const [q, setQ] = useState('')
   const [sort, setSort] = useState<'urgent' | 'newest' | 'oldest' | 'high' | 'low'>('urgent')
@@ -123,7 +125,7 @@ export function SupplierQuotesTable({ items }: { items: SupplierQuoteItem[] }) {
             </tr></thead>
             <tbody>
               {pageRows.map(i => (
-                <tr key={i.key} className="group border-b border-[var(--border)] last:border-0 transition hover:bg-[var(--hover)]">
+                <tr key={i.key} onClick={() => router.push(`/supplier/tickets/${i.ticketId}`)} className="group cursor-pointer border-b border-[var(--border)] last:border-0 transition hover:bg-[var(--hover)]">
                   <td className="px-4 py-3">
                     <Link href={`/supplier/tickets/${i.ticketId}`} className="flex items-center gap-3">
                       <CategoryIcon category={i.category ?? i.storeName} priority={i.priority} />
