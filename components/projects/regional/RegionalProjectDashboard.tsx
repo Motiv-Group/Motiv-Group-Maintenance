@@ -17,6 +17,7 @@ export function RegionalProjectDashboard({ project, summary, stores }: { project
   const [view, setView] = useState<'cards' | 'table'>('cards')
   const [q, setQ] = useState('')
   const [status, setStatus] = useState<StatusFilter>('all')
+  const [sort, setSort] = useState<'branch' | 'name' | 'progress' | 'start' | 'end'>('branch')
 
   const counts = useMemo(() => milestoneCounts(stores), [stores])
   const daysLeft = daysUntil(project.end_date)
@@ -32,8 +33,16 @@ export function RegionalProjectDashboard({ project, summary, stores }: { project
     else if (status === 'in_progress') rows = rows.filter((r) => r.progress > 0 && r.progress < 100)
     else if (status === 'complete') rows = rows.filter((r) => r.progress >= 100)
     else if (status === 'overdue') rows = rows.filter((r) => r.overdue)
-    return rows
-  }, [stores, q, status])
+    const sorted = [...rows]
+    sorted.sort((a, b) => {
+      if (sort === 'progress') return b.progress - a.progress
+      if (sort === 'name') return (a.store_name ?? '').localeCompare(b.store_name ?? '')
+      if (sort === 'start') return (a.start_date ?? '').localeCompare(b.start_date ?? '')
+      if (sort === 'end') return (a.end_date ?? '').localeCompare(b.end_date ?? '')
+      return a.branch_code.localeCompare(b.branch_code)
+    })
+    return sorted
+  }, [stores, q, status, sort])
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-6 space-y-5">
@@ -109,6 +118,13 @@ export function RegionalProjectDashboard({ project, summary, stores }: { project
           <option value="complete">Complete</option>
           <option value="overdue">Overdue</option>
         </select>
+        <select className="rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] px-3 py-2 text-sm text-[var(--text)]" value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
+          <option value="branch">Sort: Branch</option>
+          <option value="name">Sort: Name</option>
+          <option value="progress">Sort: Completion</option>
+          <option value="start">Sort: Start date</option>
+          <option value="end">Sort: End date</option>
+        </select>
         <div className="flex rounded-lg ring-1 ring-[var(--border)] overflow-hidden">
           <button onClick={() => setView('cards')} className={`p-2 ${view === 'cards' ? 'bg-blue-600 text-white' : 'text-[var(--text-muted)] hover:bg-[var(--hover)]'}`}><LayoutGrid size={15} /></button>
           <button onClick={() => setView('table')} className={`p-2 ${view === 'table' ? 'bg-blue-600 text-white' : 'text-[var(--text-muted)] hover:bg-[var(--hover)]'}`}><Table2 size={15} /></button>
@@ -144,6 +160,8 @@ export function RegionalProjectDashboard({ project, summary, stores }: { project
                   <th className="text-left px-3 py-2 font-semibold">Store</th>
                   <th className="text-left px-3 py-2 font-semibold">Branch</th>
                   <th className="text-left px-3 py-2 font-semibold hidden md:table-cell">Town</th>
+                  <th className="text-left px-3 py-2 font-semibold hidden lg:table-cell">Start</th>
+                  <th className="text-left px-3 py-2 font-semibold hidden lg:table-cell">End</th>
                   <th className="text-left px-3 py-2 font-semibold w-40">Completion</th>
                   <th className="text-left px-3 py-2 font-semibold">Status</th>
                   <th className="px-3 py-2" />
@@ -155,6 +173,8 @@ export function RegionalProjectDashboard({ project, summary, stores }: { project
                     <td className="px-3 py-2"><Link href={`/regional/projects/${project.id}/stores/${s.id}`} className="text-[var(--text)] hover:text-blue-500">{s.store_name ?? '—'}</Link></td>
                     <td className="px-3 py-2 text-[var(--text-muted)]">{s.branch_code}</td>
                     <td className="px-3 py-2 text-[var(--text-muted)] hidden md:table-cell">{s.town ?? '—'}</td>
+                    <td className="px-3 py-2 text-[var(--text-muted)] hidden lg:table-cell">{formatDate(s.start_date) || '—'}</td>
+                    <td className="px-3 py-2 text-[var(--text-muted)] hidden lg:table-cell">{formatDate(s.end_date) || '—'}</td>
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-2">
                         <div className="flex-1 h-1.5 rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden"><div className="h-full rounded-full bg-blue-500" style={{ width: `${s.progress}%` }} /></div>
