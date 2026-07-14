@@ -673,16 +673,23 @@ export function RmQuotePanel({ ticketId, rows, canReQuote }: { ticketId: string;
   const [busy, setBusy] = useState(false)
   const [reason, setReason] = useState(DECLINE_REASONS[0])
   const [other, setOther] = useState('')
+  const [requote, setRequote] = useState(false)   // decline → also ask for a revised quote
   const [err, setErr] = useState('')
   const active = rows.find(r => r.supplierId === openId) ?? null
   const receivedIds = new Set(rows.filter(r => r.kind === 'received').map(r => r.supplierId))
   const selectedReceived = selectedId && receivedIds.has(selectedId)
 
-  function openModal(id: string, m: 'view' | 'approve' | 'decline' = 'view') { setOpenId(id); setMode(m); setReason(DECLINE_REASONS[0]); setOther(''); setErr('') }
+  function openModal(id: string, m: 'view' | 'approve' | 'decline' = 'view') { setOpenId(id); setMode(m); setReason(DECLINE_REASONS[0]); setOther(''); setRequote(false); setErr('') }
   async function decide(quoteId: string, action: 'approve' | 'decline') {
     setBusy(true); setErr('')
     const declineReason = action === 'decline' ? (reason === 'Other' ? (other.trim() || 'Other') : reason) : undefined
-    try { await post(`/api/tickets/${ticketId}/quote-decision`, { action, quoteId, reason: declineReason }); setBusy(false); setOpenId(null); router.refresh() }
+    try {
+      await post(`/api/tickets/${ticketId}/quote-decision`, { action, quoteId, reason: declineReason })
+      // If the RM ticked "also ask for a revised quote", re-invite the just-declined
+      // supplier straight away (the requote action acts on the now-declined quote).
+      if (action === 'decline' && requote) await post(`/api/tickets/${ticketId}/quote-decision`, { action: 'requote', quoteId })
+      setBusy(false); setOpenId(null); router.refresh()
+    }
     catch (e: any) { setErr(e.message); setBusy(false) }
   }
   const input = 'w-full px-3 py-2 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm'
@@ -751,6 +758,10 @@ export function RmQuotePanel({ ticketId, rows, canReQuote }: { ticketId: string;
               <div className="space-y-2 pt-1">
                 <select className={input} value={reason} onChange={e => setReason(e.target.value)}>{DECLINE_REASONS.map(r => <option key={r} value={r}>{r}</option>)}</select>
                 {reason === 'Other' && <textarea className={`${input} min-h-[60px]`} placeholder="Reason…" value={other} onChange={e => setOther(e.target.value)} />}
+                <label className="flex items-start gap-2 rounded-lg bg-[var(--input-bg)] px-3 py-2 text-sm text-[var(--text-muted)] ring-1 ring-[var(--border)]">
+                  <input type="checkbox" checked={requote} onChange={e => setRequote(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-blue-600" />
+                  Also ask this supplier to submit a revised quote
+                </label>
                 <div className="flex gap-2">
                   <button onClick={() => decide(active.quote!.id, 'decline')} disabled={busy} className="flex-1 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold disabled:opacity-50">Confirm decline</button>
                   <button onClick={() => setMode('view')} className="flex-1 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm">Back</button>
@@ -891,6 +902,7 @@ export function QuoteComparison({ ticketId, rows, onClose }: { ticketId: string;
   const [declineMode, setDeclineMode] = useState(false)
   const [reason, setReason] = useState(DECLINE_REASONS[0])
   const [other, setOther] = useState('')
+  const [requote, setRequote] = useState(false)   // decline → also ask for a revised quote
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
 
@@ -907,7 +919,13 @@ export function QuoteComparison({ ticketId, rows, onClose }: { ticketId: string;
     if (!selected?.quote) return
     setBusy(true); setErr('')
     const declineReason = action === 'decline' ? (reason === 'Other' ? (other.trim() || 'Other') : reason) : undefined
-    try { await post(`/api/tickets/${ticketId}/quote-decision`, { action, quoteId: selected.quote.id, reason: declineReason }); router.refresh() }
+    const qid = selected.quote.id
+    try {
+      await post(`/api/tickets/${ticketId}/quote-decision`, { action, quoteId: qid, reason: declineReason })
+      // Ticked "also ask for a revised quote" → re-invite the just-declined supplier.
+      if (action === 'decline' && requote) await post(`/api/tickets/${ticketId}/quote-decision`, { action: 'requote', quoteId: qid })
+      router.refresh()
+    }
     catch (e: any) { setErr(e.message); setBusy(false) }
   }
 
@@ -974,6 +992,10 @@ export function QuoteComparison({ ticketId, rows, onClose }: { ticketId: string;
           <p className="text-sm text-[var(--text)]">Decline <span className="font-semibold">{selected.name}</span>&apos;s quote — choose a reason:</p>
           <select className={input} value={reason} onChange={e => setReason(e.target.value)}>{DECLINE_REASONS.map(r => <option key={r} value={r}>{r}</option>)}</select>
           {reason === 'Other' && <textarea className={`${input} min-h-[60px]`} placeholder="Reason…" value={other} onChange={e => setOther(e.target.value)} />}
+          <label className="flex items-start gap-2 text-sm text-[var(--text-muted)]">
+            <input type="checkbox" checked={requote} onChange={e => setRequote(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-blue-600" />
+            Also ask this supplier to submit a revised quote
+          </label>
         </div>
       )}
 
