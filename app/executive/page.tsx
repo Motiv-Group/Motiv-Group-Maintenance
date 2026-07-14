@@ -13,7 +13,6 @@ import {
   RagBlocks, TrendArrow, STATUS_TEXT, type Kpi, type Trend,
 } from '@/components/exec/ui'
 import { getDailyBriefing } from '@/lib/briefing/generate'
-import { BriefingRefresh } from '@/components/briefing/BriefingRefresh'
 import { AiBriefing } from '@/components/briefing/AiBriefing'
 import { estateFacts } from '@/lib/briefing/facts'
 import { STATUS_LABELS } from '@/lib/health/constants'
@@ -73,12 +72,11 @@ export default async function ExecutiveEstatePage() {
             <div className="flex items-center justify-center lg:justify-start gap-2 flex-wrap">
               <h2 className="text-lg font-bold text-[var(--text)]">Estate Health</h2>
               <Pill status={e.status} label={`${quality(e.finalEstateHealth)} / ${STATUS_LABELS[e.status]}`} />
-              <span className="ml-auto"><BriefingRefresh scope="estate" scopeId={companyId} /></span>
             </div>
             {briefing?.body && (
               <div className="flex items-start gap-2 justify-center lg:justify-start text-left">
                 <span className="shrink-0 mt-0.5 inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wide text-[#C6A35D] bg-[#C6A35D]/10 rounded-full px-1.5 py-0.5"><Sparkles size={10} /> AI</span>
-                <AiBriefing headline={briefing.headline} body={briefing.body} className="text-sm leading-relaxed text-[var(--text-muted)]" />
+                <AiBriefing headline={briefing.headline} body={briefing.body} scope="estate" scopeId={companyId} className="text-sm leading-relaxed text-[var(--text-muted)]" />
               </div>
             )}
             {/* Health bands across the estate (all stores in the exec's regions) */}
