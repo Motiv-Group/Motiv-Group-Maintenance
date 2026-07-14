@@ -23,7 +23,7 @@ export function RegionalProjectsClient({ projects, featured }: { projects: Proje
   const overdue = projects.filter((p) => p.overdue > 0).length
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-6 space-y-5">
+    <div className="space-y-5">
       <div>
         <h1 className="text-lg font-bold text-[var(--text)] flex items-center gap-2">
           <FolderKanban size={20} className="text-blue-500" /> Projects

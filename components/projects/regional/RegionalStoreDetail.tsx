@@ -23,7 +23,7 @@ export function RegionalStoreDetail({ projectId, store, project, files }: { proj
   ]
 
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 py-6 space-y-4">
+    <div className="space-y-4">
       <Link href={`/regional/projects/${projectId}`} className="text-xs text-[var(--text-muted)] hover:text-[var(--text)]">← {project.name}</Link>
 
       {/* Summary */}

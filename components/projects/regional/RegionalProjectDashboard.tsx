@@ -45,7 +45,7 @@ export function RegionalProjectDashboard({ project, summary, stores }: { project
   }, [stores, q, status, sort])
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-6 space-y-5">
+    <div className="space-y-5">
       <Link href="/regional/projects" className="text-xs text-[var(--text-muted)] hover:text-[var(--text)]">← All projects</Link>
 
       {/* Hero */}
