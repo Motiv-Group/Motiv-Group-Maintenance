@@ -5,7 +5,7 @@ import { rateLimit } from '@/lib/rate-limit'
 import { projectAdminAuth, loadOwnedProject } from '@/lib/projects/guard'
 import { logProjectEvent } from '@/lib/projects/data'
 import { logAudit } from '@/lib/audit'
-import { parseImportRows, type RawRow, type ParsedStore } from '@/lib/projects/import'
+import { parseImportMatrix, type ParsedStore } from '@/lib/projects/import'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -37,19 +37,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!(file instanceof File)) return NextResponse.json({ error: 'No file uploaded' }, { status: 400 })
   if (file.size > MAX_BYTES) return NextResponse.json({ error: 'File too large (max 10 MB)' }, { status: 400 })
 
-  // Parse the first sheet into row objects keyed by header text.
-  let rows: RawRow[]
+  // Parse the first sheet as a raw matrix (array-of-arrays) so the header row can be
+  // auto-detected — real sheets often have title/blank rows above the column headers,
+  // and many extra columns we ignore.
+  let matrix: unknown[][]
   try {
     const buf = Buffer.from(await file.arrayBuffer())
     const wb = XLSX.read(buf, { type: 'buffer', cellDates: true })
     const ws = wb.Sheets[wb.SheetNames[0]]
     if (!ws) return NextResponse.json({ error: 'The spreadsheet has no sheets' }, { status: 400 })
-    rows = XLSX.utils.sheet_to_json(ws, { defval: '', raw: true }) as RawRow[]
+    matrix = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, blankrows: false }) as unknown[][]
   } catch (e: any) {
     return NextResponse.json({ error: `Could not read the spreadsheet: ${e?.message ?? 'unknown error'}` }, { status: 400 })
   }
 
-  const preview = parseImportRows(rows)
+  const preview = parseImportMatrix(matrix)
 
   // Which of the valid branch codes already exist on this project?
   const { data: existing } = await admin.from('project_stores').select('id, branch_code').eq('project_id', id)

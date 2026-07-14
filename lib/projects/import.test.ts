@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseImportRows, parseDate, parseRfid, mapHeaders, type RawRow } from './import'
+import { parseImportRows, parseImportMatrix, detectHeaderRow, parseDate, parseRfid, mapHeaders, type RawRow } from './import'
 
 describe('mapHeaders — alias matching, order/count independent', () => {
   it('maps the spec headers', () => {
@@ -97,5 +97,41 @@ describe('parseImportRows — validation + derived count', () => {
   it('reports missing required columns when the header is absent', () => {
     const p = parseImportRows([{ Foo: 'bar', 'Store Name': 'X' }])
     expect(p.missingColumns).toContain('branch_code')
+  })
+})
+
+describe('parseImportMatrix — header auto-detect + extra columns', () => {
+  it('skips title/blank rows above the header row and ignores extra columns', () => {
+    const matrix: unknown[][] = [
+      ['TFG Volpes RFID Shielding Rollout'], // title row
+      [], // blank
+      ['Team', 'Page Name', 'Branch Code', 'Brand', 'Centre', 'Town', 'RFID m² Required', 'Start date', 'Finish date', 'Day count'],
+      ['Team A', 'GP01', 'B001', 'Volpes', 'Alpha Store', 'Johannesburg', 12, '2026-01-01', '2026-01-10', 9],
+      ['Team A', 'GP01', 'B002', 'Volpes', 'Beta Store', 'Cape Town', 20, '2026-02-01', '2026-02-10', 9],
+    ]
+    const p = parseImportMatrix(matrix)
+    expect(p.missingColumns).toHaveLength(0)
+    expect(p.valid).toHaveLength(2)
+    // Centre → store name; extra columns (Team/Brand/Day count) ignored.
+    expect(p.valid[0]).toMatchObject({ branch_code: 'B001', store_name: 'Alpha Store', town: 'Johannesburg', rfid_m2_required: 12, start_date: '2026-01-01', end_date: '2026-01-10' })
+  })
+
+  it('detectHeaderRow finds the header row index past the preamble', () => {
+    const matrix: unknown[][] = [
+      ['Some title', ''],
+      ['generated 2026', ''],
+      ['Branch Code', 'Store Name', 'Town'],
+      ['B1', 'X', 'JHB'],
+    ]
+    expect(detectHeaderRow(matrix)).toBe(2)
+  })
+
+  it('handles header on the very first row too', () => {
+    const matrix: unknown[][] = [
+      ['Branch Code', 'Store Name'],
+      ['B1', 'X'],
+    ]
+    const p = parseImportMatrix(matrix)
+    expect(p.valid).toHaveLength(1)
   })
 })

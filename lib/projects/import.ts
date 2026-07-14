@@ -144,6 +144,57 @@ function str(value: unknown): string | null {
  * are flagged invalid on their 2nd+ occurrence (can't create two stores with one key).
  * Duplicates against EXISTING project stores are handled server-side (needs the DB).
  */
+/**
+ * Find the header row in a sheet matrix (array-of-arrays). Real-world spreadsheets
+ * often have a title/logo/blank row or two ABOVE the column headers — so we scan the
+ * first rows and pick the one that resolves our columns (preferring the first that
+ * finds the required branch-code column). Returns 0 if nothing matches.
+ */
+export function detectHeaderRow(matrix: unknown[][]): number {
+  let best = -1
+  let bestScore = 0
+  const scan = Math.min(matrix.length, 30)
+  for (let i = 0; i < scan; i++) {
+    const cells = (matrix[i] ?? []).map((c) => (c == null ? '' : String(c).trim())).filter(Boolean)
+    if (!cells.length) continue
+    const map = mapHeaders(cells)
+    const score = Object.keys(map).length
+    if (map.branch_code && score >= 2) return i // the real header row
+    if (score > bestScore) {
+      bestScore = score
+      best = i
+    }
+  }
+  return best >= 0 ? best : 0
+}
+
+/** Turn a sheet matrix into header-keyed row objects, skipping everything above the
+ *  detected header row and dropping unnamed (extra/blank-header) columns. */
+export function matrixToRows(matrix: unknown[][]): RawRow[] {
+  if (!matrix.length) return []
+  const h = detectHeaderRow(matrix)
+  const headers = (matrix[h] ?? []).map((c) => (c == null ? '' : String(c).trim()))
+  const out: RawRow[] = []
+  for (let i = h + 1; i < matrix.length; i++) {
+    const row = matrix[i] ?? []
+    const obj: RawRow = {}
+    for (let j = 0; j < headers.length; j++) {
+      const key = headers[j]
+      if (!key) continue // unnamed column → skip
+      obj[key] = row[j] ?? ''
+    }
+    out.push(obj)
+  }
+  return out
+}
+
+/** Detect the header row in a raw sheet matrix, then validate (spec §3/§12). Use this
+ *  from the API (SheetJS sheet_to_json {header:1}); it tolerates extra columns and
+ *  title rows above the headers. */
+export function parseImportMatrix(matrix: unknown[][]): ImportPreview {
+  return parseImportRows(matrixToRows(matrix))
+}
+
 export function parseImportRows(rows: RawRow[]): ImportPreview {
   const headers = rows.length ? Object.keys(rows[0]) : []
   const map = mapHeaders(headers)
