@@ -1,6 +1,7 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { signedUrl } from '@/lib/storage'
+import { rmOwnsTicket } from '@/lib/rm-ticket-access'
 
 // GET /api/tickets/[id]/quotes — the RM's quote-panel rows for a ticket (requested
 // suppliers + any submitted quotes), used by the Today queue's "Approve quote"
@@ -15,10 +16,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const { data: me } = await admin.from('user_profiles').select('role, company_id').eq('id', user.id).single()
   if (me?.role !== 'regional_manager') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { data: ticket } = await admin.from('tickets').select('id, company_id, region_id, status').eq('id', id).single()
+  const { data: ticket } = await admin.from('tickets').select('id, company_id, region_id, store_id, status').eq('id', id).single()
   if (!ticket || ticket.company_id !== me.company_id) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  const regions = ((await admin.from('regional_users').select('region_id').eq('user_id', user.id)).data ?? []).map(r => r.region_id)
-  if (!ticket.region_id || !regions.includes(ticket.region_id)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!(await rmOwnsTicket(admin, user.id, ticket))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const [{ data: quotes }, { data: invites }] = await Promise.all([
     admin.from('quotes').select('id, supplier_id, amount, amount_incl_vat, description, file_url, status, valid_until, proposed_schedule_at, created_at, decline_reason').eq('ticket_id', id).order('created_at', { ascending: false }),

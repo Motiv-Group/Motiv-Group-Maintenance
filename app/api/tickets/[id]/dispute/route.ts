@@ -5,6 +5,7 @@ import { rateLimit } from '@/lib/rate-limit'
 import { sendPushToMany } from '@/lib/push'
 import { z } from 'zod'
 import { parseJsonBody } from '@/lib/validate'
+import { rmOwnsTicket } from '@/lib/rm-ticket-access'
 
 const BodySchema = z.object({
   action: z.string().optional(),
@@ -135,8 +136,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   } else if (isIndividual) {
     if (ticket.created_by !== user.id) return NextResponse.json({ error: 'Not your ticket' }, { status: 403 })
   } else {
-    const rms = await regionIds(admin, ticket.region_id)
-    if (!rms.includes(user.id)) return NextResponse.json({ error: 'Not your ticket' }, { status: 403 })
+    if (!(await rmOwnsTicket(admin, user.id, ticket))) return NextResponse.json({ error: 'Not your ticket' }, { status: 403 })
   }
 
   const now = new Date().toISOString()

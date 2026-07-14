@@ -6,6 +6,7 @@ import { sendPushToMany } from '@/lib/push'
 import { loadSlaResolver } from '@/lib/health/data'
 import { z } from 'zod'
 import { parseJsonBody } from '@/lib/validate'
+import { rmOwnsTicket } from '@/lib/rm-ticket-access'
 
 const BodySchema = z.object({
   action: z.string().optional(),
@@ -43,10 +44,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     if (ticket.created_by !== user.id) return NextResponse.json({ error: 'Not your ticket' }, { status: 403 })
   } else {
     if (ticket.company_id !== prof.company_id) return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
-    if (prof.role === 'regional_manager') {
-      const { data: links } = await admin.from('regional_users').select('region_id').eq('user_id', user.id)
-      if (!ticket.region_id || !(links ?? []).some(l => l.region_id === ticket.region_id)) return NextResponse.json({ error: 'Not your ticket' }, { status: 403 })
-    }
+    if (prof.role === 'regional_manager' && !(await rmOwnsTicket(admin, user.id, ticket))) return NextResponse.json({ error: 'Not your ticket' }, { status: 403 })
   }
 
   const { data: quote } = await admin.from('quotes').select('id, supplier_id, status, proposed_schedule_at').eq('id', quoteId).eq('ticket_id', ticket.id).single()

@@ -6,6 +6,7 @@ import { computePriority } from '@/lib/health/priority'
 import { rateLimit } from '@/lib/rate-limit'
 import { z } from 'zod'
 import { parseJsonBody } from '@/lib/validate'
+import { rmOwnsTicket } from '@/lib/rm-ticket-access'
 import type { Database } from '@/lib/database.types'
 
 const PatchSchema = z.object({
@@ -45,8 +46,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
   // Access: SM owner (creator or store-linked), the ticket's RM, or an executive.
   let allowed = role === 'executive' || role === 'system_admin'
   if (!allowed && role === 'regional_manager') {
-    const { data: rl } = await admin.from('regional_users').select('region_id').eq('user_id', user.id)
-    allowed = !!ticket.region_id && (rl ?? []).some(l => l.region_id === ticket.region_id)
+    allowed = await rmOwnsTicket(admin, user.id, ticket)
   }
   if (!allowed) {
     let owns = ticket.created_by === user.id
