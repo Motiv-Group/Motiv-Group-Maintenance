@@ -45,6 +45,8 @@ function supplierAct(t: SupplierTicketRow): boolean {
   const s = myStatus(t)
   if (s === 'quote_requested') return true
   if (s === 'quoted') return false
+  // Once the supplier confirms no further VOs, the close-out is the RM's move.
+  if (['approved_closeout', 'vo_declined'].includes(t.status) && t.voNoneConfirmed) return false
   if (t.awardedToMe && ['accepted', 'scheduled', 'in_progress', 'evidence_requested', 'snag', 'snag_assigned', 'snag_in_progress', 'snag_resolved', 'approved_closeout', 'vo_declined'].includes(t.status)) return true
   if (t.status === 'submitted_for_signoff') return false
   return missingEvidence(t)
@@ -62,7 +64,7 @@ function supplierNext(t: SupplierTicketRow): string {
   if (['snag', 'snag_assigned'].includes(t.status)) return 'Accept & schedule the snag fix'
   if (['snag_in_progress', 'snag_resolved'].includes(t.status)) return 'Re-upload the COC & POC'
   if (t.status === 'submitted_for_signoff') return 'Awaiting sign-off'
-  if (['approved_closeout', 'vo_declined'].includes(t.status)) return 'Raise or confirm variation orders'
+  if (['approved_closeout', 'vo_declined'].includes(t.status)) return t.voNoneConfirmed ? "Awaiting the manager's close-out" : 'Raise or confirm variation orders'
   if (t.status === 'completed') return 'Completed'
   if (t.declinedForMe) return 'Declined'
   if (t.status === 'cancelled') return 'Cancelled'

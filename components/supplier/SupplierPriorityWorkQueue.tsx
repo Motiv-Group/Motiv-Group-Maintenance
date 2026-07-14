@@ -142,8 +142,11 @@ function QueueRow({ ticket, nowMs, company }: { ticket: SupplierTicketRow; nowMs
   const breached = ticket.overdue || ticket.breached || slaMs <= 0
   const status = myStatus(ticket)
   const meta = supplierStatusMeta(status)
-  const statusCls = ticket.disputed ? 'bg-red-500/15 text-red-700 dark:text-red-400' : meta.cls
-  const statusLabel = ticket.disputed ? 'Dispute' : meta.label
+  // Close-out phase: the badge is amber while the supplier still owes a VO decision,
+  // blue once they've confirmed there are none (awaiting the RM's close-out).
+  const closeout = ['approved_closeout', 'vo_declined'].includes(ticket.status) && ticket.awardedToMe
+  const statusCls = ticket.disputed ? 'bg-red-500/15 text-red-700 dark:text-red-400' : closeout ? (ticket.voNoneConfirmed ? 'bg-blue-500/15 text-blue-700 dark:text-blue-400' : 'bg-amber-500/15 text-amber-700 dark:text-amber-400') : meta.cls
+  const statusLabel = ticket.disputed ? 'Dispute' : closeout ? 'Close-out' : meta.label
   const ticketUrl = `/supplier/tickets/${ticket.id}`
   const who = ticket.isIndividual ? 'Individual' : [company, ticket.storeName].filter(Boolean).join(' · ')
   // Phase CTA — labelled by what the supplier does next; all open the ticket (the
@@ -193,7 +196,7 @@ function QueueRow({ ticket, nowMs, company }: { ticket: SupplierTicketRow; nowMs
       <div className="flex lg:justify-end">
         {toQuote(ticket)
           ? <SubmitQuoteCta ticket={ticket} className={ctaCls} />
-          : ['approved_closeout', 'vo_declined'].includes(ticket.status) && ticket.awardedToMe
+          : closeout && !ticket.voNoneConfirmed
           ? <CloseOutCta ticket={ticket} className={ctaCls} />
           : <Link href={ticketUrl} className={ctaCls}>{cta} {cta === 'View Ticket' && <ArrowRight size={15} />}</Link>}
       </div>
@@ -223,7 +226,7 @@ function CloseOutCta({ ticket, className }: { ticket: SupplierTicketRow; classNa
   const [open, setOpen] = useState(false)
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={className}>Close-out</button>
+      <button type="button" onClick={() => setOpen(true)} className={className}><CheckCircle2 size={15} /> Close-out</button>
       {open && (
         <Modal onClose={() => setOpen(false)} maxWidth="max-w-2xl">
           {() => (
@@ -286,6 +289,6 @@ function nextStep(t: SupplierTicketRow): string {
   if (['snag', 'snag_assigned'].includes(t.status)) return 'Accept and schedule the snag fix'
   if (['snag_in_progress', 'snag_resolved'].includes(t.status)) return 'Re-upload the COC & POC'
   if (t.status === 'submitted_for_signoff') return 'Awaiting the client sign-off'
-  if (['approved_closeout', 'vo_declined'].includes(t.status)) return 'Raise or confirm variation orders'
+  if (['approved_closeout', 'vo_declined'].includes(t.status)) return t.voNoneConfirmed ? "Awaiting the manager's close-out" : 'Raise or confirm variation orders'
   return 'Track progress on this job'
 }

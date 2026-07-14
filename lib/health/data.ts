@@ -646,11 +646,13 @@ export interface SupplierTicketRow {
   // Isolation: this supplier's OWN involvement, so the list never leaks another
   // supplier's progress (e.g. "Quoted" because someone else quoted).
   quotedByMe: boolean; awardedToMe: boolean
+  // The supplier confirmed there are no further variation orders (ready for the RM's close-out).
+  voNoneConfirmed: boolean
   // An open dispute on their awarded job — the badge reads "Dispute".
   disputed: boolean
 }
 export interface SupplierQuoteRow { id: string; ticketId: string; ticketTitle: string; ticketStatus: string; storeName: string; branchCode: string | null; amount: number; amountInclVat: number | null; status: string; createdAt: string; category: string | null; priority: Priority; jobRef: string | null; description: string | null; validUntil: string | null; proposedScheduleAt: string | null }
-export interface SupplierSignoffRow { id: string; ticketId: string; ticketTitle: string; storeName: string; branchCode: string | null; status: string; createdAt: string }
+export interface SupplierSignoffRow { id: string; ticketId: string; ticketTitle: string; storeName: string; branchCode: string | null; status: string; createdAt: string; category: string | null; description: string | null; jobRef: string | null; photoCount: number; certCount: number; decidedAt: string | null; decidedBy: string | null }
 export interface SupplierDashboardData {
   perf: SupplierPerformance
   company: string
@@ -704,10 +706,14 @@ export async function assembleSupplierDashboard(companyId: string | null, suppli
 
   const [{ data: quotesRaw }, { data: signoffsRaw }, { data: ratingRows }, { data: companyRow }] = await Promise.all([
     db.from('quotes').select('id, ticket_id, amount, amount_incl_vat, status, created_at, updated_at, valid_until, proposed_schedule_at').in('supplier_id', supplierIds).order('created_at', { ascending: false }),
-    db.from('signoffs').select('id, ticket_id, status, created_at').in('supplier_id', supplierIds).order('created_at', { ascending: false }),
+    db.from('signoffs').select('id, ticket_id, status, created_at, before_urls, after_urls, coc_url, invoice_url, reviewed_at, reviewed_by').in('supplier_id', supplierIds).order('created_at', { ascending: false }),
     db.from('ratings').select('score').in('supplier_id', supplierIds),
     companyId ? db.from('companies').select('name').eq('id', companyId).maybeSingle() : Promise.resolve({ data: null as { name: string } | null }),
   ])
+  // Manager names for the "decided by" line on each sign-off.
+  const reviewerIds = [...new Set(((signoffsRaw ?? []) as any[]).map(s => s.reviewed_by).filter(Boolean))]
+  const { data: reviewerRows } = reviewerIds.length ? await db.from('user_profiles').select('id, full_name').in('id', reviewerIds) : { data: [] as any[] }
+  const reviewerName = new Map(((reviewerRows ?? []) as any[]).map(r => [r.id, r.full_name]))
   const ratingScores = ((ratingRows ?? []) as any[]).map(r => Number(r.score)).filter(n => Number.isFinite(n))
   // Suppliers start at a full 5★ and degrade as real ratings arrive.
   const rating = { avg: ratingScores.length ? ratingScores.reduce((s, n) => s + n, 0) / ratingScores.length : 5, count: ratingScores.length }
@@ -780,6 +786,7 @@ export async function assembleSupplierDashboard(companyId: string | null, suppli
       declinedForMe,
       declinedBy: declinedForMe ? (declinedByOf.get(t.id) ?? null) : null,
       quotedByMe, awardedToMe,
+      voNoneConfirmed: !!raw.vo_none_confirmed_at,
       disputed: awardedToMe && disputedIds.has(t.id),
     })
   }
@@ -793,7 +800,7 @@ export async function assembleSupplierDashboard(companyId: string | null, suppli
     kpis: { open, overdue, dueToday, pendingQuotes, awaitingSignoff, evidenceMissing, scheduled },
     tickets: rows,
     quotes: (quotesRaw ?? []).map((q: any) => { const rq: any = rawById.get(q.ticket_id) ?? {}; return { id: q.id, ticketId: q.ticket_id, ticketTitle: titleOf.get(q.ticket_id) ?? 'Ticket', ticketStatus: rq.status ?? '', storeName: storeName.get(storeOf(q.ticket_id)) ?? (rq.company_id ? 'Store' : 'Individual'), branchCode: storeBranch.get(storeOf(q.ticket_id)) ?? null, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, status: q.status, createdAt: q.created_at, category: rq.category ?? null, priority: rq.priority, jobRef: rq.job_ref ?? null, description: rq.description ?? null, validUntil: q.valid_until ?? null, proposedScheduleAt: q.proposed_schedule_at ?? null } }),
-    signoffs: (signoffsRaw ?? []).map((s: any) => ({ id: s.id, ticketId: s.ticket_id, ticketTitle: titleOf.get(s.ticket_id) ?? 'Ticket', storeName: storeName.get(storeOf(s.ticket_id)) ?? (rawById.get(s.ticket_id)?.company_id ? 'Store' : 'Individual'), branchCode: storeBranch.get(storeOf(s.ticket_id)) ?? null, status: s.status, createdAt: s.created_at })),
+    signoffs: (signoffsRaw ?? []).map((s: any) => { const rq: any = rawById.get(s.ticket_id) ?? {}; return { id: s.id, ticketId: s.ticket_id, ticketTitle: titleOf.get(s.ticket_id) ?? 'Ticket', storeName: storeName.get(storeOf(s.ticket_id)) ?? (rq.company_id ? 'Store' : 'Individual'), branchCode: storeBranch.get(storeOf(s.ticket_id)) ?? null, status: s.status, createdAt: s.created_at, category: rq.category ?? null, description: rq.description ?? null, jobRef: rq.job_ref ?? null, photoCount: ((s.before_urls ?? []).length + (s.after_urls ?? []).length), certCount: (s.coc_url ? 1 : 0) + (s.invoice_url ? 1 : 0), decidedAt: s.reviewed_at ?? null, decidedBy: s.reviewed_by ? (reviewerName.get(s.reviewed_by) ?? null) : null } }),
     rating,
     generatedAt: now.toISOString(),
   }
