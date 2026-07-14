@@ -1010,7 +1010,9 @@ export function QuoteComparison({ ticketId, rows, onClose }: { ticketId: string;
       <div className="flex flex-wrap gap-2 border-t border-[var(--border)] pt-3">
         <button type="button" onClick={onClose} disabled={busy} className="min-w-[130px] flex-1 rounded-xl py-2.5 text-sm font-medium text-[var(--text)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-50">Wait for all quotes</button>
         <button type="button" disabled={!selected || busy} onClick={() => declineMode ? decide('decline') : setDeclineMode(true)} className="min-w-[130px] flex-1 rounded-xl py-2.5 text-sm font-semibold text-red-600 ring-1 ring-red-500/50 transition hover:bg-red-500/10 disabled:opacity-40 dark:text-red-400">{busy && declineMode ? 'Declining…' : declineMode ? 'Confirm decline' : 'Decline selected quote'}</button>
-        <button type="button" disabled={!selected || busy || declineMode} onClick={() => decide('approve')} className="min-w-[130px] flex-1 rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-40">{busy && !declineMode ? 'Approving…' : 'Approve selected quote'}</button>
+        {declineMode
+          ? <button type="button" disabled={busy} onClick={() => setDeclineMode(false)} className="min-w-[130px] flex-1 rounded-xl py-2.5 text-sm font-semibold text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-50">Cancel decline</button>
+          : <button type="button" disabled={!selected || busy} onClick={() => decide('approve')} className="min-w-[130px] flex-1 rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-40">{busy ? 'Approving…' : 'Approve selected quote'}</button>}
       </div>
     </>
   )
