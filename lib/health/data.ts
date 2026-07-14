@@ -349,6 +349,8 @@ export interface RegionalTicketRow {
   voNoneConfirmed: boolean
   // An open supplier↔RM dispute (snag / evidence) — the badge reads "Dispute".
   disputed: boolean
+  // The open dispute's latest message is from the supplier (awaiting the RM's reply).
+  disputeUnread: boolean
   // Suppliers already on this ticket (invited/quoted) and those who declined it —
   // so the "Assign supplier" picker (from the Today queue) can grey out the ones
   // already engaged and flag the ones who declined before.
@@ -407,6 +409,11 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
   // Tickets with an OPEN dispute → the badge reads "Dispute" everywhere.
   const { data: openDisputeRows } = ticketIds.length ? await db.from('ticket_disputes').select('ticket_id').eq('status', 'open').in('ticket_id', ticketIds) : { data: [] as any[] }
   const disputedIds = new Set<string>(((openDisputeRows ?? []) as any[]).map(d => d.ticket_id))
+  // Latest dispute-message author per open-dispute ticket → "new message" flag (a
+  // message from the supplier awaits the RM's reply).
+  const { data: dmsgR } = disputedIds.size ? await db.from('ticket_dispute_messages').select('ticket_id, author_role, created_at').in('ticket_id', [...disputedIds]).order('created_at', { ascending: false }) : { data: [] as any[] }
+  const latestDisputeAuthor = new Map<string, string>()
+  for (const m of (dmsgR ?? []) as any[]) if (!latestDisputeAuthor.has(m.ticket_id)) latestDisputeAuthor.set(m.ticket_id, m.author_role)
   // Suppliers on each ticket — invited/quoted (already engaged) vs declined/closed —
   // so the Today queue's "Assign supplier" picker can grey out the engaged ones and
   // flag the ones who declined this ticket before.
@@ -458,6 +465,7 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
       supplierAssigned: !!(t as any).supplier_id,
       voNoneConfirmed: !!(t as any).vo_none_confirmed_at,
       disputed: disputedIds.has(t.id),
+      disputeUnread: disputedIds.has(t.id) && latestDisputeAuthor.get(t.id) === 'supplier',
       engagedSupplierIds: engagedByTicket.get(t.id) ?? {},
       declinedSupplierIds: declinedByTicket.get(t.id) ?? [],
       }
@@ -650,6 +658,8 @@ export interface SupplierTicketRow {
   voNoneConfirmed: boolean
   // An open dispute on their awarded job — the badge reads "Dispute".
   disputed: boolean
+  // The open dispute's latest message is from the RM (awaiting the supplier's reply).
+  disputeUnread: boolean
 }
 export interface SupplierQuoteRow { id: string; ticketId: string; ticketTitle: string; ticketStatus: string; storeName: string; branchCode: string | null; amount: number; amountInclVat: number | null; status: string; createdAt: string; category: string | null; priority: Priority; jobRef: string | null; description: string | null; validUntil: string | null; proposedScheduleAt: string | null; reQuoteRequested: boolean }
 export interface SupplierSignoffRow { id: string; ticketId: string; ticketTitle: string; ticketStatus: string; storeName: string; branchCode: string | null; status: string; createdAt: string; category: string | null; priority: Priority; description: string | null; jobRef: string | null; photoCount: number; certCount: number; decidedAt: string | null; decidedBy: string | null }
@@ -741,6 +751,11 @@ export async function assembleSupplierDashboard(companyId: string | null, suppli
   const ownedIdList = Array.from(ownedIds) as string[]
   const { data: openDisputeRows } = ownedIdList.length ? await db.from('ticket_disputes').select('ticket_id').eq('status', 'open').in('ticket_id', ownedIdList) : { data: [] as any[] }
   const disputedIds = new Set<string>(((openDisputeRows ?? []) as any[]).map(d => d.ticket_id))
+  // Latest dispute-message author per open-dispute ticket → "new message" flag (a
+  // message from the RM awaits the supplier's reply).
+  const { data: dmsgS } = disputedIds.size ? await db.from('ticket_dispute_messages').select('ticket_id, author_role, created_at').in('ticket_id', [...disputedIds]).order('created_at', { ascending: false }) : { data: [] as any[] }
+  const latestDisputeAuthor = new Map<string, string>()
+  for (const m of (dmsgS ?? []) as any[]) if (!latestDisputeAuthor.has(m.ticket_id)) latestDisputeAuthor.set(m.ticket_id, m.author_role)
 
   const todayEnd = new Date(now); todayEnd.setHours(23, 59, 59, 999)
   let open = 0, overdue = 0, dueToday = 0, pendingQuotes = 0, awaitingSignoff = 0, evidenceMissing = 0, scheduled = 0
@@ -792,6 +807,7 @@ export async function assembleSupplierDashboard(companyId: string | null, suppli
       quotedByMe, awardedToMe,
       voNoneConfirmed: !!raw.vo_none_confirmed_at,
       disputed: awardedToMe && disputedIds.has(t.id),
+      disputeUnread: awardedToMe && disputedIds.has(t.id) && latestDisputeAuthor.get(t.id) === 'regional_manager',
     })
   }
   // Active first, then unacknowledged, then oldest — keeps the dashboard queues useful.
