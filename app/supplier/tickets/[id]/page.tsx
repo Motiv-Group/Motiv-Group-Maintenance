@@ -23,7 +23,7 @@ import { CompletionBody, CompletionFooterNote } from '@/components/workflow/Comp
 import { QuoteSummary, type QuoteSummaryStatus } from '@/components/workflow/QuoteSummary'
 import { MarkInProgressButton, DeclineWorkButton, AcceptSnagCard, StartSnagButton, SupplierVariationGate, SupplierQuoteBar, SupplierQuoteSubmittedActions } from '@/components/supplier/SupplierJobActions'
 import { PopupForm } from '@/components/supplier/PopupForm'
-import { RaiseDisputeButton, RaiseDisputeMore, DisputeThread } from '@/components/dispute/DisputeBox'
+import { RaiseDisputeButton, RaiseDisputeMore, DisputeThread, DisputeControls } from '@/components/dispute/DisputeBox'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { EditedLine } from '@/components/ui/EditedLine'
 import { buildTicketTimeline } from '@/lib/ticket-timeline'
@@ -339,6 +339,14 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
     const what = d.origin === 'snag' ? 'snag' : 'evidence request'
     return n ? `Submission #${n} · ${what}` : what
   }
+  // While a dispute is open the paused step's action area shows the resolve controls
+  // (the chat + reply live in the Dispute tab). Reused for snag / evidence / VO.
+  const disputeAction = openDispute ? (
+    <div className="space-y-2.5">
+      <p className="text-sm text-[var(--text-muted)]">This step is paused while the dispute is reviewed. Resolve it here, or keep the conversation going in the <span className="font-semibold text-[var(--text)]">Dispute</span> tab.</p>
+      <DisputeControls ticketId={t.id} origin={openDispute.origin} viewerRole="supplier" pendingOutcome={openDispute.pending_outcome ?? null} pendingBy={openDispute.pending_by ?? null} />
+    </div>
+  ) : null
 
   // The supplier's single most important pending step — the "Next action" signpost
   // that mirrors the RM/SM ticket. The real controls live in the forms/callouts
@@ -433,7 +441,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
     : null
   const disputeTab = (awarded && disputes.length > 0)
     ? (<div className="space-y-3">
-        {openDispute && <DisputeThread ticketId={t.id} dispute={openDispute} messages={msgsByDispute(openDispute.id)} viewerRole="supplier" subject={disputeSubject(openDispute)} />}
+        {openDispute && <DisputeThread ticketId={t.id} dispute={openDispute} messages={msgsByDispute(openDispute.id)} viewerRole="supplier" subject={disputeSubject(openDispute)} hideControls />}
         {resolvedDisputes.map(d => (
           <details key={d.id} className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
             <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
@@ -645,7 +653,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
                 </div>
               )}
               {openDispute ? (
-                <div className="rounded-xl bg-red-500/10 ring-1 ring-red-500/30 p-3.5 text-sm text-[var(--text-muted)]">This snag is paused while your dispute is under review — continue the conversation in the Dispute section above.</div>
+                disputeAction
               ) : (
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
                   <div className="flex-1"><AcceptSnagCard ticketId={t.id} priority={t.priority} createdAt={t.created_at} /></div>
@@ -668,7 +676,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
                 </div>
               )}
               {t.status === 'evidence_requested' && openDispute ? (
-                <div className="rounded-xl bg-red-500/10 ring-1 ring-red-500/30 p-3.5 text-sm text-[var(--text-muted)]">The evidence request is paused while your dispute is under review — continue the conversation in the Dispute section above.</div>
+                disputeAction
               ) : (
                 <div className={t.status === 'evidence_requested' ? 'flex flex-col gap-2 sm:flex-row sm:items-start' : ''}>
                   <div className={t.status === 'evidence_requested' ? 'flex-1' : ''}>
@@ -703,7 +711,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
               can also dispute the decline (paused while the dispute is open). */}
           {awarded && (t.status === 'approved_closeout' || t.status === 'vo_declined') && (
             openDispute && t.status === 'vo_declined' ? (
-              <div className="rounded-xl bg-red-500/10 ring-1 ring-red-500/30 p-3.5 text-sm text-[var(--text-muted)]">The variation-order decline is paused while your dispute is under review — continue the conversation in the Dispute section above.</div>
+              disputeAction
             ) : (
               <div className="space-y-3">
                 <SupplierVariationGate ticketId={t.id} priority={t.priority} createdAt={t.created_at} variationCount={variationCount} status={t.status as 'approved_closeout' | 'vo_declined'} declineReason={latestVoRejectReason} noVosConfirmed={!!t.vo_none_confirmed_at} />

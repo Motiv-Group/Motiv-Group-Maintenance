@@ -276,11 +276,13 @@ export function RaiseDisputeMore(props: { ticketId: string; origin: 'snag' | 'ev
 
 // The full thread: numbered messages, a reply composer while open, and the RM's
 // resolve controls. Read-only once resolved (also used for the Archive history).
-export function DisputeThread({ ticketId, dispute, messages, viewerRole, readOnly = false, subject }: {
+export function DisputeThread({ ticketId, dispute, messages, viewerRole, readOnly = false, subject, hideControls = false }: {
   ticketId: string; dispute: DisputeRecord; messages: DisputeMessage[]
   viewerRole: 'supplier' | 'regional_manager'; readOnly?: boolean
   /** What the dispute is about (e.g. "Submission #2 · snag") — shown at the top. */
   subject?: string | null
+  /** Hide the resolve/propose controls (the supplier surfaces them in the Next-action block instead). */
+  hideControls?: boolean
 }) {
   const isOpen = dispute.status === 'open' && !readOnly
   const what = originWord(dispute.origin)
@@ -302,41 +304,44 @@ export function DisputeThread({ ticketId, dispute, messages, viewerRole, readOnl
         </div>
       )}
 
-      {/* Numbered message thread. Attachments carry a running count PER SIDE across the
-          whole thread — "Evidence Supplier 1/2…", "Evidence RM 1/2…" — so each piece of
-          evidence has a stable reference. */}
-      <ol className="space-y-2">
-        {(() => { let supplierEv = 0, rmEv = 0; return messages.map((m, i) => {
-          const evLabels = (m.evidence_urls ?? []).map(() =>
-            m.author_role === 'supplier' ? `Evidence Supplier ${++supplierEv}` : `Evidence RM ${++rmEv}`)
-          return (
-          <li key={m.id} className="rounded-xl ring-1 ring-[var(--border)] bg-[var(--surface)] p-3">
-            <div className="flex items-center justify-between gap-2 mb-1">
-              <span className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--text)]">
-                <span className="text-[var(--text-faint)]">{i + 1}.</span>
-                {ROLE_LABEL[m.author_role] ?? m.author_role}
-                {m.author_role === viewerRole && <span className="text-[9px] font-bold uppercase tracking-wide text-[#C6A35D] bg-[#C6A35D]/15 rounded-full px-1.5 py-0.5">you</span>}
-              </span>
-              <span className="text-[11px] text-[var(--text-faint)]">{formatDateTime(m.created_at)}</span>
-            </div>
-            {m.body && <p className="text-sm text-[var(--text)] whitespace-pre-line">{m.body}</p>}
-            {m.evidence_urls?.length > 0 && (
-              <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5">
-                {m.evidence_urls.map((u, j) => (
-                  <a key={j} href={u} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[11px] font-medium text-[#C6A35D] hover:underline"><Paperclip size={12} /> {evLabels[j]}</a>
-                ))}
+      {/* Chat thread — the viewer's own messages sit right (blue), the other side's
+          left (surface). Attachments keep a running count PER SIDE across the whole
+          thread ("Evidence Supplier 1/2…", "Evidence RM 1/2…") for stable references. */}
+      {messages.length > 0 && (
+        <div className="max-h-[420px] space-y-2.5 overflow-y-auto rounded-xl bg-[var(--app-bg)] p-3 ring-1 ring-[var(--border)]">
+          {(() => { let supplierEv = 0, rmEv = 0; return messages.map(m => {
+            const mine = m.author_role === viewerRole
+            const evLabels = (m.evidence_urls ?? []).map(() =>
+              m.author_role === 'supplier' ? `Evidence Supplier ${++supplierEv}` : `Evidence RM ${++rmEv}`)
+            return (
+              <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
+                <div className={`min-w-0 max-w-[85%] rounded-2xl px-3.5 py-2.5 ${mine ? 'rounded-br-md bg-blue-600 text-white' : 'rounded-bl-md bg-[var(--surface)] text-[var(--text)] ring-1 ring-[var(--border)]'}`}>
+                  <div className="mb-0.5 flex items-center gap-2">
+                    <span className={`text-[11px] font-semibold ${mine ? 'text-white/85' : 'text-[var(--text-muted)]'}`}>{mine ? 'You' : (ROLE_LABEL[m.author_role] ?? m.author_role)}</span>
+                    <span className={`text-[10px] ${mine ? 'text-white/60' : 'text-[var(--text-faint)]'}`}>{formatDateTime(m.created_at)}</span>
+                  </div>
+                  {m.body && <p className="whitespace-pre-line break-words text-sm">{m.body}</p>}
+                  {m.evidence_urls?.length > 0 && (
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {m.evidence_urls.map((u, j) => (
+                        <a key={j} href={u} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition ${mine ? 'bg-white/15 text-white hover:bg-white/25' : 'bg-[var(--surface-2)] text-[#C6A35D] ring-1 ring-[var(--border)] hover:bg-[var(--hover)]'}`}><Paperclip size={11} /> {evLabels[j]}</a>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-            )}
-          </li>
-        )}) })()}
-      </ol>
+            )
+          }) })()}
+        </div>
+      )}
 
       {/* Reply while open */}
       {isOpen && <Composer ticketId={ticketId} action="reply" submitLabel="Send reply" placeholder="Add a message or evidence…" />}
 
       {/* Negotiation controls: either side can concede unilaterally, or propose an
-          outcome the other must confirm (propose → confirm). */}
-      {isOpen && <DisputeControls ticketId={ticketId} origin={dispute.origin} viewerRole={viewerRole} pendingOutcome={dispute.pending_outcome ?? null} pendingBy={dispute.pending_by ?? null} />}
+          outcome the other must confirm (propose → confirm). Hidden when the caller
+          renders them elsewhere (supplier → Next-action block). */}
+      {isOpen && !hideControls && <DisputeControls ticketId={ticketId} origin={dispute.origin} viewerRole={viewerRole} pendingOutcome={dispute.pending_outcome ?? null} pendingBy={dispute.pending_by ?? null} />}
     </div>
   )
 }
@@ -344,7 +349,7 @@ export function DisputeThread({ ticketId, dispute, messages, viewerRole, readOnl
 // Dispute resolution. Each side can CONCEDE unilaterally (supplier withdraws → the
 // request stands; RM retracts → it's dropped), or PROPOSE an outcome the OTHER side
 // must confirm (supplier proposes to resolve/drop; RM proposes to uphold/keep).
-function DisputeControls({ ticketId, origin, viewerRole, pendingOutcome, pendingBy }: {
+export function DisputeControls({ ticketId, origin, viewerRole, pendingOutcome, pendingBy }: {
   ticketId: string; origin: string; viewerRole: 'supplier' | 'regional_manager'
   pendingOutcome: string | null; pendingBy: string | null
 }) {
@@ -374,12 +379,12 @@ function DisputeControls({ ticketId, origin, viewerRole, pendingOutcome, pending
   // Role action set (propose + solo concede). Hidden for the proposer while waiting.
   const actions = viewerRole === 'supplier' ? (
     <>
-      <button onClick={() => act('propose')} disabled={!!busy} className="w-full py-2 rounded-lg bg-[#C6A35D] hover:brightness-95 text-[#0a0e17] text-sm font-semibold disabled:opacity-50">{busy === 'propose' ? 'Proposing…' : `Propose to resolve — drop the ${what}`}</button>
+      <button onClick={() => act('propose')} disabled={!!busy} className="w-full py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition disabled:opacity-50">{busy === 'propose' ? 'Proposing…' : `Propose to resolve — drop the ${what}`}</button>
       <button onClick={() => act('withdraw')} disabled={!!busy} className="w-full py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text)] text-sm font-semibold hover:bg-[var(--hover)] transition disabled:opacity-50 flex items-center justify-center gap-1.5"><ShieldCheck size={14} /> {busy === 'withdraw' ? 'Withdrawing…' : `Withdraw dispute — accept the ${what}`}</button>
     </>
   ) : (
     <>
-      <button onClick={() => act('propose')} disabled={!!busy} className="w-full py-2 rounded-lg bg-[#C6A35D] hover:brightness-95 text-[#0a0e17] text-sm font-semibold disabled:opacity-50">{busy === 'propose' ? 'Proposing…' : `Propose to uphold the ${what}`}</button>
+      <button onClick={() => act('propose')} disabled={!!busy} className="w-full py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition disabled:opacity-50">{busy === 'propose' ? 'Proposing…' : `Propose to uphold the ${what}`}</button>
       <button onClick={() => act('retract')} disabled={!!busy} className="w-full py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition disabled:opacity-50 flex items-center justify-center gap-1.5"><ShieldX size={14} /> {busy === 'retract' ? 'Retracting…' : `Retract the ${what}`}</button>
     </>
   )
