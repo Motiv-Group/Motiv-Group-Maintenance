@@ -26,7 +26,7 @@ import { priorityBadgeClass, priorityLabel } from '@/components/client/ticketBad
 import type { StoreManagerTicket } from '@/lib/health/data'
 import { CollapsibleSection } from '@/components/ui/CollapsibleSection'
 import { MarkTicketSeen } from '@/components/ui/MarkTicketSeen'
-import { DisputeThread } from '@/components/dispute/DisputeBox'
+import { DisputeThread, DisputeControls } from '@/components/dispute/DisputeBox'
 import { formatCurrency, formatDateTime, formatDate, rmStatusMeta, storeLabel, OPERATIONAL_IMPACT_LABELS, humanizeDuration } from '@/lib/utils'
 
 // Professional "what we're waiting on" copy while a snag works its way through.
@@ -330,9 +330,9 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
   // The Dispute block (open live thread + resolved read-only history), each labelled
   // with the submission it concerns. Rendered ABOVE the Actions while live, then moved
   // BELOW once resolved (history).
-  const disputeBlock = disputes.length > 0 ? (
-    <CollapsibleSection id="ticket-dispute" title="Dispute" defaultOpen={!!openDispute}>
-      {openDispute && <DisputeThread ticketId={t.id} dispute={openDispute} messages={msgsByDispute(openDispute.id)} viewerRole="regional_manager" subject={disputeSubject(openDispute)} />}
+  const disputeContent = disputes.length > 0 ? (
+    <div className="space-y-3">
+      {openDispute && <DisputeThread ticketId={t.id} dispute={openDispute} messages={msgsByDispute(openDispute.id)} viewerRole="regional_manager" subject={disputeSubject(openDispute)} hideControls />}
       {resolvedDisputes.map(d => (
         <details key={d.id} className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
           <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
@@ -347,7 +347,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
           </div>
         </details>
       ))}
-    </CollapsibleSection>
+    </div>
   ) : null
   // Snag scheduling — the supplier's proposed fix date (separate from the original
   // job schedule) and whether it's still awaiting the RM's approval.
@@ -848,6 +848,14 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
           {nextAction.sub && !breached && <p className="mt-0.5 text-sm text-[var(--text-muted)]">{nextAction.sub}</p>}
         </div>
 
+        {/* Open dispute — the resolve controls live here; the chat is in the Dispute tab. */}
+        {openDispute && (
+          <div className="space-y-2.5">
+            <p className="text-sm text-[var(--text-muted)]">This step is paused while the dispute is reviewed. Resolve it here, or continue the conversation in the <span className="font-semibold text-[var(--text)]">Dispute</span> tab.</p>
+            <DisputeControls ticketId={t.id} origin={openDispute.origin} viewerRole="regional_manager" pendingOutcome={openDispute.pending_outcome ?? null} pendingBy={openDispute.pending_by ?? null} />
+          </div>
+        )}
+
         {/* SLA breach — concise callout carrying how-late + the next action. */}
         {breached && <BreachReason action={nextAction.sub || nextAction.msg || 'This ticket is overdue — take the next action to get it back on track.'} dueAt={sla.nextActionDueAt} nowMs={now.getTime()} />}
 
@@ -1043,23 +1051,16 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
           <p className="text-sm text-[var(--text-muted)]">{t.cancellation_reason || `This ticket was ${t.status === 'declined' ? 'declined' : 'cancelled'}.`}</p>
         </div>
       )}
-      {/* Dispute — while a dispute is live it sits ABOVE the Actions (needs the RM's
-          attention); once done it moves below the Actions as history (see after the
-          Actions card). */}
-      {openDispute && disputeBlock}
+      {/* The Dispute conversation now lives in its own "Dispute" tab (next to
+          Completion); the RM's resolve controls sit in the Next-action block above. */}
       {/* COC & POC under review now lives in the "Next action" review pop-up (compact
           row → full detail + actions); its files are also in the Documents/Photos tabs. */}
-      {/* The approved COC & POC now lives in the "Completion" tab (collapsible, like
-          the Quotes tab) — no standalone section here. */}
-      {/* Resolved dispute(s) → history below the Actions once nothing is live. */}
-      {!openDispute && disputeBlock}
-      {/* Variation orders now open from the "Next action" review pop-up while pending;
-          the full record (any status) lives in the History tab + Documents tab. */}
       {/* Photos · Activity (supplier updates) · Timeline (the full audit trail —
           status changes, edits, attachments/photos viewed, quotes, sign-offs …). */}
-      <RmTicketTabs ticketId={t.id} photoGroups={photoGroups} updates={supplierUpdates} timeline={timelineItems} documents={documentsContent} quotes={quotesContent} completion={completionContent} history={historyContent}
+      <RmTicketTabs ticketId={t.id} photoGroups={photoGroups} updates={supplierUpdates} timeline={timelineItems} documents={documentsContent} quotes={quotesContent} completion={completionContent} dispute={disputeContent} history={historyContent}
         defaultTab={
-          completionContent && ['submitted_for_signoff', 'approved_closeout', 'completed'].includes(t.status) ? 'completion'
+          openDispute ? 'dispute'
+          : completionContent && ['submitted_for_signoff', 'approved_closeout', 'completed'].includes(t.status) ? 'completion'
           : quotesContent && (t.status === 'quoted' || reviewQuotes.length > 0) ? 'quotes'
           : undefined
         } />

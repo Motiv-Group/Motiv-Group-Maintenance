@@ -11,14 +11,14 @@ import type { TimelineEvent } from '@/lib/ticket-timeline'
 
 type PhotoGroup = { label: string; urls: string[] }
 type Update = { body: string; created_at: string }
-type Tab = 'photos' | 'documents' | 'quotes' | 'completion' | 'activity' | 'timeline' | 'history'
+type Tab = 'photos' | 'documents' | 'quotes' | 'completion' | 'dispute' | 'activity' | 'timeline' | 'history'
 
 /** Lower tabbed section of the RM ticket detail — Photos (every image on the
  *  ticket, grouped by source), Documents (COC/invoice/quote/VO attachments),
  *  Quotes (the approved quote + any under review), Completion (the approved COC
  *  & POC), Activity (supplier updates) and the full Timeline. */
 export function RmTicketTabs({
-  ticketId, photoGroups, updates, timeline, history, documents, quotes, completion, defaultTab,
+  ticketId, photoGroups, updates, timeline, history, documents, quotes, completion, dispute, defaultTab,
 }: {
   ticketId: string
   photoGroups: PhotoGroup[]
@@ -28,6 +28,7 @@ export function RmTicketTabs({
   documents?: ReactNode
   quotes?: ReactNode
   completion?: ReactNode
+  dispute?: ReactNode
   /** Tab selected on first render (e.g. 'completion' when a COC/POC is under review). */
   defaultTab?: Tab
 }) {
@@ -38,6 +39,7 @@ export function RmTicketTabs({
     { key: 'documents', label: 'Documents' },
     { key: 'quotes', label: 'Quotes' },
     { key: 'completion', label: 'Completion' },
+    ...(dispute ? [{ key: 'dispute' as Tab, label: 'Dispute' }] : []),
     { key: 'activity', label: `Activity${updates.length ? ` (${updates.length})` : ''}` },
     { key: 'timeline', label: 'Timeline' },
     { key: 'history', label: 'History' },
@@ -84,6 +86,10 @@ export function RmTicketTabs({
 
       {tab === 'completion' && (
         completion ?? <p className="text-sm text-[var(--text-faint)]">Not completed yet.</p>
+      )}
+
+      {tab === 'dispute' && (
+        dispute ?? <p className="text-sm text-[var(--text-faint)]">No dispute on this ticket.</p>
       )}
 
       {tab === 'activity' && (
