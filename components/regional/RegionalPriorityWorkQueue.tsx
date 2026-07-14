@@ -6,9 +6,11 @@
 // border effect as the SM cards; RM-appropriate statuses, next steps and links.
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { AlertCircle, AlertOctagon, AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, ClipboardCheck, ClipboardList, ReceiptText, UserPlus } from 'lucide-react'
 import type { RegionalTicketRow } from '@/lib/health/data'
 import { Card } from '@/components/exec/ui'
+import { Modal } from '@/components/ui/Modal'
 import { CategoryIcon } from '@/components/client/ticketBadges'
 import { AssignSuppliersButton, QuoteReviewButton, SignoffReviewButton } from '@/components/regional/RmTicketActions'
 import { rmStatusMeta, formatDate, formatDateTime, humanizeDuration, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
@@ -201,7 +203,7 @@ function QueueRow({ ticket, nowMs, suppliers, motivSuppliers }: { ticket: Region
             trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}>Assign supplier</button>} />
         ) : closeout ? (
           ticket.voNoneConfirmed
-            ? <Link href={ticketUrl} className={closeoutCls}>Close-out <ArrowRight size={15} /></Link>
+            ? <CloseOutConfirm ticketId={ticket.id} storeName={ticket.storeName} category={ticket.category || ticket.title} className={closeoutCls} />
             : <span className={`${closeoutCls} opacity-50 pointer-events-none`} aria-disabled="true">Close-out</span>
         ) : (
           <Link href={ticketUrl} className={ctaCls}>View Ticket <ArrowRight size={15} /></Link>
@@ -249,6 +251,50 @@ function priorityBadgeClass(p: string): string {
 // The RM's next step per ticket status — short, professional, and covering every
 // state (no generic fallback for a real status). Mirrors the ticket-detail
 // "Next action" wording so the queue and the ticket page always agree.
+// "Close-out" (once the supplier has confirmed no VOs) opens a confirmation
+// pop-up before completing the ticket — the close-out is final.
+function CloseOutConfirm({ ticketId, storeName, category, className }: { ticketId: string; storeName: string; category: string; className: string }) {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  async function confirm() {
+    setBusy(true); setErr('')
+    try {
+      const res = await fetch(`/api/tickets/${ticketId}/transition`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'close_out' }) })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to close out the ticket.')
+      setOpen(false); router.refresh()
+    } catch (e: any) { setErr(e.message); setBusy(false) }
+  }
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} className={className}>Close-out <ArrowRight size={15} /></button>
+      {open && (
+        <Modal onClose={() => { if (!busy) setOpen(false) }} maxWidth="max-w-lg">
+          {close => (
+            <div className="space-y-5">
+              <div className="flex flex-col items-center text-center">
+                <span className="grid h-14 w-14 place-items-center rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"><CheckCircle2 size={30} /></span>
+                <h3 className="mt-3 text-xl font-bold text-[var(--text)]">Complete this ticket?</h3>
+                <p className="mt-1.5 text-sm text-[var(--text-muted)]">This finalises the close-out and marks <span className="font-semibold text-[var(--text)]">{category}</span> at <span className="font-semibold text-[var(--text)]">{storeName}</span> as <span className="font-semibold text-emerald-600 dark:text-emerald-400">Completed</span>. This can&apos;t be undone.</p>
+              </div>
+              <div className="flex items-start gap-2.5 rounded-xl bg-emerald-500/10 px-3.5 py-3 ring-1 ring-emerald-500/25">
+                <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                <p className="text-sm text-[var(--text-muted)]">The supplier confirmed there are no further variation orders, so the job is ready to be closed out and completed.</p>
+              </div>
+              {err && <p className="text-sm text-red-500">{err}</p>}
+              <div className="flex gap-2">
+                <button type="button" onClick={close} disabled={busy} className="flex-1 rounded-xl py-2.5 text-sm font-medium text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-50">Cancel</button>
+                <button type="button" onClick={confirm} disabled={busy} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50"><CheckCircle2 size={16} /> {busy ? 'Completing…' : 'Complete ticket'}</button>
+              </div>
+            </div>
+          )}
+        </Modal>
+      )}
+    </>
+  )
+}
+
 function nextStep(t: RegionalTicketRow): string {
   if (t.disputed) return 'Resolve the open dispute'
   switch (t.status) {

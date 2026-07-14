@@ -260,6 +260,8 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
   const myQuoteRows = (myQuotes ?? []) as any[]
   const activeQuotes = myQuoteRows.filter(q => q.status !== 'declined')
   const declinedMyQuotes = myQuoteRows.filter(q => q.status === 'declined')
+  // Reason the RM declined the previous quote — shown on the re-quote prompt.
+  const requoteReason = declinedMyQuotes[0]?.decline_reason ?? declineReason
   // The Quotes block is open through quoting / scheduling, then collapses once the
   // job is marked in progress (and every stage after). A phase-specific id + key
   // forces the collapse on the transition even though the section otherwise
@@ -370,9 +372,12 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
   const photosTab = totalPhotos > 0
     ? <PhotoThumbs urls={t.photo_urls as string[]} ticketId={t.id} />
     : null
-  const quotesTab = activeQuotes.length > 0
-    ? (<div className="space-y-2">{activeQuotes.map((q, i, arr) => (
-        <QuoteSummary key={q.id} title={arr.length > 1 ? `Quote #${arr.length - i}` : 'Your submitted quote'} status={quoteStatusOf(q.status)} ticketId={t.id} collapsible
+  // Show active quotes; if none active (e.g. a re-quote after the RM declined),
+  // still show the declined quote so the Quotes tab stays available.
+  const quoteTabRows = activeQuotes.length > 0 ? activeQuotes : declinedMyQuotes
+  const quotesTab = quoteTabRows.length > 0
+    ? (<div className="space-y-2">{quoteTabRows.map((q, i, arr) => (
+        <QuoteSummary key={q.id} title={arr.length > 1 ? `Quote #${arr.length - i}` : 'Your submitted quote'} status={quoteStatusOf(q.status)} ticketId={t.id} collapsible declineReason={q.decline_reason ?? declineReason}
           quote={{ id: q.id, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, description: q.description ?? null, fileUrl: q.file_url ?? null, validUntil: q.valid_until ?? null, createdAt: q.created_at }}
           schedule={q.status === 'accepted' && t.scheduled_at ? { at: t.scheduled_at, proposed: t.schedule_status === 'proposed', technician: scheduledTechName, audience: 'supplier' } : q.proposed_schedule_at ? { at: q.proposed_schedule_at, proposed: true, audience: 'supplier' } : null} />
       ))}</div>)
@@ -598,6 +603,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
               <Clock size={16} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
               <div className="space-y-0.5">
                 <p className="text-sm font-bold text-amber-700 dark:text-amber-400">The regional manager requested a re-quote</p>
+                {requoteReason && <p className="text-sm font-medium text-red-600 dark:text-red-400"><span className="font-semibold">Reason declined:</span> {requoteReason}</p>}
                 <p className="text-sm text-[var(--text-muted)]">Your previous quote request for this ticket was declined. Please submit a new quote below.</p>
               </div>
             </div>
@@ -762,7 +768,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
           : ['snag', 'snag_assigned', 'snag_in_progress', 'snag_resolved'].includes(t.status) ? 'snag'
           : ['variation_review', 'vo_declined'].includes(t.status) ? 'variations'
           : ['submitted_for_signoff', 'evidence_requested', 'approved_closeout', 'completed'].includes(t.status) ? 'completion'
-          : ['quoted', 'accepted'].includes(t.status) ? 'quotes'
+          : (canSubmitQuote || ['quoted', 'accepted'].includes(t.status)) ? 'quotes'
           : (totalPhotos ? 'photos' : quotesTab ? 'quotes' : 'timeline')
         }
         tabs={[
