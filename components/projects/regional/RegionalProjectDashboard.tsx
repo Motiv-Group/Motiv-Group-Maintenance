@@ -17,7 +17,7 @@ export function RegionalProjectDashboard({ project, summary, stores }: { project
   const [view, setView] = useState<'cards' | 'table'>('table')
   const [q, setQ] = useState('')
   const [status, setStatus] = useState<StatusFilter>('all')
-  const [sort, setSort] = useState<'branch' | 'name' | 'progress' | 'start' | 'end'>('branch')
+  const [sort, setSort] = useState<'branch' | 'name' | 'progress' | 'start' | 'end'>('start')
 
   const counts = useMemo(() => milestoneCounts(stores), [stores])
   const daysLeft = daysUntil(project.end_date)
