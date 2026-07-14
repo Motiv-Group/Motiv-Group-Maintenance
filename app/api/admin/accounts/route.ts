@@ -27,6 +27,7 @@ const BodySchema = z.object({
   storeId: z.any().optional(),
   userId: z.any().optional(),
   role: z.any().optional(),
+  projectId: z.any().optional(),
   rows: z.array(z.record(z.string(), z.any())).optional(),
 })
 
@@ -121,6 +122,16 @@ export async function POST(request: Request) {
       const companyId = str(body.companyId), fullName = str(body.full_name)
       if (!companyId || !fullName || !body.email) return bad('Company, full name and email are required.')
       const ce = contactError(body.email, body.phone); if (ce) return bad(ce)
+
+      // Optional project: when chosen, the invite email references the project name.
+      let invitedTo: string | undefined
+      const projectId = str(body.projectId)
+      if (projectId) {
+        const { data: project } = await admin.from('projects').select('id, name, company_id').eq('id', projectId).single()
+        if (!project || (project as any).company_id !== companyId) return bad('That project is not in the selected company.')
+        invitedTo = (project as any).name
+      }
+
       let regionId = str(body.regionId)
       if (!regionId && str(body.newRegionName)) {
         const code = String(body.newRegionCode || body.newRegionName).toUpperCase().replace(/\s+/g, '').slice(0, 12)
@@ -128,12 +139,16 @@ export async function POST(request: Request) {
         if (error || !r) return bad(error?.message ?? 'Could not create region.')
         regionId = r.id
       }
-      if (!regionId) return bad('Choose an existing region or create a new one.')
-      const { data: region } = await admin.from('regions').select('id, company_id').eq('id', regionId).single()
-      if (!region || region.company_id !== companyId) return bad('That region is not in the selected company.')
-      const inv = await inviteUser({ email: body.email, role: 'regional_manager', companyId, roleLabel: 'Regional Manager', baseUrl: origin, link: { regionId }, profile: { fullName, phone: normalisePhone(body.phone), address: str(body.address) } })
-      await logAudit(admin, { actorId: user.id, companyId, action: 'admin.invite_rm', entityType: 'user', entityId: inv.userId, metadata: { email: body.email, regionId } })
-      return done({ actionLink: inv.actionLink, emailed: inv.emailed, message: inv.emailed ? 'Regional Manager invited — activation link emailed.' : 'Created. Email not sent — copy the activation link below.' })
+      // A region is required for a normal RM, but a project-only invite (client project
+      // manager) may skip it — they view the project without an estate region.
+      if (!regionId && !projectId) return bad('Choose a region, create one, or select a project.')
+      if (regionId) {
+        const { data: region } = await admin.from('regions').select('id, company_id').eq('id', regionId).single()
+        if (!region || region.company_id !== companyId) return bad('That region is not in the selected company.')
+      }
+      const inv = await inviteUser({ email: body.email, role: 'regional_manager', companyId, roleLabel: 'Regional Manager', baseUrl: origin, link: regionId ? { regionId } : {}, profile: { fullName, phone: normalisePhone(body.phone), address: str(body.address) }, invitedTo })
+      await logAudit(admin, { actorId: user.id, companyId, action: 'admin.invite_rm', entityType: 'user', entityId: inv.userId, metadata: { email: body.email, regionId: regionId || null, projectId: projectId || null } })
+      return done({ actionLink: inv.actionLink, emailed: inv.emailed, message: inv.emailed ? `Regional Manager invited${invitedTo ? ` to ${invitedTo}` : ''} — activation link emailed.` : 'Created. Email not sent — copy the activation link below.' })
     }
 
     if (action === 'invite_sm') {

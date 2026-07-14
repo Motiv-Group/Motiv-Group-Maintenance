@@ -5,7 +5,7 @@ import { requireMasterAdmin } from '@/lib/health/guard'
 import { createAdminClient } from '@/lib/supabase/server'
 import { SectionCard } from '@/components/exec/ui'
 import { InfoTip } from '@/components/ui/InfoTip'
-import { AddAccountForm, type CompanyOpt, type RegionOpt } from '@/components/admin/AddAccountForm'
+import { AddAccountForm, type CompanyOpt, type RegionOpt, type ProjectOpt } from '@/components/admin/AddAccountForm'
 import { BulkImportForm } from '@/components/admin/BulkImportForm'
 
 const roleLabel = (r: string) => r === 'executive' ? 'Executive' : r === 'regional_manager' ? 'Regional Manager' : 'Store Manager'
@@ -14,14 +14,32 @@ const roleRank = (r: string) => r === 'executive' ? 0 : r === 'regional_manager'
 export default async function AdminAccountsPage() {
   await requireMasterAdmin()
   const db = createAdminClient()
-  const [{ data: companies }, { data: regions }, { data: users }] = await Promise.all([
+  const [{ data: companies }, { data: regions }, { data: users }, { data: ru }, { data: su }, { data: stores }, { data: projects }] = await Promise.all([
     db.from('companies').select('id, name').eq('active', true).order('name'),
     db.from('regions').select('id, name, region_code, company_id').eq('active', true).order('name'),
     db.from('user_profiles').select('id, full_name, email, role, company_id').in('role', ['executive', 'regional_manager', 'store_manager']).eq('active', true),
+    db.from('regional_users').select('user_id, region_id'),
+    db.from('store_users').select('user_id, store_id'),
+    db.from('stores').select('id, branch_code, region_id'),
+    db.from('projects').select('id, name, company_id').is('archived_at', null).order('name'),
   ])
   const companyName = new Map(((companies ?? []) as any[]).map(c => [c.id, c.name]))
   const companyOpts: CompanyOpt[] = ((companies ?? []) as any[]).map(c => ({ id: c.id, name: c.name }))
   const regionOpts: RegionOpt[] = ((regions ?? []) as any[]).map(r => ({ id: r.id, name: r.name, companyId: r.company_id, code: r.region_code }))
+  const projectOpts: ProjectOpt[] = ((projects ?? []) as any[]).map(p => ({ id: p.id, name: p.name, companyId: p.company_id }))
+
+  // Per-user "Region / Branch": RMs → their region name(s); SMs → their store branch code.
+  const regionLabelById = new Map(((regions ?? []) as any[]).map(r => [r.id, `${r.name} (${r.region_code})`]))
+  const storeById = new Map(((stores ?? []) as any[]).map(s => [s.id, s]))
+  const rmRegions = new Map<string, string[]>()
+  for (const r of ((ru ?? []) as any[])) { const a = rmRegions.get(r.user_id) ?? []; const l = regionLabelById.get(r.region_id); if (l) a.push(l); rmRegions.set(r.user_id, a) }
+  const smBranch = new Map<string, string>()
+  for (const s of ((su ?? []) as any[])) { const store = storeById.get(s.store_id); if (store?.branch_code && !smBranch.has(s.user_id)) smBranch.set(s.user_id, store.branch_code) }
+  const locationFor = (u: any): string => {
+    if (u.role === 'regional_manager') return (rmRegions.get(u.id) ?? []).join(', ') || '—'
+    if (u.role === 'store_manager') return smBranch.get(u.id) ?? '—'
+    return '—'
+  }
   const rows = ((users ?? []) as any[]).sort((a, b) => roleRank(a.role) - roleRank(b.role) || (a.full_name ?? '').localeCompare(b.full_name ?? ''))
 
   return (
@@ -34,7 +52,7 @@ export default async function AdminAccountsPage() {
         <p className="text-sm text-[var(--text-muted)] mt-0.5">Invite the store hierarchy. Individuals and suppliers self-register from the sign-up page.</p>
       </div>
 
-      <AddAccountForm companies={companyOpts} regions={regionOpts} />
+      <AddAccountForm companies={companyOpts} regions={regionOpts} projects={projectOpts} />
 
       <BulkImportForm />
 
@@ -44,17 +62,18 @@ export default async function AdminAccountsPage() {
       >
         <div className="overflow-x-auto -mx-1">
           <table className="w-full text-sm min-w-[560px]">
-            <thead><tr className="text-left text-[11px] text-[var(--text-faint)] border-b border-[var(--border)]"><th className="py-2 px-2">Name</th><th className="px-2">Email</th><th className="px-2">Role</th><th className="px-2">Company</th></tr></thead>
+            <thead><tr className="text-left text-[11px] text-[var(--text-faint)] border-b border-[var(--border)]"><th className="py-2 px-2">Name</th><th className="px-2">Email</th><th className="px-2">Role</th><th className="px-2">Region / Branch</th><th className="px-2">Company</th></tr></thead>
             <tbody>
               {rows.map(u => (
                 <tr key={u.id} className="border-b border-[var(--border)] last:border-0 transition hover:bg-[var(--hover)]">
                   <td className="py-2.5 px-2 text-[var(--text)]">{u.full_name ?? '—'}</td>
                   <td className="px-2 text-[var(--text-muted)] truncate max-w-[220px]">{u.email ?? '—'}</td>
                   <td className="px-2 text-[var(--text-muted)]">{roleLabel(u.role)}</td>
+                  <td className="px-2 text-[var(--text-muted)]">{locationFor(u)}</td>
                   <td className="px-2 text-[var(--text-muted)]">{u.company_id ? (companyName.get(u.company_id) ?? '—') : <span className="text-amber-600 dark:text-amber-400">Pending</span>}</td>
                 </tr>
               ))}
-              {!rows.length && <tr><td colSpan={4} className="py-6 text-center text-[var(--text-faint)]">No accounts yet.</td></tr>}
+              {!rows.length && <tr><td colSpan={5} className="py-6 text-center text-[var(--text-faint)]">No accounts yet.</td></tr>}
             </tbody>
           </table>
         </div>

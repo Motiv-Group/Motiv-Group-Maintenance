@@ -15,6 +15,8 @@ interface InviteOpts {
   // Optional profile fields captured by the inviter (admin) → stored immediately so
   // the account is complete before the invitee even sets their password.
   profile?: { fullName?: string; phone?: string | null; address?: string; subStore?: string; branchCode?: string }
+  // Optional: invite them to a named thing (e.g. a project) instead of "as <role>".
+  invitedTo?: string
 }
 
 /**
@@ -60,19 +62,24 @@ export async function inviteUser(opts: InviteOpts): Promise<{ userId: string; ac
   // page sets the password server-side by verifying THIS token → that user — no
   // Supabase OTP, no browser session, prefetch-safe.
   const actionLink = `${base}/auth/confirm?t=${signAccountToken(uid, Date.now())}&type=invite`
-  const emailed = await sendInviteEmail(opts.email, actionLink, opts.roleLabel, base)
+  const emailed = await sendInviteEmail(opts.email, actionLink, opts.roleLabel, base, opts.invitedTo)
   return { userId: uid, actionLink, emailed }
 }
 
-async function sendInviteEmail(to: string, link: string | null, roleLabel: string, base: string): Promise<boolean> {
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
+async function sendInviteEmail(to: string, link: string | null, roleLabel: string, base: string, invitedTo?: string): Promise<boolean> {
   const key = process.env.RESEND_API_KEY, from = process.env.EMAIL_FROM
   if (!key || !from || !link) return false
   try {
+    const subject = invitedTo ? `You've been invited to ${invitedTo} on MOTIV` : `You've been invited to MOTIV as ${roleLabel}`
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        from, to, subject: `You've been invited to MOTIV as ${roleLabel}`,
-        html: inviteEmailHtml(link, roleLabel, base),
+        from, to, subject,
+        html: inviteEmailHtml(link, roleLabel, base, invitedTo),
       }),
     })
     return res.ok
@@ -80,11 +87,14 @@ async function sendInviteEmail(to: string, link: string | null, roleLabel: strin
 }
 
 // Branded invite email — shares the MOTIV template with the password-reset email.
-export function inviteEmailHtml(link: string, roleLabel: string, base: string): string {
+// When `invitedTo` is set (e.g. a project name), the copy references it instead of the role.
+export function inviteEmailHtml(link: string, roleLabel: string, base: string, invitedTo?: string): string {
   return motivBrandedEmailHtml({
     base,
     heading: "You're invited to MOTIV",
-    lead: `You've been added as <strong style="color:#0d1f2d;">${roleLabel}</strong>.`,
+    lead: invitedTo
+      ? `You've been invited to <strong style="color:#0d1f2d;">${escapeHtml(invitedTo)}</strong> on MOTIV.`
+      : `You've been added as <strong style="color:#0d1f2d;">${roleLabel}</strong>.`,
     sub: 'Set your password to activate your account and sign in.',
     ctaLabel: 'Set password &amp; sign in',
     link,
