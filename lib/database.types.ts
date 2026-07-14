@@ -745,6 +745,240 @@ export interface Database {
         }
       ]
       }
+      project_events: {
+        Row: {
+          id: string
+          project_id: string
+          company_id: string | null
+          project_store_id: string | null
+          event_type: string
+          previous_value: string | null
+          new_value: string | null
+          metadata: Json | null
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          project_id?: string
+          company_id?: string | null
+          project_store_id?: string | null
+          event_type?: string
+          previous_value?: string | null
+          new_value?: string | null
+          metadata?: Json | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          company_id?: string | null
+          project_store_id?: string | null
+          event_type?: string
+          previous_value?: string | null
+          new_value?: string | null
+          metadata?: Json | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      project_files: {
+        Row: {
+          id: string
+          project_id: string
+          company_id: string
+          project_store_id: string | null
+          file_category: string
+          storage_path: string
+          original_filename: string | null
+          mime_type: string | null
+          file_size: number | null
+          caption: string | null
+          signed_date: string | null
+          signatory_name: string | null
+          sort_order: number
+          uploaded_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          project_id?: string
+          company_id?: string
+          project_store_id?: string | null
+          file_category?: string
+          storage_path?: string
+          original_filename?: string | null
+          mime_type?: string | null
+          file_size?: number | null
+          caption?: string | null
+          signed_date?: string | null
+          signatory_name?: string | null
+          sort_order?: number
+          uploaded_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          company_id?: string
+          project_store_id?: string | null
+          file_category?: string
+          storage_path?: string
+          original_filename?: string | null
+          mime_type?: string | null
+          file_size?: number | null
+          caption?: string | null
+          signed_date?: string | null
+          signatory_name?: string | null
+          sort_order?: number
+          uploaded_by?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      project_notes: {
+        Row: {
+          id: string
+          project_id: string
+          company_id: string
+          project_store_id: string | null
+          body: string
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          project_id?: string
+          company_id?: string
+          project_store_id?: string | null
+          body?: string
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          company_id?: string
+          project_store_id?: string | null
+          body?: string
+          created_by?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      project_stores: {
+        Row: {
+          id: string
+          project_id: string
+          company_id: string
+          store_id: string | null
+          branch_code: string
+          store_name: string | null
+          town: string | null
+          rfid_m2_required: number | null
+          start_date: string | null
+          end_date: string | null
+          on_site_completed_at: string | null
+          before_photos_completed_at: string | null
+          after_photos_completed_at: string | null
+          signoff_completed_at: string | null
+          on_site_note: string | null
+          progress_percentage: number | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          project_id?: string
+          company_id?: string
+          store_id?: string | null
+          branch_code?: string
+          store_name?: string | null
+          town?: string | null
+          rfid_m2_required?: number | null
+          start_date?: string | null
+          end_date?: string | null
+          on_site_completed_at?: string | null
+          before_photos_completed_at?: string | null
+          after_photos_completed_at?: string | null
+          signoff_completed_at?: string | null
+          on_site_note?: string | null
+          progress_percentage?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          company_id?: string
+          store_id?: string | null
+          branch_code?: string
+          store_name?: string | null
+          town?: string | null
+          rfid_m2_required?: number | null
+          start_date?: string | null
+          end_date?: string | null
+          on_site_completed_at?: string | null
+          before_photos_completed_at?: string | null
+          after_photos_completed_at?: string | null
+          signoff_completed_at?: string | null
+          on_site_note?: string | null
+          progress_percentage?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      projects: {
+        Row: {
+          id: string
+          company_id: string
+          name: string
+          description: string | null
+          client_name: string | null
+          start_date: string | null
+          end_date: string | null
+          status: string
+          cover_image_path: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+          archived_at: string | null
+        }
+        Insert: {
+          id?: string
+          company_id?: string
+          name?: string
+          description?: string | null
+          client_name?: string | null
+          start_date?: string | null
+          end_date?: string | null
+          status?: string
+          cover_image_path?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+          archived_at?: string | null
+        }
+        Update: {
+          id?: string
+          company_id?: string
+          name?: string
+          description?: string | null
+          client_name?: string | null
+          start_date?: string | null
+          end_date?: string | null
+          status?: string
+          cover_image_path?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+          archived_at?: string | null
+        }
+        Relationships: []
+      }
       push_subscriptions: {
         Row: {
           id: string

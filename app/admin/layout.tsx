@@ -17,7 +17,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   const unreadCount = await getUnreadCount()
   return (
     <ExecChrome userName={prof?.full_name ?? 'Admin'} variant="admin" unreadCount={unreadCount}>
-      <RealtimeRefresh tables={['notifications', 'suppliers']} />
+      <RealtimeRefresh tables={['notifications', 'suppliers', 'projects', 'project_stores', 'project_files']} />
       {children}
     </ExecChrome>
   )

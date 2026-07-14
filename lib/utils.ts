@@ -307,7 +307,8 @@ export function formatCurrency(amount: number) {
 // runs (server SSR is UTC; client is the device tz) — so times are consistent.
 const SA_TZ = 'Africa/Johannesburg'
 
-export function formatDate(dateString: string) {
+export function formatDate(dateString: string | null | undefined) {
+  if (!dateString) return ''
   return new Date(dateString).toLocaleDateString('en-ZA', {
     day: 'numeric', month: 'short', year: 'numeric', timeZone: SA_TZ,
   })

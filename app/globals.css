@@ -67,25 +67,6 @@ html.dark select option {
   color: #f6f6f7;
 }
 
-/* ── First-load splash overlay ──
-   SSR-rendered so it paints before hydration; fades out on its own via a CSS
-   animation (no JS dependency). pointer-events:none so it never traps clicks. */
-#motiv-splash {
-  position: fixed;
-  inset: 0;
-  z-index: 2147483647;
-  background: #0b0c11 url('/splash/cape-town.jpg') center / contain no-repeat;
-  pointer-events: none;
-  animation: motivSplashOut 2.1s ease-in forwards;
-}
-@keyframes motivSplashOut {
-  0%, 58% { opacity: 1; }
-  100%    { opacity: 0; visibility: hidden; }
-}
-@media (prefers-reduced-motion: reduce) {
-  #motiv-splash { animation-duration: 1s; }
-}
-
 /* Modal enter effects — run on the same paint as mount (see components/ui/Modal.tsx),
    so a heavy modal child never leaves the content invisible waiting on a rAF flip.
    modalPop animates TRANSFORM only (opacity stays 1) so the content is visible on the

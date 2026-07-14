@@ -26,6 +26,7 @@ const BUCKET_MIME: Record<string, string[]> = {
   'completion-docs':   [...IMG, 'application/pdf'],
   'quote-attachments': [...IMG, 'application/pdf', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel'],
   'supplier-docs':     [...IMG, 'application/pdf'],
+  'project-files':     [...IMG, 'application/pdf'],
 }
 
 export async function POST(req: NextRequest) {

@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { Globe2, Map as MapIcon, Store, Truck, Gavel, Bell, Settings, LogOut, FileBarChart, LayoutDashboard, Ticket, ClipboardCheck, AlertTriangle, ReceiptText, BarChart2, Users, CalendarClock, CheckCircle2, Network, ScrollText, Database, Triangle, Mail, Zap, ShieldAlert } from 'lucide-react'
+import { Globe2, Map as MapIcon, Store, Truck, Gavel, Bell, Settings, LogOut, FileBarChart, LayoutDashboard, Ticket, ClipboardCheck, AlertTriangle, ReceiptText, BarChart2, Users, CalendarClock, CheckCircle2, Network, ScrollText, Database, Triangle, Mail, Zap, ShieldAlert, FolderKanban } from 'lucide-react'
 import { MotivLogo } from '@/components/ui/MotivLogo'
 import { ContextSwitcher } from '@/components/ui/ContextSwitcher'
 import { SwipeNav } from '@/components/ui/SwipeNav'
@@ -35,6 +35,7 @@ const REGIONAL_TABS: ChromeTab[] = [
   { href: '/regional/signoff',  label: 'Signoff',   icon: ClipboardCheck },
   { href: '/regional/snag',     label: 'Snags',     icon: AlertTriangle },
   { href: '/regional/suppliers', label: 'Suppliers', icon: Truck },
+  { href: '/regional/projects', label: 'Projects',  icon: FolderKanban },
 ]
 const STORE_TABS: ChromeTab[] = [
   { href: '/client',         label: 'Dashboard', icon: LayoutDashboard },
@@ -69,6 +70,7 @@ const ADMIN_TABS: ChromeTab[] = [
   { href: '/admin/accounts',  label: 'Accounts',  icon: Users },
   { href: '/admin/hierarchy', label: 'Hierarchy', icon: Network },
   { href: '/admin/suppliers', label: 'Suppliers', icon: Truck },
+  { href: '/admin/projects',  label: 'Projects',  icon: FolderKanban },
   { href: '/admin/audit',     label: 'Audit',     icon: ScrollText },
 ]
 const ADMIN_DESKTOP_TABS: ChromeTab[] = [
