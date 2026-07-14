@@ -42,7 +42,7 @@ function DateItem({ label, value, proposed }: { label: string; value: string; pr
   return (
     <div>
       <div className={LABEL}>{label}</div>
-      <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm text-[var(--text)]">
+      <div className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm text-[var(--text)]">
         <Calendar size={14} className="shrink-0 text-[var(--text-faint)]" />
         <span className="whitespace-nowrap">{value}</span>
         {proposed && <span className="whitespace-nowrap text-[11px] text-amber-600 dark:text-amber-400">(proposed)</span>}
@@ -88,9 +88,12 @@ export function QuoteSummary({ quote, status, title, schedule, collapsible = fal
         </div>
       )}
 
-      <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Four info columns. Thin vertical rules separate them once side-by-side
+          (borders live on cols 2-4; padding centres each rule in its gutter). On a
+          single-column mobile stack the rules drop away and the columns go full-width. */}
+      <div className="grid gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
         {/* Pricing */}
-        <div>
+        <div className="sm:pr-5">
           <div className={LABEL}>Pricing</div>
           <div className="mt-1.5">
             <div className="text-[11px] text-[var(--text-faint)]">Excl. VAT</div>
@@ -103,19 +106,19 @@ export function QuoteSummary({ quote, status, title, schedule, collapsible = fal
         </div>
 
         {/* Submitted + proposed visit */}
-        <div className="space-y-3">
+        <div className="space-y-3 sm:border-l sm:border-[var(--border)] sm:pl-5 lg:pr-5">
           <DateItem label="Submitted" value={formatDateTime(quote.createdAt)} />
           {schedule && <DateItem label="Proposed visit" value={`${formatDateTime(schedule.at)}${schedule.technician ? ` · ${schedule.technician}` : ''}`} proposed={schedule.proposed} />}
         </div>
 
         {/* Valid until + declined */}
-        <div className="space-y-3">
+        <div className="space-y-3 sm:pr-5 lg:border-l lg:border-[var(--border)] lg:pl-5">
           <DateItem label="Valid until" value={quote.validUntil ? formatDate(quote.validUntil) : 'N/A'} />
           {status === 'declined' && quote.declinedAt && <DateItem label="Declined" value={formatDateTime(quote.declinedAt)} />}
         </div>
 
         {/* Attachment — chip that truncates to its column, never overflowing */}
-        <div className="min-w-0">
+        <div className="min-w-0 sm:border-l sm:border-[var(--border)] sm:pl-5">
           <div className={LABEL}>Attachment</div>
           <div className="mt-1.5">
             {attName

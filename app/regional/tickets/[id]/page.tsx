@@ -16,7 +16,8 @@ import { QuoteSummary } from '@/components/workflow/QuoteSummary'
 import { Card } from '@/components/exec/ui'
 import { WorkflowActions } from '@/components/workflow/WorkflowActions'
 import { RmPipeline } from '@/components/regional/RmPipeline'
-import { RmQuotePanel, RmReviewPanel, ApproveSignoffCard, ReQuoteButton, AcceptScheduleCard, AcceptSnagScheduleCard, VariationReviewCard, RequestEvidenceButton, RaiseSnagButton, CloseOutButton, RmTicketActionBar } from '@/components/regional/RmTicketActions'
+import { RmQuotePanel, RmReviewPanel, ReQuoteButton, AcceptScheduleCard, AcceptSnagScheduleCard, VariationReviewCard, CloseOutButton, RmTicketActionBar, RmCompletionReview } from '@/components/regional/RmTicketActions'
+import { CompletionBody } from '@/components/workflow/CompletionBody'
 import { EditedLine } from '@/components/ui/EditedLine'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { RmTicketTabs } from '@/components/regional/RmTicketTabs'
@@ -95,10 +96,7 @@ function RmDeclinedQuoteCard({ q, ticketId, canReQuote, open = false }: { q: any
 // One COC/POC submission card — reused across the under-review, sent-back (snag)
 // and approved blocks so the RM sees the full submission history. A sent-back card
 // shows the reason it was returned (why another COC/POC was needed).
-function RmSignoffCard({ s, tone, ticketId, collapsible = false, defaultOpen = false, title, reason, freshEvidence = false, priorUrls }: { s: any; tone: 'review' | 'snag' | 'approved' | 'evidence'; ticketId: string; collapsible?: boolean; defaultOpen?: boolean; title?: string; reason?: string | null; freshEvidence?: boolean; priorUrls?: Set<string> }) {
-  // On a resubmission the signoff's after_urls carry over the previous round's
-  // photos, so only URLs NOT seen in an earlier round count as "new" (green).
-  const isNew = (u?: string | null): boolean => freshEvidence && !!u && !(priorUrls?.has(u) ?? false)
+function RmSignoffCard({ s, tone, ticketId, collapsible = false, defaultOpen = false, title, reason, freshEvidence = false }: { s: any; tone: 'review' | 'snag' | 'approved' | 'evidence'; ticketId: string; collapsible?: boolean; defaultOpen?: boolean; title?: string; reason?: string | null; freshEvidence?: boolean }) {
   // Prefer the durable round reason; fall back to the reason stored on the signoff.
   const reasonText = reason ?? s.reject_reason
   const meta = tone === 'approved'
@@ -142,29 +140,7 @@ function RmSignoffCard({ s, tone, ticketId, collapsible = false, defaultOpen = f
             <p className="text-sm text-[var(--text)]">The supplier uploaded the additional evidence you requested — the new after photos, COC and notes are shown in green below.</p>
           </div>
         )}
-        <div>
-          <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Proof of completion</div>
-          <div className="flex flex-wrap gap-x-4 gap-y-1">
-            {before.map((u, i) => <ViewTrackedLink key={`b${i}`} ticketId={ticketId} itemType="photo" itemLabel={`Before photo ${i + 1}`} href={u} className="text-sm text-[#C6A35D] underline hover:text-amber-500">Before {i + 1}</ViewTrackedLink>)}
-            {after.map((u, i) => <ViewTrackedLink key={`a${i}`} ticketId={ticketId} itemType="photo" itemLabel={`Completion photo ${i + 1}`} href={u} className={`text-sm underline ${isNew(u) ? 'text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 font-medium' : 'text-[#C6A35D] hover:text-amber-500'}`}>After {i + 1}</ViewTrackedLink>)}
-            {!before.length && !after.length && <span className="text-sm text-[var(--text-faint)]">No photos</span>}
-          </div>
-        </div>
-        {(s.coc_url || s.invoice_url) && (
-          <div>
-            <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Certificate of Completion</div>
-            <div className="flex flex-wrap gap-x-4 gap-y-1">
-              {s.coc_url && <ViewTrackedLink ticketId={ticketId} itemType="coc" itemLabel="COC" href={s.coc_url} className={`inline-flex items-center gap-1.5 text-sm font-medium hover:underline ${isNew(s.coc_url) ? 'text-emerald-600 dark:text-emerald-400' : 'text-[#C6A35D]'}`}><FileText size={14} /> View COC</ViewTrackedLink>}
-              {s.invoice_url && <ViewTrackedLink ticketId={ticketId} itemType="invoice" itemLabel="Invoice" href={s.invoice_url} className={`inline-flex items-center gap-1.5 text-sm font-medium hover:underline ${isNew(s.invoice_url) ? 'text-emerald-600 dark:text-emerald-400' : 'text-[#C6A35D]'}`}><FileText size={14} /> View invoice</ViewTrackedLink>}
-            </div>
-          </div>
-        )}
-        {s.notes && (
-          <div>
-            <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Notes</div>
-            <p className={`text-sm whitespace-pre-line ${freshEvidence ? 'text-emerald-700 dark:text-emerald-400 font-medium' : 'text-[var(--text-muted)]'}`}>{s.notes}</p>
-          </div>
-        )}
+        <CompletionBody ticketId={ticketId} beforeUrls={before} afterUrls={after} cocUrl={s.coc_url} invoiceUrl={s.invoice_url} notes={s.notes} uploadedAt={s.created_at} />
     </>
   )
   if (collapsible) {
@@ -311,14 +287,6 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
   // A pending submission that follows an earlier "more evidence" request is the
   // supplier's resubmission — flag it so the new COC/POC/notes highlight in green.
   const isEvidenceResubmission = pendingSignoffs.length > 0 && evidenceRequestedSignoffs.length > 0
-  // URLs already submitted in an earlier (superseded) round. after_urls accumulate
-  // across rounds, so these are subtracted to green ONLY the newly added evidence.
-  const priorEvidenceUrls = new Set<string>()
-  for (const s of [...evidenceRequestedSignoffs, ...rejectedSignoffs]) {
-    for (const u of ((s.after_urls ?? []) as string[])) priorEvidenceUrls.add(u)
-    if (s.coc_url) priorEvidenceUrls.add(s.coc_url)
-    if (s.invoice_url) priorEvidenceUrls.add(s.invoice_url)
-  }
 
   // Snag / evidence disputes. An OPEN one shows a live thread the RM resolves;
   // resolved ones live in the Archive (read-only). Messages grouped by dispute.
@@ -776,32 +744,15 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
 
   // "Completion" tab — the approved COC & POC as a collapsible card (open by
   // default), like the Quotes tab. Replaces the old standalone Completion section.
-  const completionContent = acceptedSignoff ? (
-    <RmSignoffCard s={acceptedSignoff} tone="approved" ticketId={t.id} collapsible defaultOpen />
+  // The COC & POC submission currently awaiting the RM's sign-off (if any) — shown
+  // in the Completion tab (full detail) and summarised in the Next-action block.
+  const reviewSignoff: any = t.status === 'submitted_for_signoff' ? (pendingSignoffs[0] ?? null) : null
+  const completionContent = (acceptedSignoff || reviewSignoff) ? (
+    <div className="space-y-3">
+      {reviewSignoff && <RmSignoffCard s={reviewSignoff} tone="review" ticketId={t.id} title={submissionLabel(reviewSignoff)} freshEvidence={isEvidenceResubmission} collapsible defaultOpen />}
+      {acceptedSignoff && <RmSignoffCard s={acceptedSignoff} tone="approved" ticketId={t.id} collapsible defaultOpen />}
+    </div>
   ) : null
-
-  // ── Review-panel items (COC/POC · snag · VO) — same compact-row-+-pop-up
-  // structure as the quote panel. Each row opens a modal with the full detail and
-  // the action buttons; the old standalone sections/cards are removed.
-  const cocReviewItems = t.status === 'submitted_for_signoff' ? pendingSignoffs.map((s: any) => ({
-    id: s.id as string,
-    dot: 'bg-[#C6A35D]',
-    title: submissionLabel(s),
-    subtitle: `submitted ${formatDateTime(s.created_at)}`,
-    statusLabel: 'Under review',
-    statusCls: 'text-amber-700 dark:text-[#C6A35D]',
-    modalTitle: 'Completion — review',
-    body: (
-      <div className="space-y-4">
-        <RmSignoffCard s={s} tone="review" ticketId={t.id} title={submissionLabel(s)} freshEvidence={isEvidenceResubmission} priorUrls={priorEvidenceUrls} />
-        <ApproveSignoffCard ticketId={t.id} />
-        <div className="grid grid-cols-2 gap-2">
-          <RequestEvidenceButton ticketId={t.id} />
-          <RaiseSnagButton ticketId={t.id} />
-        </div>
-      </div>
-    ),
-  })) : []
 
   const snagReviewItems = (snagAwaitingApproval && latestSnag?.scheduled_at) ? [{
     id: 'snag-schedule',
@@ -929,9 +880,15 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
             description={t.description ?? ''} photoUrls={Array.isArray(t.photo_urls) ? t.photo_urls : []} title={t.title} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} priority={t.priority} />
         )}
 
-        {/* Completion (COC & POC) under review — compact row → pop-up with the full
-            submission + Approve / Request evidence / Raise snag. */}
-        <RmReviewPanel heading="Completion (COC &amp; POC)" items={cocReviewItems} />
+        {/* Completion (COC & POC) submitted → inline summary + Approve completion,
+            with Raise snag / Request more evidence behind "More". Full detail is in
+            the Completion tab. */}
+        {reviewSignoff && (
+          <RmCompletionReview ticketId={t.id} label={submissionLabel(reviewSignoff)} submittedAt={reviewSignoff.created_at}
+            photoCount={(reviewSignoff.before_urls ?? []).length + (reviewSignoff.after_urls ?? []).length}
+            docCount={(reviewSignoff.coc_url ? 1 : 0) + (reviewSignoff.invoice_url ? 1 : 0)}
+            noteCount={reviewSignoff.notes && String(reviewSignoff.notes).trim() ? 1 : 0} />
+        )}
 
         {t.status === 'scheduled' && t.schedule_status === 'proposed' && t.scheduled_at && <AcceptScheduleCard ticketId={t.id} scheduledAt={t.scheduled_at} />}
 

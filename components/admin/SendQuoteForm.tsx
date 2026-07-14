@@ -656,7 +656,7 @@ export function SendQuoteForm({
             </button>
             <p className="text-xs text-[var(--text-muted)] mt-1">The job schedules to this time once the quote is approved.</p>
             {pickOpen && (
-              <Modal onClose={() => setPickOpen(false)} maxWidth="max-w-sm">
+              <Modal onClose={() => setPickOpen(false)} maxWidth="max-w-2xl">
                 {close => (
                   <>
                     <DrawerHeader onClose={close} title={<span className="flex items-center gap-2"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-blue-500/15 text-blue-600 dark:text-blue-400"><Calendar size={15} /></span><span className="text-base font-bold text-[var(--text)]">Set proposed start date &amp; time</span></span>} />

@@ -54,7 +54,7 @@ export function DeclineWorkButton({ ticketId, jobRef, title, storeName, dueAt, d
   const detailTitle = [title, storeName].filter(Boolean).join(' – ') || 'Quote request'
   return (
     <>
-      {!defaultOpen && <button type="button" onClick={() => setOpen(true)} className="w-full py-2.5 rounded-xl ring-1 ring-red-500/40 text-red-600 dark:text-red-400 text-sm font-semibold hover:bg-red-500/10 transition">Decline work</button>}
+      {!defaultOpen && <button type="button" onClick={() => setOpen(true)} className="w-full py-2.5 rounded-lg ring-1 ring-red-500/40 text-red-600 dark:text-red-400 text-sm font-semibold hover:bg-red-500/10 transition">Decline work</button>}
       {open && (
         <Modal onClose={() => { if (!busy) close() }} maxWidth="max-w-3xl">
           {dismiss => (
@@ -112,8 +112,8 @@ export function DeclineWorkButton({ ticketId, jobRef, title, storeName, dueAt, d
 
               {err && <p className="text-xs text-red-500">{err}</p>}
               <div className="flex gap-2">
-                <button type="button" onClick={dismiss} disabled={busy} className="flex-1 py-2.5 rounded-xl ring-1 ring-[var(--border)] text-[var(--text)] text-sm font-medium transition hover:bg-[var(--hover)] disabled:opacity-50">Cancel</button>
-                <button type="button" onClick={submit} disabled={busy} className="flex flex-1 items-center justify-center gap-2 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition disabled:opacity-50"><XCircle size={16} /> {busy ? 'Declining…' : 'Decline request'}</button>
+                <button type="button" onClick={dismiss} disabled={busy} className="flex-1 py-2.5 rounded-lg ring-1 ring-[var(--border)] text-[var(--text)] text-sm font-medium transition hover:bg-[var(--hover)] disabled:opacity-50">Cancel</button>
+                <button type="button" onClick={submit} disabled={busy} className="flex flex-1 items-center justify-center gap-2 py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition disabled:opacity-50"><XCircle size={16} /> {busy ? 'Declining…' : 'Decline request'}</button>
               </div>
             </>
           )}
@@ -132,7 +132,7 @@ export function SupplierQuoteBar({ ticketId, priority, createdAt, canDecline = f
   return (
     <>
       <div className="flex items-center gap-2">
-        <button type="button" onClick={() => setQuoteOpen(true)} className={`${canDecline ? 'flex-1' : 'w-full'} py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition`}>Upload Quote</button>
+        <button type="button" onClick={() => setQuoteOpen(true)} className={`${canDecline ? 'flex-1' : 'w-full'} py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition`}>Upload Quote</button>
         {canDecline && (
           <MoreMenu>
             <MoreActionItem icon={<XCircle size={16} />} label="Decline work" tone="danger" onClick={() => setDeclineOpen(true)} />
@@ -157,7 +157,7 @@ export function SupplierQuoteSubmittedActions({ ticketId, canDecline = false, de
   return (
     <>
       <div className="flex items-center gap-2">
-        <button type="button" onClick={() => setQuoteOpen(true)} className={`${canDecline ? 'flex-1' : 'w-full'} inline-flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-blue-600 dark:text-blue-400 ring-1 ring-blue-500/50 transition hover:bg-blue-500/10`}>View my quote <ArrowRight size={15} /></button>
+        <button type="button" onClick={() => setQuoteOpen(true)} className={`${canDecline ? 'flex-1' : 'w-full'} inline-flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold text-blue-600 dark:text-blue-400 ring-1 ring-blue-500/50 transition hover:bg-blue-500/10`}>View my quote <ArrowRight size={15} /></button>
         {canDecline && (
           <MoreMenu>
             <MoreActionItem icon={<XCircle size={16} />} label="Decline work" tone="danger" onClick={() => setDeclineOpen(true)} />
@@ -191,11 +191,11 @@ export function AcceptSnagCard({ ticketId, priority, createdAt }: { ticketId: st
 
   return (
     <>
-      <button onClick={() => setOpen(true)} className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition flex items-center justify-center gap-1.5">
+      <button onClick={() => setOpen(true)} className="w-full py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition flex items-center justify-center gap-1.5">
         <Calendar size={15} /> Accept snag &amp; schedule fix
       </button>
       {open && (
-        <Modal onClose={() => setOpen(false)} maxWidth="max-w-sm">
+        <Modal onClose={() => setOpen(false)} maxWidth="max-w-2xl">
           {close => (
             <>
               <DrawerHeader onClose={close} title={<p className="font-semibold text-[var(--text)]">Schedule the snag fix</p>} />
@@ -215,7 +215,7 @@ export function AssignTechnicianButton({ technicians = [] }: { technicians?: { i
   const [techId, setTechId] = useState('')
   return (
     <>
-      <button onClick={() => setOpen(true)} className="w-full py-2.5 rounded-xl ring-1 ring-[var(--border)] text-[var(--text)] text-sm font-semibold hover:bg-[var(--hover)] transition flex items-center justify-center gap-1.5">
+      <button onClick={() => setOpen(true)} className="w-full py-2.5 rounded-lg ring-1 ring-[var(--border)] text-[var(--text)] text-sm font-semibold hover:bg-[var(--hover)] transition flex items-center justify-center gap-1.5">
         <Wrench size={15} /> Assign technician
       </button>
       {open && (
@@ -261,7 +261,7 @@ export function MarkInProgressButton({ ticketId }: { ticketId: string }) {
         <p className="text-sm text-[var(--text)]">Mark this job as in progress? The store will see that the work has started.</p>
         {err && <p className="text-xs text-red-500">{err}</p>}
         <div className="flex gap-2">
-          <button onClick={go} disabled={busy} className="flex-1 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Starting…' : 'Yes, mark in progress'}</button>
+          <button onClick={go} disabled={busy} className="flex-1 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Starting…' : 'Yes, mark in progress'}</button>
           <button onClick={() => { setConfirm(false); setErr('') }} disabled={busy} className="flex-1 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm disabled:opacity-50">Cancel</button>
         </div>
       </div>
@@ -272,7 +272,7 @@ export function MarkInProgressButton({ ticketId }: { ticketId: string }) {
       <p className="text-sm text-[var(--text-muted)]">
         Mark the ticket in progress when you&apos;re ready to start the job, or once the scheduled time has arrived. This lets the store know you&apos;re on your way or busy with the work.
       </p>
-      <button onClick={() => setConfirm(true)} className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition flex items-center justify-center gap-1.5">
+      <button onClick={() => setConfirm(true)} className="w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition flex items-center justify-center gap-1.5">
         <PlayCircle size={15} /> Mark in progress
       </button>
     </div>
@@ -322,7 +322,7 @@ export function SupplierVariationGate({ ticketId, priority, createdAt, variation
         <SendQuoteForm ticketId={ticketId} variant="variation" competitive priority={priority} createdAt={createdAt} defaultOpen />
       </PopupForm>
       {/* Confirm no further VOs → un-greys the RM's Final close-out (locked after). */}
-      <button onClick={confirmNoVos} disabled={busy} className="w-full py-2.5 rounded-xl ring-1 ring-emerald-500/40 text-emerald-600 dark:text-emerald-400 text-sm font-semibold hover:bg-emerald-500/10 transition disabled:opacity-50">{busy ? 'Confirming…' : 'No further variation orders — ready for close-out'}</button>
+      <button onClick={confirmNoVos} disabled={busy} className="w-full py-2.5 rounded-lg ring-1 ring-emerald-500/40 text-emerald-600 dark:text-emerald-400 text-sm font-semibold hover:bg-emerald-500/10 transition disabled:opacity-50">{busy ? 'Confirming…' : 'No further variation orders — ready for close-out'}</button>
       {err && <p className="text-xs text-red-500">{err}</p>}
     </div>
   )
@@ -340,7 +340,7 @@ export function StartSnagButton({ ticketId }: { ticketId: string }) {
   }
   return (
     <>
-      <button onClick={go} disabled={busy} className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition disabled:opacity-50">{busy ? 'Starting…' : 'Start snag fix (in progress)'}</button>
+      <button onClick={go} disabled={busy} className="w-full py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition disabled:opacity-50">{busy ? 'Starting…' : 'Start snag fix (in progress)'}</button>
       {err && <p className="text-xs text-red-500">{err}</p>}
     </>
   )
@@ -369,11 +369,11 @@ export function ScheduleJobCard({ ticketId, priority, createdAt, technicians = [
 
   return (
     <>
-      <button onClick={() => setOpen(true)} className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition flex items-center justify-center gap-1.5">
+      <button onClick={() => setOpen(true)} className="w-full py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition flex items-center justify-center gap-1.5">
         <Calendar size={15} /> Schedule job
       </button>
       {open && (
-        <Modal onClose={() => { setOpen(false); setPendingIso(null) }} maxWidth="max-w-sm">
+        <Modal onClose={() => { setOpen(false); setPendingIso(null) }} maxWidth="max-w-2xl">
           {close => (
             <>
               <DrawerHeader onClose={close} title={<p className="font-semibold text-[var(--text)]">Schedule the job</p>} />

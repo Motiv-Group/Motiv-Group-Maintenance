@@ -19,6 +19,7 @@ import { Card } from '@/components/exec/ui'
 import { WorkflowActions } from '@/components/workflow/WorkflowActions'
 import { RmPipeline } from '@/components/regional/RmPipeline'
 import { SupplierAttachments } from '@/components/workflow/SupplierAttachments'
+import { CompletionBody } from '@/components/workflow/CompletionBody'
 import { QuoteSummary, type QuoteSummaryStatus } from '@/components/workflow/QuoteSummary'
 import { MarkInProgressButton, DeclineWorkButton, AcceptSnagCard, StartSnagButton, SupplierVariationGate, SupplierQuoteBar, SupplierQuoteSubmittedActions } from '@/components/supplier/SupplierJobActions'
 import { PopupForm } from '@/components/supplier/PopupForm'
@@ -85,29 +86,7 @@ function SignoffCard({ s, snag, ticketId, collapsible = false, title, reason }: 
             <p className="text-sm text-[var(--text)]">{reasonText}</p>
           </div>
         )}
-        <div>
-          <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Proof of completion</div>
-          <div className="flex flex-wrap gap-x-4 gap-y-1">
-            {before.map((u, j) => <ViewTrackedLink key={`b${j}`} ticketId={ticketId} itemType="photo" itemLabel={`Completion before photo ${j + 1}`} href={u} className="text-sm text-blue-600 dark:text-blue-400 hover:underline">Before {j + 1}</ViewTrackedLink>)}
-            {after.map((u, j) => <ViewTrackedLink key={`a${j}`} ticketId={ticketId} itemType="photo" itemLabel={`Completion after photo ${j + 1}`} href={u} className="text-sm text-blue-600 dark:text-blue-400 hover:underline">After {j + 1}</ViewTrackedLink>)}
-            {!before.length && !after.length && <span className="text-sm text-[var(--text-faint)]">No photos uploaded</span>}
-          </div>
-        </div>
-        {(s.coc_url || s.invoice_url) && (
-          <div>
-            <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Certificate of Completion</div>
-            <div className="flex flex-wrap gap-x-4 gap-y-1">
-              {s.coc_url && <ViewTrackedLink ticketId={ticketId} itemType="coc" itemLabel="Completion COC" href={s.coc_url} className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"><FileText size={14} /> View COC</ViewTrackedLink>}
-              {s.invoice_url && <ViewTrackedLink ticketId={ticketId} itemType="invoice" itemLabel="Completion invoice" href={s.invoice_url} className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"><FileText size={14} /> View invoice</ViewTrackedLink>}
-            </div>
-          </div>
-        )}
-        {s.notes && (
-          <div>
-            <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Notes</div>
-            <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{s.notes}</p>
-          </div>
-        )}
+        <CompletionBody ticketId={ticketId} beforeUrls={before} afterUrls={after} cocUrl={s.coc_url} invoiceUrl={s.invoice_url} notes={s.notes} uploadedAt={s.created_at} />
     </>
   )
   // Collapsed by default — tap the "Completion · … / Under review" row to reveal
@@ -660,7 +639,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
                 <div className="rounded-xl bg-red-500/10 ring-1 ring-red-500/30 p-3.5 text-sm text-[var(--text-muted)]">The evidence request is paused while your dispute is under review — continue the conversation in the Dispute section above.</div>
               ) : (
                 <>
-                  <PopupForm label={t.status === 'evidence_requested' ? 'Upload more evidence' : 'Upload COC & POC'} tone="success"><SubmitCompletionForm defaultOpen ticketId={t.id} evidenceRequested={t.status === 'evidence_requested'} requireBoth={t.status !== 'evidence_requested'} /></PopupForm>
+                  <PopupForm label={t.status === 'evidence_requested' ? 'Upload more evidence' : 'Upload COC & POC'} tone="primary"><SubmitCompletionForm defaultOpen ticketId={t.id} evidenceRequested={t.status === 'evidence_requested'} requireBoth={t.status !== 'evidence_requested'} /></PopupForm>
                   {t.status === 'evidence_requested' && <RaiseDisputeButton ticketId={t.id} origin="evidence" />}
                 </>
               )}
@@ -673,9 +652,16 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
             </div>
           )}
           {awarded && t.status === 'submitted_for_signoff' && (
-            <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 flex items-start gap-2.5">
-              <Clock size={16} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
-              <p className="text-sm text-[var(--text-muted)]">COC &amp; POC submitted — awaiting the regional manager&apos;s approval.</p>
+            <div className="rounded-lg bg-[var(--surface)] ring-1 ring-[var(--border)] p-4">
+              <div className="flex items-start gap-3">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-500"><Clock size={20} /></span>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-[var(--text)]">Certificate and proof of completion submitted</p>
+                  {pendingSignoffs[0]?.created_at && <p className="mt-0.5 text-[13px] text-[var(--text-faint)]">{formatDateTime(pendingSignoffs[0].created_at)}</p>}
+                  <p className="mt-2 text-sm text-[var(--text-muted)]">Awaiting Regional Manager approval.</p>
+                  <p className="text-sm text-[var(--text-muted)]">You will be notified when a decision is made.</p>
+                </div>
+              </div>
             </div>
           )}
           {/* Close-out stage → the supplier may raise a variation order for extra work;

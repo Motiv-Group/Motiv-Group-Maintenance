@@ -3,7 +3,7 @@
 // RM ticket-page custom actions for the competitive-quoting model.
 import { useState, useMemo, useEffect, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, Pencil, CalendarClock, Plus, Camera, Info, X, FileText, ChevronDown, ChevronLeft, ChevronRight, MessageSquare, XCircle, Send, AlertCircle, Trash2, Store, ShieldCheck, Clock, Calendar } from 'lucide-react'
+import { Search, Pencil, CalendarClock, Plus, Camera, Info, X, FileText, ChevronDown, ChevronLeft, ChevronRight, MessageSquare, XCircle, Send, AlertCircle, Trash2, Store, ShieldCheck, Clock, Calendar, ClipboardCheck, Image as ImageIcon, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { StarInput, Stars } from '@/components/ui/Stars'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { QuoteSummary } from '@/components/workflow/QuoteSummary'
@@ -42,7 +42,7 @@ export function MoreMenu({ children, fullWidth = false }: { children: ReactNode;
         onClick={() => setOpen(o => !o)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className={`${fullWidth ? 'w-full justify-center' : ''} flex items-center gap-1.5 py-2.5 px-4 rounded-xl ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm font-semibold hover:bg-[var(--hover)] transition`}
+        className={`${fullWidth ? 'w-full justify-center' : ''} flex items-center gap-1.5 py-2.5 px-4 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm font-semibold hover:bg-[var(--hover)] transition`}
       >
         More <ChevronDown size={15} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
@@ -373,29 +373,32 @@ export function RequestInfoButton({ ticketId, defaultOpen = false, onClose, trig
 // "Before photos missing" is intentionally NOT a reason here.
 const EVIDENCE_REASONS = ['After photos missing', 'COC missing', 'Photos unclear', 'Work not fully shown', 'Other']
 
-export function RequestEvidenceButton({ ticketId }: { ticketId: string }) {
+export function RequestEvidenceButton({ ticketId, defaultOpen = false, onClose, trigger }: { ticketId: string; defaultOpen?: boolean; onClose?: () => void; trigger?: (open: () => void) => ReactNode }) {
   const router = useRouter()
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(defaultOpen)
   const [preset, setPreset] = useState('')
   const [other, setOther] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  const close = () => { setOpen(false); onClose?.() }
 
   async function submit() {
     if (!preset) { setErr('Choose what evidence is needed.'); return }
     const reason = preset === 'Other' ? other.trim() : preset
     if (!reason) { setErr('Tell the supplier what evidence you need.'); return }
     setBusy(true); setErr('')
-    try { await post(`/api/tickets/${ticketId}/transition`, { action: 'request_evidence', reason }); setPreset(''); setOther(''); setOpen(false); setBusy(false); router.refresh() }
+    try { await post(`/api/tickets/${ticketId}/transition`, { action: 'request_evidence', reason }); setPreset(''); setOther(''); setBusy(false); close(); router.refresh() }
     catch (e: any) { setErr(e.message); setBusy(false) }
   }
 
   const input = 'w-full px-3 py-2 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm'
   return (
     <>
-      <button onClick={() => setOpen(true)} className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-[#0a0e17] text-sm font-semibold transition">Request more evidence</button>
+      {trigger ? trigger(() => setOpen(true)) : (!defaultOpen &&
+        <button onClick={() => setOpen(true)} className="flex-1 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-[#0a0e17] text-sm font-semibold transition">Request more evidence</button>
+      )}
       {open && (
-        <Modal title="Request more evidence" onClose={() => setOpen(false)}>
+        <Modal title="Request more evidence" onClose={close}>
           <p className="text-xs text-[var(--text-muted)]">The supplier is asked to add the missing evidence and resubmit the COC &amp; POC.</p>
           <select autoFocus className={input} value={preset} onChange={e => setPreset(e.target.value)}>
             <option value="">— Choose what&apos;s needed —</option>
@@ -404,8 +407,8 @@ export function RequestEvidenceButton({ ticketId }: { ticketId: string }) {
           {preset === 'Other' && <textarea className={`${input} min-h-[80px]`} placeholder="What evidence do you need?" value={other} onChange={e => setOther(e.target.value)} />}
           {err && <p className="text-xs text-red-500">{err}</p>}
           <div className="flex gap-2">
-            <button disabled={busy} onClick={submit} className="flex-1 py-2 rounded-xl bg-green-600 hover:bg-green-500 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Sending…' : 'Send request'}</button>
-            <button onClick={() => setOpen(false)} className="flex-1 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-semibold">Cancel</button>
+            <button disabled={busy} onClick={submit} className="flex-1 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Sending…' : 'Send request'}</button>
+            <button onClick={close} className="flex-1 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm">Cancel</button>
           </div>
         </Modal>
       )}
@@ -416,29 +419,32 @@ export function RequestEvidenceButton({ ticketId }: { ticketId: string }) {
 // ── Raise snag (red button → modal, mirrors Request more info) ───
 const SNAG_REASONS = ['Work incomplete', 'Quality below standard', 'Wrong materials or spec', 'Safety concern', 'Other']
 
-export function RaiseSnagButton({ ticketId }: { ticketId: string }) {
+export function RaiseSnagButton({ ticketId, defaultOpen = false, onClose, trigger }: { ticketId: string; defaultOpen?: boolean; onClose?: () => void; trigger?: (open: () => void) => ReactNode }) {
   const router = useRouter()
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(defaultOpen)
   const [preset, setPreset] = useState('')
   const [other, setOther] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  const close = () => { setOpen(false); onClose?.() }
 
   async function submit() {
     if (!preset) { setErr('Choose the snag reason.'); return }
     const description = preset === 'Other' ? other.trim() : preset
     if (!description) { setErr('Describe the snag.'); return }
     setBusy(true); setErr('')
-    try { await post(`/api/tickets/${ticketId}/transition`, { action: 'raise_snag', description }); setPreset(''); setOther(''); setOpen(false); setBusy(false); router.refresh() }
+    try { await post(`/api/tickets/${ticketId}/transition`, { action: 'raise_snag', description }); setPreset(''); setOther(''); setBusy(false); close(); router.refresh() }
     catch (e: any) { setErr(e.message); setBusy(false) }
   }
 
   const input = 'w-full px-3 py-2 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm'
   return (
     <>
-      <button onClick={() => setOpen(true)} className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-semibold transition">Raise snag</button>
+      {trigger ? trigger(() => setOpen(true)) : (!defaultOpen &&
+        <button onClick={() => setOpen(true)} className="flex-1 py-2.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-semibold transition">Raise snag</button>
+      )}
       {open && (
-        <Modal title="Raise a snag" onClose={() => setOpen(false)}>
+        <Modal title="Raise a snag" onClose={close}>
           <p className="text-xs text-[var(--text-muted)]">The completion is sent back. The supplier accepts the snag, schedules the corrective work and resubmits.</p>
           <select autoFocus className={input} value={preset} onChange={e => setPreset(e.target.value)}>
             <option value="">— Choose a reason —</option>
@@ -447,8 +453,8 @@ export function RaiseSnagButton({ ticketId }: { ticketId: string }) {
           {preset === 'Other' && <textarea className={`${input} min-h-[80px]`} placeholder="Describe the snag…" value={other} onChange={e => setOther(e.target.value)} />}
           {err && <p className="text-xs text-red-500">{err}</p>}
           <div className="flex gap-2">
-            <button disabled={busy} onClick={submit} className="flex-1 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Raising…' : 'Raise snag'}</button>
-            <button onClick={() => setOpen(false)} className="flex-1 py-2 rounded-xl ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm">Cancel</button>
+            <button disabled={busy} onClick={submit} className="flex-1 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Raising…' : 'Raise snag'}</button>
+            <button onClick={close} className="flex-1 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm">Cancel</button>
           </div>
         </Modal>
       )}
@@ -800,6 +806,52 @@ export function RmReviewPanel({ heading, items }: {
           {active.body}
         </Modal>
       )}
+    </div>
+  )
+}
+
+// ── RM completion review (COC & POC submitted) — inline "Next action" block ──
+// A summary of the submission (photo/document/note counts) with a primary
+// "Approve completion" (opens the star-rating step) and a "More" menu holding
+// Raise snag / Request more evidence. The full photos + COC live in the
+// Completion tab; this block is just the decision surface.
+export function RmCompletionReview({ ticketId, label, submittedAt, photoCount, docCount, noteCount }: {
+  ticketId: string; label: string; submittedAt: string; photoCount: number; docCount: number; noteCount: number
+}) {
+  const [active, setActive] = useState<'approve' | 'evidence' | 'snag' | null>(null)
+  const done = () => setActive(null)
+  return (
+    <div className="space-y-3">
+      <div className="rounded-lg bg-[var(--surface)] ring-1 ring-[var(--border)] p-4 space-y-3">
+        <div className="flex items-center gap-2.5">
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#C6A35D]/15 text-[#C6A35D]"><ClipboardCheck size={16} /></span>
+          <span className="min-w-0">
+            <span className="block text-sm font-bold text-[var(--text)]">{label}</span>
+            <span className="block text-[11px] text-[var(--text-faint)]">Submitted {formatDateTime(submittedAt)}</span>
+          </span>
+        </div>
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-1.5 text-sm text-[var(--text-muted)]">
+          <span className="flex items-center gap-1.5"><ImageIcon size={15} className="text-[var(--text-faint)]" /> <span className="font-semibold text-[var(--text)]">{photoCount}</span> Photo{photoCount === 1 ? '' : 's'}</span>
+          <span className="flex items-center gap-1.5"><FileText size={15} className="text-[var(--text-faint)]" /> <span className="font-semibold text-[var(--text)]">{docCount}</span> Document{docCount === 1 ? '' : 's'}</span>
+          <span className="flex items-center gap-1.5"><MessageSquare size={15} className="text-[var(--text-faint)]" /> <span className="font-semibold text-[var(--text)]">{noteCount}</span> Note{noteCount === 1 ? '' : 's'}</span>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <button type="button" onClick={() => setActive('approve')} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500"><CheckCircle2 size={16} /> Approve completion</button>
+        <MoreMenu>
+          <MoreActionItem icon={<AlertTriangle size={16} />} label="Raise snag" onClick={() => setActive('snag')} />
+          <MoreActionItem icon={<MessageSquare size={16} />} label="Request more evidence" onClick={() => setActive('evidence')} />
+        </MoreMenu>
+      </div>
+
+      {active === 'approve' && (
+        <Modal title="Approve completion" maxWidth="max-w-lg" onClose={done}>
+          <ApproveSignoffCard ticketId={ticketId} />
+        </Modal>
+      )}
+      {active === 'evidence' && <RequestEvidenceButton ticketId={ticketId} defaultOpen onClose={done} />}
+      {active === 'snag' && <RaiseSnagButton ticketId={ticketId} defaultOpen onClose={done} />}
     </div>
   )
 }
