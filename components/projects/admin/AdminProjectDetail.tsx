@@ -37,7 +37,7 @@ export function AdminProjectDetail({
   const [deleting, setDeleting] = useState(false)
   const [q, setQ] = useState('')
   const [status, setStatus] = useState<StatusFilter>('all')
-  const [sort, setSort] = useState<'branch' | 'name' | 'progress' | 'end'>('branch')
+  const [sort, setSort] = useState<'branch' | 'name' | 'progress' | 'start' | 'end'>('branch')
 
   const rfidTotal = useMemo(() => stores.reduce((s, r) => s + (r.rfid_m2_required ?? 0), 0), [stores])
   const daysLeft = daysUntil(project.end_date)
@@ -54,6 +54,7 @@ export function AdminProjectDetail({
     sorted.sort((a, b) => {
       if (sort === 'progress') return b.progress - a.progress
       if (sort === 'name') return (a.store_name ?? '').localeCompare(b.store_name ?? '')
+      if (sort === 'start') return (a.start_date ?? '').localeCompare(b.start_date ?? '')
       if (sort === 'end') return (a.end_date ?? '').localeCompare(b.end_date ?? '')
       return a.branch_code.localeCompare(b.branch_code)
     })
@@ -131,6 +132,7 @@ export function AdminProjectDetail({
           <option value="branch">Sort: Branch</option>
           <option value="name">Sort: Name</option>
           <option value="progress">Sort: Completion</option>
+          <option value="start">Sort: Start date</option>
           <option value="end">Sort: End date</option>
         </select>
       </div>
@@ -146,6 +148,7 @@ export function AdminProjectDetail({
                 <th className="text-left px-3 py-2 font-semibold">Branch</th>
                 <th className="text-left px-3 py-2 font-semibold hidden md:table-cell">Town</th>
                 <th className="text-right px-3 py-2 font-semibold hidden md:table-cell">RFID m²</th>
+                <th className="text-left px-3 py-2 font-semibold hidden lg:table-cell">Start</th>
                 <th className="text-left px-3 py-2 font-semibold hidden lg:table-cell">End</th>
                 <th className="text-left px-3 py-2 font-semibold">Status</th>
                 <th className="px-3 py-2" />
@@ -170,6 +173,7 @@ export function AdminProjectDetail({
                   <td className="px-3 py-2 text-[var(--text-muted)]">{s.branch_code}</td>
                   <td className="px-3 py-2 text-[var(--text-muted)] hidden md:table-cell">{s.town ?? '—'}</td>
                   <td className="px-3 py-2 text-[var(--text-muted)] text-right hidden md:table-cell tabular-nums">{s.rfid_m2_required ?? '—'}</td>
+                  <td className="px-3 py-2 text-[var(--text-muted)] hidden lg:table-cell">{formatDate(s.start_date) || '—'}</td>
                   <td className="px-3 py-2 text-[var(--text-muted)] hidden lg:table-cell">{formatDate(s.end_date) || '—'}</td>
                   <td className="px-3 py-2">
                     <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${s.overdue ? OVERDUE_PILL : STORE_STATUS_PILL[s.status]}`}>
@@ -181,7 +185,7 @@ export function AdminProjectDetail({
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-3 py-10 text-center text-sm text-[var(--text-muted)]">
+                  <td colSpan={9} className="px-3 py-10 text-center text-sm text-[var(--text-muted)]">
                     {stores.length === 0 ? 'No stores yet — import a spreadsheet to get started.' : 'No stores match your filters.'}
                   </td>
                 </tr>
