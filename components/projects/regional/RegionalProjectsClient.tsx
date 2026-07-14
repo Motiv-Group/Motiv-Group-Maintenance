@@ -92,11 +92,11 @@ function FeaturedCard({ f }: { f: Featured }) {
   const daysLeft = daysUntil(project.end_date)
   return (
     <Card className="overflow-hidden">
-      <div className="relative bg-gradient-to-br from-blue-600 via-blue-700 to-slate-900 p-5 text-white">
-        {s.coverUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={s.coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover opacity-25" />
-        )}
+      <div className="relative p-5 text-white overflow-hidden">
+        {/* Background: the project's own cover if set, else the default project image. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={s.coverUrl || '/projects/project-bed-linen.png'} alt="" className="absolute inset-0 h-full w-full object-cover" />
+        <div className="absolute inset-0 bg-gradient-to-br from-black/75 via-black/55 to-black/70" />
         <div className="relative space-y-4">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
