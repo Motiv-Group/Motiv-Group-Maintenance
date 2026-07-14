@@ -23,7 +23,7 @@ import { CompletionBody, CompletionFooterNote } from '@/components/workflow/Comp
 import { QuoteSummary, type QuoteSummaryStatus } from '@/components/workflow/QuoteSummary'
 import { MarkInProgressButton, DeclineWorkButton, AcceptSnagCard, StartSnagButton, SupplierVariationGate, SupplierQuoteBar, SupplierQuoteSubmittedActions } from '@/components/supplier/SupplierJobActions'
 import { PopupForm } from '@/components/supplier/PopupForm'
-import { RaiseDisputeButton, DisputeThread } from '@/components/dispute/DisputeBox'
+import { RaiseDisputeButton, RaiseDisputeMore, DisputeThread } from '@/components/dispute/DisputeBox'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { EditedLine } from '@/components/ui/EditedLine'
 import { buildTicketTimeline } from '@/lib/ticket-timeline'
@@ -125,7 +125,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
   // they don't belong to). The awarded/invite check below is the real gate.
   if (!t) redirect('/supplier/tickets')
   const [{ data: store }, { data: updates }, { data: invite }, { data: myQuotes }, { data: technicianRows }, { data: signoffRows }, { data: snagRows }, { data: companyRow }, { data: variationRows }, { data: viewRows }, { data: declineRows }, { data: requoteRows }, { data: roundRows }, { data: disputeRows }, { data: disputeMsgRows }, { data: snagEventRows }, { data: disputeExtra }] = await Promise.all([
-    admin.from('stores').select('name, sub_store').eq('id', t.store_id ?? '').single(),
+    admin.from('stores').select('name, sub_store, branch_code').eq('id', t.store_id ?? '').single(),
     admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('ticket_suppliers').select('supplier_id, status, invited_at, decline_reason, responded_at, declined_by, requote_requested_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).maybeSingle(),
     admin.from('quotes').select('id, amount, amount_incl_vat, description, file_url, status, valid_until, proposed_schedule_at, decline_reason, created_at, updated_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).order('created_at', { ascending: false }),
@@ -200,6 +200,8 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
   // Declined off the ticket (not re-invited) — show "Declined" to the supplier.
   const declinedForMe = !awarded && !!invite && ['declined', 'closed'].includes((invite as any).status)
   const storeName = storeLabel(store?.name, store?.sub_store)
+  // "Store · Branch" label shown on the raise-dispute pop-up's subject card.
+  const disputeStore = [storeName, (store as any)?.branch_code].filter(Boolean).join(' · ') || null
   const editorName = t.edited_by ? ((await admin.from('user_profiles').select('full_name').eq('id', t.edited_by).single()).data?.full_name ?? null) : null
   // Standalone Individual (home) job — no company/store. Load the customer's name +
   // contact so the supplier can arrange the home visit.
@@ -641,10 +643,10 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
               {openDispute ? (
                 <div className="rounded-xl bg-red-500/10 ring-1 ring-red-500/30 p-3.5 text-sm text-[var(--text-muted)]">This snag is paused while your dispute is under review — continue the conversation in the Dispute section above.</div>
               ) : (
-                <>
-                  <AcceptSnagCard ticketId={t.id} priority={t.priority} createdAt={t.created_at} />
-                  <RaiseDisputeButton ticketId={t.id} origin="snag" />
-                </>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+                  <div className="flex-1"><AcceptSnagCard ticketId={t.id} priority={t.priority} createdAt={t.created_at} /></div>
+                  <RaiseDisputeMore ticketId={t.id} origin="snag" subjectTitle={latestSnag?.description ?? latestSnag?.required_correction ?? 'Snag raised'} jobRef={t.job_ref} store={disputeStore} />
+                </div>
               )}
             </div>
           )}
@@ -664,10 +666,12 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
               {t.status === 'evidence_requested' && openDispute ? (
                 <div className="rounded-xl bg-red-500/10 ring-1 ring-red-500/30 p-3.5 text-sm text-[var(--text-muted)]">The evidence request is paused while your dispute is under review — continue the conversation in the Dispute section above.</div>
               ) : (
-                <>
-                  <PopupForm label={t.status === 'evidence_requested' ? 'Upload more evidence' : 'Upload COC & POC'} tone="primary"><SubmitCompletionForm defaultOpen ticketId={t.id} evidenceRequested={t.status === 'evidence_requested'} requireBoth={t.status !== 'evidence_requested'} /></PopupForm>
-                  {t.status === 'evidence_requested' && <RaiseDisputeButton ticketId={t.id} origin="evidence" />}
-                </>
+                <div className={t.status === 'evidence_requested' ? 'flex flex-col gap-2 sm:flex-row sm:items-start' : ''}>
+                  <div className={t.status === 'evidence_requested' ? 'flex-1' : ''}>
+                    <PopupForm label={t.status === 'evidence_requested' ? 'Upload more evidence' : 'Upload COC & POC'} tone="primary"><SubmitCompletionForm defaultOpen ticketId={t.id} evidenceRequested={t.status === 'evidence_requested'} requireBoth={t.status !== 'evidence_requested'} /></PopupForm>
+                  </div>
+                  {t.status === 'evidence_requested' && <RaiseDisputeMore ticketId={t.id} origin="evidence" subjectTitle="More evidence requested" jobRef={t.job_ref} store={disputeStore} />}
+                </div>
               )}
             </div>
           )}
@@ -699,7 +703,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
             ) : (
               <div className="space-y-3">
                 <SupplierVariationGate ticketId={t.id} priority={t.priority} createdAt={t.created_at} variationCount={variationCount} status={t.status as 'approved_closeout' | 'vo_declined'} declineReason={latestVoRejectReason} noVosConfirmed={!!t.vo_none_confirmed_at} />
-                {t.status === 'vo_declined' && !openDispute && <RaiseDisputeButton ticketId={t.id} origin="variation" />}
+                {t.status === 'vo_declined' && !openDispute && <RaiseDisputeButton ticketId={t.id} origin="variation" subjectTitle="Variation order declined" jobRef={t.job_ref} store={disputeStore} />}
               </div>
             )
           )}
