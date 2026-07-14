@@ -5,66 +5,170 @@
 // hours). The Submit COC & POC flow lives on its own page (/complete).
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Calendar, Wrench, PlayCircle } from 'lucide-react'
+import { Calendar, Wrench, PlayCircle, XCircle, X, FileText, Ticket, MapPin, Info, ArrowRight, Plus } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { DrawerHeader } from '@/components/exec/Drawer'
 import { SchedulePicker } from '@/components/ui/SchedulePicker'
 import { SendQuoteForm } from '@/components/admin/SendQuoteForm'
-import { PopupForm } from '@/components/supplier/PopupForm'
+import { MoreMenu, MoreActionItem } from '@/components/regional/RmTicketActions'
+import { QuoteSummary, type QuoteSummaryData, type QuoteSchedule } from '@/components/workflow/QuoteSummary'
 import { createClient } from '@/lib/supabase/client'
+import { formatDateTime } from '@/lib/utils'
+
+// Shared detail bundle for the decline pop-up's "Request details" card.
+interface DeclineDetails { jobRef?: string | null; title?: string | null; storeName?: string | null; dueAt?: string | null }
 
 async function transition(ticketId: string, body: Record<string, unknown>) {
   const res = await fetch(`/api/tickets/${ticketId}/transition`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
   if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Something went wrong')
 }
 
-// Decline the work (before award) — a pop-up with preset reasons + free-text
-// "Other". Sets the supplier's invite to declined and notifies the RM.
-const DECLINE_REASONS = ['Fully booked / no capacity', 'Outside our service area', 'Not our trade / speciality', 'Pricing not viable', 'Other']
-export function DeclineWorkButton({ ticketId }: { ticketId: string }) {
+// Decline the quote request (before award) — a pop-up with the request details, a
+// required reason + optional note. Sets the supplier's invite to declined + notifies
+// the RM. `defaultOpen` renders it straight in a modal (no trigger button).
+const DECLINE_REASONS = ['Unable to meet the deadline', 'Outside our service area', 'Work is outside our expertise', 'No availability', 'Insufficient information', 'Other (please specify)']
+const MAX_DECLINE_NOTE = 250
+export function DeclineWorkButton({ ticketId, jobRef, title, storeName, dueAt, defaultOpen = false, onClose }: { ticketId: string; defaultOpen?: boolean; onClose?: () => void } & DeclineDetails) {
   const router = useRouter()
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(defaultOpen)
   const [reason, setReason] = useState('')
-  const [other, setOther] = useState('')
+  const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
-  const input = 'w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)]'
+  const close = () => { setOpen(false); onClose?.() }
+  const input = 'w-full px-3 py-2.5 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)]'
 
   async function submit() {
-    if (!reason) { setErr('Choose a reason.'); return }
-    const finalReason = reason === 'Other' ? other.trim() : reason
-    if (!finalReason) { setErr('Tell the manager why.'); return }
+    if (!reason) { setErr('Choose a reason for declining.'); return }
+    // Note is optional context appended to the required reason.
+    const finalReason = [reason, note.trim()].filter(Boolean).join(' — ')
     setBusy(true); setErr('')
     try {
       const res = await fetch('/api/supplier/decline-work', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticketId, reason: finalReason }) })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed')
-      router.refresh()
+      close(); router.refresh()
     } catch (e: any) { setErr(e.message); setBusy(false) }
   }
 
+  const detailTitle = [title, storeName].filter(Boolean).join(' – ') || 'Quote request'
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className="w-full py-2.5 rounded-xl ring-1 ring-red-500/40 text-red-600 dark:text-red-400 text-sm font-semibold hover:bg-red-500/10 transition">Decline work</button>
+      {!defaultOpen && <button type="button" onClick={() => setOpen(true)} className="w-full py-2.5 rounded-lg ring-1 ring-red-500/40 text-red-600 dark:text-red-400 text-sm font-semibold hover:bg-red-500/10 transition">Decline work</button>}
       {open && (
-        <Modal onClose={() => setOpen(false)} maxWidth="max-w-md">
-          {close => (
+        <Modal onClose={() => { if (!busy) close() }} maxWidth="max-w-3xl">
+          {dismiss => (
             <>
-              <DrawerHeader onClose={close} title={<p className="font-semibold text-[var(--text)]">Decline this work</p>} />
-              <p className="text-xs text-[var(--text-muted)]">The manager is notified and the job goes to other suppliers. This can&apos;t be undone.</p>
-              <select autoFocus className={input} value={reason} onChange={e => { setReason(e.target.value); setErr('') }}>
-                <option value="">— Choose a reason —</option>
-                {DECLINE_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
-              </select>
-              {reason === 'Other' && <textarea className={`${input} min-h-[80px]`} placeholder="Tell the manager why…" value={other} onChange={e => setOther(e.target.value)} />}
+              <div className="flex items-start justify-between gap-3">
+                <span className="flex items-center gap-3">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-red-500/15 text-red-600 dark:text-red-400"><XCircle size={22} /></span>
+                  <h3 className="text-xl font-bold text-[var(--text)]">Decline quote request?</h3>
+                </span>
+                <button type="button" onClick={dismiss} aria-label="Close" className="shrink-0 -m-1 rounded-lg p-1.5 text-[var(--text-faint)] transition hover:bg-[var(--hover)] hover:text-[var(--text)]"><X size={20} /></button>
+              </div>
+              <div className="space-y-0.5 text-sm text-[var(--text-muted)]">
+                <p>The regional manager will be notified and this request may be sent to other suppliers.</p>
+                <p>You will no longer be able to submit a quote unless you are invited again.</p>
+              </div>
+
+              {/* Request details */}
+              <div className="rounded-xl bg-[var(--surface)] ring-1 ring-[var(--border)] p-4">
+                <div className="flex items-start gap-3">
+                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[var(--surface-2)] text-[var(--text-faint)]"><FileText size={18} /></span>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-faint)]">Request details</p>
+                    <p className="text-base font-bold text-[var(--text)]">{detailTitle}</p>
+                    <div className="mt-1.5 flex flex-wrap gap-x-5 gap-y-1 text-xs text-[var(--text-muted)]">
+                      {jobRef && <span className="inline-flex items-center gap-1.5"><Ticket size={13} /> TICKET: <span className="font-medium text-[var(--text)]">{jobRef}</span></span>}
+                      {dueAt && <span className="inline-flex items-center gap-1.5"><Calendar size={13} /> DUE DATE: <span className="font-medium text-[var(--text)]">{formatDateTime(dueAt)}</span></span>}
+                      {storeName && <span className="inline-flex items-center gap-1.5"><MapPin size={13} /> LOCATION: <span className="font-medium text-[var(--text)]">{storeName}</span></span>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-[var(--text)]">Reason for declining <span className="text-red-500">*</span></label>
+                  <select autoFocus className={input} value={reason} onChange={e => { setReason(e.target.value); setErr('') }}>
+                    <option value="">— Select a reason —</option>
+                    {DECLINE_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-[var(--text)]">Please provide more details</label>
+                    <div className="relative">
+                      <textarea maxLength={MAX_DECLINE_NOTE} className={`${input} min-h-[100px] pb-7`} placeholder="Add details (optional)" value={note} onChange={e => setNote(e.target.value.slice(0, MAX_DECLINE_NOTE))} />
+                      <span className="pointer-events-none absolute bottom-2.5 right-3 text-[11px] tabular-nums text-[var(--text-faint)]">{note.length} / {MAX_DECLINE_NOTE}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2.5 rounded-xl bg-blue-500/10 ring-1 ring-blue-500/25 px-3.5 py-3">
+                    <Info size={15} className="mt-0.5 shrink-0 text-blue-600 dark:text-blue-400" />
+                    <p className="text-sm text-[var(--text-muted)]">Declining helps us route work to available suppliers. Thank you for your response.</p>
+                  </div>
+                </div>
+              </div>
+
               {err && <p className="text-xs text-red-500">{err}</p>}
               <div className="flex gap-2">
-                <button onClick={submit} disabled={busy} className="flex-1 py-2 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-500 disabled:opacity-50">{busy ? 'Declining…' : 'Decline work'}</button>
-                <button onClick={close} disabled={busy} className="flex-1 py-2 rounded-xl ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm disabled:opacity-50">Cancel</button>
+                <button type="button" onClick={dismiss} disabled={busy} className="flex-1 py-2.5 rounded-lg ring-1 ring-[var(--border)] text-[var(--text)] text-sm font-medium transition hover:bg-[var(--hover)] disabled:opacity-50">Cancel</button>
+                <button type="button" onClick={submit} disabled={busy} className="flex flex-1 items-center justify-center gap-2 py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition disabled:opacity-50"><XCircle size={16} /> {busy ? 'Declining…' : 'Decline request'}</button>
               </div>
             </>
           )}
         </Modal>
       )}
+    </>
+  )
+}
+
+// Quote-phase action bar (mirrors the RM's): a primary "Upload Quote" button + a
+// "More" dropdown holding the secondary actions (Decline work). The action modals
+// render as siblings driven by lifted state, so they open instantly.
+export function SupplierQuoteBar({ ticketId, priority, createdAt, canDecline = false, decline }: { ticketId: string; priority: string; createdAt: string; canDecline?: boolean; decline?: DeclineDetails }) {
+  const [quoteOpen, setQuoteOpen] = useState(false)
+  const [declineOpen, setDeclineOpen] = useState(false)
+  return (
+    <>
+      <div className="flex items-center gap-2">
+        <button type="button" onClick={() => setQuoteOpen(true)} className={`${canDecline ? 'flex-1' : 'w-full'} py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition`}>Upload Quote</button>
+        {canDecline && (
+          <MoreMenu>
+            <MoreActionItem icon={<XCircle size={16} />} label="Decline work" tone="danger" onClick={() => setDeclineOpen(true)} />
+          </MoreMenu>
+        )}
+      </div>
+      {quoteOpen && (
+        <Modal onClose={() => setQuoteOpen(false)} maxWidth="max-w-3xl">
+          {close => <div><SendQuoteForm defaultOpen competitive ticketId={ticketId} priority={priority} createdAt={createdAt} onClose={close} /></div>}
+        </Modal>
+      )}
+      {declineOpen && <DeclineWorkButton ticketId={ticketId} defaultOpen onClose={() => setDeclineOpen(false)} {...decline} />}
+    </>
+  )
+}
+
+// Quote-submitted "Next action" actions: a primary "View my quotes" + a "More"
+// dropdown holding Decline work (the supplier can still opt out after quoting).
+export function SupplierQuoteSubmittedActions({ ticketId, canDecline = false, decline, quote, schedule }: { ticketId: string; canDecline?: boolean; decline?: DeclineDetails; quote?: QuoteSummaryData | null; schedule?: QuoteSchedule | null }) {
+  const [declineOpen, setDeclineOpen] = useState(false)
+  const [quoteOpen, setQuoteOpen] = useState(false)
+  return (
+    <>
+      <div className="flex items-center gap-2">
+        <button type="button" onClick={() => setQuoteOpen(true)} className={`${canDecline ? 'flex-1' : 'w-full'} inline-flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold text-blue-600 dark:text-blue-400 ring-1 ring-blue-500/50 transition hover:bg-blue-500/10`}>View my quote <ArrowRight size={15} /></button>
+        {canDecline && (
+          <MoreMenu>
+            <MoreActionItem icon={<XCircle size={16} />} label="Decline work" tone="danger" onClick={() => setDeclineOpen(true)} />
+          </MoreMenu>
+        )}
+      </div>
+      {quoteOpen && quote && (
+        <Modal onClose={() => setQuoteOpen(false)} maxWidth="max-w-4xl">
+          {() => <QuoteSummary quote={quote} status="pending" title="Your submitted quote" schedule={schedule} ticketId={ticketId} />}
+        </Modal>
+      )}
+      {declineOpen && <DeclineWorkButton ticketId={ticketId} defaultOpen onClose={() => setDeclineOpen(false)} {...decline} />}
     </>
   )
 }
@@ -86,11 +190,11 @@ export function AcceptSnagCard({ ticketId, priority, createdAt }: { ticketId: st
 
   return (
     <>
-      <button onClick={() => setOpen(true)} className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition flex items-center justify-center gap-1.5">
+      <button onClick={() => setOpen(true)} className="w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition flex items-center justify-center gap-1.5">
         <Calendar size={15} /> Accept snag &amp; schedule fix
       </button>
       {open && (
-        <Modal onClose={() => setOpen(false)} maxWidth="max-w-sm">
+        <Modal onClose={() => setOpen(false)} maxWidth="max-w-2xl">
           {close => (
             <>
               <DrawerHeader onClose={close} title={<p className="font-semibold text-[var(--text)]">Schedule the snag fix</p>} />
@@ -110,7 +214,7 @@ export function AssignTechnicianButton({ technicians = [] }: { technicians?: { i
   const [techId, setTechId] = useState('')
   return (
     <>
-      <button onClick={() => setOpen(true)} className="w-full py-2.5 rounded-xl ring-1 ring-[var(--border)] text-[var(--text)] text-sm font-semibold hover:bg-[var(--hover)] transition flex items-center justify-center gap-1.5">
+      <button onClick={() => setOpen(true)} className="w-full py-2.5 rounded-lg ring-1 ring-[var(--border)] text-[var(--text)] text-sm font-semibold hover:bg-[var(--hover)] transition flex items-center justify-center gap-1.5">
         <Wrench size={15} /> Assign technician
       </button>
       {open && (
@@ -156,7 +260,7 @@ export function MarkInProgressButton({ ticketId }: { ticketId: string }) {
         <p className="text-sm text-[var(--text)]">Mark this job as in progress? The store will see that the work has started.</p>
         {err && <p className="text-xs text-red-500">{err}</p>}
         <div className="flex gap-2">
-          <button onClick={go} disabled={busy} className="flex-1 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Starting…' : 'Yes, mark in progress'}</button>
+          <button onClick={go} disabled={busy} className="flex-1 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Starting…' : 'Yes, mark in progress'}</button>
           <button onClick={() => { setConfirm(false); setErr('') }} disabled={busy} className="flex-1 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm disabled:opacity-50">Cancel</button>
         </div>
       </div>
@@ -167,7 +271,7 @@ export function MarkInProgressButton({ ticketId }: { ticketId: string }) {
       <p className="text-sm text-[var(--text-muted)]">
         Mark the ticket in progress when you&apos;re ready to start the job, or once the scheduled time has arrived. This lets the store know you&apos;re on your way or busy with the work.
       </p>
-      <button onClick={() => setConfirm(true)} className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition flex items-center justify-center gap-1.5">
+      <button onClick={() => setConfirm(true)} className="w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition flex items-center justify-center gap-1.5">
         <PlayCircle size={15} /> Mark in progress
       </button>
     </div>
@@ -185,6 +289,7 @@ export function SupplierVariationGate({ ticketId, priority, createdAt, variation
   const router = useRouter()
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  const [voOpen, setVoOpen] = useState(false)
   const hasVOs = variationCount > 0 || status === 'vo_declined'
   const raiseLabel = status === 'vo_declined' ? 'Re-submit variation order' : hasVOs ? 'Raise another variation order' : 'Raise variation order'
 
@@ -204,20 +309,29 @@ export function SupplierVariationGate({ ticketId, priority, createdAt, variation
 
   return (
     <div className="space-y-3">
-      {status === 'vo_declined' ? (
+      {/* Only the vo_declined callout stays here; the "your COC & POC were approved…"
+          line lives in the Next-action sub-heading, so it isn't said twice. */}
+      {status === 'vo_declined' && (
         <div className="rounded-xl bg-red-500/10 ring-1 ring-red-500/30 p-3.5 space-y-1">
           <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Variation order declined</p>
           <p className="text-sm text-[var(--text)]">{declineReason || 'The regional manager declined your variation order.'}</p>
           <p className="text-sm text-[var(--text-muted)]">Submit a revised variation order, or confirm there are none so the manager can close out.</p>
         </div>
-      ) : (
-        <p className="text-sm text-[var(--text-muted)]">Your COC &amp; POC were approved. Raise a variation order for any extra work, or confirm there are none so the manager can close out.</p>
       )}
-      <PopupForm label={raiseLabel} tone="primary">
-        <SendQuoteForm ticketId={ticketId} variant="variation" competitive priority={priority} createdAt={createdAt} defaultOpen />
-      </PopupForm>
-      {/* Confirm no further VOs → un-greys the RM's Final close-out (locked after). */}
-      <button onClick={confirmNoVos} disabled={busy} className="w-full py-2.5 rounded-xl ring-1 ring-emerald-500/40 text-emerald-600 dark:text-emerald-400 text-sm font-semibold hover:bg-emerald-500/10 transition disabled:opacity-50">{busy ? 'Confirming…' : 'No further variation orders — ready for close-out'}</button>
+      {/* Primary = confirm no further VOs (ready for close-out); raising a VO lives
+          under "More" like the other action blocks. */}
+      <div className="flex items-center gap-2">
+        <button onClick={confirmNoVos} disabled={busy} className="flex-1 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition disabled:opacity-50">{busy ? 'Confirming…' : 'Ready for Close-out'}</button>
+        <MoreMenu up>
+          <MoreActionItem icon={<Plus size={16} />} label={raiseLabel} onClick={() => setVoOpen(true)} />
+        </MoreMenu>
+      </div>
+      <p className="text-[11px] text-[var(--text-faint)]">To raise a variation order, tap <span className="font-semibold text-[var(--text-muted)]">More → Raise VO</span>.</p>
+      {voOpen && (
+        <Modal onClose={() => setVoOpen(false)} maxWidth="max-w-2xl">
+          {close => <div><SendQuoteForm ticketId={ticketId} variant="variation" competitive priority={priority} createdAt={createdAt} defaultOpen onClose={close} /></div>}
+        </Modal>
+      )}
       {err && <p className="text-xs text-red-500">{err}</p>}
     </div>
   )
@@ -235,7 +349,7 @@ export function StartSnagButton({ ticketId }: { ticketId: string }) {
   }
   return (
     <>
-      <button onClick={go} disabled={busy} className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition disabled:opacity-50">{busy ? 'Starting…' : 'Start snag fix (in progress)'}</button>
+      <button onClick={go} disabled={busy} className="w-full py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition disabled:opacity-50">{busy ? 'Starting…' : 'Start snag fix (in progress)'}</button>
       {err && <p className="text-xs text-red-500">{err}</p>}
     </>
   )
@@ -264,11 +378,11 @@ export function ScheduleJobCard({ ticketId, priority, createdAt, technicians = [
 
   return (
     <>
-      <button onClick={() => setOpen(true)} className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition flex items-center justify-center gap-1.5">
+      <button onClick={() => setOpen(true)} className="w-full py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition flex items-center justify-center gap-1.5">
         <Calendar size={15} /> Schedule job
       </button>
       {open && (
-        <Modal onClose={() => { setOpen(false); setPendingIso(null) }} maxWidth="max-w-sm">
+        <Modal onClose={() => { setOpen(false); setPendingIso(null) }} maxWidth="max-w-2xl">
           {close => (
             <>
               <DrawerHeader onClose={close} title={<p className="font-semibold text-[var(--text)]">Schedule the job</p>} />

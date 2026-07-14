@@ -5,6 +5,8 @@ import { rateLimit } from '@/lib/rate-limit'
 import { sendPushToMany } from '@/lib/push'
 import { z } from 'zod'
 import { parseJsonBody } from '@/lib/validate'
+import { rmOwnsTicket } from '@/lib/rm-ticket-access'
+import { signManyUrls } from '@/lib/storage'
 
 const BodySchema = z.object({
   action: z.string().optional(),
@@ -90,6 +92,50 @@ async function resolveDispute(admin: Admin, ticket: any, dispute: any, outcome: 
 // Supplier↔RM dispute thread over a snag or a "more evidence" request. A dispute
 // pauses the snag/evidence step (enforced in the transition route) until the RM
 // resolves it as 'upheld' (requirement stands) or 'withdrawn' (dropped → close-out).
+// GET — the ticket's OPEN dispute + its messages, for the Today-queue "View
+// dispute" pop-up (RM + supplier). Access mirrors the POST gate.
+export async function GET(_req: Request, props: { params: Promise<{ id: string }> }) {
+  const { id } = await props.params
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+
+  const admin = createAdminClient()
+  const { data: prof } = await admin.from('user_profiles').select('role, company_id').eq('id', user.id).single()
+  const role = prof?.role
+  const isIndividual = role === 'individual'
+  const { data: ticket } = await admin.from('tickets').select('id, company_id, region_id, store_id, supplier_id, created_by').eq('id', id).single()
+  if (!ticket) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  let ok = false
+  let viewerRole: 'supplier' | 'regional_manager' = 'regional_manager'
+  if (role === 'supplier') {
+    ok = (await supplierIds(admin, ticket.supplier_id)).includes(user.id); viewerRole = 'supplier'
+  } else if (isIndividual) {
+    ok = ticket.created_by === user.id
+  } else if (role === 'regional_manager') {
+    ok = await rmOwnsTicket(admin, user.id, ticket)
+  } else if (role === 'executive') {
+    ok = ticket.company_id === prof?.company_id
+  }
+  if (!ok) return NextResponse.json({ error: 'Not your ticket' }, { status: 403 })
+
+  const { data: disputes } = await admin.from('ticket_disputes')
+    .select('id, origin, status, outcome, resolution_note, pending_outcome, pending_by, created_at, resolved_at')
+    .eq('ticket_id', id).eq('status', 'open').order('created_at', { ascending: false })
+  const dispute = (disputes ?? [])[0] ?? null
+  if (!dispute) return NextResponse.json({ dispute: null, viewerRole })
+
+  const { data: msgs } = await admin.from('ticket_dispute_messages')
+    .select('id, author_role, body, evidence_urls, created_at').eq('dispute_id', dispute.id).order('created_at', { ascending: true })
+  const messages = await Promise.all(((msgs ?? []) as any[]).map(async m => ({
+    ...m, evidence_urls: Array.isArray(m.evidence_urls) ? await signManyUrls(m.evidence_urls) : [],
+  })))
+
+  const what = dispute.origin === 'snag' ? 'snag' : dispute.origin === 'variation' ? 'variation order' : 'evidence request'
+  return NextResponse.json({ dispute, messages, viewerRole, subject: `${what[0].toUpperCase()}${what.slice(1)}` })
+}
+
 export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   const supabase = await createClient()
@@ -135,8 +181,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   } else if (isIndividual) {
     if (ticket.created_by !== user.id) return NextResponse.json({ error: 'Not your ticket' }, { status: 403 })
   } else {
-    const rms = await regionIds(admin, ticket.region_id)
-    if (!rms.includes(user.id)) return NextResponse.json({ error: 'Not your ticket' }, { status: 403 })
+    if (!(await rmOwnsTicket(admin, user.id, ticket))) return NextResponse.json({ error: 'Not your ticket' }, { status: 403 })
   }
 
   const now = new Date().toISOString()

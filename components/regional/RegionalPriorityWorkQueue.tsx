@@ -6,16 +6,19 @@
 // border effect as the SM cards; RM-appropriate statuses, next steps and links.
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { AlertCircle, AlertOctagon, AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, ClipboardCheck, ClipboardList, ReceiptText, UserPlus } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { AlertCircle, AlertOctagon, AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, ClipboardCheck, ClipboardList, ReceiptText, UserPlus, MessageSquare } from 'lucide-react'
 import type { RegionalTicketRow } from '@/lib/health/data'
 import { Card } from '@/components/exec/ui'
+import { Modal } from '@/components/ui/Modal'
 import { CategoryIcon } from '@/components/client/ticketBadges'
 import { AssignSuppliersButton, QuoteReviewButton, SignoffReviewButton } from '@/components/regional/RmTicketActions'
+import { DisputeReviewButton } from '@/components/dispute/DisputeBox'
 import { rmStatusMeta, formatDate, formatDateTime, humanizeDuration, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
 
 type QueueFilter = 'all' | 'assign' | 'quotes' | 'signoff' | 'sla' | 'snags'
 type Tone = 'red' | 'purple' | 'gold' | 'green' | 'orange' | 'blue'
-type SupplierChoice = { id: string; name: string; avgRating?: number; ratingCount?: number }
+type SupplierChoice = { id: string; name: string; avgRating?: number; ratingCount?: number; category?: string | null }
 
 const URGENCY_RANK: Record<string, number> = { urgent: 0, P1: 0, high: 1, P2: 1, medium: 2, P3: 2, low: 3, P4: 3 }
 const INACTIVE = new Set(['completed', 'cancelled', 'declined'])
@@ -148,6 +151,12 @@ function QueueRow({ ticket, nowMs, suppliers, motivSuppliers }: { ticket: Region
   // Genuinely critical (P1 / urgent) tickets get a RED action button so they stand out.
   const critical = ['P1', 'urgent'].includes(String(ticket.priority))
   const ctaCls = `relative z-20 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-bold transition lg:w-40 ${critical ? 'border-red-500/60 bg-red-500/10 text-red-600 hover:bg-red-500/15 dark:text-red-300' : 'border-blue-500/60 text-blue-600 hover:bg-blue-500/10 dark:text-blue-300'}`
+  // Close-out: the status badge is blue while awaiting the supplier's "no further
+  // VOs" confirmation and amber once confirmed; the close-out button is disabled
+  // until then (the RM can only finalise after the supplier confirms).
+  const closeout = ticket.status === 'approved_closeout'
+  const closeoutCls = 'relative z-20 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-bold transition lg:w-40 border-blue-500/60 text-blue-600 hover:bg-blue-500/10 dark:text-blue-300'
+  const closeoutBadge = ticket.voNoneConfirmed ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : 'bg-blue-500/15 text-blue-700 dark:text-blue-400'
   return (
     <div className="relative grid gap-4 border-b border-[var(--border)] px-4 py-4 transition last:border-b-0 hover:bg-[var(--hover)] lg:grid-cols-[1fr_200px_1.1fr_160px] lg:items-center">
       {/* The whole row (except the CTA island) links to the ticket. */}
@@ -162,9 +171,10 @@ function QueueRow({ ticket, nowMs, suppliers, motivSuppliers }: { ticket: Region
       </div>
 
       <div className="min-w-0">
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           <span className={`inline-flex w-[72px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${priorityBadgeClass(String(ticket.priority))}`}>{PRIORITY_LEVEL_LABELS[String(ticket.priority)] ?? 'Medium'}</span>
-          <span className={`inline-flex w-[120px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${meta.cls}`}>{meta.label}</span>
+          <span className={`inline-flex w-[120px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${ticket.disputed ? 'bg-violet-500/15 text-violet-700 dark:text-violet-400' : closeout ? closeoutBadge : meta.cls}`}>{ticket.disputed ? 'Dispute' : closeout ? 'Close-out' : meta.label}</span>
+          {ticket.disputeUnread && <span className="relative z-20 inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-blue-500/15 px-1.5 py-1 text-[10px] font-bold text-blue-700 dark:text-blue-400"><MessageSquare size={10} /> New message</span>}
         </div>
         <p className="mt-1.5 truncate text-sm text-[var(--text-muted)]">{ticket.supplierAssigned ? 'Supplier assigned' : 'No supplier assigned'}</p>
       </div>
@@ -183,7 +193,10 @@ function QueueRow({ ticket, nowMs, suppliers, motivSuppliers }: { ticket: Region
       </div>
 
       <div className="flex lg:justify-end">
-        {reviewQuote ? (
+        {ticket.disputed ? (
+          <DisputeReviewButton ticketId={ticket.id} viewerRole="regional_manager"
+            trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}>View dispute</button>} />
+        ) : reviewQuote ? (
           <QuoteReviewButton ticketId={ticket.id}
             trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}>Approve quote</button>} />
         ) : reviewSignoff ? (
@@ -193,6 +206,10 @@ function QueueRow({ ticket, nowMs, suppliers, motivSuppliers }: { ticket: Region
           <AssignSuppliersButton ticketId={ticket.id} suppliers={suppliers} motivSuppliers={motivSuppliers}
             awaitingById={ticket.engagedSupplierIds} declinedSupplierIds={ticket.declinedSupplierIds}
             trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}>Assign supplier</button>} />
+        ) : closeout ? (
+          ticket.voNoneConfirmed
+            ? <CloseOutConfirm ticketId={ticket.id} storeName={ticket.storeName} category={ticket.category || ticket.title} className={closeoutCls} />
+            : <span className={`${closeoutCls} opacity-50 pointer-events-none`} aria-disabled="true">Close-out</span>
         ) : (
           <Link href={ticketUrl} className={ctaCls}>View Ticket <ArrowRight size={15} /></Link>
         )}
@@ -239,6 +256,50 @@ function priorityBadgeClass(p: string): string {
 // The RM's next step per ticket status — short, professional, and covering every
 // state (no generic fallback for a real status). Mirrors the ticket-detail
 // "Next action" wording so the queue and the ticket page always agree.
+// "Close-out" (once the supplier has confirmed no VOs) opens a confirmation
+// pop-up before completing the ticket — the close-out is final.
+function CloseOutConfirm({ ticketId, storeName, category, className }: { ticketId: string; storeName: string; category: string; className: string }) {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  async function confirm() {
+    setBusy(true); setErr('')
+    try {
+      const res = await fetch(`/api/tickets/${ticketId}/transition`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'close_out' }) })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to close out the ticket.')
+      setOpen(false); router.refresh()
+    } catch (e: any) { setErr(e.message); setBusy(false) }
+  }
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} className={className}>Close-out <ArrowRight size={15} /></button>
+      {open && (
+        <Modal onClose={() => { if (!busy) setOpen(false) }} maxWidth="max-w-lg">
+          {close => (
+            <div className="space-y-5">
+              <div className="flex flex-col items-center text-center">
+                <span className="grid h-14 w-14 place-items-center rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"><CheckCircle2 size={30} /></span>
+                <h3 className="mt-3 text-xl font-bold text-[var(--text)]">Complete this ticket?</h3>
+                <p className="mt-1.5 text-sm text-[var(--text-muted)]">This finalises the close-out and marks <span className="font-semibold text-[var(--text)]">{category}</span> at <span className="font-semibold text-[var(--text)]">{storeName}</span> as <span className="font-semibold text-emerald-600 dark:text-emerald-400">Completed</span>. This can&apos;t be undone.</p>
+              </div>
+              <div className="flex items-start gap-2.5 rounded-xl bg-emerald-500/10 px-3.5 py-3 ring-1 ring-emerald-500/25">
+                <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                <p className="text-sm text-[var(--text-muted)]">The supplier confirmed there are no further variation orders, so the job is ready to be closed out and completed.</p>
+              </div>
+              {err && <p className="text-sm text-red-500">{err}</p>}
+              <div className="flex gap-2">
+                <button type="button" onClick={close} disabled={busy} className="flex-1 rounded-xl py-2.5 text-sm font-medium text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-50">Cancel</button>
+                <button type="button" onClick={confirm} disabled={busy} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50"><CheckCircle2 size={16} /> {busy ? 'Completing…' : 'Complete ticket'}</button>
+              </div>
+            </div>
+          )}
+        </Modal>
+      )}
+    </>
+  )
+}
+
 function nextStep(t: RegionalTicketRow): string {
   if (t.disputed) return 'Resolve the open dispute'
   switch (t.status) {
@@ -261,7 +322,7 @@ function nextStep(t: RegionalTicketRow): string {
     case 'snag':
     case 'snag_assigned':
     case 'snag_in_progress': return 'Snag in progress'
-    case 'approved_closeout': return 'Finalise the close-out'
+    case 'approved_closeout': return t.voNoneConfirmed ? 'Finalise the close-out' : 'Awaiting the supplier to confirm variation orders'
     case 'completed': return 'Completed'
     case 'cancelled':
     case 'declined': return 'Closed'

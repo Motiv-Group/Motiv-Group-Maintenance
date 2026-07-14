@@ -10,10 +10,13 @@ import { X, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react'
  * view-tracking POST the old ViewTrackedLink recorded, so the audit trail
  * still shows "viewed Photo 2".
  */
-export function PhotoThumbs({ urls, ticketId, label = 'Photo' }: {
+export function PhotoThumbs({ urls, ticketId, label = 'Photo', limit }: {
   urls: string[]
   ticketId?: string
   label?: string
+  /** Cap the number of tiles: shows limit-1 thumbnails + a "+N" overflow tile and
+   *  a "View all N photos" link. The lightbox still steps through every photo. */
+  limit?: number
 }) {
   const [open, setOpen] = useState<number | null>(null)
 
@@ -49,10 +52,15 @@ export function PhotoThumbs({ urls, ticketId, label = 'Photo' }: {
 
   if (!urls.length) return null
 
+  // Optional cap: show limit-1 thumbnails + a "+N" overflow tile.
+  const truncated = typeof limit === 'number' && limit > 0 && urls.length > limit
+  const visible = truncated ? urls.slice(0, limit - 1) : urls
+  const moreCount = truncated ? urls.length - (limit - 1) : 0
+
   return (
     <>
       <div className="flex flex-wrap gap-2">
-        {urls.map((u, i) => (
+        {visible.map((u, i) => (
           <button
             key={i} type="button" onClick={() => show(i)}
             className="group relative h-20 w-20 sm:h-24 sm:w-24 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface-2)] focus:outline-none focus:ring-2 focus:ring-[#C6A35D]/60"
@@ -63,7 +71,21 @@ export function PhotoThumbs({ urls, ticketId, label = 'Photo' }: {
             <span className="absolute bottom-0 right-0 rounded-tl-md bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white">{i + 1}</span>
           </button>
         ))}
+        {truncated && (
+          <button
+            type="button" onClick={() => show(limit! - 1)}
+            className="grid h-20 w-20 sm:h-24 sm:w-24 place-items-center rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface-2)] text-sm font-semibold text-[var(--text-muted)] transition hover:bg-[var(--hover)] focus:outline-none focus:ring-2 focus:ring-[#C6A35D]/60"
+            title={`View all ${urls.length} ${label.toLowerCase()}s`}
+          >
+            +{moreCount}
+          </button>
+        )}
       </div>
+      {truncated && (
+        <button type="button" onClick={() => show(0)} className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-blue-600 transition hover:underline dark:text-blue-400">
+          View all {urls.length} photos <ChevronRight size={15} />
+        </button>
+      )}
 
       {open !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4" onClick={() => setOpen(null)}>

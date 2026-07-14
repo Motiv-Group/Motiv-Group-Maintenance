@@ -2,6 +2,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { serverError } from '@/lib/api-error'
 import { rateLimit } from '@/lib/rate-limit'
+import { getBriefingForUser } from '@/lib/briefing/generate'
 import { z } from 'zod'
 import { parseJsonBody } from '@/lib/validate'
 
@@ -29,7 +30,7 @@ export async function POST(request: Request) {
   if (!SCOPES.has(scope as string) || typeof scopeId !== 'string' || !scopeId) return NextResponse.json({ error: 'Bad request' }, { status: 400 })
 
   const admin = createAdminClient()
-  const { data: profile } = await admin.from('user_profiles').select('company_id').eq('id', user.id).single()
+  const { data: profile } = await admin.from('user_profiles').select('company_id, role').eq('id', user.id).single()
   if (!profile?.company_id) return NextResponse.json({ error: 'No company on account' }, { status: 403 })
 
   const date = new Date().toISOString().slice(0, 10)
@@ -37,5 +38,9 @@ export async function POST(request: Request) {
     .eq('company_id', profile.company_id).eq('scope', scope ?? '').eq('scope_id', scopeId).eq('briefing_date', date)
   if (error) return serverError(error)
 
-  return NextResponse.json({ ok: true })
+  // Regenerate straight away and return it, so the client can update the overview
+  // text IN PLACE (no full page refresh). getBriefingForUser re-derives the scope
+  // from the caller and re-caches the fresh briefing.
+  const fresh = await getBriefingForUser({ userId: user.id, role: profile.role ?? '', companyId: profile.company_id })
+  return NextResponse.json({ ok: true, headline: fresh?.headline ?? null, body: fresh?.body ?? null })
 }

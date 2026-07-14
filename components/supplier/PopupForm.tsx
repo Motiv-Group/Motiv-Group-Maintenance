@@ -24,7 +24,7 @@ export function PopupForm({ label, tone = 'primary', maxWidth = 'max-w-2xl', chi
       : 'bg-blue-600 hover:bg-blue-500 text-white'
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={`w-full py-2.5 rounded-xl text-sm font-semibold transition ${btn}`}>{label}</button>
+      <button type="button" onClick={() => setOpen(true)} className={`w-full py-2.5 rounded-lg text-sm font-semibold transition ${btn}`}>{label}</button>
       {open && <Modal onClose={() => setOpen(false)} maxWidth={maxWidth}>{() => <div>{cloneElement(children, { onClose: () => setOpen(false) })}</div>}</Modal>}
     </>
   )

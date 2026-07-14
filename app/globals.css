@@ -86,6 +86,16 @@ html.dark select option {
   #motiv-splash { animation-duration: 1s; }
 }
 
+/* Modal enter effects — run on the same paint as mount (see components/ui/Modal.tsx),
+   so a heavy modal child never leaves the content invisible waiting on a rAF flip.
+   modalPop animates TRANSFORM only (opacity stays 1) so the content is visible on the
+   first frame even if the animation is throttled/disabled — no invisible window ever. */
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes modalPop {
+  from { transform: translateY(12px) scale(0.97); }
+  to   { transform: none; }
+}
+
 /* ── Report (print) layout ── */
 .report-cover {
   text-align: center;

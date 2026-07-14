@@ -7,6 +7,7 @@ import { revalidatePath } from 'next/cache'
 import { rateLimit } from '@/lib/rate-limit'
 import { sendPushToMany } from '@/lib/push'
 import { resolveTransition, statusLabel, type WorkflowRole } from '@/lib/workflow'
+import { rmOwnsTicket } from '@/lib/rm-ticket-access'
 import { loadSlaResolver } from '@/lib/health/data'
 import type { SlaTargets } from '@/lib/health/types'
 import type { Database } from '@/lib/database.types'
@@ -359,10 +360,7 @@ async function hasAccess(admin: Admin, role: WorkflowRole, userId: string, ticke
     const { data: inv } = await admin.from('ticket_suppliers').select('id').eq('ticket_id', ticket.id).in('supplier_id', mine.length ? mine : ['00000000-0000-0000-0000-000000000000']).maybeSingle()
     return !!inv
   }
-  if (role === 'regional_manager') {
-    const { data } = await admin.from('regional_users').select('region_id').eq('user_id', userId)
-    return !!ticket.region_id && (data ?? []).some(l => l.region_id === ticket.region_id)
-  }
+  if (role === 'regional_manager') return rmOwnsTicket(admin, userId, ticket)
   if (role === 'store_manager') {
     const { data } = await admin.from('store_users').select('store_id').eq('user_id', userId)
     return (data ?? []).some(l => l.store_id === ticket.store_id)

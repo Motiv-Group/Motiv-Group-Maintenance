@@ -6,18 +6,19 @@ import { Card } from '@/components/exec/ui'
 import { PhotoThumbs } from '@/components/ui/PhotoThumbs'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { formatDateTime } from '@/lib/utils'
+import { TicketTimeline } from '@/components/ui/TicketTimeline'
 import type { TimelineEvent } from '@/lib/ticket-timeline'
 
 type PhotoGroup = { label: string; urls: string[] }
 type Update = { body: string; created_at: string }
-type Tab = 'photos' | 'documents' | 'quotes' | 'completion' | 'activity' | 'timeline' | 'history'
+type Tab = 'photos' | 'documents' | 'quotes' | 'completion' | 'dispute' | 'activity' | 'timeline' | 'history'
 
 /** Lower tabbed section of the RM ticket detail — Photos (every image on the
  *  ticket, grouped by source), Documents (COC/invoice/quote/VO attachments),
  *  Quotes (the approved quote + any under review), Completion (the approved COC
  *  & POC), Activity (supplier updates) and the full Timeline. */
 export function RmTicketTabs({
-  ticketId, photoGroups, updates, timeline, history, documents, quotes, completion,
+  ticketId, photoGroups, updates, timeline, history, documents, quotes, completion, dispute, defaultTab,
 }: {
   ticketId: string
   photoGroups: PhotoGroup[]
@@ -27,14 +28,18 @@ export function RmTicketTabs({
   documents?: ReactNode
   quotes?: ReactNode
   completion?: ReactNode
+  dispute?: ReactNode
+  /** Tab selected on first render (e.g. 'completion' when a COC/POC is under review). */
+  defaultTab?: Tab
 }) {
   const totalPhotos = photoGroups.reduce((n, g) => n + g.urls.length, 0)
-  const [tab, setTab] = useState<Tab>(totalPhotos ? 'photos' : 'timeline')
+  const [tab, setTab] = useState<Tab>(defaultTab ?? (totalPhotos ? 'photos' : 'timeline'))
   const tabs: { key: Tab; label: string }[] = [
     { key: 'photos', label: `Photos${totalPhotos ? ` (${totalPhotos})` : ''}` },
     { key: 'documents', label: 'Documents' },
     { key: 'quotes', label: 'Quotes' },
     { key: 'completion', label: 'Completion' },
+    ...(dispute ? [{ key: 'dispute' as Tab, label: 'Dispute' }] : []),
     { key: 'activity', label: `Activity${updates.length ? ` (${updates.length})` : ''}` },
     { key: 'timeline', label: 'Timeline' },
     { key: 'history', label: 'History' },
@@ -83,6 +88,10 @@ export function RmTicketTabs({
         completion ?? <p className="text-sm text-[var(--text-faint)]">Not completed yet.</p>
       )}
 
+      {tab === 'dispute' && (
+        dispute ?? <p className="text-sm text-[var(--text-faint)]">No dispute on this ticket.</p>
+      )}
+
       {tab === 'activity' && (
         updates.length ? (
           <div>
@@ -101,26 +110,7 @@ export function RmTicketTabs({
         ) : <p className="text-sm text-[var(--text-faint)]">No updates from the supplier yet.</p>
       )}
 
-      {tab === 'timeline' && (
-        timeline.length ? (
-          // Same look & feel as the store-manager Timeline (dot + connecting line),
-          // but the RM also sees who acted — who viewed a photo/attachment, edits, etc.
-          <ol className="space-y-4">
-            {timeline.map((e, i) => (
-              <li key={i} className="flex gap-3">
-                <div className="flex flex-col items-center">
-                  <span className={`mt-1 h-2.5 w-2.5 rounded-full ${i === timeline.length - 1 ? 'bg-blue-500' : 'bg-[var(--text-faint)]'}`} />
-                  {i < timeline.length - 1 && <span className="mt-1 w-px flex-1 bg-[var(--border)]" />}
-                </div>
-                <div className="min-w-0 pb-1">
-                  <p className="text-sm font-medium text-[var(--text)]">{e.label}</p>
-                  <p className="text-[11px] text-[var(--text-faint)]">{e.who ? `${e.who} · ` : ''}{formatDateTime(e.at)}</p>
-                </div>
-              </li>
-            ))}
-          </ol>
-        ) : <p className="text-sm text-[var(--text-faint)]">No history yet.</p>
-      )}
+      {tab === 'timeline' && <TicketTimeline items={timeline} />}
 
       {tab === 'history' && (
         history ?? <p className="text-sm text-[var(--text-faint)]">Nothing archived yet.</p>

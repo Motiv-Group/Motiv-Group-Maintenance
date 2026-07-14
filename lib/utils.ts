@@ -240,7 +240,7 @@ export function rmStatusMeta(status: string): { label: string; cls: string; text
   const redT = 'text-red-700 dark:text-red-400', greenT = 'text-emerald-700 dark:text-emerald-400', grayT = 'text-gray-600 dark:text-gray-400'
   const blue = `bg-blue-500/15 ${blueT}`, amber = `bg-amber-500/15 ${amberT}`, red = `bg-red-500/15 ${redT}`, green = `bg-emerald-500/15 ${greenT}`, gray = `bg-gray-500/15 ${grayT}`
   const M: Record<string, { label: string; cls: string; text: string }> = {
-    open:                  { label: 'New',               cls: blue,  text: blueT },
+    open:                  { label: 'New',               cls: amber, text: amberT },
     info_requested:        { label: 'Info requested',    cls: blue,  text: blueT },
     assigned:              { label: 'Quote requested',   cls: blue,  text: blueT },
     quote_requested:       { label: 'Quote requested',   cls: blue,  text: blueT },
@@ -254,8 +254,9 @@ export function rmStatusMeta(status: string): { label: string; cls: string; text
     vo_declined:           { label: 'VO declined',       cls: blue,  text: blueT },
     submitted_for_signoff: { label: 'Awaiting sign-off', cls: amber, text: amberT },
     evidence_requested:    { label: 'Sign-off info',     cls: blue,  text: blueT },
-    snag:                  { label: 'Snag',              cls: red,   text: redT },
-    snag_assigned:         { label: 'Snag scheduled',    cls: red,   text: redT },
+    snag:                  { label: 'Snag',              cls: blue,  text: blueT },
+    snag_assigned:         { label: 'Snag scheduled',    cls: blue,  text: blueT },
+    snag_in_progress:      { label: 'Snag in progress',  cls: blue,  text: blueT },
     snag_resolved:         { label: 'Awaiting sign-off', cls: amber, text: amberT },
     approved_closeout:     { label: 'Close-out',         cls: amber, text: amberT },
     suppliers_declined:    { label: 'Declined (Supplier)', cls: amber, text: amberT },
@@ -264,10 +265,29 @@ export function rmStatusMeta(status: string): { label: string; cls: string; text
     declined:              { label: 'Declined',          cls: gray,  text: grayT },
     // legacy
     pending_sign_off:      { label: 'Awaiting sign-off', cls: amber, text: amberT },
-    snag_in_progress:      { label: 'Snag',              cls: red,   text: redT },
     variation_accepted:    { label: 'In progress',       cls: blue,  text: blueT },
   }
   return M[status] ?? { label: status, cls: gray, text: grayT }
+}
+
+/**
+ * Supplier-flavoured status badge. Action-ownership is the MIRROR of the RM's for
+ * the quoting phase: a "Quote requested" job is something the SUPPLIER must act on
+ * (submit a quote) → amber, whereas a "Quoted" job is now waiting on the RM's
+ * decision → blue. Everything else delegates to rmStatusMeta (labels are shared).
+ */
+export function supplierStatusMeta(status: string): { label: string; cls: string; text: string } {
+  const amberT = 'text-amber-700 dark:text-amber-400', blueT = 'text-blue-700 dark:text-blue-400'
+  const amber = `bg-amber-500/15 ${amberT}`, blue = `bg-blue-500/15 ${blueT}`
+  if (status === 'quote_requested' || status === 'assigned') return { label: 'Quote requested', cls: amber, text: amberT }
+  if (status === 'quoted' || status === 'quote_revision') return { label: 'Quoted', cls: blue, text: blueT }
+  // Action-aware from the SUPPLIER's side (mirror of the RM's): amber = the supplier
+  // owes the next action, blue = it's done and waiting on the manager.
+  if (status === 'submitted_for_signoff') return { label: 'Awaiting sign-off', cls: blue, text: blueT }        // COC/POC in → waiting on the RM
+  if (status === 'evidence_requested') return { label: 'Sign-off info', cls: amber, text: amberT }             // RM asked for more → supplier's action
+  if (status === 'snag' || status === 'snag_assigned' || status === 'snag_in_progress') return { ...rmStatusMeta(status), cls: amber, text: amberT }  // supplier fixes the snag
+  if (status === 'snag_resolved') return { ...rmStatusMeta(status), cls: blue, text: blueT }                   // re-submitted → waiting on the RM
+  return rmStatusMeta(status)
 }
 
 /** Human-readable ticket reference, e.g. JOB-00042. */

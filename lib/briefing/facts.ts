@@ -69,35 +69,52 @@ export function estateFacts(d: EstateDashboardData): BriefingFacts {
 }
 
 // ── deterministic fallback (no LLM) ─────────────────────────────
-const greet = (now: Date) => { const h = now.getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening' }
 const plural = (n: number, s: string) => `${n} ${s}${n === 1 ? '' : 's'}`
 // Status/band enums are snake_case internals ('at_risk') — never show them raw
 // in user-facing copy.
 const human = (s: unknown) => String(s ?? '').replace(/_/g, ' ')
 
+// The briefing body must NOT start with a greeting: the dashboard hero already
+// greets the user, and AiBriefing shows the body's FIRST SENTENCE as the inline
+// "condensed" line — a leading "Good afternoon." would make that line say nothing.
+// So the first sentence of every body is the single most useful headline fact.
 export function fallbackBriefing(role: BriefingRole, f: BriefingFacts, now: Date = new Date()): Briefing {
-  const g = greet(now)
   if (role === 'store_manager') {
     const parts = [`${plural(Number(f.openTickets) || 0, 'ticket')} open, ${Number(f.inProgress) || 0} in progress, ${Number(f.completedTickets) || 0} completed.`]
     if (Number(f.safetyRiskOpen) > 0) parts.push(`${plural(Number(f.safetyRiskOpen), 'safety-risk ticket')} need priority.`)
     if (Number(f.overdueTickets) > 0) parts.push(`${plural(Number(f.overdueTickets), 'ticket')} past target and not yet actioned — follow up with your Regional Manager for an update.`)
     else parts.push('Nothing is overdue — your store is on track.')
-    return { headline: 'Your store today', body: `${g}. ${parts.join(' ')}`, source: 'fallback' }
+    return { headline: 'Your store today', body: parts.join(' '), source: 'fallback' }
   }
   if (role === 'regional_manager') {
-    const parts = [`Portfolio health ${f.portfolioHealthScore}% (${human(f.portfolioStatus)}).`, `${plural(Number(f.storesNeedingAttention) || 0, 'store')} need attention.`]
+    const attention = Number(f.storesNeedingAttention) || 0
+    const stores = Number(f.activeStores) || 0
+    // Lead sentence = the condensed overview shown inline; the rest elaborates it
+    // in the "View insight" pop-up.
+    const parts = [`Portfolio health is ${f.portfolioHealthScore}% (${human(f.portfolioStatus)}) across ${plural(stores, 'active store')}.`]
+    if (attention > 0) {
+      const top = Array.isArray(f.topAttentionStores) ? (f.topAttentionStores as any[]) : []
+      const named = top.length ? ` — led by ${top.map(s => `${s.name} (${Math.round(Number(s.health))}%)`).join(', ')}` : ''
+      parts.push(`${plural(attention, 'store')} need attention${named}.`)
+    } else {
+      parts.push('Every store is under control.')
+    }
+    if (Number(f.overdueTickets) > 0) parts.push(`${plural(Number(f.overdueTickets), 'ticket')} overdue of ${Number(f.openTickets) || 0} open.`)
+    const breaches = (Number(f.supplierSlaBreaches) || 0) + (Number(f.internalSlaBreaches) || 0)
+    if (breaches > 0) parts.push(`${plural(breaches, 'SLA breach')} to chase.`)
     if (Number(f.signoffsPending) > 0) parts.push(`${plural(Number(f.signoffsPending), 'job')} awaiting your sign-off.`)
     if (Number(f.openSnags) > 0) parts.push(`${plural(Number(f.openSnags), 'open snag')} to resolve.`)
-    return { headline: 'Regional snapshot', body: `${g}. ${parts.join(' ')}`, source: 'fallback' }
+    const headline = attention > 0 ? `${plural(attention, 'store')} need attention` : 'Portfolio under control'
+    return { headline, body: parts.join(' '), source: 'fallback' }
   }
   if (role === 'supplier') {
     const parts = [`Performance ${f.performanceScore}% (${human(f.performanceBand)}).`, `${plural(Number(f.openWork) || 0, 'job')} open.`]
     if (Number(f.overdue) > 0) parts.push(`${plural(Number(f.overdue), 'job')} overdue.`)
     if (Number(f.evidenceMissing) > 0) parts.push(`${plural(Number(f.evidenceMissing), 'job')} missing evidence.`)
-    return { headline: 'Your work today', body: `${g}. ${parts.join(' ')}`, source: 'fallback' }
+    return { headline: 'Your work today', body: parts.join(' '), source: 'fallback' }
   }
   const parts = [`Estate health ${f.estateHealthScore}% (${human(f.estateStatus)}); main driver ${f.mainRiskDriver}.`, `${plural(Number(f.openWork) || 0, 'open job')} across ${plural(Number(f.regions) || 0, 'region')}.`]
   if (Number(f.pendingApprovals) > 0) parts.push(`${plural(Number(f.pendingApprovals), 'approval')} pending (${r(Number(f.pendingApprovalValue) || 0)}).`)
   if (Number(f.supplierSlaBreaches) > 0) parts.push(`${plural(Number(f.supplierSlaBreaches), 'supplier SLA breach')}.`)
-  return { headline: 'Estate snapshot', body: `${g}. ${parts.join(' ')}`, source: 'fallback' }
+  return { headline: 'Estate snapshot', body: parts.join(' '), source: 'fallback' }
 }

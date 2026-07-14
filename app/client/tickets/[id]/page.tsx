@@ -30,36 +30,39 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 
 type TimelineEntry = { label: string; at: string }
 type EventRow = { from_status: string | null; to_status: string; created_at: string }
-type ViewRow = { viewer_role: string | null; item_type: string; item_label: string; first_viewed_at: string }
 
-// The store manager only ever sees role-based actors (no internal staff names),
-// so each viewer role maps to a plain label.
-function viewerWho(role: string | null): string {
-  if (role === 'regional_manager') return 'Your manager'
-  if (role === 'supplier') return 'The supplier'
-  if (role === 'store_manager' || role === 'client') return 'You'
-  if (role === 'executive' || role === 'system_admin') return 'An administrator'
-  return 'Someone'
-}
-
-// SM-safe label for a status transition. Quote / assignment / sign-off changes
-// collapse to the same client-visible status and are dropped.
+// SM-safe label for a status transition — the store manager sees only the
+// necessary milestones: the info-request loop, scheduling, work start, the
+// completion submission, and the terminal states. The competitive quoting and
+// every "viewed" event are intentionally hidden (award is added separately, from
+// the ticket row, so it fires even without a captured status event).
 function lifecycleLabel(from: string | null, to: string): string | null {
   if (to === 'info_requested') return 'Your manager requested more information'
   if (from === 'info_requested' && to === 'open') return 'You added the requested information'
-  const cvTo = clientVisibleStatus(to as TicketStatus)
-  if (from != null && cvTo === clientVisibleStatus(from as TicketStatus)) return null
-  return cvTo === 'scheduled' ? 'A visit was scheduled'
-    : cvTo === 'in_progress' ? 'The supplier started work'
-    : cvTo === 'completed' ? 'Work was completed'
-    : cvTo === 'cancelled' ? 'The ticket was cancelled' : null
+  switch (to) {
+    case 'scheduled': return 'A visit was scheduled'
+    case 'in_progress': return 'The supplier started work'
+    case 'submitted_for_signoff':
+    case 'pending_sign_off': return 'The supplier submitted the completion for review'
+    case 'completed': return 'Work was completed'
+    case 'cancelled': return 'The ticket was cancelled'
+    case 'declined': return 'The ticket was declined'
+    default: return null
+  }
 }
 
-// The SM audit trail: who did what / viewed what. Merges the status-change trail
-// (ticket_events, with a fallback for tickets created before the trigger) with
-// the view log (ticket_views), sorted oldest-first.
-function buildSmTimeline(t: any, events: EventRow[], views: ViewRow[]): TimelineEntry[] {
+// The SM audit trail: the necessary milestones only (no competitive-quoting
+// detail, no "viewed" events). Built from ticket_events (status changes, with a
+// fallback for tickets predating the trigger), the award (from the ticket row),
+// and the edit. De-duplicated by label so a reschedule doesn't repeat, oldest-first.
+function buildSmTimeline(t: any, events: EventRow[]): TimelineEntry[] {
   const out: TimelineEntry[] = [{ label: 'You logged the ticket', at: t.created_at }]
+
+  // Supplier awarded — taken from the ticket row so it shows regardless of how the
+  // approval was recorded. The store manager never sees the quoting that led here.
+  if (t.quote_decision_status === 'approved' && t.quote_decided_at) {
+    out.push({ label: 'A supplier was assigned to the job', at: t.quote_decided_at })
+  }
 
   for (const ev of events) {
     if (ev.from_status == null) continue // "created" already added above
@@ -79,25 +82,22 @@ function buildSmTimeline(t: any, events: EventRow[], views: ViewRow[]): Timeline
     out.push({ label: `${who}${note}`, at: t.edited_at })
   }
 
-  for (const v of views) {
-    const verb = v.item_type === 'photo' || v.item_type === 'photos' ? 'viewed' : 'opened'
-    const item = v.item_label || (v.item_type.startsWith('photo') ? 'a photo' : 'an attachment')
-    out.push({ label: `${viewerWho(v.viewer_role)} ${verb} ${item}`, at: v.first_viewed_at })
-  }
-
-  return out.sort((a, b) => +new Date(a.at) - +new Date(b.at))
+  // Oldest-first, then keep the first occurrence of each milestone label.
+  const seen = new Set<string>()
+  return out
+    .sort((a, b) => +new Date(a.at) - +new Date(b.at))
+    .filter(e => (seen.has(e.label) ? false : (seen.add(e.label), true)))
 }
 
 export default async function StoreTicketDetailPage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params
   const admin = createAdminClient()
-  const [{ storeIds }, { data: t }, { data: updates }, { data: snagRows }, { data: eventRows }, { data: viewRows }] = await Promise.all([
+  const [{ storeIds }, { data: t }, { data: updates }, { data: snagRows }, { data: eventRows }] = await Promise.all([
     requireStoreManagerV3(),
     admin.from('tickets').select('*').eq('id', params.id).single(),
     admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', params.id).order('created_at', { ascending: false }),
     admin.from('snags').select('scheduled_at, schedule_status, status').eq('ticket_id', params.id).order('created_at', { ascending: false }),
     (admin as any).from('ticket_events').select('from_status, to_status, created_at').eq('ticket_id', params.id).order('created_at', { ascending: true }),
-    admin.from('ticket_views').select('viewer_role, item_type, item_label, first_viewed_at').eq('ticket_id', params.id),
   ])
   if (!t || !storeIds.includes(t.store_id ?? '')) redirect('/client/tickets')
 
@@ -137,7 +137,7 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
   // today page / Tickets tab, so they match everywhere.
   const badgeTicket = { priority: t.priority, status: (cv ?? t.status) as any, infoAdded } as unknown as StoreManagerTicket
 
-  const timeline = buildSmTimeline(t, (eventRows ?? []) as EventRow[], (viewRows ?? []) as ViewRow[])
+  const timeline = buildSmTimeline(t, (eventRows ?? []) as EventRow[])
 
   return (
     <div className="space-y-4">

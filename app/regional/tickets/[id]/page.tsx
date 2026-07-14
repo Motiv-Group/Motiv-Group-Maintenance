@@ -12,10 +12,12 @@ import { computeTicketSla } from '@/lib/health/sla'
 import { isActive } from '@/lib/health/types'
 import type { HealthTicket, Priority } from '@/lib/health/types'
 import { BreachReason } from '@/components/workflow/BreachReason'
+import { QuoteSummary } from '@/components/workflow/QuoteSummary'
 import { Card } from '@/components/exec/ui'
 import { WorkflowActions } from '@/components/workflow/WorkflowActions'
 import { RmPipeline } from '@/components/regional/RmPipeline'
-import { RmEditTicketForm, RmQuotePanel, RmReviewPanel, ApproveSignoffCard, ReQuoteButton, AcceptScheduleCard, AcceptSnagScheduleCard, VariationReviewCard, RequestEvidenceButton, RaiseSnagButton, CloseOutButton, RmTicketActionBar } from '@/components/regional/RmTicketActions'
+import { RmQuotePanel, RmReviewPanel, ReQuoteButton, AcceptScheduleCard, AcceptSnagScheduleCard, VariationReviewCard, CloseOutButton, RmTicketActionBar, RmCompletionReview } from '@/components/regional/RmTicketActions'
+import { CompletionBody, CompletionFooterNote } from '@/components/workflow/CompletionBody'
 import { EditedLine } from '@/components/ui/EditedLine'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { RmTicketTabs } from '@/components/regional/RmTicketTabs'
@@ -24,7 +26,7 @@ import { priorityBadgeClass, priorityLabel } from '@/components/client/ticketBad
 import type { StoreManagerTicket } from '@/lib/health/data'
 import { CollapsibleSection } from '@/components/ui/CollapsibleSection'
 import { MarkTicketSeen } from '@/components/ui/MarkTicketSeen'
-import { DisputeThread } from '@/components/dispute/DisputeBox'
+import { DisputeThread, DisputeControls } from '@/components/dispute/DisputeBox'
 import { formatCurrency, formatDateTime, formatDate, rmStatusMeta, storeLabel, OPERATIONAL_IMPACT_LABELS, humanizeDuration } from '@/lib/utils'
 
 // Professional "what we're waiting on" copy while a snag works its way through.
@@ -94,10 +96,7 @@ function RmDeclinedQuoteCard({ q, ticketId, canReQuote, open = false }: { q: any
 // One COC/POC submission card — reused across the under-review, sent-back (snag)
 // and approved blocks so the RM sees the full submission history. A sent-back card
 // shows the reason it was returned (why another COC/POC was needed).
-function RmSignoffCard({ s, tone, ticketId, collapsible = false, defaultOpen = false, title, reason, freshEvidence = false, priorUrls }: { s: any; tone: 'review' | 'snag' | 'approved' | 'evidence'; ticketId: string; collapsible?: boolean; defaultOpen?: boolean; title?: string; reason?: string | null; freshEvidence?: boolean; priorUrls?: Set<string> }) {
-  // On a resubmission the signoff's after_urls carry over the previous round's
-  // photos, so only URLs NOT seen in an earlier round count as "new" (green).
-  const isNew = (u?: string | null): boolean => freshEvidence && !!u && !(priorUrls?.has(u) ?? false)
+function RmSignoffCard({ s, tone, ticketId, collapsible = false, defaultOpen = false, title, reason, freshEvidence = false, footer }: { s: any; tone: 'review' | 'snag' | 'approved' | 'evidence'; ticketId: string; collapsible?: boolean; defaultOpen?: boolean; title?: string; reason?: string | null; freshEvidence?: boolean; footer?: React.ReactNode }) {
   // Prefer the durable round reason; fall back to the reason stored on the signoff.
   const reasonText = reason ?? s.reject_reason
   const meta = tone === 'approved'
@@ -141,43 +140,23 @@ function RmSignoffCard({ s, tone, ticketId, collapsible = false, defaultOpen = f
             <p className="text-sm text-[var(--text)]">The supplier uploaded the additional evidence you requested — the new after photos, COC and notes are shown in green below.</p>
           </div>
         )}
-        <div>
-          <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Proof of completion</div>
-          <div className="flex flex-wrap gap-x-4 gap-y-1">
-            {before.map((u, i) => <ViewTrackedLink key={`b${i}`} ticketId={ticketId} itemType="photo" itemLabel={`Before photo ${i + 1}`} href={u} className="text-sm text-[#C6A35D] underline hover:text-amber-500">Before {i + 1}</ViewTrackedLink>)}
-            {after.map((u, i) => <ViewTrackedLink key={`a${i}`} ticketId={ticketId} itemType="photo" itemLabel={`Completion photo ${i + 1}`} href={u} className={`text-sm underline ${isNew(u) ? 'text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 font-medium' : 'text-[#C6A35D] hover:text-amber-500'}`}>After {i + 1}</ViewTrackedLink>)}
-            {!before.length && !after.length && <span className="text-sm text-[var(--text-faint)]">No photos</span>}
-          </div>
-        </div>
-        {(s.coc_url || s.invoice_url) && (
-          <div>
-            <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Certificate of Completion</div>
-            <div className="flex flex-wrap gap-x-4 gap-y-1">
-              {s.coc_url && <ViewTrackedLink ticketId={ticketId} itemType="coc" itemLabel="COC" href={s.coc_url} className={`inline-flex items-center gap-1.5 text-sm font-medium hover:underline ${isNew(s.coc_url) ? 'text-emerald-600 dark:text-emerald-400' : 'text-[#C6A35D]'}`}><FileText size={14} /> View COC</ViewTrackedLink>}
-              {s.invoice_url && <ViewTrackedLink ticketId={ticketId} itemType="invoice" itemLabel="Invoice" href={s.invoice_url} className={`inline-flex items-center gap-1.5 text-sm font-medium hover:underline ${isNew(s.invoice_url) ? 'text-emerald-600 dark:text-emerald-400' : 'text-[#C6A35D]'}`}><FileText size={14} /> View invoice</ViewTrackedLink>}
-            </div>
-          </div>
-        )}
-        {s.notes && (
-          <div>
-            <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Notes</div>
-            <p className={`text-sm whitespace-pre-line ${freshEvidence ? 'text-emerald-700 dark:text-emerald-400 font-medium' : 'text-[var(--text-muted)]'}`}>{s.notes}</p>
-          </div>
-        )}
+        <CompletionBody ticketId={ticketId} beforeUrls={before} afterUrls={after} cocUrl={s.coc_url} invoiceUrl={s.invoice_url} notes={s.notes} uploadedAt={s.created_at} />
     </>
   )
   if (collapsible) {
     return (
-      <details open={defaultOpen} className={`rounded-xl ring-1 ${meta.ring} ${meta.bg} overflow-hidden`}>
+      <details open={defaultOpen} className={`rounded-xl bg-[var(--surface)] ring-1 ring-[var(--border)] overflow-hidden`}>
         <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">{header}</summary>
-        <div className={`p-4 space-y-3 border-t ${meta.head}`}>{body}</div>
+        <div className={`p-4 space-y-4 border-t border-[var(--border)]`}>{body}</div>
+        {footer && <div className={`border-t border-[var(--border)] px-4 py-3`}>{footer}</div>}
       </details>
     )
   }
   return (
-    <div className={`rounded-xl ring-1 ${meta.ring} ${meta.bg} overflow-hidden`}>
-      <div className={`flex items-center justify-between gap-2 px-4 py-2.5 border-b ${meta.head}`}>{header}</div>
-      <div className="p-4 space-y-3">{body}</div>
+    <div className={`rounded-xl bg-[var(--surface)] ring-1 ring-[var(--border)] overflow-hidden`}>
+      <div className={`flex items-center justify-between gap-2 px-4 py-2.5 border-b border-[var(--border)]`}>{header}</div>
+      <div className="p-4 space-y-4">{body}</div>
+      {footer && <div className={`border-t border-[var(--border)] px-4 py-3`}>{footer}</div>}
     </div>
   )
 }
@@ -236,7 +215,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
     admin.from('quotes').select('id, supplier_id, amount, amount_incl_vat, description, file_url, status, valid_until, proposed_schedule_at, decline_reason, created_at, updated_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('signoffs').select('id, status, before_urls, after_urls, coc_url, invoice_url, notes, reject_reason, reviewed_at, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
-    admin.from('suppliers').select('id, company_name').eq('company_id', companyId).eq('active', true).order('company_name'),
+    admin.from('suppliers').select('id, company_name, trade, trades').eq('company_id', companyId).eq('active', true).order('company_name'),
     admin.from('ticket_variations').select('description, amount, warranty, status, reject_reason, reviewed_at, created_at, file_urls').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('snags').select('description, status, scheduled_at, schedule_status, assigned_at, schedule_agreed_at, schedule_declined_at, schedule_decline_reason, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('ticket_suppliers').select('supplier_id, status, invited_at, responded_at, decline_reason, declined_by, suppliers(company_name)').eq('ticket_id', t.id),
@@ -250,7 +229,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
   const editorName = t.edited_by ? ((await admin.from('user_profiles').select('full_name').eq('id', t.edited_by).single()).data?.full_name ?? null) : null
   // Motiv-curated supplier pool (assign pop-up) + who has viewed this ticket's items.
   const [{ data: motivSuppliers }, { data: viewRows }, { data: declineRows }, { data: requestRows }, { data: readRow }, { data: disputeRows }, { data: disputeMsgRows }, { data: snagEventRows }, { data: disputeExtra }] = await Promise.all([
-    admin.from('suppliers').select('id, company_name').eq('is_motiv', true).eq('active', true).order('company_name'),
+    admin.from('suppliers').select('id, company_name, trade, trades').eq('is_motiv', true).eq('active', true).order('company_name'),
     admin.from('ticket_views').select('viewer_role, item_type, item_label, first_viewed_at').eq('ticket_id', t.id),
     // Durable supplier request-declines — kept even after the supplier is re-invited.
     admin.from('ticket_supplier_declines').select('supplier_id, reason, declined_at').eq('ticket_id', t.id).order('declined_at', { ascending: true }),
@@ -310,14 +289,6 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
   // A pending submission that follows an earlier "more evidence" request is the
   // supplier's resubmission — flag it so the new COC/POC/notes highlight in green.
   const isEvidenceResubmission = pendingSignoffs.length > 0 && evidenceRequestedSignoffs.length > 0
-  // URLs already submitted in an earlier (superseded) round. after_urls accumulate
-  // across rounds, so these are subtracted to green ONLY the newly added evidence.
-  const priorEvidenceUrls = new Set<string>()
-  for (const s of [...evidenceRequestedSignoffs, ...rejectedSignoffs]) {
-    for (const u of ((s.after_urls ?? []) as string[])) priorEvidenceUrls.add(u)
-    if (s.coc_url) priorEvidenceUrls.add(s.coc_url)
-    if (s.invoice_url) priorEvidenceUrls.add(s.invoice_url)
-  }
 
   // Snag / evidence disputes. An OPEN one shows a live thread the RM resolves;
   // resolved ones live in the Archive (read-only). Messages grouped by dispute.
@@ -334,7 +305,14 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
   // Superseded submissions (sent back for more evidence OR snagged) → collapsed round
   // cards in the Archive, newest first. The live under-review one stays in COC & POC;
   // the approved one in Completion.
-  const supersededSubmissions = [...evidenceRequestedSignoffs, ...rejectedSignoffs].sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at))
+  // A submission with an OUTSTANDING request (more evidence, or a raised snag) stays
+  // live in the Completion tab until the supplier re-submits — only then is it
+  // superseded and moved to the Archive. Mirrors the supplier's ticket view.
+  const liveEvidence = t.status === 'evidence_requested' ? (evidenceRequestedSignoffs[0] ?? null) : null
+  const liveSnagSubmission = ['snag', 'snag_assigned', 'snag_in_progress', 'snag_resolved'].includes(t.status) ? (rejectedSignoffs[0] ?? null) : null
+  const supersededSubmissions = [...evidenceRequestedSignoffs, ...rejectedSignoffs]
+    .filter(s => s.id !== liveEvidence?.id && s.id !== liveSnagSubmission?.id)
+    .sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at))
   // Durable review-round log drives the number / kind / reason on each round card;
   // falls back to the signoff row (submission ordinal + reject_reason + status) for
   // tickets that predate the signoff_rounds table.
@@ -352,9 +330,9 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
   // The Dispute block (open live thread + resolved read-only history), each labelled
   // with the submission it concerns. Rendered ABOVE the Actions while live, then moved
   // BELOW once resolved (history).
-  const disputeBlock = disputes.length > 0 ? (
-    <CollapsibleSection id="ticket-dispute" title="Dispute" defaultOpen={!!openDispute}>
-      {openDispute && <DisputeThread ticketId={t.id} dispute={openDispute} messages={msgsByDispute(openDispute.id)} viewerRole="regional_manager" subject={disputeSubject(openDispute)} />}
+  const disputeContent = disputes.length > 0 ? (
+    <div className="space-y-3">
+      {openDispute && <DisputeThread ticketId={t.id} dispute={openDispute} messages={msgsByDispute(openDispute.id)} viewerRole="regional_manager" subject={disputeSubject(openDispute)} hideControls />}
       {resolvedDisputes.map(d => (
         <details key={d.id} className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
           <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
@@ -369,7 +347,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
           </div>
         </details>
       ))}
-    </CollapsibleSection>
+    </div>
   ) : null
   // Snag scheduling — the supplier's proposed fix date (separate from the original
   // job schedule) and whether it's still awaiting the RM's approval.
@@ -392,7 +370,6 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
   // Dual-SLA result → breach reason (which pending action ran past its deadline).
   const sla = computeTicketSla(t as HealthTicket, rules(t.priority as Priority), now)
   const breached = isActive(t.status) && (sla.supplierBreached || sla.internalBreached)
-  const breachOwner = sla.delayOwner === 'supplier' ? 'Supplier' : sla.delayOwner === 'store' ? 'Store' : 'Regional Manager (internal)'
 
   // Avg star rating per supplier, so the RM sees each contractor's record when assigning.
   const ratingAgg = new Map<string, { sum: number; n: number }>()
@@ -400,7 +377,11 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
     if (!r.supplier_id) continue
     const a = ratingAgg.get(r.supplier_id) ?? { sum: 0, n: 0 }; a.sum += Number(r.score); a.n++; ratingAgg.set(r.supplier_id, a)
   }
-  const toSupplierCard = (s: any) => { const ra = ratingAgg.get(s.id); return { id: s.id, name: s.company_name, avgRating: ra ? ra.sum / ra.n : 5, ratingCount: ra ? ra.n : 0 } }
+  const toSupplierCard = (s: any) => {
+    const ra = ratingAgg.get(s.id)
+    const category = Array.isArray(s.trades) && s.trades.filter(Boolean).length ? s.trades.filter(Boolean).join(', ') : (s.trade ?? null)
+    return { id: s.id, name: s.company_name, category, avgRating: ra ? ra.sum / ra.n : 5, ratingCount: ra ? ra.n : 0 }
+  }
   const supplierList = (suppliers ?? []).map(toSupplierCard)
   // Motiv-curated suppliers the RM can also invite (shown under a toggle in the pop-up).
   const motivSupplierList = ((motivSuppliers ?? []) as any[]).filter(s => !supplierList.some(m => m.id === s.id)).map(toSupplierCard)
@@ -761,30 +742,10 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
     <div className="space-y-2">
       {quotesTabList.map(q => {
         const isApproved = acceptedQuoteIds.has(q.id)
-        // Collapsible card (like the History quotes) — summary row + expandable
-        // detail. The approved quote opens by default; the rest stay collapsed.
         return (
-          <details key={q.id} open={isApproved} className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
-            <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
-              <span className="text-sm font-semibold text-[var(--text)] min-w-0 truncate">{q.supplierName}</span>
-              <span className="flex items-center gap-2 shrink-0">
-                <span className="text-sm text-[var(--text)] tabular-nums">{formatCurrency(q.amount)}</span>
-                <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 ${isApproved ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' : 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D]'}`}>{isApproved ? 'Approved' : 'Received'}</span>
-              </span>
-            </summary>
-            <div className="border-t border-[var(--border)] p-4 space-y-2">
-              <p className="text-[11px] text-[var(--text-faint)]">Received {formatDateTime(q.createdAt)}{q.amountInclVat ? ` · incl VAT ${formatCurrency(q.amountInclVat)}` : ''}</p>
-              {q.proposedScheduleAt && (
-                <div className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-500/10 ring-1 ring-indigo-500/30 px-2.5 py-1 text-[13px]">
-                  <CalendarClock size={14} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
-                  <span className="text-[var(--text-muted)]">Proposed visit</span>
-                  <span className="font-semibold text-[var(--text)]">{formatDateTime(q.proposedScheduleAt)}</span>
-                </div>
-              )}
-              {q.description && <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{q.description}</p>}
-              {q.fileUrl && <ViewTrackedLink ticketId={t.id} itemType="quote" itemLabel={`${q.supplierName}'s quote`} href={q.fileUrl} className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"><FileText size={14} /> View attachment</ViewTrackedLink>}
-            </div>
-          </details>
+          <QuoteSummary key={q.id} title={q.supplierName ?? 'Supplier'} status={isApproved ? 'accepted' : 'pending'} collapsible ticketId={t.id}
+            quote={{ id: q.id, supplierName: q.supplierName, amount: q.amount, amountInclVat: q.amountInclVat ?? null, description: q.description ?? null, fileUrl: q.fileUrl ?? null, validUntil: q.validUntil ?? null, createdAt: q.createdAt }}
+            schedule={q.proposedScheduleAt ? { at: q.proposedScheduleAt, proposed: true, audience: 'rm' } : null} />
         )
       })}
     </div>
@@ -792,32 +753,17 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
 
   // "Completion" tab — the approved COC & POC as a collapsible card (open by
   // default), like the Quotes tab. Replaces the old standalone Completion section.
-  const completionContent = acceptedSignoff ? (
-    <RmSignoffCard s={acceptedSignoff} tone="approved" ticketId={t.id} collapsible defaultOpen />
+  // The COC & POC submission currently awaiting the RM's sign-off (if any) — shown
+  // in the Completion tab (full detail) and summarised in the Next-action block.
+  const reviewSignoff: any = t.status === 'submitted_for_signoff' ? (pendingSignoffs[0] ?? null) : null
+  const completionContent = (acceptedSignoff || reviewSignoff || liveEvidence || liveSnagSubmission) ? (
+    <div className="space-y-3">
+      {reviewSignoff && <RmSignoffCard s={reviewSignoff} tone="review" ticketId={t.id} title={submissionLabel(reviewSignoff)} freshEvidence={isEvidenceResubmission} collapsible defaultOpen footer={<CompletionFooterNote>Approve, request more evidence, or raise a snag from the Next action panel above.</CompletionFooterNote>} />}
+      {liveEvidence && <RmSignoffCard s={liveEvidence} tone="evidence" ticketId={t.id} title={submissionLabel(liveEvidence)} reason={roundBySignoff.get(liveEvidence.id)?.reason ?? liveEvidence.reject_reason} collapsible defaultOpen footer={<CompletionFooterNote>Awaiting the supplier&apos;s updated evidence — this moves to History once they re-submit.</CompletionFooterNote>} />}
+      {liveSnagSubmission && <RmSignoffCard s={liveSnagSubmission} tone="snag" ticketId={t.id} title={submissionLabel(liveSnagSubmission)} reason={roundBySignoff.get(liveSnagSubmission.id)?.reason ?? liveSnagSubmission.reject_reason} collapsible defaultOpen footer={<CompletionFooterNote>Awaiting the supplier&apos;s snag fix — this moves to History once they re-submit.</CompletionFooterNote>} />}
+      {acceptedSignoff && <RmSignoffCard s={acceptedSignoff} tone="approved" ticketId={t.id} collapsible defaultOpen />}
+    </div>
   ) : null
-
-  // ── Review-panel items (COC/POC · snag · VO) — same compact-row-+-pop-up
-  // structure as the quote panel. Each row opens a modal with the full detail and
-  // the action buttons; the old standalone sections/cards are removed.
-  const cocReviewItems = t.status === 'submitted_for_signoff' ? pendingSignoffs.map((s: any) => ({
-    id: s.id as string,
-    dot: 'bg-[#C6A35D]',
-    title: submissionLabel(s),
-    subtitle: `submitted ${formatDateTime(s.created_at)}`,
-    statusLabel: 'Under review',
-    statusCls: 'text-amber-700 dark:text-[#C6A35D]',
-    modalTitle: 'Completion — review',
-    body: (
-      <div className="space-y-4">
-        <RmSignoffCard s={s} tone="review" ticketId={t.id} title={submissionLabel(s)} freshEvidence={isEvidenceResubmission} priorUrls={priorEvidenceUrls} />
-        <ApproveSignoffCard ticketId={t.id} />
-        <div className="grid grid-cols-2 gap-2">
-          <RequestEvidenceButton ticketId={t.id} />
-          <RaiseSnagButton ticketId={t.id} />
-        </div>
-      </div>
-    ),
-  })) : []
 
   const snagReviewItems = (snagAwaitingApproval && latestSnag?.scheduled_at) ? [{
     id: 'snag-schedule',
@@ -897,11 +843,21 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
         <div>
           <h2 className="text-sm font-bold text-[var(--text)]">Next action</h2>
           {nextAction.msg && <p className="mt-1 text-sm font-bold text-[var(--text)]">{nextAction.msg}</p>}
-          {nextAction.sub && <p className="mt-0.5 text-sm text-[var(--text-muted)]">{nextAction.sub}</p>}
+          {/* When breached the instruction moves into the red callout below, so it
+              isn't said twice. */}
+          {nextAction.sub && !breached && <p className="mt-0.5 text-sm text-[var(--text-muted)]">{nextAction.sub}</p>}
         </div>
 
-        {/* SLA breach — shown here in the action block (not as a separate banner). */}
-        {breached && <BreachReason nextAction={sla.nextAction} dueAt={sla.nextActionDueAt} owner={breachOwner} />}
+        {/* Open dispute — the resolve controls live here; the chat is in the Dispute tab. */}
+        {openDispute && (
+          <div className="space-y-2.5">
+            <p className="text-sm text-[var(--text-muted)]">This step is paused while the dispute is reviewed. Resolve it here, or continue the conversation in the <span className="font-semibold text-[var(--text)]">Dispute</span> tab.</p>
+            <DisputeControls ticketId={t.id} origin={openDispute.origin} viewerRole="regional_manager" pendingOutcome={openDispute.pending_outcome ?? null} pendingBy={openDispute.pending_by ?? null} />
+          </div>
+        )}
+
+        {/* SLA breach — concise callout carrying how-late + the next action. */}
+        {breached && <BreachReason action={nextAction.sub || nextAction.msg || 'This ticket is overdue — take the next action to get it back on track.'} dueAt={sla.nextActionDueAt} nowMs={now.getTime()} />}
 
         {/* Snag-fix schedule awaiting approval — compact row → pop-up (approve/decline). */}
         <RmReviewPanel heading="Snag" items={snagReviewItems} />
@@ -938,14 +894,22 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
             It's a client component so its per-action trigger render-props are created
             client-side (a Server Component can't pass functions to Client Components). */}
         {!isTerminal && (canAssign || canCancel) && (
-          <RmTicketActionBar ticketId={t.id} status={t.status} canAssign={canAssign} canAssignSupplier={canAssignSupplier} canCancel={canCancel}
+          <RmTicketActionBar ticketId={t.id} status={t.status} canAssign={canAssign} canAssignSupplier={canAssignSupplier} canCancel={canCancel} canEdit={canEdit} jobRef={t.job_ref}
             suppliers={supplierList} motivSuppliers={motivSupplierList} declinedSupplierIds={declinedSupplierIds} awaitingById={engagedSupplierIds}
-            description={t.description ?? ''} photoUrls={Array.isArray(t.photo_urls) ? t.photo_urls : []} title={t.title} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} />
+            description={t.description ?? ''} photoUrls={Array.isArray(t.photo_urls) ? t.photo_urls : []} title={t.title} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} priority={t.priority} />
         )}
 
-        {/* Completion (COC & POC) under review — compact row → pop-up with the full
-            submission + Approve / Request evidence / Raise snag. */}
-        <RmReviewPanel heading="Completion (COC &amp; POC)" items={cocReviewItems} />
+        {/* Completion (COC & POC) submitted → inline summary + Approve completion,
+            with Raise snag / Request more evidence behind "More". Full detail is in
+            the Completion tab. */}
+        {reviewSignoff && (
+          <RmCompletionReview ticketId={t.id} label={submissionLabel(reviewSignoff)} submittedAt={reviewSignoff.created_at}
+            photoCount={(reviewSignoff.before_urls ?? []).length + (reviewSignoff.after_urls ?? []).length}
+            docCount={(reviewSignoff.coc_url ? 1 : 0) + (reviewSignoff.invoice_url ? 1 : 0)}
+            noteCount={reviewSignoff.notes && String(reviewSignoff.notes).trim() ? 1 : 0}
+            beforeUrls={reviewSignoff.before_urls ?? []} afterUrls={reviewSignoff.after_urls ?? []}
+            cocUrl={reviewSignoff.coc_url ?? null} invoiceUrl={reviewSignoff.invoice_url ?? null} notes={reviewSignoff.notes ?? null} />
+        )}
 
         {t.status === 'scheduled' && t.schedule_status === 'proposed' && t.scheduled_at && <AcceptScheduleCard ticketId={t.id} scheduledAt={t.scheduled_at} />}
 
@@ -1029,12 +993,9 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
             })()}
           </div>
 
-          {(t.edited_at || canEdit) && (
-            <div className="flex items-center justify-between gap-2 pt-1">
-              <EditedLine at={t.edited_at} by={editorName} />
-              {canEdit && <RmEditTicketForm ticketId={t.id} initial={{ title: t.title, category: t.category ?? 'General', impact: t.operational_impact ?? 'none', priority: t.priority, description: t.description }} />}
-            </div>
-          )}
+          {/* Editing the ticket now lives in the Next-action "More" menu; only the
+              "edited" provenance line remains here. */}
+          {t.edited_at && <div className="pt-1"><EditedLine at={t.edited_at} by={editorName} /></div>}
 
           {t.info_request_reason && <p className="text-xs text-amber-600 dark:text-amber-400">Info requested: {t.info_request_reason}</p>}
           {/* Scheduled visit — hidden once a snag fix is in play (that callout replaces it). */}
@@ -1090,21 +1051,19 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
           <p className="text-sm text-[var(--text-muted)]">{t.cancellation_reason || `This ticket was ${t.status === 'declined' ? 'declined' : 'cancelled'}.`}</p>
         </div>
       )}
-      {/* Dispute — while a dispute is live it sits ABOVE the Actions (needs the RM's
-          attention); once done it moves below the Actions as history (see after the
-          Actions card). */}
-      {openDispute && disputeBlock}
+      {/* The Dispute conversation now lives in its own "Dispute" tab (next to
+          Completion); the RM's resolve controls sit in the Next-action block above. */}
       {/* COC & POC under review now lives in the "Next action" review pop-up (compact
           row → full detail + actions); its files are also in the Documents/Photos tabs. */}
-      {/* The approved COC & POC now lives in the "Completion" tab (collapsible, like
-          the Quotes tab) — no standalone section here. */}
-      {/* Resolved dispute(s) → history below the Actions once nothing is live. */}
-      {!openDispute && disputeBlock}
-      {/* Variation orders now open from the "Next action" review pop-up while pending;
-          the full record (any status) lives in the History tab + Documents tab. */}
       {/* Photos · Activity (supplier updates) · Timeline (the full audit trail —
           status changes, edits, attachments/photos viewed, quotes, sign-offs …). */}
-      <RmTicketTabs ticketId={t.id} photoGroups={photoGroups} updates={supplierUpdates} timeline={timelineItems} documents={documentsContent} quotes={quotesContent} completion={completionContent} history={historyContent} />
+      <RmTicketTabs ticketId={t.id} photoGroups={photoGroups} updates={supplierUpdates} timeline={timelineItems} documents={documentsContent} quotes={quotesContent} completion={completionContent} dispute={disputeContent} history={historyContent}
+        defaultTab={
+          openDispute ? 'dispute'
+          : completionContent && ['submitted_for_signoff', 'approved_closeout', 'completed'].includes(t.status) ? 'completion'
+          : quotesContent && (t.status === 'quoted' || reviewQuotes.length > 0) ? 'quotes'
+          : undefined
+        } />
     </div>
   );
 }

@@ -32,9 +32,7 @@ export default function LoginPage() {
   const [forwarding, setForwarding] = useState(false)
   const [remember, setRemember] = useState(true)
 
-  // mode:'onChange' makes formState.isValid reactive so we can gate the submit
-  // button on the required fields being filled (both registered as required).
-  const { register, handleSubmit, setValue, formState: { errors, isValid } } = useForm<LoginForm>({ mode: 'onChange' })
+  const { register, handleSubmit, setValue, formState: { errors } } = useForm<LoginForm>({ mode: 'onChange' })
 
   // Prefill a remembered email address (remember defaults to true already).
   // Wrapped in try/catch like the write path — localStorage throws when the
@@ -124,7 +122,7 @@ export default function LoginPage() {
   }
 
   return (
-    <AuthShell logoHeight={186} maxWidth="md">
+    <AuthShell logoHeight={186} logoGap={0} maxWidth="md">
       <h1 className="text-xl sm:text-2xl font-semibold text-white mb-1">Welcome back</h1>
       <p className="text-sm text-gray-300 mb-6">Sign in to continue to your workspace.</p>
 
@@ -177,9 +175,10 @@ export default function LoginPage() {
 
         <AuthError message={error} />
 
-        {/* Enabled = confident blue; incomplete form = clearly-neutral disabled
-            (both handled by the shared `gold` variant). */}
-        <Button type="submit" variant="gold" loading={loading} disabled={!isValid} size="lg" className="w-full">
+        {/* Always clickable — required-field validation runs on submit. Gating on
+            react-hook-form isValid left the button stuck disabled when the browser
+            auto-filled the fields (e.g. after logout), which RHF never sees. */}
+        <Button type="submit" variant="gold" loading={loading} size="lg" className="w-full">
           Log in
         </Button>
       </form>

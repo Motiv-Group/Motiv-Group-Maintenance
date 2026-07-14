@@ -8,11 +8,17 @@
 // quote state, never another supplier's progress.
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { AlertCircle, AlertOctagon, AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, ClipboardList, ReceiptText, Camera } from 'lucide-react'
+import { AlertCircle, AlertOctagon, AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, ClipboardList, ReceiptText, Camera, MessageSquare } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import type { SupplierTicketRow } from '@/lib/health/data'
 import { Card } from '@/components/exec/ui'
 import { CategoryIcon } from '@/components/client/ticketBadges'
-import { rmStatusMeta, formatDate, formatDateTime, humanizeDuration, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
+import { Modal } from '@/components/ui/Modal'
+import { SendQuoteForm } from '@/components/admin/SendQuoteForm'
+import { SubmitCompletionForm } from '@/components/supplier/SubmitCompletionForm'
+import { SupplierVariationGate, AcceptSnagCard } from '@/components/supplier/SupplierJobActions'
+import { DisputeReviewButton, RaiseDisputeMore } from '@/components/dispute/DisputeBox'
+import { supplierStatusMeta, formatDate, formatDateTime, humanizeDuration, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
 
 type QueueFilter = 'all' | 'to_quote' | 'attend' | 'evidence' | 'snags' | 'sla'
 type Tone = 'red' | 'purple' | 'gold' | 'green' | 'orange' | 'blue'
@@ -138,17 +144,21 @@ function QueueRow({ ticket, nowMs, company }: { ticket: SupplierTicketRow; nowMs
   const slaMs = new Date(slaDeadline).getTime() - nowMs
   const breached = ticket.overdue || ticket.breached || slaMs <= 0
   const status = myStatus(ticket)
-  const meta = rmStatusMeta(status)
-  const statusCls = ticket.disputed ? 'bg-red-500/15 text-red-700 dark:text-red-400' : meta.cls
-  const statusLabel = ticket.disputed ? 'Dispute' : meta.label
+  const meta = supplierStatusMeta(status)
+  // Close-out phase: the badge is amber while the supplier still owes a VO decision,
+  // blue once they've confirmed there are none (awaiting the RM's close-out).
+  const closeout = ['approved_closeout', 'vo_declined'].includes(ticket.status) && ticket.awardedToMe
+  const statusCls = ticket.disputed ? 'bg-violet-500/15 text-violet-700 dark:text-violet-400' : closeout ? (ticket.voNoneConfirmed ? 'bg-blue-500/15 text-blue-700 dark:text-blue-400' : 'bg-amber-500/15 text-amber-700 dark:text-amber-400') : meta.cls
+  const statusLabel = ticket.disputed ? 'Dispute' : closeout ? 'Close-out' : meta.label
   const ticketUrl = `/supplier/tickets/${ticket.id}`
   const who = ticket.isIndividual ? 'Individual' : [company, ticket.storeName].filter(Boolean).join(' · ')
-  // Phase CTA — labelled by what the supplier does next; all open the ticket (the
-  // full multi-field actions — quote upload, COC/POC — live on the detail page).
-  const cta = toQuote(ticket) ? 'Submit quote'
+  // Phase CTA — labelled by what the supplier does next. Disputed → view the dispute
+  // chat; snagged → view the snag; the rest open a pop-up or the ticket.
+  const cta = ticket.disputed ? 'View dispute'
+    : toQuote(ticket) ? 'Submit quote'
     : ['accepted', 'scheduled'].includes(ticket.status) && ticket.awardedToMe ? 'Mark in progress'
     : needsEvidence(ticket) ? 'Upload evidence'
-    : isSnag(ticket) ? 'Accept snag'
+    : isSnag(ticket) ? 'View snag'
     : 'View Ticket'
   // Genuinely critical (P1 / urgent) jobs get a RED action button so they stand out.
   const critical = ['P1', 'urgent'].includes(String(ticket.priority))
@@ -167,9 +177,10 @@ function QueueRow({ ticket, nowMs, company }: { ticket: SupplierTicketRow; nowMs
       </div>
 
       <div className="min-w-0">
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           <span className={`inline-flex w-[72px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${priorityBadgeClass(String(ticket.priority))}`}>{PRIORITY_LEVEL_LABELS[String(ticket.priority)] ?? 'Medium'}</span>
           <span className={`inline-flex w-[120px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${statusCls}`}>{statusLabel}</span>
+          {ticket.disputeUnread && <span className="relative z-20 inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-blue-500/15 px-1.5 py-1 text-[10px] font-bold text-blue-700 dark:text-blue-400"><MessageSquare size={10} /> New message</span>}
         </div>
         <p className="mt-1.5 truncate text-sm text-[var(--text-muted)]">{ticket.awardedToMe ? 'Awarded to you' : 'Invited to quote'}</p>
       </div>
@@ -188,9 +199,147 @@ function QueueRow({ ticket, nowMs, company }: { ticket: SupplierTicketRow; nowMs
       </div>
 
       <div className="flex lg:justify-end">
-        <Link href={ticketUrl} className={ctaCls}>{cta} {cta === 'View Ticket' && <ArrowRight size={15} />}</Link>
+        {cta === 'View dispute'
+          ? <DisputeReviewButton ticketId={ticket.id} viewerRole="supplier" trigger={open => <button type="button" onClick={open} className={ctaCls}>View dispute</button>} />
+          : toQuote(ticket)
+          ? <SubmitQuoteCta ticket={ticket} className={ctaCls} />
+          : closeout && !ticket.voNoneConfirmed
+          ? <CloseOutCta ticket={ticket} className={ctaCls} />
+          : cta === 'Mark in progress'
+          ? <MarkInProgressCta ticket={ticket} className={ctaCls} />
+          : cta === 'Upload evidence'
+          ? <UploadEvidenceCta ticket={ticket} className={ctaCls} />
+          : cta === 'View snag'
+          ? <ViewSnagCta ticket={ticket} className={ctaCls} company={company} />
+          : <Link href={ticketUrl} className={ctaCls}>{cta} {cta === 'View Ticket' && <ArrowRight size={15} />}</Link>}
       </div>
     </div>
+  )
+}
+
+// "Submit quote" opens the full quote-upload pop-up in place (same SendQuoteForm as
+// the ticket detail), so the supplier can quote straight from the Today queue.
+function SubmitQuoteCta({ ticket, className }: { ticket: SupplierTicketRow; className: string }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} className={className}>Submit quote</button>
+      {open && (
+        <Modal onClose={() => setOpen(false)} maxWidth="max-w-3xl">
+          {close => <div><SendQuoteForm defaultOpen competitive ticketId={ticket.id} priority={String(ticket.priority)} createdAt={ticket.createdAt} onClose={close} /></div>}
+        </Modal>
+      )}
+    </>
+  )
+}
+
+// "Mark in progress" from the Today queue — confirm in a pop-up (start_work), no
+// navigation into the ticket.
+function MarkInProgressCta({ ticket, className }: { ticket: SupplierTicketRow; className: string }) {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  async function go(close: () => void) {
+    setBusy(true); setErr('')
+    try {
+      const res = await fetch(`/api/tickets/${ticket.id}/transition`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'start_work' }) })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Could not update the job')
+      close(); router.refresh()
+    } catch (e: any) { setErr(e.message); setBusy(false) }
+  }
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} className={className}>Mark in progress</button>
+      {open && (
+        <Modal onClose={() => setOpen(false)} maxWidth="max-w-md">
+          {close => (
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-base font-bold text-[var(--text)]">Mark this job in progress?</h3>
+                <p className="mt-1 text-sm text-[var(--text-muted)]">The store will see that the work has started. Do this once you&apos;re on your way or on site.</p>
+              </div>
+              {err && <p className="text-xs text-red-500">{err}</p>}
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setOpen(false)} disabled={busy} className="flex-1 rounded-xl py-2.5 text-sm font-medium text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-50">Cancel</button>
+                <button type="button" onClick={() => go(close)} disabled={busy} className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50">{busy ? 'Starting…' : 'Yes, mark in progress'}</button>
+              </div>
+            </div>
+          )}
+        </Modal>
+      )}
+    </>
+  )
+}
+
+// "Upload evidence" from the Today queue — opens the COC/POC (or more-evidence)
+// uploader in a pop-up, no navigation into the ticket.
+function UploadEvidenceCta({ ticket, className }: { ticket: SupplierTicketRow; className: string }) {
+  const [open, setOpen] = useState(false)
+  const evidenceRequested = ticket.status === 'evidence_requested'
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} className={className}>Upload evidence</button>
+      {open && (
+        <Modal onClose={() => setOpen(false)} maxWidth="max-w-2xl">
+          {close => <SubmitCompletionForm defaultOpen ticketId={ticket.id} evidenceRequested={evidenceRequested} requireBoth={!evidenceRequested} onClose={close} />}
+        </Modal>
+      )}
+    </>
+  )
+}
+
+// "View snag" from the Today queue — pops the snagged-completion context with the
+// relevant actions in place (Accept snag & schedule fix + More → Raise dispute),
+// plus a link to the full snagged submission on the ticket.
+function ViewSnagCta({ ticket, className, company }: { ticket: SupplierTicketRow; className: string; company?: string }) {
+  const [open, setOpen] = useState(false)
+  const store = ticket.isIndividual ? 'Individual' : [company, ticket.storeName, ticket.branchCode].filter(Boolean).join(' · ')
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} className={className}>View snag</button>
+      {open && (
+        <Modal onClose={() => setOpen(false)} maxWidth="max-w-2xl">
+          {close => (
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-base font-bold text-[var(--text)]">Completion snagged</h3>
+                <p className="mt-1 text-sm text-[var(--text-muted)]">The regional manager raised a snag on your completion. Accept the snag and schedule the corrective work, or raise a dispute if you disagree.</p>
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+                <div className="flex-1"><AcceptSnagCard ticketId={ticket.id} priority={String(ticket.priority)} createdAt={ticket.createdAt} /></div>
+                <RaiseDisputeMore ticketId={ticket.id} origin="snag" subjectTitle={ticket.category || ticket.title} jobRef={ticket.jobRef} store={store} />
+              </div>
+              <Link href={`/supplier/tickets/${ticket.id}`} onClick={close} className="inline-flex items-center gap-1 text-sm font-semibold text-blue-600 hover:underline dark:text-blue-400">View full snag details <ArrowRight size={14} /></Link>
+            </div>
+          )}
+        </Modal>
+      )}
+    </>
+  )
+}
+
+// "Close-out" opens the variation-order gate in place — the supplier raises a VO
+// (via More) or confirms there are none so the manager can close out.
+function CloseOutCta({ ticket, className }: { ticket: SupplierTicketRow; className: string }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} className={className}><CheckCircle2 size={15} /> Close-out</button>
+      {open && (
+        <Modal onClose={() => setOpen(false)} maxWidth="max-w-2xl">
+          {() => (
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-base font-bold text-[var(--text)]">Variation orders</h3>
+                <p className="mt-1 text-sm text-[var(--text-muted)]">Your COC &amp; POC were approved — raise a variation order for any extra work, or confirm there are none so the manager can close out.</p>
+              </div>
+              <SupplierVariationGate ticketId={ticket.id} priority={String(ticket.priority)} createdAt={ticket.createdAt} variationCount={0} status={ticket.status as 'approved_closeout' | 'vo_declined'} declineReason={null} noVosConfirmed={false} />
+            </div>
+          )}
+        </Modal>
+      )}
+    </>
   )
 }
 
@@ -239,5 +388,6 @@ function nextStep(t: SupplierTicketRow): string {
   if (['snag', 'snag_assigned'].includes(t.status)) return 'Accept and schedule the snag fix'
   if (['snag_in_progress', 'snag_resolved'].includes(t.status)) return 'Re-upload the COC & POC'
   if (t.status === 'submitted_for_signoff') return 'Awaiting the client sign-off'
+  if (['approved_closeout', 'vo_declined'].includes(t.status)) return t.voNoneConfirmed ? "Awaiting the manager's close-out" : 'Raise or confirm variation orders'
   return 'Track progress on this job'
 }
