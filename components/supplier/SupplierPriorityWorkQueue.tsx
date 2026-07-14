@@ -8,7 +8,7 @@
 // quote state, never another supplier's progress.
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { AlertCircle, AlertOctagon, AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, ClipboardList, ReceiptText, Camera, PlayCircle } from 'lucide-react'
+import { AlertCircle, AlertOctagon, AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, ClipboardList, ReceiptText, Camera } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import type { SupplierTicketRow } from '@/lib/health/data'
 import { Card } from '@/components/exec/ui'
@@ -16,6 +16,7 @@ import { CategoryIcon } from '@/components/client/ticketBadges'
 import { Modal } from '@/components/ui/Modal'
 import { SendQuoteForm } from '@/components/admin/SendQuoteForm'
 import { SubmitCompletionForm } from '@/components/supplier/SubmitCompletionForm'
+import { SchedulePicker } from '@/components/ui/SchedulePicker'
 import { SupplierVariationGate } from '@/components/supplier/SupplierJobActions'
 import { supplierStatusMeta, formatDate, formatDateTime, humanizeDuration, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
 
@@ -204,6 +205,8 @@ function QueueRow({ ticket, nowMs, company }: { ticket: SupplierTicketRow; nowMs
           ? <MarkInProgressCta ticket={ticket} className={ctaCls} />
           : cta === 'Upload evidence'
           ? <UploadEvidenceCta ticket={ticket} className={ctaCls} />
+          : cta === 'Accept snag'
+          ? <AcceptSnagCta ticket={ticket} className={ctaCls} />
           : <Link href={ticketUrl} className={ctaCls}>{cta} {cta === 'View Ticket' && <ArrowRight size={15} />}</Link>}
       </div>
     </div>
@@ -243,7 +246,7 @@ function MarkInProgressCta({ ticket, className }: { ticket: SupplierTicketRow; c
   }
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={className}><PlayCircle size={15} /> Mark in progress</button>
+      <button type="button" onClick={() => setOpen(true)} className={className}>Mark in progress</button>
       {open && (
         <Modal onClose={() => setOpen(false)} maxWidth="max-w-md">
           {close => (
@@ -255,7 +258,7 @@ function MarkInProgressCta({ ticket, className }: { ticket: SupplierTicketRow; c
               {err && <p className="text-xs text-red-500">{err}</p>}
               <div className="flex gap-2">
                 <button type="button" onClick={() => setOpen(false)} disabled={busy} className="flex-1 rounded-xl py-2.5 text-sm font-medium text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-50">Cancel</button>
-                <button type="button" onClick={() => go(close)} disabled={busy} className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:opacity-50">{busy ? 'Starting…' : 'Yes, mark in progress'}</button>
+                <button type="button" onClick={() => go(close)} disabled={busy} className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50">{busy ? 'Starting…' : 'Yes, mark in progress'}</button>
               </div>
             </div>
           )}
@@ -272,10 +275,43 @@ function UploadEvidenceCta({ ticket, className }: { ticket: SupplierTicketRow; c
   const evidenceRequested = ticket.status === 'evidence_requested'
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={className}><Camera size={15} /> Upload evidence</button>
+      <button type="button" onClick={() => setOpen(true)} className={className}>Upload evidence</button>
       {open && (
         <Modal onClose={() => setOpen(false)} maxWidth="max-w-2xl">
           {close => <SubmitCompletionForm defaultOpen ticketId={ticket.id} evidenceRequested={evidenceRequested} requireBoth={!evidenceRequested} onClose={close} />}
+        </Modal>
+      )}
+    </>
+  )
+}
+
+// "Accept snag" from the Today queue — opens the snag-fix schedule picker in a
+// pop-up (accept_snag transition), no navigation into the ticket.
+function AcceptSnagCta({ ticket, className }: { ticket: SupplierTicketRow; className: string }) {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  async function accept(iso: string, close: () => void) {
+    setBusy(true); setErr('')
+    try {
+      const res = await fetch(`/api/tickets/${ticket.id}/transition`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'accept_snag', scheduledAt: iso }) })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Could not accept the snag')
+      close(); router.refresh()
+    } catch (e: any) { setErr(e.message); setBusy(false) }
+  }
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} className={className}>Accept snag</button>
+      {open && (
+        <Modal onClose={() => setOpen(false)} maxWidth="max-w-2xl">
+          {close => (
+            <div className="space-y-3">
+              <h3 className="text-base font-bold text-[var(--text)]">Accept snag &amp; schedule the fix</h3>
+              {err && <p className="text-xs text-red-500">{err}</p>}
+              <SchedulePicker priority={String(ticket.priority)} createdAt={ticket.createdAt} busy={busy} onConfirm={iso => accept(iso, close)} onCancel={close} />
+            </div>
+          )}
         </Modal>
       )}
     </>

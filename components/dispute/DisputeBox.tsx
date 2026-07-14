@@ -58,7 +58,9 @@ const originWord = (o: string) => o === 'snag' ? 'snag' : o === 'variation' ? 'v
 const ROLE_LABEL: Record<string, string> = { supplier: 'Supplier', regional_manager: 'Regional Manager' }
 
 async function uploadEvidence(_ticketId: string, file: File): Promise<string> {
-  const bucket = file.type.startsWith('image/') ? 'ticket-photos' : 'completion-docs'
+  // Non-image evidence → the ticket-docs bucket, which accepts PDF/Word/Excel/text
+  // (completion-docs only allows images + PDF, so .doc/.docx uploads were rejected).
+  const bucket = file.type.startsWith('image/') ? 'ticket-photos' : 'ticket-docs'
   return uploadOne(file, bucket)
 }
 
