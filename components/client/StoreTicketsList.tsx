@@ -1,198 +1,80 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
-import { PlusCircle, Search, Ticket, ChevronDown, FilePlus2, MessageSquare, Calendar, Loader2, Clock, CheckCircle2, XCircle } from 'lucide-react'
+// Store-manager Tickets tab — the shared RM-style layout (stat cards + filter bar
+// + table). The SM manages a single store, so there's no per-store grouping: it
+// renders one flat table instead of store-grouped cards.
+import { useMemo } from 'react'
 import type { StoreManagerTicket } from '@/lib/health/data'
-import { Card } from '@/components/exec/ui'
-import { TicketFilterTiles, type FilterGroup } from '@/components/ui/TicketFilterTiles'
-import { CategoryIcon, TicketBadges } from './ticketBadges'
-import { readCollapse, writeCollapse } from '@/lib/collapse-state'
-import { formatDate, formatDateTime, humanizeDuration, urgencyCountCls, OPERATIONAL_IMPACT_LABELS, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
+import { clientStatusLabel, clientStatusBadgeClass } from './ticketBadges'
+import { TicketTabView, type TabRow, type Intent } from '@/components/ui/TicketTabView'
 
 type Filter = 'all' | 'open' | 'info_requested' | 'scheduled' | 'in_progress' | 'completed' | 'cancelled' | 'overdue'
 
-const WORD: Record<string, string> = { open: 'New', info_requested: 'Info Requested', scheduled: 'Job scheduled', in_progress: 'In Progress', completed: 'Completed', cancelled: 'Cancelled' }
-
-// Urgency rank (handles classic low/medium/high/urgent and engine P1–P4).
-const URGENCY: Record<string, number> = { urgent: 0, P1: 0, high: 1, P2: 1, medium: 2, P3: 2, low: 3, P4: 3 }
-const urgency = (p: string) => URGENCY[p] ?? 5
-// Newest first, then most urgent.
-const byDateThenUrgency = (a: StoreManagerTicket, b: StoreManagerTicket) =>
-  (+new Date(b.createdAt) - +new Date(a.createdAt)) || (urgency(a.priority) - urgency(b.priority))
-
-function Row({ t, storeName }: { t: StoreManagerTicket; storeName: string }) {
-  return (
-    <Link href={`/client/tickets/${t.id}`} className="grid gap-3 border-b border-[var(--border)] px-4 py-3 last:border-0 transition hover:bg-[var(--hover)] sm:grid-cols-[1fr_auto] sm:items-center">
-      <div className="flex min-w-0 items-center gap-3">
-        <CategoryIcon category={t.category ?? t.title} priority={t.priority} className="h-11 w-11" iconSize={18} />
-        <div className="min-w-0">
-          {t.jobRef && <p className="text-[10px] font-mono text-[var(--text-faint)]">{t.jobRef}</p>}
-          <p className="truncate text-sm font-bold text-[var(--text)]">{t.category || t.title}</p>
-          <p className="truncate text-sm text-[var(--text-muted)]">{storeName}</p>
-        </div>
-      </div>
-      <div className="flex flex-col items-start gap-1 sm:items-end">
-        <TicketBadges ticket={t} />
-        <p className="text-sm text-[var(--text-muted)]">{t.supplierAssigned ? 'Supplier assigned' : 'No supplier assigned'}</p>
-        <p className="text-sm text-[var(--text-muted)]">
-          {formatDateTime(t.createdAt)}
-          {/* eslint-disable-next-line react-hooks/purity -- cosmetic "overdue by" readout, not hydration-critical */}
-          {t.overdue && <span className="ml-1.5 font-semibold text-red-600 dark:text-red-400">· Overdue by {humanizeDuration(Date.now() - new Date(t.dueAt).getTime())}</span>}
-        </p>
-      </div>
-    </Link>
-  )
+// The SM's next step per raw ticket status. The SM only acts on an info request;
+// everything else is driven by the RM / supplier, so it reads as "awaiting".
+function smNext(t: StoreManagerTicket): { text: string; act: boolean } {
+  switch (t.rawStatus) {
+    case 'info_requested': return { text: 'Provide the requested information', act: true }
+    case 'open':
+    case 'suppliers_declined':
+    case 'assigned':
+    case 'quote_requested':
+    case 'assessment': return { text: t.supplierAssigned ? 'Awaiting supplier quotes' : 'Awaiting quotes', act: false }
+    case 'quoted':
+    case 'quote_revision': return { text: 'Awaiting quote approval', act: false }
+    case 'accepted': return { text: 'Quote approved', act: false }
+    case 'scheduled': return { text: 'Supplier visit scheduled', act: false }
+    case 'in_progress': return { text: 'Work in progress', act: false }
+    case 'submitted_for_signoff':
+    case 'pending_sign_off':
+    case 'evidence_requested':
+    case 'snag':
+    case 'snag_assigned':
+    case 'snag_in_progress':
+    case 'snag_resolved':
+    case 'approved_closeout': return { text: 'Awaiting completion sign-off', act: false }
+    case 'completed': return { text: 'Completed', act: false }
+    case 'cancelled':
+    case 'declined': return { text: 'Cancelled', act: false }
+    default: return { text: 'Track progress', act: false }
+  }
 }
 
-/** Collapsible status group used in the "All" view. */
-function Group({ title, tickets, defaultOpen = false, storeName }: { title: string; tickets: StoreManagerTicket[]; defaultOpen?: boolean; storeName: string }) {
-  const [open, setOpen] = useState(defaultOpen)
-  // Remember the user's choice across navigation (wiped on next sign-in).
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- restores persisted group open state from localStorage (client-only) when the title changes; cannot run during SSR render
-  useEffect(() => { const v = readCollapse(`sm-group-${title}`); if (v !== null) setOpen(v) }, [title])
-  const toggle = () => setOpen(o => { const v = !o; writeCollapse(`sm-group-${title}`, v); return v })
-  if (!tickets.length) return null
-  return (
-    <Card className="p-2 cursor-pointer hover:ring-[#C6A35D]/30 transition" onClick={toggle} role="button" tabIndex={0} aria-expanded={open} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle() } }}>
-      <div className="w-full flex items-center gap-2 px-2 py-2">
-        <ChevronDown size={16} className={`shrink-0 text-[var(--text-muted)] transition-transform ${open ? 'rotate-180' : ''}`} />
-        <span className="text-sm font-bold text-[var(--text)]">{title}</span>
-        <span className={`text-[11px] font-medium rounded-full px-2 py-0.5 ${urgencyCountCls(tickets.filter(t => !['completed', 'cancelled'].includes(t.status)).map(t => t.priority))}`}>{tickets.length}</span>
-      </div>
-      {open && <div onClick={e => e.stopPropagation()}>{tickets.map(t => <Row key={t.id} t={t} storeName={storeName} />)}</div>}
-    </Card>
-  )
+function smIntent(t: StoreManagerTicket): Intent {
+  if (['completed', 'cancelled', 'declined'].includes(t.rawStatus)) return 'done'
+  if (t.rawStatus === 'info_requested') return 'mine'
+  return 'awaiting'
+}
+
+const SM_STATUS_OPTIONS = [
+  { value: 'all', label: 'All' }, { value: 'active', label: 'Open' },
+  { value: 'open', label: 'New' }, { value: 'info_requested', label: 'Input needed' },
+  { value: 'scheduled', label: 'Scheduled' }, { value: 'in_progress', label: 'In progress' },
+  { value: 'completed', label: 'Completed' },
+]
+const STAT_LABELS: Record<Intent, [string, string]> = {
+  mine: ['My actions', 'Require your response'],
+  awaiting: ['Awaiting action', 'From others'],
+  critical: ['At SLA breach and overdue', 'Require attention'],
+  done: ['Completed and closed', 'All resolved'],
 }
 
 export function StoreTicketsList({ tickets, initialFilter = 'all', storeName = 'Your store' }: { tickets: StoreManagerTicket[]; initialFilter?: Filter; storeName?: string }) {
-  const [filter, setFilter] = useState<Filter>(initialFilter)
-  const [q, setQ] = useState('')
-
-  const counts = useMemo(() => {
-    const c = { open: 0, info_requested: 0, scheduled: 0, in_progress: 0, completed: 0, cancelled: 0, overdue: 0 }
-    for (const t of tickets) { if (t.status in c) (c as any)[t.status]++; if (t.overdue) c.overdue++ }
-    return c
-  }, [tickets])
-
-  // Lowercase haystack per ticket covering every searchable field.
-  const haystacks = useMemo(() => tickets.map(t => ({
-    t,
-    hay: [
-      t.title,
-      t.description ?? '',
-      t.category ?? 'General',
-      WORD[t.status] ?? '', t.status,
-      t.priority, PRIORITY_LEVEL_LABELS[t.priority] ?? '',
-      t.operationalImpact ? (OPERATIONAL_IMPACT_LABELS[t.operationalImpact] ?? t.operationalImpact) : '',
-      t.operationalImpact ?? '',
-      t.jobRef ?? '',
-      formatDate(t.createdAt), formatDateTime(t.createdAt),
-      t.supplierAssigned ? 'supplier assigned' : '',
-    ].join(' · ').toLowerCase(),
-  })), [tickets])
-
-  // Multi-token AND search: every token must match.
-  const shown = useMemo(() => {
-    const tokens = q.toLowerCase().split(/[\s+]+/).map(s => s.trim()).filter(Boolean)
-    return haystacks
-      .filter(({ t, hay }) =>
-        (filter === 'all'
-          || (filter === 'overdue' ? t.overdue
-            // "Open" is an umbrella of every active ticket (not completed/cancelled),
-            // so a ticket stays under Open until it's completed.
-            : filter === 'open' ? !['completed', 'cancelled'].includes(t.status)
-            : t.status === filter)) &&
-        (tokens.length === 0 || tokens.every(tok => hay.includes(tok))))
-      .map(x => x.t)
-  }, [haystacks, filter, q])
-
-  // "All" view: every ticket in one list (newest → urgency), shown under a single
-  // "All Tickets" collapsible. A specific filter → the same flat list, filtered.
-  const shownSorted = useMemo(() => [...shown].sort(byDateThenUrgency), [shown])
-
-  // Filters grouped by intent (My actions / Awaiting / Critical / Completed).
-  const filterGroups: FilterGroup[] = useMemo(() => [
-    { tone: 'mine', label: 'My actions (requiring response)', tiles: [
-      { key: 'info_requested', label: 'Info requested', count: counts.info_requested, icon: <MessageSquare size={16} /> },
-    ] },
-    { tone: 'awaiting', label: 'Awaiting action (from others)', tiles: [
-      { key: 'open', label: 'New', count: counts.open, icon: <FilePlus2 size={16} /> },
-      { key: 'scheduled', label: 'Job scheduled', count: counts.scheduled, icon: <Calendar size={16} /> },
-      { key: 'in_progress', label: 'In progress', count: counts.in_progress, icon: <Loader2 size={16} /> },
-    ] },
-    { tone: 'critical', label: 'Critical & overdue', tiles: [
-      { key: 'overdue', label: 'Overdue', count: counts.overdue, icon: <Clock size={16} /> },
-    ] },
-    { tone: 'closed', label: 'Completed & closed', tiles: [
-      { key: 'completed', label: 'Completed', count: counts.completed, icon: <CheckCircle2 size={16} /> },
-      { key: 'cancelled', label: 'Cancelled', count: counts.cancelled, icon: <XCircle size={16} />, tone: 'neutral' },
-    ] },
-  ], [counts])
-
-  // Distribution bar grouped by the four filter-intent tones (My actions → Awaiting
-  // → Critical → Completed), coloured to the group headings and filled front-to-back
-  // so "My actions" (amber) starts at the left where its heading sits. Cancelled is
-  // excluded; overdue → Critical; info-requested → My actions.
-  const barSegs = useMemo(() => {
-    const g = { mine: 0, awaiting: 0, critical: 0, done: 0 }
-    for (const t of tickets) {
-      if (t.status === 'cancelled') continue
-      if (t.overdue) g.critical++
-      else if (t.status === 'completed') g.done++
-      else if (t.status === 'info_requested') g.mine++
-      else g.awaiting++
+  const rows: TabRow[] = useMemo(() => tickets.map(t => {
+    const n = smNext(t)
+    return {
+      id: t.id, href: `/client/tickets/${t.id}`, jobRef: t.jobRef, category: t.category || t.title,
+      storeName, branchCode: null,
+      priority: String(t.priority), statusLabel: clientStatusLabel(t), statusCls: clientStatusBadgeClass(t),
+      nextAction: n.text, nextActionAct: n.act, intent: smIntent(t), bucket: t.status,
+      slaDueAt: t.dueAt, overdue: t.overdue, breached: false, createdAt: t.createdAt,
     }
-    return [
-      { key: 'mine', n: g.mine, cls: 'bg-amber-500' },
-      { key: 'awaiting', n: g.awaiting, cls: 'bg-blue-500' },
-      { key: 'critical', n: g.critical, cls: 'bg-red-500' },
-      { key: 'done', n: g.done, cls: 'bg-emerald-500' },
-    ]
-  }, [tickets])
-  const barTotal = barSegs.reduce((s, x) => s + x.n, 0) || 1
+  }), [tickets, storeName])
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><Ticket className="text-blue-600 dark:text-blue-400" size={22} /> Tickets</h1>
-        </div>
-        <Link href="/client/tickets/new" className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-500 transition shrink-0"><PlusCircle size={16} /> Log a Ticket</Link>
-      </div>
-
-      {/* Distribution bar — four intent tones, filled front-to-back (My actions first). */}
-      <Card className="p-4 space-y-2">
-        <div className="h-3 rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden flex">
-          {barSegs.map(x => x.n > 0 && <div key={x.key} className={`h-full ${x.cls}`} style={{ width: `${Math.round((x.n / barTotal) * 100)}%` }} />)}
-        </div>
-      </Card>
-
-      {/* Grouped filter badges — My actions / Awaiting / Critical / Completed. */}
-      <TicketFilterTiles groups={filterGroups} active={filter === 'all' ? null : filter} onPick={k => setFilter(f => (f === k ? 'all' : (k as Filter)))} />
-
-      {/* Search */}
-      <div className="relative">
-        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
-        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search tickets…"
-          className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)] focus:ring-[#C6A35D]/40 outline-none" />
-      </div>
-
-      {/* All → every ticket under one collapsible "All Tickets" heading (newest →
-          most urgent), open by default with its state remembered until sign-out.
-          A specific filter → flat list. */}
-      {filter === 'all' ? (
-        shown.length ? (
-          <Group title="All Tickets" tickets={shownSorted} defaultOpen storeName={storeName} />
-        ) : (
-          <Card className="p-2"><p className="text-sm text-[var(--text-faint)] text-center py-8">{tickets.length ? 'No tickets match.' : 'No tickets yet.'}</p></Card>
-        )
-      ) : (
-        <Card className="p-2">
-          {shownSorted.map(t => <Row key={t.id} t={t} storeName={storeName} />)}
-          {!shownSorted.length && <p className="text-sm text-[var(--text-faint)] text-center py-8">{tickets.length ? 'No tickets match.' : 'No tickets yet.'}</p>}
-        </Card>
-      )}
-    </div>
+    <TicketTabView rows={rows} grouped={false} newHref="/client/tickets/new"
+      subtitle="Manage and track your store's tickets."
+      statusOptions={SM_STATUS_OPTIONS} statLabels={STAT_LABELS} storageKey="sm-tickets"
+      initialFilter={initialFilter === 'all' ? undefined : initialFilter} />
   )
 }
