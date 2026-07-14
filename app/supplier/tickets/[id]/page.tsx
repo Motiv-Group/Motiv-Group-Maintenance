@@ -372,9 +372,11 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
   const photosTab = totalPhotos > 0
     ? <PhotoThumbs urls={t.photo_urls as string[]} ticketId={t.id} />
     : null
-  // Show active quotes; if none active (e.g. a re-quote after the RM declined),
-  // still show the declined quote so the Quotes tab stays available.
-  const quoteTabRows = activeQuotes.length > 0 ? activeQuotes : declinedMyQuotes
+  // Quotes tab: active quotes (pending / approved). While the supplier is still
+  // (re-)quoting, also show the declined quote(s) with the reason; once a quote is
+  // approved or the request closes, declined quotes move to History instead.
+  const quoteTabRows = canSubmitQuote ? [...activeQuotes, ...declinedMyQuotes] : activeQuotes
+  const historyDeclinedQuotes = canSubmitQuote ? [] : declinedMyQuotes
   const quotesTab = quoteTabRows.length > 0
     ? (<div className="space-y-2">{quoteTabRows.map((q, i, arr) => (
         <QuoteSummary key={q.id} title={arr.length > 1 ? `Quote #${arr.length - i}` : 'Your submitted quote'} status={quoteStatusOf(q.status)} ticketId={t.id} collapsible declineReason={q.decline_reason ?? declineReason}
@@ -457,11 +459,11 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
         )}
       </div>)
     : null
-  const archiveTab = (declinedMyQuotes.length > 0 || ((declineRows ?? []) as any[]).length > 0 || archivedSuperseded.length > 0 || !!declinedSnag)
+  const archiveTab = (historyDeclinedQuotes.length > 0 || ((declineRows ?? []) as any[]).length > 0 || archivedSuperseded.length > 0 || !!declinedSnag)
     ? (<div className="space-y-4">
-        {declinedMyQuotes.length > 0 && (
+        {historyDeclinedQuotes.length > 0 && (
           <ArchiveGroup label="Quotes">
-            {declinedMyQuotes.map((q, i, arr) => (
+            {historyDeclinedQuotes.map((q, i, arr) => (
               <QuoteSummary key={q.id} title={arr.length > 1 ? `Quote #${arr.length - i}` : 'Your submitted quote'} status={quoteStatusOf(q.status)} ticketId={t.id} collapsible declineReason={q.decline_reason ?? declineReason}
                 quote={{ id: q.id, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, description: q.description ?? null, fileUrl: q.file_url ?? null, validUntil: q.valid_until ?? null, createdAt: q.created_at, declinedAt: q.updated_at ?? null }} />
             ))}
@@ -591,8 +593,16 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
             <h2 className="text-sm font-bold text-[var(--text)]">Next action</h2>
             {nextAction.msg && <p className="mt-1 text-sm font-bold text-[var(--text)]">{nextAction.msg}</p>}
             {/* When breached the instruction moves into the red callout below. */}
-            {nextAction.sub && !breached && <p className="mt-0.5 text-sm text-[var(--text-muted)]">{nextAction.sub}</p>}
+            {nextAction.sub && !breached && t.status !== 'completed' && <p className="mt-0.5 text-sm text-[var(--text-muted)]">{nextAction.sub}</p>}
           </div>
+
+          {/* Completed — a clear green sign-off callout (mirrors the RM page). */}
+          {t.status === 'completed' && (
+            <div className="flex items-start gap-2.5 rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/30 p-3.5">
+              <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+              <p className="text-sm text-[var(--text-muted)]">This job is <span className="font-semibold text-emerald-600 dark:text-emerald-400">complete</span> — the completion certificate and proof of completion have been approved and signed off. No further action is needed.</p>
+            </div>
+          )}
 
           {/* SLA breach — concise callout inside the action block (same as the RM). */}
           {breached && <BreachReason action={nextAction.sub || nextAction.msg || 'This job is overdue — take the next action to get it back on track.'} dueAt={sla.nextActionDueAt} nowMs={now.getTime()} />}
@@ -779,7 +789,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
           { key: 'snag', label: 'Snag', content: snagTab },
           { key: 'dispute', label: 'Dispute', content: disputeTab },
           { key: 'activity', label: `Activity${((updates ?? []) as any[]).length ? ` (${((updates ?? []) as any[]).length})` : ''}`, content: activityTab },
-          { key: 'archive', label: 'Archived', content: archiveTab },
+          { key: 'archive', label: 'History', content: archiveTab },
           { key: 'timeline', label: 'Timeline', content: timelineTab },
         ]}
       />

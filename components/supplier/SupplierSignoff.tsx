@@ -19,10 +19,15 @@ const PHASE_META: Record<Phase, { label: string; badge: string }> = {
   approved: { label: 'Approved', badge: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' },
   changes: { label: 'Changes requested', badge: 'bg-amber-500/15 text-amber-700 dark:text-amber-400' },
 }
-function nextStep(p: Phase): { Icon: typeof Clock; cls: string; title: string; desc: string } {
-  if (p === 'approved') return { Icon: ArrowRight, cls: 'text-emerald-600 ring-emerald-500/30 dark:text-emerald-400', title: 'Confirm additional work', desc: 'Let us know if you have extra work to add' }
-  if (p === 'changes') return { Icon: AlertCircle, cls: 'text-red-600 ring-red-500/30 dark:text-red-400', title: 'View feedback', desc: 'Please update your submission and resubmit' }
-  return { Icon: Clock, cls: 'text-[var(--text-muted)] ring-[var(--border)]', title: 'No action needed', desc: "We'll notify you once a decision has been made" }
+function nextStep(p: Phase, ticketStatus: string): { Icon: typeof Clock; cls: string; title: string; desc: string } {
+  const green = 'text-emerald-600 ring-emerald-500/30 dark:text-emerald-400'
+  if (p === 'changes') return { Icon: AlertCircle, cls: 'text-red-600 ring-red-500/30 dark:text-red-400', title: 'View feedback', desc: 'Update your submission and resubmit' }
+  if (p === 'approved') {
+    if (ticketStatus === 'completed') return { Icon: CheckCircle2, cls: green, title: 'Job complete', desc: 'Signed off and closed — no further action' }
+    if (['approved_closeout', 'vo_declined'].includes(ticketStatus)) return { Icon: ArrowRight, cls: green, title: 'Confirm additional work', desc: 'Raise a variation order for extra work, or confirm there are none' }
+    return { Icon: CheckCircle2, cls: green, title: 'Approved', desc: 'No further action needed' }
+  }
+  return { Icon: Clock, cls: 'text-[var(--text-muted)] ring-[var(--border)]', title: 'No action needed', desc: 'Waiting for the manager to review' }
 }
 
 function StatCard({ icon, tone, value, title, sub, active, onClick }: { icon: ReactNode; tone: string; value: number; title: string; sub: string; active: boolean; onClick: () => void }) {
@@ -157,7 +162,7 @@ export function SupplierSignoff({ signoffs }: { signoffs: SupplierSignoffRow[] }
                 {g.rows.map(s => {
                   const phase = phaseOf(s.status)
                   const meta = PHASE_META[phase]
-                  const ns = nextStep(phase)
+                  const ns = nextStep(phase, s.ticketStatus)
                   return (
                     <Link key={s.id} href={`/supplier/tickets/${s.ticketId}`} className={`block border-b border-l-4 border-[var(--border)] px-4 py-4 transition last:border-b-0 hover:bg-[var(--hover)] ${phase === 'changes' ? 'border-l-red-500' : 'border-l-blue-500'}`}>
                       <div className={ROW}>
