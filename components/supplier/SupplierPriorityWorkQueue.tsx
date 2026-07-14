@@ -16,8 +16,8 @@ import { CategoryIcon } from '@/components/client/ticketBadges'
 import { Modal } from '@/components/ui/Modal'
 import { SendQuoteForm } from '@/components/admin/SendQuoteForm'
 import { SubmitCompletionForm } from '@/components/supplier/SubmitCompletionForm'
-import { SchedulePicker } from '@/components/ui/SchedulePicker'
-import { SupplierVariationGate } from '@/components/supplier/SupplierJobActions'
+import { SupplierVariationGate, AcceptSnagCard } from '@/components/supplier/SupplierJobActions'
+import { DisputeReviewButton, RaiseDisputeMore } from '@/components/dispute/DisputeBox'
 import { supplierStatusMeta, formatDate, formatDateTime, humanizeDuration, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
 
 type QueueFilter = 'all' | 'to_quote' | 'attend' | 'evidence' | 'snags' | 'sla'
@@ -148,16 +148,17 @@ function QueueRow({ ticket, nowMs, company }: { ticket: SupplierTicketRow; nowMs
   // Close-out phase: the badge is amber while the supplier still owes a VO decision,
   // blue once they've confirmed there are none (awaiting the RM's close-out).
   const closeout = ['approved_closeout', 'vo_declined'].includes(ticket.status) && ticket.awardedToMe
-  const statusCls = ticket.disputed ? 'bg-red-500/15 text-red-700 dark:text-red-400' : closeout ? (ticket.voNoneConfirmed ? 'bg-blue-500/15 text-blue-700 dark:text-blue-400' : 'bg-amber-500/15 text-amber-700 dark:text-amber-400') : meta.cls
+  const statusCls = ticket.disputed ? 'bg-violet-500/15 text-violet-700 dark:text-violet-400' : closeout ? (ticket.voNoneConfirmed ? 'bg-blue-500/15 text-blue-700 dark:text-blue-400' : 'bg-amber-500/15 text-amber-700 dark:text-amber-400') : meta.cls
   const statusLabel = ticket.disputed ? 'Dispute' : closeout ? 'Close-out' : meta.label
   const ticketUrl = `/supplier/tickets/${ticket.id}`
   const who = ticket.isIndividual ? 'Individual' : [company, ticket.storeName].filter(Boolean).join(' · ')
-  // Phase CTA — labelled by what the supplier does next; all open the ticket (the
-  // full multi-field actions — quote upload, COC/POC — live on the detail page).
-  const cta = toQuote(ticket) ? 'Submit quote'
+  // Phase CTA — labelled by what the supplier does next. Disputed → view the dispute
+  // chat; snagged → view the snag; the rest open a pop-up or the ticket.
+  const cta = ticket.disputed ? 'View dispute'
+    : toQuote(ticket) ? 'Submit quote'
     : ['accepted', 'scheduled'].includes(ticket.status) && ticket.awardedToMe ? 'Mark in progress'
     : needsEvidence(ticket) ? 'Upload evidence'
-    : isSnag(ticket) ? 'Accept snag'
+    : isSnag(ticket) ? 'View snag'
     : 'View Ticket'
   // Genuinely critical (P1 / urgent) jobs get a RED action button so they stand out.
   const critical = ['P1', 'urgent'].includes(String(ticket.priority))
@@ -198,7 +199,9 @@ function QueueRow({ ticket, nowMs, company }: { ticket: SupplierTicketRow; nowMs
       </div>
 
       <div className="flex lg:justify-end">
-        {toQuote(ticket)
+        {cta === 'View dispute'
+          ? <DisputeReviewButton ticketId={ticket.id} viewerRole="supplier" trigger={open => <button type="button" onClick={open} className={ctaCls}>View dispute</button>} />
+          : toQuote(ticket)
           ? <SubmitQuoteCta ticket={ticket} className={ctaCls} />
           : closeout && !ticket.voNoneConfirmed
           ? <CloseOutCta ticket={ticket} className={ctaCls} />
@@ -206,8 +209,8 @@ function QueueRow({ ticket, nowMs, company }: { ticket: SupplierTicketRow; nowMs
           ? <MarkInProgressCta ticket={ticket} className={ctaCls} />
           : cta === 'Upload evidence'
           ? <UploadEvidenceCta ticket={ticket} className={ctaCls} />
-          : cta === 'Accept snag'
-          ? <AcceptSnagCta ticket={ticket} className={ctaCls} />
+          : cta === 'View snag'
+          ? <ViewSnagCta ticket={ticket} className={ctaCls} company={company} />
           : <Link href={ticketUrl} className={ctaCls}>{cta} {cta === 'View Ticket' && <ArrowRight size={15} />}</Link>}
       </div>
     </div>
@@ -286,31 +289,28 @@ function UploadEvidenceCta({ ticket, className }: { ticket: SupplierTicketRow; c
   )
 }
 
-// "Accept snag" from the Today queue — opens the snag-fix schedule picker in a
-// pop-up (accept_snag transition), no navigation into the ticket.
-function AcceptSnagCta({ ticket, className }: { ticket: SupplierTicketRow; className: string }) {
-  const router = useRouter()
+// "View snag" from the Today queue — pops the snagged-completion context with the
+// relevant actions in place (Accept snag & schedule fix + More → Raise dispute),
+// plus a link to the full snagged submission on the ticket.
+function ViewSnagCta({ ticket, className, company }: { ticket: SupplierTicketRow; className: string; company?: string }) {
   const [open, setOpen] = useState(false)
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState('')
-  async function accept(iso: string, close: () => void) {
-    setBusy(true); setErr('')
-    try {
-      const res = await fetch(`/api/tickets/${ticket.id}/transition`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'accept_snag', scheduledAt: iso }) })
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Could not accept the snag')
-      close(); router.refresh()
-    } catch (e: any) { setErr(e.message); setBusy(false) }
-  }
+  const store = ticket.isIndividual ? 'Individual' : [company, ticket.storeName, ticket.branchCode].filter(Boolean).join(' · ')
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={className}>Accept snag</button>
+      <button type="button" onClick={() => setOpen(true)} className={className}>View snag</button>
       {open && (
         <Modal onClose={() => setOpen(false)} maxWidth="max-w-2xl">
           {close => (
-            <div className="space-y-3">
-              <h3 className="text-base font-bold text-[var(--text)]">Accept snag &amp; schedule the fix</h3>
-              {err && <p className="text-xs text-red-500">{err}</p>}
-              <SchedulePicker priority={String(ticket.priority)} createdAt={ticket.createdAt} busy={busy} onConfirm={iso => accept(iso, close)} onCancel={close} />
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-base font-bold text-[var(--text)]">Completion snagged</h3>
+                <p className="mt-1 text-sm text-[var(--text-muted)]">The regional manager raised a snag on your completion. Accept the snag and schedule the corrective work, or raise a dispute if you disagree.</p>
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+                <div className="flex-1"><AcceptSnagCard ticketId={ticket.id} priority={String(ticket.priority)} createdAt={ticket.createdAt} /></div>
+                <RaiseDisputeMore ticketId={ticket.id} origin="snag" subjectTitle={ticket.category || ticket.title} jobRef={ticket.jobRef} store={store} />
+              </div>
+              <Link href={`/supplier/tickets/${ticket.id}`} onClick={close} className="inline-flex items-center gap-1 text-sm font-semibold text-blue-600 hover:underline dark:text-blue-400">View full snag details <ArrowRight size={14} /></Link>
             </div>
           )}
         </Modal>

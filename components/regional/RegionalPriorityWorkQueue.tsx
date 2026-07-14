@@ -13,6 +13,7 @@ import { Card } from '@/components/exec/ui'
 import { Modal } from '@/components/ui/Modal'
 import { CategoryIcon } from '@/components/client/ticketBadges'
 import { AssignSuppliersButton, QuoteReviewButton, SignoffReviewButton } from '@/components/regional/RmTicketActions'
+import { DisputeReviewButton } from '@/components/dispute/DisputeBox'
 import { rmStatusMeta, formatDate, formatDateTime, humanizeDuration, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
 
 type QueueFilter = 'all' | 'assign' | 'quotes' | 'signoff' | 'sla' | 'snags'
@@ -172,7 +173,7 @@ function QueueRow({ ticket, nowMs, suppliers, motivSuppliers }: { ticket: Region
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-1.5">
           <span className={`inline-flex w-[72px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${priorityBadgeClass(String(ticket.priority))}`}>{PRIORITY_LEVEL_LABELS[String(ticket.priority)] ?? 'Medium'}</span>
-          <span className={`inline-flex w-[120px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${closeout ? closeoutBadge : meta.cls}`}>{closeout ? 'Close-out' : meta.label}</span>
+          <span className={`inline-flex w-[120px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${ticket.disputed ? 'bg-violet-500/15 text-violet-700 dark:text-violet-400' : closeout ? closeoutBadge : meta.cls}`}>{ticket.disputed ? 'Dispute' : closeout ? 'Close-out' : meta.label}</span>
           {ticket.disputeUnread && <span className="relative z-20 inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-blue-500/15 px-1.5 py-1 text-[10px] font-bold text-blue-700 dark:text-blue-400"><MessageSquare size={10} /> New message</span>}
         </div>
         <p className="mt-1.5 truncate text-sm text-[var(--text-muted)]">{ticket.supplierAssigned ? 'Supplier assigned' : 'No supplier assigned'}</p>
@@ -192,7 +193,10 @@ function QueueRow({ ticket, nowMs, suppliers, motivSuppliers }: { ticket: Region
       </div>
 
       <div className="flex lg:justify-end">
-        {reviewQuote ? (
+        {ticket.disputed ? (
+          <DisputeReviewButton ticketId={ticket.id} viewerRole="regional_manager"
+            trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}>View dispute</button>} />
+        ) : reviewQuote ? (
           <QuoteReviewButton ticketId={ticket.id}
             trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}>Approve quote</button>} />
         ) : reviewSignoff ? (

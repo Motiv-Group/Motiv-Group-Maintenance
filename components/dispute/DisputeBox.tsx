@@ -3,11 +3,12 @@
 // Supplier↔RM dispute thread over a snag or a "more evidence" request. The supplier
 // raises it (pausing the snag/evidence step); both sides post messages + evidence in
 // a free-flowing numbered thread until the RM resolves it as upheld or withdrawn.
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { uploadOne } from '@/lib/upload'
 import type { ReactNode } from 'react'
 import { MessageSquareWarning, Paperclip, X, Send, ShieldCheck, ShieldX, FileText, Image as ImageIcon, Loader2, ClipboardList, ChevronDown } from 'lucide-react'
+import { Modal } from '@/components/ui/Modal'
 import { formatDateTime } from '@/lib/utils'
 
 // Reason quick-picks per dispute origin (folded into the first thread message).
@@ -270,6 +271,50 @@ export function RaiseDisputeMore(props: { ticketId: string; origin: 'snag' | 'ev
         )}
       </div>
       {modal && <RaiseDisputeButton {...props} defaultOpen onClose={() => setModal(false)} />}
+    </>
+  )
+}
+
+// Today-queue "View dispute" pop-up — fetches the ticket's open dispute + messages
+// on open and shows the full chat + resolve controls in place (no navigation).
+export function DisputeReviewButton({ ticketId, viewerRole, trigger }: {
+  ticketId: string; viewerRole: 'supplier' | 'regional_manager'; trigger: (open: () => void) => ReactNode
+}) {
+  const [open, setOpen] = useState(false)
+  const [data, setData] = useState<{ dispute: DisputeRecord; messages: DisputeMessage[]; subject: string | null } | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [err, setErr] = useState('')
+  useEffect(() => {
+    if (!open) return
+    let live = true
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resets fetch state when the pop-up opens, before the async load; cannot run during render
+    setLoading(true); setErr('')
+    fetch(`/api/tickets/${ticketId}/dispute`)
+      .then(r => r.json())
+      .then(d => { if (!live) return; if (d?.error) setErr(d.error); else setData(d?.dispute ? d : null) })
+      .catch(() => { if (live) setErr('Could not load the dispute.') })
+      .finally(() => { if (live) setLoading(false) })
+    return () => { live = false }
+  }, [open, ticketId])
+  return (
+    <>
+      {trigger(() => setOpen(true))}
+      {open && (
+        <Modal onClose={() => setOpen(false)} maxWidth="max-w-2xl">
+          {close => (
+            <>
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="flex items-center gap-2 text-lg font-bold text-[var(--text)]"><MessageSquareWarning size={19} className="text-red-500" /> Dispute conversation</h3>
+                <button type="button" onClick={close} aria-label="Close" className="-m-1 rounded-lg p-1.5 text-[var(--text-faint)] transition hover:bg-[var(--hover)] hover:text-[var(--text)]"><X size={18} /></button>
+              </div>
+              {loading ? <p className="py-4 text-center text-sm text-[var(--text-faint)]">Loading…</p>
+                : err ? <p className="text-sm text-red-500">{err}</p>
+                : data ? <DisputeThread ticketId={ticketId} dispute={data.dispute} messages={data.messages} viewerRole={viewerRole} subject={data.subject} />
+                : <p className="py-4 text-center text-sm text-[var(--text-faint)]">No open dispute on this ticket.</p>}
+            </>
+          )}
+        </Modal>
+      )}
     </>
   )
 }
