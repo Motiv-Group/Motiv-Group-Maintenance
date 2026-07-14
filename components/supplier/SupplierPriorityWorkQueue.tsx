@@ -14,6 +14,7 @@ import { Card } from '@/components/exec/ui'
 import { CategoryIcon } from '@/components/client/ticketBadges'
 import { Modal } from '@/components/ui/Modal'
 import { SendQuoteForm } from '@/components/admin/SendQuoteForm'
+import { SupplierVariationGate } from '@/components/supplier/SupplierJobActions'
 import { supplierStatusMeta, formatDate, formatDateTime, humanizeDuration, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
 
 type QueueFilter = 'all' | 'to_quote' | 'attend' | 'evidence' | 'snags' | 'sla'
@@ -192,6 +193,8 @@ function QueueRow({ ticket, nowMs, company }: { ticket: SupplierTicketRow; nowMs
       <div className="flex lg:justify-end">
         {toQuote(ticket)
           ? <SubmitQuoteCta ticket={ticket} className={ctaCls} />
+          : ['approved_closeout', 'vo_declined'].includes(ticket.status) && ticket.awardedToMe
+          ? <CloseOutCta ticket={ticket} className={ctaCls} />
           : <Link href={ticketUrl} className={ctaCls}>{cta} {cta === 'View Ticket' && <ArrowRight size={15} />}</Link>}
       </div>
     </div>
@@ -208,6 +211,30 @@ function SubmitQuoteCta({ ticket, className }: { ticket: SupplierTicketRow; clas
       {open && (
         <Modal onClose={() => setOpen(false)} maxWidth="max-w-3xl">
           {close => <div><SendQuoteForm defaultOpen competitive ticketId={ticket.id} priority={String(ticket.priority)} createdAt={ticket.createdAt} onClose={close} /></div>}
+        </Modal>
+      )}
+    </>
+  )
+}
+
+// "Close-out" opens the variation-order gate in place — the supplier raises a VO
+// (via More) or confirms there are none so the manager can close out.
+function CloseOutCta({ ticket, className }: { ticket: SupplierTicketRow; className: string }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} className={className}>Close-out</button>
+      {open && (
+        <Modal onClose={() => setOpen(false)} maxWidth="max-w-lg">
+          {() => (
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-base font-bold text-[var(--text)]">Variation orders</h3>
+                <p className="mt-1 text-sm text-[var(--text-muted)]">Your COC &amp; POC were approved — raise a variation order for any extra work, or confirm there are none so the manager can close out.</p>
+              </div>
+              <SupplierVariationGate ticketId={ticket.id} priority={String(ticket.priority)} createdAt={ticket.createdAt} variationCount={0} status={ticket.status as 'approved_closeout' | 'vo_declined'} declineReason={null} noVosConfirmed={false} />
+            </div>
+          )}
         </Modal>
       )}
     </>
@@ -259,5 +286,6 @@ function nextStep(t: SupplierTicketRow): string {
   if (['snag', 'snag_assigned'].includes(t.status)) return 'Accept and schedule the snag fix'
   if (['snag_in_progress', 'snag_resolved'].includes(t.status)) return 'Re-upload the COC & POC'
   if (t.status === 'submitted_for_signoff') return 'Awaiting the client sign-off'
+  if (['approved_closeout', 'vo_declined'].includes(t.status)) return 'Raise or confirm variation orders'
   return 'Track progress on this job'
 }

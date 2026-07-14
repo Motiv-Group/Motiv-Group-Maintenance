@@ -345,6 +345,8 @@ export interface RegionalTicketRow {
   breached: boolean; supplierBreached: boolean; internalBreached: boolean
   dueAt: string; slaDueAt: string | null; overdue: boolean; infoAdded: boolean
   supplierAssigned: boolean
+  // The supplier confirmed there are no further variation orders → RM can close out.
+  voNoneConfirmed: boolean
   // An open supplier↔RM dispute (snag / evidence) — the badge reads "Dispute".
   disputed: boolean
   // Suppliers already on this ticket (invited/quoted) and those who declined it —
@@ -454,6 +456,7 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
       ...dueInfo(t, rules, now),
       infoAdded: t.status === 'open' && !!(t as any).info_request_reason,
       supplierAssigned: !!(t as any).supplier_id,
+      voNoneConfirmed: !!(t as any).vo_none_confirmed_at,
       disputed: disputedIds.has(t.id),
       engagedSupplierIds: engagedByTicket.get(t.id) ?? {},
       declinedSupplierIds: declinedByTicket.get(t.id) ?? [],

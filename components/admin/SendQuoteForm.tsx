@@ -680,7 +680,7 @@ export function SendQuoteForm({
           <div className="rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] p-3 space-y-2">
             <p className="text-sm text-[var(--text)]">{isVariation ? 'Submit this variation order to the manager?' : 'Send this quote to the manager?'} Please double-check the amount and details first.</p>
             <div className="flex gap-2">
-              <button type="button" onClick={() => doSubmit(confirmVals)} disabled={loading} className={`px-3 py-2 rounded-lg text-white text-sm font-semibold transition disabled:opacity-50 ${isVariation ? 'bg-blue-600 hover:bg-blue-500' : 'bg-green-700 hover:bg-green-600'}`}>{loading ? 'Submitting…' : isVariation ? 'Yes, submit variation order' : 'Yes, send quote'}</button>
+              <button type="button" onClick={() => doSubmit(confirmVals)} disabled={loading} className="px-3 py-2 rounded-lg text-white text-sm font-semibold transition disabled:opacity-50 bg-green-700 hover:bg-green-600">{loading ? 'Submitting…' : isVariation ? 'Yes, submit variation order' : 'Yes, send quote'}</button>
               <button type="button" onClick={() => setConfirmVals(null)} className="px-3 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm">Back</button>
             </div>
           </div>
@@ -690,9 +690,7 @@ export function SendQuoteForm({
           <button
             type="submit"
             disabled={loading || uploading || parsing}
-            className={`flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold text-white transition disabled:opacity-50 ${isVariation
-              ? 'bg-blue-600 hover:bg-blue-500'
-              : 'bg-green-700 hover:bg-green-600'}`}
+            className="flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold text-white transition disabled:opacity-50 bg-green-700 hover:bg-green-600"
           >
             {uploading ? (
               <><Loader2 size={14} className="animate-spin" /> Uploading…</>

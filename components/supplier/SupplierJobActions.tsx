@@ -5,12 +5,11 @@
 // hours). The Submit COC & POC flow lives on its own page (/complete).
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Calendar, Wrench, PlayCircle, XCircle, X, FileText, Ticket, MapPin, Info, ArrowRight } from 'lucide-react'
+import { Calendar, Wrench, PlayCircle, XCircle, X, FileText, Ticket, MapPin, Info, ArrowRight, Plus } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { DrawerHeader } from '@/components/exec/Drawer'
 import { SchedulePicker } from '@/components/ui/SchedulePicker'
 import { SendQuoteForm } from '@/components/admin/SendQuoteForm'
-import { PopupForm } from '@/components/supplier/PopupForm'
 import { MoreMenu, MoreActionItem } from '@/components/regional/RmTicketActions'
 import { QuoteSummary, type QuoteSummaryData, type QuoteSchedule } from '@/components/workflow/QuoteSummary'
 import { createClient } from '@/lib/supabase/client'
@@ -290,6 +289,7 @@ export function SupplierVariationGate({ ticketId, priority, createdAt, variation
   const router = useRouter()
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  const [voOpen, setVoOpen] = useState(false)
   const hasVOs = variationCount > 0 || status === 'vo_declined'
   const raiseLabel = status === 'vo_declined' ? 'Re-submit variation order' : hasVOs ? 'Raise another variation order' : 'Raise variation order'
 
@@ -309,20 +309,28 @@ export function SupplierVariationGate({ ticketId, priority, createdAt, variation
 
   return (
     <div className="space-y-3">
-      {status === 'vo_declined' ? (
+      {/* Only the vo_declined callout stays here; the "your COC & POC were approved…"
+          line lives in the Next-action sub-heading, so it isn't said twice. */}
+      {status === 'vo_declined' && (
         <div className="rounded-xl bg-red-500/10 ring-1 ring-red-500/30 p-3.5 space-y-1">
           <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Variation order declined</p>
           <p className="text-sm text-[var(--text)]">{declineReason || 'The regional manager declined your variation order.'}</p>
           <p className="text-sm text-[var(--text-muted)]">Submit a revised variation order, or confirm there are none so the manager can close out.</p>
         </div>
-      ) : (
-        <p className="text-sm text-[var(--text-muted)]">Your COC &amp; POC were approved. Raise a variation order for any extra work, or confirm there are none so the manager can close out.</p>
       )}
-      <PopupForm label={raiseLabel} tone="primary">
-        <SendQuoteForm ticketId={ticketId} variant="variation" competitive priority={priority} createdAt={createdAt} defaultOpen />
-      </PopupForm>
-      {/* Confirm no further VOs → un-greys the RM's Final close-out (locked after). */}
-      <button onClick={confirmNoVos} disabled={busy} className="w-full py-2.5 rounded-lg ring-1 ring-emerald-500/40 text-emerald-600 dark:text-emerald-400 text-sm font-semibold hover:bg-emerald-500/10 transition disabled:opacity-50">{busy ? 'Confirming…' : 'No further variation orders — ready for close-out'}</button>
+      {/* Primary = confirm no further VOs (ready for close-out); raising a VO lives
+          under "More" like the other action blocks. */}
+      <div className="flex items-center gap-2">
+        <button onClick={confirmNoVos} disabled={busy} className="flex-1 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition disabled:opacity-50">{busy ? 'Confirming…' : 'No further variation orders — ready for close-out'}</button>
+        <MoreMenu>
+          <MoreActionItem icon={<Plus size={16} />} label={raiseLabel} onClick={() => setVoOpen(true)} />
+        </MoreMenu>
+      </div>
+      {voOpen && (
+        <Modal onClose={() => setVoOpen(false)} maxWidth="max-w-2xl">
+          {close => <div><SendQuoteForm ticketId={ticketId} variant="variation" competitive priority={priority} createdAt={createdAt} defaultOpen onClose={close} /></div>}
+        </Modal>
+      )}
       {err && <p className="text-xs text-red-500">{err}</p>}
     </div>
   )

@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import { redirect } from 'next/navigation'
-import { ClipboardCheck, FileText, Calendar, Clock, CheckCircle2, Info } from 'lucide-react'
+import { ClipboardCheck, FileText, Calendar, Clock, CheckCircle2, Info, ChevronDown } from 'lucide-react'
 import { SubmitCompletionForm } from '@/components/supplier/SubmitCompletionForm'
 import { BackLink } from '@/components/ui/BackLink'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
@@ -93,8 +93,11 @@ function SignoffCard({ s, snag, ticketId, collapsible = false, defaultOpen = fal
   // the proof-of-completion, COC and notes.
   if (collapsible) {
     return (
-      <details open={defaultOpen} className={`rounded-xl bg-[var(--surface)] ring-1 ring-[var(--border)] overflow-hidden`}>
-        <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">{header}</summary>
+      <details open={defaultOpen} className="group rounded-xl bg-[var(--surface)] ring-1 ring-[var(--border)] overflow-hidden">
+        <summary className="flex items-center gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
+          <span className="flex min-w-0 flex-1 items-center justify-between gap-2">{header}</span>
+          <ChevronDown size={16} className="shrink-0 text-[var(--text-faint)] transition-transform group-open:rotate-180" />
+        </summary>
         <div className={`p-4 space-y-4 border-t border-[var(--border)]`}>{body}</div>
         {footer && <div className={`border-t border-[var(--border)] px-4 py-3`}>{footer}</div>}
       </details>
@@ -357,7 +360,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
     if (awarded && ['in_progress', 'snag_in_progress', 'snag_resolved'].includes(t.status)) return { mode: 'act', msg: 'Upload the COC & POC', sub: 'Once the work is done, upload the certificate of completion and proof-of-completion photos below.' }
     if (awarded && t.status === 'submitted_for_signoff') return { mode: 'wait', msg: '', sub: '' }
     if (awarded && t.status === 'variation_review') return { mode: 'wait', msg: '', sub: '' }
-    if (awarded && (t.status === 'approved_closeout' || t.status === 'vo_declined')) return { mode: 'act', msg: 'Raise any variation orders', sub: 'The COC & POC were approved — raise a variation order for extra work, or confirm there are none below.' }
+    if (awarded && (t.status === 'approved_closeout' || t.status === 'vo_declined')) return { mode: 'act', msg: 'Raise any variation orders', sub: 'Your COC & POC were approved — raise a variation order for any extra work, or confirm there are none so the manager can close out.' }
     return { mode: 'wait', msg: supplierStatusMeta(supplierStatus).label, sub: 'No action needed from you right now.' }
   })()
 
@@ -377,7 +380,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
   const completionTab = (pendingSignoffs.length > 0 || acceptedSignoff)
     ? (<div className="space-y-3">
         {pendingSignoffs.map(s => <SignoffCard key={s.id} s={s} ticketId={t.id} title={submissionLabel(s)} collapsible defaultOpen footer={<CompletionFooterNote>You will be notified once the Regional Manager has reviewed and signed off.</CompletionFooterNote>} />)}
-        {acceptedSignoff && <SignoffCard s={acceptedSignoff} ticketId={t.id} />}
+        {acceptedSignoff && <SignoffCard s={acceptedSignoff} ticketId={t.id} collapsible />}
       </div>)
     : null
   const snagTab = liveSnag

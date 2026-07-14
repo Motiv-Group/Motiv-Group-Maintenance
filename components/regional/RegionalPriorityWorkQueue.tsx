@@ -148,6 +148,10 @@ function QueueRow({ ticket, nowMs, suppliers, motivSuppliers }: { ticket: Region
   // Genuinely critical (P1 / urgent) tickets get a RED action button so they stand out.
   const critical = ['P1', 'urgent'].includes(String(ticket.priority))
   const ctaCls = `relative z-20 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-bold transition lg:w-40 ${critical ? 'border-red-500/60 bg-red-500/10 text-red-600 hover:bg-red-500/15 dark:text-red-300' : 'border-blue-500/60 text-blue-600 hover:bg-blue-500/10 dark:text-blue-300'}`
+  // Close-out: blue while awaiting the supplier's "no further VOs" confirmation,
+  // green once confirmed (the RM can finalise the close-out).
+  const closeout = ticket.status === 'approved_closeout'
+  const closeoutCls = `relative z-20 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-bold transition lg:w-40 ${ticket.voNoneConfirmed ? 'border-emerald-500/60 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/15 dark:text-emerald-300' : 'border-blue-500/60 text-blue-600 hover:bg-blue-500/10 dark:text-blue-300'}`
   return (
     <div className="relative grid gap-4 border-b border-[var(--border)] px-4 py-4 transition last:border-b-0 hover:bg-[var(--hover)] lg:grid-cols-[1fr_200px_1.1fr_160px] lg:items-center">
       {/* The whole row (except the CTA island) links to the ticket. */}
@@ -193,6 +197,8 @@ function QueueRow({ ticket, nowMs, suppliers, motivSuppliers }: { ticket: Region
           <AssignSuppliersButton ticketId={ticket.id} suppliers={suppliers} motivSuppliers={motivSuppliers}
             awaitingById={ticket.engagedSupplierIds} declinedSupplierIds={ticket.declinedSupplierIds}
             trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}>Assign supplier</button>} />
+        ) : closeout ? (
+          <Link href={ticketUrl} className={closeoutCls}>Close-out <ArrowRight size={15} /></Link>
         ) : (
           <Link href={ticketUrl} className={ctaCls}>View Ticket <ArrowRight size={15} /></Link>
         )}
@@ -261,7 +267,7 @@ function nextStep(t: RegionalTicketRow): string {
     case 'snag':
     case 'snag_assigned':
     case 'snag_in_progress': return 'Snag in progress'
-    case 'approved_closeout': return 'Finalise the close-out'
+    case 'approved_closeout': return t.voNoneConfirmed ? 'Finalise the close-out' : 'Awaiting the supplier to confirm variation orders'
     case 'completed': return 'Completed'
     case 'cancelled':
     case 'declined': return 'Closed'
