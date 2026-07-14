@@ -18,7 +18,7 @@ type Tab = 'photos' | 'documents' | 'quotes' | 'completion' | 'activity' | 'time
  *  Quotes (the approved quote + any under review), Completion (the approved COC
  *  & POC), Activity (supplier updates) and the full Timeline. */
 export function RmTicketTabs({
-  ticketId, photoGroups, updates, timeline, history, documents, quotes, completion,
+  ticketId, photoGroups, updates, timeline, history, documents, quotes, completion, defaultTab,
 }: {
   ticketId: string
   photoGroups: PhotoGroup[]
@@ -28,9 +28,11 @@ export function RmTicketTabs({
   documents?: ReactNode
   quotes?: ReactNode
   completion?: ReactNode
+  /** Tab selected on first render (e.g. 'completion' when a COC/POC is under review). */
+  defaultTab?: Tab
 }) {
   const totalPhotos = photoGroups.reduce((n, g) => n + g.urls.length, 0)
-  const [tab, setTab] = useState<Tab>(totalPhotos ? 'photos' : 'timeline')
+  const [tab, setTab] = useState<Tab>(defaultTab ?? (totalPhotos ? 'photos' : 'timeline'))
   const tabs: { key: Tab; label: string }[] = [
     { key: 'photos', label: `Photos${totalPhotos ? ` (${totalPhotos})` : ''}` },
     { key: 'documents', label: 'Documents' },

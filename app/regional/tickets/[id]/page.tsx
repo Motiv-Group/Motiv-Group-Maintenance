@@ -889,7 +889,9 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
           <RmCompletionReview ticketId={t.id} label={submissionLabel(reviewSignoff)} submittedAt={reviewSignoff.created_at}
             photoCount={(reviewSignoff.before_urls ?? []).length + (reviewSignoff.after_urls ?? []).length}
             docCount={(reviewSignoff.coc_url ? 1 : 0) + (reviewSignoff.invoice_url ? 1 : 0)}
-            noteCount={reviewSignoff.notes && String(reviewSignoff.notes).trim() ? 1 : 0} />
+            noteCount={reviewSignoff.notes && String(reviewSignoff.notes).trim() ? 1 : 0}
+            beforeUrls={reviewSignoff.before_urls ?? []} afterUrls={reviewSignoff.after_urls ?? []}
+            cocUrl={reviewSignoff.coc_url ?? null} invoiceUrl={reviewSignoff.invoice_url ?? null} notes={reviewSignoff.notes ?? null} />
         )}
 
         {t.status === 'scheduled' && t.schedule_status === 'proposed' && t.scheduled_at && <AcceptScheduleCard ticketId={t.id} scheduledAt={t.scheduled_at} />}
@@ -1046,7 +1048,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
           the full record (any status) lives in the History tab + Documents tab. */}
       {/* Photos · Activity (supplier updates) · Timeline (the full audit trail —
           status changes, edits, attachments/photos viewed, quotes, sign-offs …). */}
-      <RmTicketTabs ticketId={t.id} photoGroups={photoGroups} updates={supplierUpdates} timeline={timelineItems} documents={documentsContent} quotes={quotesContent} completion={completionContent} history={historyContent} />
+      <RmTicketTabs ticketId={t.id} photoGroups={photoGroups} updates={supplierUpdates} timeline={timelineItems} documents={documentsContent} quotes={quotesContent} completion={completionContent} history={historyContent} defaultTab={reviewSignoff ? 'completion' : undefined} />
     </div>
   );
 }

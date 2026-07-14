@@ -5,6 +5,7 @@ import { useState, useMemo, useEffect, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { Search, Pencil, CalendarClock, Plus, Camera, Info, X, FileText, ChevronDown, ChevronLeft, ChevronRight, MessageSquare, XCircle, Send, AlertCircle, Trash2, Store, ShieldCheck, Clock, Calendar, ClipboardCheck, Image as ImageIcon, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { StarInput, Stars } from '@/components/ui/Stars'
+import { PhotoThumbs } from '@/components/ui/PhotoThumbs'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { QuoteSummary } from '@/components/workflow/QuoteSummary'
 import { uploadFiles } from '@/lib/upload'
@@ -33,7 +34,7 @@ function Modal({ title, onClose, children, maxWidth = 'max-w-md' }: { title: Rea
 // drops a floating menu of secondary/destructive actions. It ONLY renders the menu
 // buttons; the actual modals live as siblings in RmTicketActionBar driven by lifted
 // state, so opening one is instant and doesn't depend on the menu staying mounted.
-export function MoreMenu({ children, fullWidth = false }: { children: ReactNode; fullWidth?: boolean }) {
+export function MoreMenu({ children, fullWidth = false, label = 'More', up = false }: { children: ReactNode; fullWidth?: boolean; label?: string; up?: boolean }) {
   const [open, setOpen] = useState(false)
   return (
     <div className={`relative ${fullWidth ? '' : 'shrink-0'}`}>
@@ -44,13 +45,15 @@ export function MoreMenu({ children, fullWidth = false }: { children: ReactNode;
         aria-haspopup="menu"
         className={`${fullWidth ? 'w-full justify-center' : ''} flex items-center gap-1.5 py-2.5 px-4 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm font-semibold hover:bg-[var(--hover)] transition`}
       >
-        More <ChevronDown size={15} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+        {label} <ChevronDown size={15} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
         <>
           {/* Outside-click catcher (below the menu, above the page). */}
           <button aria-hidden tabIndex={-1} onClick={() => setOpen(false)} className="fixed inset-0 z-10 cursor-default" />
-          <div role="menu" onClick={() => setOpen(false)} className="absolute right-0 z-20 mt-2 w-64 max-w-[calc(100vw-2.5rem)] rounded-xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] shadow-lg shadow-black/20 p-1.5 space-y-0.5">
+          {/* `up` opens above the trigger — used inside pop-ups where a downward menu
+              would be clipped by the scrollable modal body. */}
+          <div role="menu" onClick={() => setOpen(false)} className={`absolute right-0 z-20 ${up ? 'bottom-full mb-2' : 'mt-2'} w-64 max-w-[calc(100vw-2.5rem)] rounded-xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] shadow-lg shadow-black/20 p-1.5 space-y-0.5`}>
             {children}
           </div>
         </>
@@ -92,12 +95,15 @@ export function RmTicketActionBar({ ticketId, status, canAssign, canAssignSuppli
   const hasPrimary = canAssignSupplier
   const hasMenu = canAssign || showRequestInfo || canEdit || canCancel
   const primaryCls = `${hasMenu ? 'flex-1' : 'w-full'} py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition`
+  // Once one or more suppliers have already been invited/quoted, assigning is
+  // adding ANOTHER supplier — reflect that in the button label.
+  const assignLabel = Object.keys(awaitingById).length > 0 ? 'Request another supplier' : 'Assign supplier'
   return (
     <>
       <div className={`flex items-center gap-2 ${hasPrimary && hasMenu ? '' : 'flex-col'}`}>
         {hasPrimary && (
           <AssignSuppliersButton ticketId={ticketId} suppliers={suppliers} motivSuppliers={motivSuppliers} declinedSupplierIds={declinedSupplierIds} awaitingById={awaitingById}
-            trigger={open => <button onClick={open} className={primaryCls}>Assign supplier</button>} />
+            trigger={open => <button onClick={open} className={primaryCls}>{assignLabel}</button>} />
         )}
         {hasMenu && (
           <MoreMenu fullWidth={!hasPrimary}>
@@ -811,43 +817,48 @@ export function RmReviewPanel({ heading, items }: {
 }
 
 // ── RM completion review (COC & POC submitted) — inline "Next action" block ──
-// A summary of the submission (photo/document/note counts) with a primary
-// "Approve completion" (opens the star-rating step) and a "More" menu holding
-// Raise snag / Request more evidence. The full photos + COC live in the
-// Completion tab; this block is just the decision surface.
-export function RmCompletionReview({ ticketId, label, submittedAt, photoCount, docCount, noteCount }: {
+// A tap-to-review summary of the submission (photo/document/note counts) that
+// opens the full "Sign off completion" pop-up (photos · COC · notes + rating +
+// approve/more), plus an "Approve completion" button (same pop-up) and a "More"
+// menu holding Raise snag / Request more evidence for quick access.
+export function RmCompletionReview({ ticketId, label, submittedAt, photoCount, docCount, noteCount, beforeUrls, afterUrls, cocUrl, invoiceUrl, notes }: {
   ticketId: string; label: string; submittedAt: string; photoCount: number; docCount: number; noteCount: number
+  beforeUrls: string[]; afterUrls: string[]; cocUrl: string | null; invoiceUrl: string | null; notes: string | null
 }) {
-  const [active, setActive] = useState<'approve' | 'evidence' | 'snag' | null>(null)
+  const [open, setOpen] = useState(false)
+  const [active, setActive] = useState<'evidence' | 'snag' | null>(null)
   const done = () => setActive(null)
+  const submission: SignoffSubmission = { id: '', label, createdAt: submittedAt, beforeUrls, afterUrls, cocUrl, invoiceUrl, notes }
   return (
     <div className="space-y-3">
-      <div className="rounded-lg bg-[var(--surface)] ring-1 ring-[var(--border)] p-4 space-y-3">
+      {/* Tap the summary to open the full submission for review + sign-off. */}
+      <button type="button" onClick={() => setOpen(true)} className="w-full rounded-lg bg-[var(--surface)] p-4 text-left ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)]">
         <div className="flex items-center gap-2.5">
           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#C6A35D]/15 text-[#C6A35D]"><ClipboardCheck size={16} /></span>
-          <span className="min-w-0">
+          <span className="min-w-0 flex-1">
             <span className="block text-sm font-bold text-[var(--text)]">{label}</span>
             <span className="block text-[11px] text-[var(--text-faint)]">Submitted {formatDateTime(submittedAt)}</span>
           </span>
+          <ChevronRight size={16} className="shrink-0 text-[var(--text-faint)]" />
         </div>
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-1.5 text-sm text-[var(--text-muted)]">
+        <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1.5 text-sm text-[var(--text-muted)]">
           <span className="flex items-center gap-1.5"><ImageIcon size={15} className="text-[var(--text-faint)]" /> <span className="font-semibold text-[var(--text)]">{photoCount}</span> Photo{photoCount === 1 ? '' : 's'}</span>
           <span className="flex items-center gap-1.5"><FileText size={15} className="text-[var(--text-faint)]" /> <span className="font-semibold text-[var(--text)]">{docCount}</span> Document{docCount === 1 ? '' : 's'}</span>
           <span className="flex items-center gap-1.5"><MessageSquare size={15} className="text-[var(--text-faint)]" /> <span className="font-semibold text-[var(--text)]">{noteCount}</span> Note{noteCount === 1 ? '' : 's'}</span>
         </div>
-      </div>
+      </button>
 
       <div className="flex items-center gap-2">
-        <button type="button" onClick={() => setActive('approve')} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500"><CheckCircle2 size={16} /> Approve completion</button>
+        <button type="button" onClick={() => setOpen(true)} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500"><CheckCircle2 size={16} /> Approve completion</button>
         <MoreMenu>
           <MoreActionItem icon={<AlertTriangle size={16} />} label="Raise snag" onClick={() => setActive('snag')} />
           <MoreActionItem icon={<MessageSquare size={16} />} label="Request more evidence" onClick={() => setActive('evidence')} />
         </MoreMenu>
       </div>
 
-      {active === 'approve' && (
-        <Modal title="Approve completion" maxWidth="max-w-lg" onClose={done}>
-          <ApproveSignoffCard ticketId={ticketId} />
+      {open && (
+        <Modal title="Sign off completion" maxWidth="max-w-2xl" onClose={() => setOpen(false)}>
+          <SignoffReviewPanel ticketId={ticketId} s={submission} onDone={() => setOpen(false)} />
         </Modal>
       )}
       {active === 'evidence' && <RequestEvidenceButton ticketId={ticketId} defaultOpen onClose={done} />}
@@ -1047,7 +1058,7 @@ export function SignoffReviewButton({ ticketId, trigger }: { ticketId: string; t
         <Modal title="Sign off completion" maxWidth="max-w-3xl" onClose={() => setOpen(false)}>
           {loading ? <p className="py-4 text-center text-sm text-[var(--text-faint)]">Loading…</p>
             : err ? <p className="text-sm text-red-500">{err}</p>
-            : data?.submission ? <SignoffReviewBody ticketId={ticketId} s={data.submission} />
+            : data?.submission ? <SignoffReviewPanel ticketId={ticketId} s={data.submission} onDone={() => setOpen(false)} />
             : <p className="text-sm text-[var(--text-faint)]">Nothing awaiting your sign-off on this ticket.</p>}
         </Modal>
       )}
@@ -1055,40 +1066,114 @@ export function SignoffReviewButton({ ticketId, trigger }: { ticketId: string; t
   )
 }
 
-function SignoffReviewBody({ ticketId, s }: { ticketId: string; s: SignoffSubmission }) {
+// Best-effort filename from a (possibly signed) storage URL.
+function docName(url: string, fallback: string): string {
+  try {
+    const raw = decodeURIComponent((url.split('?')[0].split('/').pop() || '').trim())
+    return raw.replace(/^\d{6,}-[a-z0-9]{4,}-/i, '') || fallback
+  } catch { return fallback }
+}
+
+const REVIEW_LABEL = 'text-[11px] font-semibold uppercase tracking-wide text-[var(--text-faint)]'
+
+// A document row (COC / invoice): PDF icon + filename + uploaded time, with a
+// "View …" link on the right.
+function DocRow({ ticketId, url, itemType, itemLabel, uploadedAt, viewLabel }: {
+  ticketId: string; url: string; itemType: 'coc' | 'invoice'; itemLabel: string; uploadedAt: string; viewLabel: string
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-lg bg-[var(--surface-2)] p-3 ring-1 ring-[var(--border)]">
+      <span className="flex min-w-0 items-center gap-3">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-red-500/15 text-red-600 dark:text-red-400"><FileText size={18} /></span>
+        <span className="min-w-0">
+          <span className="block truncate text-sm font-semibold text-[var(--text)]">{docName(url, itemLabel)}</span>
+          <span className="block text-[11px] text-[var(--text-faint)]">Uploaded {formatDateTime(uploadedAt)}</span>
+        </span>
+      </span>
+      <ViewTrackedLink ticketId={ticketId} itemType={itemType} itemLabel={itemLabel} href={url} className="flex shrink-0 items-center gap-1 text-sm font-semibold text-blue-600 transition hover:underline dark:text-blue-400">{viewLabel} <ChevronRight size={15} /></ViewTrackedLink>
+    </div>
+  )
+}
+
+// The rich "Sign off completion" review panel — used in BOTH the RM ticket's
+// Next-action pop-up and the Today-queue sign-off pop-up. Shows the full
+// submission (photos · COC · notes) + a star rating, with "Approve completion"
+// and a "More actions" menu (Request more evidence / Raise a snag).
+export function SignoffReviewPanel({ ticketId, s, onDone }: { ticketId: string; s: SignoffSubmission; onDone?: () => void }) {
+  const router = useRouter()
+  const [score, setScore] = useState(0)
+  const [comment, setComment] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const [sub, setSub] = useState<'evidence' | 'snag' | null>(null)
+  const photos = [...s.beforeUrls, ...s.afterUrls]
+  const closeSub = () => setSub(null)
+
+  async function approve() {
+    if (!score) { setErr('Please give the supplier a star rating before accepting.'); return }
+    setBusy(true); setErr('')
+    try {
+      await post(`/api/ratings`, { ticketId, score, comment })
+      await post(`/api/tickets/${ticketId}/transition`, { action: 'approve' })
+      onDone?.(); router.refresh()
+    } catch (e: any) { setErr(e.message); setBusy(false) }
+  }
+
   return (
     <div className="space-y-4">
-      <div className="rounded-xl ring-1 ring-[var(--border)] bg-[var(--surface)] p-4 space-y-3">
-        <p className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]"><FileText size={15} className="text-[#C6A35D] shrink-0" />{s.label} · {formatDateTime(s.createdAt)}</p>
-        <div>
-          <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Proof of completion</div>
-          <div className="flex flex-wrap gap-x-4 gap-y-1">
-            {s.beforeUrls.map((u, i) => <ViewTrackedLink key={`b${i}`} ticketId={ticketId} itemType="photo" itemLabel={`Before photo ${i + 1}`} href={u} className="text-sm text-[#C6A35D] underline hover:text-amber-500">Before {i + 1}</ViewTrackedLink>)}
-            {s.afterUrls.map((u, i) => <ViewTrackedLink key={`a${i}`} ticketId={ticketId} itemType="photo" itemLabel={`Completion photo ${i + 1}`} href={u} className="text-sm text-[#C6A35D] underline hover:text-amber-500">After {i + 1}</ViewTrackedLink>)}
-            {!s.beforeUrls.length && !s.afterUrls.length && <span className="text-sm text-[var(--text-faint)]">No photos</span>}
-          </div>
+      {/* Submission detail — photos / COC / notes, each under its own rule. */}
+      <div className="overflow-hidden rounded-xl bg-[var(--surface)] ring-1 ring-[var(--border)]">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 border-b border-[var(--border)] px-4 py-3">
+          <FileText size={16} className="shrink-0 text-[#C6A35D]" />
+          <span className="text-sm font-bold text-[var(--text)]">{s.label}</span>
+          <span className="text-[var(--text-faint)]">·</span>
+          <span className="text-[13px] text-[var(--text-faint)]">{formatDateTime(s.createdAt)}</span>
         </div>
-        {(s.cocUrl || s.invoiceUrl) && (
+        <div className="space-y-4 p-4">
           <div>
-            <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Certificate of Completion</div>
-            <div className="flex flex-wrap gap-x-4 gap-y-1">
-              {s.cocUrl && <ViewTrackedLink ticketId={ticketId} itemType="coc" itemLabel="COC" href={s.cocUrl} className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View COC</ViewTrackedLink>}
-              {s.invoiceUrl && <ViewTrackedLink ticketId={ticketId} itemType="invoice" itemLabel="Invoice" href={s.invoiceUrl} className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View invoice</ViewTrackedLink>}
+            <div className={REVIEW_LABEL}>Proof of completion</div>
+            <div className="mt-2">
+              {photos.length ? <PhotoThumbs urls={photos} ticketId={ticketId} label="Completion photo" limit={4} /> : <span className="text-sm text-[var(--text-faint)]">No photos</span>}
             </div>
           </div>
-        )}
-        {s.notes && (
-          <div>
-            <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Notes</div>
-            <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{s.notes}</p>
+          <div className="border-t border-[var(--border)] pt-4">
+            <div className={REVIEW_LABEL}>Certificate of completion</div>
+            <div className="mt-2 space-y-2">
+              {s.cocUrl ? <DocRow ticketId={ticketId} url={s.cocUrl} itemType="coc" itemLabel="COC" uploadedAt={s.createdAt} viewLabel="View COC" /> : <span className="text-sm text-[var(--text-faint)]">No certificate uploaded</span>}
+              {s.invoiceUrl && <DocRow ticketId={ticketId} url={s.invoiceUrl} itemType="invoice" itemLabel="Invoice" uploadedAt={s.createdAt} viewLabel="View invoice" />}
+            </div>
           </div>
-        )}
+          <div className="border-t border-[var(--border)] pt-4">
+            <div className={REVIEW_LABEL}>Notes</div>
+            {s.notes?.trim() ? <p className="mt-1 text-sm text-[var(--text-muted)] whitespace-pre-line">{s.notes}</p> : <span className="text-sm text-[var(--text-faint)]">No notes added</span>}
+          </div>
+        </div>
       </div>
-      <ApproveSignoffCard ticketId={ticketId} />
-      <div className="grid grid-cols-2 gap-2">
-        <RequestEvidenceButton ticketId={ticketId} />
-        <RaiseSnagButton ticketId={ticketId} />
+
+      {/* Rate the supplier (required before accepting). */}
+      <div className="space-y-2 rounded-xl p-4 ring-1 ring-[var(--border)]">
+        <p className="text-sm font-semibold text-[var(--text)]">Rate the supplier, then accept the COC &amp; POC</p>
+        <StarInput value={score} onChange={setScore} />
+        <p className="text-[11px] text-[var(--text-faint)]">Tap a star to rate</p>
+        <div className="relative">
+          <textarea maxLength={250} value={comment} onChange={e => setComment(e.target.value.slice(0, 250))} placeholder="Comment on the supplier's work (optional)"
+            className="min-h-[64px] w-full rounded-lg bg-[var(--input-bg)] px-3 py-2 pb-6 text-sm text-[var(--text)] ring-1 ring-[var(--border)]" />
+          <span className="pointer-events-none absolute bottom-2 right-3 text-[11px] tabular-nums text-[var(--text-faint)]">{comment.length}/250</span>
+        </div>
       </div>
+
+      {err && <p className="text-xs text-red-500">{err}</p>}
+
+      <div className="flex items-center gap-2">
+        <MoreMenu label="More actions" up>
+          <MoreActionItem icon={<MessageSquare size={16} />} label="Request more evidence" onClick={() => setSub('evidence')} />
+          <MoreActionItem icon={<AlertTriangle size={16} />} label="Raise a snag" tone="danger" onClick={() => setSub('snag')} />
+        </MoreMenu>
+        <button onClick={approve} disabled={busy} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50"><CheckCircle2 size={16} /> {busy ? 'Approving…' : 'Approve completion'}</button>
+      </div>
+
+      {sub === 'evidence' && <RequestEvidenceButton ticketId={ticketId} defaultOpen onClose={closeSub} />}
+      {sub === 'snag' && <RaiseSnagButton ticketId={ticketId} defaultOpen onClose={closeSub} />}
     </div>
   )
 }
