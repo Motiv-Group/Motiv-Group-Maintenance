@@ -91,12 +91,13 @@ function FeaturedCard({ f }: { f: Featured }) {
   const { summary: s, project } = f
   const daysLeft = daysUntil(project.end_date)
   return (
-    <Card className="overflow-hidden">
+    <Link href={`/regional/projects/${project.id}`} className="group block rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50">
+      <Card className="overflow-hidden transition hover:ring-2 hover:ring-blue-500/60 hover:-translate-y-0.5">
       <div className="relative p-5 text-white overflow-hidden">
         {/* Background: the project's own cover if set, else the default project image. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={s.coverUrl || '/projects/project-bed-linen.png'} alt="" className="absolute inset-0 h-full w-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-br from-black/75 via-black/55 to-black/70" />
+        <img src={s.coverUrl || '/projects/project-bed-linen.png'} alt="" className="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-105" />
+        <div className="absolute inset-0 bg-gradient-to-br from-black/75 via-black/55 to-black/70 transition group-hover:from-black/70 group-hover:via-black/45" />
         <div className="relative space-y-4">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
@@ -121,11 +122,12 @@ function FeaturedCard({ f }: { f: Featured }) {
               <CalendarDays size={13} /> {formatDate(project.start_date) || '—'} → {formatDate(project.end_date) || '—'}
               {daysLeft != null && <span className="text-white/60"> · {daysLeft >= 0 ? `${daysLeft} days remaining` : `${-daysLeft} days overdue`}</span>}
             </span>
-            <Link href={`/regional/projects/${project.id}`} className="flex items-center gap-1 font-semibold text-white hover:gap-1.5 transition-all">View Project <ArrowRight size={13} /></Link>
+            <span className="flex items-center gap-1 font-semibold text-white group-hover:gap-1.5 transition-all">View Project <ArrowRight size={13} /></span>
           </div>
         </div>
       </div>
-    </Card>
+      </Card>
+    </Link>
   )
 }
 
