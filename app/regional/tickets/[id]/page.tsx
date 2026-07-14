@@ -17,7 +17,7 @@ import { Card } from '@/components/exec/ui'
 import { WorkflowActions } from '@/components/workflow/WorkflowActions'
 import { RmPipeline } from '@/components/regional/RmPipeline'
 import { RmQuotePanel, RmReviewPanel, ReQuoteButton, AcceptScheduleCard, AcceptSnagScheduleCard, VariationReviewCard, CloseOutButton, RmTicketActionBar, RmCompletionReview } from '@/components/regional/RmTicketActions'
-import { CompletionBody } from '@/components/workflow/CompletionBody'
+import { CompletionBody, CompletionFooterNote } from '@/components/workflow/CompletionBody'
 import { EditedLine } from '@/components/ui/EditedLine'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { RmTicketTabs } from '@/components/regional/RmTicketTabs'
@@ -96,7 +96,7 @@ function RmDeclinedQuoteCard({ q, ticketId, canReQuote, open = false }: { q: any
 // One COC/POC submission card — reused across the under-review, sent-back (snag)
 // and approved blocks so the RM sees the full submission history. A sent-back card
 // shows the reason it was returned (why another COC/POC was needed).
-function RmSignoffCard({ s, tone, ticketId, collapsible = false, defaultOpen = false, title, reason, freshEvidence = false }: { s: any; tone: 'review' | 'snag' | 'approved' | 'evidence'; ticketId: string; collapsible?: boolean; defaultOpen?: boolean; title?: string; reason?: string | null; freshEvidence?: boolean }) {
+function RmSignoffCard({ s, tone, ticketId, collapsible = false, defaultOpen = false, title, reason, freshEvidence = false, footer }: { s: any; tone: 'review' | 'snag' | 'approved' | 'evidence'; ticketId: string; collapsible?: boolean; defaultOpen?: boolean; title?: string; reason?: string | null; freshEvidence?: boolean; footer?: React.ReactNode }) {
   // Prefer the durable round reason; fall back to the reason stored on the signoff.
   const reasonText = reason ?? s.reject_reason
   const meta = tone === 'approved'
@@ -147,14 +147,16 @@ function RmSignoffCard({ s, tone, ticketId, collapsible = false, defaultOpen = f
     return (
       <details open={defaultOpen} className={`rounded-xl ring-1 ${meta.ring} ${meta.bg} overflow-hidden`}>
         <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">{header}</summary>
-        <div className={`p-4 space-y-3 border-t ${meta.head}`}>{body}</div>
+        <div className={`p-4 space-y-4 border-t ${meta.head}`}>{body}</div>
+        {footer && <div className={`border-t ${meta.head} px-4 py-3`}>{footer}</div>}
       </details>
     )
   }
   return (
     <div className={`rounded-xl ring-1 ${meta.ring} ${meta.bg} overflow-hidden`}>
       <div className={`flex items-center justify-between gap-2 px-4 py-2.5 border-b ${meta.head}`}>{header}</div>
-      <div className="p-4 space-y-3">{body}</div>
+      <div className="p-4 space-y-4">{body}</div>
+      {footer && <div className={`border-t ${meta.head} px-4 py-3`}>{footer}</div>}
     </div>
   )
 }
@@ -749,7 +751,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
   const reviewSignoff: any = t.status === 'submitted_for_signoff' ? (pendingSignoffs[0] ?? null) : null
   const completionContent = (acceptedSignoff || reviewSignoff) ? (
     <div className="space-y-3">
-      {reviewSignoff && <RmSignoffCard s={reviewSignoff} tone="review" ticketId={t.id} title={submissionLabel(reviewSignoff)} freshEvidence={isEvidenceResubmission} collapsible defaultOpen />}
+      {reviewSignoff && <RmSignoffCard s={reviewSignoff} tone="review" ticketId={t.id} title={submissionLabel(reviewSignoff)} freshEvidence={isEvidenceResubmission} collapsible defaultOpen footer={<CompletionFooterNote>Approve, request more evidence, or raise a snag from the Next action panel above.</CompletionFooterNote>} />}
       {acceptedSignoff && <RmSignoffCard s={acceptedSignoff} tone="approved" ticketId={t.id} collapsible defaultOpen />}
     </div>
   ) : null

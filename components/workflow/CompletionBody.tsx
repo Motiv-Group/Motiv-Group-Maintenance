@@ -2,7 +2,8 @@
 // Completion tab and review cards on BOTH the supplier and RM ticket pages:
 // proof-of-completion photo thumbnails · the certificate/invoice as file cards ·
 // the supplier's notes. Pure/server-safe (PhotoThumbs is the only client island).
-import { FileText, ExternalLink } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { FileText, ExternalLink, Info } from 'lucide-react'
 import { PhotoThumbs } from '@/components/ui/PhotoThumbs'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { formatDateTime } from '@/lib/utils'
@@ -35,6 +36,16 @@ function DocCard({ ticketId, url, itemType, itemLabel, uploadedAt }: {
   )
 }
 
+// Centered info note shown under a full-width rule at the foot of a submission
+// card (e.g. "You will be notified once the Regional Manager has signed off").
+export function CompletionFooterNote({ children }: { children: ReactNode }) {
+  return (
+    <p className="flex items-center justify-center gap-1.5 text-center text-[13px] text-[var(--text-muted)]">
+      <Info size={14} className="shrink-0 text-[var(--text-faint)]" /> {children}
+    </p>
+  )
+}
+
 export function CompletionBody({ ticketId, beforeUrls = [], afterUrls = [], cocUrl, invoiceUrl, notes, uploadedAt }: {
   ticketId: string
   beforeUrls?: string[]
@@ -48,10 +59,13 @@ export function CompletionBody({ ticketId, beforeUrls = [], afterUrls = [], cocU
   // Notes are free text; split on line breaks so multi-line notes read as a list.
   const noteLines = (notes ?? '').split(/\r?\n/).map(l => l.trim()).filter(Boolean)
 
+  // Three columns separated by thin vertical rules once side-by-side (borders on
+  // cols 2-3, padding centres each rule in its gutter); rules drop away when the
+  // columns stack on mobile.
   return (
-    <div className="grid gap-x-6 gap-y-5 md:grid-cols-3">
+    <div className="grid gap-y-5 md:grid-cols-3">
       {/* Proof of completion — photo thumbnails (tap to open the lightbox). */}
-      <div>
+      <div className="md:pr-5">
         <div className={GROUP_LABEL}>Proof of completion{photos.length > 0 && ` (${photos.length} photo${photos.length === 1 ? '' : 's'})`}</div>
         {photos.length
           ? <PhotoThumbs urls={photos} ticketId={ticketId} label="Completion photo" />
@@ -59,7 +73,7 @@ export function CompletionBody({ ticketId, beforeUrls = [], afterUrls = [], cocU
       </div>
 
       {/* Certificate of Compliance (COC) + optional invoice — file cards. */}
-      <div>
+      <div className="md:border-l md:border-[var(--border)] md:px-5">
         <div className={GROUP_LABEL}>Certificate of Compliance (COC)</div>
         <div className="space-y-2">
           {cocUrl
@@ -70,7 +84,7 @@ export function CompletionBody({ ticketId, beforeUrls = [], afterUrls = [], cocU
       </div>
 
       {/* Supplier notes. */}
-      <div>
+      <div className="md:border-l md:border-[var(--border)] md:pl-5">
         <div className={GROUP_LABEL}>Supplier notes</div>
         {noteLines.length
           ? <ul className="space-y-1.5 text-sm text-[var(--text-muted)]">{noteLines.map((l, i) => <li key={i}>{l}</li>)}</ul>

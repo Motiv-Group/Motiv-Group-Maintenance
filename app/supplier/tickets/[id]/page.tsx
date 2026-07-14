@@ -19,7 +19,7 @@ import { Card } from '@/components/exec/ui'
 import { WorkflowActions } from '@/components/workflow/WorkflowActions'
 import { RmPipeline } from '@/components/regional/RmPipeline'
 import { SupplierAttachments } from '@/components/workflow/SupplierAttachments'
-import { CompletionBody } from '@/components/workflow/CompletionBody'
+import { CompletionBody, CompletionFooterNote } from '@/components/workflow/CompletionBody'
 import { QuoteSummary, type QuoteSummaryStatus } from '@/components/workflow/QuoteSummary'
 import { MarkInProgressButton, DeclineWorkButton, AcceptSnagCard, StartSnagButton, SupplierVariationGate, SupplierQuoteBar, SupplierQuoteSubmittedActions } from '@/components/supplier/SupplierJobActions'
 import { PopupForm } from '@/components/supplier/PopupForm'
@@ -56,7 +56,7 @@ function ArchiveGroup({ label, children }: { label: string; children: React.Reac
 
 // One COC & POC submission card — reused across the COC/POC, Snag and Completion
 // blocks. `snag` enriches a rejected submission with the "why it was sent back" reason.
-function SignoffCard({ s, snag, ticketId, collapsible = false, title, reason }: { s: any; snag?: { description?: string | null; required_correction?: string | null; severity?: string | null } | null; ticketId: string; collapsible?: boolean; title?: string; reason?: string | null }) {
+function SignoffCard({ s, snag, ticketId, collapsible = false, defaultOpen = false, title, reason, footer }: { s: any; snag?: { description?: string | null; required_correction?: string | null; severity?: string | null } | null; ticketId: string; collapsible?: boolean; defaultOpen?: boolean; title?: string; reason?: string | null; footer?: React.ReactNode }) {
   const meta = SIGNOFF_META[s.status] ?? SIGNOFF_META.submitted
   const before = (s.before_urls ?? []) as string[]
   const after = (s.after_urls ?? []) as string[]
@@ -93,16 +93,18 @@ function SignoffCard({ s, snag, ticketId, collapsible = false, title, reason }: 
   // the proof-of-completion, COC and notes.
   if (collapsible) {
     return (
-      <details className={`rounded-xl ring-1 ${meta.ring} ${meta.bg} overflow-hidden`}>
+      <details open={defaultOpen} className={`rounded-xl ring-1 ${meta.ring} ${meta.bg} overflow-hidden`}>
         <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">{header}</summary>
-        <div className={`p-4 space-y-3 border-t ${meta.head}`}>{body}</div>
+        <div className={`p-4 space-y-4 border-t ${meta.head}`}>{body}</div>
+        {footer && <div className={`border-t ${meta.head} px-4 py-3`}>{footer}</div>}
       </details>
     )
   }
   return (
     <div className={`rounded-xl ring-1 ${meta.ring} ${meta.bg} overflow-hidden`}>
       <div className={`flex items-center justify-between gap-2 px-4 py-2.5 border-b ${meta.head}`}>{header}</div>
-      <div className="p-4 space-y-3">{body}</div>
+      <div className="p-4 space-y-4">{body}</div>
+      {footer && <div className={`border-t ${meta.head} px-4 py-3`}>{footer}</div>}
     </div>
   )
 }
@@ -374,7 +376,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
     : null
   const completionTab = (pendingSignoffs.length > 0 || acceptedSignoff)
     ? (<div className="space-y-3">
-        {pendingSignoffs.map(s => <SignoffCard key={s.id} s={s} ticketId={t.id} title={submissionLabel(s)} collapsible />)}
+        {pendingSignoffs.map(s => <SignoffCard key={s.id} s={s} ticketId={t.id} title={submissionLabel(s)} collapsible defaultOpen footer={<CompletionFooterNote>You will be notified once the Regional Manager has reviewed and signed off.</CompletionFooterNote>} />)}
         {acceptedSignoff && <SignoffCard s={acceptedSignoff} ticketId={t.id} />}
       </div>)
     : null
