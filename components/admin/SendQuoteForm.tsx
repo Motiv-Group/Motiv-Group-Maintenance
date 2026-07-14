@@ -318,6 +318,7 @@ export function SendQuoteForm({
       if (!res.ok) { setError((await res.json().catch(() => ({}))).error || 'Failed to submit variation order'); setLoading(false); return }
       reset(); if (filePreview) URL.revokeObjectURL(filePreview)
       setFilePreview(null); setFile(null); setOpen(false); setValidNA(false); setWarrantyNA(false); router.refresh(); setLoading(false)
+      onClose?.()   // in a pop-up, close it — don't collapse to the lone "Upload" button
       return
     }
 
@@ -356,6 +357,7 @@ export function SendQuoteForm({
     setValidNA(false); setWarrantyNA(false)
     router.refresh()
     setLoading(false)
+    onClose?.()   // in a pop-up, close it — don't collapse to the lone "Upload" button
   }
 
   function handleClose() {
