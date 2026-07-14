@@ -56,7 +56,29 @@ export interface DisputeRecord {
 // Origin → the word used for the disputed request across the UI.
 const originWord = (o: string) => o === 'snag' ? 'snag' : o === 'variation' ? 'variation order' : 'evidence request'
 
-const ROLE_LABEL: Record<string, string> = { supplier: 'Supplier', regional_manager: 'Regional Manager' }
+const ROLE_LABEL: Record<string, string> = { supplier: 'Supplier', regional_manager: 'Regional Manager', system: 'System' }
+
+// Chat avatar tint + initial per author role.
+const AVATAR_CLS: Record<string, string> = {
+  supplier: 'bg-blue-500/20 text-blue-700 dark:text-blue-300',
+  regional_manager: 'bg-teal-500/20 text-teal-700 dark:text-teal-300',
+  system: 'bg-[var(--surface-2)] text-[var(--text-faint)]',
+}
+const roleInitial = (role: string) => role === 'supplier' ? 'S' : role === 'regional_manager' ? 'M' : 'i'
+const isImageUrl = (url: string) => /\.(jpe?g|png|webp|gif)(\?|$)/i.test(url)
+function attachmentName(url: string): string {
+  try {
+    const raw = decodeURIComponent((url.split('?')[0].split('/').pop() || '').trim())
+    return raw.replace(/^\d{6,}-[a-z0-9]{4,}-/i, '') || 'Attachment'
+  } catch { return 'Attachment' }
+}
+// The raise message stores "Reason: <x>\n\n<explanation>" — split the reason out
+// so it renders as its own pill above the body.
+function splitReason(body: string): { reason: string | null; rest: string } {
+  const m = body.match(/^Reason:\s*(.+?)(?:\n\n|\n|$)/)
+  if (!m) return { reason: null, rest: body }
+  return { reason: m[1].trim(), rest: body.slice(m[0].length).trim() }
+}
 
 async function uploadEvidence(_ticketId: string, file: File): Promise<string> {
   // Non-image evidence → the ticket-docs bucket, which accepts PDF/Word/Excel/text
@@ -108,7 +130,7 @@ function Composer({ ticketId, action, submitLabel, placeholder, onDone }: { tick
           <Paperclip size={15} /> Attach
           <input type="file" accept="image/*,.pdf,.doc,.docx" multiple className="hidden" onChange={e => { setFiles(p => [...p, ...Array.from(e.target.files ?? [])].slice(0, 10)); setErr('') }} />
         </label>
-        <button onClick={submit} disabled={busy} className="flex-1 py-2 rounded-xl bg-[#C6A35D] hover:brightness-95 text-[#0a0e17] text-sm font-semibold transition disabled:opacity-50 flex items-center justify-center gap-1.5">
+        <button onClick={submit} disabled={busy} className="flex-1 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition disabled:opacity-50 flex items-center justify-center gap-1.5">
           {busy ? <><Loader2 size={14} className="animate-spin" /> Sending…</> : <><Send size={14} /> {submitLabel}</>}
         </button>
       </div>
@@ -353,35 +375,57 @@ export function DisputeThread({ ticketId, dispute, messages, viewerRole, readOnl
           left (surface). Attachments keep a running count PER SIDE across the whole
           thread ("Evidence Supplier 1/2…", "Evidence RM 1/2…") for stable references. */}
       {messages.length > 0 && (
-        <div className="max-h-[420px] space-y-2.5 overflow-y-auto rounded-xl bg-[var(--app-bg)] p-3 ring-1 ring-[var(--border)]">
-          {(() => { let supplierEv = 0, rmEv = 0; return messages.map(m => {
+        <div className="max-h-[440px] space-y-3 overflow-y-auto rounded-xl bg-[var(--app-bg)] p-3 ring-1 ring-[var(--border)]">
+          {messages.map(m => {
+            // A system note (e.g. "Dispute created and SLA timer paused") sits centred.
+            if (m.author_role === 'system') {
+              return (
+                <div key={m.id} className="flex justify-center">
+                  <span className="rounded-lg bg-[var(--surface-2)] px-3 py-1.5 text-center text-[11px] text-[var(--text-muted)]">System · {formatDateTime(m.created_at)}{m.body ? ` — ${m.body}` : ''}</span>
+                </div>
+              )
+            }
             const mine = m.author_role === viewerRole
-            const evLabels = (m.evidence_urls ?? []).map(() =>
-              m.author_role === 'supplier' ? `Evidence Supplier ${++supplierEv}` : `Evidence RM ${++rmEv}`)
+            const { reason, rest } = splitReason(m.body ?? '')
+            const urls = m.evidence_urls ?? []
             return (
-              <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
-                <div className={`min-w-0 max-w-[85%] rounded-2xl px-3.5 py-2.5 ${mine ? 'rounded-br-md bg-blue-600 text-white' : 'rounded-bl-md bg-[var(--surface)] text-[var(--text)] ring-1 ring-[var(--border)]'}`}>
-                  <div className="mb-0.5 flex items-center gap-2">
-                    <span className={`text-[11px] font-semibold ${mine ? 'text-white/85' : 'text-[var(--text-muted)]'}`}>{mine ? 'You' : (ROLE_LABEL[m.author_role] ?? m.author_role)}</span>
+              <div key={m.id} className={`flex items-start gap-2 ${mine ? 'flex-row-reverse' : ''}`}>
+                <span className={`mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full text-[11px] font-bold ${AVATAR_CLS[m.author_role] ?? AVATAR_CLS.system}`}>{roleInitial(m.author_role)}</span>
+                <div className={`min-w-0 max-w-[82%] rounded-2xl px-3.5 py-2.5 ${mine ? 'rounded-tr-sm bg-blue-600 text-white' : 'rounded-tl-sm bg-[var(--surface)] text-[var(--text)] ring-1 ring-[var(--border)]'}`}>
+                  <div className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                    <span className={`text-[11px] font-bold ${mine ? 'text-white' : 'text-[var(--text)]'}`}>{mine ? 'You' : (ROLE_LABEL[m.author_role] ?? m.author_role)}{mine ? ` · ${ROLE_LABEL[m.author_role] ?? ''}` : ''}</span>
                     <span className={`text-[10px] ${mine ? 'text-white/60' : 'text-[var(--text-faint)]'}`}>{formatDateTime(m.created_at)}</span>
                   </div>
-                  {m.body && <p className="whitespace-pre-line break-words text-sm">{m.body}</p>}
-                  {m.evidence_urls?.length > 0 && (
-                    <div className="mt-1.5 flex flex-wrap gap-1.5">
-                      {m.evidence_urls.map((u, j) => (
-                        <a key={j} href={u} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition ${mine ? 'bg-white/15 text-white hover:bg-white/25' : 'bg-[var(--surface-2)] text-[#C6A35D] ring-1 ring-[var(--border)] hover:bg-[var(--hover)]'}`}><Paperclip size={11} /> {evLabels[j]}</a>
-                      ))}
+                  {reason && (
+                    <span className={`mb-1.5 inline-block rounded-md px-2 py-0.5 text-[11px] font-semibold ${mine ? 'bg-white/15 text-white' : 'bg-violet-500/15 text-violet-700 dark:text-violet-300'}`}>Reason: {reason}</span>
+                  )}
+                  {rest && <p className="whitespace-pre-line break-words text-sm">{rest}</p>}
+                  {urls.length > 0 && (
+                    <div className="mt-2 space-y-1.5">
+                      <p className={`text-[10px] font-semibold uppercase tracking-wide ${mine ? 'text-white/70' : 'text-[var(--text-faint)]'}`}>Attachment{urls.length === 1 ? '' : `s (${urls.length})`}</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {urls.map((u, j) => (
+                          <a key={j} href={u} target="_blank" rel="noopener noreferrer"
+                            className={`flex max-w-[200px] items-center gap-2 rounded-lg p-1.5 pr-2.5 transition ${mine ? 'bg-white/10 hover:bg-white/20' : 'bg-[var(--surface-2)] ring-1 ring-[var(--border)] hover:bg-[var(--hover)]'}`}>
+                            {isImageUrl(u)
+                              /* eslint-disable-next-line @next/next/no-img-element -- signed remote evidence thumbnail */
+                              ? <img src={u} alt="" className="h-9 w-9 shrink-0 rounded object-cover" />
+                              : <span className={`grid h-9 w-9 shrink-0 place-items-center rounded ${mine ? 'bg-white/15 text-white' : 'bg-blue-500/15 text-blue-600 dark:text-blue-400'}`}><FileText size={16} /></span>}
+                            <span className={`min-w-0 truncate text-[11px] font-medium ${mine ? 'text-white' : 'text-[var(--text)]'}`}>{attachmentName(u)}</span>
+                          </a>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
               </div>
             )
-          }) })()}
+          })}
         </div>
       )}
 
       {/* Reply while open */}
-      {isOpen && <Composer ticketId={ticketId} action="reply" submitLabel="Send reply" placeholder="Add a message or evidence…" />}
+      {isOpen && <Composer ticketId={ticketId} action="reply" submitLabel="Send" placeholder="Write a reply or add evidence…" />}
 
       {/* Negotiation controls: either side can concede unilaterally, or propose an
           outcome the other must confirm (propose → confirm). Hidden when the caller
