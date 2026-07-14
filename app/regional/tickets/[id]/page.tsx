@@ -305,7 +305,14 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
   // Superseded submissions (sent back for more evidence OR snagged) → collapsed round
   // cards in the Archive, newest first. The live under-review one stays in COC & POC;
   // the approved one in Completion.
-  const supersededSubmissions = [...evidenceRequestedSignoffs, ...rejectedSignoffs].sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at))
+  // A submission with an OUTSTANDING request (more evidence, or a raised snag) stays
+  // live in the Completion tab until the supplier re-submits — only then is it
+  // superseded and moved to the Archive. Mirrors the supplier's ticket view.
+  const liveEvidence = t.status === 'evidence_requested' ? (evidenceRequestedSignoffs[0] ?? null) : null
+  const liveSnagSubmission = ['snag', 'snag_assigned', 'snag_in_progress', 'snag_resolved'].includes(t.status) ? (rejectedSignoffs[0] ?? null) : null
+  const supersededSubmissions = [...evidenceRequestedSignoffs, ...rejectedSignoffs]
+    .filter(s => s.id !== liveEvidence?.id && s.id !== liveSnagSubmission?.id)
+    .sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at))
   // Durable review-round log drives the number / kind / reason on each round card;
   // falls back to the signoff row (submission ordinal + reject_reason + status) for
   // tickets that predate the signoff_rounds table.
@@ -749,9 +756,11 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
   // The COC & POC submission currently awaiting the RM's sign-off (if any) — shown
   // in the Completion tab (full detail) and summarised in the Next-action block.
   const reviewSignoff: any = t.status === 'submitted_for_signoff' ? (pendingSignoffs[0] ?? null) : null
-  const completionContent = (acceptedSignoff || reviewSignoff) ? (
+  const completionContent = (acceptedSignoff || reviewSignoff || liveEvidence || liveSnagSubmission) ? (
     <div className="space-y-3">
       {reviewSignoff && <RmSignoffCard s={reviewSignoff} tone="review" ticketId={t.id} title={submissionLabel(reviewSignoff)} freshEvidence={isEvidenceResubmission} collapsible defaultOpen footer={<CompletionFooterNote>Approve, request more evidence, or raise a snag from the Next action panel above.</CompletionFooterNote>} />}
+      {liveEvidence && <RmSignoffCard s={liveEvidence} tone="evidence" ticketId={t.id} title={submissionLabel(liveEvidence)} reason={roundBySignoff.get(liveEvidence.id)?.reason ?? liveEvidence.reject_reason} collapsible defaultOpen footer={<CompletionFooterNote>Awaiting the supplier&apos;s updated evidence — this moves to History once they re-submit.</CompletionFooterNote>} />}
+      {liveSnagSubmission && <RmSignoffCard s={liveSnagSubmission} tone="snag" ticketId={t.id} title={submissionLabel(liveSnagSubmission)} reason={roundBySignoff.get(liveSnagSubmission.id)?.reason ?? liveSnagSubmission.reject_reason} collapsible defaultOpen footer={<CompletionFooterNote>Awaiting the supplier&apos;s snag fix — this moves to History once they re-submit.</CompletionFooterNote>} />}
       {acceptedSignoff && <RmSignoffCard s={acceptedSignoff} tone="approved" ticketId={t.id} collapsible defaultOpen />}
     </div>
   ) : null

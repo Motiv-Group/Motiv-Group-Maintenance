@@ -309,7 +309,10 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
   // snag — shown in its own block above Quotes so the supplier sees what to fix. Older
   // superseded rounds (and the snag once resubmitted) stay in the Archived block.
   const liveSnag = ['snag', 'snag_assigned', 'snag_in_progress', 'snag_resolved'].includes(t.status) ? (rejectedSignoffs[0] ?? null) : null
-  const archivedSuperseded = supersededSubmissions.filter(s => s.id !== liveSnag?.id)
+  // An outstanding "more evidence" request stays in the Completion tab (not History)
+  // until the supplier re-submits — then it's superseded and moves to the Archive.
+  const liveEvidence = t.status === 'evidence_requested' ? (evidenceRequestedSignoffs[0] ?? null) : null
+  const archivedSuperseded = supersededSubmissions.filter(s => s.id !== liveSnag?.id && s.id !== liveEvidence?.id)
 
   // Variation orders raised on this ticket (drives the scheduled-phase VO gate and
   // the "no more variation orders" label). The most recent decline reason feeds the
@@ -386,8 +389,9 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
           schedule={q.status === 'accepted' && t.scheduled_at ? { at: t.scheduled_at, proposed: t.schedule_status === 'proposed', technician: scheduledTechName, audience: 'supplier' } : q.proposed_schedule_at ? { at: q.proposed_schedule_at, proposed: true, audience: 'supplier' } : null} />
       ))}</div>)
     : null
-  const completionTab = (pendingSignoffs.length > 0 || acceptedSignoff)
+  const completionTab = (liveEvidence || pendingSignoffs.length > 0 || acceptedSignoff)
     ? (<div className="space-y-3">
+        {liveEvidence && <SignoffCard s={liveEvidence} ticketId={t.id} title={submissionLabel(liveEvidence)} reason={roundBySignoff.get(liveEvidence.id)?.reason ?? liveEvidence.reject_reason} collapsible defaultOpen />}
         {pendingSignoffs.map(s => <SignoffCard key={s.id} s={s} ticketId={t.id} title={submissionLabel(s)} collapsible defaultOpen footer={<CompletionFooterNote>You will be notified once the Regional Manager has reviewed and signed off.</CompletionFooterNote>} />)}
         {acceptedSignoff && <SignoffCard s={acceptedSignoff} ticketId={t.id} collapsible />}
       </div>)
