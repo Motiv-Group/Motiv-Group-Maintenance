@@ -14,7 +14,7 @@ import type { ProjectSummary, StoreRow } from '@/lib/projects/data'
 type StatusFilter = 'all' | 'not_started' | 'in_progress' | 'complete' | 'overdue'
 
 export function RegionalProjectDashboard({ project, summary, stores }: { project: any; summary: ProjectSummary; stores: StoreRow[] }) {
-  const [view, setView] = useState<'cards' | 'table'>('cards')
+  const [view, setView] = useState<'cards' | 'table'>('table')
   const [q, setQ] = useState('')
   const [status, setStatus] = useState<StatusFilter>('all')
   const [sort, setSort] = useState<'branch' | 'name' | 'progress' | 'start' | 'end'>('branch')
