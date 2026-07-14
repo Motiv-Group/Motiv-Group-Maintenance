@@ -7,9 +7,31 @@ import { SectionCard } from '@/components/exec/ui'
 import { InfoTip } from '@/components/ui/InfoTip'
 import { AddAccountForm, type CompanyOpt, type RegionOpt, type ProjectOpt } from '@/components/admin/AddAccountForm'
 import { BulkImportForm } from '@/components/admin/BulkImportForm'
+import { formatDate } from '@/lib/utils'
 
 const roleLabel = (r: string) => r === 'executive' ? 'Executive' : r === 'regional_manager' ? 'Regional Manager' : 'Store Manager'
 const roleRank = (r: string) => r === 'executive' ? 0 : r === 'regional_manager' ? 1 : 2
+
+// Last sign-in per user comes from Supabase auth (last_sign_in_at) — no custom
+// tracking needed. Paginate defensively (perPage caps at 1000).
+async function loadLastSignIns(admin: ReturnType<typeof createAdminClient>): Promise<Map<string, string | null>> {
+  const map = new Map<string, string | null>()
+  for (let page = 1; page <= 20; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 })
+    const list = data?.users ?? []
+    if (error || !list.length) break
+    for (const u of list) map.set(u.id, u.last_sign_in_at ?? null)
+    if (list.length < 1000) break
+  }
+  return map
+}
+
+function daysAgo(iso: string | null): number | null {
+  if (!iso) return null
+  const t = new Date(iso).getTime()
+  if (Number.isNaN(t)) return null
+  return Math.floor((Date.now() - t) / 86400000)
+}
 
 export default async function AdminAccountsPage() {
   await requireMasterAdmin()
@@ -42,6 +64,23 @@ export default async function AdminAccountsPage() {
   }
   const rows = ((users ?? []) as any[]).sort((a, b) => roleRank(a.role) - roleRank(b.role) || (a.full_name ?? '').localeCompare(b.full_name ?? ''))
 
+  // Engagement: last sign-in per user + a "signed in this week / never" summary.
+  const signIns = await loadLastSignIns(db)
+  const activeWeek = rows.filter(u => { const d = daysAgo(signIns.get(u.id) ?? null); return d != null && d <= 7 }).length
+  const neverSignedIn = rows.filter(u => !signIns.get(u.id)).length
+  const lastSignInCell = (u: any) => {
+    const iso = signIns.get(u.id) ?? null
+    if (!iso) return <span className="text-amber-600 dark:text-amber-400">Never</span>
+    const d = daysAgo(iso)
+    const recent = d != null && d <= 7
+    return (
+      <span className="flex items-center gap-1.5">
+        <i className={`h-1.5 w-1.5 rounded-full ${recent ? 'bg-emerald-500' : 'bg-slate-400/60'}`} />
+        {formatDate(iso)}{d != null && <span className="text-[var(--text-faint)]">· {d === 0 ? 'today' : `${d}d ago`}</span>}
+      </span>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -58,11 +97,17 @@ export default async function AdminAccountsPage() {
 
       <SectionCard
         title="Existing accounts"
-        action={<span className="text-xs text-[var(--text-muted)]">{rows.length} total</span>}
+        action={
+          <span className="text-xs text-[var(--text-muted)] flex items-center gap-2">
+            <span className="text-emerald-600 dark:text-emerald-400">{activeWeek} active this week</span>
+            {neverSignedIn > 0 && <span className="text-amber-600 dark:text-amber-400">{neverSignedIn} never signed in</span>}
+            <span>· {rows.length} total</span>
+          </span>
+        }
       >
         <div className="overflow-x-auto -mx-1">
           <table className="w-full text-sm min-w-[560px]">
-            <thead><tr className="text-left text-[11px] text-[var(--text-faint)] border-b border-[var(--border)]"><th className="py-2 px-2">Name</th><th className="px-2">Email</th><th className="px-2">Role</th><th className="px-2">Region / Branch</th><th className="px-2">Company</th></tr></thead>
+            <thead><tr className="text-left text-[11px] text-[var(--text-faint)] border-b border-[var(--border)]"><th className="py-2 px-2">Name</th><th className="px-2">Email</th><th className="px-2">Role</th><th className="px-2">Region / Branch</th><th className="px-2">Company</th><th className="px-2">Last sign-in</th></tr></thead>
             <tbody>
               {rows.map(u => (
                 <tr key={u.id} className="border-b border-[var(--border)] last:border-0 transition hover:bg-[var(--hover)]">
@@ -71,9 +116,10 @@ export default async function AdminAccountsPage() {
                   <td className="px-2 text-[var(--text-muted)]">{roleLabel(u.role)}</td>
                   <td className="px-2 text-[var(--text-muted)]">{locationFor(u)}</td>
                   <td className="px-2 text-[var(--text-muted)]">{u.company_id ? (companyName.get(u.company_id) ?? '—') : <span className="text-amber-600 dark:text-amber-400">Pending</span>}</td>
+                  <td className="px-2 text-[var(--text-muted)] whitespace-nowrap">{lastSignInCell(u)}</td>
                 </tr>
               ))}
-              {!rows.length && <tr><td colSpan={5} className="py-6 text-center text-[var(--text-faint)]">No accounts yet.</td></tr>}
+              {!rows.length && <tr><td colSpan={6} className="py-6 text-center text-[var(--text-faint)]">No accounts yet.</td></tr>}
             </tbody>
           </table>
         </div>
