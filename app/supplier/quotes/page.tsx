@@ -18,16 +18,24 @@ export default async function SupplierQuotesPage() {
   const d = await assembleSupplierDashboard(companyId, supplierIds)
   const declinedByByTicket = new Map(d.tickets.map(t => [t.id, t.declinedBy]))
   const quotedTicketIds = new Set(d.quotes.map(q => q.ticketId))
+  // Latest quote timestamp per ticket — a declined quote that's since been superseded
+  // by a newer (re-)submitted quote drops off the tab entirely.
+  const latestQuoteAt = new Map<string, number>()
+  for (const q of d.quotes) { const ms = +new Date(q.createdAt); if (ms > (latestQuoteAt.get(q.ticketId) ?? 0)) latestQuoteAt.set(q.ticketId, ms) }
 
-  // Submitted quotes — declined always show; others hide once past the decision phase.
+  // Submitted quotes — declined show only while they're the latest quote on the
+  // ticket (a re-quote hides them); others hide once past the decision phase.
   const submitted: SupplierQuoteItem[] = d.quotes
-    .filter(q => q.status === 'declined' || !HIDE_FROM_QUOTES.has(q.ticketStatus))
+    .filter(q => q.status === 'declined'
+      ? +new Date(q.createdAt) >= (latestQuoteAt.get(q.ticketId) ?? 0)
+      : !HIDE_FROM_QUOTES.has(q.ticketStatus))
     .map(q => {
       const kind = kindOf(q.status)
       return {
         key: `q-${q.id}`, ticketId: q.ticketId, storeName: q.storeName, jobRef: q.jobRef, category: q.category, priority: String(q.priority ?? ''), description: q.description,
         kind, at: q.createdAt, proposedVisit: q.proposedScheduleAt, validUntil: q.validUntil, amount: q.amount, amountInclVat: q.amountInclVat,
         declinedLabel: kind === 'declined' ? declinedLabelOf(declinedByByTicket.get(q.ticketId) ?? null) : null,
+        reQuoteRequested: kind === 'declined' && q.reQuoteRequested,
       }
     })
 

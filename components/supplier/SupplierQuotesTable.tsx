@@ -16,6 +16,8 @@ export interface SupplierQuoteItem {
   kind: QuoteKind; at: string
   proposedVisit: string | null; validUntil: string | null; amount: number | null; amountInclVat: number | null
   declinedLabel?: string | null
+  /** RM asked this supplier to re-submit after the decline (shown on the declined row). */
+  reQuoteRequested?: boolean
 }
 
 const STATUS: Record<QuoteKind, { label: string; badge: string; tab: string; ring: string }> = {
@@ -28,7 +30,7 @@ const ORDER: QuoteKind[] = ['requested', 'pending', 'accepted', 'declined']
 
 // Ticket priority (engine P1–P4) → badge label/colour + sort rank (P1 = most urgent).
 const PRIO: Record<string, { label: string; cls: string; rank: number }> = {
-  P1: { label: 'Urgent', cls: 'bg-red-500/15 text-red-700 dark:text-red-400',        rank: 0 },
+  P1: { label: 'Critical', cls: 'bg-red-500/15 text-red-700 dark:text-red-400',      rank: 0 },
   P2: { label: 'High',   cls: 'bg-orange-500/15 text-orange-700 dark:text-orange-400', rank: 1 },
   P3: { label: 'Medium', cls: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',    rank: 2 },
   P4: { label: 'Low',    cls: 'bg-slate-500/15 text-slate-600 dark:text-slate-300',    rank: 3 },
@@ -140,6 +142,7 @@ export function SupplierQuotesTable({ items }: { items: SupplierQuoteItem[] }) {
                     <div className="flex w-fit flex-col items-stretch gap-1">
                       {PRIO[i.priority] && <span className={`${BADGE} ${PRIO[i.priority].cls}`}>{PRIO[i.priority].label}</span>}
                       <span className={`${BADGE} ${STATUS[i.kind].badge}`}>{i.declinedLabel ?? STATUS[i.kind].label}</span>
+                      {i.kind === 'declined' && i.reQuoteRequested && <span className={`${BADGE} bg-amber-500/15 text-amber-700 dark:text-amber-400`}>Re-quote requested</span>}
                     </div>
                   </td>
                   <td className="px-3 text-right"><Link href={`/supplier/tickets/${i.ticketId}`} aria-label="Open ticket" className="inline-flex rounded-lg p-1.5 text-[var(--text-faint)] transition group-hover:text-[var(--text)]"><Chev size={16} /></Link></td>
@@ -163,6 +166,7 @@ export function SupplierQuotesTable({ items }: { items: SupplierQuoteItem[] }) {
                       <span className="flex w-fit shrink-0 flex-col items-stretch gap-1">
                         {PRIO[i.priority] && <span className={`${BADGE} ${PRIO[i.priority].cls}`}>{PRIO[i.priority].label}</span>}
                         <span className={`${BADGE} ${STATUS[i.kind].badge}`}>{i.declinedLabel ?? STATUS[i.kind].label}</span>
+                        {i.kind === 'declined' && i.reQuoteRequested && <span className={`${BADGE} bg-amber-500/15 text-amber-700 dark:text-amber-400`}>Re-quote requested</span>}
                       </span>
                     </div>
                     <p className="truncate text-[11px] text-[var(--text-faint)]">{[i.jobRef, i.category].filter(Boolean).join(' · ')}</p>

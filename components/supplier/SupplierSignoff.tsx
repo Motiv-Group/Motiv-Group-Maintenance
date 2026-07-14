@@ -9,8 +9,13 @@ import Link from 'next/link'
 import { ClipboardCheck, Clock, CheckCircle2, AlertCircle, ChevronDown, ChevronRight, ChevronLeft, Search, Store, X, Image as ImageIcon, FileText, ArrowRight, HelpCircle, Calendar } from 'lucide-react'
 import type { SupplierSignoffRow } from '@/lib/health/data'
 import { Card } from '@/components/exec/ui'
-import { CategoryIcon } from '@/components/client/ticketBadges'
+import { CategoryIcon, priorityBadgeClass, priorityLabel } from '@/components/client/ticketBadges'
 import { formatDateTime } from '@/lib/utils'
+
+// P1 (urgent) → P4 (low). A store's icon takes the colour of its most urgent job.
+const PRANK: Record<string, number> = { P1: 0, P2: 1, P3: 2, P4: 3 }
+const topPriority = (rows: SupplierSignoffRow[]): string => [...rows].map(r => r.priority).sort((a, b) => (PRANK[a] ?? 9) - (PRANK[b] ?? 9))[0] ?? 'P3'
+const prioTicket = (p: string) => ({ priority: p } as unknown as Parameters<typeof priorityBadgeClass>[0])
 
 type Phase = 'awaiting' | 'approved' | 'changes'
 const phaseOf = (status: string): Phase => status === 'accepted' ? 'approved' : status === 'rejected' ? 'changes' : 'awaiting'
@@ -149,7 +154,7 @@ export function SupplierSignoff({ signoffs }: { signoffs: SupplierSignoffRow[] }
         return (
           <div key={storeName} className={`overflow-hidden rounded-xl bg-[var(--surface)] ring-1 ring-[var(--border)]`}>
             <div role="button" tabIndex={0} aria-expanded={open} onClick={() => toggleStore(storeName)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleStore(storeName) } }} className="flex cursor-pointer items-center gap-3 px-4 py-3 transition hover:bg-[var(--hover)]">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[var(--surface-2)] text-[var(--text-muted)]"><Store size={17} /></span>
+            <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${priorityBadgeClass(prioTicket(topPriority(g.rows)))}`}><Store size={17} /></span>
             <span className="flex min-w-0 flex-1 items-center gap-2">
               <span className="truncate text-base font-bold text-[var(--text)]">{storeName}</span>
               {g.branchCode && <span className="shrink-0 text-sm text-[var(--text-muted)]">· {g.branchCode}</span>}
@@ -168,7 +173,7 @@ export function SupplierSignoff({ signoffs }: { signoffs: SupplierSignoffRow[] }
                       <div className={ROW}>
                         {/* Job */}
                         <div className="flex min-w-0 items-start gap-3">
-                          <CategoryIcon category={s.category ?? s.ticketTitle} className="h-11 w-11" iconSize={18} />
+                          <CategoryIcon category={s.category ?? s.ticketTitle} priority={s.priority} className="h-11 w-11" iconSize={18} />
                           <div className="min-w-0">
                             <p className="truncate text-sm font-bold text-[var(--text)]">{s.category || s.ticketTitle}</p>
                             {s.jobRef && <p className="truncate text-[11px] text-[var(--text-faint)]">Ticket {s.jobRef}</p>}
@@ -185,7 +190,10 @@ export function SupplierSignoff({ signoffs }: { signoffs: SupplierSignoffRow[] }
                         {/* Decision */}
                         <div className="min-w-0">
                           <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-faint)]">Decision</p>
-                          <span className={`inline-flex rounded-md px-2 py-0.5 text-[11px] font-semibold ${meta.badge}`}>{meta.label}</span>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className={`inline-flex rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase ${priorityBadgeClass(prioTicket(s.priority))}`}>{priorityLabel(prioTicket(s.priority))}</span>
+                            <span className={`inline-flex rounded-md px-2 py-0.5 text-[11px] font-semibold ${meta.badge}`}>{meta.label}</span>
+                          </div>
                           {s.decidedBy && <p className="mt-1 text-[11px] text-[var(--text-muted)]">by {s.decidedBy}</p>}
                           {s.decidedAt && <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(s.decidedAt)}</p>}
                         </div>

@@ -651,8 +651,8 @@ export interface SupplierTicketRow {
   // An open dispute on their awarded job — the badge reads "Dispute".
   disputed: boolean
 }
-export interface SupplierQuoteRow { id: string; ticketId: string; ticketTitle: string; ticketStatus: string; storeName: string; branchCode: string | null; amount: number; amountInclVat: number | null; status: string; createdAt: string; category: string | null; priority: Priority; jobRef: string | null; description: string | null; validUntil: string | null; proposedScheduleAt: string | null }
-export interface SupplierSignoffRow { id: string; ticketId: string; ticketTitle: string; ticketStatus: string; storeName: string; branchCode: string | null; status: string; createdAt: string; category: string | null; description: string | null; jobRef: string | null; photoCount: number; certCount: number; decidedAt: string | null; decidedBy: string | null }
+export interface SupplierQuoteRow { id: string; ticketId: string; ticketTitle: string; ticketStatus: string; storeName: string; branchCode: string | null; amount: number; amountInclVat: number | null; status: string; createdAt: string; category: string | null; priority: Priority; jobRef: string | null; description: string | null; validUntil: string | null; proposedScheduleAt: string | null; reQuoteRequested: boolean }
+export interface SupplierSignoffRow { id: string; ticketId: string; ticketTitle: string; ticketStatus: string; storeName: string; branchCode: string | null; status: string; createdAt: string; category: string | null; priority: Priority; description: string | null; jobRef: string | null; photoCount: number; certCount: number; decidedAt: string | null; decidedBy: string | null }
 export interface SupplierDashboardData {
   perf: SupplierPerformance
   company: string
@@ -677,7 +677,7 @@ export async function assembleSupplierDashboard(companyId: string | null, suppli
     // is awarded client-company tickets they don't belong to). Scoped to their
     // supplier ids, which is the real ownership gate.
     db.from('tickets').select(TICKET_COLS).in('supplier_id', supplierIds),
-    db.from('ticket_suppliers').select('ticket_id, status, responded_at, declined_by').in('supplier_id', supplierIds).in('status', ['invited', 'quoted', 'awarded', 'declined', 'closed']),
+    db.from('ticket_suppliers').select('ticket_id, status, responded_at, declined_by, requote_requested_at').in('supplier_id', supplierIds).in('status', ['invited', 'quoted', 'awarded', 'declined', 'closed']),
   ])
   const owned = (bySupplier ?? []) as any[]
   const ownedIds = new Set(owned.map(t => t.id))
@@ -688,10 +688,14 @@ export async function assembleSupplierDashboard(companyId: string | null, suppli
   const declinedInviteAt = new Map<string, string>()
   // Who took them off it: 'supplier' (self) vs 'regional_manager' (declined quote).
   const declinedByOf = new Map<string, 'supplier' | 'regional_manager'>()
+  // The RM asked this supplier to (re-)submit a quote after a decline → drives the
+  // "Re-quote requested" flag on the Quotes tab.
+  const requoteAt = new Map<string, string>()
   for (const r of (invRows ?? []) as any[]) {
     myInviteStatus.set(r.ticket_id, r.status)
     if (['declined', 'closed'].includes(r.status) && r.responded_at) declinedInviteAt.set(r.ticket_id, r.responded_at)
     if (r.declined_by === 'supplier' || r.declined_by === 'regional_manager') declinedByOf.set(r.ticket_id, r.declined_by)
+    if (r.requote_requested_at) requoteAt.set(r.ticket_id, r.requote_requested_at)
   }
   const extraIds = Array.from(new Set((invRows ?? []).map(r => r.ticket_id))).filter(id => !ownedIds.has(id))
   const { data: invitedTickets } = extraIds.length ? await db.from('tickets').select(TICKET_COLS).in('id', extraIds) : { data: [] as any[] }
@@ -799,8 +803,9 @@ export async function assembleSupplierDashboard(companyId: string | null, suppli
     company: (companyRow as any)?.name ?? '',
     kpis: { open, overdue, dueToday, pendingQuotes, awaitingSignoff, evidenceMissing, scheduled },
     tickets: rows,
-    quotes: (quotesRaw ?? []).map((q: any) => { const rq: any = rawById.get(q.ticket_id) ?? {}; return { id: q.id, ticketId: q.ticket_id, ticketTitle: titleOf.get(q.ticket_id) ?? 'Ticket', ticketStatus: rq.status ?? '', storeName: storeName.get(storeOf(q.ticket_id)) ?? (rq.company_id ? 'Store' : 'Individual'), branchCode: storeBranch.get(storeOf(q.ticket_id)) ?? null, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, status: q.status, createdAt: q.created_at, category: rq.category ?? null, priority: rq.priority, jobRef: rq.job_ref ?? null, description: rq.description ?? null, validUntil: q.valid_until ?? null, proposedScheduleAt: q.proposed_schedule_at ?? null } }),
-    signoffs: (signoffsRaw ?? []).map((s: any) => { const rq: any = rawById.get(s.ticket_id) ?? {}; return { id: s.id, ticketId: s.ticket_id, ticketTitle: titleOf.get(s.ticket_id) ?? 'Ticket', ticketStatus: rq.status ?? '', storeName: storeName.get(storeOf(s.ticket_id)) ?? (rq.company_id ? 'Store' : 'Individual'), branchCode: storeBranch.get(storeOf(s.ticket_id)) ?? null, status: s.status, createdAt: s.created_at, category: rq.category ?? null, description: rq.description ?? null, jobRef: rq.job_ref ?? null, photoCount: ((s.before_urls ?? []).length + (s.after_urls ?? []).length), certCount: (s.coc_url ? 1 : 0) + (s.invoice_url ? 1 : 0), decidedAt: s.reviewed_at ?? null, decidedBy: s.reviewed_by ? (reviewerName.get(s.reviewed_by) ?? null) : null } }),
+    quotes: (quotesRaw ?? []).map((q: any) => { const rq: any = rawById.get(q.ticket_id) ?? {}; return { id: q.id, ticketId: q.ticket_id, ticketTitle: titleOf.get(q.ticket_id) ?? 'Ticket', ticketStatus: rq.status ?? '', storeName: storeName.get(storeOf(q.ticket_id)) ?? (rq.company_id ? 'Store' : 'Individual'), branchCode: storeBranch.get(storeOf(q.ticket_id)) ?? null, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, status: q.status, createdAt: q.created_at, category: rq.category ?? null, priority: rq.priority, jobRef: rq.job_ref ?? null, description: rq.description ?? null, validUntil: q.valid_until ?? null, proposedScheduleAt: q.proposed_schedule_at ?? null, reQuoteRequested: !!requoteAt.get(q.ticket_id) } }),
+    // A completed ticket drops off the Sign-off tab entirely (nothing left to do).
+    signoffs: (signoffsRaw ?? []).filter((s: any) => (rawById.get(s.ticket_id)?.status) !== 'completed').map((s: any) => { const rq: any = rawById.get(s.ticket_id) ?? {}; return { id: s.id, ticketId: s.ticket_id, ticketTitle: titleOf.get(s.ticket_id) ?? 'Ticket', ticketStatus: rq.status ?? '', storeName: storeName.get(storeOf(s.ticket_id)) ?? (rq.company_id ? 'Store' : 'Individual'), branchCode: storeBranch.get(storeOf(s.ticket_id)) ?? null, status: s.status, createdAt: s.created_at, category: rq.category ?? null, priority: rq.priority, description: rq.description ?? null, jobRef: rq.job_ref ?? null, photoCount: ((s.before_urls ?? []).length + (s.after_urls ?? []).length), certCount: (s.coc_url ? 1 : 0) + (s.invoice_url ? 1 : 0), decidedAt: s.reviewed_at ?? null, decidedBy: s.reviewed_by ? (reviewerName.get(s.reviewed_by) ?? null) : null } }),
     rating,
     generatedAt: now.toISOString(),
   }
