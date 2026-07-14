@@ -750,9 +750,18 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
         </Card>
         </div>
       )}
-      {/* Lower tabbed section — same look as the RM ticket detail; empty tabs drop. */}
+      {/* Lower tabbed section — same look as the RM ticket detail; empty tabs drop.
+          Opens on the tab matching where the ticket is in the process (DetailTabs
+          falls back to the first available tab if the chosen one has no content). */}
       <DetailTabs
-        initial={totalPhotos ? 'photos' : quotesTab ? 'quotes' : 'timeline'}
+        initial={
+          openDispute ? 'dispute'
+          : ['snag', 'snag_assigned', 'snag_in_progress', 'snag_resolved'].includes(t.status) ? 'snag'
+          : ['variation_review', 'vo_declined'].includes(t.status) ? 'variations'
+          : ['submitted_for_signoff', 'evidence_requested', 'approved_closeout', 'completed'].includes(t.status) ? 'completion'
+          : ['quoted', 'accepted'].includes(t.status) ? 'quotes'
+          : (totalPhotos ? 'photos' : quotesTab ? 'quotes' : 'timeline')
+        }
         tabs={[
           { key: 'photos', label: `Photos${totalPhotos ? ` (${totalPhotos})` : ''}`, content: photosTab },
           { key: 'quotes', label: 'Quotes', content: quotesTab },

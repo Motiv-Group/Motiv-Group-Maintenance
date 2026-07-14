@@ -1048,7 +1048,12 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
           the full record (any status) lives in the History tab + Documents tab. */}
       {/* Photos · Activity (supplier updates) · Timeline (the full audit trail —
           status changes, edits, attachments/photos viewed, quotes, sign-offs …). */}
-      <RmTicketTabs ticketId={t.id} photoGroups={photoGroups} updates={supplierUpdates} timeline={timelineItems} documents={documentsContent} quotes={quotesContent} completion={completionContent} history={historyContent} defaultTab={reviewSignoff ? 'completion' : undefined} />
+      <RmTicketTabs ticketId={t.id} photoGroups={photoGroups} updates={supplierUpdates} timeline={timelineItems} documents={documentsContent} quotes={quotesContent} completion={completionContent} history={historyContent}
+        defaultTab={
+          completionContent && ['submitted_for_signoff', 'approved_closeout', 'completed'].includes(t.status) ? 'completion'
+          : quotesContent && (t.status === 'quoted' || reviewQuotes.length > 0) ? 'quotes'
+          : undefined
+        } />
     </div>
   );
 }
