@@ -225,7 +225,7 @@ function CloseOutCta({ ticket, className }: { ticket: SupplierTicketRow; classNa
     <>
       <button type="button" onClick={() => setOpen(true)} className={className}>Close-out</button>
       {open && (
-        <Modal onClose={() => setOpen(false)} maxWidth="max-w-lg">
+        <Modal onClose={() => setOpen(false)} maxWidth="max-w-2xl">
           {() => (
             <div className="space-y-4">
               <div>

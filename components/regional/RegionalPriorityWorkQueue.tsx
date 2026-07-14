@@ -148,10 +148,12 @@ function QueueRow({ ticket, nowMs, suppliers, motivSuppliers }: { ticket: Region
   // Genuinely critical (P1 / urgent) tickets get a RED action button so they stand out.
   const critical = ['P1', 'urgent'].includes(String(ticket.priority))
   const ctaCls = `relative z-20 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-bold transition lg:w-40 ${critical ? 'border-red-500/60 bg-red-500/10 text-red-600 hover:bg-red-500/15 dark:text-red-300' : 'border-blue-500/60 text-blue-600 hover:bg-blue-500/10 dark:text-blue-300'}`
-  // Close-out: blue while awaiting the supplier's "no further VOs" confirmation,
-  // green once confirmed (the RM can finalise the close-out).
+  // Close-out: the status badge is blue while awaiting the supplier's "no further
+  // VOs" confirmation and amber once confirmed; the close-out button is disabled
+  // until then (the RM can only finalise after the supplier confirms).
   const closeout = ticket.status === 'approved_closeout'
-  const closeoutCls = `relative z-20 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-bold transition lg:w-40 ${ticket.voNoneConfirmed ? 'border-emerald-500/60 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/15 dark:text-emerald-300' : 'border-blue-500/60 text-blue-600 hover:bg-blue-500/10 dark:text-blue-300'}`
+  const closeoutCls = 'relative z-20 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-bold transition lg:w-40 border-blue-500/60 text-blue-600 hover:bg-blue-500/10 dark:text-blue-300'
+  const closeoutBadge = ticket.voNoneConfirmed ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : 'bg-blue-500/15 text-blue-700 dark:text-blue-400'
   return (
     <div className="relative grid gap-4 border-b border-[var(--border)] px-4 py-4 transition last:border-b-0 hover:bg-[var(--hover)] lg:grid-cols-[1fr_200px_1.1fr_160px] lg:items-center">
       {/* The whole row (except the CTA island) links to the ticket. */}
@@ -168,7 +170,7 @@ function QueueRow({ ticket, nowMs, suppliers, motivSuppliers }: { ticket: Region
       <div className="min-w-0">
         <div className="flex items-center gap-1.5">
           <span className={`inline-flex w-[72px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${priorityBadgeClass(String(ticket.priority))}`}>{PRIORITY_LEVEL_LABELS[String(ticket.priority)] ?? 'Medium'}</span>
-          <span className={`inline-flex w-[120px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${meta.cls}`}>{meta.label}</span>
+          <span className={`inline-flex w-[120px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${closeout ? closeoutBadge : meta.cls}`}>{closeout ? 'Close-out' : meta.label}</span>
         </div>
         <p className="mt-1.5 truncate text-sm text-[var(--text-muted)]">{ticket.supplierAssigned ? 'Supplier assigned' : 'No supplier assigned'}</p>
       </div>
@@ -198,7 +200,9 @@ function QueueRow({ ticket, nowMs, suppliers, motivSuppliers }: { ticket: Region
             awaitingById={ticket.engagedSupplierIds} declinedSupplierIds={ticket.declinedSupplierIds}
             trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}>Assign supplier</button>} />
         ) : closeout ? (
-          <Link href={ticketUrl} className={closeoutCls}>Close-out <ArrowRight size={15} /></Link>
+          ticket.voNoneConfirmed
+            ? <Link href={ticketUrl} className={closeoutCls}>Close-out <ArrowRight size={15} /></Link>
+            : <span className={`${closeoutCls} opacity-50 pointer-events-none`} aria-disabled="true">Close-out</span>
         ) : (
           <Link href={ticketUrl} className={ctaCls}>View Ticket <ArrowRight size={15} /></Link>
         )}

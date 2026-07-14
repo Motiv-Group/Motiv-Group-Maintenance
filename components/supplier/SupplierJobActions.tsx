@@ -321,11 +321,12 @@ export function SupplierVariationGate({ ticketId, priority, createdAt, variation
       {/* Primary = confirm no further VOs (ready for close-out); raising a VO lives
           under "More" like the other action blocks. */}
       <div className="flex items-center gap-2">
-        <button onClick={confirmNoVos} disabled={busy} className="flex-1 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition disabled:opacity-50">{busy ? 'Confirming…' : 'No further variation orders — ready for close-out'}</button>
-        <MoreMenu>
+        <button onClick={confirmNoVos} disabled={busy} className="flex-1 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition disabled:opacity-50">{busy ? 'Confirming…' : 'Ready for Close-out'}</button>
+        <MoreMenu up>
           <MoreActionItem icon={<Plus size={16} />} label={raiseLabel} onClick={() => setVoOpen(true)} />
         </MoreMenu>
       </div>
+      <p className="text-[11px] text-[var(--text-faint)]">To raise a variation order, tap <span className="font-semibold text-[var(--text-muted)]">More → Raise VO</span>.</p>
       {voOpen && (
         <Modal onClose={() => setVoOpen(false)} maxWidth="max-w-2xl">
           {close => <div><SendQuoteForm ticketId={ticketId} variant="variation" competitive priority={priority} createdAt={createdAt} defaultOpen onClose={close} /></div>}

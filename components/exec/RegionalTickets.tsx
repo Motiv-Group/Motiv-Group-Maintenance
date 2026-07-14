@@ -146,11 +146,11 @@ function FilterSelect<T extends string>({ label, value, onChange, options }: { l
 }
 
 // ── One store's expanded ticket table ───────────────────────────
-const COLS = 'grid-cols-[minmax(120px,1.1fr)_minmax(90px,0.8fr)_120px_86px_minmax(120px,1fr)_130px_minmax(120px,0.9fr)_24px]'
+const COLS = 'grid-cols-[1.3fr_1fr_1fr_0.8fr_1.5fr_1.1fr_1.2fr_0.3fr]'
 function TicketTable({ rows, nowMs }: { rows: RegionalTicketRow[]; nowMs: number }) {
   return (
     <div className="overflow-x-auto">
-      <div className="min-w-[860px]">
+      <div className="min-w-[920px]">
         <div className={`grid ${COLS} gap-3 border-b border-[var(--border)] px-2 py-2 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-faint)]`}>
           <span>Ticket ID</span><span>Category</span><span>Status</span><span>Priority</span><span>Next action</span><span>SLA status</span><span>Updated</span><span />
         </div>
@@ -181,7 +181,7 @@ function TicketTable({ rows, nowMs }: { rows: RegionalTicketRow[]; nowMs: number
 export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
   const [q, setQ] = useState('')
   const [intent, setIntent] = useState<Intent | null>(null)
-  const [status, setStatus] = useState<'active' | 'all' | 'completed' | Bucket>('active')
+  const [status, setStatus] = useState<'active' | 'all' | 'completed' | Bucket>('all')
   const [priority, setPriority] = useState<'all' | '0' | '1' | '2' | '3'>('all')
   const [store, setStore] = useState<string>('all')
   const [sort, setSort] = useState<'urgent' | 'newest' | 'oldest' | 'sla'>('urgent')
