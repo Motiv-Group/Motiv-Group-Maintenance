@@ -39,7 +39,7 @@ export function CustomizationClient({ initial }: { initial: AppSettings }) {
       <ColoursSection initialColors={initial.colors} initialButtonColor={initial.authButtonColor} appName={initial.appName} symbolSrc={symbolSrc} />
       <LoginBackgroundsSection initialUrls={initial.authBgUrls} />
       <SupportSection initialEmail={initial.supportEmail} initialPhone={initial.supportPhone} />
-      <EmailsSection initialEmails={initial.emails} />
+      <EmailsSection initialEmails={initial.emails} branding={initial.branding} />
       <AppearanceSection initialTheme={initial.defaultTheme} />
     </div>
   )

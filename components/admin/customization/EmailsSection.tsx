@@ -7,9 +7,9 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Mail } from 'lucide-react'
-import type { AppSettings, EmailCopy, EmailCopyField, EmailKey, EmailOverrides } from '@/lib/settings'
+import type { AppSettings, BrandingState, EmailCopy, EmailCopyField, EmailKey, EmailOverrides } from '@/lib/settings'
 import { EMAIL_COPY_FIELDS, EMAIL_KEYS } from '@/lib/settings'
-import { EMAIL_DEFS, SAMPLE_VARS, resolveCopy } from '@/lib/emails/defaults'
+import { EMAIL_DEFS, SAMPLE_VARS, emailLogoHeader, resolveCopy, type EmailLogo } from '@/lib/emails/defaults'
 import { renderBrandedEmail, renderStoreWelcome, renderSupplierAdded } from '@/lib/email'
 import { Field, SaveRow, Section, inputCls, postJson, useAsyncSave } from './shared'
 
@@ -46,28 +46,28 @@ const SAMPLE_LINK = '/auth/confirm?t=sample'
 const SAMPLE_LOGIN = '/auth/login'
 const SAMPLE_MESSAGE = 'Looking forward to working with you — please confirm your details when you get a chance.'
 
-function renderPreviewHtml(key: EmailKey, draft: EmailCopy, base: string): string {
+function renderPreviewHtml(key: EmailKey, draft: EmailCopy, base: string, logo: EmailLogo): string {
   const copy = resolveCopy(key, draft, SAMPLE_VARS[key])
   const link = `${base}${SAMPLE_LINK}`
   const loginUrl = `${base}${SAMPLE_LOGIN}`
   switch (key) {
     case 'store_welcome':
-      return renderStoreWelcome(copy, { email: 'thabo@picknpay.co.za', password: 'Xk7m-Rp2q', loginUrl }).html
+      return renderStoreWelcome(copy, { logo, email: 'thabo@picknpay.co.za', password: 'Xk7m-Rp2q', loginUrl }).html
     case 'supplier_added':
-      return renderSupplierAdded(copy, { loginUrl }).html
+      return renderSupplierAdded(copy, { logo, loginUrl }).html
     case 'supplier_invite':
       return renderBrandedEmail(copy, {
-        base,
+        logo,
         link,
         note: SAMPLE_MESSAGE,
         noteLabel: `Message from ${SAMPLE_VARS.supplier_invite.inviter}`,
       }).html
     default:
-      return renderBrandedEmail(copy, { base, link }).html
+      return renderBrandedEmail(copy, { logo, link }).html
   }
 }
 
-export function EmailsSection({ initialEmails }: { initialEmails: EmailOverrides }) {
+export function EmailsSection({ initialEmails, branding }: { initialEmails: EmailOverrides; branding: Pick<BrandingState, 'files' | 'dims'> }) {
   const router = useRouter()
   const [sel, setSel] = useState<EmailKey>('role_invite')
   const [draft, setDraft] = useState<Draft>(() => initDraft(initialEmails))
@@ -85,7 +85,10 @@ export function EmailsSection({ initialEmails }: { initialEmails: EmailOverrides
   const dirty = EMAIL_COPY_FIELDS.some((f) => cur[f] !== saved[sel][f])
   const hasOverride = EMAIL_COPY_FIELDS.some((f) => saved[sel][f].trim() !== '')
 
-  const previewHtml = useMemo(() => renderPreviewHtml(sel, cur, origin), [sel, cur, origin])
+  // Header logo for the preview — the admin's custom upload (absolute storage URL)
+  // or the built-in files resolved against this origin.
+  const logo = useMemo(() => emailLogoHeader(branding, origin), [branding, origin])
+  const previewHtml = useMemo(() => renderPreviewHtml(sel, cur, origin, logo), [sel, cur, origin, logo])
 
   function setField(f: EmailCopyField, value: string) {
     setDraft((d) => ({ ...d, [sel]: { ...d[sel], [f]: value } }))

@@ -11,8 +11,34 @@
 // supports. The `defaults` reproduce the app's current hardcoded wording so
 // nothing changes visually until an admin overrides a field.
 
-import { EMAIL_COPY_FIELDS } from '@/lib/settings'
-import type { EmailCopy, EmailCopyField, EmailKey } from '@/lib/settings'
+import { DEFAULT_BRAND_ASSETS, EMAIL_COPY_FIELDS } from '@/lib/settings'
+import type { BrandingState, EmailCopy, EmailCopyField, EmailKey } from '@/lib/settings'
+
+// ── Email header logo ────────────────────────────────────────────────────────
+// The invite emails render the brand logo in their header. It must use ABSOLUTE
+// URLs (email clients / the preview iframe can't resolve app-relative paths) and
+// prefer the admin's CUSTOM uploaded logo (a Supabase storage URL) over the
+// built-in files. Sizes are aspect-correct so a custom logo never stretches.
+export interface EmailLogo {
+  symbolUrl: string; symbolW: number; symbolH: number
+  wordmarkUrl: string; wordmarkW: number; wordmarkH: number
+}
+
+/** Resolve the email header logo from branding. `base` = absolute origin for the
+ *  built-in fallback (e.g. https://…  or, in the preview, window.location.origin). */
+export function emailLogoHeader(branding: Pick<BrandingState, 'files' | 'dims'>, base: string): EmailLogo {
+  const symH = 30, wordH = 20
+  const symDim = branding.dims['symbol.png']
+  const wordDim = branding.dims['wordmark.png']
+  const symAspect = symDim && symDim.h > 0 ? symDim.w / symDim.h : DEFAULT_BRAND_ASSETS.symbolAspect
+  const wordAspect = wordDim && wordDim.h > 0 ? wordDim.w / wordDim.h : DEFAULT_BRAND_ASSETS.wordmarkAspect
+  return {
+    symbolUrl: branding.files['symbol.png'] || `${base}${DEFAULT_BRAND_ASSETS.symbolUrl}`,
+    symbolH: symH, symbolW: Math.round(symH * symAspect),
+    wordmarkUrl: branding.files['wordmark.png'] || `${base}${DEFAULT_BRAND_ASSETS.wordmarkUrl}`,
+    wordmarkH: wordH, wordmarkW: Math.round(wordH * wordAspect),
+  }
+}
 
 export interface EmailDef {
   key: EmailKey
@@ -31,7 +57,6 @@ export interface EmailDef {
 }
 
 const ALL_FIELDS: EmailCopyField[] = ['subject', 'heading', 'lead', 'sub', 'ctaLabel', 'footerNote']
-const NO_SUB_FIELDS: EmailCopyField[] = ['subject', 'heading', 'lead', 'ctaLabel', 'footerNote']
 
 export const EMAIL_DEFS: Record<EmailKey, EmailDef> = {
   role_invite: {
@@ -90,13 +115,13 @@ export const EMAIL_DEFS: Record<EmailKey, EmailDef> = {
     description:
       'Sent to a store manager when their account is created for them. Includes their login email and password in a fixed block.',
     placeholders: ['{name}', '{inviter}', '{company}', '{store}'],
-    fields: NO_SUB_FIELDS,
+    fields: ALL_FIELDS,
     hasCredentials: true,
     defaults: {
       subject: "You've been added to Motiv — {company} ({store})",
       heading: 'Welcome to Motiv',
-      lead: '{inviter} has created a Motiv account for {company} — {store}. Use the details below to log in.',
-      sub: '',
+      lead: '{inviter} has created a Motiv account for {company} — {store}.',
+      sub: 'Use the login details below to sign in.',
       ctaLabel: 'Log in to Motiv',
       footerNote: 'Please change your password after your first login (Settings → Profile).',
     },
@@ -107,14 +132,14 @@ export const EMAIL_DEFS: Record<EmailKey, EmailDef> = {
     description:
       'Sent to a supplier who already has a Motiv account when a company adds them as one of their suppliers — no setup needed, just a heads-up.',
     placeholders: ['{inviter}', '{company}'],
-    fields: NO_SUB_FIELDS,
+    fields: ALL_FIELDS,
     defaults: {
       subject: "You've been added as a supplier on Motiv",
       heading: "You've been added as a supplier",
-      lead: "{inviter} has added {company} as one of their suppliers on Motiv. You already have a Motiv account, so there's nothing to set up — just log in to see any work they send your way.",
-      sub: '',
+      lead: '{inviter} has added {company} as one of their suppliers on Motiv.',
+      sub: "You already have a Motiv account — just log in to see any work they send your way.",
       ctaLabel: 'Log in to Motiv',
-      footerNote: "If the button doesn't work, use the login link above.",
+      footerNote: "You're receiving this because your email is registered on Motiv.",
     },
   },
 }

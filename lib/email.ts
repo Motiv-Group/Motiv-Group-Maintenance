@@ -8,6 +8,7 @@
 // overrides happens in lib/emails/server.ts.
 
 import type { EmailCopy } from '@/lib/settings'
+import type { EmailLogo } from '@/lib/emails/defaults'
 
 interface SendEmailArgs {
   to:      string
@@ -52,8 +53,10 @@ export function escapeHtml(s: string): string {
 // Optional `note` renders a quoted personal-message block (blue rule) above the
 // CTA — used to carry the inviter's own words. `note` is plain text; escape it here.
 export function motivBrandedEmailHtml(o: {
-  base: string; heading: string; lead: string; sub?: string; ctaLabel: string; link: string; footerNote: string
+  logo: EmailLogo; heading: string; lead: string; sub?: string; ctaLabel: string; link: string; footerNote: string
   note?: string; noteLabel?: string
+  /** Optional login credentials box (store-manager welcome). */
+  credentials?: { email: string; password: string }
 }): string {
   const noteBlock = o.note && o.note.trim()
     ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;"><tr><td style="border-left:3px solid #2563eb;background:#f8fafc;border-radius:0 8px 8px 0;padding:12px 16px;">
@@ -61,18 +64,26 @@ export function motivBrandedEmailHtml(o: {
             <p style="margin:0;font-size:14px;line-height:1.6;color:#374151;white-space:pre-line;">${escapeHtml(o.note.trim())}</p>
           </td></tr></table>`
     : ''
+  const credsBlock = o.credentials
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;"><tr><td style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:16px 18px;">
+            <p style="margin:0 0 10px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#94a3b8;">Your login details</p>
+            <p style="margin:0 0 8px;font-size:14px;line-height:1.5;color:#374151;"><strong style="color:#0d1f2d;">Email:</strong> ${escapeHtml(o.credentials.email)}</p>
+            <p style="margin:0;font-size:14px;line-height:1.5;color:#374151;"><strong style="color:#0d1f2d;">Password:</strong> <span style="font-family:Menlo,Consolas,monospace;">${escapeHtml(o.credentials.password)}</span></p>
+          </td></tr></table>`
+    : ''
   return `<div style="margin:0;padding:0;background:#f3f4f6;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:32px 12px;font-family:Arial,Helvetica,sans-serif;">
     <tr><td align="center">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e5e7eb;">
         <tr><td style="background:#0d1f2d;padding:20px 32px;">
-          <img src="${o.base}/brand/motiv-symbol.png" alt="" width="45" height="30" style="display:inline-block;vertical-align:bottom;border:0;height:30px;width:45px;" />
-          <img src="${o.base}/brand/motiv-wordmark.png" alt="MOTIV" width="93" height="20" style="display:inline-block;vertical-align:bottom;border:0;height:20px;width:93px;margin-left:9px;" />
+          <img src="${o.logo.symbolUrl}" alt="" width="${o.logo.symbolW}" height="${o.logo.symbolH}" style="display:inline-block;vertical-align:bottom;border:0;height:${o.logo.symbolH}px;width:${o.logo.symbolW}px;" />
+          <img src="${o.logo.wordmarkUrl}" alt="MOTIV" width="${o.logo.wordmarkW}" height="${o.logo.wordmarkH}" style="display:inline-block;vertical-align:bottom;border:0;height:${o.logo.wordmarkH}px;width:${o.logo.wordmarkW}px;margin-left:9px;" />
         </td></tr>
         <tr><td style="padding:32px;color:#1f2937;">
           <h1 style="margin:0 0 12px;font-size:20px;font-weight:700;color:#0d1f2d;">${o.heading}</h1>
           <p style="margin:0 0 ${o.sub ? '6px' : '24px'};font-size:15px;line-height:1.6;color:#374151;">${o.lead}</p>
           ${o.sub ? `<p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#374151;">${o.sub}</p>` : ''}
+          ${credsBlock}
           ${noteBlock}
           <table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="border-radius:10px;background:#2563eb;">
             <a href="${o.link}" style="display:inline-block;padding:13px 28px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:10px;">${o.ctaLabel}</a>
@@ -98,13 +109,18 @@ export function motivBrandedEmailHtml(o: {
 // the saved overrides + defaults to these; the admin preview calls them directly.
 
 /** Plain-text sibling of a branded (link + CTA) email. */
-function brandedText(copy: EmailCopy, link: string, note?: string): string {
+function brandedText(
+  copy: EmailCopy,
+  link: string,
+  o?: { note?: string; credentials?: { email: string; password: string } },
+): string {
   return [
     copy.heading,
     '',
     copy.lead,
     ...(copy.sub ? ['', copy.sub] : []),
-    ...(note && note.trim() ? ['', note.trim()] : []),
+    ...(o?.credentials ? ['', `Email:    ${o.credentials.email}`, `Password: ${o.credentials.password}`] : []),
+    ...(o?.note && o.note.trim() ? ['', o.note.trim()] : []),
     '',
     `${copy.ctaLabel}: ${link}`,
     '',
@@ -113,16 +129,17 @@ function brandedText(copy: EmailCopy, link: string, note?: string): string {
 }
 
 /**
- * Branded template email (navy header, blue CTA, copy-paste link) — used by the
- * role invite, supplier invite and password-reset emails. `note` renders the
- * optional quoted personal-message block above the CTA.
+ * The branded template email (logo header, blue CTA, copy-paste link) — the
+ * single renderer behind EVERY transactional email so they all share one
+ * professional layout. `note` renders the optional quoted personal-message block;
+ * `credentials` renders the locked login-details box (store-manager welcome).
  */
 export function renderBrandedEmail(
   copy: EmailCopy,
-  o: { base: string; link: string; note?: string; noteLabel?: string },
+  o: { logo: EmailLogo; link: string; note?: string; noteLabel?: string; credentials?: { email: string; password: string } },
 ): { subject: string; html: string; text: string } {
   const html = motivBrandedEmailHtml({
-    base: o.base,
+    logo: o.logo,
     heading: copy.heading,
     lead: copy.lead,
     sub: copy.sub || undefined,
@@ -131,79 +148,30 @@ export function renderBrandedEmail(
     footerNote: copy.footerNote,
     note: o.note,
     noteLabel: o.noteLabel,
+    credentials: o.credentials,
   })
-  return { subject: copy.subject, html, text: brandedText(copy, o.link, o.note) }
+  return { subject: copy.subject, html, text: brandedText(copy, o.link, { note: o.note, credentials: o.credentials }) }
 }
 
 /**
- * Store-manager welcome email — inline template with a FIXED credentials block
- * (login email + password) and login button. Only heading/lead/ctaLabel/
- * footerNote come from copy; the credentials box structure stays locked.
+ * Store-manager welcome — the branded template with a FIXED login-credentials
+ * box and the login button. Copy (heading/lead/sub/ctaLabel/footerNote) is
+ * editable; the credentials block structure stays locked.
  */
 export function renderStoreWelcome(
   copy: EmailCopy,
-  o: { email: string; password: string; loginUrl: string },
+  o: { logo: EmailLogo; email: string; password: string; loginUrl: string },
 ): { subject: string; html: string; text: string } {
-  const html = `
-  <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:480px;margin:0 auto;color:#0f172a">
-    <h2 style="color:#1e293b;margin:0 0 12px">${copy.heading}</h2>
-    <p style="margin:0 0 16px">${copy.lead}</p>
-    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin:0 0 16px">
-      <p style="margin:0 0 8px"><strong>Email:</strong> ${escapeHtml(o.email)}</p>
-      <p style="margin:0"><strong>Password:</strong> ${escapeHtml(o.password)}</p>
-    </div>
-    <p style="margin:0 0 20px">
-      <a href="${o.loginUrl}" style="display:inline-block;background:#1e293b;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-weight:600">${copy.ctaLabel}</a>
-    </p>
-    <p style="margin:0;color:#64748b;font-size:13px">${copy.footerNote}</p>
-  </div>`
-
-  const text = [
-    copy.heading,
-    '',
-    copy.lead,
-    '',
-    `Log in here: ${o.loginUrl}`,
-    `Email:    ${o.email}`,
-    `Password: ${o.password}`,
-    '',
-    copy.footerNote,
-    '',
-    '— Motiv',
-  ].join('\n')
-
-  return { subject: copy.subject, html, text }
+  return renderBrandedEmail(copy, { logo: o.logo, link: o.loginUrl, credentials: { email: o.email, password: o.password } })
 }
 
 /**
- * "You've been added as a supplier" notice — inline template for a supplier who
- * already has an account. Only heading/lead/ctaLabel/footerNote come from copy.
+ * "You've been added as a supplier" notice for a supplier who already has an
+ * account — the same branded template, login button, no credentials.
  */
 export function renderSupplierAdded(
   copy: EmailCopy,
-  o: { loginUrl: string },
+  o: { logo: EmailLogo; loginUrl: string },
 ): { subject: string; html: string; text: string } {
-  const html = `
-  <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:480px;margin:0 auto;color:#0f172a">
-    <h2 style="color:#1e293b;margin:0 0 12px">${copy.heading}</h2>
-    <p style="margin:0 0 16px">${copy.lead}</p>
-    <p style="margin:0 0 20px">
-      <a href="${o.loginUrl}" style="display:inline-block;background:#1e293b;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-weight:600">${copy.ctaLabel}</a>
-    </p>
-    <p style="margin:0;color:#64748b;font-size:12px">${copy.footerNote}</p>
-  </div>`
-
-  const text = [
-    copy.heading,
-    '',
-    copy.lead,
-    '',
-    `Log in here: ${o.loginUrl}`,
-    '',
-    copy.footerNote,
-    '',
-    '— Motiv',
-  ].join('\n')
-
-  return { subject: copy.subject, html, text }
+  return renderBrandedEmail(copy, { logo: o.logo, link: o.loginUrl })
 }
