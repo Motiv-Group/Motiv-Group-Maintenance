@@ -75,7 +75,7 @@ export default async function SentryAdminPage() {
               <Bug size={15} className="text-red-500" /> Unresolved issues
               <InfoTip title="Issues">The open bug backlog from real users, most-recent first. Count = how many times it fired; users = how many distinct people hit it. Click through to Sentry for the full stack trace.</InfoTip>
             </h2>
-            <div className="overflow-x-auto -mx-1">
+            <div className="hidden sm:block overflow-x-auto -mx-1">
               <table className="w-full text-sm min-w-[560px]">
                 <thead>
                   <tr className="text-left text-[11px] text-[var(--text-faint)] border-b border-[var(--border)]">
@@ -106,6 +106,28 @@ export default async function SentryAdminPage() {
                   {!d.unresolved.length && <tr><td colSpan={5} className="py-6 text-center"><span className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400"><CheckCircle2 size={15} /> No unresolved issues — all clear.</span></td></tr>}
                 </tbody>
               </table>
+            </div>
+
+            <div className="sm:hidden space-y-2">
+              {d.unresolved.map((i: SentryIssue) => (
+                <div key={i.id} className="rounded-xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      {i.permalink
+                        ? <a href={i.permalink} target="_blank" rel="noopener noreferrer" className="font-bold text-[var(--text)] hover:text-blue-600 dark:hover:text-blue-400 transition-colors block truncate">{i.title}</a>
+                        : <span className="font-bold text-[var(--text)] block truncate">{i.title}</span>}
+                      {i.culprit && <span className="block text-[11px] text-[var(--text-faint)] font-mono truncate">{i.culprit}</span>}
+                    </div>
+                    <span className={`shrink-0 inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full ring-1 ${LEVEL_CLS[i.level ?? ''] ?? 'ring-slate-400/30 text-[var(--text-muted)]'}`}>{i.level ?? '—'}</span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-[var(--text-muted)]">
+                    <span>Events <span className="tabular-nums text-[var(--text)]">{formatNumber(i.count == null ? null : Number(i.count))}</span></span>
+                    <span>Users <span className="tabular-nums text-[var(--text)]">{formatNumber(i.userCount)}</span></span>
+                    <span>Last seen <span className="text-[var(--text)]">{ago(i.lastSeen)}</span></span>
+                  </div>
+                </div>
+              ))}
+              {!d.unresolved.length && <div className="py-6 text-center"><span className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400"><CheckCircle2 size={15} /> No unresolved issues — all clear.</span></div>}
             </div>
           </Card>
 

@@ -6,8 +6,8 @@
 // and a "Review & sign off" action.
 import { useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { ClipboardCheck, Clock, CheckCircle2, ChevronDown, ChevronRight, ChevronLeft, Search, Store, X, Image as ImageIcon, FileText, HelpCircle, Calendar, Truck } from 'lucide-react'
-import { Card } from '@/components/exec/ui'
+import { ClipboardCheck, Clock, CheckCircle2, ChevronDown, ChevronRight, ChevronLeft, Store, X, Image as ImageIcon, FileText, HelpCircle, Calendar, Truck } from 'lucide-react'
+import { Card, FilterSelect, SearchInput } from '@/components/exec/ui'
 import { CategoryIcon, priorityBadgeClass, priorityLabel } from '@/components/client/ticketBadges'
 import { formatDateTime } from '@/lib/utils'
 
@@ -27,26 +27,14 @@ const prioTicket = (p: string) => ({ priority: p } as unknown as Parameters<type
 
 function StatCard({ icon, tone, value, title, sub, active, onClick }: { icon: ReactNode; tone: string; value: number; title: string; sub: string; active: boolean; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} aria-pressed={active} className={`flex items-center gap-3 rounded-xl border-l-4 bg-[var(--surface)] p-4 text-left ring-1 transition hover:bg-[var(--hover)] ${tone} ${active ? 'ring-2 ring-[#C6A35D]/50' : 'ring-[var(--border)]'}`}>
+    <button type="button" onClick={onClick} aria-pressed={active} className={`flex items-center gap-2.5 rounded-xl bg-[var(--surface)] p-3 text-left ring-1 transition hover:bg-[var(--hover)] sm:gap-3 sm:p-4 ${active ? 'ring-2 ring-blue-500/50' : 'ring-[var(--border)]'}`}>
       <span className="shrink-0">{icon}</span>
       <span className="min-w-0">
-        <span className="block text-2xl font-bold leading-none text-[var(--text)]">{value}</span>
-        <span className="mt-1 block text-sm font-semibold text-[var(--text)]">{title}</span>
-        <span className="block text-[11px] text-[var(--text-muted)]">{sub}</span>
+        <span className="block text-xl font-bold leading-none text-[var(--text)] sm:text-2xl">{value}</span>
+        <span className="mt-1 block text-xs font-semibold text-[var(--text)] sm:text-sm">{title}</span>
+        <span className="hidden text-[11px] text-[var(--text-muted)] sm:block">{sub}</span>
       </span>
     </button>
-  )
-}
-
-function Select<T extends string>({ label, value, onChange, options }: { label: string; value: T; onChange: (v: T) => void; options: { value: T; label: string }[] }) {
-  return (
-    <label className="relative flex min-w-[150px] flex-1 items-center gap-1.5 rounded-xl bg-[var(--input-bg)] px-3 py-2.5 text-sm ring-1 ring-[var(--border)] transition focus-within:ring-[#C6A35D]/40 sm:flex-none">
-      <span className="whitespace-nowrap text-[11px] uppercase tracking-wide text-[var(--text-faint)]">{label}</span>
-      <select value={value} onChange={e => onChange(e.target.value as T)} className="w-full cursor-pointer appearance-none bg-transparent pr-4 font-semibold text-[var(--text)] outline-none">
-        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
-      <ChevronDown size={14} className="pointer-events-none absolute right-2.5 text-[var(--text-faint)]" />
-    </label>
   )
 }
 
@@ -110,27 +98,28 @@ export function RegionalSignoff({ signoffs }: { signoffs: RegionalSignoffRow[] }
         </Card>
       )}
 
-      {/* Stat cards */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <StatCard icon={<span className="grid h-11 w-11 place-items-center rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400"><Clock size={20} /></span>} tone="border-blue-500" value={stats.review} title="Awaiting review" sub="Action required" active={statusF === 'review'} onClick={() => { setStatusF(f => f === 'review' ? 'all' : 'review'); setPage(1) }} />
-        <StatCard icon={<span className="grid h-11 w-11 place-items-center rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400"><CheckCircle2 size={20} /></span>} tone="border-amber-500" value={stats.evidence} title="Evidence pending" sub="Awaiting the supplier" active={statusF === 'evidence'} onClick={() => { setStatusF(f => f === 'evidence' ? 'all' : 'evidence'); setPage(1) }} />
-        <StatCard icon={<span className="grid h-11 w-11 place-items-center rounded-full bg-[var(--surface-2)] text-[var(--text-muted)]"><ClipboardCheck size={20} /></span>} tone="border-[var(--border)]" value={stats.total} title="In sign-off" sub="Total open" active={statusF === 'all'} onClick={() => { setStatusF('all'); setPage(1) }} />
+      {/* Stat cards — compact 3-up on phones. */}
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-2 sm:gap-3 lg:grid-cols-3">
+        <StatCard icon={<span className="grid h-9 w-9 place-items-center rounded-full sm:h-11 sm:w-11 bg-blue-500/15 text-blue-600 dark:text-blue-400"><Clock size={20} /></span>} tone="border-blue-500" value={stats.review} title="Awaiting review" sub="Action required" active={statusF === 'review'} onClick={() => { setStatusF(f => f === 'review' ? 'all' : 'review'); setPage(1) }} />
+        <StatCard icon={<span className="grid h-9 w-9 place-items-center rounded-full sm:h-11 sm:w-11 bg-amber-500/15 text-amber-600 dark:text-amber-400"><CheckCircle2 size={20} /></span>} tone="border-amber-500" value={stats.evidence} title="Evidence pending" sub="Awaiting the supplier" active={statusF === 'evidence'} onClick={() => { setStatusF(f => f === 'evidence' ? 'all' : 'evidence'); setPage(1) }} />
+        <StatCard icon={<span className="grid h-9 w-9 place-items-center rounded-full sm:h-11 sm:w-11 bg-[var(--surface-2)] text-[var(--text-muted)]"><ClipboardCheck size={20} /></span>} tone="border-[var(--border)]" value={stats.total} title="In sign-off" sub="Total open" active={statusF === 'all'} onClick={() => { setStatusF('all'); setPage(1) }} />
       </div>
 
-      {/* Filter bar */}
+      {/* Filter bar — matches the Tickets tab: full-width search + a horizontally-
+          swipeable pill strip on phones (sm:contents dissolves it so desktop keeps
+          the flex-wrap row). Clear sits outside the strip like Tickets' Filters btn. */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[220px] flex-1">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
-          <input value={q} onChange={e => { setQ(e.target.value); setPage(1) }} placeholder="Search by store, supplier, ticket ID or category…" className="w-full rounded-xl bg-[var(--input-bg)] py-2.5 pl-9 pr-3 text-sm text-[var(--text)] ring-1 ring-[var(--border)] outline-none placeholder-[var(--text-faint)] focus:ring-[#C6A35D]/40" />
+        <SearchInput value={q} onChange={v => { setQ(v); setPage(1) }} placeholder="Search by store, supplier, ticket ID or category…" />
+        <div className="flex w-full flex-nowrap items-center gap-2 overflow-x-auto pb-0.5 sm:contents">
+        <FilterSelect label="Store" value={store} onChange={v => { setStore(v); setPage(1) }} options={[{ value: 'all', label: 'All stores' }, ...storeNames.map(s => ({ value: s, label: s }))]} />
+        <FilterSelect label="Status" value={statusF} onChange={v => { setStatusF(v); setPage(1) }} options={[{ value: 'all', label: 'All statuses' }, { value: 'review', label: 'Awaiting review' }, { value: 'evidence', label: 'Evidence pending' }]} />
+        <FilterSelect label="Sort by" value={sort} onChange={setSort} options={[{ value: 'newest', label: 'Newest first' }, { value: 'oldest', label: 'Oldest first' }]} />
         </div>
-        <Select label="Store" value={store} onChange={v => { setStore(v); setPage(1) }} options={[{ value: 'all', label: 'All stores' }, ...storeNames.map(s => ({ value: s, label: s }))]} />
-        <Select label="Status" value={statusF} onChange={v => { setStatusF(v); setPage(1) }} options={[{ value: 'all', label: 'All statuses' }, { value: 'review', label: 'Awaiting review' }, { value: 'evidence', label: 'Evidence pending' }]} />
-        <Select label="Sort by" value={sort} onChange={setSort} options={[{ value: 'newest', label: 'Newest first' }, { value: 'oldest', label: 'Oldest first' }]} />
-        <button type="button" onClick={clear} className="flex items-center gap-1.5 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)]"><X size={15} /> Clear filters</button>
+        <button type="button" onClick={clear} className="flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)]"><X size={15} /> Clear filters</button>
       </div>
 
       {!groups.length && (
-        <div className="rounded-xl border border-dashed border-[var(--border)] p-12 text-center">
+        <div className="rounded-xl border border-dashed border-[var(--border)] p-8 text-center sm:p-12">
           <ClipboardCheck size={28} className="mx-auto mb-2 text-[var(--text-faint)]" />
           <p className="text-sm text-[var(--text-faint)]">{signoffs.length ? 'No submissions match your filters.' : 'Nothing awaiting your sign-off.'}</p>
         </div>
@@ -145,9 +134,10 @@ export function RegionalSignoff({ signoffs }: { signoffs: RegionalSignoffRow[] }
               <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[var(--surface-2)] text-[var(--text-muted)]"><Store size={17} /></span>
               <span className="flex min-w-0 flex-1 items-center gap-2">
                 <span className="truncate text-base font-bold text-[var(--text)]">{storeName}</span>
-                {g.branchCode && <span className="shrink-0 text-sm text-[var(--text-muted)]">· {g.branchCode}</span>}
+                {g.branchCode && <span className="hidden shrink-0 text-sm text-[var(--text-muted)] sm:inline">· {g.branchCode}</span>}
               </span>
-              <span className="shrink-0 text-sm text-[var(--text-muted)]">{g.rows.length} job{g.rows.length === 1 ? '' : 's'}</span>
+              {/* Mobile: number-only count to protect the store name's width. */}
+              <span className="shrink-0 text-sm text-[var(--text-muted)]">{g.rows.length}<span className="hidden sm:inline"> job{g.rows.length === 1 ? '' : 's'}</span></span>
               <ChevronDown size={18} className={`shrink-0 text-[var(--text-muted)] transition-transform ${open ? 'rotate-180' : ''}`} />
             </div>
             {open && (
@@ -156,12 +146,12 @@ export function RegionalSignoff({ signoffs }: { signoffs: RegionalSignoffRow[] }
                   const p = phaseOf(s)
                   const meta = PHASE_META[p]
                   return (
-                    <div key={s.id} className={`block border-b border-l-4 border-[var(--border)] px-4 py-4 last:border-b-0 ${p === 'evidence' ? 'border-l-amber-500' : 'border-l-blue-500'}`}>
+                    <div key={s.id} className="block border-b border-[var(--border)] px-4 py-4 last:border-b-0">
                       <div className={ROW}>
                         <div className="flex min-w-0 items-start gap-3">
-                          <CategoryIcon category={s.category ?? s.title} priority={s.priority} className="h-11 w-11" iconSize={18} />
+                          <CategoryIcon category={s.category ?? s.title} priority={s.priority} className="h-9 w-9 sm:h-11 sm:w-11" iconSize={18} />
                           <div className="min-w-0">
-                            <p className="truncate text-sm font-bold text-[var(--text)]">{s.category || s.title}</p>
+                            <p className="line-clamp-2 text-sm font-bold text-[var(--text)] lg:line-clamp-1">{s.category || s.title}</p>
                             {s.jobRef && <p className="truncate text-[11px] text-[var(--text-faint)]">Ticket {s.jobRef}</p>}
                             {s.supplier && <p className="flex items-center gap-1 truncate text-[11px] text-[var(--text-muted)]"><Truck size={11} className="shrink-0" /> {s.supplier}</p>}
                             <div className="mt-1.5 flex flex-wrap gap-1.5">
@@ -176,7 +166,9 @@ export function RegionalSignoff({ signoffs }: { signoffs: RegionalSignoffRow[] }
                           <p className="flex items-center gap-1.5 text-sm text-[var(--text-muted)]"><ImageIcon size={13} className="shrink-0 text-[var(--text-faint)]" /> {s.photoCount} photo{s.photoCount === 1 ? '' : 's'}</p>
                           <p className="flex items-center gap-1.5 text-sm text-[var(--text-muted)]"><FileText size={13} className="shrink-0 text-[var(--text-faint)]" /> {s.certCount} certificate{s.certCount === 1 ? '' : 's'}</p>
                         </div>
-                        <div className="min-w-0">
+                        {/* Boilerplate next-step copy is lg+ (its own grid column) —
+                            on phones the phase badge already carries the state. */}
+                        <div className="hidden min-w-0 lg:block">
                           <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-faint)]">Next step</p>
                           <p className="text-sm text-[var(--text)]">{p === 'evidence' ? 'Awaiting the supplier to add the requested evidence.' : 'Review the COC & POC and approve, request evidence, or snag.'}</p>
                         </div>

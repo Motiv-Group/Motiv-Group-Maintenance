@@ -52,7 +52,7 @@ export function ContextSwitcher({ options, activeId, cookieName, Icon }: {
               <button key={o.id} type="button" role="option" aria-selected={o.id === active?.id} onClick={() => pick(o.id)}
                 className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm text-gray-200 transition hover:bg-white/[0.08]">
                 <span className="truncate">{o.label}</span>
-                {o.id === active?.id && <Check size={14} className="shrink-0 text-[#C6A35D]" />}
+                {o.id === active?.id && <Check size={14} className="shrink-0 text-blue-500" />}
               </button>
             ))}
           </div>

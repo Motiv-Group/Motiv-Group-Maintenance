@@ -47,7 +47,7 @@ export function SlaReacceptGate({ signedNameDefault }: { signedNameDefault: stri
     <div className="max-w-xl mx-auto py-8">
       <Card className="p-6 space-y-4">
         <div className="flex items-center gap-2">
-          <FileText className="text-[#C6A35D]" size={22} />
+          <FileText className="text-[#f59e0b]" size={22} />
           <h1 className="text-xl font-bold text-[var(--text)]">Service Level Agreement updated</h1>
         </div>
         <p className="text-sm text-[var(--text-muted)]">

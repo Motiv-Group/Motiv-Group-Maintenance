@@ -1,12 +1,40 @@
 # Path to 9.5 / 10 — production-grade tracker
 
-> **Living doc.** Derived from `docs/Motiv_Production_Readiness_Audit_2026-07-06.pdf` (v1.4).
-> Claude updates this file whenever an item is completed or a new issue is found — check + update it every session.
+> **THE single canonical production-readiness doc.** Merged 2026-07-14 from `PATH_TO_9.5.md` +
+> `GO_LIVE_CHECKLIST.md` + `PRODUCTION_TODO.md` + `PRODUCTION_READINESS.md` (those four are now
+> folded in here; the standalone files were removed). Origin: the 2026-07-06 readiness audit
+> (v1.4, transcribed below — the source PDF was archived out of the repo).
+> **Living doc.** Claude updates this whenever an item is completed or a new issue is found — check + update it every session.
 > 9.5 overall = **every section ≥ 9.0** *plus* independent validation (penetration test + backup-restore drill).
 
 **Overall score:** 7.4 / 10 → target 9.5
-**Last updated:** 2026-07-07
+**Last updated:** 2026-07-14
 **Audit baseline commit:** ff1bdeb (audit) / cdc7dec (same-day fixes)
+
+## Open items to 9.5 — consolidated (start here)
+Launch-blocking **code is largely done** (private buckets + signed URLs, RLS everywhere, signup role-clamp, Next 16 + CSP nonce, rate limiting, zod validation, audit logs, CI + branch protection, typed queries, transition tests). What remains is mostly **not code**. Owner: **You** = owner action · **Code** = Claude · **Both**.
+
+**1 — Launch blockers (before public/commercial):**
+- Buy **Vercel Pro** (~$20/mo, non-commercial license) + **Supabase Pro** (~$25/mo, PITR/backups) — *You* · A5
+- **Legal content** real copy in `/privacy` `/terms` `/sla` + lawyer sign-off — *You* · A3
+- **Decide SLA priority timings** → align `sla_rules` + `FALLBACK_SLA` + `/sla`, bump `SLA_VERSION` — *Both* · A4
+- **Auth dashboard settings**: Site/redirect allowlist, Confirm-email ON, min-pw server-side, CAPTCHA on signup — *You* · see Appendix A
+- Set **`WHATSAPP_APP_SECRET`** once Meta registration lands (webhook fail-closed until then) — *You* · A6
+- **Launch smoke test** (day-of) — *Both* · A8
+
+**2 — Owner infra/ops:** leaked-password (Pro), custom SMTP, uptime + log-drain alerts, enforce SSL + pooler, staging env, backup-restore drill, incident runbook, HSTS-preload submit — *You* · C1–C6, C8, O-items in Appendix A.
+
+**3 — POPIA/legal:** register Information Officer; signup consent checkbox (Code) — C11.
+
+**4 — Open code (Claude can do now):** B19 workflow consolidation (design ready) · B14 UI phase-2 remnants · true schema-drift CI (C9) · **WhatsApp webhook split** (tech-debt) · **RmTicketActions mechanical split** (tech-debt, low value).
+
+**5 — Live verification (coded, confirm on deploy ⏳):** Android WebView on device (B6) · signed-URL render + raw-URL 403 · realtime on `/individual` (B4) · `snags.schedule_agreed_at/declined_at` on live (B20) · CSP violation → Sentry (C7) · zod 400 spot-check (B8) · dispute e2e on Individual ticket (N4) · Individual address shown to supplier (N5).
+
+**6 — Post-launch:** pen test (C12) · usability pass on real phones (C13) · quarterly advisor + `xlsx` check (C10).
+
+**7 — Deferred until paid tier:** hourly SLA cron, WhatsApp dispatch, in-app analytics tabs — see `INFRASTRUCTURE_TIERS.md`.
+
+Detail + status for every lettered/numbered item is in the Phase A/B/C tables below; owner-settings + security posture in **Appendix A/B**.
 
 ## Legend
 | Mark | Meaning |
@@ -114,3 +142,42 @@
 - **2026-07-06 N1** — fixed the production upload outage (all roles). Root cause proven: storage RLS never sees the JWT on this migrated project, so `auth.uid()`/`auth.role()` are null in `storage.objects` policies → every browser upload 403'd. New `POST /api/uploads` route uploads via the service-role client after cookie auth + MIME/size validation, forcing a `<userId>/…` path (also advances B5). `lib/upload.ts` posts to it. Verified end-to-end in preview (login → upload → 200). The applied `auth.uid()` policy migration was folded into schema.sql (correct-in-principle, but not the live write path).
 - **2026-07-06 N1 (sweep)** — migrated **all** remaining direct browser→storage uploads onto the route via shared `uploadFiles`/`uploadOne`: `SubmitCompletionForm` (COC/POC), `VerificationCard` (supplier-docs), `SendQuoteForm` (quote-attachments), `RmTicketActions`, `DisputeBox`, `SupplierAttachments`, `AddInfoForm`. All 7 were still broken after the log-a-job fix; now fixed app-wide. tsc + lint clean.
 - **2026-07-06 B13** — doc drift fixed: `CLAUDE.md` now lists all 6 roles (+`individual`, +`system_admin`) with correct `/individual` + `/admin` routes and a corrected env list; `PRODUCTION_READINESS.md` storage section rewritten (private buckets + signed URLs), rate-limiting marked Upstash-Redis, verify item corrected to 403; stale `/api/files/sign` reference removed from `schema.sql`; `NEXT_PUBLIC_ADMIN_EMAILS` marked deprecated in `.env.example`. Audit MEDIUM 3 closed.
+
+---
+
+## Appendix A — deploy-day + owner settings (merged from GO_LIVE_CHECKLIST + PRODUCTION_READINESS)
+
+### At deploy
+- [ ] After deploy, **smoke-test**: open one ticket's photo gallery + a COC doc + a quote PDF (images render); confirm a raw `…/object/public/…` URL **403s**.
+- [ ] Set Vercel env then redeploy: `WHATSAPP_APP_SECRET` (fail-closed until set; waiting on WhatsApp Business registration). (`NEXT_PUBLIC_SENTRY_DSN`, `UPSTASH_REDIS_*`, `CRON_SECRET` already set — A6.)
+
+### Auth (Supabase → Authentication) — owner
+- [ ] **Site URL** = production URL; **Redirect URLs** = exact allowlist (prod + `http://localhost:3000`), no wildcards.
+- [ ] **Confirm email** ON.
+- [ ] **Leaked-password protection** ON (Supabase **Pro** only) + **min password length ≥ 8 server-side** (app enforces 8 client-side).
+- [ ] **CAPTCHA (hCaptcha/Turnstile)** on signup to throttle account/email abuse.
+- [ ] Custom **SMTP** sender (built-in mailer is rate-limited).
+- [ ] Only the **Email** provider enabled unless others are intended.
+
+### Secrets & keys — owner
+- [ ] `SUPABASE_SERVICE_ROLE_KEY` server-only (never `NEXT_PUBLIC_*`) — bypasses RLS, treat as root.
+- [ ] `CRON_SECRET` set (guards `/api/cron/*`). `NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` if using push. Rotate any keys that ever leaked.
+
+### Database & ops — owner
+- [ ] **PITR / daily backups** (Supabase Pro) before real data lands.
+- [ ] **Enforce SSL** on DB connections; use the connection pooler for app traffic.
+- [ ] Run **Security Advisor** and clear warnings (RLS on all, `search_path` pinned — triaged 2026-07-07).
+- [ ] Log drains / alerts for auth failures and 5xx.
+
+### Supabase advisor — triaged 2026-07-07 (documented so we don't "fix" them into a hole)
+- ✅ Revoked public/authenticated EXECUTE on `append_session_photo` / `handle_new_user` / `assign_store_job_ref`; OTP expiry ≤ 3600s.
+- **Safe by design — leave as-is:** `app_*` SECURITY DEFINER helpers must stay executable (RLS calls them per query; each returns only the caller's own scope). "RLS enabled, no policy" on `whatsapp_sessions`, `store_ticket_counters`, `ticket_disputes`, `ticket_dispute_messages`, `ticket_suppliers`, `daily_briefings`, `ratings`, `technicians` = **deny-all = most secure**; all accessed via service-role. (If the client `ratings` display ever renders empty, add a *precise* scoped read policy for `ratings` only.)
+
+## Appendix B — security posture (configured, for reference)
+
+- **RLS on every table.** Policy-less tables reachable only by the service-role key (deny-by-default to clients). `security definer` functions pinned with `set search_path = public`. Role-scoped read policies per role + owner-scoped read for `individual` standalone tickets.
+- **Storage — private buckets + signed URLs.** All buckets (`ticket-photos`, `completion-docs`, `quote-attachments`, `supplier-docs`, `ticket-docs`) are private; files (incl. COCs, invoices, completion photos) served only via short-lived signed URLs (`lib/storage.ts` `signManyUrls`). Uploads gated to authenticated users, per-bucket MIME allow-lists + 15 MB caps + per-user path prefix + per-user quota. No client-side signing endpoint.
+- **Signup role escalation — closed.** `handle_new_user` clamps any client-supplied role to `individual`; every privileged role is assigned only by a trusted service-role path.
+- **Rate limiting** (`lib/rate-limit.ts`) = Upstash Redis distributed sliding window when configured, graceful in-memory fallback otherwise, Sentry-alerted on fallback. Applied to every write/expensive route.
+- **CSP** enforced with per-request nonce (`proxy.ts`), `strict-dynamic`, no `'unsafe-inline'` in script-src; `report-uri /api/csp-report`.
+- **Source of truth** for the DB is `supabase/schema.sql` (reconstructed from the live prod dump); migrations are ephemeral and folded back in once applied.

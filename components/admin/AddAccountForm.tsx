@@ -7,6 +7,7 @@ import { Card } from '@/components/exec/ui'
 
 export interface CompanyOpt { id: string; name: string }
 export interface RegionOpt { id: string; name: string; companyId: string; code: string }
+export interface ProjectOpt { id: string; name: string; companyId: string }
 
 type SubRole = 'executive' | 'regional_manager' | 'store_manager'
 const NEW = '__new__'
@@ -17,7 +18,7 @@ const NEW = '__new__'
 //  · an existing company        → add an Executive (optional), Regional Manager
 //    or Store Manager under it
 // The company is chosen a single time up top and never repeated per role.
-export function AddAccountForm({ companies, regions }: { companies: CompanyOpt[]; regions: RegionOpt[] }) {
+export function AddAccountForm({ companies, regions, projects = [] }: { companies: CompanyOpt[]; regions: RegionOpt[]; projects?: ProjectOpt[] }) {
   const router = useRouter()
   const [companySel, setCompanySel] = useState('')      // '' | company id | NEW
   const [subRole, setSubRole] = useState<SubRole>('regional_manager')
@@ -41,6 +42,9 @@ export function AddAccountForm({ companies, regions }: { companies: CompanyOpt[]
   const [regionId, setRegionId] = useState('')          // '' | region id | NEW
   const [newRegionName, setNewRegionName] = useState('')
   const [newRegionCode, setNewRegionCode] = useState('')
+  // RM → optional project (changes the invite wording to reference the project)
+  const [projectOn, setProjectOn] = useState(false)
+  const [projectId, setProjectId] = useState('')
   // SM store
   const [storeName, setStoreName] = useState('')
   const [subStore, setSubStore] = useState('')
@@ -53,19 +57,21 @@ export function AddAccountForm({ companies, regions }: { companies: CompanyOpt[]
   const isNew = companySel === NEW
   const isExisting = companySel !== '' && companySel !== NEW
   const companyRegions = useMemo(() => regions.filter(r => r.companyId === companySel), [regions, companySel])
+  const companyProjects = useMemo(() => projects.filter(p => p.companyId === companySel), [projects, companySel])
 
   const input = 'w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)] outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500/60'
 
   function resetSubFields() {
     setRegionId(''); setNewRegionName(''); setNewRegionCode('')
     setStoreName(''); setSubStore(''); setBranchCode(''); setCompanyName('')
+    setProjectOn(false); setProjectId('')
   }
   function pickCompany(v: string) {
     setCompanySel(v); setErr(''); setResult(null); setSubRole('regional_manager'); resetSubFields()
   }
   function pickSubRole(v: SubRole) {
     setSubRole(v); setErr(''); setResult(null)
-    setRegionId(''); setNewRegionName(''); setNewRegionCode(''); setStoreName(''); setSubStore(''); setBranchCode('')
+    setRegionId(''); setNewRegionName(''); setNewRegionCode(''); setStoreName(''); setSubStore(''); setBranchCode(''); setProjectOn(false); setProjectId('')
   }
 
   async function submit(e: React.FormEvent) {
@@ -80,6 +86,7 @@ export function AddAccountForm({ companies, regions }: { companies: CompanyOpt[]
         payload.action = 'invite_rm'; payload.companyId = companySel
         if (regionId === NEW) { payload.newRegionName = newRegionName; payload.newRegionCode = newRegionCode }
         else payload.regionId = regionId
+        if (projectOn && projectId) payload.projectId = projectId
       } else {
         payload.action = 'invite_sm'; payload.companyId = companySel; payload.regionId = regionId
         payload.storeName = storeName; payload.subStore = subStore; payload.branchCode = branchCode
@@ -147,9 +154,9 @@ export function AddAccountForm({ companies, regions }: { companies: CompanyOpt[]
               )}
 
               {subRole === 'regional_manager' && (
-                <Field label="Region" required>
-                  <select className={input} value={regionId} onChange={e => setRegionId(e.target.value)} required>
-                    <option value="">Select a region…</option>
+                <Field label={projectOn ? 'Region (optional)' : 'Region'} required={!projectOn}>
+                  <select className={input} value={regionId} onChange={e => setRegionId(e.target.value)} required={!projectOn}>
+                    <option value="">{projectOn ? 'Leave unassigned — project view only' : 'Select a region…'}</option>
                     {companyRegions.map(r => <option key={r.id} value={r.id}>{r.name} ({r.code})</option>)}
                     <option value={NEW}>＋ New region…</option>
                   </select>
@@ -159,6 +166,23 @@ export function AddAccountForm({ companies, regions }: { companies: CompanyOpt[]
                 <div className="grid grid-cols-2 gap-2">
                   <Field label="New region name" required><input className={input} value={newRegionName} onChange={e => setNewRegionName(e.target.value)} placeholder="Gauteng" required /></Field>
                   <Field label="Region code" required><input className={input} value={newRegionCode} onChange={e => setNewRegionCode(e.target.value.toUpperCase())} placeholder="GP" required /></Field>
+                </div>
+              )}
+              {subRole === 'regional_manager' && companyProjects.length > 0 && (
+                <div className="rounded-xl ring-1 ring-[var(--border)] p-3 space-y-2">
+                  <label className="flex items-center gap-2 text-sm text-[var(--text)] cursor-pointer">
+                    <input type="checkbox" checked={projectOn} onChange={e => { setProjectOn(e.target.checked); if (!e.target.checked) setProjectId('') }} className="accent-emerald-600" />
+                    Invite this manager to a specific project
+                  </label>
+                  {projectOn && (
+                    <>
+                      <select className={input} value={projectId} onChange={e => setProjectId(e.target.value)} required>
+                        <option value="">Select a project…</option>
+                        {companyProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      </select>
+                      <p className="text-xs text-[var(--text-faint)]">The invite email will reference the project by name. A region is optional for a project-only manager.</p>
+                    </>
+                  )}
                 </div>
               )}
 

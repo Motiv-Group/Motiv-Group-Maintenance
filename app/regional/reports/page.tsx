@@ -16,12 +16,13 @@ export default async function RegionalReportsPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between gap-3 print:hidden">
-        <div><h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><FileBarChart className="text-slate-600 dark:text-slate-400" size={22} /> Regional Report</h1>
+      {/* Stacks on phones — the title + PrintButton need ~410px side by side. */}
+      <div className="flex flex-col items-start gap-3 print:hidden sm:flex-row sm:items-center sm:justify-between">
+        <div><h1 className="text-xl font-bold text-[var(--text)] flex items-center gap-2 sm:text-2xl"><FileBarChart className="text-slate-600 dark:text-slate-400" size={22} /> Regional Report</h1>
           <p className="text-sm text-[var(--text-muted)] mt-0.5">Portfolio summary for your region. Print or save as PDF.</p></div>
         <PrintButton />
       </div>
-      <article className="bg-white text-slate-900 rounded-2xl p-8 space-y-6 print:p-0">
+      <article className="bg-white text-slate-900 rounded-2xl p-5 sm:p-8 space-y-6 print:p-0">
         <header className="border-b border-slate-200 pb-4">
           <h2 className="text-2xl font-bold">Regional Portfolio Report</h2>
           <p className="text-sm text-[var(--text-faint)]">Generated {formatDateTime(d.generatedAt)}</p>
@@ -32,7 +33,10 @@ export default async function RegionalReportsPage() {
         </section>
         <section>
           <h3 className="font-bold mb-2">Stores</h3>
-          <table className="w-full text-xs border-collapse">
+          {/* Wide print-style table: scrolls inside its own container on phones so the
+              page body never scrolls horizontally. */}
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px] text-xs border-collapse">
             <thead><tr className="text-left text-[var(--text-faint)] border-b border-slate-200"><th className="py-1.5 pr-3">Store</th><th className="py-1.5 pr-3">Health</th><th className="py-1.5 pr-3">Status</th><th className="py-1.5 pr-3">Open</th><th className="py-1.5 pr-3">Overdue</th><th className="py-1.5 pr-3">Exposure</th><th className="py-1.5 pr-3">Main Driver</th></tr></thead>
             <tbody>
               {d.stores.map(s => (
@@ -40,6 +44,7 @@ export default async function RegionalReportsPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </section>
       </article>
     </div>

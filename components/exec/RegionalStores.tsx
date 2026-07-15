@@ -3,11 +3,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { Store, Plus, User, Mail, Phone, MapPin, Ticket, MoreVertical, Pencil, Power, RotateCcw, Trash2, X, ChevronDown, ChevronLeft, ChevronRight, Search, Download, Archive, ArrowRight, Eye, EyeOff } from 'lucide-react'
+import { Store, Plus, User, Mail, Phone, MapPin, Ticket, MoreVertical, Pencil, Power, RotateCcw, Trash2, X, ChevronDown, ChevronLeft, ChevronRight, Download, Archive, ArrowRight, Eye, EyeOff } from 'lucide-react'
 import type { StoreCard } from '@/lib/health/data'
 import { formatCurrency, formatDateTime } from '@/lib/utils'
 import { isValidEmail, isValidPhone, normalisePhone } from '@/lib/csv'
-import { Card, Pill, Donut, BreakdownList, STATUS_TEXT } from '@/components/exec/ui'
+import { Card, Pill, Donut, BreakdownList, STATUS_TEXT, FilterSelect, SearchInput } from '@/components/exec/ui'
 import { DrawerHeader } from '@/components/exec/Drawer'
 import { Modal } from '@/components/ui/Modal'
 
@@ -20,7 +20,7 @@ type Bucket = 'critical' | 'attention' | 'healthy'
 const bucketOf = (st: string): Bucket => st === 'controlled' ? 'healthy' : st === 'critical' ? 'critical' : 'attention'
 const BUCKET_META: Record<Bucket, { label: string; badge: string; bar: string; text: string; tab: string }> = {
   critical:  { label: 'Critical',  badge: 'bg-red-500/15 text-red-700 dark:text-red-400 ring-red-500/30',              bar: '#ef4444', text: 'text-red-600 dark:text-red-400',    tab: 'bg-red-500/15 text-red-700 dark:text-red-400 ring-red-500/40' },
-  attention: { label: 'Attention', badge: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D] ring-[#C6A35D]/30',      bar: '#C6A35D', text: 'text-amber-600 dark:text-[#C6A35D]', tab: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D] ring-[#C6A35D]/40' },
+  attention: { label: 'Attention', badge: 'bg-[#f59e0b]/15 text-amber-700 dark:text-[#f59e0b] ring-[#f59e0b]/30',      bar: '#f59e0b', text: 'text-amber-600 dark:text-[#f59e0b]', tab: 'bg-[#f59e0b]/15 text-amber-700 dark:text-[#f59e0b] ring-[#f59e0b]/40' },
   healthy:   { label: 'Controlled', badge: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 ring-emerald-500/30', bar: '#10b981', text: 'text-emerald-600 dark:text-emerald-400', tab: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 ring-emerald-500/40' },
 }
 
@@ -40,11 +40,11 @@ function relativeTime(iso: string | null | undefined, nowMs: number): string {
   return `${Math.floor(day / 30)}mo ago`
 }
 
-const SEL_CLS = 'appearance-none rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm pl-3 pr-8 py-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#C6A35D]/40'
+const SEL_CLS = 'appearance-none rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm pl-3 pr-8 py-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/40'
 /** Styled native <select> with a chevron — used across the Stores toolbar + pager. */
 function Select({ value, onChange, ariaLabel, children }: { value: string; onChange: (v: string) => void; ariaLabel: string; children: React.ReactNode }) {
   return (
-    <div className="relative">
+    <div className="relative shrink-0">
       <select aria-label={ariaLabel} value={value} onChange={e => onChange(e.target.value)} className={SEL_CLS}>{children}</select>
       <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
     </div>
@@ -164,8 +164,9 @@ export function RegionalStores({ stores, archived = [], companyName = '' }: { st
 
   return (
     <div className="space-y-5">
-      {/* Header — title, subtitle, Export + Add Store */}
-      <div className="flex items-start justify-between gap-3">
+      {/* Header — title, subtitle, Export + Add Store. Stacks on phones (the two
+          buttons claim ~215px of the row). */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-[var(--text)]">Stores</h1>
           <p className="mt-0.5 text-sm text-[var(--text-muted)]">All {counts.all} store{counts.all === 1 ? '' : 's'} ranked by highest attention first.</p>
@@ -189,7 +190,7 @@ export function RegionalStores({ stores, archived = [], companyName = '' }: { st
         {([
           { key: 'all', label: 'All', n: counts.all, tint: 'bg-blue-500/15 text-blue-700 dark:text-blue-400', ring: 'ring-blue-500/40' },
           { key: 'critical', label: 'Critical', n: counts.critical, tint: 'bg-red-500/15 text-red-700 dark:text-red-400', ring: 'ring-red-500/40' },
-          { key: 'attention', label: 'Attention', n: counts.attention, tint: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D]', ring: 'ring-[#C6A35D]/40' },
+          { key: 'attention', label: 'Attention', n: counts.attention, tint: 'bg-[#f59e0b]/15 text-amber-700 dark:text-[#f59e0b]', ring: 'ring-[#f59e0b]/40' },
           { key: 'healthy', label: 'Controlled', n: counts.healthy, tint: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400', ring: 'ring-emerald-500/40' },
         ] as const).map(t => {
           const active = bucket === t.key
@@ -206,23 +207,15 @@ export function RegionalStores({ stores, archived = [], companyName = '' }: { st
       <Card className="overflow-hidden">
         {/* Toolbar */}
         <div className="flex flex-wrap items-center gap-2 border-b border-[var(--border)] p-3">
-          <div className="relative min-w-[180px] flex-1">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
-            <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search stores…"
-              className="w-full rounded-xl bg-[var(--input-bg)] py-2 pl-9 pr-3 text-sm text-[var(--text)] ring-1 ring-[var(--border)] placeholder-[var(--text-faint)] focus:outline-none focus:ring-2 focus:ring-[#C6A35D]/40" />
+          <SearchInput value={q} onChange={setQ} placeholder="Search stores…" />
+          {/* Mobile: pills form one swipeable strip; sm:contents restores the
+              flex-wrap desktop layout (matches the Tickets tab). */}
+          <div className="flex w-full flex-nowrap items-center gap-2 overflow-x-auto pb-0.5 sm:contents">
+          <FilterSelect label="Status" value={bucket} onChange={v => setBucket(v as 'all' | Bucket)} options={[{ value: 'all', label: 'All' }, { value: 'critical', label: 'Critical' }, { value: 'attention', label: 'Attention' }, { value: 'healthy', label: 'Controlled' }]} />
+          <FilterSelect label="SLA" value={sla} onChange={v => setSla(v as typeof sla)} options={[{ value: 'all', label: 'All' }, { value: 'overdue', label: 'Has overdue' }, { value: 'ok', label: 'No overdue' }]} />
+          <FilterSelect label="Open" value={openF} onChange={v => setOpenF(v as typeof openF)} options={[{ value: 'all', label: 'All' }, { value: 'none', label: 'None (0)' }, { value: 'low', label: '1–3' }, { value: 'high', label: '4+' }]} />
+          <FilterSelect label="Sort by" value={sort} onChange={v => setSort(v as typeof sort)} options={[{ value: 'attention', label: 'Attention' }, { value: 'health', label: 'Health' }, { value: 'open', label: 'Open' }, { value: 'overdue', label: 'Overdue' }, { value: 'exposure', label: 'Exposure' }, { value: 'name', label: 'Name' }]} />
           </div>
-          <Select ariaLabel="Filter by status" value={bucket} onChange={v => setBucket(v as 'all' | Bucket)}>
-            <option value="all">Status</option><option value="critical">Critical</option><option value="attention">Attention</option><option value="healthy">Controlled</option>
-          </Select>
-          <Select ariaLabel="Filter by SLA" value={sla} onChange={v => setSla(v as typeof sla)}>
-            <option value="all">SLA</option><option value="overdue">Has overdue</option><option value="ok">No overdue</option>
-          </Select>
-          <Select ariaLabel="Filter by open tickets" value={openF} onChange={v => setOpenF(v as typeof openF)}>
-            <option value="all">Open Tickets</option><option value="none">None (0)</option><option value="low">1–3</option><option value="high">4+</option>
-          </Select>
-          <Select ariaLabel="Sort by" value={sort} onChange={v => setSort(v as typeof sort)}>
-            <option value="attention">Sort: Attention</option><option value="health">Sort: Health</option><option value="open">Sort: Open</option><option value="overdue">Sort: Overdue</option><option value="exposure">Sort: Exposure</option><option value="name">Sort: Name</option>
-          </Select>
         </div>
 
         {/* Desktop / tablet — full table */}
@@ -271,7 +264,8 @@ export function RegionalStores({ stores, archived = [], companyName = '' }: { st
                 <button onClick={() => { setSelId(s.storeId); setOpen(true) }} className="w-full p-3 pr-10 text-left transition hover:bg-[var(--hover)]">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-[var(--text)]"><span className="text-[var(--text-faint)]">#{(curPage - 1) * perPage + i + 1}</span> {s.storeName}{s.branchCode && <span className="ml-1.5 font-mono text-[11px] text-[var(--text-faint)]">{s.branchCode}</span>}</p>
+                      {/* Mobile-only card (ul is md:hidden) — let the name wrap. */}
+                      <p className="line-clamp-2 break-words text-sm font-semibold text-[var(--text)]"><span className="text-[var(--text-faint)]">#{(curPage - 1) * perPage + i + 1}</span> {s.storeName}{s.branchCode && <span className="ml-1.5 font-mono text-[11px] text-[var(--text-faint)]">{s.branchCode}</span>}</p>
                       <p className="mt-0.5 truncate text-[11px] text-[var(--text-faint)]">{s.mainIssue}</p>
                     </div>
                     <span className="flex shrink-0 flex-col items-end gap-1">
@@ -302,13 +296,16 @@ export function RegionalStores({ stores, archived = [], companyName = '' }: { st
               <option value="10">10</option><option value="25">25</option><option value="50">50</option>
             </Select>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="mr-1 text-xs text-[var(--text-faint)] tabular-nums">{firstShown}–{lastShown} of {filtered.length}</span>
+          {/* Mobile: wrap allowed, range label hidden, "Next" icon-only — the full
+              cluster (~380px) overflows the card at 375px. sm+ unchanged. */}
+          <div className="flex flex-wrap items-center justify-end gap-1.5">
+            <span className="mr-1 hidden text-xs text-[var(--text-faint)] tabular-nums sm:inline">{firstShown}–{lastShown} of {filtered.length}</span>
             <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={curPage <= 1} aria-label="Previous page" className="rounded-lg p-1.5 text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-40"><ChevronLeft size={15} /></button>
+            <span className="text-xs text-[var(--text-muted)] tabular-nums sm:hidden">{curPage} / {totalPages}</span>
             {pageNums.map(p => (
-              <button key={p} onClick={() => setPage(p)} aria-current={p === curPage} className={`min-w-8 rounded-lg px-2.5 py-1.5 text-sm font-semibold tabular-nums transition ${p === curPage ? 'bg-blue-600 text-white' : 'text-[var(--text-muted)] ring-1 ring-[var(--border)] hover:bg-[var(--hover)]'}`}>{p}</button>
+              <button key={p} onClick={() => setPage(p)} aria-current={p === curPage} className={`hidden sm:inline-flex min-w-8 justify-center rounded-lg px-2.5 py-1.5 text-sm font-semibold tabular-nums transition ${p === curPage ? 'bg-blue-600 text-white' : 'text-[var(--text-muted)] ring-1 ring-[var(--border)] hover:bg-[var(--hover)]'}`}>{p}</button>
             ))}
-            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={curPage >= totalPages} className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-40">Next <ChevronRight size={14} /></button>
+            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={curPage >= totalPages} aria-label="Next page" className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-40"><span className="hidden sm:inline">Next</span> <ChevronRight size={14} /></button>
           </div>
         </div>
       </Card>
@@ -327,7 +324,7 @@ export function RegionalStores({ stores, archived = [], companyName = '' }: { st
               {archived.map(a => (
                 <li key={a.id} className="flex items-center justify-between gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5">
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-[var(--text)] truncate">{a.name}</p>
+                    <p className="text-sm font-medium text-[var(--text)] break-words sm:truncate">{a.name}</p>
                     <p className="text-[11px] text-[var(--text-faint)]">
                       <span className="text-amber-600 dark:text-amber-400 font-semibold">Deactivated</span>
                       {a.deactivatedAt ? ` · ${formatDateTime(a.deactivatedAt)}` : ''}
@@ -608,7 +605,7 @@ function AddStoreModal({ companyName = '', onClose, onSaved }: { companyName?: s
   )
 }
 
-const FIELD_INPUT = 'w-full rounded-xl bg-[var(--input-bg)] px-3 py-2.5 text-sm text-[var(--text)] ring-1 ring-[var(--border)] placeholder-[var(--text-faint)] focus:outline-none focus:ring-2 focus:ring-[#C6A35D]/40'
+const FIELD_INPUT = 'w-full rounded-xl bg-[var(--input-bg)] px-3 py-2.5 text-sm text-[var(--text)] ring-1 ring-[var(--border)] placeholder-[var(--text-faint)] focus:outline-none focus:ring-2 focus:ring-blue-500/40'
 
 function FormSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (

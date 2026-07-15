@@ -12,9 +12,9 @@ import type { RegionalTicketRow } from '@/lib/health/data'
 import { Card } from '@/components/exec/ui'
 import { Modal } from '@/components/ui/Modal'
 import { CategoryIcon } from '@/components/client/ticketBadges'
-import { AssignSuppliersButton, QuoteReviewButton, SignoffReviewButton } from '@/components/regional/RmTicketActions'
+import { ViewAssignButton, QuoteReviewButton, SignoffReviewButton } from '@/components/regional/RmTicketActions'
 import { DisputeReviewButton } from '@/components/dispute/DisputeBox'
-import { rmStatusMeta, formatDate, formatDateTime, humanizeDuration, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
+import { rmStatusMeta, formatDate, formatDateTime, humanizeDuration, formatJobId, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
 
 type QueueFilter = 'all' | 'assign' | 'quotes' | 'signoff' | 'sla' | 'snags'
 type Tone = 'red' | 'purple' | 'gold' | 'green' | 'orange' | 'blue'
@@ -61,7 +61,7 @@ export function RegionalPriorityWorkQueue({ tickets, generatedAt, suppliers = []
 
   return (
     <div className="space-y-5">
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+      <section className="grid grid-cols-2 gap-2.5 sm:grid-cols-2 sm:gap-3 lg:grid-cols-3 xl:grid-cols-5 max-sm:[&>*:nth-child(5)]:col-span-2">
         <MetricButton active={filter === 'assign'} icon={<UserPlus size={21} />} tone="blue" label="Needs Assignment"
           value={counts.assign} sub={counts.assign ? `${counts.assign} to assign` : 'All assigned'} subActive={counts.assign > 0} onClick={() => pick('assign')} />
         <MetricButton active={filter === 'quotes'} icon={<ReceiptText size={21} />} tone="purple" label="Quotes to Approve"
@@ -75,8 +75,8 @@ export function RegionalPriorityWorkQueue({ tickets, generatedAt, suppliers = []
       </section>
 
       <Card className="overflow-hidden p-0">
-        <div className="flex items-start gap-3 border-b border-[var(--border)] px-5 py-5">
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-blue-600/15 text-blue-600 dark:text-blue-300">
+        <div className="flex items-start gap-3 border-b border-[var(--border)] px-4 py-4 sm:px-5 sm:py-5">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-blue-600/15 sm:h-11 sm:w-11 text-blue-600 dark:text-blue-300">
             <ClipboardList size={21} />
           </span>
           <div>
@@ -115,13 +115,13 @@ function MetricButton({ active, icon, label, value, sub, subActive, onClick }: {
   return (
     <button type="button" onClick={onClick}
       className={`block rounded-2xl text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 ${active ? 'ring-2 ring-blue-500/70' : ''}`}>
-      <Card className={`h-full p-4 transition hover:-translate-y-0.5 hover:ring-blue-500/30 ${stateBorder} ${active ? 'ring-blue-500/60' : ''}`}>
-        <div className="flex items-center gap-4">
-          <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-full ring-1 ${iconChip}`}>{icon}</span>
+      <Card className={`h-full p-3 sm:p-4 transition hover:-translate-y-0.5 hover:ring-blue-500/30 ${stateBorder} ${active ? 'ring-blue-500/60' : ''}`}>
+        <div className="flex items-center gap-2.5 sm:gap-4">
+          <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-full ring-1 sm:h-12 sm:w-12 ${iconChip}`}>{icon}</span>
           <div className="min-w-0">
-            <p className="truncate text-xs font-semibold text-[var(--text-muted)]">{label}</p>
-            <p className={`mt-1 text-2xl font-bold leading-none ${stateText}`}>{value}</p>
-            <p className={`mt-1 truncate text-xs font-semibold ${subActive ? stateText : 'text-[var(--text-faint)]'}`}>{sub}</p>
+            <p className="line-clamp-2 text-[11px] font-semibold text-[var(--text-muted)] sm:line-clamp-none sm:truncate sm:text-xs">{label}</p>
+            <p className={`mt-0.5 text-xl font-bold leading-none sm:mt-1 sm:text-2xl ${stateText}`}>{value}</p>
+            <p className={`mt-0.5 truncate text-[11px] font-semibold sm:mt-1 sm:text-xs ${subActive ? stateText : 'text-[var(--text-faint)]'}`}>{sub}</p>
           </div>
         </div>
       </Card>
@@ -157,14 +157,16 @@ function QueueRow({ ticket, nowMs, suppliers, motivSuppliers }: { ticket: Region
   const closeout = ticket.status === 'approved_closeout'
   const closeoutCls = 'relative z-20 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-bold transition lg:w-40 border-blue-500/60 text-blue-600 hover:bg-blue-500/10 dark:text-blue-300'
   const closeoutBadge = ticket.voNoneConfirmed ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : 'bg-blue-500/15 text-blue-700 dark:text-blue-400'
+  const jobId = ticket.jobRef ?? formatJobId(ticket.jobNumber)
   return (
-    <div className="relative grid gap-4 border-b border-[var(--border)] px-4 py-4 transition last:border-b-0 hover:bg-[var(--hover)] lg:grid-cols-[1fr_200px_1.1fr_160px] lg:items-center">
+    <div className="relative grid gap-3 border-b border-[var(--border)] px-4 py-3 transition last:border-b-0 hover:bg-[var(--hover)] sm:gap-4 sm:py-4 lg:grid-cols-[1fr_200px_1.1fr_160px] lg:items-center">
       {/* The whole row (except the CTA island) links to the ticket. */}
       <Link href={ticketUrl} aria-label={`View ${ticket.category || ticket.title} ticket`} className="absolute inset-0 z-10" />
 
       <div className="flex min-w-0 items-center gap-3">
         <CategoryIcon category={ticket.category ?? ticket.title} priority={ticket.priority} />
         <div className="min-w-0">
+          {jobId && <p className="truncate font-mono text-[10px] text-[var(--text-faint)]">{jobId}</p>}
           <p className="truncate text-base font-bold text-[var(--text)]">{ticket.category || ticket.title}</p>
           <p className="truncate text-sm text-[var(--text-muted)]">{ticket.storeName}</p>
         </div>
@@ -187,7 +189,8 @@ function QueueRow({ ticket, nowMs, suppliers, motivSuppliers }: { ticket: Region
         ) : (
           <>
             <p className="mt-1 flex items-center gap-1.5 text-sm text-[var(--text-muted)]"><CalendarClock size={14} /> SLA in {humanizeDuration(slaMs)}</p>
-            <p className="truncate text-xs text-[var(--text-muted)]">Next deadline · {formatDateTime(slaDeadline)}</p>
+            {/* Absolute deadline duplicates the countdown above — desktop-only. */}
+            <p className="hidden truncate text-xs text-[var(--text-muted)] sm:block">Next deadline · {formatDateTime(slaDeadline)}</p>
           </>
         )}
       </div>
@@ -195,21 +198,22 @@ function QueueRow({ ticket, nowMs, suppliers, motivSuppliers }: { ticket: Region
       <div className="flex lg:justify-end">
         {ticket.disputed ? (
           <DisputeReviewButton ticketId={ticket.id} viewerRole="regional_manager"
-            trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}>View dispute</button>} />
+            trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}>View Dispute</button>} />
         ) : reviewQuote ? (
           <QuoteReviewButton ticketId={ticket.id}
-            trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}>Approve quote</button>} />
+            trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}>Approve Quote</button>} />
         ) : reviewSignoff ? (
           <SignoffReviewButton ticketId={ticket.id}
             trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}><ClipboardCheck size={15} /> Sign-Off</button>} />
         ) : assignable ? (
-          <AssignSuppliersButton ticketId={ticket.id} suppliers={suppliers} motivSuppliers={motivSuppliers}
+          <ViewAssignButton ticketId={ticket.id} suppliers={suppliers} motivSuppliers={motivSuppliers}
             awaitingById={ticket.engagedSupplierIds} declinedSupplierIds={ticket.declinedSupplierIds}
-            trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}>Assign supplier</button>} />
+            summary={{ category: ticket.category, title: ticket.title, storeName: ticket.storeName, status: ticket.status, priority: String(ticket.priority), jobId }}
+            trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}>View &amp; Assign</button>} />
         ) : closeout ? (
           ticket.voNoneConfirmed
             ? <CloseOutConfirm ticketId={ticket.id} storeName={ticket.storeName} category={ticket.category || ticket.title} className={closeoutCls} />
-            : <span className={`${closeoutCls} opacity-50 pointer-events-none`} aria-disabled="true">Close-out</span>
+            : <span className={`${closeoutCls} opacity-50 pointer-events-none`} aria-disabled="true">Close-Out</span>
         ) : (
           <Link href={ticketUrl} className={ctaCls}>View Ticket <ArrowRight size={15} /></Link>
         )}
@@ -273,7 +277,7 @@ function CloseOutConfirm({ ticketId, storeName, category, className }: { ticketI
   }
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={className}>Close-out <ArrowRight size={15} /></button>
+      <button type="button" onClick={() => setOpen(true)} className={className}>Close-Out <ArrowRight size={15} /></button>
       {open && (
         <Modal onClose={() => { if (!busy) setOpen(false) }} maxWidth="max-w-lg">
           {close => (

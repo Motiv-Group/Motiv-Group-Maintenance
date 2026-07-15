@@ -9,7 +9,7 @@ export function TabHeader({ icon, title, subtitle, children }: { icon: ReactNode
   return (
     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
       <div className="flex items-center gap-2.5">
-        <span className="grid place-items-center w-9 h-9 rounded-xl bg-[#C6A35D]/15 ring-1 ring-[#C6A35D]/30">{icon}</span>
+        <span className="grid place-items-center w-9 h-9 rounded-xl bg-[#f59e0b]/15 ring-1 ring-[#f59e0b]/30">{icon}</span>
         <div>
           <h1 className="text-xl font-bold text-[var(--text)] leading-tight">{title}</h1>
           <p className="text-xs text-[var(--text-muted)]">{subtitle}</p>
@@ -40,7 +40,7 @@ export function FilterMenu({ value, onChange, options, label = 'Filters' }: { va
   const active = options.find(o => o.value === value)
   return (
     <div className="relative" ref={ref}>
-      <button onClick={() => setOpen(o => !o)} className={`${chip} hover:ring-[#C6A35D]/40 transition`}>
+      <button onClick={() => setOpen(o => !o)} className={`${chip} hover:ring-blue-500/40 transition`}>
         <Filter size={14} className="text-[var(--text-muted)]" />
         {active && active.value !== 'all' ? active.label : label}
         <ChevronDown size={13} className={`text-[var(--text-faint)] transition-transform ${open ? 'rotate-180' : ''}`} />
@@ -54,7 +54,7 @@ export function FilterMenu({ value, onChange, options, label = 'Filters' }: { va
               className="w-full text-left px-3 py-2 text-xs rounded-lg hover:bg-[var(--hover)] flex items-center justify-between text-[var(--text-muted)] hover:text-[var(--text)] transition"
             >
               {o.label}
-              {o.value === value && <Check size={13} className="text-[#C6A35D]" />}
+              {o.value === value && <Check size={13} className="text-[#f59e0b]" />}
             </button>
           ))}
         </div>
@@ -65,7 +65,7 @@ export function FilterMenu({ value, onChange, options, label = 'Filters' }: { va
 
 export function ExportButton({ onExport }: { onExport: () => void }) {
   return (
-    <button onClick={onExport} className={`${chip} hover:ring-[#C6A35D]/40 transition`}>
+    <button onClick={onExport} className={`${chip} hover:ring-blue-500/40 transition`}>
       <Download size={14} className="text-[var(--text-muted)]" /> Export
     </button>
   )

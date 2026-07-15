@@ -23,7 +23,7 @@ export interface QuoteSummaryData {
 const BADGE: Record<QuoteSummaryStatus, { label: string; cls: string }> = {
   accepted: { label: 'Approved',     cls: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' },
   awarded:  { label: 'Awarded',      cls: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' },
-  pending:  { label: 'Under review', cls: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D]' },
+  pending:  { label: 'Under review', cls: 'bg-[#f59e0b]/15 text-amber-700 dark:text-[#f59e0b]' },
   declined: { label: 'Declined',     cls: 'bg-red-500/15 text-red-700 dark:text-red-400' },
 }
 
@@ -38,13 +38,16 @@ function fileName(url: string): string {
   } catch { return 'Quote' }
 }
 
-function DateItem({ label, value, proposed }: { label: string; value: string; proposed?: boolean }) {
+function DateItem({ label, value, suffix, proposed }: { label: string; value: string; suffix?: string | null; proposed?: boolean }) {
   return (
     <div>
       <div className={LABEL}>{label}</div>
+      {/* value and suffix are separate nowrap chunks so "date · technician" can break
+          BETWEEN them on narrow phones instead of overflowing the column. */}
       <div className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm text-[var(--text)]">
         <Calendar size={14} className="shrink-0 text-[var(--text-faint)]" />
         <span className="whitespace-nowrap">{value}</span>
+        {suffix && <span className="whitespace-nowrap text-[var(--text-muted)]">· {suffix}</span>}
         {proposed && <span className="whitespace-nowrap text-[11px] text-amber-600 dark:text-amber-400">(proposed)</span>}
       </div>
     </div>
@@ -64,10 +67,14 @@ export function QuoteSummary({ quote, status, title, schedule, collapsible = fal
         <Icon size={17} className={`shrink-0 ${iconCls}`} />
         <span className="truncate text-sm font-bold text-[var(--text)]">{title ?? quote.supplierName ?? 'Quote'}</span>
       </span>
-      <span className="flex shrink-0 items-center gap-2.5">
-        <span className="text-base font-bold tabular-nums text-[var(--text)]">{formatCurrency(quote.amount)}</span>
-        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${badge.cls}`}>{badge.label}</span>
-        {collapsible && <ChevronDown size={16} className="text-[var(--text-faint)] transition-transform group-open:rotate-180" />}
+      {/* Mobile: amount stacks above the status pill (the row form needs ~210px and
+          starves the supplier name at 375px); sm+ keeps the inline row. */}
+      <span className="flex shrink-0 items-center gap-2">
+        <span className="flex flex-col items-end gap-0.5 sm:flex-row sm:items-center sm:gap-2.5">
+          <span className="text-base font-bold tabular-nums text-[var(--text)]">{formatCurrency(quote.amount)}</span>
+          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${badge.cls}`}>{badge.label}</span>
+        </span>
+        {collapsible && <ChevronDown size={16} className="shrink-0 text-[var(--text-faint)] transition-transform group-open:rotate-180" />}
       </span>
     </>
   )
@@ -108,7 +115,7 @@ export function QuoteSummary({ quote, status, title, schedule, collapsible = fal
         {/* Submitted + proposed visit */}
         <div className="space-y-3 sm:border-l sm:border-[var(--border)] sm:pl-5 lg:pr-5">
           <DateItem label="Submitted" value={formatDateTime(quote.createdAt)} />
-          {schedule && <DateItem label="Proposed visit" value={`${formatDateTime(schedule.at)}${schedule.technician ? ` · ${schedule.technician}` : ''}`} proposed={schedule.proposed} />}
+          {schedule && <DateItem label="Proposed visit" value={formatDateTime(schedule.at)} suffix={schedule.technician} proposed={schedule.proposed} />}
         </div>
 
         {/* Valid until + declined */}
@@ -122,7 +129,7 @@ export function QuoteSummary({ quote, status, title, schedule, collapsible = fal
           <div className={LABEL}>Attachment</div>
           <div className="mt-1.5">
             {attName
-              ? fileLink(<><FileText size={14} className="shrink-0" /><span className="min-w-0 truncate">{attName}</span></>, 'inline-flex max-w-full min-w-0 items-center gap-1.5 rounded-lg bg-blue-500/10 px-2.5 py-1.5 text-sm font-medium text-blue-600 ring-1 ring-blue-500/25 transition hover:bg-blue-500/15 dark:text-blue-400')
+              ? fileLink(<><FileText size={14} className="mt-0.5 shrink-0" /><span className="min-w-0 line-clamp-2 break-all sm:line-clamp-none sm:truncate">{attName}</span></>, 'inline-flex max-w-full min-w-0 items-start gap-1.5 rounded-lg bg-blue-500/10 px-2.5 py-1.5 text-sm font-medium text-blue-600 ring-1 ring-blue-500/25 transition hover:bg-blue-500/15 dark:text-blue-400 sm:items-center')
               : <span className="text-sm text-[var(--text-faint)]">—</span>}
           </div>
         </div>

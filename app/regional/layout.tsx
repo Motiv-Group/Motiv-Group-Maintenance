@@ -19,7 +19,7 @@ export default async function RegionalLayout({ children }: { children: React.Rea
   return (
     <ExecChrome userName={fullName} variant="regional" unreadCount={unreadCount}
       contextOptions={regionOptions} activeContextId={activeRegionId} contextCookie="motiv_region">
-      <RealtimeRefresh tables={['tickets', 'quotes', 'signoffs', 'snags', 'notifications', 'ticket_updates', 'ticket_disputes', 'ticket_dispute_messages']} />
+      <RealtimeRefresh tables={['tickets', 'quotes', 'signoffs', 'snags', 'notifications', 'ticket_updates', 'ticket_disputes', 'ticket_dispute_messages', 'projects', 'project_stores', 'project_files']} />
       {children}
     </ExecChrome>
   )

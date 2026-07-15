@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { UploadCloud, ImagePlus, Camera, X, CheckCircle2, FileText } from 'lucide-react'
 import { uploadOne } from '@/lib/upload'
+import { useScrollLock } from '@/lib/useScrollLock'
 
 const MAX_PHOTOS = 10
 const MIN_PHOTOS = 2
@@ -33,11 +34,12 @@ export function SubmitCompletionForm({ ticketId, evidenceRequested = false, requ
 
   const previews = useMemo(() => photos.map(f => URL.createObjectURL(f)), [photos])
   useEffect(() => () => previews.forEach(URL.revokeObjectURL), [previews])
+  useScrollLock(!!preview)
 
   const remaining = MAX_PHOTOS - photos.length
   function addPhotos(files: File[]) {
     setErr('')
-    const imgs = files.filter(f => f.type.startsWith('image/'))
+    const imgs = files.filter(f => !f.type || f.type.startsWith('image/'))
     if (!imgs.length) return
     setPhotos(p => [...p, ...imgs].slice(0, MAX_PHOTOS))
   }

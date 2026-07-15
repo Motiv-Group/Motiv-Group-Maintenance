@@ -8,9 +8,9 @@
 // remembered expand state are all preserved.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { Ticket, Search, ChevronDown, ChevronRight, BarChart3, Store, PlusCircle, User, AlertTriangle, CheckCircle2, Clock, SlidersHorizontal, X } from 'lucide-react'
+import { Ticket, ChevronDown, ChevronRight, BarChart3, Store, PlusCircle, User, AlertTriangle, CheckCircle2, Clock, SlidersHorizontal, X } from 'lucide-react'
 import type { RegionalTicketRow } from '@/lib/health/data'
-import { Card } from '@/components/exec/ui'
+import { Card, FilterSelect, SearchInput } from '@/components/exec/ui'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { priorityBadgeClass, priorityLabel } from '@/components/client/ticketBadges'
 import { Modal } from '@/components/ui/Modal'
@@ -120,28 +120,14 @@ function StatCard({ intent, icon, value, title, sub, active, onClick }: { intent
   const tone = INTENT_TONE[intent]
   return (
     <button type="button" onClick={onClick} aria-pressed={active}
-      className={`flex items-center gap-3 rounded-xl bg-[var(--surface)] p-4 text-left ring-1 transition hover:bg-[var(--hover)] ${active ? `ring-2 ${tone.ring}` : 'ring-[var(--border)]'}`}>
-      <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${tone.icon}`}>{icon}</span>
+      className={`flex items-center gap-2.5 rounded-xl bg-[var(--surface)] p-3 text-left ring-1 transition hover:bg-[var(--hover)] sm:gap-3 sm:p-4 ${active ? `ring-2 ${tone.ring}` : 'ring-[var(--border)]'}`}>
+      <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl sm:h-11 sm:w-11 ${tone.icon}`}>{icon}</span>
       <span className="min-w-0">
-        <span className="block text-2xl font-bold leading-none text-[var(--text)]">{value}</span>
-        <span className="mt-1 block text-sm font-semibold text-[var(--text)]">{title}</span>
-        <span className="block text-[11px] text-[var(--text-muted)]">{sub}</span>
+        <span className="block text-xl font-bold leading-none text-[var(--text)] sm:text-2xl">{value}</span>
+        <span className="mt-1 block text-xs font-semibold text-[var(--text)] sm:text-sm">{title}</span>
+        <span className="hidden text-[11px] text-[var(--text-muted)] sm:block">{sub}</span>
       </span>
     </button>
-  )
-}
-
-// ── Styled dropdown (native select, "Label: Value" pill) ────────
-function FilterSelect<T extends string>({ label, value, onChange, options }: { label: string; value: T; onChange: (v: T) => void; options: { value: T; label: string }[] }) {
-  return (
-    <label className="relative flex items-center gap-1.5 rounded-xl bg-[var(--input-bg)] px-3 py-2.5 text-sm ring-1 ring-[var(--border)] transition focus-within:ring-[#C6A35D]/40">
-      <span className="whitespace-nowrap text-[var(--text-muted)]">{label}:</span>
-      <select value={value} onChange={e => onChange(e.target.value as T)}
-        className="cursor-pointer appearance-none bg-transparent pr-4 font-semibold text-[var(--text)] outline-none">
-        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
-      <ChevronDown size={14} className="pointer-events-none absolute right-2.5 text-[var(--text-faint)]" />
-    </label>
   )
 }
 
@@ -149,7 +135,36 @@ function FilterSelect<T extends string>({ label, value, onChange, options }: { l
 const COLS = 'grid-cols-[1.3fr_1fr_1fr_0.8fr_1.5fr_1.1fr_1.2fr_0.3fr]'
 function TicketTable({ rows, nowMs }: { rows: RegionalTicketRow[]; nowMs: number }) {
   return (
-    <div className="overflow-x-auto">
+    <>
+    {/* Mobile: stacked cards — the 8-column grid below needs 920px and would force
+        the phone to pan sideways. Same fields, three compact lines, whole row taps. */}
+    <div className="sm:hidden">
+      {rows.map(t => {
+        const action = rmRowAction(t)
+        const sm = rmStatusMeta(t.status)
+        const statusCls = t.disputed ? 'bg-red-500/15 text-red-700 dark:text-red-400' : t.infoAdded ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : sm.cls
+        const statusLabel = t.disputed ? 'Dispute' : t.infoAdded ? 'Info added' : sm.label
+        const sla = slaStatus(t, nowMs)
+        return (
+          <Link key={t.id} href={`/regional/tickets/${t.id}`} className="flex flex-col gap-1 border-b border-[var(--border)] px-3 py-3 transition last:border-0 hover:bg-[var(--hover)]">
+            <span className="flex items-center gap-1.5">
+              <span className="min-w-0 flex-1 truncate font-mono text-[13px] font-semibold text-[var(--text)]">{t.jobRef ?? '—'}</span>
+              <span className={`shrink-0 rounded-md px-2 py-0.5 text-[10px] font-bold ${priorityBadgeClass(t as never)}`}>{priorityLabel(t as never)}</span>
+              <span className={`shrink-0 rounded-md px-2 py-0.5 text-[10px] font-bold ${statusCls}`}>{statusLabel}</span>
+            </span>
+            <span className={`text-sm leading-snug ${action.act ? 'font-semibold text-[var(--text)]' : 'text-[var(--text-muted)]'}`}>
+              <span className="text-[var(--text-muted)] font-normal">{t.category || t.title} · </span>{action.text}
+            </span>
+            <span className="flex items-center justify-between gap-2 text-xs">
+              <span className={`flex min-w-0 items-center gap-1 font-medium ${sla.cls}`}><sla.Icon size={13} className="shrink-0" /> <span className="truncate">{sla.label}</span></span>
+              <span className="shrink-0 text-[var(--text-faint)]">{formatDateTime(t.createdAt)}</span>
+            </span>
+          </Link>
+        )
+      })}
+    </div>
+    {/* Desktop: the full 8-column grid, unchanged. */}
+    <div className="hidden overflow-x-auto sm:block">
       <div className="min-w-[920px]">
         <div className={`grid ${COLS} gap-3 border-b border-[var(--border)] px-2 py-2 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-faint)]`}>
           <span>Ticket ID</span><span>Category</span><span>Status</span><span>Priority</span><span>Next action</span><span>SLA status</span><span>Updated</span><span />
@@ -175,6 +190,7 @@ function TicketTable({ rows, nowMs }: { rows: RegionalTicketRow[]; nowMs: number
         })}
       </div>
     </div>
+    </>
   )
 }
 
@@ -313,7 +329,7 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
       </div>
 
       {/* Stat cards (click to filter) */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-2 sm:gap-3 lg:grid-cols-4">
         <StatCard intent="mine" icon={<User size={20} />} value={stats.mine} title="My actions" sub="Require your response" active={intent === 'mine'} onClick={() => pickIntent('mine')} />
         <StatCard intent="awaiting" icon={<Ticket size={20} />} value={stats.awaiting} title="Awaiting action" sub="From others" active={intent === 'awaiting'} onClick={() => pickIntent('awaiting')} />
         <StatCard intent="critical" icon={<AlertTriangle size={20} />} value={stats.critical} title="At SLA breach and overdue" sub="Require attention" active={intent === 'critical'} onClick={() => pickIntent('critical')} />
@@ -322,18 +338,19 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
 
       {/* Filter bar */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[180px] flex-1">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
-          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search tickets…"
-            className="w-full rounded-xl bg-[var(--input-bg)] py-2.5 pl-9 pr-3 text-sm text-[var(--text)] ring-1 ring-[var(--border)] outline-none placeholder-[var(--text-faint)] focus:ring-[#C6A35D]/40" />
-        </div>
+        <SearchInput value={q} onChange={setQ} placeholder="Search tickets…" />
+        {/* Mobile: pills form one horizontally-swipeable strip (sm:contents dissolves
+            the wrapper so desktop keeps the exact flex-wrap layout). */}
+        <div className="flex w-full flex-nowrap items-center gap-2 overflow-x-auto pb-0.5 sm:contents">
         <FilterSelect label="Status" value={status} onChange={v => { setStatus(v); setIntent(null) }} options={statusOptions} />
         <FilterSelect label="Priority" value={priority} onChange={setPriority} options={[{ value: 'all', label: 'All' }, { value: '0', label: 'Critical' }, { value: '1', label: 'High' }, { value: '2', label: 'Medium' }, { value: '3', label: 'Low' }]} />
         <FilterSelect label="Store" value={store} onChange={setStore} options={[{ value: 'all', label: 'All stores' }, ...storeNames.map(s => ({ value: s, label: s }))]} />
         <FilterSelect label="Sort by" value={sort} onChange={setSort} options={[{ value: 'urgent', label: 'Most urgent' }, { value: 'sla', label: 'Next SLA' }, { value: 'newest', label: 'Newest' }, { value: 'oldest', label: 'Oldest' }]} />
+        </div>
+        {/* Outside the strip: its overflow-x-auto would clip this absolute dropdown. */}
         <div className="relative">
           <button type="button" onClick={() => setFiltersOpen(o => !o)} aria-expanded={filtersOpen}
-            className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2.5 text-sm font-semibold ring-1 transition ${adv.size ? 'bg-[#C6A35D]/10 text-[#C6A35D] ring-[#C6A35D]/40' : 'text-[var(--text-muted)] ring-[var(--border)] hover:bg-[var(--hover)]'}`}>
+            className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2.5 text-sm font-semibold ring-1 transition ${adv.size ? 'bg-blue-500/10 text-blue-500 ring-blue-500/40' : 'text-[var(--text-muted)] ring-[var(--border)] hover:bg-[var(--hover)]'}`}>
             <SlidersHorizontal size={15} /> Filters{adv.size ? ` (${adv.size})` : ''}
           </button>
           {filtersOpen && (
@@ -343,7 +360,7 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
                 <p className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-faint)]">Refine</p>
                 {([['overdue', 'Overdue'], ['internal_breach', 'Internal breached'], ['supplier_breach', 'Supplier breached'], ['disputed', 'Disputed']] as const).map(([k, label]) => (
                   <label key={k} className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-2 text-sm text-[var(--text)] transition hover:bg-[var(--hover)]">
-                    <input type="checkbox" checked={adv.has(k)} onChange={e => setAdv(s => { const n = new Set(s); e.target.checked ? n.add(k) : n.delete(k); return n })} className="h-4 w-4 accent-[#C6A35D]" />
+                    <input type="checkbox" checked={adv.has(k)} onChange={e => setAdv(s => { const n = new Set(s); e.target.checked ? n.add(k) : n.delete(k); return n })} className="h-4 w-4 accent-[#f59e0b]" />
                     {label}
                   </label>
                 ))}
@@ -368,11 +385,11 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
         const up = active.map(t => +new Date(t.slaDueAt ?? t.dueAt)).filter(ms => ms > nowMs)
         const nextSla = up.length ? Math.min(...up) : null
         return (
-          <div key={storeName} className={`overflow-hidden rounded-xl border-l-4 bg-[var(--surface)] ring-1 ring-[var(--border)] ${accent.border}`}>
+          <div key={storeName} className="overflow-hidden rounded-xl bg-[var(--surface)] ring-1 ring-[var(--border)]">
             <div role="button" tabIndex={0} aria-expanded={!isCollapsed} onClick={() => toggle(storeName)}
               onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(storeName) } }}
               className="flex cursor-pointer items-center gap-3 p-4 transition hover:bg-[var(--hover)]">
-              <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-full ${accent.icon}`}><Store size={20} /></span>
+              <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full sm:h-11 sm:w-11 ${accent.icon}`}><Store size={20} /></span>
               <span className="min-w-0 flex-1">
                 <span className="flex items-center gap-2">
                   <span className="truncate text-base font-bold text-[var(--text)]">{storeName}</span>
@@ -382,10 +399,12 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
                   {openN} open
                   {critical > 0 && <> · <span className="font-semibold text-red-600 dark:text-red-400">{critical} critical</span></>}
                   {overdue > 0 && <> · <span className="font-semibold text-amber-600 dark:text-amber-400">{overdue} overdue</span></>}
+                  {/* Mobile folds the next-SLA countdown in here (right-hand block is sm+). */}
+                  {nextSla != null && <span className="sm:hidden"> · SLA {humanizeDuration(nextSla - nowMs)}</span>}
                 </span>
               </span>
-              <button type="button" onClick={e => { e.stopPropagation(); setPanelStore(storeName) }} title="Store overview" className="shrink-0 rounded-lg p-1.5 text-[var(--text-faint)] transition hover:bg-[#C6A35D]/10 hover:text-[#C6A35D]"><BarChart3 size={16} /></button>
-              <span className="shrink-0 text-right">
+              <button type="button" onClick={e => { e.stopPropagation(); setPanelStore(storeName) }} title="Store overview" className="shrink-0 rounded-lg p-2.5 -m-1 text-[var(--text-faint)] transition hover:bg-blue-500/10 hover:text-blue-500 sm:p-1.5 sm:m-0"><BarChart3 size={16} /></button>
+              <span className="hidden shrink-0 text-right sm:block">
                 <span className="block text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Next SLA in</span>
                 <span className={`block text-sm font-bold ${nextSla != null && nextSla - nowMs < 2 * 3600_000 ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'}`}>{nextSla != null ? humanizeDuration(nextSla - nowMs) : '—'}</span>
               </span>
@@ -399,7 +418,7 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
 
       {/* Archive — completed tickets, only under the default view */}
       {archived.length > 0 && (
-        <Card className="cursor-pointer p-3 transition hover:ring-[#C6A35D]/30" onClick={toggleArchive} role="button" tabIndex={0} aria-expanded={archiveOpen} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleArchive() } }}>
+        <Card className="cursor-pointer p-3 transition hover:ring-blue-500/30" onClick={toggleArchive} role="button" tabIndex={0} aria-expanded={archiveOpen} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleArchive() } }}>
           <div className="flex w-full items-center gap-2">
             <ChevronDown size={16} className={`shrink-0 text-[var(--text-muted)] transition-transform ${archiveOpen ? 'rotate-180' : ''}`} />
             <span className="text-sm font-bold text-[var(--text)]">Archive · Completed</span>

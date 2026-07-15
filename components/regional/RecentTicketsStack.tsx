@@ -73,8 +73,9 @@ export function TicketContent({ ticket, variant }: { ticket: RecentTicket; varia
         </p>
       </div>
 
-      {/* Priority + Status — right side */}
-      <div className="flex items-center gap-1.5 shrink-0">
+      {/* Priority + Status — right side. Mobile: stacked (three side-by-side chips
+          would starve the title); sm+ keeps the inline row. */}
+      <div className="flex flex-col items-end gap-1 shrink-0 sm:flex-row sm:items-center sm:gap-1.5">
         {isStaleOpen && (
           <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 whitespace-nowrap">7d+</span>
         )}
@@ -122,7 +123,7 @@ export function RecentTicketsStack({
   const collapseBar = (
     <button
       onClick={() => setExpanded(false)}
-      className="w-full text-xs text-[#C6A35D] hover:text-amber-600 flex items-center justify-between py-2 px-1 transition-colors"
+      className="w-full text-xs text-[#f59e0b] hover:text-amber-600 flex items-center justify-between py-2 px-1 transition-colors"
     >
       <span className="flex items-center gap-1 font-medium">
         <ChevronUp size={12} /> Collapse
@@ -170,7 +171,7 @@ export function RecentTicketsStack({
                 <span className="text-xs text-gray-400 dark:text-gray-500">
                   {tickets.length} ticket{tickets.length !== 1 ? 's' : ''} · {countLabel}
                 </span>
-                <span className="text-xs font-medium text-[#C6A35D] flex items-center gap-1">
+                <span className="text-xs font-medium text-[#f59e0b] flex items-center gap-1">
                   View all <ChevronDown size={11} />
                 </span>
               </div>

@@ -18,7 +18,7 @@ import { SendQuoteForm } from '@/components/admin/SendQuoteForm'
 import { SubmitCompletionForm } from '@/components/supplier/SubmitCompletionForm'
 import { SupplierVariationGate, AcceptSnagCard } from '@/components/supplier/SupplierJobActions'
 import { DisputeReviewButton, RaiseDisputeMore } from '@/components/dispute/DisputeBox'
-import { supplierStatusMeta, formatDate, formatDateTime, humanizeDuration, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
+import { supplierStatusMeta, formatDate, formatDateTime, formatJobId, humanizeDuration, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
 
 type QueueFilter = 'all' | 'to_quote' | 'attend' | 'evidence' | 'snags' | 'sla'
 type Tone = 'red' | 'purple' | 'gold' | 'green' | 'orange' | 'blue'
@@ -163,6 +163,7 @@ function QueueRow({ ticket, nowMs, company }: { ticket: SupplierTicketRow; nowMs
   // Genuinely critical (P1 / urgent) jobs get a RED action button so they stand out.
   const critical = ['P1', 'urgent'].includes(String(ticket.priority))
   const ctaCls = `relative z-20 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-bold transition lg:w-40 ${critical ? 'border-red-500/60 bg-red-500/10 text-red-600 hover:bg-red-500/15 dark:text-red-300' : 'border-blue-500/60 text-blue-600 hover:bg-blue-500/10 dark:text-blue-300'}`
+  const jobId = ticket.jobRef ?? formatJobId(ticket.jobNumber)
 
   return (
     <div className="relative grid gap-4 border-b border-[var(--border)] px-4 py-4 transition last:border-b-0 hover:bg-[var(--hover)] lg:grid-cols-[1fr_200px_1.1fr_160px] lg:items-center">
@@ -171,6 +172,7 @@ function QueueRow({ ticket, nowMs, company }: { ticket: SupplierTicketRow; nowMs
       <div className="flex min-w-0 items-center gap-3">
         <CategoryIcon category={ticket.category ?? ticket.title} priority={ticket.priority} />
         <div className="min-w-0">
+          {jobId && <p className="truncate font-mono text-[10px] text-[var(--text-faint)]">{jobId}</p>}
           <p className="truncate text-base font-bold text-[var(--text)]">{ticket.category || ticket.title}</p>
           <p className="truncate text-sm text-[var(--text-muted)]">{who}</p>
         </div>
@@ -200,7 +202,7 @@ function QueueRow({ ticket, nowMs, company }: { ticket: SupplierTicketRow; nowMs
 
       <div className="flex lg:justify-end">
         {cta === 'View dispute'
-          ? <DisputeReviewButton ticketId={ticket.id} viewerRole="supplier" trigger={open => <button type="button" onClick={open} className={ctaCls}>View dispute</button>} />
+          ? <DisputeReviewButton ticketId={ticket.id} viewerRole="supplier" trigger={open => <button type="button" onClick={open} className={ctaCls}>View Dispute</button>} />
           : toQuote(ticket)
           ? <SubmitQuoteCta ticket={ticket} className={ctaCls} />
           : closeout && !ticket.voNoneConfirmed
@@ -223,7 +225,7 @@ function SubmitQuoteCta({ ticket, className }: { ticket: SupplierTicketRow; clas
   const [open, setOpen] = useState(false)
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={className}>Submit quote</button>
+      <button type="button" onClick={() => setOpen(true)} className={className}>Submit Quote</button>
       {open && (
         <Modal onClose={() => setOpen(false)} maxWidth="max-w-3xl">
           {close => <div><SendQuoteForm defaultOpen competitive ticketId={ticket.id} priority={String(ticket.priority)} createdAt={ticket.createdAt} onClose={close} /></div>}
@@ -250,7 +252,7 @@ function MarkInProgressCta({ ticket, className }: { ticket: SupplierTicketRow; c
   }
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={className}>Mark in progress</button>
+      <button type="button" onClick={() => setOpen(true)} className={className}>Mark In Progress</button>
       {open && (
         <Modal onClose={() => setOpen(false)} maxWidth="max-w-md">
           {close => (
@@ -279,7 +281,7 @@ function UploadEvidenceCta({ ticket, className }: { ticket: SupplierTicketRow; c
   const evidenceRequested = ticket.status === 'evidence_requested'
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={className}>Upload evidence</button>
+      <button type="button" onClick={() => setOpen(true)} className={className}>Upload Evidence</button>
       {open && (
         <Modal onClose={() => setOpen(false)} maxWidth="max-w-2xl">
           {close => <SubmitCompletionForm defaultOpen ticketId={ticket.id} evidenceRequested={evidenceRequested} requireBoth={!evidenceRequested} onClose={close} />}
@@ -297,7 +299,7 @@ function ViewSnagCta({ ticket, className, company }: { ticket: SupplierTicketRow
   const store = ticket.isIndividual ? 'Individual' : [company, ticket.storeName, ticket.branchCode].filter(Boolean).join(' · ')
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={className}>View snag</button>
+      <button type="button" onClick={() => setOpen(true)} className={className}>View Snag</button>
       {open && (
         <Modal onClose={() => setOpen(false)} maxWidth="max-w-2xl">
           {close => (

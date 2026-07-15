@@ -10,6 +10,7 @@ import type { ReactNode } from 'react'
 import { MessageSquareWarning, Paperclip, X, Send, ShieldCheck, ShieldX, FileText, Image as ImageIcon, Loader2, ClipboardList, ChevronDown } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { formatDateTime } from '@/lib/utils'
+import { useScrollLock } from '@/lib/useScrollLock'
 
 // Reason quick-picks per dispute origin (folded into the first thread message).
 const DISPUTE_REASONS: Record<string, string[]> = {
@@ -22,7 +23,7 @@ const ORIGIN_CARD_LABEL: Record<string, string> = { snag: 'SNAG', evidence: 'EVI
 // One cell of the raise-dispute subject card (origin · ticket id · store).
 function DisputeInfoCell({ icon, label, value }: { icon?: ReactNode; label: string; value: string }) {
   return (
-    <div className="flex items-center gap-3 px-4 first:pl-0 last:pr-0">
+    <div className="flex items-center gap-3 py-2 first:pt-0 last:pb-0 sm:px-4 sm:py-0 sm:first:pl-0 sm:last:pr-0">
       {icon && <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-blue-500/15 text-blue-600 dark:text-blue-400">{icon}</span>}
       <div className="min-w-0">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-faint)]">{label}</p>
@@ -113,7 +114,7 @@ function Composer({ ticketId, action, submitLabel, placeholder, onDone }: { tick
   return (
     <div className="space-y-2.5">
       <textarea value={text} onChange={e => setText(e.target.value)} placeholder={placeholder} rows={3}
-        className="w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)] focus:ring-[#C6A35D]/40 outline-none" />
+        className="w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)] focus:ring-blue-500/40 outline-none" />
       {files.length > 0 && (
         <div className="space-y-1">
           {files.map((f, i) => (
@@ -154,6 +155,7 @@ export function RaiseDisputeButton({ ticketId, origin, subjectTitle, jobRef, sto
   const [files, setFiles] = useState<File[]>([])
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  useScrollLock(open)
   const what = origin === 'snag' ? 'snag' : origin === 'variation' ? 'variation-order decline' : 'evidence request'
   const reset = () => { setReason(''); setText(''); setFiles([]); setErr('') }
   const close = () => { setOpen(false); reset(); onClose?.() }
@@ -182,19 +184,21 @@ export function RaiseDisputeButton({ ticketId, origin, subjectTitle, jobRef, sto
         </button>
       )}
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={close}>
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-[var(--surface-2)] ring-1 ring-[var(--border)]" onClick={e => e.stopPropagation()}>
+        // Bottom-sheet on phones (mirrors components/ui/Modal), centered from sm up.
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4" onClick={close}>
+          <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-2xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] sm:max-h-[90vh] sm:rounded-2xl" onClick={e => e.stopPropagation()}>
             {/* Header */}
-            <div className="flex items-start justify-between gap-3 px-6 pt-6">
+            <div className="flex items-start justify-between gap-3 px-4 pt-5 sm:px-6 sm:pt-6">
               <h3 className="flex items-center gap-2.5 text-xl font-bold text-[var(--text)]"><MessageSquareWarning size={22} className="text-red-500" /> Raise a dispute</h3>
               <button onClick={close} aria-label="Close" className="-m-1 rounded-lg p-1.5 text-[var(--text-faint)] transition hover:bg-[var(--hover)] hover:text-[var(--text)]"><X size={20} /></button>
             </div>
 
-            <div className="space-y-5 p-6">
+            <div className="space-y-5 p-4 sm:p-6">
               <p className="text-sm text-[var(--text-muted)]">Raising a dispute pauses this {what} until it is resolved. Explain why you disagree and attach supporting evidence. Messages exchanged with the client will be recorded for audit purposes.</p>
 
-              {/* Subject info card */}
-              <div className="flex items-stretch divide-x divide-[var(--border)] rounded-xl bg-[var(--surface)] px-4 py-3 ring-1 ring-[var(--border)]">
+              {/* Subject info card — stacks on phones (three side-by-side cells need
+                  ~450px inside the modal); sm+ keeps the divided row. */}
+              <div className="flex flex-col divide-y divide-[var(--border)] rounded-xl bg-[var(--surface)] px-4 py-3 ring-1 ring-[var(--border)] sm:flex-row sm:items-stretch sm:divide-x sm:divide-y-0">
                 <DisputeInfoCell icon={<ClipboardList size={18} />} label={ORIGIN_CARD_LABEL[origin]} value={subjectTitle || '—'} />
                 <DisputeInfoCell label="TICKET ID" value={jobRef || '—'} />
                 <DisputeInfoCell label="STORE" value={store || '—'} />
@@ -235,7 +239,8 @@ export function RaiseDisputeButton({ ticketId, origin, subjectTitle, jobRef, sto
                       <span className="block text-[11px] text-[var(--text-faint)]">Photos, PDF or documents · Maximum 10 MB each</span>
                     </span>
                   </span>
-                  <span className="shrink-0 rounded-lg px-3 py-1.5 text-sm font-semibold text-blue-600 ring-1 ring-[var(--border)] transition hover:bg-blue-500/10 dark:text-blue-400">Browse files</span>
+                  {/* The whole dropzone label is clickable — the pill is desktop-only. */}
+                  <span className="hidden shrink-0 rounded-lg px-3 py-1.5 text-sm font-semibold text-blue-600 ring-1 ring-[var(--border)] transition hover:bg-blue-500/10 dark:text-blue-400 sm:inline-flex">Browse files</span>
                   <input type="file" accept="image/*,.pdf,.doc,.docx" multiple className="hidden" onChange={e => { addFiles(e.target.files); e.currentTarget.value = '' }} />
                 </label>
                 {files.length > 0 ? (
@@ -254,7 +259,7 @@ export function RaiseDisputeButton({ ticketId, origin, subjectTitle, jobRef, sto
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-between gap-3 border-t border-[var(--border)] px-6 py-4">
+            <div className="flex items-center justify-between gap-3 border-t border-[var(--border)] px-4 py-4 sm:px-6">
               <button type="button" onClick={close} disabled={busy} className="rounded-xl px-5 py-2.5 text-sm font-semibold text-[var(--text)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-50">Cancel</button>
               <button type="button" onClick={submit} disabled={busy} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:opacity-50">
                 {busy ? <><Loader2 size={15} className="animate-spin" /> Raising…</> : <><Send size={15} /> Raise dispute</>}
@@ -468,8 +473,8 @@ export function DisputeControls({ ticketId, origin, viewerRole, pendingOutcome, 
   // Role action set (propose + solo concede). Hidden for the proposer while waiting.
   const actions = viewerRole === 'supplier' ? (
     <>
-      <button onClick={() => act('propose')} disabled={!!busy} className="w-full py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition disabled:opacity-50">{busy === 'propose' ? 'Proposing…' : `Propose to resolve — drop the ${what}`}</button>
-      <button onClick={() => act('withdraw')} disabled={!!busy} className="w-full py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text)] text-sm font-semibold hover:bg-[var(--hover)] transition disabled:opacity-50 flex items-center justify-center gap-1.5"><ShieldCheck size={14} /> {busy === 'withdraw' ? 'Withdrawing…' : `Withdraw dispute — accept the ${what}`}</button>
+      <button onClick={() => act('propose')} disabled={!!busy} className="w-full py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition disabled:opacity-50">{busy === 'propose' ? 'Proposing…' : <><span className="sm:hidden">Propose to resolve</span><span className="hidden sm:inline">Propose to resolve — drop the {what}</span></>}</button>
+      <button onClick={() => act('withdraw')} disabled={!!busy} className="w-full py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text)] text-sm font-semibold hover:bg-[var(--hover)] transition disabled:opacity-50 flex items-center justify-center gap-1.5"><ShieldCheck size={14} /> {busy === 'withdraw' ? 'Withdrawing…' : <><span className="sm:hidden">Withdraw dispute</span><span className="hidden sm:inline">Withdraw dispute — accept the {what}</span></>}</button>
     </>
   ) : (
     <>
@@ -481,13 +486,13 @@ export function DisputeControls({ ticketId, origin, viewerRole, pendingOutcome, 
   return (
     <div className="rounded-xl ring-1 ring-[var(--border)] bg-[var(--input-bg)] p-3 space-y-2.5">
       {pending && iAmProposer && (
-        <div className="rounded-lg ring-1 ring-[#C6A35D]/30 bg-[#C6A35D]/10 p-2.5 space-y-2">
+        <div className="rounded-lg ring-1 ring-[#f59e0b]/30 bg-[#f59e0b]/10 p-2.5 space-y-2">
           <p className="text-sm text-[var(--text)]">Waiting for the {otherLabel(viewerRole === 'supplier' ? 'regional_manager' : 'supplier')} to confirm your proposal to <span className="font-semibold">{proposalText}</span>.</p>
           <button onClick={() => act('cancel')} disabled={!!busy} className="w-full py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm font-semibold disabled:opacity-50">{busy === 'cancel' ? 'Cancelling…' : 'Cancel proposal'}</button>
         </div>
       )}
       {pending && !iAmProposer && (
-        <div className="rounded-lg ring-1 ring-[#C6A35D]/30 bg-[#C6A35D]/10 p-2.5 space-y-2">
+        <div className="rounded-lg ring-1 ring-[#f59e0b]/30 bg-[#f59e0b]/10 p-2.5 space-y-2">
           <p className="text-sm text-[var(--text)]">The {otherLabel(pendingBy!)} proposed to <span className="font-semibold">{proposalText}</span>. Both sides must agree.</p>
           <button onClick={() => act('confirm')} disabled={!!busy} className="w-full py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold disabled:opacity-50">{busy === 'confirm' ? 'Agreeing…' : 'Agree'}</button>
         </div>

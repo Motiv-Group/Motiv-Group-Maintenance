@@ -119,7 +119,7 @@ export function PushNotificationToggle() {
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm font-medium text-gray-700 dark:text-gray-200 flex items-center gap-2">
-            <Bell size={14} className="text-[#C6A35D]" /> Push Notifications
+            <Bell size={14} className="text-[#f59e0b]" /> Push Notifications
           </p>
           <p className="text-xs text-green-600 dark:text-green-400 mt-0.5">Enabled on this device</p>
         </div>

@@ -79,7 +79,7 @@ export function StatTile({
   const toneCls: Record<string, string> = {
     default: 'text-[var(--text-muted)]', good: 'text-emerald-600 dark:text-emerald-400',
     warn: 'text-amber-600 dark:text-amber-500', bad: 'text-red-600 dark:text-red-400',
-    info: 'text-blue-600 dark:text-blue-400', gold: 'text-amber-600 dark:text-[#C6A35D]',
+    info: 'text-blue-600 dark:text-blue-400', gold: 'text-amber-600 dark:text-[#f59e0b]',
   }
   return (
     <Card className="p-4 flex flex-col gap-1.5 min-w-0">

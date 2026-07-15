@@ -3,19 +3,19 @@
 // work. Status accents use a darker hue in light mode for readability.
 import type { ReactNode, HTMLAttributes } from 'react'
 import Link from 'next/link'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, ChevronDown, Search } from 'lucide-react'
 import type { HealthStatus } from '@/lib/health/types'
 
-export const GOLD = '#C6A35D'
+export const GOLD = '#f59e0b'
 
 export const STATUS_PILL: Record<HealthStatus, string> = {
   controlled: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-500/30',
-  attention:  'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D] ring-1 ring-[#C6A35D]/30',
+  attention:  'bg-[#f59e0b]/15 text-amber-700 dark:text-[#f59e0b] ring-1 ring-[#f59e0b]/30',
   at_risk:    'bg-red-500/15 text-red-700 dark:text-red-400 ring-1 ring-red-500/30',
   critical:   'bg-red-700/20 text-red-800 dark:text-red-300 ring-1 ring-red-600/40',
 }
 export const STATUS_TEXT: Record<HealthStatus, string> = {
-  controlled: 'text-emerald-600 dark:text-emerald-400', attention: 'text-amber-600 dark:text-[#C6A35D]',
+  controlled: 'text-emerald-600 dark:text-emerald-400', attention: 'text-amber-600 dark:text-[#f59e0b]',
   at_risk: 'text-red-600 dark:text-red-400', critical: 'text-red-700 dark:text-red-300',
 }
 export const STATUS_STROKE: Record<HealthStatus, string> = {
@@ -51,7 +51,7 @@ export interface Kpi { label: string; value: ReactNode; hint?: ReactNode; icon?:
 const TONE: Record<NonNullable<Kpi['tone']>, string> = {
   default: 'text-[var(--text-muted)]',
   info:    'text-blue-600 dark:text-blue-400',
-  gold:    'text-amber-600 dark:text-[#C6A35D]',
+  gold:    'text-amber-600 dark:text-[#f59e0b]',
   good:    'text-emerald-600 dark:text-emerald-400',
   warn:    'text-amber-600 dark:text-amber-500',
   bad:     'text-red-600 dark:text-red-400',
@@ -63,7 +63,7 @@ const TONE: Record<NonNullable<Kpi['tone']>, string> = {
 const TONE_BORDER: Record<NonNullable<Kpi['tone']>, string> = {
   default: '!ring-[var(--border)]',
   info:    '!ring-blue-500/60',
-  gold:    '!ring-[#C6A35D]/60',
+  gold:    '!ring-blue-500/60',
   good:    '!ring-emerald-500/60',
   warn:    '!ring-amber-500/60',
   bad:     '!ring-red-500/60',
@@ -79,17 +79,17 @@ export function KpiCard({ kpi }: { kpi: Kpi }) {
   const accent = clear ? undefined : (kpi.actionable ? (kpi.border ?? TONE_BORDER[kpi.tone ?? 'default']) : kpi.border)
   const ring = accent ? `ring-1 ${accent}` : ''
   const body = (
-    <Card className={`p-4 flex flex-col gap-1.5 min-w-0 ${ring}${kpi.href ? ' h-full transition hover:ring-[#C6A35D]/50 hover:-translate-y-0.5 cursor-pointer' : ''}`}>
+    <Card className={`p-4 flex flex-col gap-1.5 min-w-0 ${ring}${kpi.href ? ' h-full transition hover:ring-blue-500/50 hover:-translate-y-0.5 cursor-pointer' : ''}`}>
       <div className={`flex items-center justify-between gap-2 text-[11px] font-semibold ${TONE[effTone]}`}>
         <span className="flex items-center gap-1.5 truncate">{kpi.icon}{kpi.label}</span>
         {kpi.trend && <TrendArrow t={kpi.trend} />}
       </div>
-      <div className="text-2xl font-bold leading-none text-[var(--text)]">{kpi.value}</div>
+      <div className="text-xl sm:text-2xl font-bold leading-none text-[var(--text)] break-words tabular-nums">{kpi.value}</div>
       {kpi.hint && <div className="text-[11px] text-[var(--text-faint)]">{kpi.hint}</div>}
     </Card>
   )
   return kpi.href
-    ? <Link href={kpi.href} className="block rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C6A35D]/50">{body}</Link>
+    ? <Link href={kpi.href} className="block rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50">{body}</Link>
     : body
 }
 // Static lg column classes so all KPIs fit in one row on wide screens (Tailwind
@@ -171,7 +171,7 @@ export function DistributionLegend({ counts }: { counts: Counts }) {
   const total = counts.controlled + counts.attention + counts.at_risk + counts.critical || 1
   const rows: { color: string; label: string; n: number }[] = [
     { color: 'bg-emerald-500', label: 'Green (Controlled)', n: counts.controlled },
-    { color: 'bg-[#C6A35D]', label: 'Amber (Attention)', n: counts.attention },
+    { color: 'bg-[#f59e0b]', label: 'Amber (Attention)', n: counts.attention },
     { color: 'bg-red-400', label: 'Red (At Risk)', n: counts.at_risk },
     { color: 'bg-red-800', label: 'Critical', n: counts.critical },
   ]
@@ -195,7 +195,7 @@ export function RagBlocks({ counts, total, unitLabel = 'estate', hrefFor }: { co
   const pct = (n: number) => (t > 0 ? Math.round((n / t) * 100) : 0)
   const blocks: { k: HealthStatus; label: string; value: number; cls: string }[] = [
     { k: 'controlled', label: 'Controlled', value: counts.controlled, cls: 'bg-emerald-500/10 ring-emerald-500/30 text-emerald-600 dark:text-emerald-400' },
-    { k: 'attention',  label: 'Attention',  value: counts.attention,  cls: 'bg-[#C6A35D]/10 ring-[#C6A35D]/30 text-amber-600 dark:text-[#C6A35D]' },
+    { k: 'attention',  label: 'Attention',  value: counts.attention,  cls: 'bg-[#f59e0b]/10 ring-[#f59e0b]/30 text-amber-600 dark:text-[#f59e0b]' },
     { k: 'at_risk',    label: 'At Risk',    value: counts.at_risk,    cls: 'bg-red-500/10 ring-red-500/30 text-red-600 dark:text-red-400' },
     { k: 'critical',   label: 'Critical',   value: counts.critical,   cls: 'bg-red-900/15 ring-red-800/40 text-red-700 dark:text-red-300' },
   ]
@@ -256,7 +256,7 @@ export function DistributionChips({ counts }: { counts: { controlled: number; at
 export function DistributionBar({ counts }: { counts: { controlled: number; attention: number; at_risk: number; critical: number } }) {
   const total = counts.controlled + counts.attention + counts.at_risk + counts.critical || 1
   const seg = [
-    { c: 'bg-emerald-500', n: counts.controlled }, { c: 'bg-[#C6A35D]', n: counts.attention },
+    { c: 'bg-emerald-500', n: counts.controlled }, { c: 'bg-[#f59e0b]', n: counts.attention },
     { c: 'bg-red-500', n: counts.at_risk }, { c: 'bg-red-800', n: counts.critical },
   ]
   return (
@@ -288,10 +288,48 @@ export function StatusLegend() {
   return (
     <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-[var(--text-muted)]">
       <span className="flex items-center gap-1.5"><i className="w-2 h-2 rounded-full bg-emerald-500" />Controlled 95–100%</span>
-      <span className="flex items-center gap-1.5"><i className="w-2 h-2 rounded-full bg-[#C6A35D]" />Attention 80–94%</span>
+      <span className="flex items-center gap-1.5"><i className="w-2 h-2 rounded-full bg-[#f59e0b]" />Attention 80–94%</span>
       <span className="flex items-center gap-1.5"><i className="w-2 h-2 rounded-full bg-red-500" />At Risk 51–79%</span>
       <span className="flex items-center gap-1.5"><i className="w-2 h-2 rounded-full bg-red-800" />Critical ≤50%</span>
     </div>
+  )
+}
+
+// ── Shared filter-bar controls ──────────────────────────────────
+// One search box + one "Label: Value" select pill, extracted from the Tickets
+// tab so every RM list tab's filter row (the controls next to the search bar)
+// looks and lays out identically. Native <select> under an appearance-none pill;
+// blue focus ring matches the search input. Long options (store names) are
+// width-capped on phones (`max-w-[55vw]`) and un-capped from `sm:`. Each tab
+// keeps its OWN label text + option set — only the control's look is shared.
+
+/** Search input with an overlaid magnifier. Full-width on mobile, grows on desktop. */
+export function SearchInput({ value, onChange, placeholder, className = 'w-full sm:w-auto sm:min-w-[180px] sm:flex-1' }: {
+  value: string; onChange: (v: string) => void; placeholder: string; className?: string
+}) {
+  return (
+    <div className={`relative ${className}`}>
+      <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
+      <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+        className="w-full rounded-xl bg-[var(--input-bg)] py-2.5 pl-9 pr-3 text-sm text-[var(--text)] ring-1 ring-[var(--border)] outline-none placeholder-[var(--text-faint)] focus:ring-blue-500/40" />
+    </div>
+  )
+}
+
+/** "Label: Value" native-select pill. Pass an optional `className` for per-tab sizing. */
+export function FilterSelect<T extends string>({ label, value, onChange, options, className = '' }: {
+  label: string; value: T; onChange: (v: T) => void; options: { value: T; label: string }[]; className?: string
+}) {
+  return (
+    <label className={`relative flex max-w-full shrink-0 items-center gap-1.5 rounded-xl bg-[var(--input-bg)] px-3 py-2.5 text-sm ring-1 ring-[var(--border)] transition focus-within:ring-blue-500/40 ${className}`}>
+      <span className="whitespace-nowrap text-[var(--text-muted)]">{label}:</span>
+      {/* Width-capped on phones — a select sizes to its longest option (store names). */}
+      <select value={value} onChange={e => onChange(e.target.value as T)}
+        className="min-w-0 max-w-[55vw] cursor-pointer appearance-none truncate bg-transparent pr-4 font-semibold text-[var(--text)] outline-none sm:max-w-none">
+        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+      <ChevronDown size={14} className="pointer-events-none absolute right-2.5 text-[var(--text-faint)]" />
+    </label>
   )
 }
 

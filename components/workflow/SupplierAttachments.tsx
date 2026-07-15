@@ -65,7 +65,7 @@ export function SupplierAttachments({ ticketId }: { ticketId: string }) {
 
       <div className="flex gap-2">
         <button onClick={() => addUpdate(note, 'note').then(() => setNote(''))} disabled={!!busy || !note.trim()}
-          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#C6A35D] text-[#0a0e17] text-sm font-semibold disabled:opacity-50"><Send size={15} /> Send update</button>
+          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold disabled:opacity-50"><Send size={15} /> Send update</button>
         <label className="flex items-center gap-2 px-3 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text)] text-sm cursor-pointer hover:bg-[var(--hover)] transition">
           <Camera size={15} /> {busy === 'photo' ? 'Uploading…' : 'Add photo'}
           <input type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) uploadPhoto(f) }} />

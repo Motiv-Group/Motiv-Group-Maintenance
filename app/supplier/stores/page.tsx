@@ -97,17 +97,17 @@ export default async function AdminStoresPage() {
             >
               <div className="flex items-center justify-between gap-3">
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="font-semibold text-sm text-[var(--text)] truncate">{store.company_name}</p>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <p className="font-semibold text-sm text-[var(--text)] truncate min-w-0">{store.company_name}</p>
                     <span className="text-[var(--text-faint)] text-xs shrink-0">·</span>
-                    <p className="text-xs text-[var(--text-muted)] truncate">{store.sub_store}</p>
+                    <p className="text-xs text-[var(--text-muted)] truncate shrink-0 max-w-[45%]">{store.sub_store}</p>
                   </div>
-                  <div className="flex items-center gap-3 mt-1">
+                  <div className="flex items-center gap-3 mt-1 min-w-0">
                     <p className="text-xs text-[var(--text-faint)]">{store.email}</p>
                     {store.rm ? (
-                      <span className="inline-flex items-center gap-1 text-xs bg-blue-500/15 text-blue-700 dark:text-blue-400 px-2 py-0.5 rounded-full">
-                        <Users size={10} />
-                        {store.rm.full_name ?? store.rm.company_name}
+                      <span className="inline-flex items-center gap-1 text-xs bg-blue-500/15 text-blue-700 dark:text-blue-400 px-2 py-0.5 rounded-full max-w-full shrink">
+                        <Users size={10} className="shrink-0" />
+                        <span className="truncate min-w-0">{store.rm.full_name ?? store.rm.company_name}</span>
                       </span>
                     ) : (
                       <span className="text-xs text-[var(--text-faint)] italic">No RM assigned</span>

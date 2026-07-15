@@ -25,7 +25,7 @@ const quality = (s: number) => (s >= 90 ? 'Excellent' : s >= 80 ? 'Good' : s >= 
 
 const BAND: Record<'High' | 'Medium' | 'Low', string> = {
   High: 'bg-red-500/15 text-red-400 ring-1 ring-red-500/30',
-  Medium: 'bg-[#C6A35D]/15 text-[#C6A35D] ring-1 ring-[#C6A35D]/30',
+  Medium: 'bg-blue-500/15 text-blue-500 ring-1 ring-[#f59e0b]/30',
   Low: 'bg-slate-500/15 text-[var(--text-muted)] ring-1 ring-slate-500/30',
 }
 
@@ -75,7 +75,7 @@ export default async function ExecutiveEstatePage() {
             </div>
             {briefing?.body && (
               <div className="flex items-start gap-2 justify-center lg:justify-start text-left">
-                <span className="shrink-0 mt-0.5 inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wide text-[#C6A35D] bg-[#C6A35D]/10 rounded-full px-1.5 py-0.5"><Sparkles size={10} /> AI</span>
+                <span className="shrink-0 mt-0.5 inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wide text-blue-500 bg-blue-500/10 rounded-full px-1.5 py-0.5"><Sparkles size={10} /> AI</span>
                 <AiBriefing headline={briefing.headline} body={briefing.body} scope="estate" scopeId={companyId} className="text-sm leading-relaxed text-[var(--text-muted)]" />
               </div>
             )}
@@ -95,8 +95,8 @@ export default async function ExecutiveEstatePage() {
         <div className="xl:col-span-5 min-w-0">
           <SectionCard
             title="Regional Ranking — highest risk first"
-            icon={<BarChart3 size={15} className="text-[#C6A35D]" />}
-            action={<Link href="/executive/regions" className="text-xs text-[#C6A35D] hover:underline flex items-center gap-1">View all <ArrowRight size={12} /></Link>}
+            icon={<BarChart3 size={15} className="text-[#f59e0b]" />}
+            action={<Link href="/executive/regions" className="text-xs text-blue-500 hover:underline flex items-center gap-1">View all <ArrowRight size={12} /></Link>}
           >
             <div className="overflow-x-auto -mx-1">
               <table className="w-full text-sm min-w-[640px]">
@@ -134,7 +134,7 @@ export default async function ExecutiveEstatePage() {
             <div className="flex flex-col items-center gap-4">
               <StoreDistributionDonut counts={e.counts} />
               <div className="w-full"><RagBlocks counts={e.counts} total={total} /></div>
-              <Link href="/executive/stores" className="text-xs text-[#C6A35D] hover:underline">View full distribution</Link>
+              <Link href="/executive/stores" className="text-xs text-blue-500 hover:underline">View full distribution</Link>
             </div>
           </SectionCard>
         </div>
@@ -143,7 +143,7 @@ export default async function ExecutiveEstatePage() {
           <SectionCard
             title="Top Risk Stores"
             icon={<ShieldAlert size={15} className="text-red-400" />}
-            action={<Link href="/executive/stores" className="text-xs text-[#C6A35D] hover:underline flex items-center gap-1">View all <ArrowRight size={12} /></Link>}
+            action={<Link href="/executive/stores" className="text-xs text-blue-500 hover:underline flex items-center gap-1">View all <ArrowRight size={12} /></Link>}
           >
             <div className="overflow-x-auto -mx-1">
               <table className="w-full text-sm min-w-[420px]">
@@ -176,8 +176,8 @@ export default async function ExecutiveEstatePage() {
       {/* Performance + decisions + cost */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
         {/* Supplier Performance — Best Performing | Underperforming, side by side */}
-        <SectionCard title="Supplier Performance Overview" icon={<Truck size={15} className="text-[#C6A35D]" />}
-          action={<Link href="/executive/suppliers" className="text-xs text-[#C6A35D] hover:underline">View all</Link>}>
+        <SectionCard title="Supplier Performance Overview" icon={<Truck size={15} className="text-[#f59e0b]" />}
+          action={<Link href="/executive/suppliers" className="text-xs text-blue-500 hover:underline">View all</Link>}>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <div className="text-[11px] uppercase tracking-wide text-emerald-400 mb-2 flex items-center gap-1.5"><CheckCircle2 size={13} /> Best Performing</div>
@@ -207,7 +207,7 @@ export default async function ExecutiveEstatePage() {
         </SectionCard>
 
         {/* Internal Performance — three metrics across */}
-        <SectionCard title="Internal Performance Overview" icon={<ShieldAlert size={15} className="text-[#C6A35D]" />}>
+        <SectionCard title="Internal Performance Overview" icon={<ShieldAlert size={15} className="text-[#f59e0b]" />}>
           <div className="grid grid-cols-3 gap-3">
             <Metric label="Approval Backlog" value={e.decisionsPending} sub={`${fmtK(data.pendingDecisionValue)}`} />
             <Metric label="Internal SLA Pressure" value={e.internalSlaBreaches} sub="Across teams" trend={tr(data.trends.slaPressure)} />
@@ -216,8 +216,8 @@ export default async function ExecutiveEstatePage() {
         </SectionCard>
 
         {/* Executive Decisions — band · title · value · due date */}
-        <SectionCard title="Executive Decisions Required" icon={<Gavel size={15} className="text-[#C6A35D]" />}
-          action={<Link href="/executive/decisions" className="text-xs text-[#C6A35D] hover:underline">View all</Link>}>
+        <SectionCard title="Executive Decisions Required" icon={<Gavel size={15} className="text-[#f59e0b]" />}
+          action={<Link href="/executive/decisions" className="text-xs text-blue-500 hover:underline">View all</Link>}>
           <div className="space-y-1">
             {actionableDecisions.slice(0, 5).map((d, i) => (
               <div key={i} className="flex items-center gap-2 py-1.5 border-b border-[var(--border)] last:border-0">
@@ -233,7 +233,7 @@ export default async function ExecutiveEstatePage() {
         </SectionCard>
 
         {/* Cost & Exposure */}
-        <SectionCard title="Cost &amp; Exposure" icon={<Banknote size={15} className="text-[#C6A35D]" />}>
+        <SectionCard title="Cost &amp; Exposure" icon={<Banknote size={15} className="text-[#f59e0b]" />}>
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <KpiCard kpi={{ label: 'Pending Quote Value', value: fmtK(data.pendingDecisionValue), hint: `${e.decisionsPending} quotes` }} />
@@ -251,7 +251,7 @@ export default async function ExecutiveEstatePage() {
                 {data.exposureBreakdown.length === 0 && <p className="text-xs text-[var(--text-faint)]">No commercial exposure</p>}
               </div>
             </div>
-            <div className="text-center"><Link href="/executive/insights/cost-exposure" className="text-xs text-[#C6A35D] hover:underline">View cost exposure details</Link></div>
+            <div className="text-center"><Link href="/executive/insights/cost-exposure" className="text-xs text-blue-500 hover:underline">View cost exposure details</Link></div>
           </div>
         </SectionCard>
       </div>

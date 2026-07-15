@@ -9,6 +9,8 @@ import { PhotoThumbs } from '@/components/ui/PhotoThumbs'
 import { createAdminClient } from '@/lib/supabase/server'
 import { signedUrl, signManyUrls } from '@/lib/storage'
 import { requireSupplierV3 } from '@/lib/health/guard'
+import { TicketChatIcon } from '@/components/chat/TicketChat'
+import { ticketChatUnread } from '@/lib/chat-unread'
 import { loadSlaResolver } from '@/lib/health/data'
 import { deriveDueDates } from '@/lib/health/priority'
 import { computeTicketSla } from '@/lib/health/sla'
@@ -39,7 +41,7 @@ const SIGNOFF_META: Record<string, { label: string; ring: string; bg: string; he
   accepted: { label: 'Approved', ring: 'ring-emerald-500/40', bg: 'bg-emerald-500/5', head: 'bg-emerald-500/10 border-emerald-500/20', badge: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400', iconCls: 'text-emerald-500' },
   rejected: { label: 'Rejected', ring: 'ring-red-500/40', bg: 'bg-red-500/5', head: 'bg-red-500/10 border-red-500/20', badge: 'bg-red-500/15 text-red-700 dark:text-red-400', iconCls: 'text-red-500' },
   evidence_requested: { label: 'More info requested', ring: 'ring-amber-500/40', bg: 'bg-amber-500/5', head: 'bg-amber-500/10 border-amber-500/20', badge: 'bg-amber-500/15 text-amber-700 dark:text-amber-400', iconCls: 'text-amber-500' },
-  submitted: { label: 'Under review', ring: 'ring-[#C6A35D]/40', bg: 'bg-[#C6A35D]/5', head: 'bg-[#C6A35D]/10 border-[#C6A35D]/20', badge: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D]', iconCls: 'text-[#C6A35D]' },
+  submitted: { label: 'Under review', ring: 'ring-[#f59e0b]/40', bg: 'bg-[#f59e0b]/5', head: 'bg-[#f59e0b]/10 border-[#f59e0b]/20', badge: 'bg-[#f59e0b]/15 text-amber-700 dark:text-[#f59e0b]', iconCls: 'text-[#f59e0b]' },
 }
 
 // A labelled sub-group inside the Archived block — a small uppercase heading over
@@ -196,6 +198,8 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
   const technicians = (technicianRows ?? []) as { id: string; name: string }[]
   // Access: the awarded supplier OR a supplier invited to quote (competitive model).
   const awarded = !!t.supplier_id && supplierIds.includes(t.supplier_id)
+  // Per-ticket RM↔supplier chat is available to the awarded supplier's users.
+  const chatUnread = awarded ? await ticketChatUnread(admin, t.id, userId) : false
   if (!awarded && !invite) redirect('/supplier/tickets')
   // Declined off the ticket (not re-invited) — show "Declined" to the supplier.
   const declinedForMe = !awarded && !!invite && ['declined', 'closed'].includes((invite as any).status)
@@ -582,17 +586,20 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
             {t.job_ref && <span className="font-mono text-sm font-semibold text-[var(--text-faint)]">{t.job_ref}</span>}
             <h1 className="text-lg font-bold text-[var(--text)]">{t.category || t.title}</h1>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end">
-            <PriorityBadge priority={t.priority} className="w-full text-center" />
-            {(() => {
-              const sm = supplierStatusMeta(supplierStatus)
-              // An open dispute (awarded supplier) overrides the badge with "Dispute" —
-              // the snag/evidence step is paused until the manager resolves it.
-              const disputing = awarded && !!openDispute
-              const cls = disputing || declinedForMe ? 'bg-red-500/15 text-red-700 dark:text-red-400' : sm.cls
-              const label = disputing ? 'Dispute' : declinedForMe ? (declinedBy === 'supplier' ? 'Declined (you)' : declinedBy === 'regional_manager' ? 'Declined (Client)' : 'Declined') : sm.label
-              return <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${cls}`}>{label}</span>
-            })()}
+          <div className="flex items-start gap-2 shrink-0">
+            <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 justify-items-end">
+              <PriorityBadge priority={t.priority} className="w-full text-center" />
+              {(() => {
+                const sm = supplierStatusMeta(supplierStatus)
+                // An open dispute (awarded supplier) overrides the badge with "Dispute" —
+                // the snag/evidence step is paused until the manager resolves it.
+                const disputing = awarded && !!openDispute
+                const cls = disputing || declinedForMe ? 'bg-red-500/15 text-red-700 dark:text-red-400' : sm.cls
+                const label = disputing ? 'Dispute' : declinedForMe ? (declinedBy === 'supplier' ? 'Declined (you)' : declinedBy === 'regional_manager' ? 'Declined (Client)' : 'Declined') : sm.label
+                return <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${cls}`}>{label}</span>
+              })()}
+            </div>
+            {awarded && <TicketChatIcon ticketId={t.id} viewerRole="supplier" unread={chatUnread} />}
           </div>
         </div>
         {!declinedForMe && <RmPipeline status={supplierStatus} />}
@@ -748,7 +755,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
         {/* Ticket information — aligned label→value rows, then description + callouts. */}
         <Card className="p-5 space-y-4 h-full">
           <h2 className="text-sm font-bold text-[var(--text)]">Ticket information</h2>
-          <dl className="grid grid-cols-[max-content_1fr] items-baseline gap-x-6 gap-y-2.5 text-sm">
+          <dl className="grid grid-cols-[max-content_1fr] items-baseline gap-x-3 sm:gap-x-6 gap-y-2.5 text-sm">
             {companyName && <><dt className="text-[var(--text-muted)]">Company</dt><dd className="font-medium text-[var(--text)]">{companyName}</dd></>}
             {store?.name && <><dt className="text-[var(--text-muted)]">Store</dt><dd className="font-medium text-[var(--text)]">{storeName}</dd></>}
             {customer && <><dt className="text-[var(--text-muted)]">Customer</dt><dd className="font-medium text-[var(--text)]">{customer.full_name || 'Individual'}</dd></>}

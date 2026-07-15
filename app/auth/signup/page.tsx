@@ -95,7 +95,7 @@ export default function SignupPage() {
   }
 
   return (
-    <AuthShell maxWidth="lg" logoHeight={138} logoGap={6}>
+    <AuthShell maxWidth="lg" logoHeight={138}>
       <h1 className="text-xl font-semibold text-white mb-1">Create your account</h1>
       <p className="text-sm text-gray-300 mb-5">Choose the type of account to get started.</p>
 

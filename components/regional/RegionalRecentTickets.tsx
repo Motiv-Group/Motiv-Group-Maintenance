@@ -29,7 +29,7 @@ export function RegionalRecentTickets({ tickets }: { tickets: RegionalTicketRow[
   }, [tickets])
 
   return (
-    <Card className="p-5 cursor-pointer hover:ring-[#C6A35D]/30 transition" onClick={toggle} role="button" tabIndex={0} aria-expanded={open}
+    <Card className="p-5 cursor-pointer hover:ring-blue-500/30 transition" onClick={toggle} role="button" tabIndex={0} aria-expanded={open}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle() } }}>
       <div className="flex items-center justify-between gap-2 mb-3">
         <span className="flex items-center gap-2 min-w-0">
@@ -37,7 +37,7 @@ export function RegionalRecentTickets({ tickets }: { tickets: RegionalTicketRow[
           <span className="text-sm font-bold text-[var(--text)]">Recent Tickets</span>
           <span className="text-[11px] font-medium text-[var(--text-muted)] bg-black/5 dark:bg-white/10 rounded-full px-2 py-0.5 whitespace-nowrap">Latest {recent.length}</span>
         </span>
-        <Link href="/regional/tickets" onClick={e => e.stopPropagation()} className="text-xs font-medium text-[#C6A35D] hover:underline shrink-0">All</Link>
+        <Link href="/regional/tickets" onClick={e => e.stopPropagation()} className="text-xs font-medium text-blue-500 hover:underline shrink-0">All</Link>
       </div>
 
       {open && (recent.length ? <div onClick={e => e.stopPropagation()}>{recent.map(t => {
@@ -56,9 +56,11 @@ export function RegionalRecentTickets({ tickets }: { tickets: RegionalTicketRow[
                 return m ? <p className={`text-[11px] font-medium truncate ${sm.text}`}>{m.l} · {formatDateTime(m.at)}</p> : null
               })()}
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
+            {/* Mobile: cap the badge column so long status labels can't starve the
+                ticket title (the grid sizes to the widest badge at base). */}
+            <div className="grid max-w-[7rem] grid-cols-1 gap-1.5 shrink-0 justify-items-end sm:max-w-none sm:grid-cols-[4.5rem_7rem] sm:justify-items-stretch">
               <PriorityBadge priority={t.priority} className="w-full text-center" />
-              <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${t.disputed ? 'bg-red-500/15 text-red-700 dark:text-red-400' : t.infoAdded ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : sm.cls}`}>{t.disputed ? 'Dispute' : t.infoAdded ? 'Info added' : sm.label}</span>
+              <span className={`max-w-full truncate text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${t.disputed ? 'bg-red-500/15 text-red-700 dark:text-red-400' : t.infoAdded ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : sm.cls}`}>{t.disputed ? 'Dispute' : t.infoAdded ? 'Info added' : sm.label}</span>
             </div>
           </Link>
         )

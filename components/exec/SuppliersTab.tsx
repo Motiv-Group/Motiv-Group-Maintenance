@@ -63,7 +63,7 @@ export function SuppliersTab({ data }: { data: EstateDashboardData }) {
 
   return (
     <div className="space-y-5">
-      <TabHeader icon={<Truck size={18} className="text-[#C6A35D]" />} title="Suppliers" subtitle="Supplier performance, SLA delivery, response quality and accountability.">
+      <TabHeader icon={<Truck size={18} className="text-[#f59e0b]" />} title="Suppliers" subtitle="Supplier performance, SLA delivery, response quality and accountability.">
         <DateChip date={formatDate(data.generatedAt)} />
         <FilterMenu value={status} onChange={setStatus} options={STATUS_FILTER_OPTIONS} />
         <ExportButton onExport={onExport} />
@@ -95,7 +95,7 @@ export function SuppliersTab({ data }: { data: EstateDashboardData }) {
                       <td className="px-2 text-[var(--text-muted)]">{Math.round(s.perf.firstTimeFixRate * 100)}%</td>
                       <td className="px-2 text-[var(--text-muted)]">{s.perf.assignedTickets ? Math.round(s.perf.repeatDefectInvolvement / s.perf.assignedTickets * 100) : 0}%</td>
                       <td className="px-2 text-[var(--text-muted)] whitespace-nowrap">{fmtK(s.costExposure)}</td><td className="px-2 text-[var(--text-muted)]">{s.perf.escalationCount}</td>
-                      <td className="px-2"><span className={`text-[11px] px-2 py-1 rounded-lg ring-1 ${s.perf.band === 'controlled' ? 'text-[var(--text-muted)] ring-white/10' : 'text-[#C6A35D] ring-[#C6A35D]/40'}`}>{s.perf.band === 'controlled' ? 'Monitor' : 'Review'}</span></td>
+                      <td className="px-2"><span className={`text-[11px] px-2 py-1 rounded-lg ring-1 ${s.perf.band === 'controlled' ? 'text-[var(--text-muted)] ring-white/10' : 'text-[#f59e0b] ring-[#f59e0b]/40'}`}>{s.perf.band === 'controlled' ? 'Monitor' : 'Review'}</span></td>
                     </tr>
                   ))}
                   {!shown.length && <tr><td colSpan={14} className="py-6 text-center text-[var(--text-faint)]">No suppliers match this filter.</td></tr>}
@@ -109,7 +109,7 @@ export function SuppliersTab({ data }: { data: EstateDashboardData }) {
               <div className="space-y-2 text-sm">
                 <Bucket color="bg-emerald-500" label="≥ 90%" n={buckets.hi} total={suppliers.length} />
                 <Bucket color="bg-emerald-400" label="80 – 89%" n={buckets.mid} total={suppliers.length} />
-                <Bucket color="bg-[#C6A35D]" label="70 – 79%" n={buckets.lo} total={suppliers.length} />
+                <Bucket color="bg-[#f59e0b]" label="70 – 79%" n={buckets.lo} total={suppliers.length} />
                 <Bucket color="bg-red-500" label="< 70%" n={buckets.risk} total={suppliers.length} />
               </div>
             </SectionCard>
@@ -120,7 +120,7 @@ export function SuppliersTab({ data }: { data: EstateDashboardData }) {
               {topCost.map((s, i) => (
                 <div key={s.id} className="py-1.5">
                   <div className="flex justify-between text-xs mb-1"><span className="text-[var(--text-muted)]">{i + 1}. {s.name}</span><span className="text-[var(--text-muted)]">{fmtK(s.costExposure)}</span></div>
-                  <div className="h-2 rounded-full bg-white/10 overflow-hidden"><div className="h-full bg-[#C6A35D]" style={{ width: `${(s.costExposure / maxCost) * 100}%` }} /></div>
+                  <div className="h-2 rounded-full bg-white/10 overflow-hidden"><div className="h-full bg-[#f59e0b]" style={{ width: `${(s.costExposure / maxCost) * 100}%` }} /></div>
                 </div>
               ))}
               {!topCost.length && <p className="text-sm text-[var(--text-faint)]">No exposure.</p>}
@@ -141,7 +141,7 @@ export function SuppliersTab({ data }: { data: EstateDashboardData }) {
                         <td className="px-2 text-[var(--text-muted)] max-w-[200px] truncate">{e.issue}</td>
                         <td className="px-2 text-[var(--text-muted)] whitespace-nowrap">{formatDate(e.escalatedAt)}</td>
                         <td className="px-2 text-[var(--text-muted)] whitespace-nowrap">{e.escalatedBy ?? '—'}</td>
-                        <td className="px-2"><span className={`text-[11px] px-2 py-0.5 rounded-full ${e.status === 'resolved' ? 'bg-emerald-500/15 text-emerald-400' : e.status === 'in_progress' ? 'bg-[#C6A35D]/15 text-[#C6A35D]' : 'bg-red-500/15 text-red-400'}`}>{e.status.replace('_', ' ')}</span></td>
+                        <td className="px-2"><span className={`text-[11px] px-2 py-0.5 rounded-full ${e.status === 'resolved' ? 'bg-emerald-500/15 text-emerald-400' : e.status === 'in_progress' ? 'bg-blue-500/15 text-blue-500' : 'bg-red-500/15 text-red-400'}`}>{e.status.replace('_', ' ')}</span></td>
                         <td className="px-2 text-[var(--text-muted)] max-w-[200px] truncate">{e.actionRequired ?? '—'}</td>
                       </tr>
                     ))}

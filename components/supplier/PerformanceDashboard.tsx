@@ -78,7 +78,7 @@ export function PerformanceDashboard({ perf, recent, rating }: { perf: SupplierP
       {/* Headline outcomes */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Card className="p-4">
-          <div className="flex items-center gap-2 text-[var(--text-muted)]"><Star size={15} className="shrink-0 text-[#C6A35D]" /><span className="text-[11px] font-medium uppercase tracking-wide">Client rating</span></div>
+          <div className="flex items-center gap-2 text-[var(--text-muted)]"><Star size={15} className="shrink-0 text-blue-500" /><span className="text-[11px] font-medium uppercase tracking-wide">Client rating</span></div>
           <div className="mt-2 flex items-center gap-2">
             <span className="text-2xl font-bold tabular-nums text-[var(--text)]">{rating.avg.toFixed(1)}</span>
             <Stars value={rating.avg} size={14} />

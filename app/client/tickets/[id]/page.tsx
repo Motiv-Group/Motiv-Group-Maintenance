@@ -130,7 +130,7 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
   const spinning = !done && !closed
   const isWait = meta.mode === 'wait'
   const NaIcon = done ? CheckCircle2 : closed ? XCircle : Loader2
-  const naColor = done ? 'text-emerald-500' : closed ? 'text-[var(--text-faint)]' : isWait ? 'text-blue-500' : 'text-[#C6A35D]'
+  const naColor = done ? 'text-emerald-500' : closed ? 'text-[var(--text-faint)]' : isWait ? 'text-blue-500' : 'text-[#f59e0b]'
 
   const cv = clientVisibleStatus(t.status as TicketStatus)
   // Priority + status badges rendered with the same component (and sizing) as the
@@ -197,7 +197,7 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
             <InfoRow label="Logged" value={formatDateTime(t.created_at)} />
             <div>
               <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Description</div>
-              <p className="text-sm text-[var(--text)] mt-0.5 whitespace-pre-line">{t.description}</p>
+              <p className="text-sm text-[var(--text)] mt-0.5 whitespace-pre-line break-words">{t.description}</p>
               <EditedLine at={t.edited_at} by={editorName} />
             </div>
             {(showVisit || showFollowUp) && <InfoRow label="Assigned supplier" value={visitSupplier ?? 'Assigned supplier'} />}

@@ -121,11 +121,12 @@ export function NotificationList({ initial }: { initial?: Notification[] } = {})
         ))}
       </div>
 
+      {/* Mobile: one swipeable chip row instead of 3-4 wrapped rows; sm+ wraps. */}
       {types.length > 2 && (
-        <div className="flex flex-wrap gap-2">
+        <div className="no-scrollbar flex flex-nowrap gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
           {types.map(t => (
             <button key={t} onClick={() => setTypeFilter(t)}
-              className={`rounded-full border px-3 py-1 text-xs transition ${typeFilter === t ? 'border-[var(--text-muted)] bg-[var(--text-muted)] text-[var(--surface)]' : 'border-[var(--border)] text-[var(--text-faint)] hover:text-[var(--text)]'}`}>
+              className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1 text-xs transition ${typeFilter === t ? 'border-[var(--text-muted)] bg-[var(--text-muted)] text-[var(--surface)]' : 'border-[var(--border)] text-[var(--text-faint)] hover:text-[var(--text)]'}`}>
               {t === 'all' ? 'All types' : prettyType(t)}
             </button>
           ))}
@@ -179,7 +180,7 @@ function Row({ n, onToggle, archived }: { n: Notification; onToggle: (id: string
   const unread = !n.read
   const inner = (
     <>
-      <p className={`truncate text-sm text-[var(--text)] ${unread ? 'font-semibold' : 'font-medium'}`}>{n.title}</p>
+      <p className={`line-clamp-2 text-sm text-[var(--text)] sm:truncate ${unread ? "font-semibold" : "font-medium"}`}>{n.title}</p>
       <p className={`mt-0.5 text-sm ${unread ? 'text-[var(--text-muted)]' : 'text-[var(--text-faint)]'}`}>{n.message}</p>
       <p className="mt-1 text-[11px] text-[var(--text-faint)]" title={formatDateTime(n.created_at)}>
         {timeAgo(n.created_at)}{n.job_ref ? <span className="font-mono"> · {n.job_ref}</span> : ''}
@@ -191,9 +192,9 @@ function Row({ n, onToggle, archived }: { n: Notification; onToggle: (id: string
       {/* Left accent bar makes unread unmistakable at a glance. */}
       {!archived && unread && <span aria-hidden className="absolute inset-y-2 left-0 w-1 rounded-full bg-blue-500" />}
       {n.link ? (
-        <Link href={n.link} onClick={() => { if (unread) onToggle(n.id, true) }} className="block py-3 pl-4 pr-12">{inner}</Link>
+        <Link href={n.link} onClick={() => { if (unread) onToggle(n.id, true) }} className="block py-3 pl-4 pr-14 sm:pr-12">{inner}</Link>
       ) : (
-        <div className="py-3 pl-4 pr-12">{inner}</div>
+        <div className="py-3 pl-4 pr-14 sm:pr-12">{inner}</div>
       )}
       {/* Read receipt: double blue tick = read, single grey tick = unread. Tap to toggle. */}
       <button
@@ -201,7 +202,7 @@ function Row({ n, onToggle, archived }: { n: Notification; onToggle: (id: string
         onClick={() => onToggle(n.id, unread)}
         title={unread ? 'Mark as read' : 'Mark as unread'}
         aria-label={unread ? 'Mark as read' : 'Mark as unread'}
-        className="absolute right-2 top-2.5 grid h-7 w-9 place-items-center rounded-lg transition hover:bg-[var(--hover)]"
+        className="absolute right-2 top-2.5 grid h-11 w-11 sm:h-7 sm:w-9 place-items-center rounded-lg transition hover:bg-[var(--hover)]"
       >
         {unread ? <Check size={16} className="text-[var(--text-faint)]" /> : <CheckCheck size={18} className="text-blue-500" />}
       </button>

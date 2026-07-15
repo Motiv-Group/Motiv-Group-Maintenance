@@ -68,7 +68,7 @@ export default async function ContractorReviewsPage(props: { params: Promise<{ i
       </div>
 
       {reviews.length === 0 ? (
-        <div className="bg-slate-50 dark:bg-gray-800 border border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-12 text-center">
+        <div className="bg-slate-50 dark:bg-gray-800 border border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-8 text-center sm:p-12">
           <Star size={28} className="mx-auto text-gray-300 mb-2" />
           <p className="text-sm text-gray-400">No reviews yet for this contractor.</p>
         </div>

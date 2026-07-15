@@ -55,7 +55,7 @@ export default async function StoreVisitsPage() {
       </div>
 
       {!rows.length && (
-        <div className="rounded-xl border border-dashed border-[var(--border)] p-12 text-center">
+        <div className="rounded-xl border border-dashed border-[var(--border)] p-8 sm:p-12 text-center">
           <CalendarClock size={28} className="mx-auto text-[var(--text-faint)] mb-2" />
           <p className="text-sm text-[var(--text-faint)]">No visits scheduled yet.</p>
         </div>
@@ -63,7 +63,7 @@ export default async function StoreVisitsPage() {
 
       {rows.map(r => (
         <Link key={r.id} href={`/client/tickets/${r.id}`}>
-          <Card className="p-4 flex items-center gap-3 transition hover:ring-[#C6A35D]/50">
+          <Card className="p-4 flex items-center gap-3 transition hover:ring-blue-500/50">
             <div className="shrink-0 w-12 text-center">
               <CalendarClock size={20} className="mx-auto text-indigo-600 dark:text-indigo-400" />
             </div>

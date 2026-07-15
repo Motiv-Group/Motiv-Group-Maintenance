@@ -88,12 +88,12 @@ export function SupplierQuotesTable({ items }: { items: SupplierQuoteItem[] }) {
       </div>
 
       {/* Status tabs */}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex gap-2 overflow-x-auto no-scrollbar flex-nowrap sm:flex-wrap">
         {([{ k: 'all' as const, label: 'All', tint: 'bg-blue-500/15 text-blue-700 dark:text-blue-400', ring: 'ring-blue-500/40' }, ...ORDER.map(k => ({ k, label: STATUS[k].label, tint: STATUS[k].tab, ring: STATUS[k].ring }))]).map(t => {
           const active = tab === t.k
           return (
             <button key={t.k} onClick={() => { setTab(t.k); reset() }} aria-pressed={active}
-              className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm transition ${t.k === 'all' ? '' : 'min-w-[172px] justify-center'} ${t.tint} ${t.ring} ${active ? 'font-bold ring-2' : 'font-semibold ring-1 opacity-80 hover:opacity-100'}`}>
+              className={`flex shrink-0 items-center gap-2 rounded-xl px-3.5 py-2 text-sm transition ${t.k === 'all' ? '' : 'sm:min-w-[172px] justify-center'} ${t.tint} ${t.ring} ${active ? 'font-bold ring-2' : 'font-semibold ring-1 opacity-80 hover:opacity-100'}`}>
               {t.label} <span className="rounded-md bg-black/10 px-1.5 py-0.5 text-xs tabular-nums dark:bg-white/10">{count(t.k)}</span>
             </button>
           )
@@ -189,9 +189,9 @@ export function SupplierQuotesTable({ items }: { items: SupplierQuoteItem[] }) {
           <span className="text-sm text-[var(--text-muted)] tabular-nums">Showing {firstShown} to {lastShown} of {filtered.length} quotes</span>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1.5">
-              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={curPage <= 1} aria-label="Previous page" className="rounded-lg p-1.5 text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-40"><ChevronLeft size={15} /></button>
+              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={curPage <= 1} aria-label="Previous page" className="rounded-lg p-2.5 sm:p-1.5 text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-40"><ChevronLeft size={15} /></button>
               <span className="px-1 text-xs text-[var(--text-muted)] tabular-nums">Page {curPage} / {totalPages}</span>
-              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={curPage >= totalPages} aria-label="Next page" className="rounded-lg p-1.5 text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-40"><ChevronRight size={15} /></button>
+              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={curPage >= totalPages} aria-label="Next page" className="rounded-lg p-2.5 sm:p-1.5 text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-40"><ChevronRight size={15} /></button>
             </div>
             <label className="flex items-center gap-2 text-sm text-[var(--text-muted)]">Rows per page
               <div className="relative"><select value={String(perPage)} onChange={e => { setPerPage(Number(e.target.value)); reset() }} className="appearance-none rounded-xl bg-[var(--input-bg)] py-1.5 pl-3 pr-7 text-sm text-[var(--text)] ring-1 ring-[var(--border)]"><option value="10">10</option><option value="25">25</option><option value="50">50</option></select><ChevronDown size={13} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" /></div>

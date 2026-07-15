@@ -65,7 +65,7 @@ export function StoresTab({ data, initialStatus = 'all' }: { data: EstateDashboa
 
   return (
     <div className="space-y-5">
-      <TabHeader icon={<Store size={18} className="text-[#C6A35D]" />} title="Store Performance" subtitle="Individual store health, exceptions and executive attention areas.">
+      <TabHeader icon={<Store size={18} className="text-[#f59e0b]" />} title="Store Performance" subtitle="Individual store health, exceptions and executive attention areas.">
         <DateChip date={formatDate(data.generatedAt)} />
         <FilterMenu value={status} onChange={setStatus} options={STATUS_FILTER_OPTIONS} />
         <ExportButton onExport={onExport} />
@@ -83,7 +83,7 @@ export function StoresTab({ data, initialStatus = 'all' }: { data: EstateDashboa
             <DistributionBar counts={counts} />
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-[var(--text-muted)] pt-1">
               <span className="text-emerald-400">Controlled {counts.controlled} ({pct(counts.controlled, stores.length)}%)</span>
-              <span className="text-[#C6A35D]">Attention {counts.attention} ({pct(counts.attention, stores.length)}%)</span>
+              <span className="text-[#f59e0b]">Attention {counts.attention} ({pct(counts.attention, stores.length)}%)</span>
               <span className="text-red-400">At Risk {counts.at_risk} ({pct(counts.at_risk, stores.length)}%)</span>
               <span className="text-red-300">Critical {counts.critical} ({pct(counts.critical, stores.length)}%)</span>
             </div>
@@ -113,7 +113,7 @@ export function StoresTab({ data, initialStatus = 'all' }: { data: EstateDashboa
                       <td className="px-2 text-[var(--text-muted)]">{s.openTickets}</td><td className="px-2 text-red-400">{s.overdueTickets}</td>
                       <td className="px-2 text-[var(--text-muted)]">{s.pendingDecisions}</td><td className="px-2 text-[var(--text-muted)] whitespace-nowrap">{fmtK(s.costExposure)}</td>
                       <td className="px-2 text-xs text-[var(--text-muted)] max-w-[200px] truncate">{s.mainIssue}</td>
-                      <td className="px-2"><span className={`text-[11px] px-2 py-1 rounded-lg ring-1 ${s.finalStatus === 'controlled' ? 'text-[var(--text-muted)] ring-white/10' : 'text-[#C6A35D] ring-[#C6A35D]/40'}`}>{s.finalStatus === 'controlled' ? 'Monitor' : 'Review'}</span></td>
+                      <td className="px-2"><span className={`text-[11px] px-2 py-1 rounded-lg ring-1 ${s.finalStatus === 'controlled' ? 'text-[var(--text-muted)] ring-white/10' : 'text-[#f59e0b] ring-[#f59e0b]/40'}`}>{s.finalStatus === 'controlled' ? 'Monitor' : 'Review'}</span></td>
                     </tr>
                   ))}
                   {!shown.length && <tr><td colSpan={12} className="py-6 text-center text-[var(--text-faint)]">No stores match this filter.</td></tr>}
@@ -123,7 +123,7 @@ export function StoresTab({ data, initialStatus = 'all' }: { data: EstateDashboa
           </SectionCard>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            <SectionCard title="Stores Requiring Attention" icon={<AlertTriangle size={15} className="text-[#C6A35D]" />}>
+            <SectionCard title="Stores Requiring Attention" icon={<AlertTriangle size={15} className="text-[#f59e0b]" />}>
               {attention.slice(0, 5).map(s => (
                 <div key={s.storeId} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0">
                   <div className="min-w-0"><p className="text-sm text-[var(--text)] truncate">{s.storeName}</p><p className="text-[11px] text-[var(--text-faint)] truncate">{s.mainIssue}</p></div>
@@ -133,7 +133,7 @@ export function StoresTab({ data, initialStatus = 'all' }: { data: EstateDashboa
               {!attention.length && <p className="text-sm text-[var(--text-faint)]">All stores controlled.</p>}
             </SectionCard>
             <SectionCard title="Performing Well" icon={<CheckCircle2 size={15} className="text-emerald-400" />}>
-              <Perf icon={<Trophy size={15} className="text-[#C6A35D]" />} label="Best Performing Store" value={best ? `${best.storeName} (${best.finalHealthScore}%)` : '—'} />
+              <Perf icon={<Trophy size={15} className="text-[#f59e0b]" />} label="Best Performing Store" value={best ? `${best.storeName} (${best.finalHealthScore}%)` : '—'} />
               <Perf icon={<TrendingUp size={15} className="text-emerald-400" />} label="Most Improved" value={mostImproved && mostImproved.up > 0 ? `${mostImproved.s.storeName} (+${mostImproved.up}%)` : '—'} />
               <Perf icon={<ClipboardList size={15} className="text-emerald-400" />} label="Lowest Open Work" value={lowestOpen ? `${lowestOpen.storeName} (${lowestOpen.openTickets} open)` : '—'} />
             </SectionCard>

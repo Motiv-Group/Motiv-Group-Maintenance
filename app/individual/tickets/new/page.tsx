@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import { uploadTicketPhotos } from '@/lib/upload'
 import { Card } from '@/components/exec/ui'
 import { OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
+import { useScrollLock } from '@/lib/useScrollLock'
 
 const CATEGORIES = ['Electrical', 'Plumbing', 'HVAC', 'Refrigeration', 'Gas', 'Structural', 'Appliances', 'Painting', 'General', 'Cleaning', 'Other']
 const IMPACTS = Object.entries(OPERATIONAL_IMPACT_LABELS).map(([v, label]) => ({ v, label }))
@@ -23,12 +24,14 @@ export default function LogJobPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
+  useScrollLock(!!preview)
+
   const previews = useMemo(() => files.map(f => URL.createObjectURL(f)), [files])
   useEffect(() => () => { previews.forEach(u => URL.revokeObjectURL(u)) }, [previews])
 
   const remaining = Math.max(0, MAX_PHOTOS - files.length)
   function addFiles(incoming: File[]) {
-    const imgs = incoming.filter(f => f.type.startsWith('image/'))
+    const imgs = incoming.filter(f => !f.type || f.type.startsWith('image/'))
     setFiles(prev => [...prev, ...imgs].slice(0, MAX_PHOTOS))
   }
 
@@ -102,7 +105,7 @@ export default function LogJobPage() {
                 <div className="mt-3 space-y-1">
                   {files.map((f, i) => (
                     <div key={i} className="flex items-center justify-between gap-2">
-                      <button type="button" onClick={() => setPreview(previews[i])} className="text-sm text-[#C6A35D] underline truncate min-w-0 text-left" title={`View ${f.name}`}>Photo {i + 1} — {f.name}</button>
+                      <button type="button" onClick={() => setPreview(previews[i])} className="text-sm text-[#f59e0b] underline truncate min-w-0 text-left" title={`View ${f.name}`}>Photo {i + 1} — {f.name}</button>
                       <button type="button" onClick={() => setFiles(files.filter((_, j) => j !== i))} className="shrink-0 text-[var(--text-faint)] hover:text-red-500" title="Remove"><X size={14} /></button>
                     </div>
                   ))}

@@ -2,7 +2,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 
 // The three private buckets. Reads must go through short-lived SIGNED URLs, not
 // permanent public URLs — see lib/storage usage + docs/STORAGE.md.
-export const STORAGE_BUCKETS = ['ticket-photos', 'ticket-docs', 'completion-docs', 'quote-attachments'] as const
+export const STORAGE_BUCKETS = ['ticket-photos', 'ticket-docs', 'completion-docs', 'quote-attachments', 'project-files'] as const
 
 const OBJECT_RE = /\/storage\/v1\/object\/(?:public|sign|authenticated)\/([^/?]+)\/([^?]+)/
 

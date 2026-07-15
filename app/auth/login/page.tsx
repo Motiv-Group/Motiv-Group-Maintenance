@@ -107,7 +107,9 @@ export default function LoginPage() {
     let dest = '/client'
     if (role === 'supplier') dest = '/supplier'
     else if (role === 'regional_manager') dest = '/regional'
-    else if (role === 'executive' || role === 'system_admin') dest = '/executive'
+    else if (role === 'system_admin') dest = '/admin'
+    else if (role === 'executive') dest = '/executive'
+    else if (role === 'individual') dest = '/individual'
     router.push(dest)
     router.refresh()
   }
@@ -122,7 +124,7 @@ export default function LoginPage() {
   }
 
   return (
-    <AuthShell logoHeight={186} logoGap={0} maxWidth="md">
+    <AuthShell logoHeight={186} maxWidth="md">
       <h1 className="text-xl sm:text-2xl font-semibold text-white mb-1">Welcome back</h1>
       <p className="text-sm text-gray-300 mb-6">Sign in to continue to your workspace.</p>
 

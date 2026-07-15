@@ -6,6 +6,8 @@ import { CheckCircle2, FileText, Calendar, CalendarClock, Clock, MessageSquare, 
 import { createAdminClient } from '@/lib/supabase/server'
 import { signedUrl } from '@/lib/storage'
 import { requireRegionalV3 } from '@/lib/health/guard'
+import { TicketChatIcon } from '@/components/chat/TicketChat'
+import { ticketChatUnread } from '@/lib/chat-unread'
 import { loadSlaResolver } from '@/lib/health/data'
 import { deriveDueDates } from '@/lib/health/priority'
 import { computeTicketSla } from '@/lib/health/sla'
@@ -52,8 +54,10 @@ function DetailItem({ label, value }: { label: string; value: string }) {
 function RmDeclinedQuoteCard({ q, ticketId, canReQuote, open = false }: { q: any; ticketId: string; canReQuote: boolean; open?: boolean }) {
   return (
     <details open={open} className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
-      <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
-        <span className="text-sm font-semibold text-[var(--text)] min-w-0 truncate">{q.supplierName}</span>
+      {/* Mobile: the summary wraps so the supplier name gets the full row and the
+          amount + Declined pill drop underneath; sm+ keeps the single row. */}
+      <summary className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition sm:flex-nowrap">
+        <span className="basis-full text-sm font-semibold text-[var(--text)] min-w-0 truncate sm:basis-auto">{q.supplierName}</span>
         <span className="flex items-center gap-2 shrink-0">
           <span className="text-sm text-[var(--text)] tabular-nums">{formatCurrency(q.amount)}</span>
           <span className="text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:text-red-400 bg-red-500/15 rounded-full px-2 py-0.5">Declined</span>
@@ -66,7 +70,7 @@ function RmDeclinedQuoteCard({ q, ticketId, canReQuote, open = false }: { q: any
             <p className="text-sm text-[var(--text)]">{q.declineReason}</p>
           </div>
         )}
-        <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+        <div className="grid grid-cols-1 gap-y-3 sm:grid-cols-2 sm:gap-x-4">
           <DetailItem label="Excl. VAT" value={formatCurrency(q.amount)} />
           <DetailItem label="Incl. VAT" value={q.amountInclVat ? formatCurrency(q.amountInclVat) : '—'} />
           <DetailItem label="Received" value={formatDateTime(q.createdAt)} />
@@ -83,7 +87,7 @@ function RmDeclinedQuoteCard({ q, ticketId, canReQuote, open = false }: { q: any
         {(q.fileUrl || canReQuote) && (
           <div className="flex items-center justify-between gap-2 pt-1">
             {q.fileUrl
-              ? <a href={q.fileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View attached quote</a>
+              ? <a href={q.fileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-500 hover:underline"><FileText size={14} /> View attached quote</a>
               : <span />}
             {canReQuote && <ReQuoteButton ticketId={ticketId} quoteId={q.id} />}
           </div>
@@ -105,13 +109,14 @@ function RmSignoffCard({ s, tone, ticketId, collapsible = false, defaultOpen = f
     ? { ring: 'ring-red-500/40', bg: 'bg-red-500/5', head: 'bg-red-500/10 border-red-500/20', badge: 'bg-red-500/15 text-red-700 dark:text-red-400', label: 'Sent back', Icon: FileText, iconCls: 'text-red-500', title: 'Snagged completion' }
     : tone === 'evidence'
     ? { ring: 'ring-amber-500/40', bg: 'bg-amber-500/5', head: 'bg-amber-500/10 border-amber-500/20', badge: 'bg-amber-500/15 text-amber-700 dark:text-amber-400', label: 'More info requested', Icon: FileText, iconCls: 'text-amber-500', title: 'Sent back for more evidence' }
-    : { ring: 'ring-[#C6A35D]/40', bg: 'bg-[#C6A35D]/5', head: 'bg-[#C6A35D]/10 border-[#C6A35D]/20', badge: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D]', label: 'Under review', Icon: FileText, iconCls: 'text-[#C6A35D]', title: 'Submitted completion' }
+    : { ring: 'ring-[#f59e0b]/40', bg: 'bg-[#f59e0b]/5', head: 'bg-[#f59e0b]/10 border-[#f59e0b]/20', badge: 'bg-[#f59e0b]/15 text-amber-700 dark:text-[#f59e0b]', label: 'Under review', Icon: FileText, iconCls: 'text-[#f59e0b]', title: 'Submitted completion' }
   const before = (s.before_urls ?? []) as string[]
   const after = (s.after_urls ?? []) as string[]
   // Header doubles as the click-to-expand summary when collapsible.
   const header = (
     <>
-      <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)] min-w-0"><meta.Icon size={15} className={`${meta.iconCls} shrink-0`} /><span className="truncate">{title ?? meta.title} · {formatDateTime(s.created_at)}</span></span>
+      {/* Timestamp is desktop-only — on phones it eats the title's space. */}
+      <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)] min-w-0"><meta.Icon size={15} className={`${meta.iconCls} shrink-0`} /><span className="truncate">{title ?? meta.title}<span className="hidden sm:inline"> · {formatDateTime(s.created_at)}</span></span></span>
       <span className="flex items-center gap-1.5 shrink-0">
         {freshEvidence && <span className="text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 bg-emerald-500/15 text-emerald-700 dark:text-emerald-400">New evidence</span>}
         <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 ${meta.badge}`}>{meta.label}</span>
@@ -179,16 +184,16 @@ function ArchiveGroup({ label, children }: { label: string; children: React.Reac
 function SupplierUpdateItem({ u, ticketId, isNew = false }: { u: { body: string; created_at: string }; ticketId: string; isNew?: boolean }) {
   const photo = String(u.body).match(/^📷\s*Progress photo:\s*(\S+)/)
   return (
-    <li className={`rounded-xl ring-1 p-3 bg-[var(--surface)] ${isNew ? 'ring-[#C6A35D]/40' : 'ring-[var(--border)]'}`}>
+    <li className={`rounded-xl ring-1 p-3 bg-[var(--surface)] ${isNew ? 'ring-[#f59e0b]/40' : 'ring-[var(--border)]'}`}>
       <div className="flex items-center justify-between gap-2 mb-1">
         <span className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--text)]">
           Supplier
-          {isNew && <span className="text-[9px] font-bold uppercase tracking-wide text-amber-700 dark:text-[#C6A35D] bg-[#C6A35D]/15 rounded-full px-1.5 py-0.5">New</span>}
+          {isNew && <span className="text-[9px] font-bold uppercase tracking-wide text-amber-700 dark:text-[#f59e0b] bg-[#f59e0b]/15 rounded-full px-1.5 py-0.5">New</span>}
         </span>
         <span className="text-[11px] text-[var(--text-faint)]">{formatDateTime(u.created_at)}</span>
       </div>
       {photo
-        ? <ViewTrackedLink ticketId={ticketId} itemType="photo" itemLabel="Supplier progress photo" href={photo[1]} className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><Camera size={14} /> View progress photo</ViewTrackedLink>
+        ? <ViewTrackedLink ticketId={ticketId} itemType="photo" itemLabel="Supplier progress photo" href={photo[1]} className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-500 hover:underline"><Camera size={14} /> View progress photo</ViewTrackedLink>
         : <p className="text-sm text-[var(--text)] whitespace-pre-line">{u.body}</p>}
     </li>
   )
@@ -335,9 +340,9 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
       {openDispute && <DisputeThread ticketId={t.id} dispute={openDispute} messages={msgsByDispute(openDispute.id)} viewerRole="regional_manager" subject={disputeSubject(openDispute)} hideControls />}
       {resolvedDisputes.map(d => (
         <details key={d.id} className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
-          <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
+          <summary className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition sm:flex-nowrap">
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-[var(--text)] truncate">Dispute — {disputeSubject(d)}</p>
+              <p className="text-sm font-semibold text-[var(--text)] line-clamp-2 sm:truncate">Dispute — {disputeSubject(d)}</p>
               <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(d.resolved_at ?? d.created_at)}</p>
             </div>
             <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 shrink-0 ${d.outcome === 'withdrawn' ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' : 'bg-amber-500/15 text-amber-700 dark:text-amber-400'}`}>{d.outcome === 'withdrawn' ? 'Retracted' : 'Withdrawn'}</span>
@@ -403,6 +408,8 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
   const awaitingSupplierQuotes = ['assigned', 'assessment', 'quote_requested', 'quote_revision'].includes(t.status) && activeSupplierRows.some(r => r.status === 'invited')
   // A quote has been approved → the ticket is awarded and the round is over.
   const awarded = ((quotes ?? []) as any[]).some(q => q.status === 'accepted') || !!t.supplier_id
+  // Per-ticket RM↔supplier chat is available once a supplier is awarded.
+  const chatUnread = t.supplier_id ? await ticketChatUnread(admin, t.id, userId) : false
   // Round boundary = the most recent quote-request round (assign / re-assign). A
   // decline (quote or request) is "live" only if it happened in this current round;
   // everything from earlier rounds moves to the Archive so nothing is ever dropped.
@@ -613,7 +620,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
                     <p className="text-sm text-[var(--text)]">{d.reason}</p>
                   </div>
                 )}
-                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                <div className="grid grid-cols-1 gap-y-3 sm:grid-cols-2 sm:gap-x-4">
                   <DetailItem label="Type" value="Declined quote request" />
                   <DetailItem label="Declined" value={formatDateTime(d.at)} />
                 </div>
@@ -631,7 +638,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
                   <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Note</p>
                   <p className="text-sm text-[var(--text)]">{COURTESY_NOTE}</p>
                 </div>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                <div className="grid grid-cols-1 gap-y-3 sm:grid-cols-2 sm:gap-x-4">
                   <DetailItem label="Type" value="Awaiting quote — closed" />
                   <DetailItem label="Requested" value={r.invitedAt ? formatDateTime(r.invitedAt) : '—'} />
                 </div>
@@ -809,26 +816,32 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
       <BackLink fallbackHref="/regional/tickets" label="Back to tickets" />
 
       {/* Header — reference, title, priority + status, progress stepper (SM flavor). */}
-      <Card className="p-5 space-y-7">
+      <Card className="p-4 space-y-5 sm:p-5 sm:space-y-7">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex flex-wrap items-center gap-x-2 gap-y-0.5">
             {t.job_ref && <span className="font-mono text-sm font-semibold text-[var(--text-faint)]">{t.job_ref}</span>}
             <h1 className="text-lg font-bold text-[var(--text)]">{t.category || t.title}</h1>
           </div>
-          {/* Priority + status badges — same form factor as the SM ticket detail. */}
-          <div className="flex items-center gap-1.5 shrink-0">
-            <span className={`inline-flex w-[120px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${priorityBadgeClass({ priority: t.priority } as StoreManagerTicket)}`}>{priorityLabel({ priority: t.priority } as StoreManagerTicket)}</span>
-            {(() => {
-              const sm = rmStatusMeta(t.status)
-              // An open dispute overrides the badge with "Dispute" (the snag/evidence
-              // step is paused). Otherwise: a ticket where every supplier declined is
-              // back at 'open' and reads "New"; "Info added" reads like an "Info
-              // requested" badge (amber); the fresh answer is highlighted red in the
-              // description until the RM acts.
-              const label = openDispute ? 'Dispute' : rmInfoAdded ? 'Info added' : sm.label
-              const cls = openDispute ? 'bg-red-500/15 text-red-700 dark:text-red-400' : rmInfoAdded ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : sm.cls
-              return <span className={`inline-flex w-[120px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${cls}`}>{label}</span>
-            })()}
+          {/* Priority + status badges — same form factor as the SM ticket detail.
+              Mobile: stacked + content-width (two fixed 120px badges side by side
+              starve the title at 375px); sm+ keeps the fixed-width row. The chat icon
+              (once a supplier is awarded) sits to the right of the badge cluster. */}
+          <div className="flex items-start gap-2 shrink-0">
+            <div className="flex flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-1.5">
+              <span className={`inline-flex w-auto justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold sm:w-[120px] ${priorityBadgeClass({ priority: t.priority } as StoreManagerTicket)}`}>{priorityLabel({ priority: t.priority } as StoreManagerTicket)}</span>
+              {(() => {
+                const sm = rmStatusMeta(t.status)
+                // An open dispute overrides the badge with "Dispute" (the snag/evidence
+                // step is paused). Otherwise: a ticket where every supplier declined is
+                // back at 'open' and reads "New"; "Info added" reads like an "Info
+                // requested" badge (amber); the fresh answer is highlighted red in the
+                // description until the RM acts.
+                const label = openDispute ? 'Dispute' : rmInfoAdded ? 'Info added' : sm.label
+                const cls = openDispute ? 'bg-red-500/15 text-red-700 dark:text-red-400' : rmInfoAdded ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : sm.cls
+                return <span className={`inline-flex w-auto justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold sm:w-[120px] ${cls}`}>{label}</span>
+              })()}
+            </div>
+            {t.supplier_id && <TicketChatIcon ticketId={t.id} viewerRole="regional_manager" unread={chatUnread} />}
           </div>
         </div>
 
@@ -839,7 +852,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
       <div className="grid gap-4 lg:grid-cols-2 items-stretch">
       {/* Next action — the RM's most important pending step + the controls to take it
           (buttons stacked one under another). */}
-      <Card className="p-5 space-y-4 h-full">
+      <Card className="p-4 space-y-4 h-full sm:p-5">
         <div>
           <h2 className="text-sm font-bold text-[var(--text)]">Next action</h2>
           {nextAction.msg && <p className="mt-1 text-sm font-bold text-[var(--text)]">{nextAction.msg}</p>}
@@ -926,7 +939,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
         )}
 
         {t.status === 'in_progress' && (
-          <div className="rounded-xl bg-[#C6A35D]/10 ring-1 ring-[#C6A35D]/30 p-3.5 text-sm text-[var(--text-muted)]">Work in progress — the supplier is on site or en route to attend to the job. The completion certificate and proof-of-completion photos will follow once the work is done.</div>
+          <div className="rounded-xl bg-[#f59e0b]/10 ring-1 ring-[#f59e0b]/30 p-3.5 text-sm text-[var(--text-muted)]">Work in progress — the supplier is on site or en route to attend to the job. The completion certificate and proof-of-completion photos will follow once the work is done.</div>
         )}
 
         {(t.status === 'approved_closeout' || t.status === 'vo_declined') && (
@@ -952,9 +965,9 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
       </Card>
 
       {/* Ticket information — aligned label→value rows, then full-width description. */}
-        <Card className="p-5 space-y-4 h-full">
+        <Card className="p-4 space-y-4 h-full sm:p-5">
           <h2 className="text-sm font-bold text-[var(--text)]">Ticket information</h2>
-          <dl className="grid grid-cols-[max-content_1fr] items-baseline gap-x-6 gap-y-2.5 text-sm">
+          <dl className="grid grid-cols-[max-content_1fr] items-baseline gap-x-4 sm:gap-x-6 gap-y-2.5 text-sm">
             <dt className="text-[var(--text-muted)]">Store</dt>
             <dd className="font-medium text-[var(--text)]">{storeName}</dd>
             <dt className="text-[var(--text-muted)]">Category</dt>
@@ -1029,13 +1042,13 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
           they're the first thing the RM notices. Shows only the unseen updates; on the
           next open they fold into the collapsible history above the audit trail. */}
       {newSupplierUpdates.length > 0 && (
-        <Card className="p-5 space-y-3 bg-[#C6A35D]/5 ring-1 ring-[#C6A35D]/50">
+        <Card className="p-5 space-y-3 bg-[#f59e0b]/5 ring-1 ring-blue-500/50">
           <div className="flex items-center justify-between gap-2">
-            <h2 className="flex items-center gap-2 text-sm font-bold text-[var(--text)]"><MessageSquare size={15} className="text-[#C6A35D]" /> New updates from the supplier</h2>
-            <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-[#C6A35D] bg-[#C6A35D]/15 rounded-full px-2 py-0.5">
+            <h2 className="flex items-center gap-2 text-sm font-bold text-[var(--text)]"><MessageSquare size={15} className="text-[#f59e0b]" /> New updates from the supplier</h2>
+            <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-[#f59e0b] bg-[#f59e0b]/15 rounded-full px-2 py-0.5">
               <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#C6A35D] opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#C6A35D]" />
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#f59e0b] opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#f59e0b]" />
               </span>
               {newSupplierUpdates.length} new
             </span>

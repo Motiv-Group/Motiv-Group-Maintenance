@@ -1,6 +1,14 @@
 // Transactional email via the Resend REST API.
 // Mirrors lib/push.ts: silently no-ops (returns false) when not configured, so
 // callers never have to guard — a missing RESEND_API_KEY just means no email.
+//
+// This module is PURE / client-importable on purpose — the admin Customize
+// preview imports the render* helpers to draw emails in the browser. Do NOT add
+// 'server-only' or import lib/settings-server here; loading the saved copy
+// overrides happens in lib/emails/server.ts.
+
+import type { EmailCopy } from '@/lib/settings'
+import type { EmailLogo } from '@/lib/emails/defaults'
 
 interface SendEmailArgs {
   to:      string
@@ -45,8 +53,10 @@ export function escapeHtml(s: string): string {
 // Optional `note` renders a quoted personal-message block (blue rule) above the
 // CTA — used to carry the inviter's own words. `note` is plain text; escape it here.
 export function motivBrandedEmailHtml(o: {
-  base: string; heading: string; lead: string; sub?: string; ctaLabel: string; link: string; footerNote: string
+  logo: EmailLogo; heading: string; lead: string; sub?: string; ctaLabel: string; link: string; footerNote: string
   note?: string; noteLabel?: string
+  /** Optional login credentials box (store-manager welcome). */
+  credentials?: { email: string; password: string }
 }): string {
   const noteBlock = o.note && o.note.trim()
     ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;"><tr><td style="border-left:3px solid #2563eb;background:#f8fafc;border-radius:0 8px 8px 0;padding:12px 16px;">
@@ -54,18 +64,26 @@ export function motivBrandedEmailHtml(o: {
             <p style="margin:0;font-size:14px;line-height:1.6;color:#374151;white-space:pre-line;">${escapeHtml(o.note.trim())}</p>
           </td></tr></table>`
     : ''
+  const credsBlock = o.credentials
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;"><tr><td style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:16px 18px;">
+            <p style="margin:0 0 10px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#94a3b8;">Your login details</p>
+            <p style="margin:0 0 8px;font-size:14px;line-height:1.5;color:#374151;"><strong style="color:#0d1f2d;">Email:</strong> ${escapeHtml(o.credentials.email)}</p>
+            <p style="margin:0;font-size:14px;line-height:1.5;color:#374151;"><strong style="color:#0d1f2d;">Password:</strong> <span style="font-family:Menlo,Consolas,monospace;">${escapeHtml(o.credentials.password)}</span></p>
+          </td></tr></table>`
+    : ''
   return `<div style="margin:0;padding:0;background:#f3f4f6;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:32px 12px;font-family:Arial,Helvetica,sans-serif;">
     <tr><td align="center">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e5e7eb;">
         <tr><td style="background:#0d1f2d;padding:20px 32px;">
-          <img src="${o.base}/brand/motiv-symbol.png" alt="" width="45" height="30" style="display:inline-block;vertical-align:bottom;border:0;height:30px;width:45px;" />
-          <img src="${o.base}/brand/motiv-wordmark.png" alt="MOTIV" width="93" height="20" style="display:inline-block;vertical-align:bottom;border:0;height:20px;width:93px;margin-left:9px;" />
+          <img src="${o.logo.symbolUrl}" alt="" width="${o.logo.symbolW}" height="${o.logo.symbolH}" style="display:inline-block;vertical-align:bottom;border:0;height:${o.logo.symbolH}px;width:${o.logo.symbolW}px;" />
+          <img src="${o.logo.wordmarkUrl}" alt="MOTIV" width="${o.logo.wordmarkW}" height="${o.logo.wordmarkH}" style="display:inline-block;vertical-align:bottom;border:0;height:${o.logo.wordmarkH}px;width:${o.logo.wordmarkW}px;margin-left:9px;" />
         </td></tr>
         <tr><td style="padding:32px;color:#1f2937;">
           <h1 style="margin:0 0 12px;font-size:20px;font-weight:700;color:#0d1f2d;">${o.heading}</h1>
           <p style="margin:0 0 ${o.sub ? '6px' : '24px'};font-size:15px;line-height:1.6;color:#374151;">${o.lead}</p>
           ${o.sub ? `<p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#374151;">${o.sub}</p>` : ''}
+          ${credsBlock}
           ${noteBlock}
           <table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="border-radius:10px;background:#2563eb;">
             <a href="${o.link}" style="display:inline-block;padding:13px 28px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:10px;">${o.ctaLabel}</a>
@@ -83,139 +101,77 @@ export function motivBrandedEmailHtml(o: {
 </div>`
 }
 
-/** Branded password-reset email (sent via our Resend sender, not Supabase). */
-export function passwordResetEmailHtml(link: string, base: string): string {
-  return motivBrandedEmailHtml({
-    base,
-    heading: 'Reset your password',
-    lead: 'We received a request to reset the password for your MOTIV account.',
-    sub: 'Click below to choose a new password.',
-    ctaLabel: 'Reset password',
-    link,
-    footerNote: "If you didn't request this, you can safely ignore this email — your password won't change.",
-  })
-}
+// ── Pure renderers (resolved copy → { subject, html, text }) ─────────────────
+// Each takes an already-resolved EmailCopy (placeholders substituted upstream)
+// plus the dynamic, non-editable inputs it needs (links, credentials, base).
+// The copy is system_admin-authored, so — like the strings that used to live
+// here — it is trusted and rendered into HTML as-is. buildEmail (server) wires
+// the saved overrides + defaults to these; the admin preview calls them directly.
 
-interface StoreInviteArgs {
-  managerName: string
-  loginUrl:    string
-  email:       string
-  password:    string
-  rmName?:     string | null
-  company:     string
-  subStore:    string
-}
-
-/** Build the welcome email for a freshly-provisioned store-manager account. */
-export function storeInviteEmail({
-  managerName, loginUrl, email, password, rmName, company, subStore,
-}: StoreInviteArgs): { subject: string; html: string; text: string } {
-  const subject = `You've been added to Motiv — ${company} (${subStore})`
-
-  const text = [
-    `Hi ${managerName || 'there'},`,
-    ``,
-    `${rmName ? `${rmName} has` : 'Your regional manager has'} created a Motiv account for ${company} — ${subStore}.`,
-    ``,
-    `Log in here: ${loginUrl}`,
-    `Email:    ${email}`,
-    `Password: ${password}`,
-    ``,
-    `Please change your password after your first login (Settings → Profile).`,
-    ``,
-    `— Motiv`,
+/** Plain-text sibling of a branded (link + CTA) email. */
+function brandedText(
+  copy: EmailCopy,
+  link: string,
+  o?: { note?: string; credentials?: { email: string; password: string } },
+): string {
+  return [
+    copy.heading,
+    '',
+    copy.lead,
+    ...(copy.sub ? ['', copy.sub] : []),
+    ...(o?.credentials ? ['', `Email:    ${o.credentials.email}`, `Password: ${o.credentials.password}`] : []),
+    ...(o?.note && o.note.trim() ? ['', o.note.trim()] : []),
+    '',
+    `${copy.ctaLabel}: ${link}`,
+    '',
+    copy.footerNote,
   ].join('\n')
-
-  const html = `
-  <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:480px;margin:0 auto;color:#0f172a">
-    <h2 style="color:#1e293b;margin:0 0 12px">Welcome to Motiv</h2>
-    <p style="margin:0 0 12px">Hi ${managerName || 'there'},</p>
-    <p style="margin:0 0 16px">
-      ${rmName ? `${rmName} has` : 'Your regional manager has'} created a Motiv account for
-      <strong>${company} — ${subStore}</strong>. Use the details below to log in.
-    </p>
-    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin:0 0 16px">
-      <p style="margin:0 0 8px"><strong>Email:</strong> ${email}</p>
-      <p style="margin:0"><strong>Password:</strong> ${password}</p>
-    </div>
-    <p style="margin:0 0 20px">
-      <a href="${loginUrl}" style="display:inline-block;background:#1e293b;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-weight:600">Log in to Motiv</a>
-    </p>
-    <p style="margin:0;color:#64748b;font-size:13px">Please change your password after your first login (Settings → Profile).</p>
-  </div>`
-
-  return { subject, html, text }
 }
 
-/** Notice email for a supplier whose email already has a Motiv account — they
- *  don't need to create a login, so we tell them they've been added instead of
- *  sending an onboarding link. */
-export function supplierAddedNoticeEmail({ companyName, addedBy, loginUrl }: { companyName: string; addedBy?: string | null; loginUrl: string }): { subject: string; html: string; text: string } {
-  const subject = `You've been added as a supplier on Motiv`
-  const who = addedBy ? `${addedBy}` : 'A company'
-  const text = [
-    `Hi,`,
-    ``,
-    `${who} has added ${companyName} as one of their suppliers on Motiv.`,
-    `You already have a Motiv account, so there's nothing to set up — just log in to see any work they send your way:`,
-    ``,
-    loginUrl,
-    ``,
-    `— Motiv`,
-  ].join('\n')
-
-  const html = `
-  <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:480px;margin:0 auto;color:#0f172a">
-    <h2 style="color:#1e293b;margin:0 0 12px">You've been added as a supplier</h2>
-    <p style="margin:0 0 16px">${who} has added <strong>${companyName}</strong> as one of their suppliers on Motiv.</p>
-    <p style="margin:0 0 16px">You already have a Motiv account, so there's nothing to set up — just log in to see any work they send your way.</p>
-    <p style="margin:0 0 20px">
-      <a href="${loginUrl}" style="display:inline-block;background:#1e293b;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-weight:600">Log in to Motiv</a>
-    </p>
-    <p style="margin:0;color:#64748b;font-size:12px">If the button doesn't work, paste this link:<br>${loginUrl}</p>
-  </div>`
-
-  return { subject, html, text }
-}
-
-/** Build the supplier invite email — a reusable onboarding link (custom token).
- *  Uses the shared branded MOTIV template (same look as the RM/SM invites), and
- *  carries the inviter's optional personal message. `inviterCompany` is the client
- *  company doing the inviting; `message` is the RM's free-text note. */
-export function supplierInviteEmail(
-  { link, base, inviterCompany, message }: { link: string; base: string; inviterCompany?: string | null; message?: string | null },
+/**
+ * The branded template email (logo header, blue CTA, copy-paste link) — the
+ * single renderer behind EVERY transactional email so they all share one
+ * professional layout. `note` renders the optional quoted personal-message block;
+ * `credentials` renders the locked login-details box (store-manager welcome).
+ */
+export function renderBrandedEmail(
+  copy: EmailCopy,
+  o: { logo: EmailLogo; link: string; note?: string; noteLabel?: string; credentials?: { email: string; password: string } },
 ): { subject: string; html: string; text: string } {
-  const subject = `You've been invited to MOTIV as a supplier`
-  const inviter = (inviterCompany ?? '').trim()
-  const lead = inviter
-    ? `<strong style="color:#0d1f2d;">${escapeHtml(inviter)}</strong> has invited you to join <strong style="color:#0d1f2d;">MOTIV</strong> as a supplier.`
-    : `You've been invited to join <strong style="color:#0d1f2d;">MOTIV</strong> as a supplier.`
-
   const html = motivBrandedEmailHtml({
-    base,
-    heading: "You're invited to MOTIV",
-    lead,
-    sub: 'Set up your account — choose a password and confirm your company details — to start receiving work.',
-    note: message ?? undefined,
-    noteLabel: inviter ? `Message from ${inviter}` : 'Message',
-    ctaLabel: 'Set up my account',
-    link,
-    footerNote: "This invitation link stays valid until you finish signing up. If you weren't expecting it, you can safely ignore this email.",
+    logo: o.logo,
+    heading: copy.heading,
+    lead: copy.lead,
+    sub: copy.sub || undefined,
+    ctaLabel: copy.ctaLabel,
+    link: o.link,
+    footerNote: copy.footerNote,
+    note: o.note,
+    noteLabel: o.noteLabel,
+    credentials: o.credentials,
   })
+  return { subject: copy.subject, html, text: brandedText(copy, o.link, { note: o.note, credentials: o.credentials }) }
+}
 
-  const text = [
-    `Hi,`,
-    ``,
-    inviter ? `${inviter} has invited you to join MOTIV as a supplier.` : `You've been invited to join MOTIV as a supplier.`,
-    `Open the link below to set up your account — choose your password and confirm your company details:`,
-    ``,
-    link,
-    ...(message && message.trim() ? ['', `Message: ${message.trim()}`] : []),
-    ``,
-    `This link stays valid until you complete sign-up.`,
-    ``,
-    `— Motiv`,
-  ].join('\n')
+/**
+ * Store-manager welcome — the branded template with a FIXED login-credentials
+ * box and the login button. Copy (heading/lead/sub/ctaLabel/footerNote) is
+ * editable; the credentials block structure stays locked.
+ */
+export function renderStoreWelcome(
+  copy: EmailCopy,
+  o: { logo: EmailLogo; email: string; password: string; loginUrl: string },
+): { subject: string; html: string; text: string } {
+  return renderBrandedEmail(copy, { logo: o.logo, link: o.loginUrl, credentials: { email: o.email, password: o.password } })
+}
 
-  return { subject, html, text }
+/**
+ * "You've been added as a supplier" notice for a supplier who already has an
+ * account — the same branded template, login button, no credentials.
+ */
+export function renderSupplierAdded(
+  copy: EmailCopy,
+  o: { logo: EmailLogo; loginUrl: string },
+): { subject: string; html: string; text: string } {
+  return renderBrandedEmail(copy, { logo: o.logo, link: o.loginUrl })
 }

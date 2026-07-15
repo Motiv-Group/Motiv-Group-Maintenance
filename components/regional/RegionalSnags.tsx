@@ -6,8 +6,8 @@
 // reason, timing and a phase-aware action (Review dispute / Sign off / View).
 import { useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { AlertOctagon, AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, ChevronLeft, Search, Store, X, HelpCircle, Calendar, Clock, Tag, MessageSquareWarning, Truck } from 'lucide-react'
-import { Card } from '@/components/exec/ui'
+import { AlertOctagon, AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, ChevronLeft, Store, X, HelpCircle, Calendar, Clock, Tag, MessageSquareWarning, Truck } from 'lucide-react'
+import { Card, FilterSelect, SearchInput } from '@/components/exec/ui'
 import { CategoryIcon, priorityBadgeClass, priorityLabel } from '@/components/client/ticketBadges'
 import { formatDateTime, humanizeDuration } from '@/lib/utils'
 
@@ -33,28 +33,17 @@ const PHASE_META: Record<Phase, { label: string; badge: string; store: string }>
 
 function StatCard({ icon, tone, value, title, sub, active, onClick }: { icon: ReactNode; tone: string; value: number; title: string; sub: string; active: boolean; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} aria-pressed={active} className={`flex items-center gap-3 rounded-xl border-l-4 bg-[var(--surface)] p-4 text-left ring-1 transition hover:bg-[var(--hover)] ${tone} ${active ? 'ring-2 ring-[#C6A35D]/50' : 'ring-[var(--border)]'}`}>
+    <button type="button" onClick={onClick} aria-pressed={active} className={`flex items-center gap-2.5 rounded-xl bg-[var(--surface)] p-3 text-left ring-1 transition hover:bg-[var(--hover)] sm:gap-3 sm:p-4 ${active ? 'ring-2 ring-blue-500/50' : 'ring-[var(--border)]'}`}>
       <span className="shrink-0">{icon}</span>
       <span className="min-w-0">
-        <span className="block text-2xl font-bold leading-none text-[var(--text)]">{value}</span>
-        <span className="mt-1 block text-sm font-semibold text-[var(--text)]">{title}</span>
-        <span className="block text-[11px] text-[var(--text-muted)]">{sub}</span>
+        <span className="block text-xl font-bold leading-none text-[var(--text)] sm:text-2xl">{value}</span>
+        <span className="mt-1 block text-xs font-semibold text-[var(--text)] sm:text-sm">{title}</span>
+        <span className="hidden text-[11px] text-[var(--text-muted)] sm:block">{sub}</span>
       </span>
     </button>
   )
 }
 
-function Select<T extends string>({ label, value, onChange, options }: { label: string; value: T; onChange: (v: T) => void; options: { value: T; label: string }[] }) {
-  return (
-    <label className="relative flex min-w-[150px] flex-1 items-center gap-1.5 rounded-xl bg-[var(--input-bg)] px-3 py-2.5 text-sm ring-1 ring-[var(--border)] transition focus-within:ring-[#C6A35D]/40 sm:flex-none">
-      <span className="whitespace-nowrap text-[11px] uppercase tracking-wide text-[var(--text-faint)]">{label}</span>
-      <select value={value} onChange={e => onChange(e.target.value as T)} className="w-full cursor-pointer appearance-none bg-transparent pr-4 font-semibold text-[var(--text)] outline-none">
-        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
-      <ChevronDown size={14} className="pointer-events-none absolute right-2.5 text-[var(--text-faint)]" />
-    </label>
-  )
-}
 
 const PRANK: Record<string, number> = { P1: 0, P2: 1, P3: 2, P4: 3 }
 const PER_PAGE = 10
@@ -121,29 +110,30 @@ export function RegionalSnags({ snags, generatedAt }: { snags: RegionalSnagRow[]
         </Card>
       )}
 
-      {/* Stat cards */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard icon={<span className="grid h-11 w-11 place-items-center rounded-full bg-red-500/15 text-red-600 dark:text-red-400"><AlertOctagon size={20} /></span>} tone="border-red-500" value={snags.length} title="Open snags" sub="Across your region" active={statusF === 'all'} onClick={() => { setStatusF('all'); setPage(1) }} />
-        <StatCard icon={<span className="grid h-11 w-11 place-items-center rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400"><Clock size={20} /></span>} tone="border-blue-500" value={stats.awaiting} title="Awaiting supplier" sub="Fix in progress" active={statusF === 'awaiting'} onClick={() => { setStatusF(f => f === 'awaiting' ? 'all' : 'awaiting'); setPage(1) }} />
-        <StatCard icon={<span className="grid h-11 w-11 place-items-center rounded-full bg-violet-500/15 text-violet-600 dark:text-violet-400"><MessageSquareWarning size={20} /></span>} tone="border-violet-500" value={stats.dispute} title="Under dispute" sub="Needs your review" active={statusF === 'dispute'} onClick={() => { setStatusF(f => f === 'dispute' ? 'all' : 'dispute'); setPage(1) }} />
-        <StatCard icon={<span className="grid h-11 w-11 place-items-center rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400"><CheckCircle2 size={20} /></span>} tone="border-amber-500" value={stats.review} title="To review" sub="Re-submitted — sign off" active={statusF === 'review'} onClick={() => { setStatusF(f => f === 'review' ? 'all' : 'review'); setPage(1) }} />
+      {/* Stat cards — compact 2×2 on phones. */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-2 sm:gap-3 lg:grid-cols-4">
+        <StatCard icon={<span className="grid h-9 w-9 place-items-center rounded-full sm:h-11 sm:w-11 bg-red-500/15 text-red-600 dark:text-red-400"><AlertOctagon size={20} /></span>} tone="border-red-500" value={snags.length} title="Open snags" sub="Across your region" active={statusF === 'all'} onClick={() => { setStatusF('all'); setPage(1) }} />
+        <StatCard icon={<span className="grid h-9 w-9 place-items-center rounded-full sm:h-11 sm:w-11 bg-blue-500/15 text-blue-600 dark:text-blue-400"><Clock size={20} /></span>} tone="border-blue-500" value={stats.awaiting} title="Awaiting supplier" sub="Fix in progress" active={statusF === 'awaiting'} onClick={() => { setStatusF(f => f === 'awaiting' ? 'all' : 'awaiting'); setPage(1) }} />
+        <StatCard icon={<span className="grid h-9 w-9 place-items-center rounded-full sm:h-11 sm:w-11 bg-violet-500/15 text-violet-600 dark:text-violet-400"><MessageSquareWarning size={20} /></span>} tone="border-violet-500" value={stats.dispute} title="Under dispute" sub="Needs your review" active={statusF === 'dispute'} onClick={() => { setStatusF(f => f === 'dispute' ? 'all' : 'dispute'); setPage(1) }} />
+        <StatCard icon={<span className="grid h-9 w-9 place-items-center rounded-full sm:h-11 sm:w-11 bg-amber-500/15 text-amber-600 dark:text-amber-400"><CheckCircle2 size={20} /></span>} tone="border-amber-500" value={stats.review} title="To review" sub="Re-submitted — sign off" active={statusF === 'review'} onClick={() => { setStatusF(f => f === 'review' ? 'all' : 'review'); setPage(1) }} />
       </div>
 
-      {/* Filter bar */}
+      {/* Filter bar — matches the Tickets tab: full-width search + a horizontally-
+          swipeable pill strip on phones (sm:contents dissolves it so desktop keeps
+          the flex-wrap row). Clear sits outside the strip like Tickets' Filters btn. */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[220px] flex-1">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
-          <input value={q} onChange={e => { setQ(e.target.value); setPage(1) }} placeholder="Search snags by store, supplier, ticket ID or title…" className="w-full rounded-xl bg-[var(--input-bg)] py-2.5 pl-9 pr-3 text-sm text-[var(--text)] ring-1 ring-[var(--border)] outline-none placeholder-[var(--text-faint)] focus:ring-[#C6A35D]/40" />
+        <SearchInput value={q} onChange={v => { setQ(v); setPage(1) }} placeholder="Search snags by store, supplier, ticket ID or title…" />
+        <div className="flex w-full flex-nowrap items-center gap-2 overflow-x-auto pb-0.5 sm:contents">
+        <FilterSelect label="Store" value={store} onChange={v => { setStore(v); setPage(1) }} options={[{ value: 'all', label: 'All stores' }, ...storeNames.map(s => ({ value: s, label: s }))]} />
+        <FilterSelect label="Status" value={statusF} onChange={v => { setStatusF(v); setPage(1) }} options={[{ value: 'all', label: 'All statuses' }, { value: 'awaiting', label: 'Awaiting supplier' }, { value: 'dispute', label: 'Under dispute' }, { value: 'review', label: 'To review' }]} />
+        <FilterSelect label="Priority" value={priorityF} onChange={v => { setPriorityF(v); setPage(1) }} options={[{ value: 'all', label: 'All priorities' }, { value: 'P1', label: 'Critical' }, { value: 'P2', label: 'High' }, { value: 'P3', label: 'Medium' }, { value: 'P4', label: 'Low' }]} />
+        <FilterSelect label="Sort by" value={sort} onChange={setSort} options={[{ value: 'urgent', label: 'Most urgent' }, { value: 'newest', label: 'Newest first' }, { value: 'oldest', label: 'Oldest first' }]} />
         </div>
-        <Select label="Store" value={store} onChange={v => { setStore(v); setPage(1) }} options={[{ value: 'all', label: 'All stores' }, ...storeNames.map(s => ({ value: s, label: s }))]} />
-        <Select label="Status" value={statusF} onChange={v => { setStatusF(v); setPage(1) }} options={[{ value: 'all', label: 'All statuses' }, { value: 'awaiting', label: 'Awaiting supplier' }, { value: 'dispute', label: 'Under dispute' }, { value: 'review', label: 'To review' }]} />
-        <Select label="Priority" value={priorityF} onChange={v => { setPriorityF(v); setPage(1) }} options={[{ value: 'all', label: 'All priorities' }, { value: 'P1', label: 'Critical' }, { value: 'P2', label: 'High' }, { value: 'P3', label: 'Medium' }, { value: 'P4', label: 'Low' }]} />
-        <Select label="Sort by" value={sort} onChange={setSort} options={[{ value: 'urgent', label: 'Most urgent' }, { value: 'newest', label: 'Newest first' }, { value: 'oldest', label: 'Oldest first' }]} />
-        <button type="button" onClick={clear} className="flex items-center gap-1.5 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)]"><X size={15} /> Clear filters</button>
+        <button type="button" onClick={clear} className="flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)]"><X size={15} /> Clear filters</button>
       </div>
 
       {!groups.length && (
-        <div className="rounded-xl border border-dashed border-[var(--border)] p-12 text-center">
+        <div className="rounded-xl border border-dashed border-[var(--border)] p-8 text-center sm:p-12">
           <AlertTriangle size={28} className="mx-auto mb-2 text-[var(--text-faint)]" />
           <p className="text-sm text-[var(--text-faint)]">{snags.length ? 'No snags match your filters.' : 'No open snags in your region.'}</p>
         </div>
@@ -167,7 +157,8 @@ export function RegionalSnags({ snags, generatedAt }: { snags: RegionalSnagRow[]
                 <span className="flex items-center gap-2"><span className="truncate text-base font-bold text-[var(--text)]">{storeName}</span>{g.branchCode && <span className="shrink-0 text-sm text-[var(--text-muted)]">· {g.branchCode}</span>}</span>
                 <span className="text-[11px] text-[var(--text-muted)]">{g.rows.length} snag{g.rows.length === 1 ? '' : 's'} · <span className={`font-semibold ${meta.store}`}>{summary}</span></span>
               </span>
-              <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${meta.badge}`}>{g.rows.length} {phase === 'dispute' ? 'under dispute' : phase === 'review' ? 'to review' : 'open'}</span>
+              {/* Phase pill is sm+ — the summary line above already carries it on phones. */}
+              <span className={`hidden shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold sm:inline-flex ${meta.badge}`}>{g.rows.length} {phase === 'dispute' ? 'under dispute' : phase === 'review' ? 'to review' : 'open'}</span>
               <ChevronDown size={18} className={`shrink-0 text-[var(--text-muted)] transition-transform ${open ? 'rotate-180' : ''}`} />
             </div>
             {open && (
@@ -177,12 +168,12 @@ export function RegionalSnags({ snags, generatedAt }: { snags: RegionalSnagRow[]
                   const pm = PHASE_META[p]
                   const rDue = t.dueAt ? new Date(t.dueAt).getTime() - nowMs : null
                   return (
-                    <div key={t.id} className={`border-b border-l-4 border-[var(--border)] px-4 py-4 last:border-b-0 ${p === 'dispute' ? 'border-l-violet-500' : p === 'review' ? 'border-l-amber-500' : 'border-l-blue-500'}`}>
+                    <div key={t.id} className="border-b border-[var(--border)] px-4 py-4 last:border-b-0">
                       <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr_1.3fr_auto]">
                         <div className="flex min-w-0 items-start gap-3">
-                          <CategoryIcon category={t.category ?? t.title} priority={t.priority} className="h-11 w-11" iconSize={18} />
+                          <CategoryIcon category={t.category ?? t.title} priority={t.priority} className="h-9 w-9 sm:h-11 sm:w-11" iconSize={18} />
                           <div className="min-w-0">
-                            <p className="truncate text-sm font-bold text-[var(--text)]">{t.category || t.title}</p>
+                            <p className="line-clamp-2 text-sm font-bold text-[var(--text)] lg:line-clamp-1">{t.category || t.title}</p>
                             {t.jobRef && <Link href={`/regional/tickets/${t.id}`} className="block truncate text-[11px] font-medium text-blue-600 hover:underline dark:text-blue-400">Ticket {t.jobRef}</Link>}
                             {t.supplier && <p className="flex items-center gap-1 truncate text-[11px] text-[var(--text-muted)]"><Truck size={11} className="shrink-0" /> {t.supplier}</p>}
                             {t.description && <p className="mt-0.5 line-clamp-2 text-sm text-[var(--text-muted)]">{t.description}</p>}
@@ -195,10 +186,11 @@ export function RegionalSnags({ snags, generatedAt }: { snags: RegionalSnagRow[]
                         <div className="min-w-0 space-y-1.5 text-sm">
                           <div><p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-faint)]">Raised</p><p className="flex items-center gap-1.5 text-[var(--text)]"><Calendar size={13} className="shrink-0 text-[var(--text-faint)]" /> {formatDateTime(t.createdAt)}</p></div>
                           {t.dueAt && <div><p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-faint)]">Fix due</p><p className="flex items-center gap-1.5 text-[var(--text)]"><Clock size={13} className="shrink-0 text-[var(--text-faint)]" /> {formatDateTime(t.dueAt)}</p>{rDue != null && <p className={`text-[11px] font-semibold ${rDue <= 0 ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'}`}>{rDue <= 0 ? 'overdue' : `in ${humanizeDuration(rDue)}`}</p>}</div>}
-                          {t.category && <div><p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-faint)]">Category</p><p className="flex items-center gap-1.5 text-[var(--text)]"><Tag size={13} className="shrink-0 text-[var(--text-faint)]" /> {t.category}</p></div>}
+                          {/* Category block is lg+ — the card title already shows it on phones. */}
+                          {t.category && <div className="hidden lg:block"><p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-faint)]">Category</p><p className="flex items-center gap-1.5 text-[var(--text)]"><Tag size={13} className="shrink-0 text-[var(--text-faint)]" /> {t.category}</p></div>}
                         </div>
                         <div className="min-w-0">
-                          {t.snagReason ? (<><p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-faint)]">Reason</p><p className="text-sm text-[var(--text)]">{t.snagReason}</p></>) : <p className="text-sm text-[var(--text-faint)]">Open the ticket for the full snag detail.</p>}
+                          {t.snagReason ? (<><p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-faint)]">Reason</p><p className="line-clamp-3 text-sm text-[var(--text)] lg:line-clamp-none">{t.snagReason}</p></>) : <p className="text-sm text-[var(--text-faint)]">Open the ticket for the full snag detail.</p>}
                         </div>
                         <div className="flex flex-col items-stretch justify-center gap-2 lg:w-40">
                           <Link href={`/regional/tickets/${t.id}`} className={`inline-flex items-center justify-center gap-1.5 rounded-xl px-4 py-2 text-sm font-bold text-white transition ${p === 'dispute' ? 'bg-violet-600 hover:bg-violet-500' : p === 'review' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-blue-600 hover:bg-blue-500'}`}>{p === 'dispute' ? 'Review dispute' : p === 'review' ? 'Sign off' : 'View'} <ChevronRight size={15} /></Link>

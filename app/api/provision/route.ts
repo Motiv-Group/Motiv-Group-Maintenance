@@ -5,7 +5,8 @@ import { rateLimit } from '@/lib/rate-limit'
 import { inviteUser } from '@/lib/invite'
 import { logAudit } from '@/lib/audit'
 import { normalisePhone, isValidEmail, isValidPhone, generatePassword } from '@/lib/csv'
-import { sendEmail, storeInviteEmail, supplierInviteEmail, supplierAddedNoticeEmail } from '@/lib/email'
+import { sendEmail } from '@/lib/email'
+import { buildEmail } from '@/lib/emails/server'
 import { randomBytes } from 'crypto'
 import { z } from 'zod'
 import { parseJsonBody } from '@/lib/validate'
@@ -171,9 +172,9 @@ export async function POST(request: Request) {
 
         // 4) email the credentials
         const { data: company } = await admin.from('companies').select('name').eq('id', companyId).single()
-        const { subject, html, text } = storeInviteEmail({
-          managerName: full_name, loginUrl: `${origin.replace(/\/$/, '')}/auth/login`, email: cleanEmail, password,
-          rmName: me?.full_name ?? null, company: company?.name ?? store_name, subStore,
+        const { subject, html, text } = await buildEmail('store_welcome', {
+          name: full_name, loginUrl: `${origin.replace(/\/$/, '')}/auth/login`, email: cleanEmail, password,
+          inviter: me?.full_name ?? null, company: company?.name ?? store_name, store: subStore,
         })
         const emailed = await sendEmail({ to: cleanEmail, subject, html, text })
         await logAudit(admin, { actorId: user.id, companyId, action: 'provision.create_store_manager', entityType: 'user', entityId: uid, metadata: { email: cleanEmail, storeId: store.id, branch_code: bcode } })
@@ -193,7 +194,7 @@ export async function POST(request: Request) {
           // link — send a notice that they've been added as a supplier instead.
           const { data: existing } = await admin.from('user_profiles').select('id').ilike('email', supEmail).maybeSingle()
           if (existing) {
-            const { subject, html, text } = supplierAddedNoticeEmail({ companyName: body.companyName, addedBy: me?.full_name ?? null, loginUrl: `${origin.replace(/\/$/, '')}/auth/login` })
+            const { subject, html, text } = await buildEmail('supplier_added', { company: body.companyName, inviter: me?.full_name ?? null, loginUrl: `${origin.replace(/\/$/, '')}/auth/login` })
             const emailed = await sendEmail({ to: supEmail, subject, html, text })
             revalidatePath('/executive/suppliers'); revalidatePath('/regional/suppliers')
             return NextResponse.json({ ok: true, emailed, message: emailed ? 'Supplier added — they already have an account, so we let them know.' : 'Supplier added. They already have an account.' })
@@ -207,7 +208,7 @@ export async function POST(request: Request) {
           }
           const link = `${origin.replace(/\/$/, '')}/auth/supplier-onboard?token=${token}`
           const { data: myCompany } = await admin.from('companies').select('name').eq('id', companyId).single()
-          const { subject, html, text } = supplierInviteEmail({ link, base: origin.replace(/\/$/, ''), inviterCompany: myCompany?.name ?? null })
+          const { subject, html, text } = await buildEmail('supplier_invite', { link, base: origin.replace(/\/$/, ''), inviterCompany: myCompany?.name ?? null })
           const emailed = await sendEmail({ to: supEmail, subject, html, text })
           revalidatePath('/executive/suppliers'); revalidatePath('/regional/suppliers')
           return NextResponse.json({ ok: true, emailed, actionLink: emailed ? undefined : link, message: emailed ? 'Supplier added — invite link emailed.' : 'Supplier added. Email not sent — copy this link:' })
@@ -235,7 +236,7 @@ export async function POST(request: Request) {
           const { data: sup, error } = await admin.from('suppliers').insert({ company_id: companyId, company_name: supName, email: supEmail }).select('id').single()
           if (error || !sup) return NextResponse.json({ error: error?.message ?? 'Failed' }, { status: 400 })
           await logAudit(admin, { actorId: user.id, companyId, action: 'provision.invite_supplier', entityType: 'supplier', entityId: sup.id, metadata: { email: supEmail, existing: true } })
-          const { subject, html, text } = supplierAddedNoticeEmail({ companyName: myCompany?.name ?? supName, addedBy: me?.full_name ?? null, loginUrl: `${origin.replace(/\/$/, '')}/auth/login` })
+          const { subject, html, text } = await buildEmail('supplier_added', { company: myCompany?.name ?? supName, inviter: me?.full_name ?? null, loginUrl: `${origin.replace(/\/$/, '')}/auth/login` })
           const emailed = await sendEmail({ to: supEmail, subject, html, text })
           revalidatePath('/executive/suppliers'); revalidatePath('/regional/suppliers')
           return NextResponse.json({ ok: true, emailed, message: emailed ? 'They already have a Motiv account — we let them know they were added.' : 'Supplier added. They already have an account.' })
@@ -251,7 +252,7 @@ export async function POST(request: Request) {
         }
         await logAudit(admin, { actorId: user.id, companyId, action: 'provision.invite_supplier', entityType: 'supplier', entityId: sup.id, metadata: { email: supEmail, hasMessage: !!message } })
         const link = `${origin.replace(/\/$/, '')}/auth/supplier-onboard?token=${token}`
-        const { subject, html, text } = supplierInviteEmail({ link, base: origin.replace(/\/$/, ''), inviterCompany: myCompany?.name ?? null, message })
+        const { subject, html, text } = await buildEmail('supplier_invite', { link, base: origin.replace(/\/$/, ''), inviterCompany: myCompany?.name ?? null, message })
         const emailed = await sendEmail({ to: supEmail, subject, html, text })
         revalidatePath('/executive/suppliers'); revalidatePath('/regional/suppliers')
         return NextResponse.json({ ok: true, emailed, actionLink: emailed ? undefined : link, message: emailed ? 'Invite sent — the supplier will get an email to set up their account.' : 'Invite created. Email not configured — copy this link:' })
@@ -323,9 +324,9 @@ export async function POST(request: Request) {
             if (Object.keys(profPatch).length) await admin.from('user_profiles').update(profPatch as Database['public']['Tables']['user_profiles']['Update']).eq('id', smId)
             // Email the new credentials (invite link + username + password).
             const { data: company } = await admin.from('companies').select('name').eq('id', companyId).single()
-            const { subject, html, text } = storeInviteEmail({
-              managerName: cur?.full_name ?? '', loginUrl: `${origin.replace(/\/$/, '')}/auth/login`, email: newEmail, password,
-              rmName: me?.full_name ?? null, company: company?.name ?? (patch.name ?? store.name), subStore: patch.sub_store ?? store.sub_store ?? store.name,
+            const { subject, html, text } = await buildEmail('store_welcome', {
+              name: cur?.full_name ?? '', loginUrl: `${origin.replace(/\/$/, '')}/auth/login`, email: newEmail, password,
+              inviter: me?.full_name ?? null, company: company?.name ?? (patch.name ?? store.name), store: patch.sub_store ?? store.sub_store ?? store.name,
             })
             emailed = await sendEmail({ to: newEmail, subject, html, text })
           } else if (Object.keys(profPatch).length) {

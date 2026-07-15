@@ -36,7 +36,7 @@ export function EditTicketForm({ ticketId, initial }: Props) {
   const [impact, setImpact] = useState(initial.impact || 'none')
   const [description, setDescription] = useState(initial.description)
 
-  const input = 'w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] placeholder-[var(--text-faint)] focus:outline-none focus:ring-2 focus:ring-[#C6A35D]/40'
+  const input = 'w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] placeholder-[var(--text-faint)] focus:outline-none focus:ring-2 focus:ring-blue-500/40'
 
   async function save(e: React.FormEvent) {
     e.preventDefault(); setBusy(true); setError('')
@@ -67,7 +67,7 @@ export function EditTicketForm({ ticketId, initial }: Props) {
       <p className="text-[11px] text-[var(--text-faint)]">Priority is recalculated from the operational impact.</p>
       {error && <p className="text-xs text-red-500">{error}</p>}
       <div className="flex gap-2">
-        <button type="submit" disabled={busy} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#C6A35D] text-[#0a0e17] text-sm font-semibold disabled:opacity-50"><Save size={14} /> {busy ? 'Saving…' : 'Save changes'}</button>
+        <button type="submit" disabled={busy} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-600 text-white text-sm font-semibold disabled:opacity-50"><Save size={14} /> {busy ? 'Saving…' : 'Save changes'}</button>
         <button type="button" onClick={reset} className="px-3 py-2 rounded-xl ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm">Reset</button>
       </div>
     </form>

@@ -43,13 +43,13 @@ export function RegionalOverview({ data, name, briefing, briefingScopeId, motivS
 
       {/* Portfolio blocks side by side: distribution · focus · supplier perf · quote value */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <SectionCard title="Store Health Distribution" icon={<Building2 size={15} className="text-indigo-600 dark:text-indigo-400" />} action={<Link href="/regional/stores" className="text-xs text-[#C6A35D] hover:underline">View all</Link>}>
+        <SectionCard title="Store Health Distribution" icon={<Building2 size={15} className="text-indigo-600 dark:text-indigo-400" />} action={<Link href="/regional/stores" className="text-xs text-blue-500 hover:underline">View all</Link>}>
           <DistributionBar counts={p.counts} />
           {/* Each RAG block deep-links into the Stores tab filtered to that status. */}
           <div className="mt-3"><RagBlocks counts={p.counts} unitLabel="stores" hrefFor={s => `/regional/stores?status=${s}`} /></div>
         </SectionCard>
 
-        <SectionCard title="Recommended Focus Today" icon={<ListTodo size={15} className="text-[#C6A35D]" />}>
+        <SectionCard title="Recommended Focus Today" icon={<ListTodo size={15} className="text-[#f59e0b]" />}>
           {actions.length ? (
             <ul className="space-y-2">
               {actions.map(a => {
@@ -73,7 +73,7 @@ export function RegionalOverview({ data, name, briefing, briefingScopeId, motivS
           ) : <p className="text-sm text-[var(--text-faint)]">Nothing urgent — portfolio under control.</p>}
         </SectionCard>
 
-        <SectionCard title="Supplier Performance" icon={<Truck size={15} className="text-teal-600 dark:text-teal-400" />} action={<Link href="/regional/suppliers" className="text-xs text-[#C6A35D] hover:underline">View all</Link>}>
+        <SectionCard title="Supplier Performance" icon={<Truck size={15} className="text-teal-600 dark:text-teal-400" />} action={<Link href="/regional/suppliers" className="text-xs text-blue-500 hover:underline">View all</Link>}>
           {data.suppliers.slice(0, 5).map(s => (
             <Link key={s.id} href={`/regional/suppliers?supplier=${s.id}`} className="flex items-center justify-between gap-2 py-2 -mx-2 px-2 rounded-lg border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition">
               <div className="min-w-0">

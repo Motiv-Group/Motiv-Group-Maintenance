@@ -1,10 +1,12 @@
 'use client'
 import type { ReactNode } from 'react'
 import { X } from 'lucide-react'
+import { useScrollLock } from '@/lib/useScrollLock'
 
 /** Click-to-open slide-over panel, on every screen size. Always mounted so it
  *  can animate in/out; content is hidden off-canvas when closed. */
 export function Drawer({ open, onClose, children }: { open: boolean; onClose: () => void; children: ReactNode }) {
+  useScrollLock(open)
   return (
     <>
       <div
@@ -37,7 +39,7 @@ export function DrawerHeader({ title, onClose, children }: { title: ReactNode; o
 
 export function PrimaryButton({ children, tone = 'danger', onClick }: { children: ReactNode; tone?: 'danger' | 'gold'; onClick?: () => void }) {
   const cls = tone === 'gold'
-    ? 'bg-[#C6A35D] text-[#0a0e17] hover:brightness-95'
+    ? 'bg-blue-600 text-white hover:brightness-95'
     : 'bg-red-600 text-white hover:bg-red-500'
   return <button onClick={onClick} className={`w-full mt-4 py-2.5 rounded-xl text-sm font-semibold transition ${cls}`}>{children}</button>
 }

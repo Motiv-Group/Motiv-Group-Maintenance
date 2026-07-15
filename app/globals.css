@@ -25,6 +25,17 @@
        Default 90%; user-configurable 70–95% via Settings → Appearance. The blocking
        script in app/layout.tsx overrides this from localStorage before paint. */
     --content-width: 90%;
+    /* Brand palette as RGB channels (see tailwind.config.ts). Factory defaults —
+       the admin Customize tab injects overrides from app/layout.tsx at runtime.
+       Keep in sync with lib/settings.ts BRAND_DEFAULT_HEX. */
+    --brand-50:  248 245 237;
+    --brand-100: 232 223 196;
+    --brand-300: 201 185 154;
+    --brand-400: 181 160 125;
+    --brand-500: 27 29 36;
+    --brand-600: 14 16 22;
+    --brand-700: 9 10 14;
+    --brand-900: 5 6 8;
     --app-bg:     #f0f1f4;
     --surface:    #ffffff;
     --surface-2:  #f7f8fa;
@@ -53,6 +64,20 @@
 @layer utilities {
   .safe-top    { padding-top: env(safe-area-inset-top); }
   .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+  /* Hide the scrollbar on horizontal control strips (tab rows, filter-pill
+     strips): they scroll by swipe/drag, and a stray scrollbar draws a line
+     across the controls + content below it. */
+  .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+}
+
+/* Auth hero logo (MotivLockup): admin-tunable size that shrinks on phones.
+   Height comes from CSS vars set inline per-render; width auto-follows the
+   intrinsic aspect. The 640px breakpoint matches Tailwind's `sm`. Unlayered so
+   it beats the width/height attrs next/image emits. */
+.auth-hero-logo { height: var(--logo-h); width: auto; }
+@media (max-width: 640px) {
+  .auth-hero-logo { height: var(--logo-h-mobile); }
 }
 
 /* ── Native <select> dark-mode popup fix ──
@@ -65,25 +90,6 @@ html.dark select,
 html.dark select option {
   background-color: #26272e;
   color: #f6f6f7;
-}
-
-/* ── First-load splash overlay ──
-   SSR-rendered so it paints before hydration; fades out on its own via a CSS
-   animation (no JS dependency). pointer-events:none so it never traps clicks. */
-#motiv-splash {
-  position: fixed;
-  inset: 0;
-  z-index: 2147483647;
-  background: #0b0c11 url('/splash/cape-town.jpg') center / contain no-repeat;
-  pointer-events: none;
-  animation: motivSplashOut 2.1s ease-in forwards;
-}
-@keyframes motivSplashOut {
-  0%, 58% { opacity: 1; }
-  100%    { opacity: 0; visibility: hidden; }
-}
-@media (prefers-reduced-motion: reduce) {
-  #motiv-splash { animation-duration: 1s; }
 }
 
 /* Modal enter effects — run on the same paint as mount (see components/ui/Modal.tsx),

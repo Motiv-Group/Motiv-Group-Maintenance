@@ -15,7 +15,7 @@ export default async function CostExposureInsightPage() {
     <StoreMetricBreakdown
       title="Cost & Exposure"
       subtitle="Commercial exposure by store across the estate."
-      icon={<Banknote className="text-[#C6A35D]" size={22} />}
+      icon={<Banknote className="text-[#f59e0b]" size={22} />}
       rows={rows}
       valueLabel="Exposure"
       total={formatCurrency(total)}

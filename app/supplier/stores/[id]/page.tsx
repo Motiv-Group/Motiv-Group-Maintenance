@@ -157,10 +157,10 @@ export default async function AdminStoreDetailPage(props: { params: Promise<{ id
                   <p className="text-xs text-[var(--text-faint)] mt-0.5">{formatDate(ticket.created_at)}</p>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
-                  <span className={`inline-flex w-[120px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${PRIORITY_COLORS[ticket.priority]}`}>
+                  <span className={`inline-flex w-auto sm:w-[120px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${PRIORITY_COLORS[ticket.priority]}`}>
                     {PRIORITY_LABELS[ticket.priority]}
                   </span>
-                  <span className={`inline-flex w-[120px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${STATUS_COLORS[ticket.status]}`}>
+                  <span className={`inline-flex w-auto sm:w-[120px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${STATUS_COLORS[ticket.status]}`}>
                     {STATUS_LABELS[ticket.status]}
                   </span>
                 </div>

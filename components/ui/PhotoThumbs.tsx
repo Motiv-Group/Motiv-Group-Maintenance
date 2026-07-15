@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { X, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react'
+import { useScrollLock } from '@/lib/useScrollLock'
 
 /**
  * Evidence photo strip: thumbnails + swipeable lightbox. Replaces the old
@@ -19,6 +20,9 @@ export function PhotoThumbs({ urls, ticketId, label = 'Photo', limit }: {
   limit?: number
 }) {
   const [open, setOpen] = useState<number | null>(null)
+
+  // Lock page scroll while the lightbox overlay is open.
+  useScrollLock(open !== null)
 
   const track = useCallback((i: number) => {
     if (!ticketId) return
@@ -63,7 +67,7 @@ export function PhotoThumbs({ urls, ticketId, label = 'Photo', limit }: {
         {visible.map((u, i) => (
           <button
             key={i} type="button" onClick={() => show(i)}
-            className="group relative h-20 w-20 sm:h-24 sm:w-24 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface-2)] focus:outline-none focus:ring-2 focus:ring-[#C6A35D]/60"
+            className="group relative h-20 w-20 sm:h-24 sm:w-24 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface-2)] focus:outline-none focus:ring-2 focus:ring-blue-500/60"
             title={`View ${label.toLowerCase()} ${i + 1}`}
           >
             {/* eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL; next/image can't optimize it */}
@@ -74,7 +78,7 @@ export function PhotoThumbs({ urls, ticketId, label = 'Photo', limit }: {
         {truncated && (
           <button
             type="button" onClick={() => show(limit! - 1)}
-            className="grid h-20 w-20 sm:h-24 sm:w-24 place-items-center rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface-2)] text-sm font-semibold text-[var(--text-muted)] transition hover:bg-[var(--hover)] focus:outline-none focus:ring-2 focus:ring-[#C6A35D]/60"
+            className="grid h-20 w-20 sm:h-24 sm:w-24 place-items-center rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface-2)] text-sm font-semibold text-[var(--text-muted)] transition hover:bg-[var(--hover)] focus:outline-none focus:ring-2 focus:ring-blue-500/60"
             title={`View all ${urls.length} ${label.toLowerCase()}s`}
           >
             +{moreCount}

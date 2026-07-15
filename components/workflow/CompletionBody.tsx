@@ -25,9 +25,10 @@ function DocCard({ ticketId, url, itemType, itemLabel, uploadedAt }: {
   return (
     <div className="rounded-lg bg-[var(--surface)] p-3 ring-1 ring-[var(--border)]">
       <div className="flex items-start gap-3">
-        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-red-500/15 text-red-600 dark:text-red-400"><FileText size={20} /></span>
+        <span className="grid h-9 w-9 sm:h-11 sm:w-11 shrink-0 place-items-center rounded-lg bg-red-500/15 text-red-600 dark:text-red-400"><FileText size={20} /></span>
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-[var(--text)]">{docName(url, itemLabel)}</p>
+          {/* Wraps to two lines on phones so the filename stays readable. */}
+          <p className="line-clamp-2 break-all text-sm font-semibold text-[var(--text)] sm:line-clamp-none sm:truncate">{docName(url, itemLabel)}</p>
           {uploadedAt && <p className="text-[11px] text-[var(--text-faint)]">Uploaded {formatDateTime(uploadedAt)}</p>}
         </div>
       </div>

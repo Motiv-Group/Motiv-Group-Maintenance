@@ -214,14 +214,14 @@ export function SupplierReviews({ reviews, now }: { reviews: SupplierReview[]; n
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="mr-1 text-xs text-[var(--text-faint)] tabular-nums">{firstShown}–{lastShown} of {filtered.length}</span>
-                  <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={curPage <= 1} aria-label="Previous page" className="rounded-lg p-1.5 text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-40"><ChevronLeft size={15} /></button>
+                  <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={curPage <= 1} aria-label="Previous page" className="rounded-lg p-2.5 sm:p-1.5 text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-40"><ChevronLeft size={15} /></button>
                   <span className="px-1 text-xs text-[var(--text-muted)] tabular-nums">Page {curPage} / {totalPages}</span>
-                  <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={curPage >= totalPages} aria-label="Next page" className="rounded-lg p-1.5 text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-40"><ChevronRight size={15} /></button>
+                  <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={curPage >= totalPages} aria-label="Next page" className="rounded-lg p-2.5 sm:p-1.5 text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-40"><ChevronRight size={15} /></button>
                 </div>
               </div>
             </div>
           ) : (
-            <Card className="grid min-h-32 place-items-center p-8 text-center">
+            <Card className="grid min-h-32 place-items-center p-6 sm:p-8 text-center">
               <div>
                 <Star size={28} className="mx-auto mb-2 text-[var(--text-faint)]" />
                 <p className="text-sm text-[var(--text-faint)]">{total ? 'No reviews match your filters.' : 'No reviews yet — they appear here after a manager signs off a completed job.'}</p>

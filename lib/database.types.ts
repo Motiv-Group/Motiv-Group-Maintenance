@@ -6,6 +6,24 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export interface Database {
   public: {
     Tables: {
+      app_settings: {
+        Row: {
+          key: string | null
+          value: Json
+          updated_at: string
+        }
+        Insert: {
+          key?: string | null
+          value?: Json
+          updated_at?: string
+        }
+        Update: {
+          key?: string | null
+          value?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
       approvals: {
         Row: {
           id: string
@@ -744,6 +762,240 @@ export interface Database {
           referencedColumns: ["id"]
         }
       ]
+      }
+      project_events: {
+        Row: {
+          id: string
+          project_id: string
+          company_id: string | null
+          project_store_id: string | null
+          event_type: string
+          previous_value: string | null
+          new_value: string | null
+          metadata: Json | null
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          project_id?: string
+          company_id?: string | null
+          project_store_id?: string | null
+          event_type?: string
+          previous_value?: string | null
+          new_value?: string | null
+          metadata?: Json | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          company_id?: string | null
+          project_store_id?: string | null
+          event_type?: string
+          previous_value?: string | null
+          new_value?: string | null
+          metadata?: Json | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      project_files: {
+        Row: {
+          id: string
+          project_id: string
+          company_id: string
+          project_store_id: string | null
+          file_category: string
+          storage_path: string
+          original_filename: string | null
+          mime_type: string | null
+          file_size: number | null
+          caption: string | null
+          signed_date: string | null
+          signatory_name: string | null
+          sort_order: number
+          uploaded_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          project_id?: string
+          company_id?: string
+          project_store_id?: string | null
+          file_category?: string
+          storage_path?: string
+          original_filename?: string | null
+          mime_type?: string | null
+          file_size?: number | null
+          caption?: string | null
+          signed_date?: string | null
+          signatory_name?: string | null
+          sort_order?: number
+          uploaded_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          company_id?: string
+          project_store_id?: string | null
+          file_category?: string
+          storage_path?: string
+          original_filename?: string | null
+          mime_type?: string | null
+          file_size?: number | null
+          caption?: string | null
+          signed_date?: string | null
+          signatory_name?: string | null
+          sort_order?: number
+          uploaded_by?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      project_notes: {
+        Row: {
+          id: string
+          project_id: string
+          company_id: string
+          project_store_id: string | null
+          body: string
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          project_id?: string
+          company_id?: string
+          project_store_id?: string | null
+          body?: string
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          company_id?: string
+          project_store_id?: string | null
+          body?: string
+          created_by?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      project_stores: {
+        Row: {
+          id: string
+          project_id: string
+          company_id: string
+          store_id: string | null
+          branch_code: string
+          store_name: string | null
+          town: string | null
+          rfid_m2_required: number | null
+          start_date: string | null
+          end_date: string | null
+          on_site_completed_at: string | null
+          before_photos_completed_at: string | null
+          after_photos_completed_at: string | null
+          signoff_completed_at: string | null
+          on_site_note: string | null
+          progress_percentage: number | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          project_id?: string
+          company_id?: string
+          store_id?: string | null
+          branch_code?: string
+          store_name?: string | null
+          town?: string | null
+          rfid_m2_required?: number | null
+          start_date?: string | null
+          end_date?: string | null
+          on_site_completed_at?: string | null
+          before_photos_completed_at?: string | null
+          after_photos_completed_at?: string | null
+          signoff_completed_at?: string | null
+          on_site_note?: string | null
+          progress_percentage?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          company_id?: string
+          store_id?: string | null
+          branch_code?: string
+          store_name?: string | null
+          town?: string | null
+          rfid_m2_required?: number | null
+          start_date?: string | null
+          end_date?: string | null
+          on_site_completed_at?: string | null
+          before_photos_completed_at?: string | null
+          after_photos_completed_at?: string | null
+          signoff_completed_at?: string | null
+          on_site_note?: string | null
+          progress_percentage?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      projects: {
+        Row: {
+          id: string
+          company_id: string
+          name: string
+          description: string | null
+          client_name: string | null
+          start_date: string | null
+          end_date: string | null
+          status: string
+          cover_image_path: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+          archived_at: string | null
+        }
+        Insert: {
+          id?: string
+          company_id?: string
+          name?: string
+          description?: string | null
+          client_name?: string | null
+          start_date?: string | null
+          end_date?: string | null
+          status?: string
+          cover_image_path?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+          archived_at?: string | null
+        }
+        Update: {
+          id?: string
+          company_id?: string
+          name?: string
+          description?: string | null
+          client_name?: string | null
+          start_date?: string | null
+          end_date?: string | null
+          status?: string
+          cover_image_path?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+          archived_at?: string | null
+        }
+        Relationships: []
       }
       push_subscriptions: {
         Row: {
@@ -2309,6 +2561,57 @@ export interface Database {
           referencedColumns: ["id"]
         }
       ]
+      }
+      ticket_chat_messages: {
+        Row: {
+          id: string | null
+          ticket_id: string
+          company_id: string | null
+          author_id: string
+          author_role: string
+          body: string | null
+          attachment_urls: Json
+          created_at: string
+        }
+        Insert: {
+          id?: string | null
+          ticket_id?: string
+          company_id?: string | null
+          author_id?: string
+          author_role?: string
+          body?: string | null
+          attachment_urls?: Json
+          created_at?: string
+        }
+        Update: {
+          id?: string | null
+          ticket_id?: string
+          company_id?: string | null
+          author_id?: string
+          author_role?: string
+          body?: string | null
+          attachment_urls?: Json
+          created_at?: string
+        }
+        Relationships: []
+      }
+      ticket_chat_reads: {
+        Row: {
+          ticket_id: string
+          user_id: string
+          last_read_at: string
+        }
+        Insert: {
+          ticket_id?: string
+          user_id?: string
+          last_read_at?: string
+        }
+        Update: {
+          ticket_id?: string
+          user_id?: string
+          last_read_at?: string
+        }
+        Relationships: []
       }
       ticket_dispute_messages: {
         Row: {

@@ -36,7 +36,7 @@ function tone(action: string): string {
   if (/^accept_snag/.test(action))
     return 'bg-green-600 text-white hover:bg-green-500'
   if (/^(approve|close_out|proceed|approve_quote|approve_variation|start_work|schedule)/.test(action))
-    return 'bg-[#C6A35D] text-[#0a0e17] hover:brightness-95'
+    return 'bg-blue-600 text-white hover:brightness-95'
   if (/^request_evidence/.test(action))
     return 'bg-amber-500 text-[#0a0e17] hover:bg-amber-600'
   if (/^(reject|reject_quote|reject_variation|raise_snag)/.test(action))
@@ -124,7 +124,7 @@ export function WorkflowActions({ ticketId, status, role, suppliers = [], exclud
       <div className="flex flex-wrap gap-2">
         {actions.map(t => (
           <button key={t.action} onClick={() => start(t)} disabled={busy}
-            className={`flex-1 min-w-[8rem] text-center px-3 py-2 rounded-xl text-sm font-medium transition disabled:opacity-50 ${tone(t.action)} ${active?.action === t.action ? 'ring-2 ring-[#C6A35D]' : ''}`}>
+            className={`flex-1 min-w-[8rem] text-center px-3 py-2 rounded-xl text-sm font-medium transition disabled:opacity-50 ${tone(t.action)} ${active?.action === t.action ? 'ring-2 ring-blue-500' : ''}`}>
             {t.label}
           </button>
         ))}

@@ -22,12 +22,12 @@ export const STATUS_LABELS: Record<HealthStatus, string> = {
 // Dark-navy/gold brand-aligned classes
 export const STATUS_COLORS: Record<HealthStatus, string> = {
   controlled: 'bg-emerald-500/15 text-emerald-400',
-  attention:  'bg-[#C6A35D]/15 text-[#C6A35D]',
+  attention:  'bg-blue-500/15 text-blue-500',
   at_risk:    'bg-red-500/15 text-red-400',
   critical:   'bg-red-800/30 text-red-300',
 }
 export const STATUS_STROKE: Record<HealthStatus, string> = {
-  controlled: '#10b981', attention: '#C6A35D', at_risk: '#ef4444', critical: '#b91c1c',
+  controlled: '#10b981', attention: '#f59e0b', at_risk: '#ef4444', critical: '#b91c1c',
 }
 export function bandCeiling(s: HealthStatus): number {
   return s === 'critical' ? 50 : s === 'at_risk' ? 79 : s === 'attention' ? 94 : 100

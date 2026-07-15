@@ -119,9 +119,9 @@ export default async function IndividualTicketDetailPage(props: { params: Promis
         <Card className="p-5 space-y-3">
           <h2 className="text-sm font-bold text-[var(--text)]">COC &amp; POC — review &amp; sign off</h2>
           <div className="flex flex-wrap gap-x-4 gap-y-1">
-            {(pendingSignoff.after_urls ?? []).map((u: string, i: number) => <a key={`a${i}`} href={u} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C6A35D] underline hover:text-amber-500">After {i + 1}</a>)}
-            {pendingSignoff.coc_url && <a href={pendingSignoff.coc_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View COC</a>}
-            {pendingSignoff.invoice_url && <a href={pendingSignoff.invoice_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View invoice</a>}
+            {(pendingSignoff.after_urls ?? []).map((u: string, i: number) => <a key={`a${i}`} href={u} target="_blank" rel="noopener noreferrer" className="text-sm text-[#f59e0b] underline hover:text-amber-500">After {i + 1}</a>)}
+            {pendingSignoff.coc_url && <a href={pendingSignoff.coc_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-500 hover:underline"><FileText size={14} /> View COC</a>}
+            {pendingSignoff.invoice_url && <a href={pendingSignoff.invoice_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-500 hover:underline"><FileText size={14} /> View invoice</a>}
           </div>
           {pendingSignoff.notes && <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{pendingSignoff.notes}</p>}
           <ApproveSignoffCard ticketId={t.id} />
@@ -134,8 +134,8 @@ export default async function IndividualTicketDetailPage(props: { params: Promis
         <Card className="p-5 space-y-3">
           <h2 className="text-sm font-bold text-[var(--text)]">Completion</h2>
           <div className="flex flex-wrap gap-x-4 gap-y-1">
-            {(acceptedSignoff.after_urls ?? []).map((u: string, i: number) => <a key={`c${i}`} href={u} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C6A35D] underline hover:text-amber-500">After {i + 1}</a>)}
-            {acceptedSignoff.coc_url && <a href={acceptedSignoff.coc_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View COC</a>}
+            {(acceptedSignoff.after_urls ?? []).map((u: string, i: number) => <a key={`c${i}`} href={u} target="_blank" rel="noopener noreferrer" className="text-sm text-[#f59e0b] underline hover:text-amber-500">After {i + 1}</a>)}
+            {acceptedSignoff.coc_url && <a href={acceptedSignoff.coc_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-500 hover:underline"><FileText size={14} /> View COC</a>}
           </div>
         </Card>
       )}
@@ -166,8 +166,8 @@ export default async function IndividualTicketDetailPage(props: { params: Promis
           </div>
         )}
         {t.status === 'in_progress' && (
-          <div className="rounded-xl bg-[#C6A35D]/10 ring-1 ring-[#C6A35D]/30 p-3.5 flex items-start gap-2.5">
-            <Clock size={16} className="text-[#C6A35D] shrink-0 mt-0.5" />
+          <div className="rounded-xl bg-[#f59e0b]/10 ring-1 ring-[#f59e0b]/30 p-3.5 flex items-start gap-2.5">
+            <Clock size={16} className="text-[#f59e0b] shrink-0 mt-0.5" />
             <p className="text-sm text-[var(--text-muted)]">Work in progress — the supplier is on site or on their way.</p>
           </div>
         )}

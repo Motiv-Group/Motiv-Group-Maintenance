@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { Globe2, Map as MapIcon, Store, Truck, Gavel, Bell, Settings, LogOut, FileBarChart, LayoutDashboard, Ticket, ClipboardCheck, AlertTriangle, ReceiptText, BarChart2, Users, CalendarClock, CheckCircle2, Network, ScrollText, Database, Triangle, Mail, Zap, ShieldAlert } from 'lucide-react'
+import { Globe2, Map as MapIcon, Store, Truck, Gavel, Bell, Settings, LogOut, FileBarChart, LayoutDashboard, Ticket, ClipboardCheck, AlertTriangle, ReceiptText, BarChart2, Users, CalendarClock, CheckCircle2, Network, ScrollText, Database, Triangle, Mail, Zap, ShieldAlert, FolderKanban, Paintbrush } from 'lucide-react'
 import { MotivLogo } from '@/components/ui/MotivLogo'
 import { ContextSwitcher } from '@/components/ui/ContextSwitcher'
 import { SwipeNav } from '@/components/ui/SwipeNav'
@@ -35,6 +35,7 @@ const REGIONAL_TABS: ChromeTab[] = [
   { href: '/regional/signoff',  label: 'Signoff',   icon: ClipboardCheck },
   { href: '/regional/snag',     label: 'Snags',     icon: AlertTriangle },
   { href: '/regional/suppliers', label: 'Suppliers', icon: Truck },
+  { href: '/regional/projects', label: 'Projects',  icon: FolderKanban },
 ]
 const STORE_TABS: ChromeTab[] = [
   { href: '/client',         label: 'Dashboard', icon: LayoutDashboard },
@@ -69,10 +70,12 @@ const ADMIN_TABS: ChromeTab[] = [
   { href: '/admin/accounts',  label: 'Accounts',  icon: Users },
   { href: '/admin/hierarchy', label: 'Hierarchy', icon: Network },
   { href: '/admin/suppliers', label: 'Suppliers', icon: Truck },
+  { href: '/admin/projects',  label: 'Projects',  icon: FolderKanban },
   { href: '/admin/audit',     label: 'Audit',     icon: ScrollText },
 ]
 const ADMIN_DESKTOP_TABS: ChromeTab[] = [
   ...ADMIN_TABS,
+  { href: '/admin/customization', label: 'Customize', icon: Paintbrush },
   { href: '/admin/supabase', label: 'Supabase', icon: Database },
   { href: '/admin/vercel',   label: 'Vercel',   icon: Triangle },
   { href: '/admin/resend',   label: 'Resend',   icon: Mail },
@@ -106,7 +109,7 @@ export function ExecChrome({
   const hasSidebar = isStore || isRegional || isSupplier || isAdmin
   // Nav bars are always deep navy (brand-600) in both light and dark mode,
   // matching the Settings Navbar — so icons/labels use light tones on navy.
-  const iconBtn = 'p-2 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 transition-colors'
+  const iconBtn = 'p-2.5 sm:p-2 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 transition-colors'
   // All roles share the same content width so the chrome (header, main, nav) is
   // consistent. On desktop the content fills --content-width of the available width
   // (default 90%, user-configurable 70–95% in Settings → Appearance); mobile stays
@@ -138,9 +141,12 @@ export function ExecChrome({
       )}
 
       <div className={hasSidebar ? 'lg:pl-[260px] flex min-h-screen flex-col' : 'flex min-h-screen flex-col'}>
-      <header className={`sticky top-0 z-20 bg-brand-600 border-b border-brand-700 ${hasSidebar ? 'lg:hidden' : ''}`}>
+      <header className={`sticky top-0 z-30 bg-brand-600 border-b border-brand-700 ${hasSidebar ? 'lg:hidden' : ''}`}>
         <div className={`${wrap} mx-auto px-4 h-16 flex items-center justify-between`}>
-          <Link href={home}><MotivLogo height={46} /></Link>
+          <Link href={home} className="shrink-0">
+            <MotivLogo height={40} wordmark={false} className="sm:hidden" />
+            <MotivLogo height={44} className="hidden sm:inline-flex" />
+          </Link>
           <div className="flex items-center gap-1">
             {reports && <Link href={`${base}/reports`} className={iconBtn} title="Reports"><FileBarChart size={18} /></Link>}
             <Link href={`${base}/notifications`} className={`relative ${iconBtn}`} title="Notifications">
@@ -154,7 +160,7 @@ export function ExecChrome({
               <button type="submit" className={iconBtn} title="Log out"><LogOut size={17} /></button>
             </form>
             <div className="flex items-center gap-2 pl-2 ml-1 border-l border-white/15">
-              <span className="w-8 h-8 rounded-full bg-[#C6A35D] text-[#0a0e17] font-bold flex items-center justify-center text-sm">{initial}</span>
+              <span className="w-8 h-8 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-sm">{initial}</span>
               <div className="hidden sm:block leading-tight">
                 <div className="text-sm font-medium text-white truncate">{userName ?? roleLabel}</div>
                 <div className="text-[11px] text-gray-300 truncate">{roleLabel}{accountStatus && statusSuffix(accountStatus)}</div>
@@ -169,13 +175,13 @@ export function ExecChrome({
         <main className={`flex-1 ${mainWrap} w-full mx-auto px-4 sm:px-5 ${hasSidebar ? 'py-5 pb-32 lg:px-10 lg:py-8 lg:pb-10' : 'py-6 pb-32'}`}>{children}</main>
       </SwipeNav>
 
-      <nav className={`fixed bottom-0 inset-x-0 z-20 bg-brand-600 border-t border-brand-700 ${hasSidebar ? 'lg:hidden' : ''}`}>
+      <nav className={`fixed bottom-0 inset-x-0 z-30 bg-brand-600 border-t border-brand-700 ${hasSidebar ? 'lg:hidden' : ''}`}>
         <div className={`${wrap} mx-auto flex items-stretch h-20 justify-around`}>
           {tabs.map(({ href, label, icon: Icon }) => {
             const active = isActiveHref(href, home, pathname, searchParams)
             return (
               <Link key={href} href={href}
-                className={`flex flex-col items-center justify-center gap-1 flex-1 text-[11px] font-medium transition-colors ${active ? 'text-[#C6A35D]' : 'text-gray-400 hover:text-gray-200'}`}>
+                className={`flex flex-col items-center justify-center gap-1 flex-1 text-[11px] font-medium transition-colors ${active ? 'text-blue-400' : 'text-gray-400 hover:text-gray-200'}`}>
                 <Icon size={22} strokeWidth={active ? 2.4 : 1.8} />
                 {label}
               </Link>

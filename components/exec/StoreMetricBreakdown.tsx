@@ -52,7 +52,7 @@ export function StoreMetricBreakdown({ title, subtitle, icon, rows, valueLabel, 
               {shown.map((r, i) => (
                 <tr key={r.storeId} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)]">
                   <td className="py-2.5 px-3 text-[var(--text-faint)]">{i + 1}</td>
-                  <td className="px-3"><Link href="/executive/stores" className="text-[var(--text)] hover:text-[#C6A35D]">{r.storeName}</Link></td>
+                  <td className="px-3"><Link href="/executive/stores" className="text-[var(--text)] hover:text-blue-500">{r.storeName}</Link></td>
                   <td className="px-3 text-[var(--text-muted)]">{r.regionName}</td>
                   <td className="px-3"><Pill status={r.status} /></td>
                   <td className="px-3 text-right font-semibold text-[var(--text)] tabular-nums whitespace-nowrap">{r.value}</td>

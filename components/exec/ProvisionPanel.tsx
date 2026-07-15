@@ -6,6 +6,7 @@ import { UserPlus, PlusCircle, ChevronDown, X } from 'lucide-react'
 import { Card } from '@/components/exec/ui'
 import { Drawer, DrawerHeader } from '@/components/exec/Drawer'
 import { isValidEmail, isValidPhone } from '@/lib/csv'
+import { useScrollLock } from '@/lib/useScrollLock'
 
 type Mode = 'exec-regions' | 'rm-stores' | 'suppliers'
 interface Opt { id: string; name: string }
@@ -47,7 +48,7 @@ export function ProvisionPanel({ mode, regions = [], stores = [] }: Props) {
   return (
     <Card className="p-0 overflow-hidden">
       <button onClick={() => setOpen(o => !o)} className="w-full flex items-center justify-between px-5 py-3 text-sm font-semibold text-[var(--text)]">
-        <span className="flex items-center gap-2"><UserPlus size={15} className="text-[#C6A35D]" /> {title(mode)}</span>
+        <span className="flex items-center gap-2"><UserPlus size={15} className="text-[#f59e0b]" /> {title(mode)}</span>
         <ChevronDown size={16} className={`text-[var(--text-muted)] transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && <div className="px-5 pb-5 border-t border-[var(--border)] pt-4"><ProvisionForms mode={mode} regions={regions} stores={stores} /></div>}
@@ -59,9 +60,10 @@ export function ProvisionPanel({ mode, regions = [], stores = [] }: Props) {
  *  uses a slide-over; `variant='modal'` uses a centred pop-up. */
 export function ProvisionButton({ mode, regions = [], stores = [], label, tone = 'gold', variant = 'drawer' }: Props & { label?: string; tone?: 'gold' | 'green'; variant?: 'drawer' | 'modal' }) {
   const [open, setOpen] = useState(false)
+  useScrollLock(variant === 'modal' && open)
   const btn = tone === 'green'
     ? 'text-white bg-emerald-600 hover:bg-emerald-500'
-    : 'text-[#0a0e17] bg-[#C6A35D] hover:brightness-95'
+    : 'text-[#0a0e17] bg-[#f59e0b] hover:brightness-95'
   return (
     <>
       <button onClick={() => setOpen(true)} className={`flex items-center gap-2 text-sm font-semibold rounded-xl px-3.5 py-2 transition ${btn}`}>
@@ -132,8 +134,8 @@ function Form({ action, title, fields, select, cta }: { action: string; title: s
           {select.opts.map(o => <option key={o.id} value={o.id} className="bg-[var(--input-bg)]">{o.name}</option>)}
         </select>
       )}
-      <button disabled={busy} className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-[#C6A35D] text-[#0a0e17] text-sm font-medium disabled:opacity-50">{busy ? '…' : cta}</button>
-      {msg && <p className={`text-xs ${msg.ok ? 'text-emerald-400' : 'text-red-400'}`}>{msg.text}{msg.link && <a href={msg.link} className="block text-[#C6A35D] underline break-all mt-1">{msg.link}</a>}</p>}
+      <button disabled={busy} className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium disabled:opacity-50">{busy ? '…' : cta}</button>
+      {msg && <p className={`text-xs ${msg.ok ? 'text-emerald-400' : 'text-red-400'}`}>{msg.text}{msg.link && <a href={msg.link} className="block text-[#f59e0b] underline break-all mt-1">{msg.link}</a>}</p>}
     </form>
   )
 }

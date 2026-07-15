@@ -37,7 +37,7 @@ function nextStep(p: Phase, ticketStatus: string): { Icon: typeof Clock; cls: st
 
 function StatCard({ icon, tone, value, title, sub, active, onClick }: { icon: ReactNode; tone: string; value: number; title: string; sub: string; active: boolean; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} aria-pressed={active} className={`flex items-center gap-3 rounded-xl border-l-4 bg-[var(--surface)] p-4 text-left ring-1 transition hover:bg-[var(--hover)] ${tone} ${active ? 'ring-2 ring-[#C6A35D]/50' : 'ring-[var(--border)]'}`}>
+    <button type="button" onClick={onClick} aria-pressed={active} className={`flex items-center gap-3 rounded-xl bg-[var(--surface)] p-4 text-left ring-1 transition hover:bg-[var(--hover)] ${active ? 'ring-2 ring-blue-500/50' : 'ring-[var(--border)]'}`}>
       <span className="shrink-0">{icon}</span>
       <span className="min-w-0">
         <span className="block text-2xl font-bold leading-none text-[var(--text)]">{value}</span>
@@ -50,7 +50,7 @@ function StatCard({ icon, tone, value, title, sub, active, onClick }: { icon: Re
 
 function Select<T extends string>({ label, value, onChange, options }: { label: string; value: T; onChange: (v: T) => void; options: { value: T; label: string }[] }) {
   return (
-    <label className="relative flex min-w-[150px] flex-1 items-center gap-1.5 rounded-xl bg-[var(--input-bg)] px-3 py-2.5 text-sm ring-1 ring-[var(--border)] transition focus-within:ring-[#C6A35D]/40 sm:flex-none">
+    <label className="relative flex min-h-[44px] min-w-[150px] flex-1 items-center gap-1.5 rounded-xl bg-[var(--input-bg)] px-3 py-2.5 text-sm ring-1 ring-[var(--border)] transition focus-within:ring-blue-500/40 sm:min-h-0 sm:flex-none">
       <span className="whitespace-nowrap text-[11px] uppercase tracking-wide text-[var(--text-faint)]">{label}</span>
       <select value={value} onChange={e => onChange(e.target.value as T)} className="w-full cursor-pointer appearance-none bg-transparent pr-4 font-semibold text-[var(--text)] outline-none">
         {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -132,7 +132,7 @@ export function SupplierSignoff({ signoffs }: { signoffs: SupplierSignoffRow[] }
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-[220px] flex-1">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
-          <input value={q} onChange={e => { setQ(e.target.value); setPage(1) }} placeholder="Search jobs by store, ticket ID or category…" className="w-full rounded-xl bg-[var(--input-bg)] py-2.5 pl-9 pr-3 text-sm text-[var(--text)] ring-1 ring-[var(--border)] outline-none placeholder-[var(--text-faint)] focus:ring-[#C6A35D]/40" />
+          <input value={q} onChange={e => { setQ(e.target.value); setPage(1) }} placeholder="Search jobs by store, ticket ID or category…" className="w-full rounded-xl bg-[var(--input-bg)] py-2.5 pl-9 pr-3 text-sm text-[var(--text)] ring-1 ring-[var(--border)] outline-none placeholder-[var(--text-faint)] focus:ring-blue-500/40" />
         </div>
         <Select label="Store" value={store} onChange={v => { setStore(v); setPage(1) }} options={[{ value: 'all', label: 'All stores' }, ...storeNames.map(s => ({ value: s, label: s }))]} />
         <Select label="Status" value={statusF} onChange={v => { setStatusF(v); setPage(1) }} options={[{ value: 'all', label: 'All status' }, { value: 'awaiting', label: 'Awaiting review' }, { value: 'approved', label: 'Approved' }, { value: 'changes', label: 'Changes requested' }]} />
@@ -141,7 +141,7 @@ export function SupplierSignoff({ signoffs }: { signoffs: SupplierSignoffRow[] }
       </div>
 
       {!groups.length && (
-        <div className="rounded-xl border border-dashed border-[var(--border)] p-12 text-center">
+        <div className="rounded-xl border border-dashed border-[var(--border)] p-8 text-center sm:p-12">
           <ClipboardCheck size={28} className="mx-auto mb-2 text-[var(--text-faint)]" />
           <p className="text-sm text-[var(--text-faint)]">{signoffs.length ? 'No sign-offs match your filters.' : 'No sign-offs yet.'}</p>
         </div>
@@ -169,7 +169,7 @@ export function SupplierSignoff({ signoffs }: { signoffs: SupplierSignoffRow[] }
                   const meta = PHASE_META[phase]
                   const ns = nextStep(phase, s.ticketStatus)
                   return (
-                    <Link key={s.id} href={`/supplier/tickets/${s.ticketId}`} className={`block border-b border-l-4 border-[var(--border)] px-4 py-4 transition last:border-b-0 hover:bg-[var(--hover)] ${phase === 'changes' ? 'border-l-red-500' : 'border-l-blue-500'}`}>
+                    <Link key={s.id} href={`/supplier/tickets/${s.ticketId}`} className="block border-b border-[var(--border)] px-4 py-4 transition last:border-b-0 hover:bg-[var(--hover)]">
                       <div className={ROW}>
                         {/* Job */}
                         <div className="flex min-w-0 items-start gap-3">
@@ -222,9 +222,9 @@ export function SupplierSignoff({ signoffs }: { signoffs: SupplierSignoffRow[] }
           <p className="text-sm text-[var(--text-muted)]">Showing {firstShown} to {lastShown} of {groups.length} store{groups.length === 1 ? '' : 's'}</p>
           {totalPages > 1 && (
             <div className="flex items-center gap-1.5">
-              <button type="button" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={cur <= 1} aria-label="Previous page" className="rounded-lg p-1.5 text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-40"><ChevronLeft size={15} /></button>
+              <button type="button" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={cur <= 1} aria-label="Previous page" className="rounded-lg p-2.5 text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-40 sm:p-1.5"><ChevronLeft size={15} /></button>
               <span className="grid h-8 min-w-8 place-items-center rounded-lg bg-blue-600 px-2 text-sm font-semibold text-white">{cur}</span>
-              <button type="button" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={cur >= totalPages} aria-label="Next page" className="rounded-lg p-1.5 text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-40"><ChevronRight size={15} /></button>
+              <button type="button" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={cur >= totalPages} aria-label="Next page" className="rounded-lg p-2.5 text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-40 sm:p-1.5"><ChevronRight size={15} /></button>
             </div>
           )}
         </div>

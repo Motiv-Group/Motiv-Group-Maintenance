@@ -47,15 +47,15 @@ export function DashboardHealthHeader({
         {aside && <div className="mt-2.5">{aside}</div>}
       </div>
       {status && (
-        <div className="flex items-center gap-4 lg:flex-1 lg:min-w-0">
+        <div className="flex items-center gap-3 sm:gap-4 lg:flex-1 lg:min-w-0">
           <Donut value={score ?? 0} status={status} size={100} label={donutLabel} />
-          <div className="min-w-0 flex-1 border-l border-[var(--border)] pl-4">
-            <div className="flex items-center gap-2">
+          <div className="min-w-0 flex-1 sm:border-l sm:border-[var(--border)] sm:pl-4">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
               <span className="text-sm font-bold">
                 <span className="text-[var(--text)]">{scopePrefix} </span>
                 <span className={STATUS_TEXT[status]}>{HEADLINE[status]}</span>
               </span>
-              <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-faint)]"><Sparkles size={11} className="text-[#C6A35D]" /> AI</span>
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-faint)]"><Sparkles size={11} className="text-blue-500" /> AI</span>
             </div>
             <AiBriefing headline={briefingHeadline} body={briefingBody} scope={briefingScope} scopeId={briefingScopeId} className="mt-1.5 text-xs leading-relaxed text-[var(--text-muted)]" />
           </div>

@@ -8,7 +8,7 @@ const STAGES = [
   { label: 'Quoted',            dot: 'bg-violet-500',  ring: 'ring-violet-500/30',  text: 'text-violet-600 dark:text-violet-400' },
   { label: 'Approved',          dot: 'bg-teal-500',    ring: 'ring-teal-500/30',    text: 'text-teal-600 dark:text-teal-400' },
   { label: 'Job scheduled',     dot: 'bg-indigo-500',  ring: 'ring-indigo-500/30',  text: 'text-indigo-600 dark:text-indigo-400' },
-  { label: 'In progress',       dot: 'bg-[#C6A35D]',   ring: 'ring-[#C6A35D]/30',   text: 'text-amber-600 dark:text-[#C6A35D]' },
+  { label: 'In progress',       dot: 'bg-[#f59e0b]',   ring: 'ring-[#f59e0b]/30',   text: 'text-amber-600 dark:text-[#f59e0b]' },
   { label: 'Awaiting sign-off', dot: 'bg-orange-500',  ring: 'ring-orange-500/30',  text: 'text-orange-600 dark:text-orange-400' },
   { label: 'Completed',         dot: 'bg-emerald-500', ring: 'ring-emerald-500/30', text: 'text-emerald-600 dark:text-emerald-400' },
 ] as const
@@ -33,6 +33,12 @@ export function RmPipeline({ status }: { status: string }) {
   }
   const idx = IDX[status] ?? 0
   const snagged = SNAG_STATUSES.has(status)
+  // Current step's label + colour, for the mobile-only summary line (the per-dot
+  // labels are hidden on phones — 8 labelled columns can't fit under ~370px and
+  // would force the whole page to scroll sideways).
+  const cur = STAGES[idx]
+  const curText = snagged ? 'text-red-600 dark:text-red-400' : cur.text
+  const curLabel = snagged ? 'Snag' : cur.label
 
   return (
     <div>
@@ -49,15 +55,17 @@ export function RmPipeline({ status }: { status: string }) {
           const label = isSnagStep ? 'Snag' : s.label
           return (
             <div key={s.label} className={isLast ? 'flex items-start' : 'flex items-start flex-1'}>
-              <div className="flex flex-col items-center gap-1.5 w-14 sm:w-[74px]">
+              <div className="flex flex-col items-center gap-1.5 w-8 sm:w-[74px]">
                 <div className={`rounded-full transition ${isCurrent ? 'h-6 w-6' : 'h-5 w-5'} ${reached ? dot : 'bg-slate-300 dark:bg-white/25'} ${isCurrent ? `ring-4 ${ring}` : reached ? '' : 'ring-1 ring-black/10 dark:ring-white/15'}`} />
-                <span className={`text-center leading-tight ${isCurrent ? `text-xs sm:text-[13px] ${text} font-bold` : reached ? 'text-[11px] sm:text-xs font-medium text-[var(--text)]' : 'text-[11px] sm:text-xs text-[var(--text-muted)]'}`}>{label}</span>
+                <span className={`hidden text-center leading-tight sm:block ${isCurrent ? `text-xs sm:text-[13px] ${text} font-bold` : reached ? 'text-[11px] sm:text-xs font-medium text-[var(--text)]' : 'text-[11px] sm:text-xs text-[var(--text-muted)]'}`}>{label}</span>
               </div>
               {!isLast && <div className={`flex-1 h-1 mt-[9px] rounded-full ${i < idx ? s.dot : 'bg-slate-200 dark:bg-white/15'}`} />}
             </div>
           )
         })}
       </div>
+      {/* Mobile-only current-step readout (labels above are sm+). */}
+      <p className={`mt-2 text-xs font-bold sm:hidden ${curText}`}>Step {idx + 1} of {STAGES.length} · {curLabel}</p>
     </div>
   )
 }

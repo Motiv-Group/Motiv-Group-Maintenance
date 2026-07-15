@@ -1,15 +1,17 @@
 'use client'
 
 // RM ticket-page custom actions for the competitive-quoting model.
-import { useState, useMemo, useEffect, type ReactNode } from 'react'
+import { useState, useMemo, useEffect, useRef, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
+import { useScrollLock } from '@/lib/useScrollLock'
 import { Search, Pencil, CalendarClock, Plus, Camera, Info, X, FileText, ChevronDown, ChevronLeft, ChevronRight, MessageSquare, XCircle, Send, AlertCircle, Trash2, Store, ShieldCheck, Clock, Calendar, ClipboardCheck, Image as ImageIcon, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { StarInput, Stars } from '@/components/ui/Stars'
 import { PhotoThumbs } from '@/components/ui/PhotoThumbs'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { QuoteSummary } from '@/components/workflow/QuoteSummary'
 import { uploadFiles } from '@/lib/upload'
-import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils'
+import { formatCurrency, formatDate, formatDateTime, rmStatusMeta, PRIORITY_LEVEL_LABELS, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
 
 async function post(url: string, body: unknown): Promise<void> {
   const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
@@ -17,9 +19,11 @@ async function post(url: string, body: unknown): Promise<void> {
 }
 
 function Modal({ title, onClose, children, maxWidth = 'max-w-md' }: { title: ReactNode; onClose: () => void; children: React.ReactNode; maxWidth?: string }) {
+  useScrollLock() // lock the background so it can't scroll behind the pop-up
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className={`bg-[var(--surface-2)] ring-1 ring-[var(--border)] rounded-2xl p-5 ${maxWidth} w-full space-y-3 max-h-[85vh] overflow-y-auto`} onClick={e => e.stopPropagation()}>
+    // Bottom-sheet on phones (mirrors components/ui/Modal), centered from sm up.
+    <div className="fixed inset-0 bg-black/60 flex items-end justify-center z-50 p-0 sm:items-center sm:p-4" onClick={onClose}>
+      <div className={`bg-[var(--surface-2)] ring-1 ring-[var(--border)] rounded-t-2xl p-4 sm:rounded-2xl sm:p-5 ${maxWidth} w-full space-y-3 max-h-[92vh] sm:max-h-[85vh] overflow-y-auto`} onClick={e => e.stopPropagation()}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 text-base font-bold text-[var(--text)]">{title}</div>
           <button type="button" onClick={onClose} aria-label="Close" className="shrink-0 -m-1 rounded-lg p-1.5 text-[var(--text-faint)] transition hover:bg-[var(--hover)] hover:text-[var(--text)]"><X size={18} /></button>
@@ -36,9 +40,35 @@ function Modal({ title, onClose, children, maxWidth = 'max-w-md' }: { title: Rea
 // state, so opening one is instant and doesn't depend on the menu staying mounted.
 export function MoreMenu({ children, fullWidth = false, label = 'More', up = false, align = 'right' }: { children: ReactNode; fullWidth?: boolean; label?: string; up?: boolean; align?: 'left' | 'right' }) {
   const [open, setOpen] = useState(false)
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null)
+
+  // The menu is PORTALLED to <body> and fixed-positioned against the trigger, so
+  // it's never clipped by a pop-up's `overflow-y-auto` body (which also clips
+  // overflow-x, cutting the old absolute menu off to the side). Left is clamped
+  // into the viewport so a 256px menu can't run off a phone edge. Scroll/resize
+  // just closes it — simpler and correct vs. live repositioning.
+  useEffect(() => {
+    if (!open) return
+    const place = () => {
+      const b = btnRef.current?.getBoundingClientRect()
+      if (!b) return
+      const width = Math.min(256, window.innerWidth - 16)
+      let left = align === 'left' ? b.left : b.right - width
+      left = Math.max(8, Math.min(left, window.innerWidth - width - 8))
+      setPos({ top: up ? b.top - 8 : b.bottom + 8, left, width })
+    }
+    place()
+    const onMove = () => setOpen(false)
+    window.addEventListener('scroll', onMove, true)
+    window.addEventListener('resize', onMove)
+    return () => { window.removeEventListener('scroll', onMove, true); window.removeEventListener('resize', onMove) }
+  }, [open, align, up])
+
   return (
     <div className={`relative ${fullWidth ? '' : 'shrink-0'}`}>
       <button
+        ref={btnRef}
         type="button"
         onClick={() => setOpen(o => !o)}
         aria-expanded={open}
@@ -47,16 +77,20 @@ export function MoreMenu({ children, fullWidth = false, label = 'More', up = fal
       >
         {label} <ChevronDown size={15} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
-      {open && (
+      {open && pos && createPortal(
         <>
-          {/* Outside-click catcher (below the menu, above the page). */}
-          <button aria-hidden tabIndex={-1} onClick={() => setOpen(false)} className="fixed inset-0 z-10 cursor-default" />
-          {/* `up` opens above the trigger — used inside pop-ups where a downward menu
-              would be clipped by the scrollable modal body. */}
-          <div role="menu" onClick={() => setOpen(false)} className={`absolute z-20 ${align === 'left' ? 'left-0' : 'right-0'} ${up ? 'bottom-full mb-2' : 'mt-2'} w-64 max-w-[calc(100vw-2.5rem)] rounded-xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] shadow-lg shadow-black/20 p-1.5 space-y-0.5`}>
+          {/* Outside-click catcher (below the menu, above everything else). */}
+          <button aria-hidden tabIndex={-1} onClick={() => setOpen(false)} className="fixed inset-0 z-[110] cursor-default" />
+          <div
+            role="menu"
+            onClick={() => setOpen(false)}
+            style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width, transform: up ? 'translateY(-100%)' : undefined }}
+            className="z-[111] rounded-xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] shadow-lg shadow-black/20 p-1.5 space-y-0.5"
+          >
             {children}
           </div>
-        </>
+        </>,
+        document.body,
       )}
     </div>
   )
@@ -204,7 +238,7 @@ export function AssignSuppliersButton({ ticketId, suppliers, motivSuppliers = []
     doAssign()
   }
 
-  const tabCls = (on: boolean) => `flex-1 py-2 rounded-lg text-sm font-semibold transition ${on ? 'bg-emerald-600 text-white' : 'ring-1 ring-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--hover)]'}`
+  const tabCls = (on: boolean) => `flex-1 min-w-0 truncate px-1 py-2 rounded-lg text-sm font-semibold transition ${on ? 'bg-emerald-600 text-white' : 'ring-1 ring-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--hover)]'}`
   return (
     <>
       {trigger ? trigger(() => setOpen(true)) : (
@@ -265,7 +299,10 @@ export function AssignSuppliersButton({ ticketId, suppliers, motivSuppliers = []
                     <span className="block truncate text-sm font-medium text-[var(--text)]">{s.name}{declinedSet.has(s.id) && <span className="ml-1.5 text-[10px] font-semibold text-red-500">· declined before</span>}</span>
                     {s.category && <span className="block truncate text-[11px] text-[var(--text-muted)]">{s.category}</span>}
                   </span>
-                  <span className="shrink-0"><Stars value={s.avgRating ?? 5} count={s.ratingCount} size={13} /></span>
+                  {/* Full star row is sm+; phones get a compact rating so the supplier
+                      name keeps its space. */}
+                  <span className="hidden shrink-0 sm:block"><Stars value={s.avgRating ?? 5} count={s.ratingCount} size={13} /></span>
+                  <span className="shrink-0 text-[11px] font-semibold text-amber-500 sm:hidden">{(s.avgRating ?? 5).toFixed(1)}★</span>
                 </label>
               )
             })}
@@ -297,11 +334,117 @@ export function AssignSuppliersButton({ ticketId, suppliers, motivSuppliers = []
               <span className={`grid h-6 w-6 place-items-center rounded-full ${sel.size ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-[var(--surface-2)] text-[var(--text-faint)]'}`}><Send size={13} /></span>
               <span className="text-[var(--text-muted)]">{sel.size ? <><span className="font-semibold text-[var(--text)]">{sel.size} selected</span> · they&apos;ll be notified to quote</> : 'No suppliers selected'}</span>
             </p>
-            <div className="flex gap-2">
+            {/* Buttons stack on phones (the pair needs ~300px side by side). */}
+            <div className="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row">
               <button onClick={() => { confirmReinvite ? setConfirmReinvite(false) : setOpen(false) }} disabled={busy} className="rounded-xl px-4 py-2.5 text-sm font-medium text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-50">{confirmReinvite ? 'Back' : 'Cancel'}</button>
-              <button disabled={busy || !sel.size} onClick={assign} className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50">
+              <button disabled={busy || !sel.size} onClick={assign} className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50">
                 <Send size={15} /> {busy ? 'Sending…' : confirmReinvite ? 'Yes, send again' : `Send quote request${sel.size ? ` (${sel.size})` : ''}`}
               </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </>
+  )
+}
+
+// ── View & Assign (Today queue) ─────────────────────────────────
+// A pop-up that shows the ticket detail + the quotes gathered so far, with the
+// assign-supplier action in place. Replaces the bare supplier-picker CTA so the
+// RM can review the job (description, photos, impact, any quotes) before requesting
+// quotes. Ticket detail + quote rows are fetched on open from the RM-only /quotes
+// endpoint; the header renders instantly from the queue row's summary.
+interface ViewAssignSummary { category: string | null; title: string; storeName: string; status: string; priority: string; jobId: string | null }
+interface ViewAssignTicket { title: string; category: string | null; description: string; operationalImpact: string | null; priority: string | null; jobRef: string | null; storeName: string | null; photoUrls: string[] }
+interface ViewAssignQuoteRow { supplierId: string; name: string; kind: 'waiting' | 'received' | 'accepted' | 'declined'; quote: { amount: number } | null }
+
+// Priority pill colours (mirrors the Today queue's priorityBadgeClass).
+function vaPriorityBadge(p: string): string {
+  if (p === 'urgent' || p === 'P1') return 'bg-red-500/15 text-red-600 dark:text-red-400'
+  if (p === 'high' || p === 'P2') return 'bg-orange-500/15 text-orange-600 dark:text-orange-400'
+  if (p === 'medium' || p === 'P3') return 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
+  return 'bg-slate-500/15 text-slate-600 dark:text-slate-300'
+}
+
+export function ViewAssignButton({ ticketId, summary, suppliers, motivSuppliers = [], awaitingById = {}, declinedSupplierIds = [], trigger }: {
+  ticketId: string; summary: ViewAssignSummary
+  suppliers: SupplierChoice[]; motivSuppliers?: SupplierChoice[]
+  awaitingById?: Record<string, 'invited' | 'quoted'>; declinedSupplierIds?: string[]
+  trigger: (open: () => void) => ReactNode
+}) {
+  const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [err, setErr] = useState('')
+  const [ticket, setTicket] = useState<ViewAssignTicket | null>(null)
+  const [rows, setRows] = useState<ViewAssignQuoteRow[]>([])
+
+  useEffect(() => {
+    if (!open) return
+    let live = true
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resets fetch state when the pop-up opens, before the async load; cannot run during render
+    setLoading(true); setErr('')
+    fetch(`/api/tickets/${ticketId}/quotes`)
+      .then(r => r.json())
+      .then(d => { if (!live) return; if (d?.error) setErr(d.error); else { setTicket(d.ticket ?? null); setRows(d.rows ?? []) } })
+      .catch(() => { if (live) setErr('Could not load the ticket.') })
+      .finally(() => { if (live) setLoading(false) })
+    return () => { live = false }
+  }, [open, ticketId])
+
+  const meta = rmStatusMeta(summary.status)
+  const priorityLabel = PRIORITY_LEVEL_LABELS[String(summary.priority)] ?? 'Medium'
+
+  return (
+    <>
+      {trigger(() => setOpen(true))}
+      {open && (
+        <Modal title="Ticket &amp; quotes" maxWidth="max-w-2xl" onClose={() => setOpen(false)}>
+          <div className="space-y-3">
+            {/* Ticket detail header (renders instantly from the queue row). */}
+            <div className="min-w-0">
+              {summary.jobId && <p className="font-mono text-[10px] text-[var(--text-faint)]">{summary.jobId}</p>}
+              <p className="text-base font-bold text-[var(--text)]">{summary.category || summary.title}</p>
+              <p className="text-sm text-[var(--text-muted)]">{summary.storeName}</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className={`inline-flex justify-center rounded-md px-2 py-1 text-[10px] font-bold ${vaPriorityBadge(String(summary.priority))}`}>{priorityLabel}</span>
+              <span className={`inline-flex justify-center rounded-md px-2 py-1 text-[10px] font-bold ${meta.cls}`}>{meta.label}</span>
+            </div>
+
+            {loading ? <p className="py-4 text-center text-sm text-[var(--text-faint)]">Loading…</p>
+              : err ? <p className="text-sm text-red-500">{err}</p>
+              : ticket && (
+                <>
+                  {ticket.description && <p className="whitespace-pre-line break-words text-sm text-[var(--text-muted)]">{ticket.description}</p>}
+                  {ticket.operationalImpact && <p className="text-xs text-[var(--text-faint)]">Impact · {OPERATIONAL_IMPACT_LABELS[ticket.operationalImpact] ?? ticket.operationalImpact}</p>}
+                  {ticket.photoUrls.length > 0 && <PhotoThumbs urls={ticket.photoUrls} ticketId={ticketId} limit={5} />}
+
+                  {/* Suppliers & quotes gathered so far. */}
+                  <div className="space-y-1 rounded-xl ring-1 ring-[var(--border)] p-3">
+                    <p className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Suppliers &amp; quotes</p>
+                    {rows.length ? rows.map(r => {
+                      const m = PANEL_META[r.kind]
+                      return (
+                        <div key={r.supplierId} className="flex items-center justify-between gap-2 py-1">
+                          <span className="flex min-w-0 items-center gap-2">
+                            <i className={`h-2.5 w-2.5 shrink-0 rounded-full ${m.dot}`} />
+                            <span className="truncate text-sm text-[var(--text)]">{r.name}</span>
+                          </span>
+                          <span className="flex shrink-0 items-center gap-2">
+                            {r.quote && <span className="text-sm font-semibold text-[var(--text)]">{formatCurrency(r.quote.amount)}</span>}
+                            <span className={`text-[11px] font-semibold ${m.txt}`}>{m.label}</span>
+                          </span>
+                        </div>
+                      )
+                    }) : <p className="py-2 text-center text-sm text-[var(--text-faint)]">No suppliers requested yet.</p>}
+                  </div>
+                </>
+              )}
+
+            {/* Assign action — opens the existing searchable supplier picker on top. */}
+            <div className="border-t border-[var(--border)] pt-3">
+              <AssignSuppliersButton ticketId={ticketId} suppliers={suppliers} motivSuppliers={motivSuppliers} awaitingById={awaitingById} declinedSupplierIds={declinedSupplierIds}
+                trigger={openPicker => <button onClick={openPicker} className="w-full rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500">Assign supplier</button>} />
             </div>
           </div>
         </Modal>
@@ -511,7 +654,7 @@ export function RmEditTicketForm({ ticketId, initial, defaultOpen = false, onClo
       {open && (
         <Modal maxWidth="max-w-lg" title="Edit ticket" onClose={() => { if (!busy) close() }}>
           <ReqLabel label="Title"><input className={input} value={title} onChange={e => setTitle(e.target.value)} placeholder="Title" /></ReqLabel>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <ReqLabel label="Category"><select className={input} value={category} onChange={e => setCategory(e.target.value)}>{CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select></ReqLabel>
             <ReqLabel label="Priority"><select className={input} value={priority} onChange={e => setPriority(e.target.value)}>{PRIORITIES.map(p => <option key={p.v} value={p.v}>{p.label}</option>)}</select></ReqLabel>
           </div>
@@ -618,7 +761,7 @@ export function QuoteReviewCard({ ticketId, quotes }: { ticketId: string; quotes
             </div>
           )}
           {q.description && <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{q.description}</p>}
-          {q.fileUrl && <ViewTrackedLink ticketId={ticketId} itemType="quote" itemLabel={`${q.supplierName}'s quote`} href={q.fileUrl} className="text-sm text-[#C6A35D] underline">View attachment</ViewTrackedLink>}
+          {q.fileUrl && <ViewTrackedLink ticketId={ticketId} itemType="quote" itemLabel={`${q.supplierName}'s quote`} href={q.fileUrl} className="text-sm text-[#f59e0b] underline">View attachment</ViewTrackedLink>}
 
           {declineFor === q.id ? (
             <div className="space-y-2 pt-1">
@@ -845,14 +988,14 @@ export function RmCompletionReview({ ticketId, label, submittedAt, photoCount, d
       {/* Tap the summary to open the full submission for review + sign-off. */}
       <button type="button" onClick={() => setOpen(true)} className="w-full rounded-lg bg-[var(--surface)] p-4 text-left ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)]">
         <div className="flex items-center gap-2.5">
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#C6A35D]/15 text-[#C6A35D]"><ClipboardCheck size={16} /></span>
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-blue-500/15 text-blue-500"><ClipboardCheck size={16} /></span>
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-bold text-[var(--text)]">{label}</span>
             <span className="block text-[11px] text-[var(--text-faint)]">Submitted {formatDateTime(submittedAt)}</span>
           </span>
           <ChevronRight size={16} className="shrink-0 text-[var(--text-faint)]" />
         </div>
-        <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1.5 text-sm text-[var(--text-muted)]">
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-[var(--text-muted)] sm:gap-x-6">
           <span className="flex items-center gap-1.5"><ImageIcon size={15} className="text-[var(--text-faint)]" /> <span className="font-semibold text-[var(--text)]">{photoCount}</span> Photo{photoCount === 1 ? '' : 's'}</span>
           <span className="flex items-center gap-1.5"><FileText size={15} className="text-[var(--text-faint)]" /> <span className="font-semibold text-[var(--text)]">{docCount}</span> Document{docCount === 1 ? '' : 's'}</span>
           <span className="flex items-center gap-1.5"><MessageSquare size={15} className="text-[var(--text-faint)]" /> <span className="font-semibold text-[var(--text)]">{noteCount}</span> Note{noteCount === 1 ? '' : 's'}</span>
@@ -964,16 +1107,17 @@ export function QuoteComparison({ ticketId, rows, onClose }: { ticketId: string;
             <div key={r.supplierId} className={`rounded-xl bg-[var(--surface)] ring-1 transition ${on ? 'ring-emerald-500' : 'ring-[var(--border)]'}`}>
               <label className="flex cursor-pointer items-start justify-between gap-3 px-4 py-3">
                 <span className="flex min-w-0 items-start gap-3">
-                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"><Store size={18} /></span>
+                  {/* Avatar chip is sm+ — phones give its width back to the supplier name. */}
+                  <span className="hidden h-10 w-10 shrink-0 place-items-center rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 sm:grid"><Store size={18} /></span>
                   <span className="min-w-0"><span className="block truncate text-sm font-bold text-[var(--text)]">{r.name}</span><span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">Quote received</span><span className="block text-[11px] text-[var(--text-faint)]">Received {formatDateTime(q.createdAt)}</span></span>
                 </span>
                 <span className="flex shrink-0 items-start gap-3">
-                  <span className="text-right"><span className="block text-lg font-bold tabular-nums text-[var(--text)]">{formatCurrency(q.amount)}</span><span className="block text-[11px] text-[var(--text-faint)]">excl VAT</span>{q.amountInclVat != null && <span className="block text-[11px] text-[var(--text-faint)]">{formatCurrency(q.amountInclVat)} incl VAT</span>}</span>
+                  <span className="text-right"><span className="block text-lg font-bold tabular-nums text-[var(--text)]">{formatCurrency(q.amount)}</span><span className="block text-[11px] text-[var(--text-faint)]">excl VAT</span>{q.amountInclVat != null && <span className="hidden text-[11px] text-[var(--text-faint)] sm:block">{formatCurrency(q.amountInclVat)} incl VAT</span>}</span>
                   {q.fileUrl && <FileText size={16} className="mt-0.5 text-emerald-600 dark:text-emerald-400" />}
                   <input type="radio" name="qc" checked={on} onChange={() => setSelectedId(r.supplierId)} onClick={() => { if (selectedId === r.supplierId) setSelectedId(null) }} className="mt-1 h-4 w-4 accent-emerald-600" />
                 </span>
               </label>
-              <div className="mx-4 grid grid-cols-2 gap-x-4 gap-y-2 border-t border-[var(--border)] py-3">
+              <div className="mx-4 grid grid-cols-1 gap-y-2 border-t border-[var(--border)] py-3 sm:grid-cols-2 sm:gap-x-4">
                 <DetailCell icon={<Calendar size={14} />} label="Proposed visit" value={q.proposedScheduleAt ? formatDateTime(q.proposedScheduleAt) : '—'} />
                 <DetailCell icon={<ShieldCheck size={14} />} label="Valid until" value={q.validUntil ? formatDate(q.validUntil) : 'N/A'} />
               </div>
@@ -1007,12 +1151,14 @@ export function QuoteComparison({ ticketId, rows, onClose }: { ticketId: string;
       )}
       {err && <p className="text-xs text-red-500">{err}</p>}
 
-      <div className="flex flex-wrap gap-2 border-t border-[var(--border)] pt-3">
-        <button type="button" onClick={onClose} disabled={busy} className="min-w-[130px] flex-1 rounded-xl py-2.5 text-sm font-medium text-[var(--text)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-50">Wait for all quotes</button>
-        <button type="button" disabled={!selected || busy} onClick={() => declineMode ? decide('decline') : setDeclineMode(true)} className="min-w-[130px] flex-1 rounded-xl py-2.5 text-sm font-semibold text-red-600 ring-1 ring-red-500/50 transition hover:bg-red-500/10 disabled:opacity-40 dark:text-red-400">{busy && declineMode ? 'Declining…' : declineMode ? 'Confirm decline' : 'Decline selected quote'}</button>
+      {/* Footer CTAs stack full-width on phones (three ~150px buttons wrap unevenly
+          at 375px); sm+ keeps the flex-wrap row. */}
+      <div className="flex flex-col gap-2 border-t border-[var(--border)] pt-3 sm:flex-row sm:flex-wrap">
+        <button type="button" onClick={onClose} disabled={busy} className="w-full rounded-xl py-2.5 text-sm font-medium text-[var(--text)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-50 sm:w-auto sm:min-w-[130px] sm:flex-1">Wait for all quotes</button>
+        <button type="button" disabled={!selected || busy} onClick={() => declineMode ? decide('decline') : setDeclineMode(true)} className="w-full rounded-xl py-2.5 text-sm font-semibold text-red-600 ring-1 ring-red-500/50 transition hover:bg-red-500/10 disabled:opacity-40 dark:text-red-400 sm:w-auto sm:min-w-[130px] sm:flex-1">{busy && declineMode ? 'Declining…' : declineMode ? 'Confirm decline' : 'Decline selected quote'}</button>
         {declineMode
-          ? <button type="button" disabled={busy} onClick={() => setDeclineMode(false)} className="min-w-[130px] flex-1 rounded-xl py-2.5 text-sm font-semibold text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-50">Cancel decline</button>
-          : <button type="button" disabled={!selected || busy} onClick={() => decide('approve')} className="min-w-[130px] flex-1 rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-40">{busy ? 'Approving…' : 'Approve selected quote'}</button>}
+          ? <button type="button" disabled={busy} onClick={() => setDeclineMode(false)} className="w-full rounded-xl py-2.5 text-sm font-semibold text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-50 sm:w-auto sm:min-w-[130px] sm:flex-1">Cancel decline</button>
+          : <button type="button" disabled={!selected || busy} onClick={() => decide('approve')} className="w-full rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-40 sm:w-auto sm:min-w-[130px] sm:flex-1">{busy ? 'Approving…' : 'Approve selected quote'}</button>}
       </div>
     </>
   )
@@ -1110,7 +1256,8 @@ function DocRow({ ticketId, url, itemType, itemLabel, uploadedAt, viewLabel }: {
       <span className="flex min-w-0 items-center gap-3">
         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-red-500/15 text-red-600 dark:text-red-400"><FileText size={18} /></span>
         <span className="min-w-0">
-          <span className="block truncate text-sm font-semibold text-[var(--text)]">{docName(url, itemLabel)}</span>
+          {/* Wraps to two lines on phones so the filename stays readable. */}
+          <span className="line-clamp-2 break-all text-sm font-semibold text-[var(--text)] sm:line-clamp-none sm:block sm:truncate">{docName(url, itemLabel)}</span>
           <span className="block text-[11px] text-[var(--text-faint)]">Uploaded {formatDateTime(uploadedAt)}</span>
         </span>
       </span>
@@ -1148,7 +1295,7 @@ export function SignoffReviewPanel({ ticketId, s, onDone }: { ticketId: string; 
       {/* Submission detail — photos / COC / notes, each under its own rule. */}
       <div className="overflow-hidden rounded-xl bg-[var(--surface)] ring-1 ring-[var(--border)]">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 border-b border-[var(--border)] px-4 py-3">
-          <FileText size={16} className="shrink-0 text-[#C6A35D]" />
+          <FileText size={16} className="shrink-0 text-blue-500" />
           <span className="text-sm font-bold text-[var(--text)]">{s.label}</span>
           <span className="text-[var(--text-faint)]">·</span>
           <span className="text-[13px] text-[var(--text-faint)]">{formatDateTime(s.createdAt)}</span>
@@ -1220,13 +1367,18 @@ export function RmAddWorkForm({ ticketId, description, photoUrls, title, categor
   // Object-URL thumbnails for the selected photos; revoked when the set changes.
   const previews = useMemo(() => files.map(f => URL.createObjectURL(f)), [files])
   useEffect(() => () => previews.forEach(URL.revokeObjectURL), [previews])
-  const addFiles = (list: FileList | null) => setFiles(p => [...p, ...Array.from(list ?? []).filter(f => f.type.startsWith('image/'))].slice(0, MAX_WORK_PHOTOS))
+  // Keep files the OS picker returned. On mobile the picked image often has an
+  // empty MIME type (Android WebView), so require-image would silently drop it —
+  // the `accept="image/*"` picker already limits selection, and the upload route
+  // accepts an empty type, so only reject a clearly non-image type here.
+  const addFiles = (list: FileList | null) => setFiles(p => [...p, ...Array.from(list ?? []).filter(f => !f.type || f.type.startsWith('image/'))].slice(0, MAX_WORK_PHOTOS))
 
   async function submit() {
     if (!text.trim()) { setErr('Describe the extra work needed.'); return }
     setBusy(true); setErr('')
     try {
-      const { urls: newUrls } = await uploadFiles(files, 'ticket-photos')
+      const { urls: newUrls, failed } = await uploadFiles(files, 'ticket-photos')
+      if (failed.length) { setErr(`Couldn't upload ${failed.length} photo${failed.length > 1 ? 's' : ''}. Check the file type and try again.`); setBusy(false); return }
       const newDescription = `${description}\n\n— Extra Work: ${text.trim()}`
       // The ticket endpoint is PATCH-only — POSTing here was the "something went wrong".
       const res = await fetch(`/api/tickets/${ticketId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, description: newDescription, category, operational_impact: impact, photo_urls: [...photoUrls, ...newUrls], edit_note: 'added extra work' }) })
@@ -1331,7 +1483,8 @@ export function VariationReviewCard({ ticketId }: { ticketId: string }) {
           </div>
         </div>
       ) : (
-        <div className="flex gap-2">
+        // Stack on phones — side by side both labels wrap to two lines at 375px.
+        <div className="flex flex-col gap-2 sm:flex-row">
           <button onClick={() => { setErr(''); setConfirmApprove(true) }} className="flex-1 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition">Approve variation order</button>
           <button onClick={() => { setReason(''); setOther(''); setErr(''); setDeclineOpen(true) }} className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-semibold transition">Decline variation order</button>
         </div>
