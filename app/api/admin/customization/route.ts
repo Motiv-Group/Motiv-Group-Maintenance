@@ -16,15 +16,20 @@ const BodySchema = z.object({
   supportPhone: z.string().max(40).optional(),
   defaultTheme: z.enum(['light', 'dark', 'system']).optional(),
   colors: z.record(z.string(), HEX).optional(),
+  authButtonColor: HEX.optional(),
   authBgUrls: z.array(z.string().url()).max(4).optional(),
   // Logo sizing/alignment — numbers are re-clamped server-side by normaliseLogoLayout.
   logo: z.object({
+    navSymbolScale: z.number(),
     navWordmarkScale: z.number(),
     navWordmarkNudge: z.number(),
     authLogoScale: z.number(),
     authLogoScaleMobile: z.number(),
     authLogoGap: z.number(),
   }).partial().optional(),
+  // Email copy overrides — keys/fields/values are whitelisted server-side by
+  // normaliseEmails; loose here so an unknown key is dropped, not rejected.
+  emails: z.record(z.string().max(40), z.record(z.string().max(40), z.string().max(2000))).optional(),
   // Drops the generated logo set and returns the app to the built-in Motiv assets.
   resetBranding: z.boolean().optional(),
 })
@@ -47,6 +52,9 @@ export async function POST(request: Request) {
 
   const patch: Partial<Omit<AppSettings, 'logo'>> & { logo?: Partial<AppSettings['logo']> } = {}
   if (body.appName !== undefined) patch.appName = body.appName
+  if (body.authButtonColor !== undefined) patch.authButtonColor = body.authButtonColor.toLowerCase()
+  // Whitelisted + cleaned by normaliseEmails (in saveAppSettings); '' fields clear an override.
+  if (body.emails !== undefined) patch.emails = body.emails as AppSettings['emails']
   if (body.tagline !== undefined) patch.tagline = body.tagline
   if (body.supportEmail !== undefined) patch.supportEmail = body.supportEmail
   if (body.supportPhone !== undefined) patch.supportPhone = body.supportPhone

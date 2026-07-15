@@ -34,13 +34,19 @@ export async function POST(request: Request) {
   let form: FormData
   try { form = await request.formData() } catch { return NextResponse.json({ error: 'Expected multipart form data' }, { status: 400 }) }
 
-  const buffers: Record<(typeof MASTERS)[number], Buffer> = {} as any
+  // Any subset of the three masters may be uploaded — only what's provided is
+  // regenerated; the rest keep their current (or built-in) assets.
+  const buffers: Partial<Record<(typeof MASTERS)[number], Buffer>> = {}
   for (const name of MASTERS) {
     const file = form.get(name)
-    if (!(file instanceof File)) return NextResponse.json({ error: `Missing ${name} image` }, { status: 400 })
+    if (file == null || (file instanceof File && file.size === 0)) continue // not provided
+    if (!(file instanceof File)) return NextResponse.json({ error: `Invalid ${name} upload` }, { status: 400 })
     if (!ALLOWED_TYPES.has(file.type)) return NextResponse.json({ error: `${name} must be a PNG or WebP image` }, { status: 400 })
     if (file.size > MAX_BYTES) return NextResponse.json({ error: `${name} is over 8MB` }, { status: 400 })
     buffers[name] = Buffer.from(await file.arrayBuffer())
+  }
+  if (!buffers.symbol && !buffers.wordmark && !buffers.lockup) {
+    return NextResponse.json({ error: 'Upload at least one image (symbol, wordmark or lockup)' }, { status: 400 })
   }
 
   const current = await getAppSettings()
@@ -48,12 +54,7 @@ export async function POST(request: Request) {
 
   let generated
   try {
-    generated = await generateBrandAssets({
-      symbol: buffers.symbol,
-      wordmark: buffers.wordmark,
-      lockup: buffers.lockup,
-      chromeHex,
-    })
+    generated = await generateBrandAssets({ ...buffers, chromeHex })
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Generation failed'
     return NextResponse.json({ error: msg }, { status: 400 })
@@ -65,49 +66,72 @@ export async function POST(request: Request) {
   const prefix = `v${version}`
   const storage = admin.storage.from('branding')
 
-  const files: Record<string, string> = {}
+  // Start from the current file/dim map and overlay only the regenerated assets,
+  // so a partial upload keeps the untouched logos.
+  const files: Record<string, string> = { ...current.branding.files }
+  const dims: BrandingState['dims'] = { ...current.branding.dims }
   for (const asset of generated.web) {
     const path = `${prefix}/${asset.key}`
     const { error } = await storage.upload(path, asset.data, { contentType: asset.contentType, cacheControl: '31536000' })
     if (error) return NextResponse.json({ error: `Upload failed for ${asset.key}: ${error.message}` }, { status: 500 })
     files[asset.key] = storage.getPublicUrl(path).data.publicUrl
+    // The UI needs the trimmed masters' aspect ratios to size custom logos.
+    if (asset.key === 'symbol.png' || asset.key === 'wordmark.png' || asset.key === 'lockup.png') {
+      const meta = await sharp(asset.data).metadata()
+      if (meta.width && meta.height) dims[asset.key] = { w: meta.width, h: meta.height }
+    }
   }
 
-  const zipPath = `${prefix}/motiv-asset-pack.zip`
-  const { error: zipErr } = await storage.upload(zipPath, generated.zip, { contentType: 'application/zip', cacheControl: '31536000' })
-  if (zipErr) return NextResponse.json({ error: `Zip upload failed: ${zipErr.message}` }, { status: 500 })
-  const zipUrl = storage.getPublicUrl(zipPath).data.publicUrl
-
-  // Natural dimensions of the trimmed masters — the UI components need the
-  // aspect ratios to size custom logos correctly.
-  const dims: BrandingState['dims'] = {}
-  for (const key of ['symbol.png', 'wordmark.png', 'lockup.png']) {
-    const asset = generated.web.find(a => a.key === key)
-    if (!asset) continue
-    const meta = await sharp(asset.data).metadata()
-    if (meta.width && meta.height) dims[key] = { w: meta.width, h: meta.height }
+  // The asset pack is only regenerated when the symbol changed (it's mostly
+  // icons); otherwise keep the previous pack.
+  let zipUrl = current.branding.zipUrl
+  if (generated.zip) {
+    const zipPath = `${prefix}/motiv-asset-pack.zip`
+    const { error: zipErr } = await storage.upload(zipPath, generated.zip, { contentType: 'application/zip', cacheControl: '31536000' })
+    if (zipErr) return NextResponse.json({ error: `Zip upload failed: ${zipErr.message}` }, { status: 500 })
+    zipUrl = storage.getPublicUrl(zipPath).data.publicUrl
   }
 
   try {
     const settings = await saveAppSettings({ branding: { version, files, dims, zipUrl } })
-    // Best-effort: drop the previous generation's files (free-tier storage; the
-    // new versioned prefix is already live so nothing references the old one).
-    if (current.branding.version && current.branding.version !== version) {
-      const oldPrefix = `v${current.branding.version}`
-      const { data: oldFiles } = await storage.list(oldPrefix)
-      if (oldFiles?.length) await storage.remove(oldFiles.map(o => `${oldPrefix}/${o.name}`))
-    }
+    // Best-effort orphan cleanup: any version folder no longer referenced by the
+    // live file/zip URLs is safe to delete (a partial upload keeps several
+    // versions referenced, so we can't just wipe the previous one).
+    await cleanupOrphans(storage, files, zipUrl)
     await logAudit(admin, {
       actorId: user.id,
       action: 'customization.logo_generate',
       entityType: 'app_settings',
       entityId: 'app',
-      metadata: { version, assetCount: generated.web.length },
+      metadata: { version, regenerated: generated.web.map(a => a.key) },
     })
     revalidatePath('/', 'layout')
     return NextResponse.json({ ok: true, settings })
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Save failed'
     return NextResponse.json({ error: msg }, { status: 500 })
+  }
+}
+
+/** Delete any `v*` folder in the branding bucket not referenced by a live URL. */
+async function cleanupOrphans(
+  storage: ReturnType<ReturnType<typeof createAdminClient>['storage']['from']>,
+  files: Record<string, string>,
+  zipUrl: string | null,
+): Promise<void> {
+  try {
+    const referenced = new Set<string>()
+    for (const url of [...Object.values(files), ...(zipUrl ? [zipUrl] : [])]) {
+      const m = /\/branding\/(v[^/]+)\//.exec(url)
+      if (m) referenced.add(m[1])
+    }
+    const { data: entries } = await storage.list('', { limit: 1000 })
+    const orphanFolders = (entries ?? []).filter(e => /^v\d+$/.test(e.name) && !referenced.has(e.name))
+    for (const folder of orphanFolders) {
+      const { data: contents } = await storage.list(folder.name, { limit: 1000 })
+      if (contents?.length) await storage.remove(contents.map(c => `${folder.name}/${c.name}`))
+    }
+  } catch {
+    // Cleanup is best-effort — never fail the save over stale files.
   }
 }

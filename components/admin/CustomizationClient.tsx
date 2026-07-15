@@ -12,6 +12,7 @@ import { DarkTile, Field, SaveRow, Section, inputCls, postForm, postJson, useAsy
 import { LogoSection } from '@/components/admin/customization/LogoSection'
 import { LogoLayoutSection } from '@/components/admin/customization/LogoLayoutSection'
 import { ColoursSection } from '@/components/admin/customization/ColoursSection'
+import { EmailsSection } from '@/components/admin/customization/EmailsSection'
 
 type SettingsResponse = { ok: true; settings: AppSettings }
 
@@ -35,9 +36,10 @@ export function CustomizationClient({ initial }: { initial: AppSettings }) {
       <IdentitySection initialName={initial.appName} initialTagline={initial.tagline} iconSrc={iconSrc} />
       <LogoSection initialBranding={initial.branding} />
       <LogoLayoutSection initialLayout={initial.logo} symbolUrl={symbolSrc} wordmarkUrl={wordmarkSrc} lockupUrl={lockupSrc} custom={initial.branding.version != null} />
-      <ColoursSection initialColors={initial.colors} appName={initial.appName} symbolSrc={symbolSrc} />
+      <ColoursSection initialColors={initial.colors} initialButtonColor={initial.authButtonColor} appName={initial.appName} symbolSrc={symbolSrc} />
       <LoginBackgroundsSection initialUrls={initial.authBgUrls} />
       <SupportSection initialEmail={initial.supportEmail} initialPhone={initial.supportPhone} />
+      <EmailsSection initialEmails={initial.emails} />
       <AppearanceSection initialTheme={initial.defaultTheme} />
     </div>
   )

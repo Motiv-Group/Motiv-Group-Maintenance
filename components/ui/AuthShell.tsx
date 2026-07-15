@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
 import { MotivLockup } from '@/components/ui/MotivLockup'
 import { useBranding } from '@/components/providers/BrandingProvider'
 
@@ -41,7 +41,8 @@ export function AuthShell({
   const widthClass = maxWidth === 'lg' ? 'max-w-[540px]' : maxWidth === 'md' ? 'max-w-md' : 'max-w-sm sm:max-w-md'
   const support = [branding.supportEmail, branding.supportPhone].filter(Boolean)
   return (
-    <div className="dark">
+    // --auth-btn drives the primary auth buttons (Button variant "gold"); admin-set hex.
+    <div className="dark" style={{ '--auth-btn': branding.authButtonColor } as CSSProperties}>
       <div className="relative min-h-screen bg-[#0b0c11] flex flex-col items-center justify-center px-4 py-10">
         {bgUrl && (
           // eslint-disable-next-line @next/next/no-img-element -- arbitrary storage URL; plain img avoids remote-domain config

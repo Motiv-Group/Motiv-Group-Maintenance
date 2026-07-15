@@ -1,6 +1,13 @@
 // Transactional email via the Resend REST API.
 // Mirrors lib/push.ts: silently no-ops (returns false) when not configured, so
 // callers never have to guard — a missing RESEND_API_KEY just means no email.
+//
+// This module is PURE / client-importable on purpose — the admin Customize
+// preview imports the render* helpers to draw emails in the browser. Do NOT add
+// 'server-only' or import lib/settings-server here; loading the saved copy
+// overrides happens in lib/emails/server.ts.
+
+import type { EmailCopy } from '@/lib/settings'
 
 interface SendEmailArgs {
   to:      string
@@ -83,139 +90,120 @@ export function motivBrandedEmailHtml(o: {
 </div>`
 }
 
-/** Branded password-reset email (sent via our Resend sender, not Supabase). */
-export function passwordResetEmailHtml(link: string, base: string): string {
-  return motivBrandedEmailHtml({
-    base,
-    heading: 'Reset your password',
-    lead: 'We received a request to reset the password for your MOTIV account.',
-    sub: 'Click below to choose a new password.',
-    ctaLabel: 'Reset password',
-    link,
-    footerNote: "If you didn't request this, you can safely ignore this email — your password won't change.",
-  })
-}
+// ── Pure renderers (resolved copy → { subject, html, text }) ─────────────────
+// Each takes an already-resolved EmailCopy (placeholders substituted upstream)
+// plus the dynamic, non-editable inputs it needs (links, credentials, base).
+// The copy is system_admin-authored, so — like the strings that used to live
+// here — it is trusted and rendered into HTML as-is. buildEmail (server) wires
+// the saved overrides + defaults to these; the admin preview calls them directly.
 
-interface StoreInviteArgs {
-  managerName: string
-  loginUrl:    string
-  email:       string
-  password:    string
-  rmName?:     string | null
-  company:     string
-  subStore:    string
-}
-
-/** Build the welcome email for a freshly-provisioned store-manager account. */
-export function storeInviteEmail({
-  managerName, loginUrl, email, password, rmName, company, subStore,
-}: StoreInviteArgs): { subject: string; html: string; text: string } {
-  const subject = `You've been added to Motiv — ${company} (${subStore})`
-
-  const text = [
-    `Hi ${managerName || 'there'},`,
-    ``,
-    `${rmName ? `${rmName} has` : 'Your regional manager has'} created a Motiv account for ${company} — ${subStore}.`,
-    ``,
-    `Log in here: ${loginUrl}`,
-    `Email:    ${email}`,
-    `Password: ${password}`,
-    ``,
-    `Please change your password after your first login (Settings → Profile).`,
-    ``,
-    `— Motiv`,
+/** Plain-text sibling of a branded (link + CTA) email. */
+function brandedText(copy: EmailCopy, link: string, note?: string): string {
+  return [
+    copy.heading,
+    '',
+    copy.lead,
+    ...(copy.sub ? ['', copy.sub] : []),
+    ...(note && note.trim() ? ['', note.trim()] : []),
+    '',
+    `${copy.ctaLabel}: ${link}`,
+    '',
+    copy.footerNote,
   ].join('\n')
+}
 
+/**
+ * Branded template email (navy header, blue CTA, copy-paste link) — used by the
+ * role invite, supplier invite and password-reset emails. `note` renders the
+ * optional quoted personal-message block above the CTA.
+ */
+export function renderBrandedEmail(
+  copy: EmailCopy,
+  o: { base: string; link: string; note?: string; noteLabel?: string },
+): { subject: string; html: string; text: string } {
+  const html = motivBrandedEmailHtml({
+    base: o.base,
+    heading: copy.heading,
+    lead: copy.lead,
+    sub: copy.sub || undefined,
+    ctaLabel: copy.ctaLabel,
+    link: o.link,
+    footerNote: copy.footerNote,
+    note: o.note,
+    noteLabel: o.noteLabel,
+  })
+  return { subject: copy.subject, html, text: brandedText(copy, o.link, o.note) }
+}
+
+/**
+ * Store-manager welcome email — inline template with a FIXED credentials block
+ * (login email + password) and login button. Only heading/lead/ctaLabel/
+ * footerNote come from copy; the credentials box structure stays locked.
+ */
+export function renderStoreWelcome(
+  copy: EmailCopy,
+  o: { email: string; password: string; loginUrl: string },
+): { subject: string; html: string; text: string } {
   const html = `
   <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:480px;margin:0 auto;color:#0f172a">
-    <h2 style="color:#1e293b;margin:0 0 12px">Welcome to Motiv</h2>
-    <p style="margin:0 0 12px">Hi ${managerName || 'there'},</p>
-    <p style="margin:0 0 16px">
-      ${rmName ? `${rmName} has` : 'Your regional manager has'} created a Motiv account for
-      <strong>${company} — ${subStore}</strong>. Use the details below to log in.
-    </p>
+    <h2 style="color:#1e293b;margin:0 0 12px">${copy.heading}</h2>
+    <p style="margin:0 0 16px">${copy.lead}</p>
     <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin:0 0 16px">
-      <p style="margin:0 0 8px"><strong>Email:</strong> ${email}</p>
-      <p style="margin:0"><strong>Password:</strong> ${password}</p>
+      <p style="margin:0 0 8px"><strong>Email:</strong> ${escapeHtml(o.email)}</p>
+      <p style="margin:0"><strong>Password:</strong> ${escapeHtml(o.password)}</p>
     </div>
     <p style="margin:0 0 20px">
-      <a href="${loginUrl}" style="display:inline-block;background:#1e293b;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-weight:600">Log in to Motiv</a>
+      <a href="${o.loginUrl}" style="display:inline-block;background:#1e293b;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-weight:600">${copy.ctaLabel}</a>
     </p>
-    <p style="margin:0;color:#64748b;font-size:13px">Please change your password after your first login (Settings → Profile).</p>
+    <p style="margin:0;color:#64748b;font-size:13px">${copy.footerNote}</p>
   </div>`
 
-  return { subject, html, text }
-}
-
-/** Notice email for a supplier whose email already has a Motiv account — they
- *  don't need to create a login, so we tell them they've been added instead of
- *  sending an onboarding link. */
-export function supplierAddedNoticeEmail({ companyName, addedBy, loginUrl }: { companyName: string; addedBy?: string | null; loginUrl: string }): { subject: string; html: string; text: string } {
-  const subject = `You've been added as a supplier on Motiv`
-  const who = addedBy ? `${addedBy}` : 'A company'
   const text = [
-    `Hi,`,
-    ``,
-    `${who} has added ${companyName} as one of their suppliers on Motiv.`,
-    `You already have a Motiv account, so there's nothing to set up — just log in to see any work they send your way:`,
-    ``,
-    loginUrl,
-    ``,
-    `— Motiv`,
+    copy.heading,
+    '',
+    copy.lead,
+    '',
+    `Log in here: ${o.loginUrl}`,
+    `Email:    ${o.email}`,
+    `Password: ${o.password}`,
+    '',
+    copy.footerNote,
+    '',
+    '— Motiv',
   ].join('\n')
 
+  return { subject: copy.subject, html, text }
+}
+
+/**
+ * "You've been added as a supplier" notice — inline template for a supplier who
+ * already has an account. Only heading/lead/ctaLabel/footerNote come from copy.
+ */
+export function renderSupplierAdded(
+  copy: EmailCopy,
+  o: { loginUrl: string },
+): { subject: string; html: string; text: string } {
   const html = `
   <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:480px;margin:0 auto;color:#0f172a">
-    <h2 style="color:#1e293b;margin:0 0 12px">You've been added as a supplier</h2>
-    <p style="margin:0 0 16px">${who} has added <strong>${companyName}</strong> as one of their suppliers on Motiv.</p>
-    <p style="margin:0 0 16px">You already have a Motiv account, so there's nothing to set up — just log in to see any work they send your way.</p>
+    <h2 style="color:#1e293b;margin:0 0 12px">${copy.heading}</h2>
+    <p style="margin:0 0 16px">${copy.lead}</p>
     <p style="margin:0 0 20px">
-      <a href="${loginUrl}" style="display:inline-block;background:#1e293b;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-weight:600">Log in to Motiv</a>
+      <a href="${o.loginUrl}" style="display:inline-block;background:#1e293b;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-weight:600">${copy.ctaLabel}</a>
     </p>
-    <p style="margin:0;color:#64748b;font-size:12px">If the button doesn't work, paste this link:<br>${loginUrl}</p>
+    <p style="margin:0;color:#64748b;font-size:12px">${copy.footerNote}</p>
   </div>`
 
-  return { subject, html, text }
-}
-
-/** Build the supplier invite email — a reusable onboarding link (custom token).
- *  Uses the shared branded MOTIV template (same look as the RM/SM invites), and
- *  carries the inviter's optional personal message. `inviterCompany` is the client
- *  company doing the inviting; `message` is the RM's free-text note. */
-export function supplierInviteEmail(
-  { link, base, inviterCompany, message }: { link: string; base: string; inviterCompany?: string | null; message?: string | null },
-): { subject: string; html: string; text: string } {
-  const subject = `You've been invited to MOTIV as a supplier`
-  const inviter = (inviterCompany ?? '').trim()
-  const lead = inviter
-    ? `<strong style="color:#0d1f2d;">${escapeHtml(inviter)}</strong> has invited you to join <strong style="color:#0d1f2d;">MOTIV</strong> as a supplier.`
-    : `You've been invited to join <strong style="color:#0d1f2d;">MOTIV</strong> as a supplier.`
-
-  const html = motivBrandedEmailHtml({
-    base,
-    heading: "You're invited to MOTIV",
-    lead,
-    sub: 'Set up your account — choose a password and confirm your company details — to start receiving work.',
-    note: message ?? undefined,
-    noteLabel: inviter ? `Message from ${inviter}` : 'Message',
-    ctaLabel: 'Set up my account',
-    link,
-    footerNote: "This invitation link stays valid until you finish signing up. If you weren't expecting it, you can safely ignore this email.",
-  })
-
   const text = [
-    `Hi,`,
-    ``,
-    inviter ? `${inviter} has invited you to join MOTIV as a supplier.` : `You've been invited to join MOTIV as a supplier.`,
-    `Open the link below to set up your account — choose your password and confirm your company details:`,
-    ``,
-    link,
-    ...(message && message.trim() ? ['', `Message: ${message.trim()}`] : []),
-    ``,
-    `This link stays valid until you complete sign-up.`,
-    ``,
-    `— Motiv`,
+    copy.heading,
+    '',
+    copy.lead,
+    '',
+    `Log in here: ${o.loginUrl}`,
+    '',
+    copy.footerNote,
+    '',
+    '— Motiv',
   ].join('\n')
 
-  return { subject, html, text }
+  return { subject: copy.subject, html, text }
 }

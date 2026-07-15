@@ -4,7 +4,7 @@
 
 import { cache } from 'react'
 import { createAdminClient } from '@/lib/supabase/server'
-import { AppSettings, DEFAULT_SETTINGS, LogoLayout, normaliseSettings } from '@/lib/settings'
+import { AppSettings, DEFAULT_SETTINGS, EmailOverrides, LogoLayout, normaliseSettings } from '@/lib/settings'
 
 const KEY = 'app'
 
@@ -35,6 +35,9 @@ export async function saveAppSettings(
     ...current,
     ...patch,
     logo: patch.logo ? { ...current.logo, ...patch.logo } : current.logo,
+    // Merge email overrides at the per-email-type level: an edited email replaces
+    // its own override set (blank fields dropped by normalise); others untouched.
+    emails: patch.emails ? ({ ...current.emails, ...patch.emails } as EmailOverrides) : current.emails,
   })
   const admin = createAdminClient() as any
   const { error } = await admin

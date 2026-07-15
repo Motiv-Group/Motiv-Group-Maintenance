@@ -33,22 +33,27 @@ function toFull(overrides: Partial<Record<BrandStop, string>>): Record<BrandStop
   return full
 }
 
-export function ColoursSection({ initialColors, appName, symbolSrc }: {
+const AUTH_BTN_DEFAULT = '#2563eb'
+
+export function ColoursSection({ initialColors, initialButtonColor, appName, symbolSrc }: {
   initialColors: Partial<Record<BrandStop, string>>
+  initialButtonColor: string
   appName: string
   symbolSrc: string
 }) {
   const router = useRouter()
   const [stops, setStops] = useState<Record<BrandStop, string>>(() => toFull(initialColors))
   const [savedStops, setSavedStops] = useState<Record<BrandStop, string>>(() => toFull(initialColors))
+  const [btn, setBtn] = useState(initialButtonColor)
+  const [savedBtn, setSavedBtn] = useState(initialButtonColor)
   const [advanced, setAdvanced] = useState(false)
   // Which button kicked off the in-flight request, so only it shows a spinner.
   const [op, setOp] = useState<'save' | 'reset' | null>(null)
   const saver = useAsyncSave<SettingsResponse>()
   const saving = saver.state === 'saving'
 
-  const dirty = STOP_ORDER.some((s) => stops[s] !== savedStops[s])
-  const canReset = STOP_ORDER.some(
+  const dirty = btn !== savedBtn || STOP_ORDER.some((s) => stops[s] !== savedStops[s])
+  const canReset = btn.toLowerCase() !== AUTH_BTN_DEFAULT || STOP_ORDER.some(
     (s) => stops[s] !== String(BRAND_DEFAULT_HEX[s]).toLowerCase() || savedStops[s] !== String(BRAND_DEFAULT_HEX[s]).toLowerCase(),
   )
 
@@ -68,22 +73,26 @@ export function ColoursSection({ initialColors, appName, symbolSrc }: {
     for (const s of STOP_ORDER) {
       if (stops[s] !== String(BRAND_DEFAULT_HEX[s]).toLowerCase()) overrides[s] = stops[s]
     }
-    const data = await saver.run(() => postJson<SettingsResponse>('/api/admin/customization', { colors: overrides }))
+    const data = await saver.run(() => postJson<SettingsResponse>('/api/admin/customization', { colors: overrides, authButtonColor: btn }))
     if (data) {
       const full = toFull(data.settings.colors)
       setStops(full)
       setSavedStops(full)
+      setBtn(data.settings.authButtonColor)
+      setSavedBtn(data.settings.authButtonColor)
       router.refresh()
     }
   }
 
   async function resetColours() {
     setOp('reset')
-    const data = await saver.run(() => postJson<SettingsResponse>('/api/admin/customization', { colors: {} }))
+    const data = await saver.run(() => postJson<SettingsResponse>('/api/admin/customization', { colors: {}, authButtonColor: AUTH_BTN_DEFAULT }))
     if (data) {
       const full = toFull({})
       setStops(full)
       setSavedStops(full)
+      setBtn(data.settings.authButtonColor)
+      setSavedBtn(data.settings.authButtonColor)
       router.refresh()
     }
   }
@@ -171,6 +180,30 @@ export function ColoursSection({ initialColors, appName, symbolSrc }: {
           </div>
         </div>
         <p className="mt-1.5 text-[11px] text-[var(--text-faint)]">Preview — how the main surfaces will look.</p>
+      </div>
+
+      {/* Login button colour — independent of the chrome palette, with its own
+          preview on the dark login background. */}
+      <div className="grid gap-4 border-t border-[var(--border)] pt-4 sm:grid-cols-2">
+        <ColorField
+          label="Login button colour"
+          hint="The colour of the “Log in” / “Create account” buttons on the sign-in screens. Use a hex code or the picker."
+          value={btn}
+          onChange={setBtn}
+        />
+        <div>
+          <span className="mb-1.5 block text-xs font-semibold text-[var(--text)]">Preview</span>
+          <div className="grid place-items-center rounded-xl bg-[#0b0c11] px-4 py-5 ring-1 ring-[var(--border)]">
+            <button
+              type="button"
+              tabIndex={-1}
+              className="pointer-events-none w-full max-w-[220px] rounded-lg px-6 py-3 text-base font-semibold text-white shadow-sm"
+              style={{ backgroundColor: btn }}
+            >
+              Log in
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-3 pt-1">

@@ -1,7 +1,8 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { rateLimit } from '@/lib/rate-limit'
-import { sendEmail, passwordResetEmailHtml } from '@/lib/email'
+import { sendEmail } from '@/lib/email'
+import { buildEmail } from '@/lib/emails/server'
 import { isValidEmail } from '@/lib/csv'
 import { parseJsonBody } from '@/lib/validate'
 import { signAccountToken } from '@/lib/auth-token'
@@ -28,7 +29,8 @@ export async function POST(request: Request) {
   if (!(prof as any)?.id) return ok // unknown address — say nothing
 
   const link = `${base}/auth/confirm?t=${signAccountToken((prof as any).id, Date.now())}&type=recovery`
-  const sent = await sendEmail({ to: email, subject: 'Reset your MOTIV password', html: passwordResetEmailHtml(link, base) })
+  const { subject, html, text } = await buildEmail('password_reset', { link, base })
+  const sent = await sendEmail({ to: email, subject, html, text })
   if (!sent) console.error('[forgot-password] sendEmail returned false (Resend not configured or rejected)', { email })
   return ok
 }

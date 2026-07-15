@@ -16,11 +16,12 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       secondary: 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 focus:ring-brand-500',
       danger:    'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
       ghost:     'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 focus:ring-gray-400',
-      // Auth-screen primary action — confident blue with a bold white label
-      // (navy 'primary' is near-invisible on the dark auth background). The
-      // disabled state is an explicit neutral, not a dimmed blue, so an
-      // incomplete form reads clearly as disabled. (Key kept as `gold`.)
-      gold:      'bg-blue-600 text-white font-semibold shadow-sm hover:bg-blue-500 focus:ring-blue-500 disabled:opacity-100 disabled:bg-[#1c1f27] disabled:text-gray-400 disabled:shadow-none',
+      // Auth-screen primary action — colour comes from the --auth-btn CSS var set
+      // by AuthShell (admin-configurable hex), defaulting to blue; hover just
+      // brightens it so any hue works. The disabled state is an explicit neutral,
+      // not a dimmed colour, so an incomplete form reads clearly as disabled.
+      // (Key kept as `gold`.)
+      gold:      'bg-[var(--auth-btn,#2563eb)] text-white font-semibold shadow-sm hover:brightness-110 focus:ring-[var(--auth-btn,#2563eb)] disabled:opacity-100 disabled:bg-[#1c1f27] disabled:text-gray-400 disabled:shadow-none disabled:hover:brightness-100',
     }
 
     const sizes = {

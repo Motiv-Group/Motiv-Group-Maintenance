@@ -82,6 +82,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     symbolAspect: aspect('symbol.png', DEFAULT_BRAND_ASSETS.symbolAspect),
     wordmarkAspect: aspect('wordmark.png', DEFAULT_BRAND_ASSETS.wordmarkAspect),
     lockupAspect: aspect('lockup.png', DEFAULT_BRAND_ASSETS.lockupAspect),
+    navSymbolScale: settings.logo.navSymbolScale,
     navWordmarkScale: settings.logo.navWordmarkScale,
     // Custom logos are trimmed tight by the generator → their bottoms already
     // line up, so base shift 0; the built-in glow-padded symbol needs ~0.18.
@@ -90,6 +91,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     authLogoScale: settings.logo.authLogoScale,
     authLogoScaleMobile: settings.logo.authLogoScaleMobile,
     authLogoGap: settings.logo.authLogoGap,
+    authButtonColor: settings.authButtonColor,
   }
 
   return (

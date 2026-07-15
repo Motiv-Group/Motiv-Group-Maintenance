@@ -1,6 +1,7 @@
 import 'server-only'
 import { createAdminClient } from '@/lib/supabase/server'
-import { motivBrandedEmailHtml } from '@/lib/email'
+import { sendEmail } from '@/lib/email'
+import { buildEmail } from '@/lib/emails/server'
 import { signAccountToken } from '@/lib/auth-token'
 
 export type InviteRole = 'regional_manager' | 'store_manager' | 'supplier' | 'executive'
@@ -66,38 +67,8 @@ export async function inviteUser(opts: InviteOpts): Promise<{ userId: string; ac
   return { userId: uid, actionLink, emailed }
 }
 
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
-}
-
 async function sendInviteEmail(to: string, link: string | null, roleLabel: string, base: string, invitedTo?: string): Promise<boolean> {
-  const key = process.env.RESEND_API_KEY, from = process.env.EMAIL_FROM
-  if (!key || !from || !link) return false
-  try {
-    const subject = invitedTo ? `You've been invited to ${invitedTo} on MOTIV` : `You've been invited to MOTIV as ${roleLabel}`
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        from, to, subject,
-        html: inviteEmailHtml(link, roleLabel, base, invitedTo),
-      }),
-    })
-    return res.ok
-  } catch { return false }
-}
-
-// Branded invite email — shares the MOTIV template with the password-reset email.
-// When `invitedTo` is set (e.g. a project name), the copy references it instead of the role.
-export function inviteEmailHtml(link: string, roleLabel: string, base: string, invitedTo?: string): string {
-  return motivBrandedEmailHtml({
-    base,
-    heading: "You're invited to MOTIV",
-    lead: invitedTo
-      ? `You've been invited to <strong style="color:#0d1f2d;">${escapeHtml(invitedTo)}</strong> on MOTIV.`
-      : `You've been added as <strong style="color:#0d1f2d;">${roleLabel}</strong>.`,
-    sub: 'Set your password to activate your account and sign in.',
-    ctaLabel: 'Set password &amp; sign in',
-    link,
-    footerNote: "This invitation was sent by MOTIV. If you weren't expecting it, you can safely ignore this email.",
-  })
+  if (!link) return false
+  const { subject, html, text } = await buildEmail('role_invite', { link, base, roleLabel, invitedTo })
+  return sendEmail({ to, subject, html, text })
 }

@@ -46,11 +46,12 @@ export function LogoLayoutSection({ initialLayout, symbolUrl, wordmarkUrl, locku
     setLayout({ ...LOGO_LAYOUT_DEFAULT })
   }
 
-  // Nav preview: mirror MotivLogo's layout at a fixed nav height (44px).
-  const navH = 44
+  // Nav preview: mirror MotivLogo's layout at a fixed base height (44px).
+  const navBase = 44
+  const symH = Math.round(navBase * layout.navSymbolScale)
   const baseShift = custom ? 0 : 0.18
   const navShift = baseShift + layout.navWordmarkNudge
-  const wordH = Math.round(navH * layout.navWordmarkScale)
+  const wordH = Math.round(symH * layout.navWordmarkScale)
 
   // Login preview: illustrative base height so both frames fit the tile.
   const previewBase = 74
@@ -69,18 +70,19 @@ export function LogoLayoutSection({ initialLayout, symbolUrl, wordmarkUrl, locku
             The symbol + MOTIV wordmark shown in the header. Use the nudge to line the bottom of the text up with the bottom of the mark.
           </p>
         </div>
-        <DarkTile className="flex items-end px-5 py-4">
+        <DarkTile className="flex min-h-24 items-end px-5 py-4">
           {/* Mirrors components/ui/MotivLogo.tsx composition. */}
-          <span className="inline-flex items-end" style={{ gap: Math.round(navH * 0.16) }}>
+          <span className="inline-flex items-end" style={{ gap: Math.round(symH * 0.16) }}>
             {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary storage URL */}
-            <img src={symbolUrl} alt="" style={{ height: navH }} className="w-auto object-contain" />
+            <img src={symbolUrl} alt="" style={{ height: symH }} className="w-auto object-contain" />
             {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary storage URL */}
-            <img src={wordmarkUrl} alt="" style={{ height: wordH, transform: `translateY(-${Math.round(navShift * navH)}px)` }} className="w-auto object-contain" />
+            <img src={wordmarkUrl} alt="" style={{ height: wordH, transform: `translateY(-${Math.round(navShift * symH)}px)` }} className="w-auto object-contain" />
           </span>
           {/* Baseline guide — the symbol's bottom edge, to check alignment. */}
           <span aria-hidden className="pointer-events-none ml-4 mb-0 h-px flex-1 self-end bg-white/20" />
         </DarkTile>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Slider label="Symbol size" value={layout.navSymbolScale} range={LOGO_LAYOUT_RANGE.navSymbolScale} step={0.05} display={(v) => `${Math.round(v * 100)}%`} onChange={(v) => set('navSymbolScale', v)} />
           <Slider label="Wordmark size" value={layout.navWordmarkScale} range={LOGO_LAYOUT_RANGE.navWordmarkScale} step={0.02} display={(v) => `${Math.round(v * 100)}%`} onChange={(v) => set('navWordmarkScale', v)} />
           <Slider label="Wordmark vertical nudge" value={layout.navWordmarkNudge} range={LOGO_LAYOUT_RANGE.navWordmarkNudge} step={0.01} display={(v) => (v === 0 ? 'Aligned' : `${v > 0 ? '↑' : '↓'} ${Math.abs(Math.round(v * 100))}%`)} onChange={(v) => set('navWordmarkNudge', v)} />
         </div>

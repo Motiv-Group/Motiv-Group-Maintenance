@@ -22,6 +22,8 @@ export interface BrandingValue {
   symbolAspect: number
   wordmarkAspect: number
   lockupAspect: number
+  /** Nav lockup: symbol height multiplier (1 = the header's base size). */
+  navSymbolScale: number
   /** Nav lockup: wordmark height as a fraction of symbol height. */
   navWordmarkScale: number
   /** Nav lockup: how far (fraction of symbol height) to lift the wordmark so its
@@ -32,6 +34,8 @@ export interface BrandingValue {
   authLogoScale: number
   authLogoScaleMobile: number
   authLogoGap: number
+  /** Solid hex for the login/auth primary buttons. */
+  authButtonColor: string
 }
 
 export const DEFAULT_BRANDING: BrandingValue = {
@@ -41,6 +45,7 @@ export const DEFAULT_BRANDING: BrandingValue = {
   supportPhone: '',
   authBgUrls: [],
   ...DEFAULT_BRAND_ASSETS,
+  navSymbolScale: 1,
   navWordmarkScale: 0.44,
   // Built-in symbol PNG has soft glow below the visible "M" — lift the wordmark
   // ~18% so their visible bottoms line up. Trimmed custom logos override to 0.
@@ -48,6 +53,7 @@ export const DEFAULT_BRANDING: BrandingValue = {
   authLogoScale: 1,
   authLogoScaleMobile: 0.6,
   authLogoGap: 12,
+  authButtonColor: '#2563eb',
 }
 
 const BrandingContext = createContext<BrandingValue>(DEFAULT_BRANDING)

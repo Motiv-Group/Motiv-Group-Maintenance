@@ -48,6 +48,8 @@ export interface BrandingState {
 // Logo layout knobs (nav lockup + login hero), all editable from the Customize
 // tab. Kept as ratios/px with safe clamps so a bad value can never break layout.
 export interface LogoLayout {
+  /** Nav symbol height multiplier (1 = the size each header passes in). */
+  navSymbolScale: number
   /** Nav wordmark height as a fraction of the symbol height. */
   navWordmarkScale: number
   /** Vertical nudge of the nav wordmark, as a fraction of symbol height.
@@ -64,6 +66,7 @@ export interface LogoLayout {
 }
 
 export const LOGO_LAYOUT_DEFAULT: LogoLayout = {
+  navSymbolScale: 1,
   navWordmarkScale: 0.44,
   navWordmarkNudge: 0,
   authLogoScale: 1,
@@ -73,6 +76,7 @@ export const LOGO_LAYOUT_DEFAULT: LogoLayout = {
 
 // Clamp ranges — also the slider bounds in the Customize UI. Keep in sync.
 export const LOGO_LAYOUT_RANGE = {
+  navSymbolScale: [0.7, 1.45],
   navWordmarkScale: [0.28, 0.7],
   navWordmarkNudge: [-0.25, 0.25],
   authLogoScale: [0.5, 1.6],
@@ -89,11 +93,47 @@ export interface AppSettings {
   defaultTheme: 'light' | 'dark' | 'system'
   /** Hex overrides ('#rrggbb') of the brand palette; missing stop = factory colour. */
   colors: Partial<Record<BrandStop, string>>
+  /** Solid hex ('#rrggbb') for the login/auth primary buttons. */
+  authButtonColor: string
   /** Optional login-screen background photos (public URLs, one picked per visit). */
   authBgUrls: string[]
   /** Logo sizing/alignment knobs (nav + login). */
   logo: LogoLayout
+  /** Per-email-type copy overrides (subject/heading/… ); missing = built-in copy. */
+  emails: EmailOverrides
   branding: BrandingState
+}
+
+// ── Editable email copy ──────────────────────────────────────────────────────
+// The invite/notification emails the app sends. Admins can override the WORDING
+// only (subject/heading/intro/button/footer); links, the credentials block, the
+// logo and the layout stay locked in code. Default copy + placeholders live in
+// lib/emails/defaults.ts. Values may contain {placeholders} substituted at send.
+export const EMAIL_KEYS = ['role_invite', 'supplier_invite', 'password_reset', 'store_welcome', 'supplier_added'] as const
+export type EmailKey = (typeof EMAIL_KEYS)[number]
+export const EMAIL_COPY_FIELDS = ['subject', 'heading', 'lead', 'sub', 'ctaLabel', 'footerNote'] as const
+export type EmailCopyField = (typeof EMAIL_COPY_FIELDS)[number]
+export type EmailCopy = Record<EmailCopyField, string>
+export type EmailOverrides = Partial<Record<EmailKey, Partial<EmailCopy>>>
+
+const AUTH_BUTTON_DEFAULT = '#2563eb'
+
+/** Keep only known email keys/fields with trimmed, length-capped string values. */
+export function normaliseEmails(raw: unknown): EmailOverrides {
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+  const out: EmailOverrides = {}
+  for (const key of EMAIL_KEYS) {
+    const e = (r[key] && typeof r[key] === 'object' ? r[key] : null) as Record<string, unknown> | null
+    if (!e) continue
+    const copy: Partial<EmailCopy> = {}
+    for (const f of EMAIL_COPY_FIELDS) {
+      const v = e[f]
+      // Empty string = "use the built-in default", so it is dropped (not stored).
+      if (typeof v === 'string' && v.trim()) copy[f] = v.slice(0, 600)
+    }
+    if (Object.keys(copy).length) out[key] = copy
+  }
+  return out
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -103,8 +143,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
   supportPhone: '',
   defaultTheme: 'system',
   colors: {},
+  authButtonColor: AUTH_BUTTON_DEFAULT,
   authBgUrls: [],
   logo: { ...LOGO_LAYOUT_DEFAULT },
+  emails: {},
   branding: { version: null, files: {}, dims: {}, zipUrl: null },
 }
 
@@ -119,6 +161,7 @@ export function clampNum(v: unknown, [min, max]: readonly [number, number], fall
 export function normaliseLogoLayout(raw: unknown): LogoLayout {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
   return {
+    navSymbolScale: clampNum(r.navSymbolScale, LOGO_LAYOUT_RANGE.navSymbolScale, LOGO_LAYOUT_DEFAULT.navSymbolScale),
     navWordmarkScale: clampNum(r.navWordmarkScale, LOGO_LAYOUT_RANGE.navWordmarkScale, LOGO_LAYOUT_DEFAULT.navWordmarkScale),
     navWordmarkNudge: clampNum(r.navWordmarkNudge, LOGO_LAYOUT_RANGE.navWordmarkNudge, LOGO_LAYOUT_DEFAULT.navWordmarkNudge),
     authLogoScale: clampNum(r.authLogoScale, LOGO_LAYOUT_RANGE.authLogoScale, LOGO_LAYOUT_DEFAULT.authLogoScale),
@@ -163,8 +206,10 @@ export function normaliseSettings(raw: unknown): AppSettings {
     supportPhone: str(r.supportPhone, '', 40),
     defaultTheme: r.defaultTheme === 'light' || r.defaultTheme === 'dark' ? r.defaultTheme : 'system',
     colors,
+    authButtonColor: isHex(r.authButtonColor) ? (r.authButtonColor as string).toLowerCase() : AUTH_BUTTON_DEFAULT,
     authBgUrls: Array.isArray(r.authBgUrls) ? r.authBgUrls.filter((u): u is string => typeof u === 'string').slice(0, 4) : [],
     logo: normaliseLogoLayout(r.logo),
+    emails: normaliseEmails(r.emails),
     branding: {
       version: typeof b.version === 'number' ? b.version : null,
       files: (b.files && typeof b.files === 'object' ? b.files : {}) as Record<string, string>,

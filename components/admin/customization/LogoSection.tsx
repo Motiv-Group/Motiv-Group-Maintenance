@@ -41,7 +41,7 @@ export function LogoSection({ initialBranding }: { initialBranding: BrandingStat
   const gen = useAsyncSave<SettingsResponse>()
   const revert = useAsyncSave<SettingsResponse>()
   const generating = gen.state === 'saving'
-  const allPicked = SLOTS.every((s) => picked[s.key] !== null)
+  const anyPicked = SLOTS.some((s) => picked[s.key] !== null)
 
   // branding.version is the backend's cache-busting stamp (epoch ms when set
   // by Date.now()); only format it as a date when it plausibly is one.
@@ -63,17 +63,15 @@ export function LogoSection({ initialBranding }: { initialBranding: BrandingStat
   }
 
   async function generate() {
-    const symbol = picked.symbol, wordmark = picked.wordmark, lockup = picked.lockup
-    if (!symbol || !wordmark || !lockup) return
+    const chosen = SLOTS.map((s) => ({ key: s.key, picked: picked[s.key] })).filter((c) => c.picked)
+    if (!chosen.length) return
     const data = await gen.run(() => {
       const fd = new FormData()
-      fd.append('symbol', symbol.file)
-      fd.append('wordmark', wordmark.file)
-      fd.append('lockup', lockup.file)
+      for (const c of chosen) fd.append(c.key, c.picked!.file)
       return postForm<SettingsResponse>('/api/admin/branding/logo', fd)
     })
     if (data) {
-      for (const p of [symbol, wordmark, lockup]) URL.revokeObjectURL(p.url)
+      for (const c of chosen) URL.revokeObjectURL(c.picked!.url)
       setPicked({ symbol: null, wordmark: null, lockup: null })
       setBranding(data.settings.branding)
       router.refresh()
@@ -93,7 +91,7 @@ export function LogoSection({ initialBranding }: { initialBranding: BrandingStat
     <Section
       icon={<ImageIcon size={15} className="text-blue-600 dark:text-blue-400" />}
       title="Logo & app icons"
-      blurb="Upload the three master images once — the system generates every size the app needs (favicons, home-screen icons, Android launcher icons) and applies the web ones instantly. The zip is for the Android app and the code repository, which need a rebuild to pick the new logo up."
+      blurb="Upload one, two or all three master images — only the ones you pick are updated. The system generates every size the app needs (favicons, home-screen icons, Android launcher icons) and applies the web ones instantly. The zip is for the Android app and the code repository, which need a rebuild to pick the new logo up."
     >
       {/* Three upload slots — stack on mobile, side by side from sm. */}
       <div className="grid gap-4 sm:grid-cols-3">
@@ -125,17 +123,17 @@ export function LogoSection({ initialBranding }: { initialBranding: BrandingStat
         <button
           type="button"
           onClick={generate}
-          disabled={!allPicked || generating}
+          disabled={!anyPicked || generating}
           className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {generating ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
           {generating ? 'Generating…' : 'Generate & apply'}
         </button>
         {generating && (
-          <span className="text-xs text-[var(--text-muted)]">Generating all icon sizes — this takes up to half a minute…</span>
+          <span className="text-xs text-[var(--text-muted)]">Generating icon sizes — this can take up to half a minute…</span>
         )}
-        {!generating && !allPicked && (
-          <span className="text-[11px] text-[var(--text-faint)]">Pick all three images to enable. PNG or WebP, up to 8 MB each.</span>
+        {!generating && !anyPicked && (
+          <span className="text-[11px] text-[var(--text-faint)]">Pick at least one image to enable. PNG or WebP, up to 8 MB each. The Symbol regenerates all favicons &amp; app icons.</span>
         )}
         {gen.state === 'error' && <span className="text-xs text-red-600 dark:text-red-400">{gen.error}</span>}
       </div>

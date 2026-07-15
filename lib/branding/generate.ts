@@ -3,9 +3,10 @@ import JSZip from 'jszip'
 import pngToIco from 'png-to-ico'
 
 export interface GenerateInput {
-  symbol: Buffer
-  wordmark: Buffer
-  lockup: Buffer
+  /** Any subset — only the provided masters are (re)generated. At least one required. */
+  symbol?: Buffer
+  wordmark?: Buffer
+  lockup?: Buffer
   /** solid background for icons, hex like '#0e1016' (app chrome colour) */
   chromeHex: string
 }
@@ -18,7 +19,10 @@ export interface GeneratedAsset {
 
 export interface GenerateResult {
   web: GeneratedAsset[]
-  zip: Buffer
+  /** The repo + Android asset pack. null when no symbol was provided (icons —
+   *  the bulk of the pack — depend on the symbol, so a wordmark/lockup-only
+   *  round keeps the previous pack rather than shipping a near-empty zip). */
+  zip: Buffer | null
 }
 
 const PNG = 'image/png'
@@ -155,89 +159,91 @@ export async function generateBrandAssets(input: GenerateInput): Promise<Generat
   const bgHex = input.chromeHex
   hexToRgb(bgHex) // fail fast on a bad colour before any image work
 
-  const [symbol, wordmark, lockup] = await Promise.all([
-    trimTransparent(input.symbol, 'symbol'),
-    trimTransparent(input.wordmark, 'wordmark'),
-    trimTransparent(input.lockup, 'lockup'),
-  ])
+  if (!input.symbol && !input.wordmark && !input.lockup) {
+    throw new Error('Provide at least one image (symbol, wordmark or lockup)')
+  }
 
-  const [
-    icon192,
-    icon512,
-    icon512Maskable,
-    appleTouch,
-    fav16,
-    fav32,
-    fav48,
-    symbolPng,
-    wordmarkPng,
-    lockupPng,
-  ] = await Promise.all([
-    squareOnBg(symbol, 192, 0.8, bgHex),
-    squareOnBg(symbol, 512, 0.8, bgHex),
-    // Maskable icons get cropped to arbitrary shapes; 66% content keeps the
-    // symbol inside the guaranteed-visible safe zone.
-    squareOnBg(symbol, 512, 0.66, bgHex),
-    squareOnBg(symbol, 180, 0.8, bgHex),
-    // Larger content ratio at tiny sizes so the mark stays legible.
-    squareOnBg(symbol, 16, 0.9, bgHex),
-    squareOnBg(symbol, 32, 0.85, bgHex),
-    squareOnBg(symbol, 48, 0.85, bgHex),
-    sharp(symbol).resize(512, 512, { fit: 'inside', withoutEnlargement: true }).png().toBuffer(),
-    // The wordmark is white-on-transparent: flattening would make it invisible
-    // on white, so alpha is always preserved.
-    sharp(wordmark).resize({ height: 120 }).png().toBuffer(),
-    sharp(lockup).resize({ width: 1200, withoutEnlargement: true }).png().toBuffer(),
-  ])
-
-  const faviconIco = await pngToIco([fav16, fav32, fav48])
-
-  // Android launcher set, one trio per density bucket.
-  const androidFiles = (
-    await Promise.all(
-      ANDROID_DENSITIES.map(async (d) => {
-        const launcher = await squareOnBg(symbol, d.launcher, 0.8, bgHex)
-        const [round, foreground] = await Promise.all([
-          circleCrop(launcher, d.launcher),
-          // Adaptive icons mask away the outer third; ~44% content sits well
-          // inside the 66-of-108dp safe zone.
-          squareTransparent(symbol, d.foreground, 0.44),
-        ])
-        return [
-          { path: `android/res/mipmap-${d.name}/ic_launcher.png`, data: launcher },
-          { path: `android/res/mipmap-${d.name}/ic_launcher_round.png`, data: round },
-          { path: `android/res/mipmap-${d.name}/ic_launcher_foreground.png`, data: foreground },
-        ]
-      })
-    )
-  ).flat()
-
-  const web: GeneratedAsset[] = [
-    { key: 'icon-192.png', contentType: PNG, data: icon192 },
-    { key: 'icon-512.png', contentType: PNG, data: icon512 },
-    { key: 'icon-512-maskable.png', contentType: PNG, data: icon512Maskable },
-    { key: 'apple-touch-icon.png', contentType: PNG, data: appleTouch },
-    { key: 'favicon-16.png', contentType: PNG, data: fav16 },
-    { key: 'favicon-32.png', contentType: PNG, data: fav32 },
-    { key: 'favicon.ico', contentType: ICO, data: faviconIco },
-    { key: 'symbol.png', contentType: PNG, data: symbolPng },
-    { key: 'wordmark.png', contentType: PNG, data: wordmarkPng },
-    { key: 'lockup.png', contentType: PNG, data: lockupPng },
-  ]
-
+  const web: GeneratedAsset[] = []
   const zip = new JSZip()
-  zip.file('README.md', buildReadme())
-  zip.file('web/public/icon-192.png', icon192)
-  zip.file('web/public/icon-512.png', icon512)
-  zip.file('web/app/favicon.ico', faviconIco)
-  zip.file('web/app/icon.png', icon512)
-  zip.file('web/app/apple-icon.png', appleTouch)
-  zip.file('brand/motiv-symbol.png', symbolPng)
-  zip.file('brand/motiv-wordmark.png', wordmarkPng)
-  zip.file('brand/motiv-lockup.png', lockupPng)
-  for (const f of androidFiles) zip.file(f.path, f.data)
+  let wroteZip = false
 
-  const zipBuffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' })
+  // ── Symbol → every icon/favicon/launcher + symbol.png + the repo/Android pack ──
+  if (input.symbol) {
+    const symbol = await trimTransparent(input.symbol, 'symbol')
+    const [icon192, icon512, icon512Maskable, appleTouch, fav16, fav32, fav48, symbolPng] = await Promise.all([
+      squareOnBg(symbol, 192, 0.8, bgHex),
+      squareOnBg(symbol, 512, 0.8, bgHex),
+      // Maskable icons get cropped to arbitrary shapes; 66% content keeps the
+      // symbol inside the guaranteed-visible safe zone.
+      squareOnBg(symbol, 512, 0.66, bgHex),
+      squareOnBg(symbol, 180, 0.8, bgHex),
+      // Larger content ratio at tiny sizes so the mark stays legible.
+      squareOnBg(symbol, 16, 0.9, bgHex),
+      squareOnBg(symbol, 32, 0.85, bgHex),
+      squareOnBg(symbol, 48, 0.85, bgHex),
+      sharp(symbol).resize(512, 512, { fit: 'inside', withoutEnlargement: true }).png().toBuffer(),
+    ])
+    const faviconIco = await pngToIco([fav16, fav32, fav48])
+
+    // Android launcher set, one trio per density bucket.
+    const androidFiles = (
+      await Promise.all(
+        ANDROID_DENSITIES.map(async (d) => {
+          const launcher = await squareOnBg(symbol, d.launcher, 0.8, bgHex)
+          const [round, foreground] = await Promise.all([
+            circleCrop(launcher, d.launcher),
+            // Adaptive icons mask away the outer third; ~44% content sits well
+            // inside the 66-of-108dp safe zone.
+            squareTransparent(symbol, d.foreground, 0.44),
+          ])
+          return [
+            { path: `android/res/mipmap-${d.name}/ic_launcher.png`, data: launcher },
+            { path: `android/res/mipmap-${d.name}/ic_launcher_round.png`, data: round },
+            { path: `android/res/mipmap-${d.name}/ic_launcher_foreground.png`, data: foreground },
+          ]
+        })
+      )
+    ).flat()
+
+    web.push(
+      { key: 'icon-192.png', contentType: PNG, data: icon192 },
+      { key: 'icon-512.png', contentType: PNG, data: icon512 },
+      { key: 'icon-512-maskable.png', contentType: PNG, data: icon512Maskable },
+      { key: 'apple-touch-icon.png', contentType: PNG, data: appleTouch },
+      { key: 'favicon-16.png', contentType: PNG, data: fav16 },
+      { key: 'favicon-32.png', contentType: PNG, data: fav32 },
+      { key: 'favicon.ico', contentType: ICO, data: faviconIco },
+      { key: 'symbol.png', contentType: PNG, data: symbolPng },
+    )
+
+    zip.file('README.md', buildReadme())
+    zip.file('web/public/icon-192.png', icon192)
+    zip.file('web/public/icon-512.png', icon512)
+    zip.file('web/app/favicon.ico', faviconIco)
+    zip.file('web/app/icon.png', icon512)
+    zip.file('web/app/apple-icon.png', appleTouch)
+    zip.file('brand/motiv-symbol.png', symbolPng)
+    for (const f of androidFiles) zip.file(f.path, f.data)
+    wroteZip = true
+  }
+
+  // ── Wordmark → wordmark.png (white-on-transparent; alpha always preserved) ──
+  if (input.wordmark) {
+    const wordmark = await trimTransparent(input.wordmark, 'wordmark')
+    const wordmarkPng = await sharp(wordmark).resize({ height: 120 }).png().toBuffer()
+    web.push({ key: 'wordmark.png', contentType: PNG, data: wordmarkPng })
+    if (wroteZip) zip.file('brand/motiv-wordmark.png', wordmarkPng)
+  }
+
+  // ── Lockup → lockup.png (login hero) ──
+  if (input.lockup) {
+    const lockup = await trimTransparent(input.lockup, 'lockup')
+    const lockupPng = await sharp(lockup).resize({ width: 1200, withoutEnlargement: true }).png().toBuffer()
+    web.push({ key: 'lockup.png', contentType: PNG, data: lockupPng })
+    if (wroteZip) zip.file('brand/motiv-lockup.png', lockupPng)
+  }
+
+  const zipBuffer = wroteZip ? await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' }) : null
 
   return { web, zip: zipBuffer }
 }
