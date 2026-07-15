@@ -45,7 +45,7 @@ interface Detail {
 const SEL_CLS = 'appearance-none rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm pl-3 pr-8 py-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/40'
 function Select({ value, onChange, ariaLabel, children }: { value: string; onChange: (v: string) => void; ariaLabel: string; children: React.ReactNode }) {
   return (
-    <div className="relative">
+    <div className="relative shrink-0">
       <select aria-label={ariaLabel} value={value} onChange={e => onChange(e.target.value)} className={SEL_CLS}>{children}</select>
       <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
     </div>
@@ -151,11 +151,14 @@ export function RegionalSuppliersTable({ suppliers }: { suppliers: Row[] }) {
       <Card className="overflow-hidden">
         {/* Toolbar */}
         <div className="flex flex-wrap items-center gap-2 border-b border-[var(--border)] p-3">
-          <div className="relative min-w-[180px] flex-1">
+          <div className="relative w-full sm:w-auto sm:min-w-[180px] sm:flex-1">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
             <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search suppliers…"
               className="w-full rounded-xl bg-[var(--input-bg)] py-2 pl-9 pr-3 text-sm text-[var(--text)] ring-1 ring-[var(--border)] placeholder-[var(--text-faint)] focus:outline-none focus:ring-2 focus:ring-blue-500/40" />
           </div>
+          {/* Mobile: selects form one swipeable strip; sm:contents restores the
+              flex-wrap desktop layout. */}
+          <div className="flex w-full flex-nowrap items-center gap-2 overflow-x-auto pb-0.5 sm:contents">
           <Select ariaLabel="Filter by status" value={status} onChange={v => setStatus(v as 'all' | Bucket)}>
             <option value="all">Status: All</option><option value="healthy">Healthy</option><option value="at_risk">At risk</option><option value="critical">Critical</option>
           </Select>
@@ -167,10 +170,11 @@ export function RegionalSuppliersTable({ suppliers }: { suppliers: Row[] }) {
             <option value="all">Performance: All</option><option value="high">90%+</option><option value="mid">70–89%</option><option value="low">Below 70%</option>
           </Select>
           {activeFilters > 0 && (
-            <button onClick={() => { setStatus('all'); setCat('all'); setPerfF('all') }} className="flex items-center gap-1.5 rounded-xl px-2.5 py-2 text-sm text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)]">
+            <button onClick={() => { setStatus('all'); setCat('all'); setPerfF('all') }} className="flex shrink-0 items-center gap-1.5 rounded-xl px-2.5 py-2 text-sm text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)]">
               <X size={13} /> Clear <span className="rounded-md bg-blue-500/15 px-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400">{activeFilters}</span>
             </button>
           )}
+          </div>
         </div>
 
         {/* Desktop / tablet — full table */}
@@ -227,7 +231,8 @@ export function RegionalSuppliersTable({ suppliers }: { suppliers: Row[] }) {
                     <div className="flex min-w-0 items-center gap-3">
                       <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-blue-600/15 text-[11px] font-bold text-blue-700 dark:text-blue-300">{initials(s.name)}</span>
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-[var(--text)]">{s.name}</p>
+                        {/* Mobile-only card (ul is md:hidden) — let the name wrap. */}
+                        <p className="line-clamp-2 break-words text-sm font-semibold text-[var(--text)]">{s.name}</p>
                         {s.category && <p className="truncate text-[11px] text-[var(--text-muted)]">{s.category}</p>}
                       </div>
                     </div>
@@ -261,8 +266,9 @@ export function RegionalSuppliersTable({ suppliers }: { suppliers: Row[] }) {
           <div className="flex flex-wrap items-center justify-end gap-1.5">
             <span className="mr-1 hidden text-xs text-[var(--text-faint)] tabular-nums sm:inline">{firstShown}–{lastShown} of {filtered.length}</span>
             <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={curPage <= 1} aria-label="Previous page" className="rounded-lg p-1.5 text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-40"><ChevronLeft size={15} /></button>
+            <span className="text-xs text-[var(--text-muted)] tabular-nums sm:hidden">{curPage} / {totalPages}</span>
             {pageNums.map(p => (
-              <button key={p} onClick={() => setPage(p)} aria-current={p === curPage} className={`min-w-8 rounded-lg px-2.5 py-1.5 text-sm font-semibold tabular-nums transition ${p === curPage ? 'bg-blue-600 text-white' : 'text-[var(--text-muted)] ring-1 ring-[var(--border)] hover:bg-[var(--hover)]'}`}>{p}</button>
+              <button key={p} onClick={() => setPage(p)} aria-current={p === curPage} className={`hidden sm:inline-flex min-w-8 justify-center rounded-lg px-2.5 py-1.5 text-sm font-semibold tabular-nums transition ${p === curPage ? 'bg-blue-600 text-white' : 'text-[var(--text-muted)] ring-1 ring-[var(--border)] hover:bg-[var(--hover)]'}`}>{p}</button>
             ))}
             <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={curPage >= totalPages} aria-label="Next page" className="rounded-lg p-1.5 text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-40"><ChevronRight size={15} /></button>
           </div>
@@ -297,12 +303,12 @@ export function RegionalSuppliersTable({ suppliers }: { suppliers: Row[] }) {
 
 function SupKpi({ icon, wrap, value, label, hint, tone }: { icon: React.ReactNode; wrap: string; value: React.ReactNode; label: string; hint?: string; tone?: string }) {
   return (
-    <div className="flex items-start gap-3 rounded-2xl bg-[var(--surface)] p-4 ring-1 ring-[var(--border)]">
-      <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${wrap}`}>{icon}</span>
+    <div className="flex items-start gap-2.5 rounded-2xl bg-[var(--surface)] p-3 ring-1 ring-[var(--border)] sm:gap-3 sm:p-4">
+      <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl sm:h-11 sm:w-11 ${wrap}`}>{icon}</span>
       <div className="min-w-0">
-        <div className={`text-2xl font-bold leading-tight ${tone ?? 'text-[var(--text)]'}`}>{value}</div>
-        <div className="truncate text-xs font-medium text-[var(--text-muted)]">{label}</div>
-        {hint && <div className="mt-0.5 truncate text-[11px] text-[var(--text-faint)]">{hint}</div>}
+        <div className={`text-xl font-bold leading-tight sm:text-2xl ${tone ?? 'text-[var(--text)]'}`}>{value}</div>
+        <div className="line-clamp-2 text-xs font-medium text-[var(--text-muted)] sm:line-clamp-none sm:truncate">{label}</div>
+        {hint && <div className="mt-0.5 hidden truncate text-[11px] text-[var(--text-faint)] sm:block">{hint}</div>}
       </div>
     </div>
   )

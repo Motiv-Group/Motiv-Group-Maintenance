@@ -54,7 +54,9 @@ export function MoreMenu({ children, fullWidth = false, label = 'More', up = fal
           <button aria-hidden tabIndex={-1} onClick={() => setOpen(false)} className="fixed inset-0 z-10 cursor-default" />
           {/* `up` opens above the trigger — used inside pop-ups where a downward menu
               would be clipped by the scrollable modal body. */}
-          <div role="menu" onClick={() => setOpen(false)} className={`absolute z-20 ${align === 'left' ? 'left-0' : 'right-0'} ${up ? 'bottom-full mb-2' : 'mt-2'} w-64 max-w-[calc(100vw-2.5rem)] rounded-xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] shadow-lg shadow-black/20 p-1.5 space-y-0.5`}>
+          {/* Base always pins to the right edge (a left-aligned 256px menu walks off a
+              phone screen); `align` is honoured from sm up. */}
+          <div role="menu" onClick={() => setOpen(false)} className={`absolute z-20 ${align === 'left' ? 'right-0 sm:left-0 sm:right-auto' : 'right-0'} ${up ? 'bottom-full mb-2' : 'mt-2'} w-64 max-w-[calc(100vw-2.5rem)] rounded-xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] shadow-lg shadow-black/20 p-1.5 space-y-0.5`}>
             {children}
           </div>
         </>
@@ -1118,7 +1120,8 @@ function DocRow({ ticketId, url, itemType, itemLabel, uploadedAt, viewLabel }: {
       <span className="flex min-w-0 items-center gap-3">
         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-red-500/15 text-red-600 dark:text-red-400"><FileText size={18} /></span>
         <span className="min-w-0">
-          <span className="block truncate text-sm font-semibold text-[var(--text)]">{docName(url, itemLabel)}</span>
+          {/* Wraps to two lines on phones so the filename stays readable. */}
+          <span className="line-clamp-2 break-all text-sm font-semibold text-[var(--text)] sm:line-clamp-none sm:block sm:truncate">{docName(url, itemLabel)}</span>
           <span className="block text-[11px] text-[var(--text-faint)]">Uploaded {formatDateTime(uploadedAt)}</span>
         </span>
       </span>

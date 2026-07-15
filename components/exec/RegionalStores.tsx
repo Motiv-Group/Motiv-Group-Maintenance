@@ -44,7 +44,7 @@ const SEL_CLS = 'appearance-none rounded-xl bg-[var(--input-bg)] ring-1 ring-[va
 /** Styled native <select> with a chevron — used across the Stores toolbar + pager. */
 function Select({ value, onChange, ariaLabel, children }: { value: string; onChange: (v: string) => void; ariaLabel: string; children: React.ReactNode }) {
   return (
-    <div className="relative">
+    <div className="relative shrink-0">
       <select aria-label={ariaLabel} value={value} onChange={e => onChange(e.target.value)} className={SEL_CLS}>{children}</select>
       <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
     </div>
@@ -164,8 +164,9 @@ export function RegionalStores({ stores, archived = [], companyName = '' }: { st
 
   return (
     <div className="space-y-5">
-      {/* Header — title, subtitle, Export + Add Store */}
-      <div className="flex items-start justify-between gap-3">
+      {/* Header — title, subtitle, Export + Add Store. Stacks on phones (the two
+          buttons claim ~215px of the row). */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-[var(--text)]">Stores</h1>
           <p className="mt-0.5 text-sm text-[var(--text-muted)]">All {counts.all} store{counts.all === 1 ? '' : 's'} ranked by highest attention first.</p>
@@ -206,11 +207,14 @@ export function RegionalStores({ stores, archived = [], companyName = '' }: { st
       <Card className="overflow-hidden">
         {/* Toolbar */}
         <div className="flex flex-wrap items-center gap-2 border-b border-[var(--border)] p-3">
-          <div className="relative min-w-[180px] flex-1">
+          <div className="relative w-full sm:w-auto sm:min-w-[180px] sm:flex-1">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
             <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search stores…"
               className="w-full rounded-xl bg-[var(--input-bg)] py-2 pl-9 pr-3 text-sm text-[var(--text)] ring-1 ring-[var(--border)] placeholder-[var(--text-faint)] focus:outline-none focus:ring-2 focus:ring-blue-500/40" />
           </div>
+          {/* Mobile: selects form one swipeable strip; sm:contents restores the
+              flex-wrap desktop layout. */}
+          <div className="flex w-full flex-nowrap items-center gap-2 overflow-x-auto pb-0.5 sm:contents">
           <Select ariaLabel="Filter by status" value={bucket} onChange={v => setBucket(v as 'all' | Bucket)}>
             <option value="all">Status</option><option value="critical">Critical</option><option value="attention">Attention</option><option value="healthy">Controlled</option>
           </Select>
@@ -223,6 +227,7 @@ export function RegionalStores({ stores, archived = [], companyName = '' }: { st
           <Select ariaLabel="Sort by" value={sort} onChange={v => setSort(v as typeof sort)}>
             <option value="attention">Sort: Attention</option><option value="health">Sort: Health</option><option value="open">Sort: Open</option><option value="overdue">Sort: Overdue</option><option value="exposure">Sort: Exposure</option><option value="name">Sort: Name</option>
           </Select>
+          </div>
         </div>
 
         {/* Desktop / tablet — full table */}
@@ -271,7 +276,8 @@ export function RegionalStores({ stores, archived = [], companyName = '' }: { st
                 <button onClick={() => { setSelId(s.storeId); setOpen(true) }} className="w-full p-3 pr-10 text-left transition hover:bg-[var(--hover)]">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-[var(--text)]"><span className="text-[var(--text-faint)]">#{(curPage - 1) * perPage + i + 1}</span> {s.storeName}{s.branchCode && <span className="ml-1.5 font-mono text-[11px] text-[var(--text-faint)]">{s.branchCode}</span>}</p>
+                      {/* Mobile-only card (ul is md:hidden) — let the name wrap. */}
+                      <p className="line-clamp-2 break-words text-sm font-semibold text-[var(--text)]"><span className="text-[var(--text-faint)]">#{(curPage - 1) * perPage + i + 1}</span> {s.storeName}{s.branchCode && <span className="ml-1.5 font-mono text-[11px] text-[var(--text-faint)]">{s.branchCode}</span>}</p>
                       <p className="mt-0.5 truncate text-[11px] text-[var(--text-faint)]">{s.mainIssue}</p>
                     </div>
                     <span className="flex shrink-0 flex-col items-end gap-1">
@@ -307,8 +313,9 @@ export function RegionalStores({ stores, archived = [], companyName = '' }: { st
           <div className="flex flex-wrap items-center justify-end gap-1.5">
             <span className="mr-1 hidden text-xs text-[var(--text-faint)] tabular-nums sm:inline">{firstShown}–{lastShown} of {filtered.length}</span>
             <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={curPage <= 1} aria-label="Previous page" className="rounded-lg p-1.5 text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-40"><ChevronLeft size={15} /></button>
+            <span className="text-xs text-[var(--text-muted)] tabular-nums sm:hidden">{curPage} / {totalPages}</span>
             {pageNums.map(p => (
-              <button key={p} onClick={() => setPage(p)} aria-current={p === curPage} className={`min-w-8 rounded-lg px-2.5 py-1.5 text-sm font-semibold tabular-nums transition ${p === curPage ? 'bg-blue-600 text-white' : 'text-[var(--text-muted)] ring-1 ring-[var(--border)] hover:bg-[var(--hover)]'}`}>{p}</button>
+              <button key={p} onClick={() => setPage(p)} aria-current={p === curPage} className={`hidden sm:inline-flex min-w-8 justify-center rounded-lg px-2.5 py-1.5 text-sm font-semibold tabular-nums transition ${p === curPage ? 'bg-blue-600 text-white' : 'text-[var(--text-muted)] ring-1 ring-[var(--border)] hover:bg-[var(--hover)]'}`}>{p}</button>
             ))}
             <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={curPage >= totalPages} aria-label="Next page" className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-40"><span className="hidden sm:inline">Next</span> <ChevronRight size={14} /></button>
           </div>

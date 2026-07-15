@@ -28,8 +28,9 @@ export function AnimatedBar({
       <div className="flex items-end justify-between mb-2">
         <span className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">{label}</span>
         <span className="flex items-baseline gap-2">
-          {stage && <span className="text-xs font-medium text-[var(--text-muted)]">{stage}</span>}
-          <span className="text-2xl font-bold tabular-nums text-[var(--text)]">{pct}%</span>
+          {/* Stage word is sm+ — the uppercase label + % already fill a phone row. */}
+          {stage && <span className="hidden text-xs font-medium text-[var(--text-muted)] sm:inline">{stage}</span>}
+          <span className="text-xl font-bold tabular-nums text-[var(--text)] sm:text-2xl">{pct}%</span>
         </span>
       </div>
       <div className="w-full rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden" style={{ height }}>

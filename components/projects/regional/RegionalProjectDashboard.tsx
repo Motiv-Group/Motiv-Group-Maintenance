@@ -107,27 +107,32 @@ export function RegionalProjectDashboard({ project, summary, stores }: { project
 
       {/* Store section */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 min-w-[200px]">
+        <div className="relative w-full sm:w-auto sm:flex-1 sm:min-w-[200px]">
           <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
           <input className="w-full rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] pl-8 pr-3 py-2 text-sm text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-blue-500/50" placeholder="Search store, branch, town…" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
-        <select className="rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] px-3 py-2 text-sm text-[var(--text)]" value={status} onChange={(e) => setStatus(e.target.value as StatusFilter)}>
+        {/* Mobile: controls share one row under the search; sm:contents restores
+            the flex-wrap desktop layout. */}
+        <div className="flex w-full items-center gap-2 sm:contents">
+        <select className="min-w-0 flex-1 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] px-3 py-2 text-sm text-[var(--text)] sm:flex-none" value={status} onChange={(e) => setStatus(e.target.value as StatusFilter)}>
           <option value="all">All statuses</option>
           <option value="not_started">Not started</option>
           <option value="in_progress">In progress</option>
           <option value="complete">Complete</option>
           <option value="overdue">Overdue</option>
         </select>
-        <select className="rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] px-3 py-2 text-sm text-[var(--text)]" value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
+        <select className="min-w-0 flex-1 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] px-3 py-2 text-sm text-[var(--text)] sm:flex-none" value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
           <option value="branch">Sort: Branch</option>
           <option value="name">Sort: Name</option>
           <option value="progress">Sort: Completion</option>
           <option value="start">Sort: Start date</option>
           <option value="end">Sort: End date</option>
         </select>
-        <div className="flex rounded-lg ring-1 ring-[var(--border)] overflow-hidden">
+        {/* View toggle is sm+ — phones always see cards (the table needs ~470px). */}
+        <div className="hidden rounded-lg ring-1 ring-[var(--border)] overflow-hidden sm:flex">
           <button onClick={() => setView('cards')} className={`p-2 ${view === 'cards' ? 'bg-blue-600 text-white' : 'text-[var(--text-muted)] hover:bg-[var(--hover)]'}`}><LayoutGrid size={15} /></button>
           <button onClick={() => setView('table')} className={`p-2 ${view === 'table' ? 'bg-blue-600 text-white' : 'text-[var(--text-muted)] hover:bg-[var(--hover)]'}`}><Table2 size={15} /></button>
+        </div>
         </div>
       </div>
 

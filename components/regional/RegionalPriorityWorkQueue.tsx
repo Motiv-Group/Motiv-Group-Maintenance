@@ -196,21 +196,21 @@ function QueueRow({ ticket, nowMs, suppliers, motivSuppliers }: { ticket: Region
       <div className="flex lg:justify-end">
         {ticket.disputed ? (
           <DisputeReviewButton ticketId={ticket.id} viewerRole="regional_manager"
-            trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}>View dispute</button>} />
+            trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}>View Dispute</button>} />
         ) : reviewQuote ? (
           <QuoteReviewButton ticketId={ticket.id}
-            trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}>Approve quote</button>} />
+            trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}>Approve Quote</button>} />
         ) : reviewSignoff ? (
           <SignoffReviewButton ticketId={ticket.id}
             trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}><ClipboardCheck size={15} /> Sign-Off</button>} />
         ) : assignable ? (
           <AssignSuppliersButton ticketId={ticket.id} suppliers={suppliers} motivSuppliers={motivSuppliers}
             awaitingById={ticket.engagedSupplierIds} declinedSupplierIds={ticket.declinedSupplierIds}
-            trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}>Assign supplier</button>} />
+            trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}>Assign Supplier</button>} />
         ) : closeout ? (
           ticket.voNoneConfirmed
             ? <CloseOutConfirm ticketId={ticket.id} storeName={ticket.storeName} category={ticket.category || ticket.title} className={closeoutCls} />
-            : <span className={`${closeoutCls} opacity-50 pointer-events-none`} aria-disabled="true">Close-out</span>
+            : <span className={`${closeoutCls} opacity-50 pointer-events-none`} aria-disabled="true">Close-Out</span>
         ) : (
           <Link href={ticketUrl} className={ctaCls}>View Ticket <ArrowRight size={15} /></Link>
         )}
@@ -274,7 +274,7 @@ function CloseOutConfirm({ ticketId, storeName, category, className }: { ticketI
   }
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={className}>Close-out <ArrowRight size={15} /></button>
+      <button type="button" onClick={() => setOpen(true)} className={className}>Close-Out <ArrowRight size={15} /></button>
       {open && (
         <Modal onClose={() => { if (!busy) setOpen(false) }} maxWidth="max-w-lg">
           {close => (

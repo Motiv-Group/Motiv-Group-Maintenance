@@ -129,7 +129,7 @@ export function QuoteSummary({ quote, status, title, schedule, collapsible = fal
           <div className={LABEL}>Attachment</div>
           <div className="mt-1.5">
             {attName
-              ? fileLink(<><FileText size={14} className="shrink-0" /><span className="min-w-0 truncate">{attName}</span></>, 'inline-flex max-w-full min-w-0 items-center gap-1.5 rounded-lg bg-blue-500/10 px-2.5 py-1.5 text-sm font-medium text-blue-600 ring-1 ring-blue-500/25 transition hover:bg-blue-500/15 dark:text-blue-400')
+              ? fileLink(<><FileText size={14} className="mt-0.5 shrink-0" /><span className="min-w-0 line-clamp-2 break-all sm:line-clamp-none sm:truncate">{attName}</span></>, 'inline-flex max-w-full min-w-0 items-start gap-1.5 rounded-lg bg-blue-500/10 px-2.5 py-1.5 text-sm font-medium text-blue-600 ring-1 ring-blue-500/25 transition hover:bg-blue-500/15 dark:text-blue-400 sm:items-center')
               : <span className="text-sm text-[var(--text-faint)]">—</span>}
           </div>
         </div>

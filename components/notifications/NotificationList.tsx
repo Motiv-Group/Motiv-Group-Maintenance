@@ -121,11 +121,12 @@ export function NotificationList({ initial }: { initial?: Notification[] } = {})
         ))}
       </div>
 
+      {/* Mobile: one swipeable chip row instead of 3-4 wrapped rows; sm+ wraps. */}
       {types.length > 2 && (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-nowrap gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
           {types.map(t => (
             <button key={t} onClick={() => setTypeFilter(t)}
-              className={`rounded-full border px-3 py-1 text-xs transition ${typeFilter === t ? 'border-[var(--text-muted)] bg-[var(--text-muted)] text-[var(--surface)]' : 'border-[var(--border)] text-[var(--text-faint)] hover:text-[var(--text)]'}`}>
+              className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1 text-xs transition ${typeFilter === t ? 'border-[var(--text-muted)] bg-[var(--text-muted)] text-[var(--surface)]' : 'border-[var(--border)] text-[var(--text-faint)] hover:text-[var(--text)]'}`}>
               {t === 'all' ? 'All types' : prettyType(t)}
             </button>
           ))}

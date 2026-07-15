@@ -200,7 +200,7 @@ function QueueRow({ ticket, nowMs, company }: { ticket: SupplierTicketRow; nowMs
 
       <div className="flex lg:justify-end">
         {cta === 'View dispute'
-          ? <DisputeReviewButton ticketId={ticket.id} viewerRole="supplier" trigger={open => <button type="button" onClick={open} className={ctaCls}>View dispute</button>} />
+          ? <DisputeReviewButton ticketId={ticket.id} viewerRole="supplier" trigger={open => <button type="button" onClick={open} className={ctaCls}>View Dispute</button>} />
           : toQuote(ticket)
           ? <SubmitQuoteCta ticket={ticket} className={ctaCls} />
           : closeout && !ticket.voNoneConfirmed
@@ -223,7 +223,7 @@ function SubmitQuoteCta({ ticket, className }: { ticket: SupplierTicketRow; clas
   const [open, setOpen] = useState(false)
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={className}>Submit quote</button>
+      <button type="button" onClick={() => setOpen(true)} className={className}>Submit Quote</button>
       {open && (
         <Modal onClose={() => setOpen(false)} maxWidth="max-w-3xl">
           {close => <div><SendQuoteForm defaultOpen competitive ticketId={ticket.id} priority={String(ticket.priority)} createdAt={ticket.createdAt} onClose={close} /></div>}
@@ -250,7 +250,7 @@ function MarkInProgressCta({ ticket, className }: { ticket: SupplierTicketRow; c
   }
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={className}>Mark in progress</button>
+      <button type="button" onClick={() => setOpen(true)} className={className}>Mark In Progress</button>
       {open && (
         <Modal onClose={() => setOpen(false)} maxWidth="max-w-md">
           {close => (
@@ -279,7 +279,7 @@ function UploadEvidenceCta({ ticket, className }: { ticket: SupplierTicketRow; c
   const evidenceRequested = ticket.status === 'evidence_requested'
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={className}>Upload evidence</button>
+      <button type="button" onClick={() => setOpen(true)} className={className}>Upload Evidence</button>
       {open && (
         <Modal onClose={() => setOpen(false)} maxWidth="max-w-2xl">
           {close => <SubmitCompletionForm defaultOpen ticketId={ticket.id} evidenceRequested={evidenceRequested} requireBoth={!evidenceRequested} onClose={close} />}
@@ -297,7 +297,7 @@ function ViewSnagCta({ ticket, className, company }: { ticket: SupplierTicketRow
   const store = ticket.isIndividual ? 'Individual' : [company, ticket.storeName, ticket.branchCode].filter(Boolean).join(' · ')
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={className}>View snag</button>
+      <button type="button" onClick={() => setOpen(true)} className={className}>View Snag</button>
       {open && (
         <Modal onClose={() => setOpen(false)} maxWidth="max-w-2xl">
           {close => (

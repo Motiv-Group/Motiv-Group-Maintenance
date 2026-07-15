@@ -101,7 +101,8 @@ function FeaturedCard({ f }: { f: Featured }) {
         <div className="relative space-y-4">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <h2 className="text-xl font-bold truncate">{project.name}</h2>
+              {/* Two lines on phones; one truncated line from sm up. */}
+              <h2 className="text-xl font-bold line-clamp-2 sm:line-clamp-1">{project.name}</h2>
               <p className="text-xs text-white/70">{project.client_name ?? ''}</p>
             </div>
             <span className={`shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-white/90 ${PROJECT_STATUS_PILL[s.status].replace(/bg-[^ ]+/, '')}`}>{PROJECT_STATUS_LABELS[s.status]}</span>
@@ -118,9 +119,9 @@ function FeaturedCard({ f }: { f: Featured }) {
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs text-white/80">
-            <span className="flex items-center gap-1.5">
-              <CalendarDays size={13} /> {formatDate(project.start_date) || '—'} → {formatDate(project.end_date) || '—'}
-              {daysLeft != null && <span className="text-white/60"> · {daysLeft >= 0 ? `${daysLeft} days remaining` : `${-daysLeft} days overdue`}</span>}
+            <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+              <span className="flex items-center gap-1.5 whitespace-nowrap"><CalendarDays size={13} /> {formatDate(project.start_date) || '—'} → {formatDate(project.end_date) || '—'}</span>
+              {daysLeft != null && <span className="whitespace-nowrap text-white/60">· {daysLeft >= 0 ? `${daysLeft} days remaining` : `${-daysLeft} days overdue`}</span>}
             </span>
             <span className="flex items-center gap-1 font-semibold text-white group-hover:gap-1.5 transition-all">View Project <ArrowRight size={13} /></span>
           </div>

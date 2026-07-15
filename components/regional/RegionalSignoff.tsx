@@ -27,12 +27,13 @@ const prioTicket = (p: string) => ({ priority: p } as unknown as Parameters<type
 
 function StatCard({ icon, tone, value, title, sub, active, onClick }: { icon: ReactNode; tone: string; value: number; title: string; sub: string; active: boolean; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} aria-pressed={active} className={`flex items-center gap-3 rounded-xl bg-[var(--surface)] p-4 text-left ring-1 transition hover:bg-[var(--hover)] ${active ? 'ring-2 ring-blue-500/50' : 'ring-[var(--border)]'}`}>
-      <span className="shrink-0">{icon}</span>
+    <button type="button" onClick={onClick} aria-pressed={active} className={`flex items-center gap-3 rounded-xl bg-[var(--surface)] p-3 text-left ring-1 transition hover:bg-[var(--hover)] sm:p-4 ${active ? 'ring-2 ring-blue-500/50' : 'ring-[var(--border)]'}`}>
+      {/* Icon chip is sm+ — the compact 3-up mobile grid has no room for it. */}
+      <span className="hidden shrink-0 sm:block">{icon}</span>
       <span className="min-w-0">
-        <span className="block text-2xl font-bold leading-none text-[var(--text)]">{value}</span>
-        <span className="mt-1 block text-sm font-semibold text-[var(--text)]">{title}</span>
-        <span className="block text-[11px] text-[var(--text-muted)]">{sub}</span>
+        <span className="block text-xl font-bold leading-none text-[var(--text)] sm:text-2xl">{value}</span>
+        <span className="mt-1 block text-xs font-semibold text-[var(--text)] sm:text-sm">{title}</span>
+        <span className="hidden text-[11px] text-[var(--text-muted)] sm:block">{sub}</span>
       </span>
     </button>
   )
@@ -110,23 +111,26 @@ export function RegionalSignoff({ signoffs }: { signoffs: RegionalSignoffRow[] }
         </Card>
       )}
 
-      {/* Stat cards */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {/* Stat cards — compact 3-up on phones. */}
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-2 sm:gap-3 lg:grid-cols-3">
         <StatCard icon={<span className="grid h-11 w-11 place-items-center rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400"><Clock size={20} /></span>} tone="border-blue-500" value={stats.review} title="Awaiting review" sub="Action required" active={statusF === 'review'} onClick={() => { setStatusF(f => f === 'review' ? 'all' : 'review'); setPage(1) }} />
         <StatCard icon={<span className="grid h-11 w-11 place-items-center rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400"><CheckCircle2 size={20} /></span>} tone="border-amber-500" value={stats.evidence} title="Evidence pending" sub="Awaiting the supplier" active={statusF === 'evidence'} onClick={() => { setStatusF(f => f === 'evidence' ? 'all' : 'evidence'); setPage(1) }} />
         <StatCard icon={<span className="grid h-11 w-11 place-items-center rounded-full bg-[var(--surface-2)] text-[var(--text-muted)]"><ClipboardCheck size={20} /></span>} tone="border-[var(--border)]" value={stats.total} title="In sign-off" sub="Total open" active={statusF === 'all'} onClick={() => { setStatusF('all'); setPage(1) }} />
       </div>
 
-      {/* Filter bar */}
+      {/* Filter bar — phones: full-width search + a 2-col grid of controls;
+          sm:contents dissolves the grid so desktop keeps the flex-wrap row. */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[220px] flex-1">
+        <div className="relative w-full sm:w-auto sm:min-w-[220px] sm:flex-1">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
           <input value={q} onChange={e => { setQ(e.target.value); setPage(1) }} placeholder="Search by store, supplier, ticket ID or category…" className="w-full rounded-xl bg-[var(--input-bg)] py-2.5 pl-9 pr-3 text-sm text-[var(--text)] ring-1 ring-[var(--border)] outline-none placeholder-[var(--text-faint)] focus:ring-blue-500/40" />
         </div>
+        <div className="grid w-full grid-cols-2 gap-2 sm:contents">
         <Select label="Store" value={store} onChange={v => { setStore(v); setPage(1) }} options={[{ value: 'all', label: 'All stores' }, ...storeNames.map(s => ({ value: s, label: s }))]} />
         <Select label="Status" value={statusF} onChange={v => { setStatusF(v); setPage(1) }} options={[{ value: 'all', label: 'All statuses' }, { value: 'review', label: 'Awaiting review' }, { value: 'evidence', label: 'Evidence pending' }]} />
         <Select label="Sort by" value={sort} onChange={setSort} options={[{ value: 'newest', label: 'Newest first' }, { value: 'oldest', label: 'Oldest first' }]} />
-        <button type="button" onClick={clear} className="flex items-center gap-1.5 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)]"><X size={15} /> Clear filters</button>
+        <button type="button" onClick={clear} className="flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)]"><X size={15} /> Clear filters</button>
+        </div>
       </div>
 
       {!groups.length && (
@@ -176,7 +180,9 @@ export function RegionalSignoff({ signoffs }: { signoffs: RegionalSignoffRow[] }
                           <p className="flex items-center gap-1.5 text-sm text-[var(--text-muted)]"><ImageIcon size={13} className="shrink-0 text-[var(--text-faint)]" /> {s.photoCount} photo{s.photoCount === 1 ? '' : 's'}</p>
                           <p className="flex items-center gap-1.5 text-sm text-[var(--text-muted)]"><FileText size={13} className="shrink-0 text-[var(--text-faint)]" /> {s.certCount} certificate{s.certCount === 1 ? '' : 's'}</p>
                         </div>
-                        <div className="min-w-0">
+                        {/* Boilerplate next-step copy is lg+ (its own grid column) —
+                            on phones the phase badge already carries the state. */}
+                        <div className="hidden min-w-0 lg:block">
                           <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-faint)]">Next step</p>
                           <p className="text-sm text-[var(--text)]">{p === 'evidence' ? 'Awaiting the supplier to add the requested evidence.' : 'Review the COC & POC and approve, request evidence, or snag.'}</p>
                         </div>
