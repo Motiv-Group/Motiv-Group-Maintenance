@@ -9,6 +9,8 @@ import { PhotoThumbs } from '@/components/ui/PhotoThumbs'
 import { createAdminClient } from '@/lib/supabase/server'
 import { signedUrl, signManyUrls } from '@/lib/storage'
 import { requireSupplierV3 } from '@/lib/health/guard'
+import { TicketChatIcon } from '@/components/chat/TicketChat'
+import { ticketChatUnread } from '@/lib/chat-unread'
 import { loadSlaResolver } from '@/lib/health/data'
 import { deriveDueDates } from '@/lib/health/priority'
 import { computeTicketSla } from '@/lib/health/sla'
@@ -196,6 +198,8 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
   const technicians = (technicianRows ?? []) as { id: string; name: string }[]
   // Access: the awarded supplier OR a supplier invited to quote (competitive model).
   const awarded = !!t.supplier_id && supplierIds.includes(t.supplier_id)
+  // Per-ticket RM↔supplier chat is available to the awarded supplier's users.
+  const chatUnread = awarded ? await ticketChatUnread(admin, t.id, userId) : false
   if (!awarded && !invite) redirect('/supplier/tickets')
   // Declined off the ticket (not re-invited) — show "Declined" to the supplier.
   const declinedForMe = !awarded && !!invite && ['declined', 'closed'].includes((invite as any).status)
@@ -582,17 +586,20 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
             {t.job_ref && <span className="font-mono text-sm font-semibold text-[var(--text-faint)]">{t.job_ref}</span>}
             <h1 className="text-lg font-bold text-[var(--text)]">{t.category || t.title}</h1>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end">
-            <PriorityBadge priority={t.priority} className="w-full text-center" />
-            {(() => {
-              const sm = supplierStatusMeta(supplierStatus)
-              // An open dispute (awarded supplier) overrides the badge with "Dispute" —
-              // the snag/evidence step is paused until the manager resolves it.
-              const disputing = awarded && !!openDispute
-              const cls = disputing || declinedForMe ? 'bg-red-500/15 text-red-700 dark:text-red-400' : sm.cls
-              const label = disputing ? 'Dispute' : declinedForMe ? (declinedBy === 'supplier' ? 'Declined (you)' : declinedBy === 'regional_manager' ? 'Declined (Client)' : 'Declined') : sm.label
-              return <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${cls}`}>{label}</span>
-            })()}
+          <div className="flex items-start gap-2 shrink-0">
+            <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 justify-items-end">
+              <PriorityBadge priority={t.priority} className="w-full text-center" />
+              {(() => {
+                const sm = supplierStatusMeta(supplierStatus)
+                // An open dispute (awarded supplier) overrides the badge with "Dispute" —
+                // the snag/evidence step is paused until the manager resolves it.
+                const disputing = awarded && !!openDispute
+                const cls = disputing || declinedForMe ? 'bg-red-500/15 text-red-700 dark:text-red-400' : sm.cls
+                const label = disputing ? 'Dispute' : declinedForMe ? (declinedBy === 'supplier' ? 'Declined (you)' : declinedBy === 'regional_manager' ? 'Declined (Client)' : 'Declined') : sm.label
+                return <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${cls}`}>{label}</span>
+              })()}
+            </div>
+            {awarded && <TicketChatIcon ticketId={t.id} viewerRole="supplier" unread={chatUnread} />}
           </div>
         </div>
         {!declinedForMe && <RmPipeline status={supplierStatus} />}

@@ -6,6 +6,8 @@ import { CheckCircle2, FileText, Calendar, CalendarClock, Clock, MessageSquare, 
 import { createAdminClient } from '@/lib/supabase/server'
 import { signedUrl } from '@/lib/storage'
 import { requireRegionalV3 } from '@/lib/health/guard'
+import { TicketChatIcon } from '@/components/chat/TicketChat'
+import { ticketChatUnread } from '@/lib/chat-unread'
 import { loadSlaResolver } from '@/lib/health/data'
 import { deriveDueDates } from '@/lib/health/priority'
 import { computeTicketSla } from '@/lib/health/sla'
@@ -406,6 +408,8 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
   const awaitingSupplierQuotes = ['assigned', 'assessment', 'quote_requested', 'quote_revision'].includes(t.status) && activeSupplierRows.some(r => r.status === 'invited')
   // A quote has been approved → the ticket is awarded and the round is over.
   const awarded = ((quotes ?? []) as any[]).some(q => q.status === 'accepted') || !!t.supplier_id
+  // Per-ticket RM↔supplier chat is available once a supplier is awarded.
+  const chatUnread = t.supplier_id ? await ticketChatUnread(admin, t.id, userId) : false
   // Round boundary = the most recent quote-request round (assign / re-assign). A
   // decline (quote or request) is "live" only if it happened in this current round;
   // everything from earlier rounds moves to the Archive so nothing is ever dropped.
@@ -820,20 +824,24 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
           </div>
           {/* Priority + status badges — same form factor as the SM ticket detail.
               Mobile: stacked + content-width (two fixed 120px badges side by side
-              starve the title at 375px); sm+ keeps the fixed-width row. */}
-          <div className="flex flex-col items-end gap-1 shrink-0 sm:flex-row sm:items-center sm:gap-1.5">
-            <span className={`inline-flex w-auto justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold sm:w-[120px] ${priorityBadgeClass({ priority: t.priority } as StoreManagerTicket)}`}>{priorityLabel({ priority: t.priority } as StoreManagerTicket)}</span>
-            {(() => {
-              const sm = rmStatusMeta(t.status)
-              // An open dispute overrides the badge with "Dispute" (the snag/evidence
-              // step is paused). Otherwise: a ticket where every supplier declined is
-              // back at 'open' and reads "New"; "Info added" reads like an "Info
-              // requested" badge (amber); the fresh answer is highlighted red in the
-              // description until the RM acts.
-              const label = openDispute ? 'Dispute' : rmInfoAdded ? 'Info added' : sm.label
-              const cls = openDispute ? 'bg-red-500/15 text-red-700 dark:text-red-400' : rmInfoAdded ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : sm.cls
-              return <span className={`inline-flex w-auto justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold sm:w-[120px] ${cls}`}>{label}</span>
-            })()}
+              starve the title at 375px); sm+ keeps the fixed-width row. The chat icon
+              (once a supplier is awarded) sits to the right of the badge cluster. */}
+          <div className="flex items-start gap-2 shrink-0">
+            <div className="flex flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-1.5">
+              <span className={`inline-flex w-auto justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold sm:w-[120px] ${priorityBadgeClass({ priority: t.priority } as StoreManagerTicket)}`}>{priorityLabel({ priority: t.priority } as StoreManagerTicket)}</span>
+              {(() => {
+                const sm = rmStatusMeta(t.status)
+                // An open dispute overrides the badge with "Dispute" (the snag/evidence
+                // step is paused). Otherwise: a ticket where every supplier declined is
+                // back at 'open' and reads "New"; "Info added" reads like an "Info
+                // requested" badge (amber); the fresh answer is highlighted red in the
+                // description until the RM acts.
+                const label = openDispute ? 'Dispute' : rmInfoAdded ? 'Info added' : sm.label
+                const cls = openDispute ? 'bg-red-500/15 text-red-700 dark:text-red-400' : rmInfoAdded ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : sm.cls
+                return <span className={`inline-flex w-auto justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold sm:w-[120px] ${cls}`}>{label}</span>
+              })()}
+            </div>
+            {t.supplier_id && <TicketChatIcon ticketId={t.id} viewerRole="regional_manager" unread={chatUnread} />}
           </div>
         </div>
 

@@ -1,11 +1,13 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { signedUrl } from '@/lib/storage'
+import { signedUrl, signManyUrls } from '@/lib/storage'
 import { rmOwnsTicket } from '@/lib/rm-ticket-access'
 
 // GET /api/tickets/[id]/quotes — the RM's quote-panel rows for a ticket (requested
-// suppliers + any submitted quotes), used by the Today queue's "Approve quote"
-// pop-up. RM-scoped: the ticket must be in one of the caller's regions.
+// suppliers + any submitted quotes), used by the Today queue's "Approve quote" and
+// "View & Assign" pop-ups. RM-scoped: the ticket must be in one of the caller's
+// regions. Also returns a `ticket` detail summary (description, photos, impact) so
+// the "View & Assign" pop-up can show the full context before assigning a supplier.
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createClient()
@@ -16,7 +18,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const { data: me } = await admin.from('user_profiles').select('role, company_id').eq('id', user.id).single()
   if (me?.role !== 'regional_manager') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { data: ticket } = await admin.from('tickets').select('id, company_id, region_id, store_id, status').eq('id', id).single()
+  const { data: ticket } = await admin.from('tickets').select('id, company_id, region_id, store_id, status, title, category, description, operational_impact, priority, job_ref, photo_urls').eq('id', id).single()
   if (!ticket || ticket.company_id !== me.company_id) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   if (!(await rmOwnsTicket(admin, user.id, ticket))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
@@ -56,5 +58,17 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const canReQuote = !((quotes ?? []) as any[]).some(q => q.status === 'accepted')
     && ['open', 'info_requested', 'assigned', 'assessment', 'quote_requested', 'quoted', 'quote_revision', 'suppliers_declined'].includes(ticket.status)
 
-  return NextResponse.json({ rows, canReQuote })
+  // Ticket detail summary for the "View & Assign" pop-up — store name + signed
+  // photos so the RM can review the job before assigning suppliers.
+  const { data: store } = ticket.store_id
+    ? await admin.from('stores').select('name').eq('id', ticket.store_id).maybeSingle()
+    : { data: null }
+  const photoUrls = Array.isArray(ticket.photo_urls) && ticket.photo_urls.length ? await signManyUrls(ticket.photo_urls) : []
+  const ticketDetail = {
+    title: ticket.title, category: ticket.category ?? null, description: ticket.description ?? '',
+    operationalImpact: ticket.operational_impact ?? null, priority: ticket.priority ?? null,
+    jobRef: ticket.job_ref ?? null, storeName: (store as any)?.name ?? null, photoUrls,
+  }
+
+  return NextResponse.json({ rows, canReQuote, ticket: ticketDetail })
 }

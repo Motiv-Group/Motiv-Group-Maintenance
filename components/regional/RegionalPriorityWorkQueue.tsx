@@ -12,7 +12,7 @@ import type { RegionalTicketRow } from '@/lib/health/data'
 import { Card } from '@/components/exec/ui'
 import { Modal } from '@/components/ui/Modal'
 import { CategoryIcon } from '@/components/client/ticketBadges'
-import { AssignSuppliersButton, QuoteReviewButton, SignoffReviewButton } from '@/components/regional/RmTicketActions'
+import { ViewAssignButton, QuoteReviewButton, SignoffReviewButton } from '@/components/regional/RmTicketActions'
 import { DisputeReviewButton } from '@/components/dispute/DisputeBox'
 import { rmStatusMeta, formatDate, formatDateTime, humanizeDuration, formatJobId, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
 
@@ -206,9 +206,10 @@ function QueueRow({ ticket, nowMs, suppliers, motivSuppliers }: { ticket: Region
           <SignoffReviewButton ticketId={ticket.id}
             trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}><ClipboardCheck size={15} /> Sign-Off</button>} />
         ) : assignable ? (
-          <AssignSuppliersButton ticketId={ticket.id} suppliers={suppliers} motivSuppliers={motivSuppliers}
+          <ViewAssignButton ticketId={ticket.id} suppliers={suppliers} motivSuppliers={motivSuppliers}
             awaitingById={ticket.engagedSupplierIds} declinedSupplierIds={ticket.declinedSupplierIds}
-            trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}>Assign Supplier</button>} />
+            summary={{ category: ticket.category, title: ticket.title, storeName: ticket.storeName, status: ticket.status, priority: String(ticket.priority), jobId }}
+            trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}>View &amp; Assign</button>} />
         ) : closeout ? (
           ticket.voNoneConfirmed
             ? <CloseOutConfirm ticketId={ticket.id} storeName={ticket.storeName} category={ticket.category || ticket.title} className={closeoutCls} />

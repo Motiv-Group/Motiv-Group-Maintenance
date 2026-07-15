@@ -11,7 +11,7 @@ import { PhotoThumbs } from '@/components/ui/PhotoThumbs'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { QuoteSummary } from '@/components/workflow/QuoteSummary'
 import { uploadFiles } from '@/lib/upload'
-import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils'
+import { formatCurrency, formatDate, formatDateTime, rmStatusMeta, PRIORITY_LEVEL_LABELS, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
 
 async function post(url: string, body: unknown): Promise<void> {
   const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
@@ -340,6 +340,111 @@ export function AssignSuppliersButton({ ticketId, suppliers, motivSuppliers = []
               <button disabled={busy || !sel.size} onClick={assign} className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50">
                 <Send size={15} /> {busy ? 'Sending…' : confirmReinvite ? 'Yes, send again' : `Send quote request${sel.size ? ` (${sel.size})` : ''}`}
               </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </>
+  )
+}
+
+// ── View & Assign (Today queue) ─────────────────────────────────
+// A pop-up that shows the ticket detail + the quotes gathered so far, with the
+// assign-supplier action in place. Replaces the bare supplier-picker CTA so the
+// RM can review the job (description, photos, impact, any quotes) before requesting
+// quotes. Ticket detail + quote rows are fetched on open from the RM-only /quotes
+// endpoint; the header renders instantly from the queue row's summary.
+interface ViewAssignSummary { category: string | null; title: string; storeName: string; status: string; priority: string; jobId: string | null }
+interface ViewAssignTicket { title: string; category: string | null; description: string; operationalImpact: string | null; priority: string | null; jobRef: string | null; storeName: string | null; photoUrls: string[] }
+interface ViewAssignQuoteRow { supplierId: string; name: string; kind: 'waiting' | 'received' | 'accepted' | 'declined'; quote: { amount: number } | null }
+
+// Priority pill colours (mirrors the Today queue's priorityBadgeClass).
+function vaPriorityBadge(p: string): string {
+  if (p === 'urgent' || p === 'P1') return 'bg-red-500/15 text-red-600 dark:text-red-400'
+  if (p === 'high' || p === 'P2') return 'bg-orange-500/15 text-orange-600 dark:text-orange-400'
+  if (p === 'medium' || p === 'P3') return 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
+  return 'bg-slate-500/15 text-slate-600 dark:text-slate-300'
+}
+
+export function ViewAssignButton({ ticketId, summary, suppliers, motivSuppliers = [], awaitingById = {}, declinedSupplierIds = [], trigger }: {
+  ticketId: string; summary: ViewAssignSummary
+  suppliers: SupplierChoice[]; motivSuppliers?: SupplierChoice[]
+  awaitingById?: Record<string, 'invited' | 'quoted'>; declinedSupplierIds?: string[]
+  trigger: (open: () => void) => ReactNode
+}) {
+  const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [err, setErr] = useState('')
+  const [ticket, setTicket] = useState<ViewAssignTicket | null>(null)
+  const [rows, setRows] = useState<ViewAssignQuoteRow[]>([])
+
+  useEffect(() => {
+    if (!open) return
+    let live = true
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resets fetch state when the pop-up opens, before the async load; cannot run during render
+    setLoading(true); setErr('')
+    fetch(`/api/tickets/${ticketId}/quotes`)
+      .then(r => r.json())
+      .then(d => { if (!live) return; if (d?.error) setErr(d.error); else { setTicket(d.ticket ?? null); setRows(d.rows ?? []) } })
+      .catch(() => { if (live) setErr('Could not load the ticket.') })
+      .finally(() => { if (live) setLoading(false) })
+    return () => { live = false }
+  }, [open, ticketId])
+
+  const meta = rmStatusMeta(summary.status)
+  const priorityLabel = PRIORITY_LEVEL_LABELS[String(summary.priority)] ?? 'Medium'
+
+  return (
+    <>
+      {trigger(() => setOpen(true))}
+      {open && (
+        <Modal title="Ticket &amp; quotes" maxWidth="max-w-2xl" onClose={() => setOpen(false)}>
+          <div className="space-y-3">
+            {/* Ticket detail header (renders instantly from the queue row). */}
+            <div className="min-w-0">
+              {summary.jobId && <p className="font-mono text-[10px] text-[var(--text-faint)]">{summary.jobId}</p>}
+              <p className="text-base font-bold text-[var(--text)]">{summary.category || summary.title}</p>
+              <p className="text-sm text-[var(--text-muted)]">{summary.storeName}</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className={`inline-flex justify-center rounded-md px-2 py-1 text-[10px] font-bold ${vaPriorityBadge(String(summary.priority))}`}>{priorityLabel}</span>
+              <span className={`inline-flex justify-center rounded-md px-2 py-1 text-[10px] font-bold ${meta.cls}`}>{meta.label}</span>
+            </div>
+
+            {loading ? <p className="py-4 text-center text-sm text-[var(--text-faint)]">Loading…</p>
+              : err ? <p className="text-sm text-red-500">{err}</p>
+              : ticket && (
+                <>
+                  {ticket.description && <p className="whitespace-pre-line break-words text-sm text-[var(--text-muted)]">{ticket.description}</p>}
+                  {ticket.operationalImpact && <p className="text-xs text-[var(--text-faint)]">Impact · {OPERATIONAL_IMPACT_LABELS[ticket.operationalImpact] ?? ticket.operationalImpact}</p>}
+                  {ticket.photoUrls.length > 0 && <PhotoThumbs urls={ticket.photoUrls} ticketId={ticketId} limit={5} />}
+
+                  {/* Suppliers & quotes gathered so far. */}
+                  <div className="space-y-1 rounded-xl ring-1 ring-[var(--border)] p-3">
+                    <p className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Suppliers &amp; quotes</p>
+                    {rows.length ? rows.map(r => {
+                      const m = PANEL_META[r.kind]
+                      return (
+                        <div key={r.supplierId} className="flex items-center justify-between gap-2 py-1">
+                          <span className="flex min-w-0 items-center gap-2">
+                            <i className={`h-2.5 w-2.5 shrink-0 rounded-full ${m.dot}`} />
+                            <span className="truncate text-sm text-[var(--text)]">{r.name}</span>
+                          </span>
+                          <span className="flex shrink-0 items-center gap-2">
+                            {r.quote && <span className="text-sm font-semibold text-[var(--text)]">{formatCurrency(r.quote.amount)}</span>}
+                            <span className={`text-[11px] font-semibold ${m.txt}`}>{m.label}</span>
+                          </span>
+                        </div>
+                      )
+                    }) : <p className="py-2 text-center text-sm text-[var(--text-faint)]">No suppliers requested yet.</p>}
+                  </div>
+                </>
+              )}
+
+            {/* Assign action — opens the existing searchable supplier picker on top. */}
+            <div className="border-t border-[var(--border)] pt-3">
+              <AssignSuppliersButton ticketId={ticketId} suppliers={suppliers} motivSuppliers={motivSuppliers} awaitingById={awaitingById} declinedSupplierIds={declinedSupplierIds}
+                trigger={openPicker => <button onClick={openPicker} className="w-full rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500">Assign supplier</button>} />
             </div>
           </div>
         </Modal>
