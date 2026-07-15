@@ -14,8 +14,11 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { data: profile } = await supabase.from('user_profiles').select('role').eq('id', user.id).single()
+  const { data: profile } = await supabase.from('user_profiles').select('role, company_id').eq('id', user.id).single()
   if (profile?.role !== 'supplier') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  // SEC-010/015: bulk-created suppliers must carry the caller's company_id, never NULL.
+  if (!profile.company_id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const companyId = profile.company_id
 
   if (!(await rateLimit(`suppliers-bulk:${user.id}`, 5, 60_000)))
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
@@ -32,6 +35,7 @@ export async function POST(request: Request) {
   const rows = suppliers
     .filter((s: any) => s.company_name?.trim())
     .map((s: any) => ({
+      company_id:            companyId,
       company_name:          s.company_name.trim(),
       contact_name:          s.contact_name?.trim() || null,
       email:                 s.email?.trim() || null,
