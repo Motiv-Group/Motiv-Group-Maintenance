@@ -64,6 +64,11 @@
 @layer utilities {
   .safe-top    { padding-top: env(safe-area-inset-top); }
   .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+  /* Hide the scrollbar on horizontal control strips (tab rows, filter-pill
+     strips): they scroll by swipe/drag, and a stray scrollbar draws a line
+     across the controls + content below it. */
+  .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
 }
 
 /* Auth hero logo (MotivLockup): admin-tunable size that shrinks on phones.

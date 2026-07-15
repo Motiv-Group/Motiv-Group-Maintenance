@@ -6,6 +6,7 @@ import { UserPlus, PlusCircle, ChevronDown, X } from 'lucide-react'
 import { Card } from '@/components/exec/ui'
 import { Drawer, DrawerHeader } from '@/components/exec/Drawer'
 import { isValidEmail, isValidPhone } from '@/lib/csv'
+import { useScrollLock } from '@/lib/useScrollLock'
 
 type Mode = 'exec-regions' | 'rm-stores' | 'suppliers'
 interface Opt { id: string; name: string }
@@ -59,6 +60,7 @@ export function ProvisionPanel({ mode, regions = [], stores = [] }: Props) {
  *  uses a slide-over; `variant='modal'` uses a centred pop-up. */
 export function ProvisionButton({ mode, regions = [], stores = [], label, tone = 'gold', variant = 'drawer' }: Props & { label?: string; tone?: 'gold' | 'green'; variant?: 'drawer' | 'modal' }) {
   const [open, setOpen] = useState(false)
+  useScrollLock(variant === 'modal' && open)
   const btn = tone === 'green'
     ? 'text-white bg-emerald-600 hover:bg-emerald-500'
     : 'text-[#0a0e17] bg-[#f59e0b] hover:brightness-95'

@@ -10,6 +10,7 @@ import type { ReactNode } from 'react'
 import { MessageSquareWarning, Paperclip, X, Send, ShieldCheck, ShieldX, FileText, Image as ImageIcon, Loader2, ClipboardList, ChevronDown } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { formatDateTime } from '@/lib/utils'
+import { useScrollLock } from '@/lib/useScrollLock'
 
 // Reason quick-picks per dispute origin (folded into the first thread message).
 const DISPUTE_REASONS: Record<string, string[]> = {
@@ -154,6 +155,7 @@ export function RaiseDisputeButton({ ticketId, origin, subjectTitle, jobRef, sto
   const [files, setFiles] = useState<File[]>([])
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  useScrollLock(open)
   const what = origin === 'snag' ? 'snag' : origin === 'variation' ? 'variation-order decline' : 'evidence request'
   const reset = () => { setReason(''); setText(''); setFiles([]); setErr('') }
   const close = () => { setOpen(false); reset(); onClose?.() }

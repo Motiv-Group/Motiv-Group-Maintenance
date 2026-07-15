@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X, ChevronLeft, ChevronRight, Download, ImageOff } from 'lucide-react'
 import type { ProjectFileView } from '@/lib/projects/data'
+import { useScrollLock } from '@/lib/useScrollLock'
 
 export function PhotoGallery({ title, photos }: { title: string; photos: ProjectFileView[] }) {
   const [open, setOpen] = useState<number | null>(null)
@@ -37,6 +38,8 @@ export function PhotoGallery({ title, photos }: { title: string; photos: Project
 function Lightbox({ photos, index, onClose, onIndex }: { photos: ProjectFileView[]; index: number; onClose: () => void; onIndex: (i: number) => void }) {
   const [mounted, setMounted] = useState(false)
   const p = photos[index]
+
+  useScrollLock()
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only portal-mount gate; must run after mount so createPortal(document.body) never runs during SSR

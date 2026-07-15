@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Trash2 } from 'lucide-react'
+import { useScrollLock } from '@/lib/useScrollLock'
 
 /**
  * Full-width delete button for the store manager's Next action card. Same shape
@@ -14,6 +15,7 @@ export function DeleteTicketButton({ ticketId }: { ticketId: string }) {
   const [confirm, setConfirm] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  useScrollLock(confirm)
 
   async function del() {
     setBusy(true); setError('')

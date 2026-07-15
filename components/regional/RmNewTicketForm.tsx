@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation'
 import { ImagePlus, Camera, X, Check, ArrowRight, ArrowLeft, Search, Store as StoreIcon } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { uploadTicketPhotos } from '@/lib/upload'
+import { useScrollLock } from '@/lib/useScrollLock'
 import { OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
 import { categoryVisual } from '@/lib/categoryVisual'
 
@@ -46,9 +47,12 @@ export function RmNewTicketForm({ stores, suppliers }: { stores: { id: string; n
   const previews = useMemo(() => files.map(f => URL.createObjectURL(f)), [files])
   useEffect(() => () => { previews.forEach(u => URL.revokeObjectURL(u)) }, [previews])
 
+  // Lock page scroll while the photo lightbox is open.
+  useScrollLock(!!preview)
+
   const remaining = Math.max(0, MAX_PHOTOS - files.length)
   function addFiles(incoming: File[]) {
-    const imgs = incoming.filter(f => f.type.startsWith('image/'))
+    const imgs = incoming.filter(f => !f.type || f.type.startsWith('image/'))
     setFiles(prev => [...prev, ...imgs].slice(0, MAX_PHOTOS))
   }
 

@@ -6,6 +6,7 @@
 // click or Escape, and locks body scroll while open.
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { useScrollLock } from '@/lib/useScrollLock'
 
 export function Modal({ onClose, children, maxWidth = 'max-w-lg' }: {
   onClose: () => void
@@ -23,14 +24,14 @@ export function Modal({ onClose, children, maxWidth = 'max-w-lg' }: {
     setTimeout(onClose, 180)
   }
 
+  useScrollLock() // mobile-safe: locks the background so it never scrolls behind the modal
+
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only portal-mount gate; must run after mount so createPortal(document.body) never runs during SSR render
     setMounted(true)
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close() }
     document.addEventListener('keydown', onKey)
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = prev }
+    return () => { document.removeEventListener('keydown', onKey) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

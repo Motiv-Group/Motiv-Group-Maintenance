@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { X, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react'
+import { useScrollLock } from '@/lib/useScrollLock'
 
 /**
  * Evidence photo strip: thumbnails + swipeable lightbox. Replaces the old
@@ -19,6 +20,9 @@ export function PhotoThumbs({ urls, ticketId, label = 'Photo', limit }: {
   limit?: number
 }) {
   const [open, setOpen] = useState<number | null>(null)
+
+  // Lock page scroll while the lightbox overlay is open.
+  useScrollLock(open !== null)
 
   const track = useCallback((i: number) => {
     if (!ticketId) return

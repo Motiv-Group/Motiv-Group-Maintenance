@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import { useState, useRef, useEffect, type ReactNode } from 'react'
 import { Camera } from 'lucide-react'
 import { Card } from '@/components/exec/ui'
 import { PhotoThumbs } from '@/components/ui/PhotoThumbs'
@@ -45,12 +45,33 @@ export function RmTicketTabs({
     { key: 'history', label: 'History' },
   ]
 
+  // Swipe the content area left/right to move between tabs (mobile). The active
+  // tab is kept scrolled into view in the strip so it never hides off-edge.
+  const stripRef = useRef<HTMLDivElement>(null)
+  const touch = useRef<{ x: number; y: number } | null>(null)
+  const idx = tabs.findIndex(t => t.key === tab)
+  const go = (delta: number) => { const next = tabs[idx + delta]; if (next) setTab(next.key) }
+  const onTouchStart = (e: React.TouchEvent) => { const t = e.touches[0]; touch.current = { x: t.clientX, y: t.clientY } }
+  const onTouchEnd = (e: React.TouchEvent) => {
+    if (!touch.current) return
+    const t = e.changedTouches[0]
+    const dx = t.clientX - touch.current.x, dy = t.clientY - touch.current.y
+    touch.current = null
+    // Horizontal intent only (don't hijack vertical scroll).
+    if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.5) go(dx < 0 ? 1 : -1)
+  }
+  useEffect(() => {
+    const el = stripRef.current?.querySelector('[aria-current="page"]') as HTMLElement | null
+    el?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' })
+  }, [tab])
+
   return (
     <Card className="p-4 sm:p-5">
       {/* Tab strip scrolls sideways (contained, controls not content). Full-bleed to
           the card edges (-mx-5) so the last tab swipes clear of the p-5 padding;
-          scroll-snap settles half-hidden tabs into view. */}
-      <div className="-mx-5 mb-4 flex snap-x gap-1 overflow-x-auto overflow-y-hidden border-b border-[var(--border)] px-5 [-webkit-overflow-scrolling:touch]">
+          scroll-snap + no-scrollbar keep it clean (a scrollbar would draw a line
+          across the tabs and the block below). */}
+      <div ref={stripRef} className="no-scrollbar -mx-5 mb-4 flex snap-x gap-1 overflow-x-auto overflow-y-hidden border-b border-[var(--border)] px-5 [-webkit-overflow-scrolling:touch]">
         {tabs.map(t => (
           <button
             key={t.key}
@@ -66,6 +87,8 @@ export function RmTicketTabs({
         ))}
       </div>
 
+      {/* Swipe left/right anywhere in the panel to move to the next/prev tab. */}
+      <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} style={{ touchAction: 'pan-y' }}>
       {tab === 'photos' && (
         totalPhotos ? (
           <div className="space-y-4">
@@ -118,6 +141,7 @@ export function RmTicketTabs({
       {tab === 'history' && (
         history ?? <p className="text-sm text-[var(--text-faint)]">Nothing archived yet.</p>
       )}
+      </div>
     </Card>
   )
 }

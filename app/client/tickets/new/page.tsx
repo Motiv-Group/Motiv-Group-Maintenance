@@ -9,6 +9,7 @@ import { uploadTicketPhotos } from '@/lib/upload'
 import { Card } from '@/components/exec/ui'
 import { OPERATIONAL_IMPACT_LABELS, storeLabel } from '@/lib/utils'
 import { categoryVisual } from '@/lib/categoryVisual'
+import { useScrollLock } from '@/lib/useScrollLock'
 
 // Category grid — same taxonomy the API + health engine expect. Icons/colours
 // come from the shared categoryVisual() map so they match everywhere. "Multiple"
@@ -38,6 +39,9 @@ export default function LogTicketPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
+  // Lock page scroll while the photo lightbox overlay is open.
+  useScrollLock(!!preview)
+
   // Object URLs for thumbnails; revoked when the file list changes / unmounts.
   const previews = useMemo(() => files.map(f => URL.createObjectURL(f)), [files])
   useEffect(() => () => { previews.forEach(u => URL.revokeObjectURL(u)) }, [previews])
@@ -64,7 +68,7 @@ export default function LogTicketPage() {
 
   const remaining = Math.max(0, MAX_PHOTOS - files.length)
   function addFiles(incoming: File[]) {
-    const imgs = incoming.filter(f => f.type.startsWith('image/'))
+    const imgs = incoming.filter(f => !f.type || f.type.startsWith('image/'))
     setFiles(prev => [...prev, ...imgs].slice(0, MAX_PHOTOS))
   }
 

@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import { uploadTicketPhotos } from '@/lib/upload'
 import { Card } from '@/components/exec/ui'
 import { OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
+import { useScrollLock } from '@/lib/useScrollLock'
 
 const CATEGORIES = ['Electrical', 'Plumbing', 'HVAC', 'Refrigeration', 'Gas', 'Structural', 'Appliances', 'Painting', 'General', 'Cleaning', 'Other']
 const IMPACTS = Object.entries(OPERATIONAL_IMPACT_LABELS).map(([v, label]) => ({ v, label }))
@@ -23,12 +24,14 @@ export default function LogJobPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
+  useScrollLock(!!preview)
+
   const previews = useMemo(() => files.map(f => URL.createObjectURL(f)), [files])
   useEffect(() => () => { previews.forEach(u => URL.revokeObjectURL(u)) }, [previews])
 
   const remaining = Math.max(0, MAX_PHOTOS - files.length)
   function addFiles(incoming: File[]) {
-    const imgs = incoming.filter(f => f.type.startsWith('image/'))
+    const imgs = incoming.filter(f => !f.type || f.type.startsWith('image/'))
     setFiles(prev => [...prev, ...imgs].slice(0, MAX_PHOTOS))
   }
 

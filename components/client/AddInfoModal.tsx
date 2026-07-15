@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation'
 import { Send, X, FileUp, FileText, MessageSquarePlus } from 'lucide-react'
 import { uploadFiles } from '@/lib/upload'
 import { PhotoUploader } from '@/components/ui/PhotoUploader'
+import { useScrollLock } from '@/lib/useScrollLock'
 
 const MAX_NEW_PHOTOS = 5
 const MAX_DOCS = 5
@@ -39,19 +40,19 @@ export function AddInfoModal({ ticketId, title, description, category, impact, p
 
   useEffect(() => () => { previews.forEach(URL.revokeObjectURL) }, [previews])
 
-  // Lock body scroll + close on Escape while the modal is open.
+  useScrollLock(open)
+
+  // Close on Escape while the modal is open.
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !busy) setOpen(false) }
     document.addEventListener('keydown', onKey)
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = prev }
+    return () => { document.removeEventListener('keydown', onKey) }
   }, [open, busy])
 
   function addFiles(incoming: File[]) {
     setErr('')
-    const imgs = incoming.filter(f => f.type.startsWith('image/'))
+    const imgs = incoming.filter(f => !f.type || f.type.startsWith('image/'))
     setFiles(p => [...p, ...imgs].slice(0, MAX_NEW_PHOTOS))
     setPreviews(p => [...p, ...imgs.map(f => URL.createObjectURL(f))].slice(0, MAX_NEW_PHOTOS))
   }

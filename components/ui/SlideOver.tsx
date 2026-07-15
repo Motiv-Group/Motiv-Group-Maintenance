@@ -8,11 +8,13 @@
 // that animates out before the parent unmounts (onClose fires after the slide).
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { useScrollLock } from '@/lib/useScrollLock'
 
 export function SlideOver({ onClose, children }: { onClose: () => void; children: (close: () => void) => ReactNode }) {
   const [mounted, setMounted] = useState(false)
   const [shown, setShown] = useState(false)
   const closing = useRef(false)
+  useScrollLock()
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only portal-mount gate; setMounted(true) must run after mount so createPortal(document.body) never runs during SSR render

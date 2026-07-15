@@ -1,8 +1,10 @@
 'use client'
 
 // RM ticket-page custom actions for the competitive-quoting model.
-import { useState, useMemo, useEffect, type ReactNode } from 'react'
+import { useState, useMemo, useEffect, useRef, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
+import { useScrollLock } from '@/lib/useScrollLock'
 import { Search, Pencil, CalendarClock, Plus, Camera, Info, X, FileText, ChevronDown, ChevronLeft, ChevronRight, MessageSquare, XCircle, Send, AlertCircle, Trash2, Store, ShieldCheck, Clock, Calendar, ClipboardCheck, Image as ImageIcon, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { StarInput, Stars } from '@/components/ui/Stars'
 import { PhotoThumbs } from '@/components/ui/PhotoThumbs'
@@ -17,6 +19,7 @@ async function post(url: string, body: unknown): Promise<void> {
 }
 
 function Modal({ title, onClose, children, maxWidth = 'max-w-md' }: { title: ReactNode; onClose: () => void; children: React.ReactNode; maxWidth?: string }) {
+  useScrollLock() // lock the background so it can't scroll behind the pop-up
   return (
     // Bottom-sheet on phones (mirrors components/ui/Modal), centered from sm up.
     <div className="fixed inset-0 bg-black/60 flex items-end justify-center z-50 p-0 sm:items-center sm:p-4" onClick={onClose}>
@@ -37,9 +40,35 @@ function Modal({ title, onClose, children, maxWidth = 'max-w-md' }: { title: Rea
 // state, so opening one is instant and doesn't depend on the menu staying mounted.
 export function MoreMenu({ children, fullWidth = false, label = 'More', up = false, align = 'right' }: { children: ReactNode; fullWidth?: boolean; label?: string; up?: boolean; align?: 'left' | 'right' }) {
   const [open, setOpen] = useState(false)
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null)
+
+  // The menu is PORTALLED to <body> and fixed-positioned against the trigger, so
+  // it's never clipped by a pop-up's `overflow-y-auto` body (which also clips
+  // overflow-x, cutting the old absolute menu off to the side). Left is clamped
+  // into the viewport so a 256px menu can't run off a phone edge. Scroll/resize
+  // just closes it — simpler and correct vs. live repositioning.
+  useEffect(() => {
+    if (!open) return
+    const place = () => {
+      const b = btnRef.current?.getBoundingClientRect()
+      if (!b) return
+      const width = Math.min(256, window.innerWidth - 16)
+      let left = align === 'left' ? b.left : b.right - width
+      left = Math.max(8, Math.min(left, window.innerWidth - width - 8))
+      setPos({ top: up ? b.top - 8 : b.bottom + 8, left, width })
+    }
+    place()
+    const onMove = () => setOpen(false)
+    window.addEventListener('scroll', onMove, true)
+    window.addEventListener('resize', onMove)
+    return () => { window.removeEventListener('scroll', onMove, true); window.removeEventListener('resize', onMove) }
+  }, [open, align, up])
+
   return (
     <div className={`relative ${fullWidth ? '' : 'shrink-0'}`}>
       <button
+        ref={btnRef}
         type="button"
         onClick={() => setOpen(o => !o)}
         aria-expanded={open}
@@ -48,18 +77,20 @@ export function MoreMenu({ children, fullWidth = false, label = 'More', up = fal
       >
         {label} <ChevronDown size={15} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
-      {open && (
+      {open && pos && createPortal(
         <>
-          {/* Outside-click catcher (below the menu, above the page). */}
-          <button aria-hidden tabIndex={-1} onClick={() => setOpen(false)} className="fixed inset-0 z-10 cursor-default" />
-          {/* `up` opens above the trigger — used inside pop-ups where a downward menu
-              would be clipped by the scrollable modal body. */}
-          {/* Base always pins to the right edge (a left-aligned 256px menu walks off a
-              phone screen); `align` is honoured from sm up. */}
-          <div role="menu" onClick={() => setOpen(false)} className={`absolute z-20 ${align === 'left' ? 'right-0 sm:left-0 sm:right-auto' : 'right-0'} ${up ? 'bottom-full mb-2' : 'mt-2'} w-64 max-w-[calc(100vw-2.5rem)] rounded-xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] shadow-lg shadow-black/20 p-1.5 space-y-0.5`}>
+          {/* Outside-click catcher (below the menu, above everything else). */}
+          <button aria-hidden tabIndex={-1} onClick={() => setOpen(false)} className="fixed inset-0 z-[110] cursor-default" />
+          <div
+            role="menu"
+            onClick={() => setOpen(false)}
+            style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width, transform: up ? 'translateY(-100%)' : undefined }}
+            className="z-[111] rounded-xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] shadow-lg shadow-black/20 p-1.5 space-y-0.5"
+          >
             {children}
           </div>
-        </>
+        </>,
+        document.body,
       )}
     </div>
   )
@@ -1231,13 +1262,18 @@ export function RmAddWorkForm({ ticketId, description, photoUrls, title, categor
   // Object-URL thumbnails for the selected photos; revoked when the set changes.
   const previews = useMemo(() => files.map(f => URL.createObjectURL(f)), [files])
   useEffect(() => () => previews.forEach(URL.revokeObjectURL), [previews])
-  const addFiles = (list: FileList | null) => setFiles(p => [...p, ...Array.from(list ?? []).filter(f => f.type.startsWith('image/'))].slice(0, MAX_WORK_PHOTOS))
+  // Keep files the OS picker returned. On mobile the picked image often has an
+  // empty MIME type (Android WebView), so require-image would silently drop it —
+  // the `accept="image/*"` picker already limits selection, and the upload route
+  // accepts an empty type, so only reject a clearly non-image type here.
+  const addFiles = (list: FileList | null) => setFiles(p => [...p, ...Array.from(list ?? []).filter(f => !f.type || f.type.startsWith('image/'))].slice(0, MAX_WORK_PHOTOS))
 
   async function submit() {
     if (!text.trim()) { setErr('Describe the extra work needed.'); return }
     setBusy(true); setErr('')
     try {
-      const { urls: newUrls } = await uploadFiles(files, 'ticket-photos')
+      const { urls: newUrls, failed } = await uploadFiles(files, 'ticket-photos')
+      if (failed.length) { setErr(`Couldn't upload ${failed.length} photo${failed.length > 1 ? 's' : ''}. Check the file type and try again.`); setBusy(false); return }
       const newDescription = `${description}\n\n— Extra Work: ${text.trim()}`
       // The ticket endpoint is PATCH-only — POSTing here was the "something went wrong".
       const res = await fetch(`/api/tickets/${ticketId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, description: newDescription, category, operational_impact: impact, photo_urls: [...photoUrls, ...newUrls], edit_note: 'added extra work' }) })
