@@ -304,7 +304,7 @@ export function TicketTabView({ rows, grouped, newHref, subtitle, statusOptions,
             const up = active.map(t => t.slaDueAt ? +new Date(t.slaDueAt) : Infinity).filter(ms => ms > nowMs)
             const nextSla = up.length ? Math.min(...up) : null
             return (
-              <div key={storeName} className={`overflow-hidden rounded-xl border-l-4 bg-[var(--surface)] ring-1 ring-[var(--border)] ${accent.border}`}>
+              <div key={storeName} className="overflow-hidden rounded-xl bg-[var(--surface)] ring-1 ring-[var(--border)]">
                 <div role="button" tabIndex={0} aria-expanded={!isCollapsed} onClick={() => toggle(storeName)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(storeName) } }} className="flex cursor-pointer items-center gap-3 p-4 transition hover:bg-[var(--hover)]">
                   <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-full ${accent.icon}`}><Store size={20} /></span>
                   <span className="min-w-0 flex-1">
