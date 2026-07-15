@@ -57,7 +57,7 @@ export default async function AdminSuppliersPage() {
       </div>
 
       {!rows.length && (
-        <Card className="p-8 text-center">
+        <Card className="p-6 sm:p-8 text-center">
           <ShieldCheck className="mx-auto mb-2 text-emerald-500" size={24} />
           <p className="text-sm text-[var(--text-muted)]">No suppliers waiting for review.</p>
         </Card>

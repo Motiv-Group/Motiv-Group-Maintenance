@@ -748,7 +748,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
         {/* Ticket information — aligned label→value rows, then description + callouts. */}
         <Card className="p-5 space-y-4 h-full">
           <h2 className="text-sm font-bold text-[var(--text)]">Ticket information</h2>
-          <dl className="grid grid-cols-[max-content_1fr] items-baseline gap-x-6 gap-y-2.5 text-sm">
+          <dl className="grid grid-cols-[max-content_1fr] items-baseline gap-x-3 sm:gap-x-6 gap-y-2.5 text-sm">
             {companyName && <><dt className="text-[var(--text-muted)]">Company</dt><dd className="font-medium text-[var(--text)]">{companyName}</dd></>}
             {store?.name && <><dt className="text-[var(--text-muted)]">Store</dt><dd className="font-medium text-[var(--text)]">{storeName}</dd></>}
             {customer && <><dt className="text-[var(--text-muted)]">Customer</dt><dd className="font-medium text-[var(--text)]">{customer.full_name || 'Individual'}</dd></>}

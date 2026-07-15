@@ -62,13 +62,13 @@ export function AdminSelfCompany({
       <div className="flex flex-wrap items-center gap-2">
         {companies.length > 0 && (
           <div className="flex rounded-lg ring-1 ring-[var(--border)] overflow-hidden text-xs">
-            <button onClick={() => setMode('existing')} className={`px-3 py-1.5 ${mode === 'existing' ? 'bg-blue-600 text-white' : 'text-[var(--text-muted)]'}`}>Existing</button>
-            <button onClick={() => setMode('new')} className={`px-3 py-1.5 ${mode === 'new' ? 'bg-blue-600 text-white' : 'text-[var(--text-muted)]'}`}>Create new</button>
+            <button onClick={() => setMode('existing')} className={`px-3 py-2.5 sm:py-1.5 ${mode === 'existing' ? 'bg-blue-600 text-white' : 'text-[var(--text-muted)]'}`}>Existing</button>
+            <button onClick={() => setMode('new')} className={`px-3 py-2.5 sm:py-1.5 ${mode === 'new' ? 'bg-blue-600 text-white' : 'text-[var(--text-muted)]'}`}>Create new</button>
           </div>
         )}
 
         {mode === 'existing' && companies.length > 0 ? (
-          <select className={input} value={companyId} onChange={(e) => setCompanyId(e.target.value)}>
+          <select className={`${input} w-full sm:w-auto min-w-0`} value={companyId} onChange={(e) => setCompanyId(e.target.value)}>
             {companies.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -76,7 +76,7 @@ export function AdminSelfCompany({
             ))}
           </select>
         ) : (
-          <input className={input} placeholder="New company name (e.g. Motiv)" value={newName} onChange={(e) => setNewName(e.target.value)} />
+          <input className={`${input} w-full sm:w-auto min-w-0`} placeholder="New company name (e.g. Motiv)" value={newName} onChange={(e) => setNewName(e.target.value)} />
         )}
 
         <button

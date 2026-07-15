@@ -79,7 +79,7 @@ export default async function AdminAuditPage() {
       </div>
 
       {!logs.length && (
-        <Card className="p-8 text-center">
+        <Card className="p-6 sm:p-8 text-center">
           <ScrollText className="mx-auto mb-2 text-[var(--text-faint)]" size={24} />
           <p className="text-sm text-[var(--text-muted)]">No audit events recorded yet.</p>
         </Card>
@@ -87,7 +87,7 @@ export default async function AdminAuditPage() {
 
       {!!logs.length && (
         <Card className="p-0 overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="hidden sm:block overflow-x-auto">
             <table className="w-full text-sm min-w-[760px]">
               <thead>
                 <tr className="text-left text-[11px] uppercase tracking-wide text-[var(--text-faint)] border-b border-[var(--border)]">
@@ -127,6 +127,47 @@ export default async function AdminAuditPage() {
                 })}
               </tbody>
             </table>
+          </div>
+
+          <div className="sm:hidden space-y-2 p-3">
+            {logs.map(l => {
+              const actor = actorById.get(l.actor_id) as any
+              const company = companyById.get(l.company_id) as any
+              return (
+                <div key={l.id} className="rounded-xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] p-3">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-[var(--text)] truncate">{label(l.action)}</div>
+                    <div className="text-[11px] text-[var(--text-faint)] font-mono truncate">{l.action}</div>
+                  </div>
+                  <dl className="mt-2 space-y-1 text-[13px]">
+                    <div className="flex justify-between gap-3">
+                      <dt className="text-[var(--text-faint)] shrink-0">When</dt>
+                      <dd className="text-right text-[var(--text-muted)]">{formatDateTime(l.created_at)}</dd>
+                    </div>
+                    <div className="flex justify-between gap-3">
+                      <dt className="text-[var(--text-faint)] shrink-0">Actor</dt>
+                      <dd className="text-right min-w-0">
+                        <div className="text-[var(--text)] truncate">{actor ? (actor.full_name || actor.email || 'Unknown') : 'System'}</div>
+                        {actor?.role && <div className="text-[11px] text-[var(--text-faint)]">{actor.role}</div>}
+                      </dd>
+                    </div>
+                    <div className="flex justify-between gap-3">
+                      <dt className="text-[var(--text-faint)] shrink-0">Target</dt>
+                      <dd className="text-right min-w-0 text-[var(--text-muted)]">
+                        <div className="truncate">{l.entity_type ?? '—'}</div>
+                        {company && <div className="text-[11px] text-[var(--text-faint)] truncate">{company.name}</div>}
+                      </dd>
+                    </div>
+                  </dl>
+                  {l.metadata && (
+                    <div className="mt-2">
+                      <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Details</div>
+                      <code className="block mt-0.5 text-[11px] text-[var(--text-faint)] break-words whitespace-pre-wrap">{JSON.stringify(l.metadata)}</code>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         </Card>
       )}

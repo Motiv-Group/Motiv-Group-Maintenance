@@ -197,7 +197,7 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
             <InfoRow label="Logged" value={formatDateTime(t.created_at)} />
             <div>
               <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Description</div>
-              <p className="text-sm text-[var(--text)] mt-0.5 whitespace-pre-line">{t.description}</p>
+              <p className="text-sm text-[var(--text)] mt-0.5 whitespace-pre-line break-words">{t.description}</p>
               <EditedLine at={t.edited_at} by={editorName} />
             </div>
             {(showVisit || showFollowUp) && <InfoRow label="Assigned supplier" value={visitSupplier ?? 'Assigned supplier'} />}

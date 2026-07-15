@@ -31,7 +31,10 @@
 | 2 | De-squeeze + de-bulk the main flow (Today → Tickets → detail → actions) | ✅ 2026-07-15 |
 | 3 | Sign-off / Snags / Stores / Suppliers / Projects / Notifications mediums | ✅ 2026-07-15 |
 | 4 | Polish pass (lows) | ✅ 2026-07-15 |
-| 5 | Owner device pass → taste fixes (ongoing); then roll recipe to Supplier/SM/Admin | 🟡 |
+| 5 | Roll recipe to **Supplier / SM / Admin** — audit + fix (3 HIGH / 15 MED / 23 LOW) | ✅ 2026-07-15 |
+| 6 | Owner device pass across all surfaces → taste fixes | 🟡 |
+
+> Phase 5 fixes are recorded in the "Phase 5 — Supplier / SM / Admin" findings section at the bottom of this file. Shared components fixed there (`components/exec/ui.tsx` KpiCard, `components/ui/InfoTip.tsx`, `components/notifications/NotificationList.tsx`, `components/ui/TicketTabView.tsx`) improve every surface at once.
 
 ## Findings
 
@@ -146,3 +149,38 @@
 - [x] `components/exec/ExecChrome.tsx:111` — Header icon buttons are `p-2` around 17-18px icons (~34px square targets) packed with `gap-1`; the regional variant shows four of them (Reports, Bell, Settin…
 - [x] `components/reports/ReportDocument.tsx:75` — Section stat tiles are a fixed `grid grid-cols-3 gap-2` at all widths; at 375px inside the report column each tile is ~103px, so text-lg values like 'R123 45…
 - [x] `app/regional/reviews/[id]/page.tsx:71` — Empty state uses `p-12` (48px padding all round) on the dashed 'nothing to review' card — the same oversized-empty-state pattern the audit flagged low in Reg…
+
+## Phase 5 — Supplier / SM / Admin
+
+> From the 2026-07-15 audit of every Supplier / store-manager(client) / Admin page at 375px, using the `mobile-ready` skill recipe. 3 HIGH / 15 MED / 23 LOW — all fixed the same session (mobile-first additive; desktop pixel-identical). Owner device pass (Phase 6) still pending.
+
+### HIGH (3)
+
+- [x] `app/supplier/stores/[id]/page.tsx:160` — two fixed `w-[120px]` badges starved the `flex-1 min-w-0` title to 0px on every ticket row (title invisible) → `w-auto sm:w-[120px]`.
+- [x] `components/admin/AdminSelfCompany.tsx:71` — uncapped company-picker `<select>` sized to its longest option and pushed the whole page into horizontal scroll → `w-full sm:w-auto min-w-0` (select + input).
+- [x] `components/projects/admin/AdminProjectDetail.tsx:142` — primary store list was a wide table in `overflow-x-auto` with no fallback → `hidden sm:block` table + `sm:hidden` stacked cards; header also stacks (`flex-col … sm:flex-row`).
+
+### MEDIUM (15)
+
+- [x] `app/admin/page.tsx:79` + `:104` — Subscribers (`min-w-[520px]`) + Suppliers (`min-w-[560px]`) primary tables → `hidden sm:block` + `sm:hidden` stacked cards (Suppliers total as summary card).
+- [x] `app/admin/page.tsx:59` — 4-KPI ZAR row overflowed the 2-col grid (non-breaking-space totals) → shared KpiCard value `text-xl sm:text-2xl` + `break-words tabular-nums`.
+- [x] `app/admin/accounts/page.tsx:109` — Existing-accounts 6-col `min-w-[560px]` table → stacked-card fallback; `:100` header count phrases → `flex-wrap` + verbose words `hidden sm:inline`.
+- [x] `app/admin/audit/page.tsx:91` — `min-w-[760px]` audit table → stacked-card fallback.
+- [x] `app/admin/sentry/page.tsx:79` + `app/admin/vercel/page.tsx:92` — `min-w-[560px]` infra primary lists → stacked-card fallbacks (reuse level/State badges).
+- [x] `components/admin/HierarchyView.tsx:41` — uncapped reassign/move `<select>` clipped by the card → `min-w-0 max-w-[55vw] truncate sm:max-w-none`.
+- [x] `components/projects/admin/AdminProjectDetail.tsx:89` — 5-button action cluster starved the title → `flex-col gap-3 sm:flex-row` + cluster `w-full sm:w-auto`.
+- [x] `components/projects/admin/AdminStoreEditor.tsx:235` — dropzone `accept:{image/*}` silently dropped empty-MIME Android camera photos → accept by extension + surface `rejections`.
+- [x] `app/supplier/stores/page.tsx:101` + `:108` — store-name/sub-store/RM-pill `truncate` never engaged (no `min-w-0`) → added `min-w-0`/`shrink`/`max-w`.
+- [x] `app/supplier/tickets/[id]/page.tsx:751` — `gap-x-6` detail grid starved values → `gap-x-3 sm:gap-x-6`.
+- [x] `components/supplier/SupplierQuotesTable.tsx:96` — 5 `min-w-[172px]` status tabs stacked into ~4 rows → swipe strip (`overflow-x-auto no-scrollbar flex-nowrap sm:flex-wrap`, `shrink-0 sm:min-w-[172px]`).
+
+### LOW (23)
+
+- [x] Shared: `components/notifications/NotificationList.tsx` — read/unread toggle `h-11 w-11 sm:h-7 sm:w-9` + `pr-14 sm:pr-12`; type-filter strip `no-scrollbar` (client + supplier + admin).
+- [x] Shared: `components/ui/TicketTabView.tsx:293` — filter swipe strip `no-scrollbar`.
+- [x] Shared: `components/ui/InfoTip.tsx` — clamp popover within the viewport (right-column StatTile tooltip no longer causes page scroll).
+- [x] Tap targets (→ `p-2.5 sm:p-1.5` / `min-h-[40px] sm:min-h-0`): `app/supplier/page.tsx:63`, `SupplierSignoff.tsx:225/53`, `SupplierQuotesTable.tsx:192`, `SupplierReviews.tsx`, `FieldTeamManager.tsx:212`, `HierarchyView.tsx:41`, `AdminSelfCompany.tsx:65`, `SupplierReviewActions.tsx`, `AdminStoreEditor.tsx:196`.
+- [x] Empty-state density (→ `p-6/p-8 sm:p-8/p-10/p-12`): `SupplierSignoff.tsx:144`, `SupplierReviews.tsx:224`, `FieldTeamManager.tsx:139`, `app/client/visits/page.tsx:58`, `app/admin/audit/page.tsx:82`, `app/admin/suppliers/page.tsx:60`.
+- [x] `app/client/tickets/[id]/page.tsx:200` — description `break-words` (long token no longer scrolls the page).
+- [x] `components/client/StoreTicketsList.tsx:58` — shorter SM stat titles on mobile (verbose sub-line stays `sm:`-only).
+- [ ] `app/admin/resend/page.tsx:79` + `app/admin/supabase/page.tsx:82` — short `min-w-[420px]` secondary tables; sanctioned `overflow-x-auto` pattern, left as-is (optional stacked fallback for consistency).

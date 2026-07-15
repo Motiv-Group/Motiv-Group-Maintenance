@@ -84,7 +84,7 @@ export function KpiCard({ kpi }: { kpi: Kpi }) {
         <span className="flex items-center gap-1.5 truncate">{kpi.icon}{kpi.label}</span>
         {kpi.trend && <TrendArrow t={kpi.trend} />}
       </div>
-      <div className="text-2xl font-bold leading-none text-[var(--text)]">{kpi.value}</div>
+      <div className="text-xl sm:text-2xl font-bold leading-none text-[var(--text)] break-words tabular-nums">{kpi.value}</div>
       {kpi.hint && <div className="text-[11px] text-[var(--text-faint)]">{kpi.hint}</div>}
     </Card>
   )

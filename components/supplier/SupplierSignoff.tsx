@@ -50,7 +50,7 @@ function StatCard({ icon, tone, value, title, sub, active, onClick }: { icon: Re
 
 function Select<T extends string>({ label, value, onChange, options }: { label: string; value: T; onChange: (v: T) => void; options: { value: T; label: string }[] }) {
   return (
-    <label className="relative flex min-w-[150px] flex-1 items-center gap-1.5 rounded-xl bg-[var(--input-bg)] px-3 py-2.5 text-sm ring-1 ring-[var(--border)] transition focus-within:ring-blue-500/40 sm:flex-none">
+    <label className="relative flex min-h-[44px] min-w-[150px] flex-1 items-center gap-1.5 rounded-xl bg-[var(--input-bg)] px-3 py-2.5 text-sm ring-1 ring-[var(--border)] transition focus-within:ring-blue-500/40 sm:min-h-0 sm:flex-none">
       <span className="whitespace-nowrap text-[11px] uppercase tracking-wide text-[var(--text-faint)]">{label}</span>
       <select value={value} onChange={e => onChange(e.target.value as T)} className="w-full cursor-pointer appearance-none bg-transparent pr-4 font-semibold text-[var(--text)] outline-none">
         {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -141,7 +141,7 @@ export function SupplierSignoff({ signoffs }: { signoffs: SupplierSignoffRow[] }
       </div>
 
       {!groups.length && (
-        <div className="rounded-xl border border-dashed border-[var(--border)] p-12 text-center">
+        <div className="rounded-xl border border-dashed border-[var(--border)] p-8 text-center sm:p-12">
           <ClipboardCheck size={28} className="mx-auto mb-2 text-[var(--text-faint)]" />
           <p className="text-sm text-[var(--text-faint)]">{signoffs.length ? 'No sign-offs match your filters.' : 'No sign-offs yet.'}</p>
         </div>
@@ -222,9 +222,9 @@ export function SupplierSignoff({ signoffs }: { signoffs: SupplierSignoffRow[] }
           <p className="text-sm text-[var(--text-muted)]">Showing {firstShown} to {lastShown} of {groups.length} store{groups.length === 1 ? '' : 's'}</p>
           {totalPages > 1 && (
             <div className="flex items-center gap-1.5">
-              <button type="button" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={cur <= 1} aria-label="Previous page" className="rounded-lg p-1.5 text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-40"><ChevronLeft size={15} /></button>
+              <button type="button" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={cur <= 1} aria-label="Previous page" className="rounded-lg p-2.5 text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-40 sm:p-1.5"><ChevronLeft size={15} /></button>
               <span className="grid h-8 min-w-8 place-items-center rounded-lg bg-blue-600 px-2 text-sm font-semibold text-white">{cur}</span>
-              <button type="button" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={cur >= totalPages} aria-label="Next page" className="rounded-lg p-1.5 text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-40"><ChevronRight size={15} /></button>
+              <button type="button" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={cur >= totalPages} aria-label="Next page" className="rounded-lg p-2.5 text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-40 sm:p-1.5"><ChevronRight size={15} /></button>
             </div>
           )}
         </div>

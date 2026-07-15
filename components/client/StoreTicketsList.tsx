@@ -55,8 +55,8 @@ const SM_STATUS_OPTIONS = [
 const STAT_LABELS: Record<Intent, [string, string]> = {
   mine: ['My actions', 'Require your response'],
   awaiting: ['Awaiting action', 'From others'],
-  critical: ['At SLA breach and overdue', 'Require attention'],
-  done: ['Completed and closed', 'All resolved'],
+  critical: ['SLA breached', 'Require attention'],
+  done: ['Completed', 'All resolved'],
 }
 
 export function StoreTicketsList({ tickets, initialFilter = 'all', storeName = 'Your store' }: { tickets: StoreManagerTicket[]; initialFilter?: Filter; storeName?: string }) {

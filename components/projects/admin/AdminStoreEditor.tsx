@@ -192,8 +192,8 @@ export function AdminStoreEditor({
 }
 
 function NavBtn({ href, icon }: { href: string | null; icon: React.ReactNode }) {
-  if (!href) return <span className="rounded-lg p-1.5 text-[var(--text-faint)] opacity-40">{icon}</span>
-  return <Link href={href} className="rounded-lg p-1.5 ring-1 ring-[var(--border)] text-[var(--text)] hover:bg-[var(--hover)]">{icon}</Link>
+  if (!href) return <span className="inline-flex items-center justify-center rounded-lg p-1.5 min-h-[40px] min-w-[40px] sm:min-h-0 sm:min-w-0 text-[var(--text-faint)] opacity-40">{icon}</span>
+  return <Link href={href} className="inline-flex items-center justify-center rounded-lg p-1.5 min-h-[40px] min-w-[40px] sm:min-h-0 sm:min-w-0 ring-1 ring-[var(--border)] text-[var(--text)] hover:bg-[var(--hover)]">{icon}</Link>
 }
 
 function MilestoneCard({ n, title, done, date, children }: { n: number; title: string; done: boolean; date: string | null; children: React.ReactNode }) {
@@ -231,8 +231,19 @@ function PhotoMilestone({
   onToggle: (m: MilestoneKey, complete: boolean) => void
   allowPdf?: boolean
 }) {
-  const accept: Record<string, string[]> = allowPdf ? { 'image/*': [], 'application/pdf': [] } : { 'image/*': [] }
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({ accept, onDrop: (f) => onUpload(category, f) })
+  const [dropErr, setDropErr] = useState<string | null>(null)
+  // Include extensions so Android camera photos with an empty MIME type match by name instead of being silently rejected.
+  const imageExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.heif']
+  const accept: Record<string, string[]> = allowPdf
+    ? { 'image/*': imageExts, 'application/pdf': ['.pdf'] }
+    : { 'image/*': imageExts }
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    accept,
+    onDrop: (accepted, rejections) => {
+      onUpload(category, accepted)
+      setDropErr(rejections.length ? `${rejections.length} file${rejections.length > 1 ? 's' : ''} skipped — unsupported type` : null)
+    },
+  })
 
   return (
     <Card className={`p-4 space-y-3 ${done ? 'ring-emerald-500/30' : ''}`}>
@@ -276,6 +287,7 @@ function PhotoMilestone({
         <UploadCloud size={20} className="text-[var(--text-faint)]" />
         <span className="text-xs text-[var(--text-muted)]">{busy === category ? 'Uploading…' : `Drop or click to upload ${title.toLowerCase()}${allowPdf ? ' (images or PDF)' : ''}`}</span>
       </div>
+      {dropErr && <p className="text-[11px] text-red-500">{dropErr}</p>}
     </Card>
   )
 }

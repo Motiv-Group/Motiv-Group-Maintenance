@@ -55,7 +55,7 @@ export default async function StoreVisitsPage() {
       </div>
 
       {!rows.length && (
-        <div className="rounded-xl border border-dashed border-[var(--border)] p-12 text-center">
+        <div className="rounded-xl border border-dashed border-[var(--border)] p-8 sm:p-12 text-center">
           <CalendarClock size={28} className="mx-auto text-[var(--text-faint)] mb-2" />
           <p className="text-sm text-[var(--text-faint)]">No visits scheduled yet.</p>
         </div>

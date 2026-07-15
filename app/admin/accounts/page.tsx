@@ -98,14 +98,14 @@ export default async function AdminAccountsPage() {
       <SectionCard
         title="Existing accounts"
         action={
-          <span className="text-xs text-[var(--text-muted)] flex items-center gap-2">
-            <span className="text-emerald-600 dark:text-emerald-400">{activeWeek} active this week</span>
-            {neverSignedIn > 0 && <span className="text-amber-600 dark:text-amber-400">{neverSignedIn} never signed in</span>}
-            <span>· {rows.length} total</span>
+          <span className="text-xs text-[var(--text-muted)] flex flex-wrap items-center justify-end gap-x-2 gap-y-0.5">
+            <span className="text-emerald-600 dark:text-emerald-400">{activeWeek}<span className="hidden sm:inline"> active this week</span></span>
+            {neverSignedIn > 0 && <span className="text-amber-600 dark:text-amber-400">{neverSignedIn}<span className="hidden sm:inline"> never signed in</span></span>}
+            <span>· {rows.length}<span className="hidden sm:inline"> total</span></span>
           </span>
         }
       >
-        <div className="overflow-x-auto -mx-1">
+        <div className="hidden sm:block overflow-x-auto -mx-1">
           <table className="w-full text-sm min-w-[560px]">
             <thead><tr className="text-left text-[11px] text-[var(--text-faint)] border-b border-[var(--border)]"><th className="py-2 px-2">Name</th><th className="px-2">Email</th><th className="px-2">Role</th><th className="px-2">Region / Branch</th><th className="px-2">Company</th><th className="px-2">Last sign-in</th></tr></thead>
             <tbody>
@@ -122,6 +122,34 @@ export default async function AdminAccountsPage() {
               {!rows.length && <tr><td colSpan={6} className="py-6 text-center text-[var(--text-faint)]">No accounts yet.</td></tr>}
             </tbody>
           </table>
+        </div>
+        <div className="sm:hidden space-y-2">
+          {rows.map(u => (
+            <div key={u.id} className="rounded-xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] p-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-semibold text-[var(--text)] truncate">{u.full_name ?? '—'}</p>
+                  <p className="text-xs text-[var(--text-muted)] truncate">{u.email ?? '—'}</p>
+                </div>
+                <span className="text-xs text-[var(--text-muted)] shrink-0">{roleLabel(u.role)}</span>
+              </div>
+              <dl className="mt-2 space-y-1 text-xs">
+                <div className="flex justify-between gap-2">
+                  <dt className="text-[var(--text-faint)]">Company</dt>
+                  <dd className="text-[var(--text-muted)] text-right min-w-0 truncate">{u.company_id ? (companyName.get(u.company_id) ?? '—') : <span className="text-amber-600 dark:text-amber-400">Pending</span>}</dd>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <dt className="text-[var(--text-faint)]">Region / Branch</dt>
+                  <dd className="text-[var(--text-muted)] text-right min-w-0 truncate">{locationFor(u)}</dd>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <dt className="text-[var(--text-faint)] shrink-0">Last sign-in</dt>
+                  <dd className="text-[var(--text-muted)]">{lastSignInCell(u)}</dd>
+                </div>
+              </dl>
+            </div>
+          ))}
+          {!rows.length && <p className="py-6 text-center text-[var(--text-faint)]">No accounts yet.</p>}
         </div>
       </SectionCard>
     </div>

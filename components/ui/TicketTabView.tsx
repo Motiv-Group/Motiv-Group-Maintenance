@@ -290,7 +290,7 @@ export function TicketTabView({ rows, grouped, newHref, subtitle, statusOptions,
         {/* Mobile: the pills form one horizontally-swipeable strip instead of wrapping
             into a tall block; sm:contents dissolves the wrapper so desktop keeps the
             exact flex-wrap layout. */}
-        <div className="flex w-full flex-nowrap items-center gap-2 overflow-x-auto pb-0.5 sm:contents">
+        <div className="flex w-full flex-nowrap items-center gap-2 overflow-x-auto no-scrollbar pb-0.5 sm:contents">
         <FilterSelect label="Status" value={status} onChange={v => { setStatus(v); setIntent(null) }} options={statusOptions} />
         <FilterSelect label="Priority" value={priority} onChange={setPriority} options={[{ value: 'all', label: 'All' }, { value: '0', label: 'Critical' }, { value: '1', label: 'High' }, { value: '2', label: 'Medium' }, { value: '3', label: 'Low' }]} />
         {grouped && <FilterSelect label="Store" value={store} onChange={setStore} options={[{ value: 'all', label: 'All stores' }, ...storeNames.map(s => ({ value: s, label: s }))]} />}

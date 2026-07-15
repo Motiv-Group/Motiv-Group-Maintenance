@@ -60,7 +60,7 @@ export default async function SupplierOverviewPage() {
         briefingScope="supplier"
         briefingScopeId={briefingScopeId}
         aside={
-          <Link href="/supplier/reviews" className="inline-flex items-center gap-2.5 rounded-full bg-[var(--surface-2)] ring-1 ring-[var(--border)] px-3.5 py-1.5 transition hover:bg-[var(--hover)]" title="View your reviews">
+          <Link href="/supplier/reviews" className="inline-flex items-center gap-2.5 rounded-full bg-[var(--surface-2)] ring-1 ring-[var(--border)] px-3.5 py-2.5 sm:py-1.5 transition hover:bg-[var(--hover)]" title="View your reviews">
             <span className="inline-flex items-center gap-1.5">
               <Star size={15} className="shrink-0 fill-amber-400 text-amber-400" />
               <span className="text-sm font-bold text-[var(--text)]">{d.rating.avg.toFixed(1)}</span>

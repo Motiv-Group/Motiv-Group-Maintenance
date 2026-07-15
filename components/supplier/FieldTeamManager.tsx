@@ -136,7 +136,7 @@ export function FieldTeamManager({ members }: { members: FieldTeamMember[] }) {
       )}
 
       {members.length === 0 ? (
-        <Card className="p-10 text-center">
+        <Card className="p-8 sm:p-10 text-center">
           <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-[var(--surface-2)] text-[var(--text-faint)]"><Users size={22} /></span>
           <p className="mt-3 text-sm font-medium text-[var(--text)]">No team members yet</p>
           <p className="mt-1 text-sm text-[var(--text-muted)]">Add your first technician to start assigning jobs.</p>
@@ -209,8 +209,8 @@ function MemberCard({ member: m, tint, editing, onEdit, onCancel, onSaved, onRem
           <a href={`tel:${m.phone}`} className="mt-0.5 inline-flex items-center gap-1 text-xs text-[var(--text-muted)] transition hover:text-blue-600 dark:hover:text-blue-400"><Phone size={11} /> {m.phone}</a>
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          <button onClick={onEdit} title="Edit" className="rounded-lg p-1.5 text-[var(--text-faint)] transition hover:bg-blue-500/10 hover:text-blue-600 dark:hover:text-blue-400"><Pencil size={15} /></button>
-          <button onClick={onRemove} title="Remove" className="rounded-lg p-1.5 text-[var(--text-faint)] transition hover:bg-red-500/10 hover:text-red-500"><Trash2 size={15} /></button>
+          <button onClick={onEdit} title="Edit" className="rounded-lg p-2.5 sm:p-1.5 text-[var(--text-faint)] transition hover:bg-blue-500/10 hover:text-blue-600 dark:hover:text-blue-400"><Pencil size={15} /></button>
+          <button onClick={onRemove} title="Remove" className="rounded-lg p-2.5 sm:p-1.5 text-[var(--text-faint)] transition hover:bg-red-500/10 hover:text-red-500"><Trash2 size={15} /></button>
         </div>
       </div>
 

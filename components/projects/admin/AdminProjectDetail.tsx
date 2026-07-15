@@ -86,7 +86,7 @@ export function AdminProjectDetail({
 
       {/* Header */}
       <Card className="p-5 space-y-4">
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <h1 className="text-lg font-bold text-[var(--text)] truncate">{project.name}</h1>
@@ -94,7 +94,7 @@ export function AdminProjectDetail({
             </div>
             <p className="text-xs text-[var(--text-muted)] mt-0.5">{project.client_name ?? '—'} · {formatDate(project.start_date) || 'no start'} → {formatDate(project.end_date) || 'no end'}{daysLeft != null && ` · ${daysLeft >= 0 ? `${daysLeft} days left` : `${-daysLeft} days overdue`}`}</p>
           </div>
-          <div className="flex flex-wrap items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5 w-full sm:w-auto">
             <ActionBtn icon={<Pencil size={14} />} label="Edit" onClick={() => setEditing(true)} />
             <ActionBtn icon={<FileSpreadsheet size={14} />} label="Import" onClick={() => setImporting(true)} primary />
             <ActionBtn icon={<Plus size={14} />} label="Add store" onClick={() => setAdding(true)} />
@@ -139,7 +139,7 @@ export function AdminProjectDetail({
 
       {/* Store table */}
       <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] border-b border-[var(--border)]">
               <tr>
@@ -193,6 +193,38 @@ export function AdminProjectDetail({
             </tbody>
           </table>
         </div>
+
+        {/* Mobile stacked cards */}
+        <div className="sm:hidden space-y-2 p-2">
+          {filtered.map((s) => (
+            <div
+              key={s.id}
+              onClick={() => router.push(`/admin/projects/${project.id}/stores/${s.id}`)}
+              className="rounded-xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] p-3 cursor-pointer"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="font-semibold text-[var(--text)] truncate">{s.store_name ?? '—'}</div>
+                  <div className="text-xs text-[var(--text-muted)] mt-0.5">{s.branch_code}{s.town ? ` · ${s.town}` : ''}</div>
+                </div>
+                <span className={`shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full ${s.overdue ? OVERDUE_PILL : STORE_STATUS_PILL[s.status]}`}>
+                  {s.overdue ? 'Overdue' : STORE_STATUS_LABEL[s.status]}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 mt-2">
+                <div className="flex-1 h-1.5 rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden">
+                  <div className="h-full rounded-full bg-blue-500" style={{ width: `${s.progress}%` }} />
+                </div>
+                <span className="text-[11px] tabular-nums text-[var(--text-muted)] w-8 text-right">{s.progress}%</span>
+              </div>
+            </div>
+          ))}
+          {filtered.length === 0 && (
+            <div className="px-3 py-10 text-center text-sm text-[var(--text-muted)]">
+              {stores.length === 0 ? 'No stores yet — import a spreadsheet to get started.' : 'No stores match your filters.'}
+            </div>
+          )}
+        </div>
       </Card>
 
       {/* Internal notes */}
@@ -231,7 +263,7 @@ function ActionBtn({ icon, label, onClick, primary, danger }: { icon: React.Reac
       ? 'bg-blue-600 text-white hover:bg-blue-700'
       : 'ring-1 ring-[var(--border)] text-[var(--text)] hover:bg-[var(--hover)]'
   return (
-    <button onClick={onClick} className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold ${cls}`}>
+    <button onClick={onClick} className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold min-h-[40px] sm:min-h-0 ${cls}`}>
       {icon} {label}
     </button>
   )

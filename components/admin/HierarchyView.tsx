@@ -38,7 +38,7 @@ function ReLinkSelect({ value, regions, onPick, label, question }: {
     <span className="inline-flex flex-col items-start gap-1 align-top">
       <select disabled={busy} value={value} title={label}
         onChange={e => { const v = e.target.value; if (!v || v === value) return; setPending(v) }}
-        className="text-[11px] rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] px-2 py-1 outline-none focus:ring-2 focus:ring-emerald-500/40 disabled:opacity-50">
+        className="text-[11px] rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] px-2 py-2 min-h-[40px] sm:py-1 sm:min-h-0 min-w-0 max-w-[55vw] truncate sm:max-w-none outline-none focus:ring-2 focus:ring-emerald-500/40 disabled:opacity-50">
         {value === '' && <option value="" disabled>Assign to region…</option>}
         {regions.map(r => <option key={r.id} value={r.id}>{r.name} ({r.code})</option>)}
       </select>

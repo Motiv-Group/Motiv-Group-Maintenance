@@ -31,11 +31,11 @@ export function SupplierReviewActions({ supplierId, companyName }: { supplierId:
           </p>
           <div className="flex gap-2">
             <button type="button" onClick={() => act(confirm)} disabled={!!busy}
-              className={`flex-1 rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition disabled:opacity-60 ${confirm === 'approve' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-red-600 hover:bg-red-700'}`}>
+              className={`flex-1 min-h-[40px] sm:min-h-0 rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition disabled:opacity-60 ${confirm === 'approve' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-red-600 hover:bg-red-700'}`}>
               {busy ? 'Working…' : 'Yes'}
             </button>
             <button type="button" onClick={() => setConfirm(null)} disabled={!!busy}
-              className="flex-1 rounded-lg px-3 py-1.5 text-xs font-semibold ring-1 ring-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--hover)] transition disabled:opacity-60">
+              className="flex-1 min-h-[40px] sm:min-h-0 rounded-lg px-3 py-1.5 text-xs font-semibold ring-1 ring-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--hover)] transition disabled:opacity-60">
               Cancel
             </button>
           </div>
@@ -43,11 +43,11 @@ export function SupplierReviewActions({ supplierId, companyName }: { supplierId:
       ) : (
         <div className="flex gap-2">
           <button type="button" onClick={() => setConfirm('approve')} disabled={!!busy}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 px-3.5 py-2 text-xs font-semibold text-white transition disabled:opacity-60">
+            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 px-3.5 min-h-[40px] sm:min-h-0 py-2 text-xs font-semibold text-white transition disabled:opacity-60">
             <Check size={14} /> {busy === 'approve' ? 'Approving…' : 'Approve'}
           </button>
           <button type="button" onClick={() => setConfirm('reject')} disabled={!!busy}
-            className="inline-flex items-center gap-1.5 rounded-lg ring-1 ring-red-500/40 text-red-600 dark:text-red-400 hover:bg-red-500/10 px-3.5 py-2 text-xs font-semibold transition disabled:opacity-60">
+            className="inline-flex items-center gap-1.5 rounded-lg ring-1 ring-red-500/40 text-red-600 dark:text-red-400 hover:bg-red-500/10 px-3.5 min-h-[40px] sm:min-h-0 py-2 text-xs font-semibold transition disabled:opacity-60">
             <X size={14} /> {busy === 'reject' ? 'Rejecting…' : 'Reject'}
           </button>
         </div>

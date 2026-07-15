@@ -88,7 +88,7 @@ export default async function VercelAdminPage() {
               <GitBranch size={15} className="text-[var(--text-muted)]" /> Recent deployments
               <InfoTip title="Deployments">Each push to the repo triggers a build. This lists the latest 8 with their branch, commit message, target (production/preview) and result.</InfoTip>
             </h2>
-            <div className="overflow-x-auto -mx-1">
+            <div className="hidden sm:block overflow-x-auto -mx-1">
               <table className="w-full text-sm min-w-[560px]">
                 <thead>
                   <tr className="text-left text-[11px] text-[var(--text-faint)] border-b border-[var(--border)]">
@@ -112,6 +112,22 @@ export default async function VercelAdminPage() {
                   {!d.deployments.length && <tr><td colSpan={5} className="py-6 text-center text-[var(--text-faint)]">No deployments reported.</td></tr>}
                 </tbody>
               </table>
+            </div>
+            <div className="sm:hidden space-y-2">
+              {d.deployments.map((x: VercelDeployment) => (
+                <div key={x.uid} className="rounded-xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="min-w-0 flex-1 truncate font-semibold text-[var(--text)]">{x.commitMessage ?? '—'}</p>
+                    <StateBadge state={x.state} />
+                  </div>
+                  <p className="mt-1 font-mono text-[12px] text-[var(--text-muted)] truncate">{x.branch ?? '—'}</p>
+                  <div className="mt-1 flex items-center justify-between gap-2 text-[12px]">
+                    <span className="text-[var(--text-muted)]">{x.target ?? 'preview'}</span>
+                    <span className="text-[var(--text-faint)]">{when(x.createdAt)}</span>
+                  </div>
+                </div>
+              ))}
+              {!d.deployments.length && <p className="py-6 text-center text-[var(--text-faint)]">No deployments reported.</p>}
             </div>
           </Card>
 
