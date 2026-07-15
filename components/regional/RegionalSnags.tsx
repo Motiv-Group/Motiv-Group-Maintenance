@@ -33,7 +33,7 @@ const PHASE_META: Record<Phase, { label: string; badge: string; store: string }>
 
 function StatCard({ icon, tone, value, title, sub, active, onClick }: { icon: ReactNode; tone: string; value: number; title: string; sub: string; active: boolean; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} aria-pressed={active} className={`flex items-center gap-3 rounded-xl border-l-4 bg-[var(--surface)] p-4 text-left ring-1 transition hover:bg-[var(--hover)] ${tone} ${active ? 'ring-2 ring-[#C6A35D]/50' : 'ring-[var(--border)]'}`}>
+    <button type="button" onClick={onClick} aria-pressed={active} className={`flex items-center gap-3 rounded-xl bg-[var(--surface)] p-4 text-left ring-1 transition hover:bg-[var(--hover)] ${active ? 'ring-2 ring-[#C6A35D]/50' : 'ring-[var(--border)]'}`}>
       <span className="shrink-0">{icon}</span>
       <span className="min-w-0">
         <span className="block text-2xl font-bold leading-none text-[var(--text)]">{value}</span>
@@ -177,7 +177,7 @@ export function RegionalSnags({ snags, generatedAt }: { snags: RegionalSnagRow[]
                   const pm = PHASE_META[p]
                   const rDue = t.dueAt ? new Date(t.dueAt).getTime() - nowMs : null
                   return (
-                    <div key={t.id} className={`border-b border-l-4 border-[var(--border)] px-4 py-4 last:border-b-0 ${p === 'dispute' ? 'border-l-violet-500' : p === 'review' ? 'border-l-amber-500' : 'border-l-blue-500'}`}>
+                    <div key={t.id} className="border-b border-[var(--border)] px-4 py-4 last:border-b-0">
                       <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr_1.3fr_auto]">
                         <div className="flex min-w-0 items-start gap-3">
                           <CategoryIcon category={t.category ?? t.title} priority={t.priority} className="h-11 w-11" iconSize={18} />

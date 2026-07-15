@@ -37,7 +37,7 @@ function nextStep(p: Phase, ticketStatus: string): { Icon: typeof Clock; cls: st
 
 function StatCard({ icon, tone, value, title, sub, active, onClick }: { icon: ReactNode; tone: string; value: number; title: string; sub: string; active: boolean; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} aria-pressed={active} className={`flex items-center gap-3 rounded-xl border-l-4 bg-[var(--surface)] p-4 text-left ring-1 transition hover:bg-[var(--hover)] ${tone} ${active ? 'ring-2 ring-[#C6A35D]/50' : 'ring-[var(--border)]'}`}>
+    <button type="button" onClick={onClick} aria-pressed={active} className={`flex items-center gap-3 rounded-xl bg-[var(--surface)] p-4 text-left ring-1 transition hover:bg-[var(--hover)] ${active ? 'ring-2 ring-[#C6A35D]/50' : 'ring-[var(--border)]'}`}>
       <span className="shrink-0">{icon}</span>
       <span className="min-w-0">
         <span className="block text-2xl font-bold leading-none text-[var(--text)]">{value}</span>
@@ -169,7 +169,7 @@ export function SupplierSignoff({ signoffs }: { signoffs: SupplierSignoffRow[] }
                   const meta = PHASE_META[phase]
                   const ns = nextStep(phase, s.ticketStatus)
                   return (
-                    <Link key={s.id} href={`/supplier/tickets/${s.ticketId}`} className={`block border-b border-l-4 border-[var(--border)] px-4 py-4 transition last:border-b-0 hover:bg-[var(--hover)] ${phase === 'changes' ? 'border-l-red-500' : 'border-l-blue-500'}`}>
+                    <Link key={s.id} href={`/supplier/tickets/${s.ticketId}`} className="block border-b border-[var(--border)] px-4 py-4 transition last:border-b-0 hover:bg-[var(--hover)]">
                       <div className={ROW}>
                         {/* Job */}
                         <div className="flex min-w-0 items-start gap-3">

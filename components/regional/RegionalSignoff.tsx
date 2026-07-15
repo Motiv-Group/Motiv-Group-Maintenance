@@ -27,7 +27,7 @@ const prioTicket = (p: string) => ({ priority: p } as unknown as Parameters<type
 
 function StatCard({ icon, tone, value, title, sub, active, onClick }: { icon: ReactNode; tone: string; value: number; title: string; sub: string; active: boolean; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} aria-pressed={active} className={`flex items-center gap-3 rounded-xl border-l-4 bg-[var(--surface)] p-4 text-left ring-1 transition hover:bg-[var(--hover)] ${tone} ${active ? 'ring-2 ring-[#C6A35D]/50' : 'ring-[var(--border)]'}`}>
+    <button type="button" onClick={onClick} aria-pressed={active} className={`flex items-center gap-3 rounded-xl bg-[var(--surface)] p-4 text-left ring-1 transition hover:bg-[var(--hover)] ${active ? 'ring-2 ring-[#C6A35D]/50' : 'ring-[var(--border)]'}`}>
       <span className="shrink-0">{icon}</span>
       <span className="min-w-0">
         <span className="block text-2xl font-bold leading-none text-[var(--text)]">{value}</span>
@@ -156,7 +156,7 @@ export function RegionalSignoff({ signoffs }: { signoffs: RegionalSignoffRow[] }
                   const p = phaseOf(s)
                   const meta = PHASE_META[p]
                   return (
-                    <div key={s.id} className={`block border-b border-l-4 border-[var(--border)] px-4 py-4 last:border-b-0 ${p === 'evidence' ? 'border-l-amber-500' : 'border-l-blue-500'}`}>
+                    <div key={s.id} className="block border-b border-[var(--border)] px-4 py-4 last:border-b-0">
                       <div className={ROW}>
                         <div className="flex min-w-0 items-start gap-3">
                           <CategoryIcon category={s.category ?? s.title} priority={s.priority} className="h-11 w-11" iconSize={18} />
