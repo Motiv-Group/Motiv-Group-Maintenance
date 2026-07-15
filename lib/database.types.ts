@@ -6,6 +6,24 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export interface Database {
   public: {
     Tables: {
+      app_settings: {
+        Row: {
+          key: string | null
+          value: Json
+          updated_at: string
+        }
+        Insert: {
+          key?: string | null
+          value?: Json
+          updated_at?: string
+        }
+        Update: {
+          key?: string | null
+          value?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
       approvals: {
         Row: {
           id: string
@@ -2543,6 +2561,57 @@ export interface Database {
           referencedColumns: ["id"]
         }
       ]
+      }
+      ticket_chat_messages: {
+        Row: {
+          id: string | null
+          ticket_id: string
+          company_id: string | null
+          author_id: string
+          author_role: string
+          body: string | null
+          attachment_urls: Json
+          created_at: string
+        }
+        Insert: {
+          id?: string | null
+          ticket_id?: string
+          company_id?: string | null
+          author_id?: string
+          author_role?: string
+          body?: string | null
+          attachment_urls?: Json
+          created_at?: string
+        }
+        Update: {
+          id?: string | null
+          ticket_id?: string
+          company_id?: string | null
+          author_id?: string
+          author_role?: string
+          body?: string | null
+          attachment_urls?: Json
+          created_at?: string
+        }
+        Relationships: []
+      }
+      ticket_chat_reads: {
+        Row: {
+          ticket_id: string
+          user_id: string
+          last_read_at: string
+        }
+        Insert: {
+          ticket_id?: string
+          user_id?: string
+          last_read_at?: string
+        }
+        Update: {
+          ticket_id?: string
+          user_id?: string
+          last_read_at?: string
+        }
+        Relationships: []
       }
       ticket_dispute_messages: {
         Row: {
