@@ -134,7 +134,7 @@ function StatCard({ intent, icon, value, title, sub, active, onClick }: { intent
 // ── Styled dropdown (native select, "Label: Value" pill) ────────
 function FilterSelect<T extends string>({ label, value, onChange, options }: { label: string; value: T; onChange: (v: T) => void; options: { value: T; label: string }[] }) {
   return (
-    <label className="relative flex items-center gap-1.5 rounded-xl bg-[var(--input-bg)] px-3 py-2.5 text-sm ring-1 ring-[var(--border)] transition focus-within:ring-[#C6A35D]/40">
+    <label className="relative flex items-center gap-1.5 rounded-xl bg-[var(--input-bg)] px-3 py-2.5 text-sm ring-1 ring-[var(--border)] transition focus-within:ring-blue-500/40">
       <span className="whitespace-nowrap text-[var(--text-muted)]">{label}:</span>
       <select value={value} onChange={e => onChange(e.target.value as T)}
         className="cursor-pointer appearance-none bg-transparent pr-4 font-semibold text-[var(--text)] outline-none">
@@ -325,7 +325,7 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
         <div className="relative min-w-[180px] flex-1">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
           <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search tickets…"
-            className="w-full rounded-xl bg-[var(--input-bg)] py-2.5 pl-9 pr-3 text-sm text-[var(--text)] ring-1 ring-[var(--border)] outline-none placeholder-[var(--text-faint)] focus:ring-[#C6A35D]/40" />
+            className="w-full rounded-xl bg-[var(--input-bg)] py-2.5 pl-9 pr-3 text-sm text-[var(--text)] ring-1 ring-[var(--border)] outline-none placeholder-[var(--text-faint)] focus:ring-blue-500/40" />
         </div>
         <FilterSelect label="Status" value={status} onChange={v => { setStatus(v); setIntent(null) }} options={statusOptions} />
         <FilterSelect label="Priority" value={priority} onChange={setPriority} options={[{ value: 'all', label: 'All' }, { value: '0', label: 'Critical' }, { value: '1', label: 'High' }, { value: '2', label: 'Medium' }, { value: '3', label: 'Low' }]} />
@@ -333,7 +333,7 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
         <FilterSelect label="Sort by" value={sort} onChange={setSort} options={[{ value: 'urgent', label: 'Most urgent' }, { value: 'sla', label: 'Next SLA' }, { value: 'newest', label: 'Newest' }, { value: 'oldest', label: 'Oldest' }]} />
         <div className="relative">
           <button type="button" onClick={() => setFiltersOpen(o => !o)} aria-expanded={filtersOpen}
-            className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2.5 text-sm font-semibold ring-1 transition ${adv.size ? 'bg-[#C6A35D]/10 text-[#C6A35D] ring-[#C6A35D]/40' : 'text-[var(--text-muted)] ring-[var(--border)] hover:bg-[var(--hover)]'}`}>
+            className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2.5 text-sm font-semibold ring-1 transition ${adv.size ? 'bg-blue-500/10 text-blue-500 ring-blue-500/40' : 'text-[var(--text-muted)] ring-[var(--border)] hover:bg-[var(--hover)]'}`}>
             <SlidersHorizontal size={15} /> Filters{adv.size ? ` (${adv.size})` : ''}
           </button>
           {filtersOpen && (
@@ -343,7 +343,7 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
                 <p className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-faint)]">Refine</p>
                 {([['overdue', 'Overdue'], ['internal_breach', 'Internal breached'], ['supplier_breach', 'Supplier breached'], ['disputed', 'Disputed']] as const).map(([k, label]) => (
                   <label key={k} className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-2 text-sm text-[var(--text)] transition hover:bg-[var(--hover)]">
-                    <input type="checkbox" checked={adv.has(k)} onChange={e => setAdv(s => { const n = new Set(s); e.target.checked ? n.add(k) : n.delete(k); return n })} className="h-4 w-4 accent-[#C6A35D]" />
+                    <input type="checkbox" checked={adv.has(k)} onChange={e => setAdv(s => { const n = new Set(s); e.target.checked ? n.add(k) : n.delete(k); return n })} className="h-4 w-4 accent-[#f59e0b]" />
                     {label}
                   </label>
                 ))}
@@ -384,7 +384,7 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
                   {overdue > 0 && <> · <span className="font-semibold text-amber-600 dark:text-amber-400">{overdue} overdue</span></>}
                 </span>
               </span>
-              <button type="button" onClick={e => { e.stopPropagation(); setPanelStore(storeName) }} title="Store overview" className="shrink-0 rounded-lg p-1.5 text-[var(--text-faint)] transition hover:bg-[#C6A35D]/10 hover:text-[#C6A35D]"><BarChart3 size={16} /></button>
+              <button type="button" onClick={e => { e.stopPropagation(); setPanelStore(storeName) }} title="Store overview" className="shrink-0 rounded-lg p-1.5 text-[var(--text-faint)] transition hover:bg-blue-500/10 hover:text-blue-500"><BarChart3 size={16} /></button>
               <span className="shrink-0 text-right">
                 <span className="block text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Next SLA in</span>
                 <span className={`block text-sm font-bold ${nextSla != null && nextSla - nowMs < 2 * 3600_000 ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'}`}>{nextSla != null ? humanizeDuration(nextSla - nowMs) : '—'}</span>
@@ -399,7 +399,7 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
 
       {/* Archive — completed tickets, only under the default view */}
       {archived.length > 0 && (
-        <Card className="cursor-pointer p-3 transition hover:ring-[#C6A35D]/30" onClick={toggleArchive} role="button" tabIndex={0} aria-expanded={archiveOpen} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleArchive() } }}>
+        <Card className="cursor-pointer p-3 transition hover:ring-blue-500/30" onClick={toggleArchive} role="button" tabIndex={0} aria-expanded={archiveOpen} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleArchive() } }}>
           <div className="flex w-full items-center gap-2">
             <ChevronDown size={16} className={`shrink-0 text-[var(--text-muted)] transition-transform ${archiveOpen ? 'rotate-180' : ''}`} />
             <span className="text-sm font-bold text-[var(--text)]">Archive · Completed</span>

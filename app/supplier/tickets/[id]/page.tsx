@@ -39,7 +39,7 @@ const SIGNOFF_META: Record<string, { label: string; ring: string; bg: string; he
   accepted: { label: 'Approved', ring: 'ring-emerald-500/40', bg: 'bg-emerald-500/5', head: 'bg-emerald-500/10 border-emerald-500/20', badge: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400', iconCls: 'text-emerald-500' },
   rejected: { label: 'Rejected', ring: 'ring-red-500/40', bg: 'bg-red-500/5', head: 'bg-red-500/10 border-red-500/20', badge: 'bg-red-500/15 text-red-700 dark:text-red-400', iconCls: 'text-red-500' },
   evidence_requested: { label: 'More info requested', ring: 'ring-amber-500/40', bg: 'bg-amber-500/5', head: 'bg-amber-500/10 border-amber-500/20', badge: 'bg-amber-500/15 text-amber-700 dark:text-amber-400', iconCls: 'text-amber-500' },
-  submitted: { label: 'Under review', ring: 'ring-[#C6A35D]/40', bg: 'bg-[#C6A35D]/5', head: 'bg-[#C6A35D]/10 border-[#C6A35D]/20', badge: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D]', iconCls: 'text-[#C6A35D]' },
+  submitted: { label: 'Under review', ring: 'ring-[#f59e0b]/40', bg: 'bg-[#f59e0b]/5', head: 'bg-[#f59e0b]/10 border-[#f59e0b]/20', badge: 'bg-[#f59e0b]/15 text-amber-700 dark:text-[#f59e0b]', iconCls: 'text-[#f59e0b]' },
 }
 
 // A labelled sub-group inside the Archived block — a small uppercase heading over

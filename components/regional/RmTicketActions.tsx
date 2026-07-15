@@ -618,7 +618,7 @@ export function QuoteReviewCard({ ticketId, quotes }: { ticketId: string; quotes
             </div>
           )}
           {q.description && <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{q.description}</p>}
-          {q.fileUrl && <ViewTrackedLink ticketId={ticketId} itemType="quote" itemLabel={`${q.supplierName}'s quote`} href={q.fileUrl} className="text-sm text-[#C6A35D] underline">View attachment</ViewTrackedLink>}
+          {q.fileUrl && <ViewTrackedLink ticketId={ticketId} itemType="quote" itemLabel={`${q.supplierName}'s quote`} href={q.fileUrl} className="text-sm text-[#f59e0b] underline">View attachment</ViewTrackedLink>}
 
           {declineFor === q.id ? (
             <div className="space-y-2 pt-1">
@@ -845,7 +845,7 @@ export function RmCompletionReview({ ticketId, label, submittedAt, photoCount, d
       {/* Tap the summary to open the full submission for review + sign-off. */}
       <button type="button" onClick={() => setOpen(true)} className="w-full rounded-lg bg-[var(--surface)] p-4 text-left ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)]">
         <div className="flex items-center gap-2.5">
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#C6A35D]/15 text-[#C6A35D]"><ClipboardCheck size={16} /></span>
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-blue-500/15 text-blue-500"><ClipboardCheck size={16} /></span>
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-bold text-[var(--text)]">{label}</span>
             <span className="block text-[11px] text-[var(--text-faint)]">Submitted {formatDateTime(submittedAt)}</span>
@@ -1148,7 +1148,7 @@ export function SignoffReviewPanel({ ticketId, s, onDone }: { ticketId: string; 
       {/* Submission detail — photos / COC / notes, each under its own rule. */}
       <div className="overflow-hidden rounded-xl bg-[var(--surface)] ring-1 ring-[var(--border)]">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 border-b border-[var(--border)] px-4 py-3">
-          <FileText size={16} className="shrink-0 text-[#C6A35D]" />
+          <FileText size={16} className="shrink-0 text-blue-500" />
           <span className="text-sm font-bold text-[var(--text)]">{s.label}</span>
           <span className="text-[var(--text-faint)]">·</span>
           <span className="text-[13px] text-[var(--text-faint)]">{formatDateTime(s.createdAt)}</span>

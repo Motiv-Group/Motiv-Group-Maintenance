@@ -62,7 +62,7 @@ export function AiBriefing({ headline: initHeadline, body: initBody, scope, scop
         {scope && scopeId && (
           <>{' '}
             <button type="button" onClick={refresh} disabled={busy} aria-label="Refresh briefing" title="Refresh briefing"
-              className="inline-flex translate-y-0.5 rounded p-0.5 text-[var(--text-faint)] transition hover:text-[#C6A35D] disabled:opacity-60">
+              className="inline-flex translate-y-0.5 rounded p-0.5 text-[var(--text-faint)] transition hover:text-blue-500 disabled:opacity-60">
               <RefreshCw size={12} className={busy ? 'animate-spin' : ''} />
             </button>
           </>
@@ -76,7 +76,7 @@ export function AiBriefing({ headline: initHeadline, body: initBody, scope, scop
                 onClose={close}
                 title={
                   <span className="flex items-center gap-2">
-                    <span className="grid h-7 w-7 place-items-center rounded-lg bg-[#C6A35D]/15 text-[#C6A35D]"><Sparkles size={15} /></span>
+                    <span className="grid h-7 w-7 place-items-center rounded-lg bg-blue-500/15 text-blue-500"><Sparkles size={15} /></span>
                     <span className="text-base font-bold text-[var(--text)]">AI insight</span>
                   </span>
                 }

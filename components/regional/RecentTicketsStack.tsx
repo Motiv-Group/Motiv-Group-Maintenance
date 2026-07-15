@@ -122,7 +122,7 @@ export function RecentTicketsStack({
   const collapseBar = (
     <button
       onClick={() => setExpanded(false)}
-      className="w-full text-xs text-[#C6A35D] hover:text-amber-600 flex items-center justify-between py-2 px-1 transition-colors"
+      className="w-full text-xs text-[#f59e0b] hover:text-amber-600 flex items-center justify-between py-2 px-1 transition-colors"
     >
       <span className="flex items-center gap-1 font-medium">
         <ChevronUp size={12} /> Collapse
@@ -170,7 +170,7 @@ export function RecentTicketsStack({
                 <span className="text-xs text-gray-400 dark:text-gray-500">
                   {tickets.length} ticket{tickets.length !== 1 ? 's' : ''} · {countLabel}
                 </span>
-                <span className="text-xs font-medium text-[#C6A35D] flex items-center gap-1">
+                <span className="text-xs font-medium text-[#f59e0b] flex items-center gap-1">
                   View all <ChevronDown size={11} />
                 </span>
               </div>

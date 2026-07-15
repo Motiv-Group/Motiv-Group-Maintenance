@@ -113,7 +113,7 @@ function Composer({ ticketId, action, submitLabel, placeholder, onDone }: { tick
   return (
     <div className="space-y-2.5">
       <textarea value={text} onChange={e => setText(e.target.value)} placeholder={placeholder} rows={3}
-        className="w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)] focus:ring-[#C6A35D]/40 outline-none" />
+        className="w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)] focus:ring-blue-500/40 outline-none" />
       {files.length > 0 && (
         <div className="space-y-1">
           {files.map((f, i) => (
@@ -481,13 +481,13 @@ export function DisputeControls({ ticketId, origin, viewerRole, pendingOutcome, 
   return (
     <div className="rounded-xl ring-1 ring-[var(--border)] bg-[var(--input-bg)] p-3 space-y-2.5">
       {pending && iAmProposer && (
-        <div className="rounded-lg ring-1 ring-[#C6A35D]/30 bg-[#C6A35D]/10 p-2.5 space-y-2">
+        <div className="rounded-lg ring-1 ring-[#f59e0b]/30 bg-[#f59e0b]/10 p-2.5 space-y-2">
           <p className="text-sm text-[var(--text)]">Waiting for the {otherLabel(viewerRole === 'supplier' ? 'regional_manager' : 'supplier')} to confirm your proposal to <span className="font-semibold">{proposalText}</span>.</p>
           <button onClick={() => act('cancel')} disabled={!!busy} className="w-full py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm font-semibold disabled:opacity-50">{busy === 'cancel' ? 'Cancelling…' : 'Cancel proposal'}</button>
         </div>
       )}
       {pending && !iAmProposer && (
-        <div className="rounded-lg ring-1 ring-[#C6A35D]/30 bg-[#C6A35D]/10 p-2.5 space-y-2">
+        <div className="rounded-lg ring-1 ring-[#f59e0b]/30 bg-[#f59e0b]/10 p-2.5 space-y-2">
           <p className="text-sm text-[var(--text)]">The {otherLabel(pendingBy!)} proposed to <span className="font-semibold">{proposalText}</span>. Both sides must agree.</p>
           <button onClick={() => act('confirm')} disabled={!!busy} className="w-full py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold disabled:opacity-50">{busy === 'confirm' ? 'Agreeing…' : 'Agree'}</button>
         </div>

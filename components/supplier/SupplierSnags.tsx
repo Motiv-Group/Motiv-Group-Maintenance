@@ -33,7 +33,7 @@ const PHASE_META: Record<Phase, { label: string; badge: string; store: string }>
 
 function StatCard({ icon, tone, value, title, sub, active, onClick }: { icon: ReactNode; tone: string; value: number; title: string; sub: string; active: boolean; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} aria-pressed={active} className={`flex items-center gap-3 rounded-xl bg-[var(--surface)] p-4 text-left ring-1 transition hover:bg-[var(--hover)] ${active ? 'ring-2 ring-[#C6A35D]/50' : 'ring-[var(--border)]'}`}>
+    <button type="button" onClick={onClick} aria-pressed={active} className={`flex items-center gap-3 rounded-xl bg-[var(--surface)] p-4 text-left ring-1 transition hover:bg-[var(--hover)] ${active ? 'ring-2 ring-blue-500/50' : 'ring-[var(--border)]'}`}>
       <span className="shrink-0">{icon}</span>
       <span className="min-w-0">
         <span className="block text-2xl font-bold leading-none text-[var(--text)]">{value}</span>
@@ -46,7 +46,7 @@ function StatCard({ icon, tone, value, title, sub, active, onClick }: { icon: Re
 
 function Select<T extends string>({ label, value, onChange, options }: { label: string; value: T; onChange: (v: T) => void; options: { value: T; label: string }[] }) {
   return (
-    <label className="relative flex min-w-[150px] flex-1 items-center gap-1.5 rounded-xl bg-[var(--input-bg)] px-3 py-2.5 text-sm ring-1 ring-[var(--border)] transition focus-within:ring-[#C6A35D]/40 sm:flex-none">
+    <label className="relative flex min-w-[150px] flex-1 items-center gap-1.5 rounded-xl bg-[var(--input-bg)] px-3 py-2.5 text-sm ring-1 ring-[var(--border)] transition focus-within:ring-blue-500/40 sm:flex-none">
       <span className="whitespace-nowrap text-[11px] uppercase tracking-wide text-[var(--text-faint)]">{label}</span>
       <select value={value} onChange={e => onChange(e.target.value as T)} className="w-full cursor-pointer appearance-none bg-transparent pr-4 font-semibold text-[var(--text)] outline-none">
         {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -133,7 +133,7 @@ export function SupplierSnags({ snags, company, generatedAt }: { snags: Supplier
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-[220px] flex-1">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
-          <input value={q} onChange={e => { setQ(e.target.value); setPage(1) }} placeholder="Search snags by store, ticket ID or title…" className="w-full rounded-xl bg-[var(--input-bg)] py-2.5 pl-9 pr-3 text-sm text-[var(--text)] ring-1 ring-[var(--border)] outline-none placeholder-[var(--text-faint)] focus:ring-[#C6A35D]/40" />
+          <input value={q} onChange={e => { setQ(e.target.value); setPage(1) }} placeholder="Search snags by store, ticket ID or title…" className="w-full rounded-xl bg-[var(--input-bg)] py-2.5 pl-9 pr-3 text-sm text-[var(--text)] ring-1 ring-[var(--border)] outline-none placeholder-[var(--text-faint)] focus:ring-blue-500/40" />
         </div>
         <Select label="Store" value={store} onChange={v => { setStore(v); setPage(1) }} options={[{ value: 'all', label: 'All stores' }, ...storeNames.map(s => ({ value: s, label: s }))]} />
         <Select label="Status" value={statusF} onChange={v => { setStatusF(v); setPage(1) }} options={[{ value: 'all', label: 'All statuses' }, { value: 'open', label: 'Open' }, { value: 'action', label: 'Action required' }, { value: 'dispute', label: 'Under dispute' }, { value: 'resolved', label: 'Resolved' }]} />

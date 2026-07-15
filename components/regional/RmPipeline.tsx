@@ -8,7 +8,7 @@ const STAGES = [
   { label: 'Quoted',            dot: 'bg-violet-500',  ring: 'ring-violet-500/30',  text: 'text-violet-600 dark:text-violet-400' },
   { label: 'Approved',          dot: 'bg-teal-500',    ring: 'ring-teal-500/30',    text: 'text-teal-600 dark:text-teal-400' },
   { label: 'Job scheduled',     dot: 'bg-indigo-500',  ring: 'ring-indigo-500/30',  text: 'text-indigo-600 dark:text-indigo-400' },
-  { label: 'In progress',       dot: 'bg-[#C6A35D]',   ring: 'ring-[#C6A35D]/30',   text: 'text-amber-600 dark:text-[#C6A35D]' },
+  { label: 'In progress',       dot: 'bg-[#f59e0b]',   ring: 'ring-[#f59e0b]/30',   text: 'text-amber-600 dark:text-[#f59e0b]' },
   { label: 'Awaiting sign-off', dot: 'bg-orange-500',  ring: 'ring-orange-500/30',  text: 'text-orange-600 dark:text-orange-400' },
   { label: 'Completed',         dot: 'bg-emerald-500', ring: 'ring-emerald-500/30', text: 'text-emerald-600 dark:text-emerald-400' },
 ] as const

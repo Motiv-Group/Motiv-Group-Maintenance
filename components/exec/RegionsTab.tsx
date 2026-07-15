@@ -45,7 +45,7 @@ export function RegionsTab({ data }: { data: EstateDashboardData }) {
 
   return (
     <div className="space-y-5">
-      <TabHeader icon={<Globe2 size={18} className="text-[#C6A35D]" />} title="Regions" subtitle="Regional performance, portfolio health and executive attention areas.">
+      <TabHeader icon={<Globe2 size={18} className="text-[#f59e0b]" />} title="Regions" subtitle="Regional performance, portfolio health and executive attention areas.">
         <DateChip date={formatDate(data.generatedAt)} />
         <FilterMenu value={status} onChange={setStatus} options={STATUS_FILTER_OPTIONS} />
         <ProvisionButton mode="exec-regions" regions={regions.map(r => ({ id: r.region.regionId, name: r.regionName }))} label="Manage regions & RMs" />
@@ -84,7 +84,7 @@ export function RegionsTab({ data }: { data: EstateDashboardData }) {
                       <td className="px-2 text-[var(--text-muted)] whitespace-nowrap">{fmtK(region.costExposure)}</td>
                       <td className="px-2 text-xs text-[var(--text-muted)] max-w-[200px] truncate">{region.mainReason}</td>
                       <td className="px-2">
-                        <span className={`text-[11px] px-2 py-1 rounded-lg ring-1 ${region.status === 'controlled' ? 'text-[var(--text-muted)] ring-white/10' : 'text-[#C6A35D] ring-[#C6A35D]/40'}`}>
+                        <span className={`text-[11px] px-2 py-1 rounded-lg ring-1 ${region.status === 'controlled' ? 'text-[var(--text-muted)] ring-white/10' : 'text-[#f59e0b] ring-[#f59e0b]/40'}`}>
                           {region.status === 'controlled' ? 'Monitor' : 'Review'}
                         </span>
                       </td>
@@ -98,7 +98,7 @@ export function RegionsTab({ data }: { data: EstateDashboardData }) {
           </SectionCard>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            <SectionCard title="Regions Requiring Attention" icon={<AlertTriangle size={15} className="text-[#C6A35D]" />}>
+            <SectionCard title="Regions Requiring Attention" icon={<AlertTriangle size={15} className="text-[#f59e0b]" />}>
               {regions.filter(r => r.region.status !== 'controlled').slice(0, 5).map(({ region, regionName }) => (
                 <div key={region.regionId} className="flex items-center justify-between gap-2 py-2 border-b border-[var(--border)] last:border-0">
                   <div className="min-w-0"><Pill status={region.status} label={regionName} /><p className="text-xs text-[var(--text-muted)] mt-1 truncate">{region.mainReason}</p></div>
@@ -109,7 +109,7 @@ export function RegionsTab({ data }: { data: EstateDashboardData }) {
             </SectionCard>
 
             <SectionCard title="Performing Well" icon={<CheckCircle2 size={15} className="text-emerald-400" />}>
-              <PerfRow icon={<Trophy size={15} className="text-[#C6A35D]" />} label="Best Performing Region" value={best ? `${best.regionName} (${best.region.finalPortfolioHealth}%)` : '—'} />
+              <PerfRow icon={<Trophy size={15} className="text-[#f59e0b]" />} label="Best Performing Region" value={best ? `${best.regionName} (${best.region.finalPortfolioHealth}%)` : '—'} />
               <PerfRow icon={<Lock size={15} className="text-emerald-400" />} label="Lowest SLA Breaches" value={lowestBreaches ? `${lowestBreaches.regionName}` : '—'} />
               <PerfRow icon={<Coins size={15} className="text-emerald-400" />} label="Lowest Cost Exposure" value={lowestCost ? `${lowestCost.regionName} (${fmtK(lowestCost.region.costExposure)})` : '—'} />
             </SectionCard>

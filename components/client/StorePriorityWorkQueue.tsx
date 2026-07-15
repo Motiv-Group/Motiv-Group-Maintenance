@@ -324,7 +324,7 @@ function clientStatusLabel(ticket: StoreManagerTicket): string {
 function clientStatusBadgeClass(ticket: StoreManagerTicket): string {
   if (ticket.infoAdded || ticket.status === 'info_requested') return 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
   switch (ticket.status) {
-    case 'in_progress': return 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D]'
+    case 'in_progress': return 'bg-[#f59e0b]/15 text-amber-700 dark:text-[#f59e0b]'
     case 'completed':   return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
     case 'scheduled':   return 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-400'
     case 'cancelled':   return 'bg-slate-500/15 text-slate-600 dark:text-slate-300'

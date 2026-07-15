@@ -46,7 +46,7 @@ export function PhotoUploader({ photos, previews, onAdd, onRemove, max = 5, minH
         <div className="space-y-1">
           {previews.map((src, i) => (
             <div key={i} className="flex items-center justify-between gap-2">
-              <a href={src} target="_blank" rel="noopener noreferrer" className="text-sm text-[#C6A35D] underline truncate min-w-0">Photo {i + 1}</a>
+              <a href={src} target="_blank" rel="noopener noreferrer" className="text-sm text-[#f59e0b] underline truncate min-w-0">Photo {i + 1}</a>
               <button type="button" onClick={() => onRemove(i)} className="shrink-0 text-[var(--text-faint)] hover:text-red-500">
                 <X size={14} />
               </button>
@@ -86,7 +86,7 @@ export function PhotoUploader({ photos, previews, onAdd, onRemove, max = 5, minH
                 <button
                   type="button"
                   onClick={() => browseRef.current?.click()}
-                  className="flex items-center justify-center gap-2 py-3.5 bg-white dark:bg-gray-800 border border-[var(--border)] dark:border-gray-700 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-200 hover:border-[#C6A35D] hover:text-[#C6A35D] transition-colors"
+                  className="flex items-center justify-center gap-2 py-3.5 bg-white dark:bg-gray-800 border border-[var(--border)] dark:border-gray-700 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-200 hover:border-blue-500 hover:text-blue-500 transition-colors"
                 >
                   <ImagePlus size={16} />
                   Browse
@@ -96,7 +96,7 @@ export function PhotoUploader({ photos, previews, onAdd, onRemove, max = 5, minH
                 <button
                   type="button"
                   onClick={() => cameraRef.current?.click()}
-                  className="flex items-center justify-center gap-2 py-3.5 bg-white dark:bg-gray-800 border border-[var(--border)] dark:border-gray-700 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-200 hover:border-[#C6A35D] hover:text-[#C6A35D] transition-colors"
+                  className="flex items-center justify-center gap-2 py-3.5 bg-white dark:bg-gray-800 border border-[var(--border)] dark:border-gray-700 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-200 hover:border-blue-500 hover:text-blue-500 transition-colors"
                 >
                   <Camera size={16} />
                   Take Photo

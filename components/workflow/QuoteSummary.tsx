@@ -23,7 +23,7 @@ export interface QuoteSummaryData {
 const BADGE: Record<QuoteSummaryStatus, { label: string; cls: string }> = {
   accepted: { label: 'Approved',     cls: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' },
   awarded:  { label: 'Awarded',      cls: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' },
-  pending:  { label: 'Under review', cls: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D]' },
+  pending:  { label: 'Under review', cls: 'bg-[#f59e0b]/15 text-amber-700 dark:text-[#f59e0b]' },
   declined: { label: 'Declined',     cls: 'bg-red-500/15 text-red-700 dark:text-red-400' },
 }
 

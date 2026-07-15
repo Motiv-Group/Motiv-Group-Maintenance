@@ -15,7 +15,7 @@ export function CollapsibleCard({ persistKey, header, children, defaultOpen = fa
   const toggle = () => setOpen(o => { const v = !o; writeCollapse(persistKey, v); return v })
 
   return (
-    <Card className="p-0 overflow-hidden cursor-pointer hover:ring-[#C6A35D]/30 transition" onClick={toggle} role="button" tabIndex={0} aria-expanded={open} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle() } }}>
+    <Card className="p-0 overflow-hidden cursor-pointer hover:ring-blue-500/30 transition" onClick={toggle} role="button" tabIndex={0} aria-expanded={open} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle() } }}>
       <div className="flex items-center justify-between gap-2 px-5 py-4">
         {header}
         <ChevronDown size={16} className={`shrink-0 text-[var(--text-faint)] transition-transform ${open ? 'rotate-180' : ''}`} />

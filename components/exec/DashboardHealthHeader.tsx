@@ -55,7 +55,7 @@ export function DashboardHealthHeader({
                 <span className="text-[var(--text)]">{scopePrefix} </span>
                 <span className={STATUS_TEXT[status]}>{HEADLINE[status]}</span>
               </span>
-              <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-faint)]"><Sparkles size={11} className="text-[#C6A35D]" /> AI</span>
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-faint)]"><Sparkles size={11} className="text-blue-500" /> AI</span>
             </div>
             <AiBriefing headline={briefingHeadline} body={briefingBody} scope={briefingScope} scopeId={briefingScopeId} className="mt-1.5 text-xs leading-relaxed text-[var(--text-muted)]" />
           </div>

@@ -63,7 +63,7 @@ export default async function StoreVisitsPage() {
 
       {rows.map(r => (
         <Link key={r.id} href={`/client/tickets/${r.id}`}>
-          <Card className="p-4 flex items-center gap-3 transition hover:ring-[#C6A35D]/50">
+          <Card className="p-4 flex items-center gap-3 transition hover:ring-blue-500/50">
             <div className="shrink-0 w-12 text-center">
               <CalendarClock size={20} className="mx-auto text-indigo-600 dark:text-indigo-400" />
             </div>

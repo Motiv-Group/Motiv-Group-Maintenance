@@ -20,7 +20,7 @@ type Bucket = 'critical' | 'attention' | 'healthy'
 const bucketOf = (st: string): Bucket => st === 'controlled' ? 'healthy' : st === 'critical' ? 'critical' : 'attention'
 const BUCKET_META: Record<Bucket, { label: string; badge: string; bar: string; text: string; tab: string }> = {
   critical:  { label: 'Critical',  badge: 'bg-red-500/15 text-red-700 dark:text-red-400 ring-red-500/30',              bar: '#ef4444', text: 'text-red-600 dark:text-red-400',    tab: 'bg-red-500/15 text-red-700 dark:text-red-400 ring-red-500/40' },
-  attention: { label: 'Attention', badge: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D] ring-[#C6A35D]/30',      bar: '#C6A35D', text: 'text-amber-600 dark:text-[#C6A35D]', tab: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D] ring-[#C6A35D]/40' },
+  attention: { label: 'Attention', badge: 'bg-[#f59e0b]/15 text-amber-700 dark:text-[#f59e0b] ring-[#f59e0b]/30',      bar: '#f59e0b', text: 'text-amber-600 dark:text-[#f59e0b]', tab: 'bg-[#f59e0b]/15 text-amber-700 dark:text-[#f59e0b] ring-[#f59e0b]/40' },
   healthy:   { label: 'Controlled', badge: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 ring-emerald-500/30', bar: '#10b981', text: 'text-emerald-600 dark:text-emerald-400', tab: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 ring-emerald-500/40' },
 }
 
@@ -40,7 +40,7 @@ function relativeTime(iso: string | null | undefined, nowMs: number): string {
   return `${Math.floor(day / 30)}mo ago`
 }
 
-const SEL_CLS = 'appearance-none rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm pl-3 pr-8 py-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#C6A35D]/40'
+const SEL_CLS = 'appearance-none rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm pl-3 pr-8 py-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/40'
 /** Styled native <select> with a chevron — used across the Stores toolbar + pager. */
 function Select({ value, onChange, ariaLabel, children }: { value: string; onChange: (v: string) => void; ariaLabel: string; children: React.ReactNode }) {
   return (
@@ -189,7 +189,7 @@ export function RegionalStores({ stores, archived = [], companyName = '' }: { st
         {([
           { key: 'all', label: 'All', n: counts.all, tint: 'bg-blue-500/15 text-blue-700 dark:text-blue-400', ring: 'ring-blue-500/40' },
           { key: 'critical', label: 'Critical', n: counts.critical, tint: 'bg-red-500/15 text-red-700 dark:text-red-400', ring: 'ring-red-500/40' },
-          { key: 'attention', label: 'Attention', n: counts.attention, tint: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D]', ring: 'ring-[#C6A35D]/40' },
+          { key: 'attention', label: 'Attention', n: counts.attention, tint: 'bg-[#f59e0b]/15 text-amber-700 dark:text-[#f59e0b]', ring: 'ring-[#f59e0b]/40' },
           { key: 'healthy', label: 'Controlled', n: counts.healthy, tint: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400', ring: 'ring-emerald-500/40' },
         ] as const).map(t => {
           const active = bucket === t.key
@@ -209,7 +209,7 @@ export function RegionalStores({ stores, archived = [], companyName = '' }: { st
           <div className="relative min-w-[180px] flex-1">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
             <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search stores…"
-              className="w-full rounded-xl bg-[var(--input-bg)] py-2 pl-9 pr-3 text-sm text-[var(--text)] ring-1 ring-[var(--border)] placeholder-[var(--text-faint)] focus:outline-none focus:ring-2 focus:ring-[#C6A35D]/40" />
+              className="w-full rounded-xl bg-[var(--input-bg)] py-2 pl-9 pr-3 text-sm text-[var(--text)] ring-1 ring-[var(--border)] placeholder-[var(--text-faint)] focus:outline-none focus:ring-2 focus:ring-blue-500/40" />
           </div>
           <Select ariaLabel="Filter by status" value={bucket} onChange={v => setBucket(v as 'all' | Bucket)}>
             <option value="all">Status</option><option value="critical">Critical</option><option value="attention">Attention</option><option value="healthy">Controlled</option>
@@ -608,7 +608,7 @@ function AddStoreModal({ companyName = '', onClose, onSaved }: { companyName?: s
   )
 }
 
-const FIELD_INPUT = 'w-full rounded-xl bg-[var(--input-bg)] px-3 py-2.5 text-sm text-[var(--text)] ring-1 ring-[var(--border)] placeholder-[var(--text-faint)] focus:outline-none focus:ring-2 focus:ring-[#C6A35D]/40'
+const FIELD_INPUT = 'w-full rounded-xl bg-[var(--input-bg)] px-3 py-2.5 text-sm text-[var(--text)] ring-1 ring-[var(--border)] placeholder-[var(--text-faint)] focus:outline-none focus:ring-2 focus:ring-blue-500/40'
 
 function FormSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (

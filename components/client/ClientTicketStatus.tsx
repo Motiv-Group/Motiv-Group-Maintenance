@@ -47,8 +47,8 @@ export function ClientTicketStatus({ status, cancellationReason }: { status: str
   const Icon = done ? CheckCircle2 : closed ? XCircle : Loader2
   // Self-contained card: blue while being processed, gold while underway,
   // emerald when complete, red when cancelled, faint when declined.
-  const ring = done ? 'ring-emerald-500/40' : cancelled ? 'ring-red-500/40' : closed ? 'ring-[var(--border)]' : isWait ? 'ring-blue-500/40' : 'ring-[#C6A35D]/40'
-  const iconColor = done ? 'text-emerald-400' : cancelled ? 'text-red-500' : closed ? 'text-[var(--text-faint)]' : isWait ? 'text-blue-500' : 'text-[#C6A35D]'
+  const ring = done ? 'ring-emerald-500/40' : cancelled ? 'ring-red-500/40' : closed ? 'ring-[var(--border)]' : isWait ? 'ring-blue-500/40' : 'ring-[#f59e0b]/40'
+  const iconColor = done ? 'text-emerald-400' : cancelled ? 'text-red-500' : closed ? 'text-[var(--text-faint)]' : isWait ? 'text-blue-500' : 'text-[#f59e0b]'
   const subColor = active && isWait ? 'text-blue-600/90 dark:text-blue-300/80' : 'text-[var(--text-muted)]'
   const sub = cancelled && cancellationReason ? cancellationReason : m.sub
   return (

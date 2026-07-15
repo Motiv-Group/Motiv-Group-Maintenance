@@ -62,7 +62,7 @@ export function SmTicketTabs({
                 {docUrls.map((u, i) => (
                   <li key={i}>
                     <ViewTrackedLink ticketId={ticketId} itemType="attachment" itemLabel={docName(u)} href={u} className="flex items-center justify-between gap-2 rounded-lg bg-[var(--surface-2)] px-3 py-2 transition hover:bg-[var(--hover)]">
-                      <span className="flex min-w-0 items-center gap-2 text-sm text-[var(--text)]"><FileText size={14} className="shrink-0 text-[#C6A35D]" /> <span className="truncate">{docName(u)}</span></span>
+                      <span className="flex min-w-0 items-center gap-2 text-sm text-[var(--text)]"><FileText size={14} className="shrink-0 text-blue-500" /> <span className="truncate">{docName(u)}</span></span>
                       <Download size={14} className="shrink-0 text-[var(--text-faint)]" />
                     </ViewTrackedLink>
                   </li>

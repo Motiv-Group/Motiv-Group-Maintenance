@@ -89,7 +89,7 @@ export function AddInfoModal({ ticketId, title, description, category, impact, p
     } catch (e: any) { setErr(e.message); setBusy(false) }
   }
 
-  const field = 'w-full rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)] focus:outline-none focus:ring-2 focus:ring-[#C6A35D]/40'
+  const field = 'w-full rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)] focus:outline-none focus:ring-2 focus:ring-blue-500/40'
 
   return (
     <>
@@ -146,7 +146,7 @@ export function AddInfoModal({ ticketId, title, description, category, impact, p
 
               <div>
                 <p className="mb-1.5 text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Documents <span className="normal-case">(optional — PDF, Word, Excel)</span></p>
-                <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--border)] px-3 py-3 text-sm font-medium text-[var(--text)] transition hover:border-[#C6A35D]/60">
+                <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--border)] px-3 py-3 text-sm font-medium text-[var(--text)] transition hover:border-[#f59e0b]/60">
                   <FileUp size={16} /> Choose a document
                   <input type="file" multiple accept={DOC_ACCEPT} className="hidden" onChange={e => { addDocs(Array.from(e.target.files ?? [])); e.target.value = '' }} />
                 </label>
@@ -154,7 +154,7 @@ export function AddInfoModal({ ticketId, title, description, category, impact, p
                   <ul className="mt-2 space-y-1">
                     {docs.map((d, i) => (
                       <li key={i} className="flex items-center justify-between gap-2 rounded-lg bg-[var(--surface-2)] px-3 py-2">
-                        <span className="flex min-w-0 items-center gap-2 text-sm text-[var(--text)]"><FileText size={14} className="shrink-0 text-[#C6A35D]" /> <span className="truncate">{d.name}</span></span>
+                        <span className="flex min-w-0 items-center gap-2 text-sm text-[var(--text)]"><FileText size={14} className="shrink-0 text-blue-500" /> <span className="truncate">{d.name}</span></span>
                         <button type="button" onClick={() => setDocs(p => p.filter((_, j) => j !== i))} className="shrink-0 text-[var(--text-faint)] hover:text-red-500" title="Remove"><X size={14} /></button>
                       </li>
                     ))}

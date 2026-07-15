@@ -16,7 +16,7 @@ const BAND_FILTER: FilterOption[] = [
 const fmtM = (n: number) => n >= 1_000_000 ? `R ${(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `R ${(n / 1000).toFixed(0)}K` : `R ${n}`
 const BAND_PILL: Record<DecisionItem['band'], string> = {
   High: 'bg-red-500/15 text-red-400 ring-1 ring-red-500/30',
-  Medium: 'bg-[#C6A35D]/15 text-[#C6A35D] ring-1 ring-[#C6A35D]/30',
+  Medium: 'bg-blue-500/15 text-blue-500 ring-1 ring-[#f59e0b]/30',
   Low: 'bg-white/5 text-[var(--text-muted)] ring-1 ring-white/10',
 }
 const bandStatus = (b: DecisionItem['band']) => b === 'High' ? 'at_risk' : b === 'Medium' ? 'attention' : 'controlled'
@@ -56,7 +56,7 @@ export function DecisionsTab({ data }: { data: EstateDashboardData }) {
 
   return (
     <div className="space-y-5">
-      <TabHeader icon={<Gavel size={18} className="text-[#C6A35D]" />} title="Decisions" subtitle="Strategic actions, escalations and business decisions requiring executive input.">
+      <TabHeader icon={<Gavel size={18} className="text-[#f59e0b]" />} title="Decisions" subtitle="Strategic actions, escalations and business decisions requiring executive input.">
         <DateChip date={formatDate(data.generatedAt)} />
         <FilterMenu value={band} onChange={setBand} options={BAND_FILTER} label="Priority" />
         <ExportButton onExport={onExport} />
@@ -84,8 +84,8 @@ export function DecisionsTab({ data }: { data: EstateDashboardData }) {
                       <td className="px-2 text-[var(--text-muted)] whitespace-nowrap">{d.exposureValue ? fmtM(d.exposureValue) : 'R 0'}</td>
                       <td className="px-2 text-[var(--text-muted)] text-xs whitespace-nowrap">{d.owner}</td>
                       <td className="px-2 text-[var(--text-muted)] text-xs">{d.deadlineDays}d</td>
-                      <td className="px-2"><span className={`text-[11px] ${statusOf(d) === 'Overdue' ? 'text-red-400' : statusOf(d) === 'Monitor' ? 'text-[var(--text-muted)]' : 'text-[#C6A35D]'}`}>{statusOf(d)}</span></td>
-                      <td className="px-2"><span className="text-[11px] px-2 py-1 rounded-lg ring-1 text-[#C6A35D] ring-[#C6A35D]/40">Review</span></td>
+                      <td className="px-2"><span className={`text-[11px] ${statusOf(d) === 'Overdue' ? 'text-red-400' : statusOf(d) === 'Monitor' ? 'text-[var(--text-muted)]' : 'text-[#f59e0b]'}`}>{statusOf(d)}</span></td>
+                      <td className="px-2"><span className="text-[11px] px-2 py-1 rounded-lg ring-1 text-[#f59e0b] ring-[#f59e0b]/40">Review</span></td>
                     </tr>
                   ))}
                   {!shown.length && <tr><td colSpan={10} className="py-6 text-center text-[var(--text-faint)]">No decisions match this filter.</td></tr>}
@@ -104,13 +104,13 @@ export function DecisionsTab({ data }: { data: EstateDashboardData }) {
               ))}
               {!decisions.some(d => d.urgency === 'high') && <p className="text-sm text-[var(--text-faint)]">Nothing urgent.</p>}
             </SectionCard>
-            <SectionCard title="Strategic Opportunities" icon={<Lightbulb size={15} className="text-[#C6A35D]" />}>
+            <SectionCard title="Strategic Opportunities" icon={<Lightbulb size={15} className="text-[#f59e0b]" />}>
               <Opp text="Preventive maintenance can reduce repeat defects." show={decisions.some(d => d.category === 'Change Strategy')} />
               <Opp text="Contract review may improve supplier SLA." show={decisions.some(d => d.category === 'Review Contract' || d.category === 'Escalate Supplier')} />
               <Opp text="Budget reallocation can stabilise critical repairs." show={decisions.some(d => d.category === 'Reallocate Budget')} />
               <Opp text="Asset renewal likely to reduce reactive callouts." show={decisions.some(d => d.category === 'Approve Investment')} />
               <div className="grid grid-cols-2 gap-3 pt-3 mt-1 border-t border-[var(--border)] text-center">
-                <div><div className="flex items-center justify-center gap-1 text-[#C6A35D]"><Gem size={14} /><span className="text-lg font-bold">{highValue}</span></div><div className="text-[11px] text-[var(--text-faint)]">High-Value Items</div></div>
+                <div><div className="flex items-center justify-center gap-1 text-[#f59e0b]"><Gem size={14} /><span className="text-lg font-bold">{highValue}</span></div><div className="text-[11px] text-[var(--text-faint)]">High-Value Items</div></div>
                 <div><div className="flex items-center justify-center gap-1 text-emerald-400"><Coins size={14} /><span className="text-lg font-bold">{fmtM(savings)}</span></div><div className="text-[11px] text-[var(--text-faint)]">Potential Savings</div></div>
               </div>
             </SectionCard>
@@ -125,7 +125,7 @@ export function DecisionsTab({ data }: { data: EstateDashboardData }) {
 
 function Opp({ text, show }: { text: string; show: boolean }) {
   if (!show) return null
-  return <div className="flex items-start gap-2 py-1.5 text-xs text-[var(--text-muted)]"><Lightbulb size={13} className="text-[#C6A35D] mt-0.5 shrink-0" />{text}</div>
+  return <div className="flex items-start gap-2 py-1.5 text-xs text-[var(--text-muted)]"><Lightbulb size={13} className="text-[#f59e0b] mt-0.5 shrink-0" />{text}</div>
 }
 
 function DecisionDetail({ d, data, onClose }: { d: DecisionItem; data: EstateDashboardData; onClose?: () => void }) {
@@ -162,7 +162,7 @@ function DecisionDetail({ d, data, onClose }: { d: DecisionItem; data: EstateDas
           <div className="text-xs font-semibold text-[var(--text-muted)] mb-2">Affected Stores</div>
           <div className="grid grid-cols-3 gap-2 text-center text-xs">
             <div className="rounded-lg bg-red-500/15 text-red-400 py-2"><div className="text-lg font-bold">{counts.critical}</div>Critical</div>
-            <div className="rounded-lg bg-[#C6A35D]/15 text-[#C6A35D] py-2"><div className="text-lg font-bold">{counts.attention}</div>Attention</div>
+            <div className="rounded-lg bg-blue-500/15 text-blue-500 py-2"><div className="text-lg font-bold">{counts.attention}</div>Attention</div>
             <div className="rounded-lg bg-emerald-500/15 text-emerald-400 py-2"><div className="text-lg font-bold">{counts.controlled}</div>Controlled</div>
           </div>
         </div>

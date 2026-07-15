@@ -159,7 +159,7 @@ export function ExecChrome({
               <button type="submit" className={iconBtn} title="Log out"><LogOut size={17} /></button>
             </form>
             <div className="flex items-center gap-2 pl-2 ml-1 border-l border-white/15">
-              <span className="w-8 h-8 rounded-full bg-[#C6A35D] text-[#0a0e17] font-bold flex items-center justify-center text-sm">{initial}</span>
+              <span className="w-8 h-8 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-sm">{initial}</span>
               <div className="hidden sm:block leading-tight">
                 <div className="text-sm font-medium text-white truncate">{userName ?? roleLabel}</div>
                 <div className="text-[11px] text-gray-300 truncate">{roleLabel}{accountStatus && statusSuffix(accountStatus)}</div>
@@ -180,7 +180,7 @@ export function ExecChrome({
             const active = isActiveHref(href, home, pathname, searchParams)
             return (
               <Link key={href} href={href}
-                className={`flex flex-col items-center justify-center gap-1 flex-1 text-[11px] font-medium transition-colors ${active ? 'text-[#C6A35D]' : 'text-gray-400 hover:text-gray-200'}`}>
+                className={`flex flex-col items-center justify-center gap-1 flex-1 text-[11px] font-medium transition-colors ${active ? 'text-blue-400' : 'text-gray-400 hover:text-gray-200'}`}>
                 <Icon size={22} strokeWidth={active ? 2.4 : 1.8} />
                 {label}
               </Link>

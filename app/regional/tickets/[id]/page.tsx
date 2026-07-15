@@ -83,7 +83,7 @@ function RmDeclinedQuoteCard({ q, ticketId, canReQuote, open = false }: { q: any
         {(q.fileUrl || canReQuote) && (
           <div className="flex items-center justify-between gap-2 pt-1">
             {q.fileUrl
-              ? <a href={q.fileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><FileText size={14} /> View attached quote</a>
+              ? <a href={q.fileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-500 hover:underline"><FileText size={14} /> View attached quote</a>
               : <span />}
             {canReQuote && <ReQuoteButton ticketId={ticketId} quoteId={q.id} />}
           </div>
@@ -105,7 +105,7 @@ function RmSignoffCard({ s, tone, ticketId, collapsible = false, defaultOpen = f
     ? { ring: 'ring-red-500/40', bg: 'bg-red-500/5', head: 'bg-red-500/10 border-red-500/20', badge: 'bg-red-500/15 text-red-700 dark:text-red-400', label: 'Sent back', Icon: FileText, iconCls: 'text-red-500', title: 'Snagged completion' }
     : tone === 'evidence'
     ? { ring: 'ring-amber-500/40', bg: 'bg-amber-500/5', head: 'bg-amber-500/10 border-amber-500/20', badge: 'bg-amber-500/15 text-amber-700 dark:text-amber-400', label: 'More info requested', Icon: FileText, iconCls: 'text-amber-500', title: 'Sent back for more evidence' }
-    : { ring: 'ring-[#C6A35D]/40', bg: 'bg-[#C6A35D]/5', head: 'bg-[#C6A35D]/10 border-[#C6A35D]/20', badge: 'bg-[#C6A35D]/15 text-amber-700 dark:text-[#C6A35D]', label: 'Under review', Icon: FileText, iconCls: 'text-[#C6A35D]', title: 'Submitted completion' }
+    : { ring: 'ring-[#f59e0b]/40', bg: 'bg-[#f59e0b]/5', head: 'bg-[#f59e0b]/10 border-[#f59e0b]/20', badge: 'bg-[#f59e0b]/15 text-amber-700 dark:text-[#f59e0b]', label: 'Under review', Icon: FileText, iconCls: 'text-[#f59e0b]', title: 'Submitted completion' }
   const before = (s.before_urls ?? []) as string[]
   const after = (s.after_urls ?? []) as string[]
   // Header doubles as the click-to-expand summary when collapsible.
@@ -179,16 +179,16 @@ function ArchiveGroup({ label, children }: { label: string; children: React.Reac
 function SupplierUpdateItem({ u, ticketId, isNew = false }: { u: { body: string; created_at: string }; ticketId: string; isNew?: boolean }) {
   const photo = String(u.body).match(/^📷\s*Progress photo:\s*(\S+)/)
   return (
-    <li className={`rounded-xl ring-1 p-3 bg-[var(--surface)] ${isNew ? 'ring-[#C6A35D]/40' : 'ring-[var(--border)]'}`}>
+    <li className={`rounded-xl ring-1 p-3 bg-[var(--surface)] ${isNew ? 'ring-[#f59e0b]/40' : 'ring-[var(--border)]'}`}>
       <div className="flex items-center justify-between gap-2 mb-1">
         <span className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--text)]">
           Supplier
-          {isNew && <span className="text-[9px] font-bold uppercase tracking-wide text-amber-700 dark:text-[#C6A35D] bg-[#C6A35D]/15 rounded-full px-1.5 py-0.5">New</span>}
+          {isNew && <span className="text-[9px] font-bold uppercase tracking-wide text-amber-700 dark:text-[#f59e0b] bg-[#f59e0b]/15 rounded-full px-1.5 py-0.5">New</span>}
         </span>
         <span className="text-[11px] text-[var(--text-faint)]">{formatDateTime(u.created_at)}</span>
       </div>
       {photo
-        ? <ViewTrackedLink ticketId={ticketId} itemType="photo" itemLabel="Supplier progress photo" href={photo[1]} className="inline-flex items-center gap-1.5 text-sm font-medium text-[#C6A35D] hover:underline"><Camera size={14} /> View progress photo</ViewTrackedLink>
+        ? <ViewTrackedLink ticketId={ticketId} itemType="photo" itemLabel="Supplier progress photo" href={photo[1]} className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-500 hover:underline"><Camera size={14} /> View progress photo</ViewTrackedLink>
         : <p className="text-sm text-[var(--text)] whitespace-pre-line">{u.body}</p>}
     </li>
   )
@@ -926,7 +926,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
         )}
 
         {t.status === 'in_progress' && (
-          <div className="rounded-xl bg-[#C6A35D]/10 ring-1 ring-[#C6A35D]/30 p-3.5 text-sm text-[var(--text-muted)]">Work in progress — the supplier is on site or en route to attend to the job. The completion certificate and proof-of-completion photos will follow once the work is done.</div>
+          <div className="rounded-xl bg-[#f59e0b]/10 ring-1 ring-[#f59e0b]/30 p-3.5 text-sm text-[var(--text-muted)]">Work in progress — the supplier is on site or en route to attend to the job. The completion certificate and proof-of-completion photos will follow once the work is done.</div>
         )}
 
         {(t.status === 'approved_closeout' || t.status === 'vo_declined') && (
@@ -1029,13 +1029,13 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
           they're the first thing the RM notices. Shows only the unseen updates; on the
           next open they fold into the collapsible history above the audit trail. */}
       {newSupplierUpdates.length > 0 && (
-        <Card className="p-5 space-y-3 bg-[#C6A35D]/5 ring-1 ring-[#C6A35D]/50">
+        <Card className="p-5 space-y-3 bg-[#f59e0b]/5 ring-1 ring-blue-500/50">
           <div className="flex items-center justify-between gap-2">
-            <h2 className="flex items-center gap-2 text-sm font-bold text-[var(--text)]"><MessageSquare size={15} className="text-[#C6A35D]" /> New updates from the supplier</h2>
-            <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-[#C6A35D] bg-[#C6A35D]/15 rounded-full px-2 py-0.5">
+            <h2 className="flex items-center gap-2 text-sm font-bold text-[var(--text)]"><MessageSquare size={15} className="text-[#f59e0b]" /> New updates from the supplier</h2>
+            <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-[#f59e0b] bg-[#f59e0b]/15 rounded-full px-2 py-0.5">
               <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#C6A35D] opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#C6A35D]" />
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#f59e0b] opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#f59e0b]" />
               </span>
               {newSupplierUpdates.length} new
             </span>

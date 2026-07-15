@@ -40,14 +40,14 @@ export function PendingRegionalManagers() {
   if (loading || rows.length === 0) return null // hide entirely when nothing is pending
 
   return (
-    <SectionCard title={`Pending Regional Managers (${rows.length})`} icon={<UserCheck size={15} className="text-[#C6A35D]" />}>
+    <SectionCard title={`Pending Regional Managers (${rows.length})`} icon={<UserCheck size={15} className="text-[#f59e0b]" />}>
       <div className="space-y-2">
         {rows.map(r => (
           <div key={r.id} className="flex items-center justify-between gap-3 py-2 border-b border-[var(--border)] last:border-0">
             <div className="min-w-0">
               <p className="text-sm text-[var(--text)] truncate">{r.fullName || r.email}</p>
               <p className="text-[11px] text-[var(--text-faint)] truncate flex items-center gap-1">
-                <Clock size={11} /> {r.email} · code <span className="text-[#C6A35D]">{r.code}</span> → {r.regionName}
+                <Clock size={11} /> {r.email} · code <span className="text-[#f59e0b]">{r.code}</span> → {r.regionName}
               </p>
             </div>
             <div className="flex items-center gap-2 shrink-0">

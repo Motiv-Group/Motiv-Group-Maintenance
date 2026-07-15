@@ -92,7 +92,7 @@ export function EditTicketModal({ ticketId, title: t0, description: d0, category
     } catch (e: any) { setErr(e.message); setBusy(false) }
   }
 
-  const field = 'w-full rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)] focus:outline-none focus:ring-2 focus:ring-[#C6A35D]/40'
+  const field = 'w-full rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)] focus:outline-none focus:ring-2 focus:ring-blue-500/40'
 
   return (
     <>

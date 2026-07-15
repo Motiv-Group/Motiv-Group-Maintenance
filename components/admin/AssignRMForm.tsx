@@ -82,7 +82,7 @@ export function AssignRMForm({ storeId, currentRmId, currentRmName, regionalMana
             value={search}
             onChange={e => { setSearch(e.target.value); setSelected(null) }}
             placeholder="Search regional manager by name…"
-            className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)] outline-none focus:ring-[#C6A35D]/40"
+            className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)] outline-none focus:ring-blue-500/40"
           />
         </div>
 

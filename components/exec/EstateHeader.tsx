@@ -25,8 +25,8 @@ export function EstateHeader({ dateLabel, regions }: Props) {
   return (
     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
       <div className="flex items-center gap-2.5">
-        <span className="grid place-items-center w-9 h-9 rounded-xl bg-[#C6A35D]/15 ring-1 ring-[#C6A35D]/30">
-          <Globe2 size={18} className="text-[#C6A35D]" />
+        <span className="grid place-items-center w-9 h-9 rounded-xl bg-[#f59e0b]/15 ring-1 ring-[#f59e0b]/30">
+          <Globe2 size={18} className="text-[#f59e0b]" />
         </span>
         <div>
           <h1 className="text-xl font-bold text-[var(--text)] leading-tight">Executive Estate Dashboard</h1>
@@ -43,7 +43,7 @@ export function EstateHeader({ dateLabel, regions }: Props) {
         <div className="relative" ref={ref}>
           <button
             onClick={() => setOpen(o => !o)}
-            className="flex items-center gap-2 text-xs text-[var(--text-muted)] bg-[var(--surface)] ring-1 ring-[var(--border)] rounded-xl px-3 py-2 hover:ring-[#C6A35D]/40 transition"
+            className="flex items-center gap-2 text-xs text-[var(--text-muted)] bg-[var(--surface)] ring-1 ring-[var(--border)] rounded-xl px-3 py-2 hover:ring-blue-500/40 transition"
           >
             <Filter size={14} className="text-[var(--text-muted)]" />
             Filters
