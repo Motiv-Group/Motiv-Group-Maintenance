@@ -22,6 +22,16 @@ export interface BrandingValue {
   symbolAspect: number
   wordmarkAspect: number
   lockupAspect: number
+  /** Nav lockup: wordmark height as a fraction of symbol height. */
+  navWordmarkScale: number
+  /** Nav lockup: how far (fraction of symbol height) to lift the wordmark so its
+   *  bottom sits on the symbol's bottom. Resolved server-side — 0 for trimmed
+   *  custom logos, ~0.18 for the glow-padded built-in symbol, ± the user nudge. */
+  navWordmarkShift: number
+  /** Login hero logo size multipliers (desktop / phone) and gap below it (px). */
+  authLogoScale: number
+  authLogoScaleMobile: number
+  authLogoGap: number
 }
 
 export const DEFAULT_BRANDING: BrandingValue = {
@@ -31,6 +41,13 @@ export const DEFAULT_BRANDING: BrandingValue = {
   supportPhone: '',
   authBgUrls: [],
   ...DEFAULT_BRAND_ASSETS,
+  navWordmarkScale: 0.44,
+  // Built-in symbol PNG has soft glow below the visible "M" — lift the wordmark
+  // ~18% so their visible bottoms line up. Trimmed custom logos override to 0.
+  navWordmarkShift: 0.18,
+  authLogoScale: 1,
+  authLogoScaleMobile: 0.6,
+  authLogoGap: 12,
 }
 
 const BrandingContext = createContext<BrandingValue>(DEFAULT_BRANDING)

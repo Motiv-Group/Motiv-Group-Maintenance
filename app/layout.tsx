@@ -82,6 +82,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     symbolAspect: aspect('symbol.png', DEFAULT_BRAND_ASSETS.symbolAspect),
     wordmarkAspect: aspect('wordmark.png', DEFAULT_BRAND_ASSETS.wordmarkAspect),
     lockupAspect: aspect('lockup.png', DEFAULT_BRAND_ASSETS.lockupAspect),
+    navWordmarkScale: settings.logo.navWordmarkScale,
+    // Custom logos are trimmed tight by the generator → their bottoms already
+    // line up, so base shift 0; the built-in glow-padded symbol needs ~0.18.
+    // The user's nudge is added on top of whichever base applies.
+    navWordmarkShift: (settings.branding.version ? 0 : 0.18) + settings.logo.navWordmarkNudge,
+    authLogoScale: settings.logo.authLogoScale,
+    authLogoScaleMobile: settings.logo.authLogoScaleMobile,
+    authLogoGap: settings.logo.authLogoGap,
   }
 
   return (

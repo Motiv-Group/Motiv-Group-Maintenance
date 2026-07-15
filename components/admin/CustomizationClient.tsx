@@ -10,6 +10,7 @@ import { Check, Image as ImageIcon, LifeBuoy, Loader2, Monitor, Moon, Paintbrush
 import type { AppSettings } from '@/lib/settings'
 import { DarkTile, Field, SaveRow, Section, inputCls, postForm, postJson, useAsyncSave, validateImage } from '@/components/admin/customization/shared'
 import { LogoSection } from '@/components/admin/customization/LogoSection'
+import { LogoLayoutSection } from '@/components/admin/customization/LogoLayoutSection'
 import { ColoursSection } from '@/components/admin/customization/ColoursSection'
 
 type SettingsResponse = { ok: true; settings: AppSettings }
@@ -17,6 +18,8 @@ type SettingsResponse = { ok: true; settings: AppSettings }
 export function CustomizationClient({ initial }: { initial: AppSettings }) {
   const iconSrc = initial.branding.files['icon-192.png'] ?? '/icon-192.png'
   const symbolSrc = initial.branding.files['symbol.png'] ?? '/brand/motiv-symbol.png'
+  const wordmarkSrc = initial.branding.files['wordmark.png'] ?? '/brand/motiv-wordmark.png'
+  const lockupSrc = initial.branding.files['lockup.png'] ?? '/brand/motiv-lockup.png'
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -31,6 +34,7 @@ export function CustomizationClient({ initial }: { initial: AppSettings }) {
 
       <IdentitySection initialName={initial.appName} initialTagline={initial.tagline} iconSrc={iconSrc} />
       <LogoSection initialBranding={initial.branding} />
+      <LogoLayoutSection initialLayout={initial.logo} symbolUrl={symbolSrc} wordmarkUrl={wordmarkSrc} lockupUrl={lockupSrc} custom={initial.branding.version != null} />
       <ColoursSection initialColors={initial.colors} appName={initial.appName} symbolSrc={symbolSrc} />
       <LoginBackgroundsSection initialUrls={initial.authBgUrls} />
       <SupportSection initialEmail={initial.supportEmail} initialPhone={initial.supportPhone} />

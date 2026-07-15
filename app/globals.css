@@ -66,6 +66,15 @@
   .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
 }
 
+/* Auth hero logo (MotivLockup): admin-tunable size that shrinks on phones.
+   Height comes from CSS vars set inline per-render; width auto-follows the
+   intrinsic aspect. The 640px breakpoint matches Tailwind's `sm`. Unlayered so
+   it beats the width/height attrs next/image emits. */
+.auth-hero-logo { height: var(--logo-h); width: auto; }
+@media (max-width: 640px) {
+  .auth-hero-logo { height: var(--logo-h-mobile); }
+}
+
 /* ── Native <select> dark-mode popup fix ──
    Option popups composite their background from the control's
    background-color. The dark --input-bg is translucent (rgba black), so the

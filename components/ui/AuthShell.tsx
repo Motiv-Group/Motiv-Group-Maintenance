@@ -21,15 +21,12 @@ export function AuthShell({
   logoHeight = 120,
   maxWidth = 'sm',
   raise = 0,
-  logoGap = 20,
 }: {
   children: ReactNode
   logoHeight?: number
   maxWidth?: 'sm' | 'md' | 'lg'
   /** Shift the whole logo+card module up by this many px (balance on tall screens). */
   raise?: number
-  /** Gap (px) between the logo and the card. */
-  logoGap?: number
 }) {
   const branding = useBranding()
   // Background photo is chosen AFTER mount (not during SSR) so server and client
@@ -60,8 +57,10 @@ export function AuthShell({
           className={`relative w-full ${widthClass}`}
           style={raise ? { transform: `translateY(-${raise}px)` } : undefined}
         >
-          {/* Logo — a tight gap above the card; the two read as one centred group. */}
-          <div className="flex items-center justify-center" style={{ marginBottom: logoGap }}>
+          {/* Logo — gap above the card is admin-tunable (Customize tab); the two
+              read as one centred group. The per-page logoGap prop is the built-in
+              default, overridden by the saved setting. */}
+          <div className="flex items-center justify-center" style={{ marginBottom: branding.authLogoGap }}>
             <MotivLockup height={logoHeight} />
           </div>
 

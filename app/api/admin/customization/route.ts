@@ -17,6 +17,14 @@ const BodySchema = z.object({
   defaultTheme: z.enum(['light', 'dark', 'system']).optional(),
   colors: z.record(z.string(), HEX).optional(),
   authBgUrls: z.array(z.string().url()).max(4).optional(),
+  // Logo sizing/alignment — numbers are re-clamped server-side by normaliseLogoLayout.
+  logo: z.object({
+    navWordmarkScale: z.number(),
+    navWordmarkNudge: z.number(),
+    authLogoScale: z.number(),
+    authLogoScaleMobile: z.number(),
+    authLogoGap: z.number(),
+  }).partial().optional(),
   // Drops the generated logo set and returns the app to the built-in Motiv assets.
   resetBranding: z.boolean().optional(),
 })
@@ -37,7 +45,7 @@ export async function POST(request: Request) {
   if (!parsed.ok) return parsed.error
   const body = parsed.data
 
-  const patch: Partial<AppSettings> = {}
+  const patch: Partial<Omit<AppSettings, 'logo'>> & { logo?: Partial<AppSettings['logo']> } = {}
   if (body.appName !== undefined) patch.appName = body.appName
   if (body.tagline !== undefined) patch.tagline = body.tagline
   if (body.supportEmail !== undefined) patch.supportEmail = body.supportEmail
@@ -58,6 +66,9 @@ export async function POST(request: Request) {
     if (bad) return NextResponse.json({ error: 'Background images must be uploaded through the Customize tab' }, { status: 400 })
     patch.authBgUrls = body.authBgUrls
   }
+  // Raw partial — saveAppSettings deep-merges over the current layout and
+  // normaliseSettings clamps every value to its safe range.
+  if (body.logo !== undefined) patch.logo = body.logo
   if (body.resetBranding) patch.branding = { ...DEFAULT_SETTINGS.branding, files: {}, dims: {} }
 
   if (!Object.keys(patch).length) return NextResponse.json({ error: 'Nothing to save' }, { status: 400 })

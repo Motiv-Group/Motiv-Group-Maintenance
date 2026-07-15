@@ -24,12 +24,13 @@ export function MotivLogo({ height = 32, className = '', wordmark = true }: Moti
   const symW = Math.round(height * branding.symbolAspect)
   // The MOTIV wordmark is kept small next to the symbol so the mark leads and the
   // name is a quiet label (not competing with it).
-  const wordH = Math.round(height * 0.44)
+  const wordH = Math.round(height * branding.navWordmarkScale)
   const wordW = Math.round(wordH * branding.wordmarkAspect)
-  // items-end lines up the image BOXES, but the symbol PNG's solid "M" ends ~24%
-  // above its box bottom (soft glow below) while the wordmark's text ends ~13%
-  // above its own — so nudge the wordmark up to align the two VISIBLE bottoms.
-  const wordShiftUp = Math.round(0.18 * height)
+  // items-end lines up the image BOXES; the shift lifts the wordmark so the two
+  // VISIBLE bottoms line up. It's 0 for trimmed custom logos (bottoms already
+  // align) and ~0.18 for the glow-padded built-in symbol, ± the admin nudge —
+  // all resolved in BrandingProvider. Never let a nudge push it off the bottom.
+  const wordShiftUp = Math.round(Math.max(-0.4, Math.min(0.4, branding.navWordmarkShift)) * height)
 
   return (
     <span className={`inline-flex items-end ${className}`} style={{ gap: Math.round(height * 0.16) }}>

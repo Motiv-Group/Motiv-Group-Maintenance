@@ -124,7 +124,7 @@ export default function LoginPage() {
   }
 
   return (
-    <AuthShell logoHeight={186} logoGap={0} maxWidth="md">
+    <AuthShell logoHeight={186} maxWidth="md">
       <h1 className="text-xl sm:text-2xl font-semibold text-white mb-1">Welcome back</h1>
       <p className="text-sm text-gray-300 mb-6">Sign in to continue to your workspace.</p>
 

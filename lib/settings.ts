@@ -45,6 +45,41 @@ export interface BrandingState {
   zipUrl: string | null
 }
 
+// Logo layout knobs (nav lockup + login hero), all editable from the Customize
+// tab. Kept as ratios/px with safe clamps so a bad value can never break layout.
+export interface LogoLayout {
+  /** Nav wordmark height as a fraction of the symbol height. */
+  navWordmarkScale: number
+  /** Vertical nudge of the nav wordmark, as a fraction of symbol height.
+   *  + = move the MOTIV text UP (toward the symbol's mid), − = down. 0 = sit on
+   *  the symbol's bottom edge (correct for trimmed custom logos). */
+  navWordmarkNudge: number
+  /** Login/auth hero logo size multiplier on desktop (1 = each page's base). */
+  authLogoScale: number
+  /** Login/auth hero logo size multiplier on phones (< the desktop one so the
+   *  logo doesn't dominate the small pinned-width mobile viewport). */
+  authLogoScaleMobile: number
+  /** Gap in px between the hero logo and the auth card. */
+  authLogoGap: number
+}
+
+export const LOGO_LAYOUT_DEFAULT: LogoLayout = {
+  navWordmarkScale: 0.44,
+  navWordmarkNudge: 0,
+  authLogoScale: 1,
+  authLogoScaleMobile: 0.6,
+  authLogoGap: 12,
+}
+
+// Clamp ranges — also the slider bounds in the Customize UI. Keep in sync.
+export const LOGO_LAYOUT_RANGE = {
+  navWordmarkScale: [0.28, 0.7],
+  navWordmarkNudge: [-0.25, 0.25],
+  authLogoScale: [0.5, 1.6],
+  authLogoScaleMobile: [0.35, 1.3],
+  authLogoGap: [0, 56],
+} as const satisfies Record<keyof LogoLayout, readonly [number, number]>
+
 export interface AppSettings {
   appName: string
   tagline: string
@@ -56,6 +91,8 @@ export interface AppSettings {
   colors: Partial<Record<BrandStop, string>>
   /** Optional login-screen background photos (public URLs, one picked per visit). */
   authBgUrls: string[]
+  /** Logo sizing/alignment knobs (nav + login). */
+  logo: LogoLayout
   branding: BrandingState
 }
 
@@ -67,7 +104,27 @@ export const DEFAULT_SETTINGS: AppSettings = {
   defaultTheme: 'system',
   colors: {},
   authBgUrls: [],
+  logo: { ...LOGO_LAYOUT_DEFAULT },
   branding: { version: null, files: {}, dims: {}, zipUrl: null },
+}
+
+/** Clamp a value into a [min,max] range, falling back to the default if not finite. */
+export function clampNum(v: unknown, [min, max]: readonly [number, number], fallback: number): number {
+  const n = typeof v === 'number' ? v : Number(v)
+  if (!Number.isFinite(n)) return fallback
+  return Math.min(max, Math.max(min, n))
+}
+
+/** Normalise an untrusted logo-layout object against the ranges + defaults. */
+export function normaliseLogoLayout(raw: unknown): LogoLayout {
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+  return {
+    navWordmarkScale: clampNum(r.navWordmarkScale, LOGO_LAYOUT_RANGE.navWordmarkScale, LOGO_LAYOUT_DEFAULT.navWordmarkScale),
+    navWordmarkNudge: clampNum(r.navWordmarkNudge, LOGO_LAYOUT_RANGE.navWordmarkNudge, LOGO_LAYOUT_DEFAULT.navWordmarkNudge),
+    authLogoScale: clampNum(r.authLogoScale, LOGO_LAYOUT_RANGE.authLogoScale, LOGO_LAYOUT_DEFAULT.authLogoScale),
+    authLogoScaleMobile: clampNum(r.authLogoScaleMobile, LOGO_LAYOUT_RANGE.authLogoScaleMobile, LOGO_LAYOUT_DEFAULT.authLogoScaleMobile),
+    authLogoGap: Math.round(clampNum(r.authLogoGap, LOGO_LAYOUT_RANGE.authLogoGap, LOGO_LAYOUT_DEFAULT.authLogoGap)),
+  }
 }
 
 const HEX_RE = /^#[0-9a-fA-F]{6}$/
@@ -107,6 +164,7 @@ export function normaliseSettings(raw: unknown): AppSettings {
     defaultTheme: r.defaultTheme === 'light' || r.defaultTheme === 'dark' ? r.defaultTheme : 'system',
     colors,
     authBgUrls: Array.isArray(r.authBgUrls) ? r.authBgUrls.filter((u): u is string => typeof u === 'string').slice(0, 4) : [],
+    logo: normaliseLogoLayout(r.logo),
     branding: {
       version: typeof b.version === 'number' ? b.version : null,
       files: (b.files && typeof b.files === 'object' ? b.files : {}) as Record<string, string>,
