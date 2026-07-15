@@ -6,6 +6,9 @@ interface MotivLogoProps {
   /** Height in px of the symbol; the MOTIV wordmark scales to ~half of it. */
   height?: number
   className?: string
+  /** Show the MOTIV wordmark next to the symbol (default). Set false for a compact,
+   *  symbol-only mark (e.g. narrow mobile headers). */
+  wordmark?: boolean
 }
 
 /**
@@ -14,7 +17,7 @@ interface MotivLogoProps {
  * blends into the charcoal. For the big login/auth logo (symbol + name stacked)
  * use /brand/motiv-lockup.png directly.
  */
-export function MotivLogo({ height = 32, className = '' }: MotivLogoProps) {
+export function MotivLogo({ height = 32, className = '', wordmark = true }: MotivLogoProps) {
   const symW = Math.round(height * (1536 / 1024)) // symbol aspect 1536×1024
   // The MOTIV wordmark is kept small next to the symbol so the mark leads and the
   // name is a quiet label (not competing with it).
@@ -27,8 +30,10 @@ export function MotivLogo({ height = 32, className = '' }: MotivLogoProps) {
 
   return (
     <span className={`inline-flex items-end ${className}`} style={{ gap: Math.round(height * 0.16) }}>
-      <Image src="/brand/motiv-symbol.png" alt="" width={symW} height={height} priority unoptimized draggable={false} className="object-contain" />
-      <Image src="/brand/motiv-wordmark.png" alt="Motiv" width={wordW} height={wordH} priority unoptimized draggable={false} className="object-contain" style={{ transform: `translateY(-${wordShiftUp}px)` }} />
+      <Image src="/brand/motiv-symbol.png" alt={wordmark ? '' : 'Motiv'} width={symW} height={height} priority unoptimized draggable={false} className="object-contain" />
+      {wordmark && (
+        <Image src="/brand/motiv-wordmark.png" alt="Motiv" width={wordW} height={wordH} priority unoptimized draggable={false} className="object-contain" style={{ transform: `translateY(-${wordShiftUp}px)` }} />
+      )}
     </span>
   )
 }
