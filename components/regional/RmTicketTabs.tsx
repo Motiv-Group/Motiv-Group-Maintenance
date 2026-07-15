@@ -47,14 +47,16 @@ export function RmTicketTabs({
 
   return (
     <Card className="p-5">
-      <div className="mb-4 flex gap-1 overflow-x-auto overflow-y-hidden border-b border-[var(--border)]">
+      {/* Tab strip scrolls sideways (contained, controls not content). Mobile gets
+          tighter tabs + scroll-snap so half-hidden tabs settle into view. */}
+      <div className="mb-4 flex snap-x gap-1 overflow-x-auto overflow-y-hidden border-b border-[var(--border)] [-webkit-overflow-scrolling:touch]">
         {tabs.map(t => (
           <button
             key={t.key}
             type="button"
             onClick={() => setTab(t.key)}
             aria-current={tab === t.key ? 'page' : undefined}
-            className={`-mb-px shrink-0 border-b-2 px-4 py-2 text-sm font-semibold transition ${
+            className={`-mb-px shrink-0 snap-start border-b-2 px-3 py-2 text-[13px] font-semibold transition sm:px-4 sm:text-sm ${
               tab === t.key ? 'border-blue-600 text-[var(--text)]' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text)]'
             }`}
           >

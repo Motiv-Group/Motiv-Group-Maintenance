@@ -119,7 +119,7 @@ function MetricButton({ active, icon, label, value, sub, subActive, onClick }: {
         <div className="flex items-center gap-2.5 sm:gap-4">
           <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-full ring-1 sm:h-12 sm:w-12 ${iconChip}`}>{icon}</span>
           <div className="min-w-0">
-            <p className="truncate text-[11px] font-semibold text-[var(--text-muted)] sm:text-xs">{label}</p>
+            <p className="line-clamp-2 text-[11px] font-semibold text-[var(--text-muted)] sm:line-clamp-none sm:truncate sm:text-xs">{label}</p>
             <p className={`mt-0.5 text-xl font-bold leading-none sm:mt-1 sm:text-2xl ${stateText}`}>{value}</p>
             <p className={`mt-0.5 truncate text-[11px] font-semibold sm:mt-1 sm:text-xs ${subActive ? stateText : 'text-[var(--text-faint)]'}`}>{sub}</p>
           </div>
@@ -158,7 +158,7 @@ function QueueRow({ ticket, nowMs, suppliers, motivSuppliers }: { ticket: Region
   const closeoutCls = 'relative z-20 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-bold transition lg:w-40 border-blue-500/60 text-blue-600 hover:bg-blue-500/10 dark:text-blue-300'
   const closeoutBadge = ticket.voNoneConfirmed ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : 'bg-blue-500/15 text-blue-700 dark:text-blue-400'
   return (
-    <div className="relative grid gap-4 border-b border-[var(--border)] px-4 py-4 transition last:border-b-0 hover:bg-[var(--hover)] lg:grid-cols-[1fr_200px_1.1fr_160px] lg:items-center">
+    <div className="relative grid gap-3 border-b border-[var(--border)] px-4 py-3 transition last:border-b-0 hover:bg-[var(--hover)] sm:gap-4 sm:py-4 lg:grid-cols-[1fr_200px_1.1fr_160px] lg:items-center">
       {/* The whole row (except the CTA island) links to the ticket. */}
       <Link href={ticketUrl} aria-label={`View ${ticket.category || ticket.title} ticket`} className="absolute inset-0 z-10" />
 
@@ -187,7 +187,8 @@ function QueueRow({ ticket, nowMs, suppliers, motivSuppliers }: { ticket: Region
         ) : (
           <>
             <p className="mt-1 flex items-center gap-1.5 text-sm text-[var(--text-muted)]"><CalendarClock size={14} /> SLA in {humanizeDuration(slaMs)}</p>
-            <p className="truncate text-xs text-[var(--text-muted)]">Next deadline · {formatDateTime(slaDeadline)}</p>
+            {/* Absolute deadline duplicates the countdown above — desktop-only. */}
+            <p className="hidden truncate text-xs text-[var(--text-muted)] sm:block">Next deadline · {formatDateTime(slaDeadline)}</p>
           </>
         )}
       </div>

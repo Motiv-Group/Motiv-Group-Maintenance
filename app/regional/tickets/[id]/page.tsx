@@ -52,8 +52,10 @@ function DetailItem({ label, value }: { label: string; value: string }) {
 function RmDeclinedQuoteCard({ q, ticketId, canReQuote, open = false }: { q: any; ticketId: string; canReQuote: boolean; open?: boolean }) {
   return (
     <details open={open} className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
-      <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
-        <span className="text-sm font-semibold text-[var(--text)] min-w-0 truncate">{q.supplierName}</span>
+      {/* Mobile: the summary wraps so the supplier name gets the full row and the
+          amount + Declined pill drop underneath; sm+ keeps the single row. */}
+      <summary className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition sm:flex-nowrap">
+        <span className="basis-full text-sm font-semibold text-[var(--text)] min-w-0 truncate sm:basis-auto">{q.supplierName}</span>
         <span className="flex items-center gap-2 shrink-0">
           <span className="text-sm text-[var(--text)] tabular-nums">{formatCurrency(q.amount)}</span>
           <span className="text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:text-red-400 bg-red-500/15 rounded-full px-2 py-0.5">Declined</span>
@@ -111,7 +113,8 @@ function RmSignoffCard({ s, tone, ticketId, collapsible = false, defaultOpen = f
   // Header doubles as the click-to-expand summary when collapsible.
   const header = (
     <>
-      <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)] min-w-0"><meta.Icon size={15} className={`${meta.iconCls} shrink-0`} /><span className="truncate">{title ?? meta.title} · {formatDateTime(s.created_at)}</span></span>
+      {/* Timestamp is desktop-only — on phones it eats the title's space. */}
+      <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)] min-w-0"><meta.Icon size={15} className={`${meta.iconCls} shrink-0`} /><span className="truncate">{title ?? meta.title}<span className="hidden sm:inline"> · {formatDateTime(s.created_at)}</span></span></span>
       <span className="flex items-center gap-1.5 shrink-0">
         {freshEvidence && <span className="text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 bg-emerald-500/15 text-emerald-700 dark:text-emerald-400">New evidence</span>}
         <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 ${meta.badge}`}>{meta.label}</span>

@@ -18,8 +18,9 @@ async function post(url: string, body: unknown): Promise<void> {
 
 function Modal({ title, onClose, children, maxWidth = 'max-w-md' }: { title: ReactNode; onClose: () => void; children: React.ReactNode; maxWidth?: string }) {
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className={`bg-[var(--surface-2)] ring-1 ring-[var(--border)] rounded-2xl p-5 ${maxWidth} w-full space-y-3 max-h-[85vh] overflow-y-auto`} onClick={e => e.stopPropagation()}>
+    // Bottom-sheet on phones (mirrors components/ui/Modal), centered from sm up.
+    <div className="fixed inset-0 bg-black/60 flex items-end justify-center z-50 p-0 sm:items-center sm:p-4" onClick={onClose}>
+      <div className={`bg-[var(--surface-2)] ring-1 ring-[var(--border)] rounded-t-2xl p-4 sm:rounded-2xl sm:p-5 ${maxWidth} w-full space-y-3 max-h-[92vh] sm:max-h-[85vh] overflow-y-auto`} onClick={e => e.stopPropagation()}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 text-base font-bold text-[var(--text)]">{title}</div>
           <button type="button" onClick={onClose} aria-label="Close" className="shrink-0 -m-1 rounded-lg p-1.5 text-[var(--text-faint)] transition hover:bg-[var(--hover)] hover:text-[var(--text)]"><X size={18} /></button>
@@ -265,7 +266,10 @@ export function AssignSuppliersButton({ ticketId, suppliers, motivSuppliers = []
                     <span className="block truncate text-sm font-medium text-[var(--text)]">{s.name}{declinedSet.has(s.id) && <span className="ml-1.5 text-[10px] font-semibold text-red-500">· declined before</span>}</span>
                     {s.category && <span className="block truncate text-[11px] text-[var(--text-muted)]">{s.category}</span>}
                   </span>
-                  <span className="shrink-0"><Stars value={s.avgRating ?? 5} count={s.ratingCount} size={13} /></span>
+                  {/* Full star row is sm+; phones get a compact rating so the supplier
+                      name keeps its space. */}
+                  <span className="hidden shrink-0 sm:block"><Stars value={s.avgRating ?? 5} count={s.ratingCount} size={13} /></span>
+                  <span className="shrink-0 text-[11px] font-semibold text-amber-500 sm:hidden">{(s.avgRating ?? 5).toFixed(1)}★</span>
                 </label>
               )
             })}
@@ -297,9 +301,10 @@ export function AssignSuppliersButton({ ticketId, suppliers, motivSuppliers = []
               <span className={`grid h-6 w-6 place-items-center rounded-full ${sel.size ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-[var(--surface-2)] text-[var(--text-faint)]'}`}><Send size={13} /></span>
               <span className="text-[var(--text-muted)]">{sel.size ? <><span className="font-semibold text-[var(--text)]">{sel.size} selected</span> · they&apos;ll be notified to quote</> : 'No suppliers selected'}</span>
             </p>
-            <div className="flex gap-2">
+            {/* Buttons stack on phones (the pair needs ~300px side by side). */}
+            <div className="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row">
               <button onClick={() => { confirmReinvite ? setConfirmReinvite(false) : setOpen(false) }} disabled={busy} className="rounded-xl px-4 py-2.5 text-sm font-medium text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-50">{confirmReinvite ? 'Back' : 'Cancel'}</button>
-              <button disabled={busy || !sel.size} onClick={assign} className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50">
+              <button disabled={busy || !sel.size} onClick={assign} className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50">
                 <Send size={15} /> {busy ? 'Sending…' : confirmReinvite ? 'Yes, send again' : `Send quote request${sel.size ? ` (${sel.size})` : ''}`}
               </button>
             </div>
@@ -964,11 +969,12 @@ export function QuoteComparison({ ticketId, rows, onClose }: { ticketId: string;
             <div key={r.supplierId} className={`rounded-xl bg-[var(--surface)] ring-1 transition ${on ? 'ring-emerald-500' : 'ring-[var(--border)]'}`}>
               <label className="flex cursor-pointer items-start justify-between gap-3 px-4 py-3">
                 <span className="flex min-w-0 items-start gap-3">
-                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"><Store size={18} /></span>
+                  {/* Avatar chip is sm+ — phones give its width back to the supplier name. */}
+                  <span className="hidden h-10 w-10 shrink-0 place-items-center rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 sm:grid"><Store size={18} /></span>
                   <span className="min-w-0"><span className="block truncate text-sm font-bold text-[var(--text)]">{r.name}</span><span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">Quote received</span><span className="block text-[11px] text-[var(--text-faint)]">Received {formatDateTime(q.createdAt)}</span></span>
                 </span>
                 <span className="flex shrink-0 items-start gap-3">
-                  <span className="text-right"><span className="block text-lg font-bold tabular-nums text-[var(--text)]">{formatCurrency(q.amount)}</span><span className="block text-[11px] text-[var(--text-faint)]">excl VAT</span>{q.amountInclVat != null && <span className="block text-[11px] text-[var(--text-faint)]">{formatCurrency(q.amountInclVat)} incl VAT</span>}</span>
+                  <span className="text-right"><span className="block text-lg font-bold tabular-nums text-[var(--text)]">{formatCurrency(q.amount)}</span><span className="block text-[11px] text-[var(--text-faint)]">excl VAT</span>{q.amountInclVat != null && <span className="hidden text-[11px] text-[var(--text-faint)] sm:block">{formatCurrency(q.amountInclVat)} incl VAT</span>}</span>
                   {q.fileUrl && <FileText size={16} className="mt-0.5 text-emerald-600 dark:text-emerald-400" />}
                   <input type="radio" name="qc" checked={on} onChange={() => setSelectedId(r.supplierId)} onClick={() => { if (selectedId === r.supplierId) setSelectedId(null) }} className="mt-1 h-4 w-4 accent-emerald-600" />
                 </span>
@@ -1007,12 +1013,14 @@ export function QuoteComparison({ ticketId, rows, onClose }: { ticketId: string;
       )}
       {err && <p className="text-xs text-red-500">{err}</p>}
 
-      <div className="flex flex-wrap gap-2 border-t border-[var(--border)] pt-3">
-        <button type="button" onClick={onClose} disabled={busy} className="min-w-[130px] flex-1 rounded-xl py-2.5 text-sm font-medium text-[var(--text)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-50">Wait for all quotes</button>
-        <button type="button" disabled={!selected || busy} onClick={() => declineMode ? decide('decline') : setDeclineMode(true)} className="min-w-[130px] flex-1 rounded-xl py-2.5 text-sm font-semibold text-red-600 ring-1 ring-red-500/50 transition hover:bg-red-500/10 disabled:opacity-40 dark:text-red-400">{busy && declineMode ? 'Declining…' : declineMode ? 'Confirm decline' : 'Decline selected quote'}</button>
+      {/* Footer CTAs stack full-width on phones (three ~150px buttons wrap unevenly
+          at 375px); sm+ keeps the flex-wrap row. */}
+      <div className="flex flex-col gap-2 border-t border-[var(--border)] pt-3 sm:flex-row sm:flex-wrap">
+        <button type="button" onClick={onClose} disabled={busy} className="w-full rounded-xl py-2.5 text-sm font-medium text-[var(--text)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-50 sm:w-auto sm:min-w-[130px] sm:flex-1">Wait for all quotes</button>
+        <button type="button" disabled={!selected || busy} onClick={() => declineMode ? decide('decline') : setDeclineMode(true)} className="w-full rounded-xl py-2.5 text-sm font-semibold text-red-600 ring-1 ring-red-500/50 transition hover:bg-red-500/10 disabled:opacity-40 dark:text-red-400 sm:w-auto sm:min-w-[130px] sm:flex-1">{busy && declineMode ? 'Declining…' : declineMode ? 'Confirm decline' : 'Decline selected quote'}</button>
         {declineMode
-          ? <button type="button" disabled={busy} onClick={() => setDeclineMode(false)} className="min-w-[130px] flex-1 rounded-xl py-2.5 text-sm font-semibold text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-50">Cancel decline</button>
-          : <button type="button" disabled={!selected || busy} onClick={() => decide('approve')} className="min-w-[130px] flex-1 rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-40">{busy ? 'Approving…' : 'Approve selected quote'}</button>}
+          ? <button type="button" disabled={busy} onClick={() => setDeclineMode(false)} className="w-full rounded-xl py-2.5 text-sm font-semibold text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-50 sm:w-auto sm:min-w-[130px] sm:flex-1">Cancel decline</button>
+          : <button type="button" disabled={!selected || busy} onClick={() => decide('approve')} className="w-full rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-40 sm:w-auto sm:min-w-[130px] sm:flex-1">{busy ? 'Approving…' : 'Approve selected quote'}</button>}
       </div>
     </>
   )
@@ -1331,7 +1339,8 @@ export function VariationReviewCard({ ticketId }: { ticketId: string }) {
           </div>
         </div>
       ) : (
-        <div className="flex gap-2">
+        // Stack on phones — side by side both labels wrap to two lines at 375px.
+        <div className="flex flex-col gap-2 sm:flex-row">
           <button onClick={() => { setErr(''); setConfirmApprove(true) }} className="flex-1 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition">Approve variation order</button>
           <button onClick={() => { setReason(''); setOther(''); setErr(''); setDeclineOpen(true) }} className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-semibold transition">Decline variation order</button>
         </div>

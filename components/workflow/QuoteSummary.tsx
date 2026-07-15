@@ -38,13 +38,16 @@ function fileName(url: string): string {
   } catch { return 'Quote' }
 }
 
-function DateItem({ label, value, proposed }: { label: string; value: string; proposed?: boolean }) {
+function DateItem({ label, value, suffix, proposed }: { label: string; value: string; suffix?: string | null; proposed?: boolean }) {
   return (
     <div>
       <div className={LABEL}>{label}</div>
+      {/* value and suffix are separate nowrap chunks so "date · technician" can break
+          BETWEEN them on narrow phones instead of overflowing the column. */}
       <div className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm text-[var(--text)]">
         <Calendar size={14} className="shrink-0 text-[var(--text-faint)]" />
         <span className="whitespace-nowrap">{value}</span>
+        {suffix && <span className="whitespace-nowrap text-[var(--text-muted)]">· {suffix}</span>}
         {proposed && <span className="whitespace-nowrap text-[11px] text-amber-600 dark:text-amber-400">(proposed)</span>}
       </div>
     </div>
@@ -112,7 +115,7 @@ export function QuoteSummary({ quote, status, title, schedule, collapsible = fal
         {/* Submitted + proposed visit */}
         <div className="space-y-3 sm:border-l sm:border-[var(--border)] sm:pl-5 lg:pr-5">
           <DateItem label="Submitted" value={formatDateTime(quote.createdAt)} />
-          {schedule && <DateItem label="Proposed visit" value={`${formatDateTime(schedule.at)}${schedule.technician ? ` · ${schedule.technician}` : ''}`} proposed={schedule.proposed} />}
+          {schedule && <DateItem label="Proposed visit" value={formatDateTime(schedule.at)} suffix={schedule.technician} proposed={schedule.proposed} />}
         </div>
 
         {/* Valid until + declined */}

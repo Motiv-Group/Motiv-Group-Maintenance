@@ -182,15 +182,16 @@ export function RaiseDisputeButton({ ticketId, origin, subjectTitle, jobRef, sto
         </button>
       )}
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={close}>
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-[var(--surface-2)] ring-1 ring-[var(--border)]" onClick={e => e.stopPropagation()}>
+        // Bottom-sheet on phones (mirrors components/ui/Modal), centered from sm up.
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4" onClick={close}>
+          <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-2xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] sm:max-h-[90vh] sm:rounded-2xl" onClick={e => e.stopPropagation()}>
             {/* Header */}
-            <div className="flex items-start justify-between gap-3 px-6 pt-6">
+            <div className="flex items-start justify-between gap-3 px-4 pt-5 sm:px-6 sm:pt-6">
               <h3 className="flex items-center gap-2.5 text-xl font-bold text-[var(--text)]"><MessageSquareWarning size={22} className="text-red-500" /> Raise a dispute</h3>
               <button onClick={close} aria-label="Close" className="-m-1 rounded-lg p-1.5 text-[var(--text-faint)] transition hover:bg-[var(--hover)] hover:text-[var(--text)]"><X size={20} /></button>
             </div>
 
-            <div className="space-y-5 p-6">
+            <div className="space-y-5 p-4 sm:p-6">
               <p className="text-sm text-[var(--text-muted)]">Raising a dispute pauses this {what} until it is resolved. Explain why you disagree and attach supporting evidence. Messages exchanged with the client will be recorded for audit purposes.</p>
 
               {/* Subject info card — stacks on phones (three side-by-side cells need
@@ -236,7 +237,8 @@ export function RaiseDisputeButton({ ticketId, origin, subjectTitle, jobRef, sto
                       <span className="block text-[11px] text-[var(--text-faint)]">Photos, PDF or documents · Maximum 10 MB each</span>
                     </span>
                   </span>
-                  <span className="shrink-0 rounded-lg px-3 py-1.5 text-sm font-semibold text-blue-600 ring-1 ring-[var(--border)] transition hover:bg-blue-500/10 dark:text-blue-400">Browse files</span>
+                  {/* The whole dropzone label is clickable — the pill is desktop-only. */}
+                  <span className="hidden shrink-0 rounded-lg px-3 py-1.5 text-sm font-semibold text-blue-600 ring-1 ring-[var(--border)] transition hover:bg-blue-500/10 dark:text-blue-400 sm:inline-flex">Browse files</span>
                   <input type="file" accept="image/*,.pdf,.doc,.docx" multiple className="hidden" onChange={e => { addFiles(e.target.files); e.currentTarget.value = '' }} />
                 </label>
                 {files.length > 0 ? (
@@ -255,7 +257,7 @@ export function RaiseDisputeButton({ ticketId, origin, subjectTitle, jobRef, sto
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-between gap-3 border-t border-[var(--border)] px-6 py-4">
+            <div className="flex items-center justify-between gap-3 border-t border-[var(--border)] px-4 py-4 sm:px-6">
               <button type="button" onClick={close} disabled={busy} className="rounded-xl px-5 py-2.5 text-sm font-semibold text-[var(--text)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-50">Cancel</button>
               <button type="button" onClick={submit} disabled={busy} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:opacity-50">
                 {busy ? <><Loader2 size={15} className="animate-spin" /> Raising…</> : <><Send size={15} /> Raise dispute</>}

@@ -73,8 +73,9 @@ export function TicketContent({ ticket, variant }: { ticket: RecentTicket; varia
         </p>
       </div>
 
-      {/* Priority + Status — right side */}
-      <div className="flex items-center gap-1.5 shrink-0">
+      {/* Priority + Status — right side. Mobile: stacked (three side-by-side chips
+          would starve the title); sm+ keeps the inline row. */}
+      <div className="flex flex-col items-end gap-1 shrink-0 sm:flex-row sm:items-center sm:gap-1.5">
         {isStaleOpen && (
           <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 whitespace-nowrap">7d+</span>
         )}

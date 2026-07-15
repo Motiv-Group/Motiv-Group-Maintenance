@@ -81,12 +81,12 @@ function StatCard({ intent, icon, value, title, sub, active, onClick }: { intent
   const tone = INTENT_TONE[intent]
   return (
     <button type="button" onClick={onClick} aria-pressed={active}
-      className={`flex items-center gap-3 rounded-xl bg-[var(--surface)] p-4 text-left ring-1 transition hover:bg-[var(--hover)] ${active ? `ring-2 ${tone.ring}` : 'ring-[var(--border)]'}`}>
-      <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${tone.icon}`}>{icon}</span>
+      className={`flex items-center gap-2.5 rounded-xl bg-[var(--surface)] p-3 text-left ring-1 transition hover:bg-[var(--hover)] sm:gap-3 sm:p-4 ${active ? `ring-2 ${tone.ring}` : 'ring-[var(--border)]'}`}>
+      <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl sm:h-11 sm:w-11 ${tone.icon}`}>{icon}</span>
       <span className="min-w-0">
-        <span className="block text-2xl font-bold leading-none text-[var(--text)]">{value}</span>
-        <span className="mt-1 block text-sm font-semibold text-[var(--text)]">{title}</span>
-        <span className="block text-[11px] text-[var(--text-muted)]">{sub}</span>
+        <span className="block text-xl font-bold leading-none text-[var(--text)] sm:text-2xl">{value}</span>
+        <span className="mt-1 block text-xs font-semibold text-[var(--text)] sm:text-sm">{title}</span>
+        <span className="hidden text-[11px] text-[var(--text-muted)] sm:block">{sub}</span>
       </span>
     </button>
   )
@@ -94,9 +94,10 @@ function StatCard({ intent, icon, value, title, sub, active, onClick }: { intent
 
 function FilterSelect<T extends string>({ label, value, onChange, options }: { label: string; value: T; onChange: (v: T) => void; options: { value: T; label: string }[] }) {
   return (
-    <label className="relative flex items-center gap-1.5 rounded-xl bg-[var(--input-bg)] px-3 py-2.5 text-sm ring-1 ring-[var(--border)] transition focus-within:ring-blue-500/40">
+    <label className="relative flex max-w-full shrink-0 items-center gap-1.5 rounded-xl bg-[var(--input-bg)] px-3 py-2.5 text-sm ring-1 ring-[var(--border)] transition focus-within:ring-blue-500/40">
       <span className="whitespace-nowrap text-[var(--text-muted)]">{label}:</span>
-      <select value={value} onChange={e => onChange(e.target.value as T)} className="cursor-pointer appearance-none bg-transparent pr-4 font-semibold text-[var(--text)] outline-none">
+      {/* Width-capped on phones — a select sizes to its longest option (store names). */}
+      <select value={value} onChange={e => onChange(e.target.value as T)} className="min-w-0 max-w-[55vw] cursor-pointer appearance-none truncate bg-transparent pr-4 font-semibold text-[var(--text)] outline-none sm:max-w-none">
         {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
       <ChevronDown size={14} className="pointer-events-none absolute right-2.5 text-[var(--text-faint)]" />
@@ -274,7 +275,7 @@ export function TicketTabView({ rows, grouped, newHref, subtitle, statusOptions,
         {newHref && <Link href={newHref} className="flex shrink-0 items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-blue-500"><PlusCircle size={16} /> Log a Ticket</Link>}
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-2 sm:gap-3 lg:grid-cols-4">
         <StatCard intent="mine" icon={<User size={20} />} value={stats.mine} title={statLabels.mine[0]} sub={statLabels.mine[1]} active={intent === 'mine'} onClick={() => pickIntent('mine')} />
         <StatCard intent="awaiting" icon={<Ticket size={20} />} value={stats.awaiting} title={statLabels.awaiting[0]} sub={statLabels.awaiting[1]} active={intent === 'awaiting'} onClick={() => pickIntent('awaiting')} />
         <StatCard intent="critical" icon={<AlertTriangle size={20} />} value={stats.critical} title={statLabels.critical[0]} sub={statLabels.critical[1]} active={intent === 'critical'} onClick={() => pickIntent('critical')} />
@@ -282,14 +283,20 @@ export function TicketTabView({ rows, grouped, newHref, subtitle, statusOptions,
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[180px] flex-1">
+        <div className="relative w-full sm:w-auto sm:min-w-[180px] sm:flex-1">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
           <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search tickets…" className="w-full rounded-xl bg-[var(--input-bg)] py-2.5 pl-9 pr-3 text-sm text-[var(--text)] ring-1 ring-[var(--border)] outline-none placeholder-[var(--text-faint)] focus:ring-blue-500/40" />
         </div>
+        {/* Mobile: the pills form one horizontally-swipeable strip instead of wrapping
+            into a tall block; sm:contents dissolves the wrapper so desktop keeps the
+            exact flex-wrap layout. */}
+        <div className="flex w-full flex-nowrap items-center gap-2 overflow-x-auto pb-0.5 sm:contents">
         <FilterSelect label="Status" value={status} onChange={v => { setStatus(v); setIntent(null) }} options={statusOptions} />
         <FilterSelect label="Priority" value={priority} onChange={setPriority} options={[{ value: 'all', label: 'All' }, { value: '0', label: 'Critical' }, { value: '1', label: 'High' }, { value: '2', label: 'Medium' }, { value: '3', label: 'Low' }]} />
         {grouped && <FilterSelect label="Store" value={store} onChange={setStore} options={[{ value: 'all', label: 'All stores' }, ...storeNames.map(s => ({ value: s, label: s }))]} />}
         <FilterSelect label="Sort by" value={sort} onChange={setSort} options={[{ value: 'urgent', label: 'Most urgent' }, { value: 'sla', label: 'Next SLA' }, { value: 'newest', label: 'Newest' }, { value: 'oldest', label: 'Oldest' }]} />
+        </div>
+        {/* Outside the strip: its overflow-x-auto would clip this absolute dropdown. */}
         <div className="relative">
           <button type="button" onClick={() => setFiltersOpen(o => !o)} aria-expanded={filtersOpen} className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2.5 text-sm font-semibold ring-1 transition ${adv.size ? 'bg-blue-500/10 text-blue-500 ring-blue-500/40' : 'text-[var(--text-muted)] ring-[var(--border)] hover:bg-[var(--hover)]'}`}>
             <SlidersHorizontal size={15} /> Filters{adv.size ? ` (${adv.size})` : ''}
@@ -332,13 +339,14 @@ export function TicketTabView({ rows, grouped, newHref, subtitle, statusOptions,
             return (
               <div key={storeName} className="overflow-hidden rounded-xl bg-[var(--surface)] ring-1 ring-[var(--border)]">
                 <div role="button" tabIndex={0} aria-expanded={!isCollapsed} onClick={() => toggle(storeName)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(storeName) } }} className="flex cursor-pointer items-center gap-3 p-4 transition hover:bg-[var(--hover)]">
-                  <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-full ${accent.icon}`}><Store size={20} /></span>
+                  <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full sm:h-11 sm:w-11 ${accent.icon}`}><Store size={20} /></span>
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-2"><span className="truncate text-base font-bold text-[var(--text)]">{storeName}</span>{g.branchCode && <span className="shrink-0 text-sm text-[var(--text-muted)]">· {g.branchCode}</span>}</span>
-                    <span className="mt-0.5 block text-sm text-[var(--text-muted)]">{openN} open{critical > 0 && <> · <span className="font-semibold text-red-600 dark:text-red-400">{critical} critical</span></>}{overdue > 0 && <> · <span className="font-semibold text-amber-600 dark:text-amber-400">{overdue} overdue</span></>}</span>
+                    {/* Mobile folds the next-SLA countdown into this sub-line (the right-hand block is sm+). */}
+                    <span className="mt-0.5 block text-sm text-[var(--text-muted)]">{openN} open{critical > 0 && <> · <span className="font-semibold text-red-600 dark:text-red-400">{critical} critical</span></>}{overdue > 0 && <> · <span className="font-semibold text-amber-600 dark:text-amber-400">{overdue} overdue</span></>}{nextSla != null && <span className="sm:hidden"> · SLA {humanizeDuration(nextSla - nowMs)}</span>}</span>
                   </span>
                   {onStoreOverview && <button type="button" onClick={e => { e.stopPropagation(); onStoreOverview(storeName) }} title="Store overview" className="shrink-0 rounded-lg p-1.5 text-[var(--text-faint)] transition hover:bg-blue-500/10 hover:text-blue-500"><BarChart3 size={16} /></button>}
-                  <span className="shrink-0 text-right">
+                  <span className="hidden shrink-0 text-right sm:block">
                     <span className="block text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Next SLA in</span>
                     <span className={`block text-sm font-bold ${nextSla != null && nextSla - nowMs < 2 * 3600_000 ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'}`}>{nextSla != null ? humanizeDuration(nextSla - nowMs) : '—'}</span>
                   </span>

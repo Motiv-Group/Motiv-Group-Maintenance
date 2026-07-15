@@ -56,9 +56,11 @@ export function RegionalRecentTickets({ tickets }: { tickets: RegionalTicketRow[
                 return m ? <p className={`text-[11px] font-medium truncate ${sm.text}`}>{m.l} · {formatDateTime(m.at)}</p> : null
               })()}
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-[4.5rem_7rem] gap-1.5 shrink-0 justify-items-end sm:justify-items-stretch">
+            {/* Mobile: cap the badge column so long status labels can't starve the
+                ticket title (the grid sizes to the widest badge at base). */}
+            <div className="grid max-w-[7rem] grid-cols-1 gap-1.5 shrink-0 justify-items-end sm:max-w-none sm:grid-cols-[4.5rem_7rem] sm:justify-items-stretch">
               <PriorityBadge priority={t.priority} className="w-full text-center" />
-              <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${t.disputed ? 'bg-red-500/15 text-red-700 dark:text-red-400' : t.infoAdded ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : sm.cls}`}>{t.disputed ? 'Dispute' : t.infoAdded ? 'Info added' : sm.label}</span>
+              <span className={`max-w-full truncate text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${t.disputed ? 'bg-red-500/15 text-red-700 dark:text-red-400' : t.infoAdded ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : sm.cls}`}>{t.disputed ? 'Dispute' : t.infoAdded ? 'Info added' : sm.label}</span>
             </div>
           </Link>
         )
