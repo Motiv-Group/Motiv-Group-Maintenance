@@ -1,6 +1,7 @@
 'use client'
 
 import Image from 'next/image'
+import { useBranding } from '@/components/providers/BrandingProvider'
 
 interface MotivLogoProps {
   /** Height in px of the symbol; the MOTIV wordmark scales to ~half of it. */
@@ -15,14 +16,16 @@ interface MotivLogoProps {
  * Brand lockup for the app chrome: the gradient MOTIV symbol followed by the
  * MOTIV wordmark. Designed for the dark charcoal nav — the symbol's soft glow
  * blends into the charcoal. For the big login/auth logo (symbol + name stacked)
- * use /brand/motiv-lockup.png directly.
+ * use MotivLockup. Sources + aspect ratios come from BrandingProvider so an
+ * admin-uploaded logo swaps in everywhere at once.
  */
 export function MotivLogo({ height = 32, className = '', wordmark = true }: MotivLogoProps) {
-  const symW = Math.round(height * (1536 / 1024)) // symbol aspect 1536×1024
+  const branding = useBranding()
+  const symW = Math.round(height * branding.symbolAspect)
   // The MOTIV wordmark is kept small next to the symbol so the mark leads and the
   // name is a quiet label (not competing with it).
   const wordH = Math.round(height * 0.44)
-  const wordW = Math.round(wordH * (701 / 151))  // wordmark aspect 701×151
+  const wordW = Math.round(wordH * branding.wordmarkAspect)
   // items-end lines up the image BOXES, but the symbol PNG's solid "M" ends ~24%
   // above its box bottom (soft glow below) while the wordmark's text ends ~13%
   // above its own — so nudge the wordmark up to align the two VISIBLE bottoms.
@@ -30,9 +33,9 @@ export function MotivLogo({ height = 32, className = '', wordmark = true }: Moti
 
   return (
     <span className={`inline-flex items-end ${className}`} style={{ gap: Math.round(height * 0.16) }}>
-      <Image src="/brand/motiv-symbol.png" alt={wordmark ? '' : 'Motiv'} width={symW} height={height} priority unoptimized draggable={false} className="object-contain" />
+      <Image src={branding.symbolUrl} alt={wordmark ? '' : branding.appName} width={symW} height={height} priority unoptimized draggable={false} className="object-contain" />
       {wordmark && (
-        <Image src="/brand/motiv-wordmark.png" alt="Motiv" width={wordW} height={wordH} priority unoptimized draggable={false} className="object-contain" style={{ transform: `translateY(-${wordShiftUp}px)` }} />
+        <Image src={branding.wordmarkUrl} alt={branding.appName} width={wordW} height={wordH} priority unoptimized draggable={false} className="object-contain" style={{ transform: `translateY(-${wordShiftUp}px)` }} />
       )}
     </span>
   )

@@ -15,7 +15,7 @@ import {
 import type { StoreManagerTicket } from '@/lib/health/data'
 import { Card } from '@/components/exec/ui'
 import { AddInfoModal } from '@/components/client/AddInfoModal'
-import { formatDate, humanizeDuration, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
+import { formatDate, formatJobId, humanizeDuration, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
 import { CategoryIcon } from '@/components/client/ticketBadges'
 
 type TodayVisit = {
@@ -202,6 +202,7 @@ function QueueRow({ ticket, storeName, nowMs }: { ticket: StoreManagerTicket; st
   // Genuinely critical (P1 / urgent) tickets get a RED action button so they stand out.
   const critical = ['P1', 'urgent'].includes(String(ticket.priority))
   const ctaCls = `relative z-20 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-bold transition lg:w-40 ${critical ? 'border-red-500/60 bg-red-500/10 text-red-600 hover:bg-red-500/15 dark:text-red-300' : 'border-blue-500/60 text-blue-600 hover:bg-blue-500/10 dark:text-blue-300'}`
+  const jobId = ticket.jobRef ?? formatJobId(ticket.jobNumber)
 
   return (
     <div className="relative grid gap-4 border-b border-[var(--border)] px-4 py-4 transition last:border-b-0 hover:bg-[var(--hover)] lg:grid-cols-[1fr_200px_1.1fr_160px] lg:items-center">
@@ -211,6 +212,7 @@ function QueueRow({ ticket, storeName, nowMs }: { ticket: StoreManagerTicket; st
       <div className="flex min-w-0 items-center gap-3">
         <CategoryIcon category={ticket.category ?? ticket.title} priority={ticket.priority} />
         <div className="min-w-0">
+          {jobId && <p className="truncate font-mono text-[10px] text-[var(--text-faint)]">{jobId}</p>}
           <p className="truncate text-base font-bold text-[var(--text)]">{ticket.category || ticket.title}</p>
           <p className="truncate text-sm text-[var(--text-muted)]">{storeName}</p>
         </div>

@@ -340,7 +340,7 @@ export interface RegionalTicketAction {
 export interface RegionalTicketRow {
   id: string; title: string; category: string | null; scheduledAt: string | null
   storeName: string; branchCode: string | null
-  status: string; priority: Priority; jobRef: string | null; createdAt: string
+  status: string; priority: Priority; jobRef: string | null; jobNumber: number | null; createdAt: string
   quoteRequestedAt: string | null; quoteReceivedAt: string | null; quoteAcceptedAt: string | null
   breached: boolean; supplierBreached: boolean; internalBreached: boolean
   dueAt: string; slaDueAt: string | null; overdue: boolean; infoAdded: boolean
@@ -453,7 +453,7 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
       id: t.id, title: t.title ?? 'Untitled',
       category: (t as any).category ?? null, scheduledAt: (t as any).scheduled_at ?? null,
       storeName: storeName.get(t.store_id) ?? 'Store', branchCode: storeBranch.get(t.store_id) ?? null,
-      status: t.status, priority: t.priority, jobRef: (t as any).job_ref ?? null, createdAt: t.created_at,
+      status: t.status, priority: t.priority, jobRef: (t as any).job_ref ?? null, jobNumber: (t as any).job_number ?? null, createdAt: t.created_at,
       quoteRequestedAt: (t as any).quote_requested_at ?? null,
       quoteReceivedAt: firstQuoteAt.get(t.id) ?? null,
       quoteAcceptedAt: ((t as any).quote_decision_status === 'approved' ? (t as any).quote_decided_at : null) ?? acceptedQuoteAt.get(t.id) ?? null,
@@ -580,7 +580,7 @@ export type ClientStatus = 'open' | 'info_requested' | 'scheduled' | 'in_progres
 // ticket read "Open" on the detail page but "In Progress" on the dashboard).
 const clientVisible = (status: string): ClientStatus | null =>
   clientVisibleStatus(status as TicketStatus)
-export interface StoreManagerTicket { id: string; title: string; description: string | null; category: string | null; status: ClientStatus; rawStatus: string; priority: Priority; operationalImpact: string | null; createdAt: string; supplierAssigned: boolean; jobRef: string | null; dueAt: string; overdue: boolean; infoAdded: boolean; photoUrls: string[]; infoDocUrls: string[]; infoRequestReason: string | null }
+export interface StoreManagerTicket { id: string; title: string; description: string | null; category: string | null; status: ClientStatus; rawStatus: string; priority: Priority; operationalImpact: string | null; createdAt: string; supplierAssigned: boolean; jobRef: string | null; jobNumber: number | null; dueAt: string; overdue: boolean; infoAdded: boolean; photoUrls: string[]; infoDocUrls: string[]; infoRequestReason: string | null }
 export interface StoreManagerData {
   storeName: string
   company: string
@@ -622,7 +622,7 @@ export async function assembleStoreManagerDashboard(companyId: string, storeIds:
     const { dueAt, overdue } = dueInfo(t, rules, now)
     // "Info added" = the SM resubmitted after the RM requested info (back at open, reason kept).
     const infoAdded = t.status === 'open' && !!(t as any).info_request_reason
-    visible.push({ id: t.id, title: t.title ?? 'Untitled', description: (t as any).description ?? null, category: t.category ?? null, status: v, rawStatus: t.status, priority: t.priority, operationalImpact: t.operational_impact ?? null, createdAt: t.created_at, supplierAssigned: !!t.supplier_id, jobRef: (t as any).job_ref ?? null, dueAt, overdue, infoAdded,
+    visible.push({ id: t.id, title: t.title ?? 'Untitled', description: (t as any).description ?? null, category: t.category ?? null, status: v, rawStatus: t.status, priority: t.priority, operationalImpact: t.operational_impact ?? null, createdAt: t.created_at, supplierAssigned: !!t.supplier_id, jobRef: (t as any).job_ref ?? null, jobNumber: (t as any).job_number ?? null, dueAt, overdue, infoAdded,
       photoUrls: Array.isArray((t as any).photo_urls) ? (t as any).photo_urls as string[] : [],
       infoDocUrls: Array.isArray((t as any).info_doc_urls) ? (t as any).info_doc_urls as string[] : [],
       infoRequestReason: (t as any).info_request_reason ?? null })
@@ -642,7 +642,7 @@ export async function assembleStoreManagerDashboard(companyId: string, storeIds:
 // ============================================================
 export interface SupplierTicketRow {
   id: string; storeName: string; branchCode: string | null; title: string; category: string | null; priority: Priority; status: string
-  jobRef: string | null; description: string | null
+  jobRef: string | null; jobNumber: number | null; description: string | null
   ageDays: number; createdAt: string; slaLabel: string; nextActionDueAt: string | null
   acknowledged: boolean; evidenceRequired: boolean; beforeUploaded: boolean; afterUploaded: boolean; cocUploaded: boolean
   active: boolean; breached: boolean
@@ -798,7 +798,7 @@ export async function assembleSupplierDashboard(companyId: string | null, suppli
     const approvedAt = (raw.quote_decision_status === 'approved' ? raw.quote_decided_at : null) ?? acceptedQuoteAt.get(t.id) ?? null
     rows.push({
       id: t.id, storeName: storeName.get(t.store_id) ?? (raw.company_id ? 'Store' : 'Individual'), branchCode: storeBranch.get(t.store_id) ?? null, title: t.title ?? 'Ticket', category: (t as any).category ?? null, priority: t.priority, status: t.status,
-      jobRef: raw.job_ref ?? null, description: raw.description ?? null,
+      jobRef: raw.job_ref ?? null, jobNumber: raw.job_number ?? null, description: raw.description ?? null,
       ageDays: Math.floor((now.getTime() - new Date(t.created_at).getTime()) / DAY), createdAt: t.created_at, slaLabel: lbl, nextActionDueAt: sla.nextActionDueAt,
       acknowledged: !!t.first_response_at, evidenceRequired: !!t.evidence_required,
       beforeUploaded: !!t.before_photo_uploaded, afterUploaded: !!t.after_photo_uploaded, cocUploaded: !!t.completion_certificate_uploaded,

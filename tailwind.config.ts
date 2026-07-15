@@ -21,17 +21,20 @@ const config: Config = {
       },
       colors: {
         brand: {
-          // 50–400 = warm gold/cream accent (kept). 500–900 = the app chrome,
-          // retuned from navy to a neutral warm-charcoal so the gradient MOTIV
-          // logo reads clean + premium (600 is the nav / login / splash surface).
-          50:  '#f8f5ed',
-          100: '#e8dfc4',
-          300: '#c9b99a',
-          400: '#b5a07d',
-          500: '#1b1d24',
-          600: '#0e1016',
-          700: '#090a0e',
-          900: '#050608',
+          // 50–400 = warm gold/cream accent. 500–900 = the app chrome (neutral
+          // warm-charcoal; 600 is the nav / login / splash surface). The actual
+          // colours live as RGB-channel CSS vars in globals.css (defaults) so the
+          // admin Customize tab can override them at runtime — the channel form
+          // keeps Tailwind opacity modifiers (brand-900/20) working. Factory hex
+          // values are mirrored in lib/settings.ts BRAND_DEFAULT_HEX.
+          50:  'rgb(var(--brand-50) / <alpha-value>)',
+          100: 'rgb(var(--brand-100) / <alpha-value>)',
+          300: 'rgb(var(--brand-300) / <alpha-value>)',
+          400: 'rgb(var(--brand-400) / <alpha-value>)',
+          500: 'rgb(var(--brand-500) / <alpha-value>)',
+          600: 'rgb(var(--brand-600) / <alpha-value>)',
+          700: 'rgb(var(--brand-700) / <alpha-value>)',
+          900: 'rgb(var(--brand-900) / <alpha-value>)',
         },
       },
     },
