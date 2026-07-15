@@ -97,7 +97,7 @@ export function ReportBuilder({ role, stores }: { role: 'supplier' | 'regional';
           })}
         </div>
         {period === 'custom' && (
-          <div className="flex gap-3 mt-3">
+          <div className="flex flex-col gap-3 mt-3 sm:flex-row">
             <label className="text-xs text-[var(--text-muted)]">From
               <input type="date" value={from} onChange={e => setFrom(e.target.value)}
                 className="mt-1 block w-full px-3 py-2 rounded-lg text-sm bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-emerald-500/40" />

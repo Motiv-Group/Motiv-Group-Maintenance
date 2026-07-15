@@ -32,7 +32,7 @@ export function RegionalProjectsClient({ projects, featured }: { projects: Proje
       </div>
 
       {totalProjects === 0 ? (
-        <Card className="p-12 text-center">
+        <Card className="p-8 text-center sm:p-12">
           <FolderKanban size={34} className="mx-auto text-[var(--text-faint)]" />
           <p className="mt-3 text-sm font-medium text-[var(--text)]">No projects to show yet</p>
           <p className="text-xs text-[var(--text-muted)]">Projects will appear here once they’re set up.</p>
@@ -75,6 +75,8 @@ export function RegionalProjectsClient({ projects, featured }: { projects: Proje
                     <div className="flex-1 h-1.5 rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden"><div className="h-full rounded-full bg-blue-500" style={{ width: `${p.progress}%` }} /></div>
                     <span className="text-[11px] tabular-nums text-[var(--text-muted)] w-8 text-right">{p.progress}%</span>
                   </div>
+                  {/* Phones lose the bar — keep the % so rows aren't just a name + pill. */}
+                  <span className="shrink-0 text-[11px] font-semibold tabular-nums text-[var(--text-muted)] sm:hidden">{p.progress}%</span>
                   <span className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full ${PROJECT_STATUS_PILL[p.status]}`}>{PROJECT_STATUS_LABELS[p.status]}</span>
                   <ArrowRight size={15} className="text-[var(--text-faint)] group-hover:text-blue-500 transition-colors shrink-0" />
                 </Link>
@@ -93,7 +95,7 @@ function FeaturedCard({ f }: { f: Featured }) {
   return (
     <Link href={`/regional/projects/${project.id}`} className="group block rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50">
       <Card className="overflow-hidden transition hover:ring-2 hover:ring-blue-500/60 hover:-translate-y-0.5">
-      <div className="relative p-5 text-white overflow-hidden">
+      <div className="relative p-4 text-white overflow-hidden sm:p-5">
         {/* Background: the project's own cover if set, else the default project image. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={s.coverUrl || '/projects/project-bed-linen.png'} alt="" className="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-105" />

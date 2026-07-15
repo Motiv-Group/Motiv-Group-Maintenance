@@ -68,7 +68,7 @@ function RmDeclinedQuoteCard({ q, ticketId, canReQuote, open = false }: { q: any
             <p className="text-sm text-[var(--text)]">{q.declineReason}</p>
           </div>
         )}
-        <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+        <div className="grid grid-cols-1 gap-y-3 sm:grid-cols-2 sm:gap-x-4">
           <DetailItem label="Excl. VAT" value={formatCurrency(q.amount)} />
           <DetailItem label="Incl. VAT" value={q.amountInclVat ? formatCurrency(q.amountInclVat) : '—'} />
           <DetailItem label="Received" value={formatDateTime(q.createdAt)} />
@@ -338,9 +338,9 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
       {openDispute && <DisputeThread ticketId={t.id} dispute={openDispute} messages={msgsByDispute(openDispute.id)} viewerRole="regional_manager" subject={disputeSubject(openDispute)} hideControls />}
       {resolvedDisputes.map(d => (
         <details key={d.id} className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
-          <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
+          <summary className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition sm:flex-nowrap">
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-[var(--text)] truncate">Dispute — {disputeSubject(d)}</p>
+              <p className="text-sm font-semibold text-[var(--text)] line-clamp-2 sm:truncate">Dispute — {disputeSubject(d)}</p>
               <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(d.resolved_at ?? d.created_at)}</p>
             </div>
             <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 shrink-0 ${d.outcome === 'withdrawn' ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' : 'bg-amber-500/15 text-amber-700 dark:text-amber-400'}`}>{d.outcome === 'withdrawn' ? 'Retracted' : 'Withdrawn'}</span>
@@ -616,7 +616,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
                     <p className="text-sm text-[var(--text)]">{d.reason}</p>
                   </div>
                 )}
-                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                <div className="grid grid-cols-1 gap-y-3 sm:grid-cols-2 sm:gap-x-4">
                   <DetailItem label="Type" value="Declined quote request" />
                   <DetailItem label="Declined" value={formatDateTime(d.at)} />
                 </div>
@@ -634,7 +634,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
                   <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Note</p>
                   <p className="text-sm text-[var(--text)]">{COURTESY_NOTE}</p>
                 </div>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                <div className="grid grid-cols-1 gap-y-3 sm:grid-cols-2 sm:gap-x-4">
                   <DetailItem label="Type" value="Awaiting quote — closed" />
                   <DetailItem label="Requested" value={r.invitedAt ? formatDateTime(r.invitedAt) : '—'} />
                 </div>
@@ -812,7 +812,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
       <BackLink fallbackHref="/regional/tickets" label="Back to tickets" />
 
       {/* Header — reference, title, priority + status, progress stepper (SM flavor). */}
-      <Card className="p-5 space-y-7">
+      <Card className="p-4 space-y-5 sm:p-5 sm:space-y-7">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex flex-wrap items-center gap-x-2 gap-y-0.5">
             {t.job_ref && <span className="font-mono text-sm font-semibold text-[var(--text-faint)]">{t.job_ref}</span>}
@@ -844,7 +844,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
       <div className="grid gap-4 lg:grid-cols-2 items-stretch">
       {/* Next action — the RM's most important pending step + the controls to take it
           (buttons stacked one under another). */}
-      <Card className="p-5 space-y-4 h-full">
+      <Card className="p-4 space-y-4 h-full sm:p-5">
         <div>
           <h2 className="text-sm font-bold text-[var(--text)]">Next action</h2>
           {nextAction.msg && <p className="mt-1 text-sm font-bold text-[var(--text)]">{nextAction.msg}</p>}
@@ -957,9 +957,9 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
       </Card>
 
       {/* Ticket information — aligned label→value rows, then full-width description. */}
-        <Card className="p-5 space-y-4 h-full">
+        <Card className="p-4 space-y-4 h-full sm:p-5">
           <h2 className="text-sm font-bold text-[var(--text)]">Ticket information</h2>
-          <dl className="grid grid-cols-[max-content_1fr] items-baseline gap-x-6 gap-y-2.5 text-sm">
+          <dl className="grid grid-cols-[max-content_1fr] items-baseline gap-x-4 sm:gap-x-6 gap-y-2.5 text-sm">
             <dt className="text-[var(--text-muted)]">Store</dt>
             <dd className="font-medium text-[var(--text)]">{storeName}</dd>
             <dt className="text-[var(--text-muted)]">Category</dt>

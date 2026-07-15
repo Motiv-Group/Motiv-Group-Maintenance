@@ -38,11 +38,11 @@ export function SegmentedProgressBar({
           {steps.map((s) => (
             <div
               key={s.key}
-              className={`flex-1 flex items-center justify-center gap-1 text-[10px] font-medium ${
+              className={`flex-1 flex items-center justify-center gap-1 text-[9px] font-medium sm:text-[10px] ${
                 s.done ? 'text-emerald-600 dark:text-emerald-400' : 'text-[var(--text-faint)]'
               }`}
             >
-              {s.done && <Check size={11} strokeWidth={3} />}
+              {s.done && <Check size={11} strokeWidth={3} className="hidden sm:inline" />}
               <span className="truncate">{s.label}</span>
             </div>
           ))}

@@ -47,7 +47,7 @@ export function Modal({ onClose, children, maxWidth = 'max-w-lg' }: {
       <div
         role="dialog"
         aria-modal="true"
-        className={`relative flex max-h-[92vh] w-full ${maxWidth} flex-col space-y-4 overflow-y-auto rounded-t-2xl bg-[var(--surface)] p-5 ring-1 ring-[var(--border)] shadow-2xl sm:rounded-2xl ${leaving ? 'translate-y-4 opacity-0 transition-all duration-200 sm:translate-y-0 sm:scale-95' : 'motion-safe:animate-[modalPop_200ms_ease-out]'}`}
+        className={`relative flex max-h-[92vh] w-full ${maxWidth} flex-col space-y-4 overflow-y-auto rounded-t-2xl bg-[var(--surface)] p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] ring-1 sm:pb-5 ring-[var(--border)] shadow-2xl sm:rounded-2xl ${leaving ? 'translate-y-4 opacity-0 transition-all duration-200 sm:translate-y-0 sm:scale-95' : 'motion-safe:animate-[modalPop_200ms_ease-out]'}`}
       >
         {/* eslint-disable-next-line react-hooks/refs -- `close` reads closing.current from event/close handlers, never during render */}
         {children(close)}

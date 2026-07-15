@@ -207,7 +207,7 @@ export function AssignSuppliersButton({ ticketId, suppliers, motivSuppliers = []
     doAssign()
   }
 
-  const tabCls = (on: boolean) => `flex-1 py-2 rounded-lg text-sm font-semibold transition ${on ? 'bg-emerald-600 text-white' : 'ring-1 ring-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--hover)]'}`
+  const tabCls = (on: boolean) => `flex-1 min-w-0 truncate px-1 py-2 rounded-lg text-sm font-semibold transition ${on ? 'bg-emerald-600 text-white' : 'ring-1 ring-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--hover)]'}`
   return (
     <>
       {trigger ? trigger(() => setOpen(true)) : (
@@ -518,7 +518,7 @@ export function RmEditTicketForm({ ticketId, initial, defaultOpen = false, onClo
       {open && (
         <Modal maxWidth="max-w-lg" title="Edit ticket" onClose={() => { if (!busy) close() }}>
           <ReqLabel label="Title"><input className={input} value={title} onChange={e => setTitle(e.target.value)} placeholder="Title" /></ReqLabel>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <ReqLabel label="Category"><select className={input} value={category} onChange={e => setCategory(e.target.value)}>{CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select></ReqLabel>
             <ReqLabel label="Priority"><select className={input} value={priority} onChange={e => setPriority(e.target.value)}>{PRIORITIES.map(p => <option key={p.v} value={p.v}>{p.label}</option>)}</select></ReqLabel>
           </div>
@@ -859,7 +859,7 @@ export function RmCompletionReview({ ticketId, label, submittedAt, photoCount, d
           </span>
           <ChevronRight size={16} className="shrink-0 text-[var(--text-faint)]" />
         </div>
-        <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1.5 text-sm text-[var(--text-muted)]">
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-[var(--text-muted)] sm:gap-x-6">
           <span className="flex items-center gap-1.5"><ImageIcon size={15} className="text-[var(--text-faint)]" /> <span className="font-semibold text-[var(--text)]">{photoCount}</span> Photo{photoCount === 1 ? '' : 's'}</span>
           <span className="flex items-center gap-1.5"><FileText size={15} className="text-[var(--text-faint)]" /> <span className="font-semibold text-[var(--text)]">{docCount}</span> Document{docCount === 1 ? '' : 's'}</span>
           <span className="flex items-center gap-1.5"><MessageSquare size={15} className="text-[var(--text-faint)]" /> <span className="font-semibold text-[var(--text)]">{noteCount}</span> Note{noteCount === 1 ? '' : 's'}</span>
@@ -981,7 +981,7 @@ export function QuoteComparison({ ticketId, rows, onClose }: { ticketId: string;
                   <input type="radio" name="qc" checked={on} onChange={() => setSelectedId(r.supplierId)} onClick={() => { if (selectedId === r.supplierId) setSelectedId(null) }} className="mt-1 h-4 w-4 accent-emerald-600" />
                 </span>
               </label>
-              <div className="mx-4 grid grid-cols-2 gap-x-4 gap-y-2 border-t border-[var(--border)] py-3">
+              <div className="mx-4 grid grid-cols-1 gap-y-2 border-t border-[var(--border)] py-3 sm:grid-cols-2 sm:gap-x-4">
                 <DetailCell icon={<Calendar size={14} />} label="Proposed visit" value={q.proposedScheduleAt ? formatDateTime(q.proposedScheduleAt) : '—'} />
                 <DetailCell icon={<ShieldCheck size={14} />} label="Valid until" value={q.validUntil ? formatDate(q.validUntil) : 'N/A'} />
               </div>

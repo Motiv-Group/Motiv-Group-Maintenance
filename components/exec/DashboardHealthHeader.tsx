@@ -50,7 +50,7 @@ export function DashboardHealthHeader({
         <div className="flex items-center gap-3 sm:gap-4 lg:flex-1 lg:min-w-0">
           <Donut value={score ?? 0} status={status} size={100} label={donutLabel} />
           <div className="min-w-0 flex-1 sm:border-l sm:border-[var(--border)] sm:pl-4">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
               <span className="text-sm font-bold">
                 <span className="text-[var(--text)]">{scopePrefix} </span>
                 <span className={STATUS_TEXT[status]}>{HEADLINE[status]}</span>

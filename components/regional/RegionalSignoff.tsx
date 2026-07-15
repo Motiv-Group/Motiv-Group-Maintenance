@@ -27,9 +27,8 @@ const prioTicket = (p: string) => ({ priority: p } as unknown as Parameters<type
 
 function StatCard({ icon, tone, value, title, sub, active, onClick }: { icon: ReactNode; tone: string; value: number; title: string; sub: string; active: boolean; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} aria-pressed={active} className={`flex items-center gap-3 rounded-xl bg-[var(--surface)] p-3 text-left ring-1 transition hover:bg-[var(--hover)] sm:p-4 ${active ? 'ring-2 ring-blue-500/50' : 'ring-[var(--border)]'}`}>
-      {/* Icon chip is sm+ — the compact 3-up mobile grid has no room for it. */}
-      <span className="hidden shrink-0 sm:block">{icon}</span>
+    <button type="button" onClick={onClick} aria-pressed={active} className={`flex items-center gap-2.5 rounded-xl bg-[var(--surface)] p-3 text-left ring-1 transition hover:bg-[var(--hover)] sm:gap-3 sm:p-4 ${active ? 'ring-2 ring-blue-500/50' : 'ring-[var(--border)]'}`}>
+      <span className="shrink-0">{icon}</span>
       <span className="min-w-0">
         <span className="block text-xl font-bold leading-none text-[var(--text)] sm:text-2xl">{value}</span>
         <span className="mt-1 block text-xs font-semibold text-[var(--text)] sm:text-sm">{title}</span>
@@ -113,9 +112,9 @@ export function RegionalSignoff({ signoffs }: { signoffs: RegionalSignoffRow[] }
 
       {/* Stat cards — compact 3-up on phones. */}
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-2 sm:gap-3 lg:grid-cols-3">
-        <StatCard icon={<span className="grid h-11 w-11 place-items-center rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400"><Clock size={20} /></span>} tone="border-blue-500" value={stats.review} title="Awaiting review" sub="Action required" active={statusF === 'review'} onClick={() => { setStatusF(f => f === 'review' ? 'all' : 'review'); setPage(1) }} />
-        <StatCard icon={<span className="grid h-11 w-11 place-items-center rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400"><CheckCircle2 size={20} /></span>} tone="border-amber-500" value={stats.evidence} title="Evidence pending" sub="Awaiting the supplier" active={statusF === 'evidence'} onClick={() => { setStatusF(f => f === 'evidence' ? 'all' : 'evidence'); setPage(1) }} />
-        <StatCard icon={<span className="grid h-11 w-11 place-items-center rounded-full bg-[var(--surface-2)] text-[var(--text-muted)]"><ClipboardCheck size={20} /></span>} tone="border-[var(--border)]" value={stats.total} title="In sign-off" sub="Total open" active={statusF === 'all'} onClick={() => { setStatusF('all'); setPage(1) }} />
+        <StatCard icon={<span className="grid h-9 w-9 place-items-center rounded-full sm:h-11 sm:w-11 bg-blue-500/15 text-blue-600 dark:text-blue-400"><Clock size={20} /></span>} tone="border-blue-500" value={stats.review} title="Awaiting review" sub="Action required" active={statusF === 'review'} onClick={() => { setStatusF(f => f === 'review' ? 'all' : 'review'); setPage(1) }} />
+        <StatCard icon={<span className="grid h-9 w-9 place-items-center rounded-full sm:h-11 sm:w-11 bg-amber-500/15 text-amber-600 dark:text-amber-400"><CheckCircle2 size={20} /></span>} tone="border-amber-500" value={stats.evidence} title="Evidence pending" sub="Awaiting the supplier" active={statusF === 'evidence'} onClick={() => { setStatusF(f => f === 'evidence' ? 'all' : 'evidence'); setPage(1) }} />
+        <StatCard icon={<span className="grid h-9 w-9 place-items-center rounded-full sm:h-11 sm:w-11 bg-[var(--surface-2)] text-[var(--text-muted)]"><ClipboardCheck size={20} /></span>} tone="border-[var(--border)]" value={stats.total} title="In sign-off" sub="Total open" active={statusF === 'all'} onClick={() => { setStatusF('all'); setPage(1) }} />
       </div>
 
       {/* Filter bar — phones: full-width search + a 2-col grid of controls;
@@ -134,7 +133,7 @@ export function RegionalSignoff({ signoffs }: { signoffs: RegionalSignoffRow[] }
       </div>
 
       {!groups.length && (
-        <div className="rounded-xl border border-dashed border-[var(--border)] p-12 text-center">
+        <div className="rounded-xl border border-dashed border-[var(--border)] p-8 text-center sm:p-12">
           <ClipboardCheck size={28} className="mx-auto mb-2 text-[var(--text-faint)]" />
           <p className="text-sm text-[var(--text-faint)]">{signoffs.length ? 'No submissions match your filters.' : 'Nothing awaiting your sign-off.'}</p>
         </div>
@@ -149,9 +148,10 @@ export function RegionalSignoff({ signoffs }: { signoffs: RegionalSignoffRow[] }
               <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[var(--surface-2)] text-[var(--text-muted)]"><Store size={17} /></span>
               <span className="flex min-w-0 flex-1 items-center gap-2">
                 <span className="truncate text-base font-bold text-[var(--text)]">{storeName}</span>
-                {g.branchCode && <span className="shrink-0 text-sm text-[var(--text-muted)]">· {g.branchCode}</span>}
+                {g.branchCode && <span className="hidden shrink-0 text-sm text-[var(--text-muted)] sm:inline">· {g.branchCode}</span>}
               </span>
-              <span className="shrink-0 text-sm text-[var(--text-muted)]">{g.rows.length} job{g.rows.length === 1 ? '' : 's'}</span>
+              {/* Mobile: number-only count to protect the store name's width. */}
+              <span className="shrink-0 text-sm text-[var(--text-muted)]">{g.rows.length}<span className="hidden sm:inline"> job{g.rows.length === 1 ? '' : 's'}</span></span>
               <ChevronDown size={18} className={`shrink-0 text-[var(--text-muted)] transition-transform ${open ? 'rotate-180' : ''}`} />
             </div>
             {open && (
@@ -163,9 +163,9 @@ export function RegionalSignoff({ signoffs }: { signoffs: RegionalSignoffRow[] }
                     <div key={s.id} className="block border-b border-[var(--border)] px-4 py-4 last:border-b-0">
                       <div className={ROW}>
                         <div className="flex min-w-0 items-start gap-3">
-                          <CategoryIcon category={s.category ?? s.title} priority={s.priority} className="h-11 w-11" iconSize={18} />
+                          <CategoryIcon category={s.category ?? s.title} priority={s.priority} className="h-9 w-9 sm:h-11 sm:w-11" iconSize={18} />
                           <div className="min-w-0">
-                            <p className="truncate text-sm font-bold text-[var(--text)]">{s.category || s.title}</p>
+                            <p className="line-clamp-2 text-sm font-bold text-[var(--text)] lg:line-clamp-1">{s.category || s.title}</p>
                             {s.jobRef && <p className="truncate text-[11px] text-[var(--text-faint)]">Ticket {s.jobRef}</p>}
                             {s.supplier && <p className="flex items-center gap-1 truncate text-[11px] text-[var(--text-muted)]"><Truck size={11} className="shrink-0" /> {s.supplier}</p>}
                             <div className="mt-1.5 flex flex-wrap gap-1.5">

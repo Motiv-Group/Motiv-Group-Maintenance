@@ -422,7 +422,7 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
                   {nextSla != null && <span className="sm:hidden"> · SLA {humanizeDuration(nextSla - nowMs)}</span>}
                 </span>
               </span>
-              <button type="button" onClick={e => { e.stopPropagation(); setPanelStore(storeName) }} title="Store overview" className="shrink-0 rounded-lg p-1.5 text-[var(--text-faint)] transition hover:bg-blue-500/10 hover:text-blue-500"><BarChart3 size={16} /></button>
+              <button type="button" onClick={e => { e.stopPropagation(); setPanelStore(storeName) }} title="Store overview" className="shrink-0 rounded-lg p-2.5 -m-1 text-[var(--text-faint)] transition hover:bg-blue-500/10 hover:text-blue-500 sm:p-1.5 sm:m-0"><BarChart3 size={16} /></button>
               <span className="hidden shrink-0 text-right sm:block">
                 <span className="block text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Next SLA in</span>
                 <span className={`block text-sm font-bold ${nextSla != null && nextSla - nowMs < 2 * 3600_000 ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'}`}>{nextSla != null ? humanizeDuration(nextSla - nowMs) : '—'}</span>

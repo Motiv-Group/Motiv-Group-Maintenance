@@ -27,7 +27,7 @@ export function RegionalStoreDetail({ projectId, store, project, files }: { proj
       <Link href={`/regional/projects/${projectId}`} className="text-xs text-[var(--text-muted)] hover:text-[var(--text)]">← {project.name}</Link>
 
       {/* Summary */}
-      <Card className="p-5 space-y-4">
+      <Card className="p-4 sm:p-5 space-y-4">
         <div className="flex items-start justify-between gap-2">
           <div>
             <h1 className="text-lg font-bold text-[var(--text)]">{store.store_name ?? store.branch_code}</h1>
@@ -43,7 +43,7 @@ export function RegionalStoreDetail({ projectId, store, project, files }: { proj
       </Card>
 
       {/* Milestone stepper */}
-      <Card className="p-5">
+      <Card className="p-4 sm:p-5">
         <h2 className="text-sm font-bold text-[var(--text)] mb-4">Milestones</h2>
         <ol className="relative space-y-4">
           {steps.map((s) => (
@@ -64,13 +64,13 @@ export function RegionalStoreDetail({ projectId, store, project, files }: { proj
       </Card>
 
       {/* Galleries */}
-      <Card className="p-5 space-y-5">
+      <Card className="p-4 sm:p-5 space-y-5">
         <PhotoGallery title="Before Photos" photos={before} />
         <PhotoGallery title="After Photos" photos={after} />
       </Card>
 
       {/* Sign-off */}
-      <Card className="p-5">
+      <Card className="p-4 sm:p-5">
         <h2 className="text-sm font-bold text-[var(--text)] mb-3">Sign-off {signoff.length > 0 && <span className="text-[11px] font-normal text-[var(--text-faint)]">({signoff.length})</span>}</h2>
         {signoff.length === 0 ? (
           <p className="text-xs text-[var(--text-muted)]">No sign-off document uploaded yet.</p>

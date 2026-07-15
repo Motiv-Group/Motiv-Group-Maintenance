@@ -72,7 +72,7 @@ export function ReportDocument({ model }: { model: ReportModel }) {
           {s.narrative && <p className="text-sm leading-relaxed mb-3">{s.narrative}</p>}
 
           {s.stats && s.stats.length > 0 && (
-            <div className="grid grid-cols-3 gap-2 mb-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
               {s.stats.map(st => (
                 <div key={st.label} className="border rounded-lg p-3">
                   <p className="text-lg font-bold">{st.value}</p>

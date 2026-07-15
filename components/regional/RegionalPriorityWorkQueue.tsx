@@ -14,7 +14,7 @@ import { Modal } from '@/components/ui/Modal'
 import { CategoryIcon } from '@/components/client/ticketBadges'
 import { AssignSuppliersButton, QuoteReviewButton, SignoffReviewButton } from '@/components/regional/RmTicketActions'
 import { DisputeReviewButton } from '@/components/dispute/DisputeBox'
-import { rmStatusMeta, formatDate, formatDateTime, humanizeDuration, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
+import { rmStatusMeta, formatDate, formatDateTime, humanizeDuration, formatJobId, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
 
 type QueueFilter = 'all' | 'assign' | 'quotes' | 'signoff' | 'sla' | 'snags'
 type Tone = 'red' | 'purple' | 'gold' | 'green' | 'orange' | 'blue'
@@ -61,7 +61,7 @@ export function RegionalPriorityWorkQueue({ tickets, generatedAt, suppliers = []
 
   return (
     <div className="space-y-5">
-      <section className="grid grid-cols-2 gap-2.5 sm:grid-cols-2 sm:gap-3 lg:grid-cols-3 xl:grid-cols-5">
+      <section className="grid grid-cols-2 gap-2.5 sm:grid-cols-2 sm:gap-3 lg:grid-cols-3 xl:grid-cols-5 max-sm:[&>*:nth-child(5)]:col-span-2">
         <MetricButton active={filter === 'assign'} icon={<UserPlus size={21} />} tone="blue" label="Needs Assignment"
           value={counts.assign} sub={counts.assign ? `${counts.assign} to assign` : 'All assigned'} subActive={counts.assign > 0} onClick={() => pick('assign')} />
         <MetricButton active={filter === 'quotes'} icon={<ReceiptText size={21} />} tone="purple" label="Quotes to Approve"
@@ -75,8 +75,8 @@ export function RegionalPriorityWorkQueue({ tickets, generatedAt, suppliers = []
       </section>
 
       <Card className="overflow-hidden p-0">
-        <div className="flex items-start gap-3 border-b border-[var(--border)] px-5 py-5">
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-blue-600/15 text-blue-600 dark:text-blue-300">
+        <div className="flex items-start gap-3 border-b border-[var(--border)] px-4 py-4 sm:px-5 sm:py-5">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-blue-600/15 sm:h-11 sm:w-11 text-blue-600 dark:text-blue-300">
             <ClipboardList size={21} />
           </span>
           <div>
@@ -157,6 +157,7 @@ function QueueRow({ ticket, nowMs, suppliers, motivSuppliers }: { ticket: Region
   const closeout = ticket.status === 'approved_closeout'
   const closeoutCls = 'relative z-20 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-bold transition lg:w-40 border-blue-500/60 text-blue-600 hover:bg-blue-500/10 dark:text-blue-300'
   const closeoutBadge = ticket.voNoneConfirmed ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : 'bg-blue-500/15 text-blue-700 dark:text-blue-400'
+  const jobId = ticket.jobRef ?? formatJobId(ticket.jobNumber)
   return (
     <div className="relative grid gap-3 border-b border-[var(--border)] px-4 py-3 transition last:border-b-0 hover:bg-[var(--hover)] sm:gap-4 sm:py-4 lg:grid-cols-[1fr_200px_1.1fr_160px] lg:items-center">
       {/* The whole row (except the CTA island) links to the ticket. */}
@@ -165,6 +166,7 @@ function QueueRow({ ticket, nowMs, suppliers, motivSuppliers }: { ticket: Region
       <div className="flex min-w-0 items-center gap-3">
         <CategoryIcon category={ticket.category ?? ticket.title} priority={ticket.priority} />
         <div className="min-w-0">
+          {jobId && <p className="truncate font-mono text-[10px] text-[var(--text-faint)]">{jobId}</p>}
           <p className="truncate text-base font-bold text-[var(--text)]">{ticket.category || ticket.title}</p>
           <p className="truncate text-sm text-[var(--text-muted)]">{ticket.storeName}</p>
         </div>

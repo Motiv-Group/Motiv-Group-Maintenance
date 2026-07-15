@@ -50,20 +50,20 @@ export function RegionalProjectDashboard({ project, summary, stores }: { project
 
       {/* Hero */}
       <Card className="overflow-hidden">
-        <div className="relative bg-gradient-to-br from-blue-600 via-blue-700 to-slate-900 p-6 text-white">
+        <div className="relative bg-gradient-to-br from-blue-600 via-blue-700 to-slate-900 p-4 text-white sm:p-6">
           {summary.coverUrl && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={summary.coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover opacity-25" />
           )}
           <div className="relative">
             <p className="text-xs font-medium text-white/70">{project.client_name ?? 'Project'}</p>
-            <h1 className="text-2xl font-bold">{project.name}</h1>
+            <h1 className="text-xl font-bold sm:text-2xl">{project.name}</h1>
             {project.description && <p className="mt-1 text-sm text-white/80 max-w-2xl">{project.description}</p>}
           </div>
         </div>
-        <div className="p-5 space-y-4">
+        <div className="p-4 space-y-4 sm:p-5">
           <AnimatedBar pct={summary.progress} stage={stageLabel(summary.progress)} />
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 max-sm:[&>*:nth-child(5)]:col-span-2">
             <Stat label="Total stores" value={summary.storeCount} />
             <Stat label="Completed" value={summary.completed} tone="good" />
             <Stat label="In progress" value={summary.inProgress} tone="info" />

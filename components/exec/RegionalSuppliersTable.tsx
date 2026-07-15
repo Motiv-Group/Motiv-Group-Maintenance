@@ -476,7 +476,7 @@ function SupplierPane({ row, onClose }: { row: Row; onClose: () => void }) {
               <div className="space-y-1.5">
                 {factors.map(f => (
                   <div key={f.label} className="flex items-center justify-between gap-2 text-xs">
-                    <span className="text-[var(--text-muted)] min-w-0 truncate">{f.label} <span className="text-[var(--text-faint)]">· {f.stat}</span></span>
+                    <span className="text-[var(--text-muted)] min-w-0 break-words sm:truncate">{f.label} <span className="text-[var(--text-faint)]">· {f.stat}</span></span>
                     <span className={`shrink-0 font-medium tabular-nums ${f.pts ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>{f.pts ? `−${f.pts}` : '0'}<span className="text-[var(--text-faint)] font-normal"> / {f.max}</span></span>
                   </div>
                 ))}

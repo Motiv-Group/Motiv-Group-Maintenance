@@ -108,7 +108,7 @@ export function ExecChrome({
   const hasSidebar = isStore || isRegional || isSupplier || isAdmin
   // Nav bars are always deep navy (brand-600) in both light and dark mode,
   // matching the Settings Navbar — so icons/labels use light tones on navy.
-  const iconBtn = 'p-2 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 transition-colors'
+  const iconBtn = 'p-2.5 sm:p-2 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 transition-colors'
   // All roles share the same content width so the chrome (header, main, nav) is
   // consistent. On desktop the content fills --content-width of the available width
   // (default 90%, user-configurable 70–95% in Settings → Appearance); mobile stays
@@ -140,7 +140,7 @@ export function ExecChrome({
       )}
 
       <div className={hasSidebar ? 'lg:pl-[260px] flex min-h-screen flex-col' : 'flex min-h-screen flex-col'}>
-      <header className={`sticky top-0 z-20 bg-brand-600 border-b border-brand-700 ${hasSidebar ? 'lg:hidden' : ''}`}>
+      <header className={`sticky top-0 z-30 bg-brand-600 border-b border-brand-700 ${hasSidebar ? 'lg:hidden' : ''}`}>
         <div className={`${wrap} mx-auto px-4 h-16 flex items-center justify-between`}>
           <Link href={home} className="shrink-0">
             <MotivLogo height={40} wordmark={false} className="sm:hidden" />
@@ -174,7 +174,7 @@ export function ExecChrome({
         <main className={`flex-1 ${mainWrap} w-full mx-auto px-4 sm:px-5 ${hasSidebar ? 'py-5 pb-32 lg:px-10 lg:py-8 lg:pb-10' : 'py-6 pb-32'}`}>{children}</main>
       </SwipeNav>
 
-      <nav className={`fixed bottom-0 inset-x-0 z-20 bg-brand-600 border-t border-brand-700 ${hasSidebar ? 'lg:hidden' : ''}`}>
+      <nav className={`fixed bottom-0 inset-x-0 z-30 bg-brand-600 border-t border-brand-700 ${hasSidebar ? 'lg:hidden' : ''}`}>
         <div className={`${wrap} mx-auto flex items-stretch h-20 justify-around`}>
           {tabs.map(({ href, label, icon: Icon }) => {
             const active = isActiveHref(href, home, pathname, searchParams)

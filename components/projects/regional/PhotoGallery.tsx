@@ -56,10 +56,10 @@ function Lightbox({ photos, index, onClose, onIndex }: { photos: ProjectFileView
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/85 p-4" onClick={onClose}>
       <button className="absolute top-4 right-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20" onClick={onClose}><X size={18} /></button>
       {index > 0 && (
-        <button className="absolute left-2 sm:left-6 rounded-full bg-white/10 p-2 text-white hover:bg-white/20" onClick={(e) => { e.stopPropagation(); onIndex(index - 1) }}><ChevronLeft size={22} /></button>
+        <button className="absolute left-2 sm:left-6 rounded-full bg-white/10 p-3 sm:p-2 text-white hover:bg-white/20" onClick={(e) => { e.stopPropagation(); onIndex(index - 1) }}><ChevronLeft size={22} /></button>
       )}
       {index < photos.length - 1 && (
-        <button className="absolute right-2 sm:right-6 rounded-full bg-white/10 p-2 text-white hover:bg-white/20" onClick={(e) => { e.stopPropagation(); onIndex(index + 1) }}><ChevronRight size={22} /></button>
+        <button className="absolute right-2 sm:right-6 rounded-full bg-white/10 p-3 sm:p-2 text-white hover:bg-white/20" onClick={(e) => { e.stopPropagation(); onIndex(index + 1) }}><ChevronRight size={22} /></button>
       )}
       <div className="max-h-[88vh] max-w-[92vw] flex flex-col items-center gap-2" onClick={(e) => e.stopPropagation()}>
         {p.url && (

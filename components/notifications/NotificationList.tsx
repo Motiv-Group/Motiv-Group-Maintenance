@@ -180,7 +180,7 @@ function Row({ n, onToggle, archived }: { n: Notification; onToggle: (id: string
   const unread = !n.read
   const inner = (
     <>
-      <p className={`truncate text-sm text-[var(--text)] ${unread ? 'font-semibold' : 'font-medium'}`}>{n.title}</p>
+      <p className={`line-clamp-2 text-sm text-[var(--text)] sm:truncate ${unread ? "font-semibold" : "font-medium"}`}>{n.title}</p>
       <p className={`mt-0.5 text-sm ${unread ? 'text-[var(--text-muted)]' : 'text-[var(--text-faint)]'}`}>{n.message}</p>
       <p className="mt-1 text-[11px] text-[var(--text-faint)]" title={formatDateTime(n.created_at)}>
         {timeAgo(n.created_at)}{n.job_ref ? <span className="font-mono"> · {n.job_ref}</span> : ''}

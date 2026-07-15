@@ -336,7 +336,7 @@ export function RegionalStores({ stores, archived = [], companyName = '' }: { st
               {archived.map(a => (
                 <li key={a.id} className="flex items-center justify-between gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5">
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-[var(--text)] truncate">{a.name}</p>
+                    <p className="text-sm font-medium text-[var(--text)] break-words sm:truncate">{a.name}</p>
                     <p className="text-[11px] text-[var(--text-faint)]">
                       <span className="text-amber-600 dark:text-amber-400 font-semibold">Deactivated</span>
                       {a.deactivatedAt ? ` · ${formatDateTime(a.deactivatedAt)}` : ''}

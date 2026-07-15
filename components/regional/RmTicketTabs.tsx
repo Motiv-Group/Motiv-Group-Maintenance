@@ -46,10 +46,11 @@ export function RmTicketTabs({
   ]
 
   return (
-    <Card className="p-5">
-      {/* Tab strip scrolls sideways (contained, controls not content). Mobile gets
-          tighter tabs + scroll-snap so half-hidden tabs settle into view. */}
-      <div className="mb-4 flex snap-x gap-1 overflow-x-auto overflow-y-hidden border-b border-[var(--border)] [-webkit-overflow-scrolling:touch]">
+    <Card className="p-4 sm:p-5">
+      {/* Tab strip scrolls sideways (contained, controls not content). Full-bleed to
+          the card edges (-mx-5) so the last tab swipes clear of the p-5 padding;
+          scroll-snap settles half-hidden tabs into view. */}
+      <div className="-mx-5 mb-4 flex snap-x gap-1 overflow-x-auto overflow-y-hidden border-b border-[var(--border)] px-5 [-webkit-overflow-scrolling:touch]">
         {tabs.map(t => (
           <button
             key={t.key}

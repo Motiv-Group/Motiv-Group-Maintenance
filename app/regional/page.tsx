@@ -16,8 +16,8 @@ export default async function RegionalOverviewPage() {
   // Pending: signed up but not yet linked to a region by an executive.
   if (!companyId || regionIds.length === 0) {
     return (
-      <div className="max-w-xl mx-auto py-10">
-        <Card className="p-8 text-center space-y-4">
+      <div className="max-w-xl mx-auto py-6 sm:py-10">
+        <Card className="p-6 text-center space-y-4 sm:p-8">
           <span className="mx-auto grid place-items-center w-12 h-12 rounded-full bg-[#f59e0b]/15 ring-1 ring-[#f59e0b]/30">
             <Clock size={22} className="text-[#f59e0b]" />
           </span>
