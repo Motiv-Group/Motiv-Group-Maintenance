@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { parseJsonBody } from '@/lib/validate'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { serverError } from '@/lib/api-error'
+import { serverError, parseAmount } from '@/lib/api-error'
 import { revalidatePath } from 'next/cache'
 import { rateLimit } from '@/lib/rate-limit'
 import { sendPushToMany } from '@/lib/push'
@@ -124,6 +124,15 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   const slaRules = await loadSlaResolver(admin, ticket.company_id)
   const tgt: SlaTargets = slaRules(ticket.priority as 'P1' | 'P2' | 'P3' | 'P4')
 
+  // SEC-008/016: when an action assigns/invites a supplier, the supplied supplier_id
+  // must belong to the ticket's company or be a shared Motiv-pool supplier — never an
+  // arbitrary or cross-tenant supplier UUID (RLS is bypassed by the admin client).
+  if (body.supplierId && ['validate', 'require_assessment', 'request_quote', 'assign_snag'].includes(action)) {
+    const { data: sup } = await admin.from('suppliers').select('company_id, is_motiv').eq('id', String(body.supplierId)).maybeSingle()
+    const inScope = !!sup && (sup.company_id === ticket.company_id || sup.company_id === null || sup.is_motiv === true)
+    if (!inScope) return NextResponse.json({ error: 'That supplier is not available for this ticket.' }, { status: 400 })
+  }
+
   try {
     switch (action) {
       case 'validate':
@@ -163,8 +172,9 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
         break
       }
       case 'submit_quote': {
-        const amount = Number(body.amount)
-        if (!amount || amount <= 0) return NextResponse.json({ error: 'Valid quote amount required' }, { status: 400 })
+        // SEC-017: use parseAmount (rejects NaN/Infinity/over-cap), not a bare > 0 check.
+        const amount = parseAmount(body.amount)
+        if (amount == null) return NextResponse.json({ error: 'Valid quote amount required' }, { status: 400 })
         await admin.from('quotes').insert({ company_id: ticket.company_id, ticket_id: ticketId, supplier_id: ticket.supplier_id, submitted_by: user.id, amount, amount_incl_vat: body.amount_incl_vat ?? null, file_url: body.file_url ?? null, status: 'pending', description: body.description ?? null })
         updates.quote_submitted_at = now; updates.quote_value = amount; updates.quote_decision_required = true; updates.quote_decision_status = 'pending'
         break
@@ -192,7 +202,15 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
         updates.scheduled_at = when.toISOString()
         updates.schedule_status = scheduleProposed ? 'proposed' : 'agreed'
         // Optional: assign the technician who will attend (supplier's own roster).
-        if (body.technicianId !== undefined) updates.technician_id = body.technicianId || null
+        // SEC-031: verify the technician belongs to this ticket's awarded supplier —
+        // don't let a caller point the ticket at an arbitrary technician UUID.
+        if (body.technicianId) {
+          const { data: tech } = await admin.from('technicians').select('supplier_id').eq('id', String(body.technicianId)).maybeSingle()
+          if (!tech || tech.supplier_id !== ticket.supplier_id) return NextResponse.json({ error: 'That technician is not on this job’s supplier roster.' }, { status: 400 })
+          updates.technician_id = body.technicianId
+        } else if (body.technicianId !== undefined) {
+          updates.technician_id = null
+        }
         break
       }
       case 'accept_schedule': {
@@ -356,8 +374,14 @@ async function hasAccess(admin: Admin, role: WorkflowRole, userId: string, ticke
     const { data } = await admin.from('supplier_users').select('supplier_id').eq('user_id', userId)
     const mine = (data ?? []).map(l => l.supplier_id)
     if (ticket.supplier_id && mine.includes(ticket.supplier_id)) return true
-    // Also allow suppliers invited to quote (competitive model) before award.
-    const { data: inv } = await admin.from('ticket_suppliers').select('id').eq('ticket_id', ticket.id).in('supplier_id', mine.length ? mine : ['00000000-0000-0000-0000-000000000000']).maybeSingle()
+    // SEC-007: only an ACTIVE invite grants access (competitive-quote model). A
+    // losing/closed or declined invitee must NOT retain access to a ticket awarded
+    // to another supplier — gate the fallback on active statuses only.
+    const { data: inv } = await admin.from('ticket_suppliers').select('id')
+      .eq('ticket_id', ticket.id)
+      .in('supplier_id', mine.length ? mine : ['00000000-0000-0000-0000-000000000000'])
+      .in('status', ['invited', 'quoted', 'awarded'])
+      .maybeSingle()
     return !!inv
   }
   if (role === 'regional_manager') return rmOwnsTicket(admin, userId, ticket)

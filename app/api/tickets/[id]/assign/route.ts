@@ -50,6 +50,14 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     return NextResponse.json({ error: 'Suppliers can only be assigned before a quote is approved.' }, { status: 400 })
   }
 
+  // SEC-008/016: every selected supplier must belong to the ticket's company or be a
+  // shared Motiv-pool supplier — reject arbitrary or cross-tenant supplier UUIDs
+  // (the admin client bypasses RLS, so this is the only tenant guard on assignment).
+  const { data: supRows } = await admin.from('suppliers').select('id, company_id, is_motiv').in('id', supplierIds)
+  const inScope = (s: any) => s.company_id === ticket.company_id || s.company_id === null || s.is_motiv === true
+  const validIds = new Set((supRows ?? []).filter(inScope).map((s: any) => s.id))
+  if (validIds.size !== supplierIds.length) return NextResponse.json({ error: 'One or more selected suppliers are not available for this ticket.' }, { status: 400 })
+
   const now = new Date().toISOString()
   // Individual tickets have no company SLA config — use a default quote window.
   let quoteDueAt: string
