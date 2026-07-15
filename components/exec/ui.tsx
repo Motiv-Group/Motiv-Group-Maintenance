@@ -3,7 +3,7 @@
 // work. Status accents use a darker hue in light mode for readability.
 import type { ReactNode, HTMLAttributes } from 'react'
 import Link from 'next/link'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, ChevronDown, Search } from 'lucide-react'
 import type { HealthStatus } from '@/lib/health/types'
 
 export const GOLD = '#f59e0b'
@@ -292,6 +292,44 @@ export function StatusLegend() {
       <span className="flex items-center gap-1.5"><i className="w-2 h-2 rounded-full bg-red-500" />At Risk 51–79%</span>
       <span className="flex items-center gap-1.5"><i className="w-2 h-2 rounded-full bg-red-800" />Critical ≤50%</span>
     </div>
+  )
+}
+
+// ── Shared filter-bar controls ──────────────────────────────────
+// One search box + one "Label: Value" select pill, extracted from the Tickets
+// tab so every RM list tab's filter row (the controls next to the search bar)
+// looks and lays out identically. Native <select> under an appearance-none pill;
+// blue focus ring matches the search input. Long options (store names) are
+// width-capped on phones (`max-w-[55vw]`) and un-capped from `sm:`. Each tab
+// keeps its OWN label text + option set — only the control's look is shared.
+
+/** Search input with an overlaid magnifier. Full-width on mobile, grows on desktop. */
+export function SearchInput({ value, onChange, placeholder, className = 'w-full sm:w-auto sm:min-w-[180px] sm:flex-1' }: {
+  value: string; onChange: (v: string) => void; placeholder: string; className?: string
+}) {
+  return (
+    <div className={`relative ${className}`}>
+      <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
+      <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+        className="w-full rounded-xl bg-[var(--input-bg)] py-2.5 pl-9 pr-3 text-sm text-[var(--text)] ring-1 ring-[var(--border)] outline-none placeholder-[var(--text-faint)] focus:ring-blue-500/40" />
+    </div>
+  )
+}
+
+/** "Label: Value" native-select pill. Pass an optional `className` for per-tab sizing. */
+export function FilterSelect<T extends string>({ label, value, onChange, options, className = '' }: {
+  label: string; value: T; onChange: (v: T) => void; options: { value: T; label: string }[]; className?: string
+}) {
+  return (
+    <label className={`relative flex max-w-full shrink-0 items-center gap-1.5 rounded-xl bg-[var(--input-bg)] px-3 py-2.5 text-sm ring-1 ring-[var(--border)] transition focus-within:ring-blue-500/40 ${className}`}>
+      <span className="whitespace-nowrap text-[var(--text-muted)]">{label}:</span>
+      {/* Width-capped on phones — a select sizes to its longest option (store names). */}
+      <select value={value} onChange={e => onChange(e.target.value as T)}
+        className="min-w-0 max-w-[55vw] cursor-pointer appearance-none truncate bg-transparent pr-4 font-semibold text-[var(--text)] outline-none sm:max-w-none">
+        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+      <ChevronDown size={14} className="pointer-events-none absolute right-2.5 text-[var(--text-faint)]" />
+    </label>
   )
 }
 

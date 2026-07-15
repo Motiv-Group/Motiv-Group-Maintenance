@@ -3,11 +3,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { Store, Plus, User, Mail, Phone, MapPin, Ticket, MoreVertical, Pencil, Power, RotateCcw, Trash2, X, ChevronDown, ChevronLeft, ChevronRight, Search, Download, Archive, ArrowRight, Eye, EyeOff } from 'lucide-react'
+import { Store, Plus, User, Mail, Phone, MapPin, Ticket, MoreVertical, Pencil, Power, RotateCcw, Trash2, X, ChevronDown, ChevronLeft, ChevronRight, Download, Archive, ArrowRight, Eye, EyeOff } from 'lucide-react'
 import type { StoreCard } from '@/lib/health/data'
 import { formatCurrency, formatDateTime } from '@/lib/utils'
 import { isValidEmail, isValidPhone, normalisePhone } from '@/lib/csv'
-import { Card, Pill, Donut, BreakdownList, STATUS_TEXT } from '@/components/exec/ui'
+import { Card, Pill, Donut, BreakdownList, STATUS_TEXT, FilterSelect, SearchInput } from '@/components/exec/ui'
 import { DrawerHeader } from '@/components/exec/Drawer'
 import { Modal } from '@/components/ui/Modal'
 
@@ -207,26 +207,14 @@ export function RegionalStores({ stores, archived = [], companyName = '' }: { st
       <Card className="overflow-hidden">
         {/* Toolbar */}
         <div className="flex flex-wrap items-center gap-2 border-b border-[var(--border)] p-3">
-          <div className="relative w-full sm:w-auto sm:min-w-[180px] sm:flex-1">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
-            <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search stores…"
-              className="w-full rounded-xl bg-[var(--input-bg)] py-2 pl-9 pr-3 text-sm text-[var(--text)] ring-1 ring-[var(--border)] placeholder-[var(--text-faint)] focus:outline-none focus:ring-2 focus:ring-blue-500/40" />
-          </div>
-          {/* Mobile: selects form one swipeable strip; sm:contents restores the
-              flex-wrap desktop layout. */}
+          <SearchInput value={q} onChange={setQ} placeholder="Search stores…" />
+          {/* Mobile: pills form one swipeable strip; sm:contents restores the
+              flex-wrap desktop layout (matches the Tickets tab). */}
           <div className="flex w-full flex-nowrap items-center gap-2 overflow-x-auto pb-0.5 sm:contents">
-          <Select ariaLabel="Filter by status" value={bucket} onChange={v => setBucket(v as 'all' | Bucket)}>
-            <option value="all">Status</option><option value="critical">Critical</option><option value="attention">Attention</option><option value="healthy">Controlled</option>
-          </Select>
-          <Select ariaLabel="Filter by SLA" value={sla} onChange={v => setSla(v as typeof sla)}>
-            <option value="all">SLA</option><option value="overdue">Has overdue</option><option value="ok">No overdue</option>
-          </Select>
-          <Select ariaLabel="Filter by open tickets" value={openF} onChange={v => setOpenF(v as typeof openF)}>
-            <option value="all">Open Tickets</option><option value="none">None (0)</option><option value="low">1–3</option><option value="high">4+</option>
-          </Select>
-          <Select ariaLabel="Sort by" value={sort} onChange={v => setSort(v as typeof sort)}>
-            <option value="attention">Sort: Attention</option><option value="health">Sort: Health</option><option value="open">Sort: Open</option><option value="overdue">Sort: Overdue</option><option value="exposure">Sort: Exposure</option><option value="name">Sort: Name</option>
-          </Select>
+          <FilterSelect label="Status" value={bucket} onChange={v => setBucket(v as 'all' | Bucket)} options={[{ value: 'all', label: 'All' }, { value: 'critical', label: 'Critical' }, { value: 'attention', label: 'Attention' }, { value: 'healthy', label: 'Controlled' }]} />
+          <FilterSelect label="SLA" value={sla} onChange={v => setSla(v as typeof sla)} options={[{ value: 'all', label: 'All' }, { value: 'overdue', label: 'Has overdue' }, { value: 'ok', label: 'No overdue' }]} />
+          <FilterSelect label="Open" value={openF} onChange={v => setOpenF(v as typeof openF)} options={[{ value: 'all', label: 'All' }, { value: 'none', label: 'None (0)' }, { value: 'low', label: '1–3' }, { value: 'high', label: '4+' }]} />
+          <FilterSelect label="Sort by" value={sort} onChange={v => setSort(v as typeof sort)} options={[{ value: 'attention', label: 'Attention' }, { value: 'health', label: 'Health' }, { value: 'open', label: 'Open' }, { value: 'overdue', label: 'Overdue' }, { value: 'exposure', label: 'Exposure' }, { value: 'name', label: 'Name' }]} />
           </div>
         </div>
 

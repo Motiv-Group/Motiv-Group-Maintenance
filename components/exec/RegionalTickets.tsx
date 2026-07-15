@@ -8,9 +8,9 @@
 // remembered expand state are all preserved.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { Ticket, Search, ChevronDown, ChevronRight, BarChart3, Store, PlusCircle, User, AlertTriangle, CheckCircle2, Clock, SlidersHorizontal, X } from 'lucide-react'
+import { Ticket, ChevronDown, ChevronRight, BarChart3, Store, PlusCircle, User, AlertTriangle, CheckCircle2, Clock, SlidersHorizontal, X } from 'lucide-react'
 import type { RegionalTicketRow } from '@/lib/health/data'
-import { Card } from '@/components/exec/ui'
+import { Card, FilterSelect, SearchInput } from '@/components/exec/ui'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { priorityBadgeClass, priorityLabel } from '@/components/client/ticketBadges'
 import { Modal } from '@/components/ui/Modal'
@@ -128,21 +128,6 @@ function StatCard({ intent, icon, value, title, sub, active, onClick }: { intent
         <span className="hidden text-[11px] text-[var(--text-muted)] sm:block">{sub}</span>
       </span>
     </button>
-  )
-}
-
-// ── Styled dropdown (native select, "Label: Value" pill) ────────
-function FilterSelect<T extends string>({ label, value, onChange, options }: { label: string; value: T; onChange: (v: T) => void; options: { value: T; label: string }[] }) {
-  return (
-    <label className="relative flex max-w-full shrink-0 items-center gap-1.5 rounded-xl bg-[var(--input-bg)] px-3 py-2.5 text-sm ring-1 ring-[var(--border)] transition focus-within:ring-blue-500/40">
-      <span className="whitespace-nowrap text-[var(--text-muted)]">{label}:</span>
-      {/* Width-capped on phones — a select sizes to its longest option (store names). */}
-      <select value={value} onChange={e => onChange(e.target.value as T)}
-        className="min-w-0 max-w-[55vw] cursor-pointer appearance-none truncate bg-transparent pr-4 font-semibold text-[var(--text)] outline-none sm:max-w-none">
-        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
-      <ChevronDown size={14} className="pointer-events-none absolute right-2.5 text-[var(--text-faint)]" />
-    </label>
   )
 }
 
@@ -353,11 +338,7 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
 
       {/* Filter bar */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative w-full sm:w-auto sm:min-w-[180px] sm:flex-1">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
-          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search tickets…"
-            className="w-full rounded-xl bg-[var(--input-bg)] py-2.5 pl-9 pr-3 text-sm text-[var(--text)] ring-1 ring-[var(--border)] outline-none placeholder-[var(--text-faint)] focus:ring-blue-500/40" />
-        </div>
+        <SearchInput value={q} onChange={setQ} placeholder="Search tickets…" />
         {/* Mobile: pills form one horizontally-swipeable strip (sm:contents dissolves
             the wrapper so desktop keeps the exact flex-wrap layout). */}
         <div className="flex w-full flex-nowrap items-center gap-2 overflow-x-auto pb-0.5 sm:contents">

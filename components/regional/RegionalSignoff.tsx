@@ -6,8 +6,8 @@
 // and a "Review & sign off" action.
 import { useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { ClipboardCheck, Clock, CheckCircle2, ChevronDown, ChevronRight, ChevronLeft, Search, Store, X, Image as ImageIcon, FileText, HelpCircle, Calendar, Truck } from 'lucide-react'
-import { Card } from '@/components/exec/ui'
+import { ClipboardCheck, Clock, CheckCircle2, ChevronDown, ChevronRight, ChevronLeft, Store, X, Image as ImageIcon, FileText, HelpCircle, Calendar, Truck } from 'lucide-react'
+import { Card, FilterSelect, SearchInput } from '@/components/exec/ui'
 import { CategoryIcon, priorityBadgeClass, priorityLabel } from '@/components/client/ticketBadges'
 import { formatDateTime } from '@/lib/utils'
 
@@ -35,18 +35,6 @@ function StatCard({ icon, tone, value, title, sub, active, onClick }: { icon: Re
         <span className="hidden text-[11px] text-[var(--text-muted)] sm:block">{sub}</span>
       </span>
     </button>
-  )
-}
-
-function Select<T extends string>({ label, value, onChange, options }: { label: string; value: T; onChange: (v: T) => void; options: { value: T; label: string }[] }) {
-  return (
-    <label className="relative flex min-w-[150px] flex-1 items-center gap-1.5 rounded-xl bg-[var(--input-bg)] px-3 py-2.5 text-sm ring-1 ring-[var(--border)] transition focus-within:ring-blue-500/40 sm:flex-none">
-      <span className="whitespace-nowrap text-[11px] uppercase tracking-wide text-[var(--text-faint)]">{label}</span>
-      <select value={value} onChange={e => onChange(e.target.value as T)} className="w-full cursor-pointer appearance-none bg-transparent pr-4 font-semibold text-[var(--text)] outline-none">
-        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
-      <ChevronDown size={14} className="pointer-events-none absolute right-2.5 text-[var(--text-faint)]" />
-    </label>
   )
 }
 
@@ -117,19 +105,17 @@ export function RegionalSignoff({ signoffs }: { signoffs: RegionalSignoffRow[] }
         <StatCard icon={<span className="grid h-9 w-9 place-items-center rounded-full sm:h-11 sm:w-11 bg-[var(--surface-2)] text-[var(--text-muted)]"><ClipboardCheck size={20} /></span>} tone="border-[var(--border)]" value={stats.total} title="In sign-off" sub="Total open" active={statusF === 'all'} onClick={() => { setStatusF('all'); setPage(1) }} />
       </div>
 
-      {/* Filter bar — phones: full-width search + a 2-col grid of controls;
-          sm:contents dissolves the grid so desktop keeps the flex-wrap row. */}
+      {/* Filter bar — matches the Tickets tab: full-width search + a horizontally-
+          swipeable pill strip on phones (sm:contents dissolves it so desktop keeps
+          the flex-wrap row). Clear sits outside the strip like Tickets' Filters btn. */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative w-full sm:w-auto sm:min-w-[220px] sm:flex-1">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
-          <input value={q} onChange={e => { setQ(e.target.value); setPage(1) }} placeholder="Search by store, supplier, ticket ID or category…" className="w-full rounded-xl bg-[var(--input-bg)] py-2.5 pl-9 pr-3 text-sm text-[var(--text)] ring-1 ring-[var(--border)] outline-none placeholder-[var(--text-faint)] focus:ring-blue-500/40" />
+        <SearchInput value={q} onChange={v => { setQ(v); setPage(1) }} placeholder="Search by store, supplier, ticket ID or category…" />
+        <div className="flex w-full flex-nowrap items-center gap-2 overflow-x-auto pb-0.5 sm:contents">
+        <FilterSelect label="Store" value={store} onChange={v => { setStore(v); setPage(1) }} options={[{ value: 'all', label: 'All stores' }, ...storeNames.map(s => ({ value: s, label: s }))]} />
+        <FilterSelect label="Status" value={statusF} onChange={v => { setStatusF(v); setPage(1) }} options={[{ value: 'all', label: 'All statuses' }, { value: 'review', label: 'Awaiting review' }, { value: 'evidence', label: 'Evidence pending' }]} />
+        <FilterSelect label="Sort by" value={sort} onChange={setSort} options={[{ value: 'newest', label: 'Newest first' }, { value: 'oldest', label: 'Oldest first' }]} />
         </div>
-        <div className="grid w-full grid-cols-2 gap-2 sm:contents">
-        <Select label="Store" value={store} onChange={v => { setStore(v); setPage(1) }} options={[{ value: 'all', label: 'All stores' }, ...storeNames.map(s => ({ value: s, label: s }))]} />
-        <Select label="Status" value={statusF} onChange={v => { setStatusF(v); setPage(1) }} options={[{ value: 'all', label: 'All statuses' }, { value: 'review', label: 'Awaiting review' }, { value: 'evidence', label: 'Evidence pending' }]} />
-        <Select label="Sort by" value={sort} onChange={setSort} options={[{ value: 'newest', label: 'Newest first' }, { value: 'oldest', label: 'Oldest first' }]} />
         <button type="button" onClick={clear} className="flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)]"><X size={15} /> Clear filters</button>
-        </div>
       </div>
 
       {!groups.length && (

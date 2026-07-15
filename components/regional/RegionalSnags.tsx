@@ -6,8 +6,8 @@
 // reason, timing and a phase-aware action (Review dispute / Sign off / View).
 import { useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { AlertOctagon, AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, ChevronLeft, Search, Store, X, HelpCircle, Calendar, Clock, Tag, MessageSquareWarning, Truck } from 'lucide-react'
-import { Card } from '@/components/exec/ui'
+import { AlertOctagon, AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, ChevronLeft, Store, X, HelpCircle, Calendar, Clock, Tag, MessageSquareWarning, Truck } from 'lucide-react'
+import { Card, FilterSelect, SearchInput } from '@/components/exec/ui'
 import { CategoryIcon, priorityBadgeClass, priorityLabel } from '@/components/client/ticketBadges'
 import { formatDateTime, humanizeDuration } from '@/lib/utils'
 
@@ -44,17 +44,6 @@ function StatCard({ icon, tone, value, title, sub, active, onClick }: { icon: Re
   )
 }
 
-function Select<T extends string>({ label, value, onChange, options }: { label: string; value: T; onChange: (v: T) => void; options: { value: T; label: string }[] }) {
-  return (
-    <label className="relative flex min-w-[150px] flex-1 items-center gap-1.5 rounded-xl bg-[var(--input-bg)] px-3 py-2.5 text-sm ring-1 ring-[var(--border)] transition focus-within:ring-blue-500/40 sm:flex-none">
-      <span className="whitespace-nowrap text-[11px] uppercase tracking-wide text-[var(--text-faint)]">{label}</span>
-      <select value={value} onChange={e => onChange(e.target.value as T)} className="w-full cursor-pointer appearance-none bg-transparent pr-4 font-semibold text-[var(--text)] outline-none">
-        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
-      <ChevronDown size={14} className="pointer-events-none absolute right-2.5 text-[var(--text-faint)]" />
-    </label>
-  )
-}
 
 const PRANK: Record<string, number> = { P1: 0, P2: 1, P3: 2, P4: 3 }
 const PER_PAGE = 10
@@ -129,20 +118,18 @@ export function RegionalSnags({ snags, generatedAt }: { snags: RegionalSnagRow[]
         <StatCard icon={<span className="grid h-9 w-9 place-items-center rounded-full sm:h-11 sm:w-11 bg-amber-500/15 text-amber-600 dark:text-amber-400"><CheckCircle2 size={20} /></span>} tone="border-amber-500" value={stats.review} title="To review" sub="Re-submitted — sign off" active={statusF === 'review'} onClick={() => { setStatusF(f => f === 'review' ? 'all' : 'review'); setPage(1) }} />
       </div>
 
-      {/* Filter bar — phones: full-width search + a 2-col grid of controls;
-          sm:contents dissolves the grid so desktop keeps the flex-wrap row. */}
+      {/* Filter bar — matches the Tickets tab: full-width search + a horizontally-
+          swipeable pill strip on phones (sm:contents dissolves it so desktop keeps
+          the flex-wrap row). Clear sits outside the strip like Tickets' Filters btn. */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative w-full sm:w-auto sm:min-w-[220px] sm:flex-1">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
-          <input value={q} onChange={e => { setQ(e.target.value); setPage(1) }} placeholder="Search snags by store, supplier, ticket ID or title…" className="w-full rounded-xl bg-[var(--input-bg)] py-2.5 pl-9 pr-3 text-sm text-[var(--text)] ring-1 ring-[var(--border)] outline-none placeholder-[var(--text-faint)] focus:ring-blue-500/40" />
+        <SearchInput value={q} onChange={v => { setQ(v); setPage(1) }} placeholder="Search snags by store, supplier, ticket ID or title…" />
+        <div className="flex w-full flex-nowrap items-center gap-2 overflow-x-auto pb-0.5 sm:contents">
+        <FilterSelect label="Store" value={store} onChange={v => { setStore(v); setPage(1) }} options={[{ value: 'all', label: 'All stores' }, ...storeNames.map(s => ({ value: s, label: s }))]} />
+        <FilterSelect label="Status" value={statusF} onChange={v => { setStatusF(v); setPage(1) }} options={[{ value: 'all', label: 'All statuses' }, { value: 'awaiting', label: 'Awaiting supplier' }, { value: 'dispute', label: 'Under dispute' }, { value: 'review', label: 'To review' }]} />
+        <FilterSelect label="Priority" value={priorityF} onChange={v => { setPriorityF(v); setPage(1) }} options={[{ value: 'all', label: 'All priorities' }, { value: 'P1', label: 'Critical' }, { value: 'P2', label: 'High' }, { value: 'P3', label: 'Medium' }, { value: 'P4', label: 'Low' }]} />
+        <FilterSelect label="Sort by" value={sort} onChange={setSort} options={[{ value: 'urgent', label: 'Most urgent' }, { value: 'newest', label: 'Newest first' }, { value: 'oldest', label: 'Oldest first' }]} />
         </div>
-        <div className="grid w-full grid-cols-2 gap-2 sm:contents">
-        <Select label="Store" value={store} onChange={v => { setStore(v); setPage(1) }} options={[{ value: 'all', label: 'All stores' }, ...storeNames.map(s => ({ value: s, label: s }))]} />
-        <Select label="Status" value={statusF} onChange={v => { setStatusF(v); setPage(1) }} options={[{ value: 'all', label: 'All statuses' }, { value: 'awaiting', label: 'Awaiting supplier' }, { value: 'dispute', label: 'Under dispute' }, { value: 'review', label: 'To review' }]} />
-        <Select label="Priority" value={priorityF} onChange={v => { setPriorityF(v); setPage(1) }} options={[{ value: 'all', label: 'All priorities' }, { value: 'P1', label: 'Critical' }, { value: 'P2', label: 'High' }, { value: 'P3', label: 'Medium' }, { value: 'P4', label: 'Low' }]} />
-        <Select label="Sort by" value={sort} onChange={setSort} options={[{ value: 'urgent', label: 'Most urgent' }, { value: 'newest', label: 'Newest first' }, { value: 'oldest', label: 'Oldest first' }]} />
         <button type="button" onClick={clear} className="flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)]"><X size={15} /> Clear filters</button>
-        </div>
       </div>
 
       {!groups.length && (

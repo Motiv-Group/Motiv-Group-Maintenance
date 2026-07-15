@@ -9,11 +9,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Truck, User, Mail, Phone, MapPin, Wrench, ChevronDown, ChevronLeft, ChevronRight,
-  Users, Briefcase, Clock, ShieldCheck, DollarSign, Search, MoreVertical, X, Send, Info,
+  Users, Briefcase, Clock, ShieldCheck, DollarSign, MoreVertical, X, Send, Info,
 } from 'lucide-react'
 import type { HealthStatus } from '@/lib/health/types'
 import type { RegionalDashboardData } from '@/lib/health/data'
-import { Card } from '@/components/exec/ui'
+import { Card, FilterSelect, SearchInput } from '@/components/exec/ui'
 import { Stars } from '@/components/ui/Stars'
 import { MapLink } from '@/components/ui/MapLink'
 import { Modal } from '@/components/ui/Modal'
@@ -151,24 +151,13 @@ export function RegionalSuppliersTable({ suppliers }: { suppliers: Row[] }) {
       <Card className="overflow-hidden">
         {/* Toolbar */}
         <div className="flex flex-wrap items-center gap-2 border-b border-[var(--border)] p-3">
-          <div className="relative w-full sm:w-auto sm:min-w-[180px] sm:flex-1">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
-            <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search suppliers…"
-              className="w-full rounded-xl bg-[var(--input-bg)] py-2 pl-9 pr-3 text-sm text-[var(--text)] ring-1 ring-[var(--border)] placeholder-[var(--text-faint)] focus:outline-none focus:ring-2 focus:ring-blue-500/40" />
-          </div>
-          {/* Mobile: selects form one swipeable strip; sm:contents restores the
-              flex-wrap desktop layout. */}
+          <SearchInput value={q} onChange={setQ} placeholder="Search suppliers…" />
+          {/* Mobile: pills form one swipeable strip; sm:contents restores the
+              flex-wrap desktop layout (matches the Tickets tab). */}
           <div className="flex w-full flex-nowrap items-center gap-2 overflow-x-auto pb-0.5 sm:contents">
-          <Select ariaLabel="Filter by status" value={status} onChange={v => setStatus(v as 'all' | Bucket)}>
-            <option value="all">Status: All</option><option value="healthy">Healthy</option><option value="at_risk">At risk</option><option value="critical">Critical</option>
-          </Select>
-          <Select ariaLabel="Filter by category" value={cat} onChange={setCat}>
-            <option value="all">Category: All</option>
-            {categories.map(c => <option key={c} value={c}>{c}</option>)}
-          </Select>
-          <Select ariaLabel="Filter by performance" value={perfF} onChange={v => setPerfF(v as typeof perfF)}>
-            <option value="all">Performance: All</option><option value="high">90%+</option><option value="mid">70–89%</option><option value="low">Below 70%</option>
-          </Select>
+          <FilterSelect label="Status" value={status} onChange={v => setStatus(v as 'all' | Bucket)} options={[{ value: 'all', label: 'All' }, { value: 'healthy', label: 'Healthy' }, { value: 'at_risk', label: 'At risk' }, { value: 'critical', label: 'Critical' }]} />
+          <FilterSelect label="Category" value={cat} onChange={setCat} options={[{ value: 'all', label: 'All' }, ...categories.map(c => ({ value: c, label: c }))]} />
+          <FilterSelect label="Performance" value={perfF} onChange={v => setPerfF(v as typeof perfF)} options={[{ value: 'all', label: 'All' }, { value: 'high', label: '90%+' }, { value: 'mid', label: '70–89%' }, { value: 'low', label: 'Below 70%' }]} />
           {activeFilters > 0 && (
             <button onClick={() => { setStatus('all'); setCat('all'); setPerfF('all') }} className="flex shrink-0 items-center gap-1.5 rounded-xl px-2.5 py-2 text-sm text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)]">
               <X size={13} /> Clear <span className="rounded-md bg-blue-500/15 px-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400">{activeFilters}</span>
