@@ -26,19 +26,68 @@
 | Testing & CI/CD | 7.0 | 354 tests + blocking CI; **no tenant-isolation/RLS tests** |
 | Privacy & operational readiness | 5.0 | PII in logs; POPIA officer + consent pending |
 
-**Findings by severity (code review):** 🔴 2 critical · 🟠 4 high · 🟡 19 medium · 🔵 17 low · ⚪ 7 info (+ 8 owner/ops items). **Verified real (adversarial):** 5/5 critical+high security findings CONFIRMED (0 refuted). **Awaiting owner action:** OPS-001…008 + live-DB inspections. **Awaiting verification:** all code fixes (none applied yet on this branch).
+**Findings by severity (code review):** 🔴 2 critical · 🟠 4 high · 🟡 19 medium · 🔵 17 low · ⚪ 7 info (+ 8 owner/ops items). **Verified real (adversarial):** 5/5 critical+high security findings CONFIRMED (0 refuted).
+
+---
+
+## 1a. Session log — 2026-07-15 (autonomous, branch `road-to-9.5`)
+
+> Claude worked this list while the owner was away. **Nothing is `VERIFIED`** — code fixes are `FIX IMPLEMENTED` (built + tested green, not yet exercised against a live DB); the migration is `WAITING FOR OWNER` to apply. See the **Manual verification checklist (§1b)** for exactly what the owner must test.
+
+**① RLS hardening migration WRITTEN — `supabase/migrations/20260717_rls_hardening.sql` (commit `318720c`). Status: `WAITING FOR OWNER` to apply (dev → prod).** Closes SEC-001, SEC-002, SEC-004, SEC-006, SEC-011, SEC-012, SEC-013, SEC-046, SEC-047. Verified (grep) that the app writes every affected table only via the service-role admin client (except `tickets` INSERT + `notifications` UPDATE, which are preserved), so dropping the browser write policies breaks no app path. **Not yet folded into `schema.sql`** — that happens after the owner confirms it is applied (per the schema convention). Includes a post-apply owner audit query for already-escalated accounts.
+
+**② Code fixes IMPLEMENTED (built + `tsc`/`lint`/354 tests/`build` green). Status: `FIX IMPLEMENTED`** (commits `318720c`, `2cbc8b5`):
+
+| Finding(s) | Fix | File |
+|---|---|---|
+| SEC-003/005/009/010/015 | `/api/suppliers` GET/POST/bulk scoped to caller's `company_id` (was leaking all tenants) | `app/api/suppliers/route.ts`, `bulk/route.ts` |
+| SEC-007 | transition `hasAccess()` invite fallback gated on active status (invited/quoted/awarded) | `transition/route.ts` |
+| SEC-008/016 | `/transition` + `/assign` validate supplier belongs to ticket company or Motiv pool | `transition/route.ts`, `assign/route.ts` |
+| SEC-017 | transition `submit_quote` uses `parseAmount` (rejects Infinity/over-cap) | `transition/route.ts` |
+| SEC-031 | schedule action verifies technician on the awarded supplier's roster | `transition/route.ts` |
+| SEC-034 | supplier `add_update` no longer flips ticket status outside the engine | `supplier/ticket-action/route.ts` |
+| SEC-036 | `add_evidence` rejected on a closed ticket | `supplier/ticket-action/route.ts` |
+| SEC-025 | phone numbers + free-text content stripped from WhatsApp logs | `webhooks/whatsapp/route.ts` |
+| SEC-026/027 | `/view` + `/seen` add tenant/relationship check + rate limit | `tickets/[id]/view`, `seen/route.ts` |
+| SEC-041 | archived-notification purge folded into the scheduled cron | `cron/v3-snapshots/route.ts` |
+| SEC-040 | `Sentry.captureException` on handled cron 500s | `cron/v3-snapshots`, `v3-recompute` |
+| SEC-044 | csp-report rate-limit keyed per IP; raw body no longer sent to Sentry | `csp-report/route.ts` |
+| SEC-028 | supplier-onboard email-exists pre-check removed (user enumeration) | `supplier/onboard/route.ts` |
+
+**Still open (next sessions):** the migration apply (owner) · FK/CHECK/index migrations (need live orphan/index inspection — OWN-DB2) · cross-tenant/RLS negative test suite (FABLE) · SEC-018 approve_quote reconciliation · SEC-014/019-024/035/037/038/042/043/045 · all OPS-001…008 owner items.
+
+---
+
+## 1b. Manual verification checklist (OWNER — do these when you're back)
+
+> These need a human + a live/staging environment; Claude cannot run them safely. Do them **after applying the RLS migration**.
+
+**A. Apply the RLS migration (highest priority).**
+- [ ] Open Supabase SQL Editor → **dev** project → paste `supabase/migrations/20260717_rls_hardening.sql` → Run. Then repeat on **prod**.
+- [ ] **Run the escalation audit** (in the same editor): `select id, email, role, company_id from public.user_profiles where role in ('system_admin','executive') order by role;` — confirm every row is a legitimately privileged account. Anyone unexpected was escalated via SEC-001 before the fix; demote them. **Tell Claude the result** (redact emails) so SEC-001 can move toward `VERIFIED`.
+- [ ] Confirm applied → Claude will fold it into `schema.sql`, regen types, and delete the migration file.
+
+**B. Prove the criticals are closed (from a browser dev-console, logged in as a NORMAL user, against dev):**
+- [ ] As a freshly signed-up **individual**, `fetch('https://<dev-proj>.supabase.co/rest/v1/user_profiles?id=eq.<your-uid>', { method:'PATCH', headers:{ apikey:<anon>, Authorization:'Bearer '+<your-jwt>, 'Content-Type':'application/json', Prefer:'return=representation' }, body: JSON.stringify({ role:'system_admin' }) })` → **must return an error / no row** (before the fix it succeeded). *(SEC-001)*
+- [ ] As a **supplier** assigned to a ticket, attempt `PATCH …/tickets?id=eq.<ticket>` with `{ "status":"completed" }` → **must be denied**. *(SEC-002)*
+- [ ] As a **store manager** on your own ticket, attempt `PATCH …/quotes?id=eq.<quote>` with `{ "amount": 1 }` → **must be denied**. *(SEC-004/006)*
+- [ ] Regression: normal ticket **reads**, realtime, quote/signoff viewing, and logging a new ticket still work for every role.
+
+**C. Prove the suppliers leak is closed (via the app / API, logged in as a supplier):**
+- [ ] `GET /api/suppliers` returns **only your own company's** suppliers (no other tenant's rows).
+
+**D. Owner infra (see §13):** buy Supabase Pro + enable PITR (OPS-001), run a **backup-restore drill** (OPS-002 area), Vercel Pro (OPS-002), Auth dashboard hardening (OPS-003), uptime + log-drain alerts (OPS-004), legal copy + POPIA officer (OPS-005/006). Provide `pg_indexes` + `export_live_schema.sql` output (OWN-DB2) so Claude can finish the FK/CHECK/index migrations.
 
 ---
 
 ## 2. Next recommended work session
 
-**Objective:** Ship the **RLS hardening migration** — the single change that closes the two criticals (SEC-001, SEC-002) and three highs (SEC-004, SEC-006 + the WITH-CHECK family SEC-011/012/013).
-**Why this is next:** It is the highest-risk, highest-leverage unblocked work. Every one of these is directly exploitable from a browser with the public anon key + a normal user session, bypassing all route-level authZ. One coherent migration fixes the class.
-**Findings addressed:** SEC-001, SEC-002, SEC-004, SEC-006, SEC-011, SEC-012, SEC-013 (and hardens SEC-014, tickets/quotes/signoffs/ticket_variations/approvals/decision_items/snags/supplier_escalations/supplier_invites/ticket_updates policies).
-**FABLE will:** Write one idempotent migration that (a) adds an explicit `WITH CHECK` freezing `role`/`company_id` on `user_profiles` **and** a BEFORE-UPDATE trigger rejecting privileged-column changes outside service-role; (b) drops the browser INSERT/UPDATE/ALL write policies on `tickets`, `quotes`, `signoffs`, `ticket_variations` (service-role admin client is the sole writer — proven by code review); (c) mirrors USING into WITH CHECK + adds role gates on `approvals`/`decision_items`/`snags`/`supplier_escalations`/`supplier_invites`; (d) binds `author_id = auth.uid()` on `ticket_updates`. Fold into `schema.sql`, regen types, add pgTAP/integration negative tests, run `tsc`/`lint`/`test`/`build`.
-**Owner must:** Apply the migration to **dev then prod** via the Supabase SQL Editor; **immediately audit** `select id,email,role,company_id from user_profiles where role in ('system_admin','executive')` for any already-escalated accounts; confirm applied so FABLE can mark `FIX IMPLEMENTED`.
-**Expected evidence:** Migration file + schema.sql diff; passing negative tests (supplier cannot PATCH own ticket to completed; individual cannot PATCH own role; store-manager cannot edit quote amount); owner confirmation of the escalated-account audit query result.
-**Completion condition:** All seven findings move to `READY FOR VERIFICATION`, then `VERIFIED` once the negative tests pass against a live/staging DB and the owner audit returns no unexpected privileged accounts.
+**Objective:** Owner applies the **RLS hardening migration** (already written: `supabase/migrations/20260717_rls_hardening.sql`) to dev then prod, and runs the escalation-audit query — this is what actually closes SEC-001/002/004/006/011/012/013 in production.
+**Why this is next:** The code + migration are done and green; only the owner-side apply + audit remains, and it is what lifts the two score caps (open critical + confirmed cross-tenant) blocking everything.
+**FABLE will (after apply is confirmed):** Fold the migration into `schema.sql`, regen types, delete the file; add the cross-tenant/RLS negative test suite (§15); then continue the FABLE queue (§14) at order 7 (FK/CHECK/index migrations) once OWN-DB2 live output is provided.
+**Owner must:** Apply the migration (dev→prod) + run the audit query in §1b·A, and report the audit result.
+**Expected evidence:** Owner confirmation of apply + audit result; the §1b·B browser negative tests failing to escalate/tamper.
+**Completion condition:** SEC-001/002/004/006 move to `VERIFIED` once §1b·B passes on a live/staging DB and the audit query returns no unexpected privileged accounts.
 
 ---
 
