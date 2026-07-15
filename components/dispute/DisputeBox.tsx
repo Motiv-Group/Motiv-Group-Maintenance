@@ -22,7 +22,7 @@ const ORIGIN_CARD_LABEL: Record<string, string> = { snag: 'SNAG', evidence: 'EVI
 // One cell of the raise-dispute subject card (origin · ticket id · store).
 function DisputeInfoCell({ icon, label, value }: { icon?: ReactNode; label: string; value: string }) {
   return (
-    <div className="flex items-center gap-3 px-4 first:pl-0 last:pr-0">
+    <div className="flex items-center gap-3 py-2 first:pt-0 last:pb-0 sm:px-4 sm:py-0 sm:first:pl-0 sm:last:pr-0">
       {icon && <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-blue-500/15 text-blue-600 dark:text-blue-400">{icon}</span>}
       <div className="min-w-0">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-faint)]">{label}</p>
@@ -193,8 +193,9 @@ export function RaiseDisputeButton({ ticketId, origin, subjectTitle, jobRef, sto
             <div className="space-y-5 p-6">
               <p className="text-sm text-[var(--text-muted)]">Raising a dispute pauses this {what} until it is resolved. Explain why you disagree and attach supporting evidence. Messages exchanged with the client will be recorded for audit purposes.</p>
 
-              {/* Subject info card */}
-              <div className="flex items-stretch divide-x divide-[var(--border)] rounded-xl bg-[var(--surface)] px-4 py-3 ring-1 ring-[var(--border)]">
+              {/* Subject info card — stacks on phones (three side-by-side cells need
+                  ~450px inside the modal); sm+ keeps the divided row. */}
+              <div className="flex flex-col divide-y divide-[var(--border)] rounded-xl bg-[var(--surface)] px-4 py-3 ring-1 ring-[var(--border)] sm:flex-row sm:items-stretch sm:divide-x sm:divide-y-0">
                 <DisputeInfoCell icon={<ClipboardList size={18} />} label={ORIGIN_CARD_LABEL[origin]} value={subjectTitle || '—'} />
                 <DisputeInfoCell label="TICKET ID" value={jobRef || '—'} />
                 <DisputeInfoCell label="STORE" value={store || '—'} />

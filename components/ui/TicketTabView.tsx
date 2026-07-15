@@ -107,7 +107,32 @@ function FilterSelect<T extends string>({ label, value, onChange, options }: { l
 const COLS = 'grid-cols-[1.3fr_1fr_1fr_0.8fr_1.5fr_1.1fr_1.2fr_0.3fr]'
 function TicketTable({ rows, nowMs }: { rows: TabRow[]; nowMs: number }) {
   return (
-    <div className="overflow-x-auto">
+    <>
+    {/* Mobile: stacked cards — the 8-column grid below needs 920px and would force
+        the phone to pan sideways. Same fields, three compact lines, whole row taps. */}
+    <div className="sm:hidden">
+      {rows.map(t => {
+        const sla = slaStatus(t, nowMs)
+        return (
+          <Link key={t.id} href={t.href} className="flex flex-col gap-1 border-b border-[var(--border)] px-3 py-3 transition last:border-0 hover:bg-[var(--hover)]">
+            <span className="flex items-center gap-1.5">
+              <span className="min-w-0 flex-1 truncate font-mono text-[13px] font-semibold text-[var(--text)]">{t.jobRef ?? '—'}</span>
+              <span className={`shrink-0 rounded-md px-2 py-0.5 text-[10px] font-bold ${priorityBadge(t.priority)}`}>{priorityText(t.priority)}</span>
+              <span className={`shrink-0 rounded-md px-2 py-0.5 text-[10px] font-bold ${t.statusCls}`}>{t.statusLabel}</span>
+            </span>
+            <span className={`text-sm leading-snug ${t.nextActionAct ? 'font-semibold text-[var(--text)]' : 'text-[var(--text-muted)]'}`}>
+              <span className="text-[var(--text-muted)] font-normal">{t.category} · </span>{t.nextAction}
+            </span>
+            <span className="flex items-center justify-between gap-2 text-xs">
+              <span className={`flex min-w-0 items-center gap-1 font-medium ${sla.cls}`}><sla.Icon size={13} className="shrink-0" /> <span className="truncate">{sla.label}</span></span>
+              <span className="shrink-0 text-[var(--text-faint)]">{formatDateTime(t.createdAt)}</span>
+            </span>
+          </Link>
+        )
+      })}
+    </div>
+    {/* Desktop: the full 8-column grid, unchanged. */}
+    <div className="hidden overflow-x-auto sm:block">
       <div className="min-w-[920px]">
         <div className={`grid ${COLS} gap-3 border-b border-[var(--border)] px-2 py-2 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-faint)]`}>
           <span>Ticket ID</span><span>Category</span><span>Status</span><span>Priority</span><span>Next action</span><span>SLA status</span><span>Updated</span><span />
@@ -129,6 +154,7 @@ function TicketTable({ rows, nowMs }: { rows: TabRow[]; nowMs: number }) {
         })}
       </div>
     </div>
+    </>
   )
 }
 

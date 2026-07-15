@@ -131,28 +131,36 @@ export function RegionalProjectDashboard({ project, summary, stores }: { project
         </div>
       </div>
 
-      {filtered.length === 0 ? (
-        <Card className="p-10 text-center text-sm text-[var(--text-muted)]">{stores.length === 0 ? 'No stores in this project yet.' : 'No stores match your filters.'}</Card>
-      ) : view === 'cards' ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((s) => (
-            <Link key={s.id} href={`/regional/projects/${project.id}/stores/${s.id}`}>
-              <Card className="p-4 h-full transition hover:ring-blue-500/40 hover:-translate-y-0.5 space-y-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <h3 className="text-sm font-bold text-[var(--text)] truncate">{s.store_name ?? s.branch_code}</h3>
-                    <p className="text-[11px] text-[var(--text-muted)] truncate">{s.branch_code}{s.town && ` · ${s.town}`}</p>
+      {(() => {
+        // Shared card grid — the cards view, and the mobile fallback inside the table
+        // view (the table needs ~470px even with hidden columns, so phones get cards).
+        const cardsView = (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {filtered.map((s) => (
+              <Link key={s.id} href={`/regional/projects/${project.id}/stores/${s.id}`}>
+                <Card className="p-4 h-full transition hover:ring-blue-500/40 hover:-translate-y-0.5 space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <h3 className="text-sm font-bold text-[var(--text)] truncate">{s.store_name ?? s.branch_code}</h3>
+                      <p className="text-[11px] text-[var(--text-muted)] truncate">{s.branch_code}{s.town && ` · ${s.town}`}</p>
+                    </div>
+                    <span className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full ${s.overdue ? OVERDUE_PILL : STORE_STATUS_PILL[s.status]}`}>{s.overdue ? 'Overdue' : STORE_STATUS_LABEL[s.status]}</span>
                   </div>
-                  <span className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full ${s.overdue ? OVERDUE_PILL : STORE_STATUS_PILL[s.status]}`}>{s.overdue ? 'Overdue' : STORE_STATUS_LABEL[s.status]}</span>
-                </div>
-                <div className="flex items-baseline justify-between"><span className="text-[11px] text-[var(--text-muted)]">{stageLabel(s.progress)}</span><span className="text-lg font-bold tabular-nums text-[var(--text)]">{s.progress}%</span></div>
-                <SegmentedProgressBar steps={milestoneSteps(s)} />
-              </Card>
-            </Link>
-          ))}
-        </div>
-      ) : (
-        <Card className="overflow-hidden">
+                  <div className="flex items-baseline justify-between"><span className="text-[11px] text-[var(--text-muted)]">{stageLabel(s.progress)}</span><span className="text-lg font-bold tabular-nums text-[var(--text)]">{s.progress}%</span></div>
+                  <SegmentedProgressBar steps={milestoneSteps(s)} />
+                </Card>
+              </Link>
+            ))}
+          </div>
+        )
+        if (filtered.length === 0) return (
+          <Card className="p-10 text-center text-sm text-[var(--text-muted)]">{stores.length === 0 ? 'No stores in this project yet.' : 'No stores match your filters.'}</Card>
+        )
+        if (view === 'cards') return cardsView
+        return (
+        <>
+        <div className="sm:hidden">{cardsView}</div>
+        <Card className="hidden overflow-hidden sm:block">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] border-b border-[var(--border)]">
@@ -189,7 +197,9 @@ export function RegionalProjectDashboard({ project, summary, stores }: { project
             </table>
           </div>
         </Card>
-      )}
+        </>
+        )
+      })()}
     </div>
   )
 }

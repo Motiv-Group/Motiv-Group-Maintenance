@@ -64,10 +64,14 @@ export function QuoteSummary({ quote, status, title, schedule, collapsible = fal
         <Icon size={17} className={`shrink-0 ${iconCls}`} />
         <span className="truncate text-sm font-bold text-[var(--text)]">{title ?? quote.supplierName ?? 'Quote'}</span>
       </span>
-      <span className="flex shrink-0 items-center gap-2.5">
-        <span className="text-base font-bold tabular-nums text-[var(--text)]">{formatCurrency(quote.amount)}</span>
-        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${badge.cls}`}>{badge.label}</span>
-        {collapsible && <ChevronDown size={16} className="text-[var(--text-faint)] transition-transform group-open:rotate-180" />}
+      {/* Mobile: amount stacks above the status pill (the row form needs ~210px and
+          starves the supplier name at 375px); sm+ keeps the inline row. */}
+      <span className="flex shrink-0 items-center gap-2">
+        <span className="flex flex-col items-end gap-0.5 sm:flex-row sm:items-center sm:gap-2.5">
+          <span className="text-base font-bold tabular-nums text-[var(--text)]">{formatCurrency(quote.amount)}</span>
+          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${badge.cls}`}>{badge.label}</span>
+        </span>
+        {collapsible && <ChevronDown size={16} className="shrink-0 text-[var(--text-faint)] transition-transform group-open:rotate-180" />}
       </span>
     </>
   )

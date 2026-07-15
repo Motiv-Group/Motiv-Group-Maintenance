@@ -257,8 +257,9 @@ export function RegionalSuppliersTable({ suppliers }: { suppliers: Row[] }) {
               <option value="10">10</option><option value="25">25</option><option value="50">50</option>
             </Select>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="mr-1 text-xs text-[var(--text-faint)] tabular-nums">{firstShown}–{lastShown} of {filtered.length}</span>
+          {/* Mobile: wrap allowed + range label hidden so the cluster fits 375px. */}
+          <div className="flex flex-wrap items-center justify-end gap-1.5">
+            <span className="mr-1 hidden text-xs text-[var(--text-faint)] tabular-nums sm:inline">{firstShown}–{lastShown} of {filtered.length}</span>
             <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={curPage <= 1} aria-label="Previous page" className="rounded-lg p-1.5 text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-40"><ChevronLeft size={15} /></button>
             {pageNums.map(p => (
               <button key={p} onClick={() => setPage(p)} aria-current={p === curPage} className={`min-w-8 rounded-lg px-2.5 py-1.5 text-sm font-semibold tabular-nums transition ${p === curPage ? 'bg-blue-600 text-white' : 'text-[var(--text-muted)] ring-1 ring-[var(--border)] hover:bg-[var(--hover)]'}`}>{p}</button>

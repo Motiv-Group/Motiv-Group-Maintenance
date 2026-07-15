@@ -302,13 +302,15 @@ export function RegionalStores({ stores, archived = [], companyName = '' }: { st
               <option value="10">10</option><option value="25">25</option><option value="50">50</option>
             </Select>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="mr-1 text-xs text-[var(--text-faint)] tabular-nums">{firstShown}–{lastShown} of {filtered.length}</span>
+          {/* Mobile: wrap allowed, range label hidden, "Next" icon-only — the full
+              cluster (~380px) overflows the card at 375px. sm+ unchanged. */}
+          <div className="flex flex-wrap items-center justify-end gap-1.5">
+            <span className="mr-1 hidden text-xs text-[var(--text-faint)] tabular-nums sm:inline">{firstShown}–{lastShown} of {filtered.length}</span>
             <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={curPage <= 1} aria-label="Previous page" className="rounded-lg p-1.5 text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-40"><ChevronLeft size={15} /></button>
             {pageNums.map(p => (
               <button key={p} onClick={() => setPage(p)} aria-current={p === curPage} className={`min-w-8 rounded-lg px-2.5 py-1.5 text-sm font-semibold tabular-nums transition ${p === curPage ? 'bg-blue-600 text-white' : 'text-[var(--text-muted)] ring-1 ring-[var(--border)] hover:bg-[var(--hover)]'}`}>{p}</button>
             ))}
-            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={curPage >= totalPages} className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-40">Next <ChevronRight size={14} /></button>
+            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={curPage >= totalPages} aria-label="Next page" className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-40"><span className="hidden sm:inline">Next</span> <ChevronRight size={14} /></button>
           </div>
         </div>
       </Card>

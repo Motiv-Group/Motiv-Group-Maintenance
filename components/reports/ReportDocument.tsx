@@ -97,7 +97,10 @@ export function ReportDocument({ model }: { model: ReportModel }) {
             tabC++
             return (
               <div key={t.caption} className="my-4">
-                <table className="w-full text-sm border-collapse">
+                {/* Wide report tables scroll inside their own container on phones so the
+                    page body never scrolls horizontally. */}
+                <div className="overflow-x-auto">
+                <table className="w-full min-w-[560px] text-sm border-collapse">
                   <thead>
                     <tr>
                       {t.columns.map(c => (
@@ -113,6 +116,7 @@ export function ReportDocument({ model }: { model: ReportModel }) {
                     ))}
                   </tbody>
                 </table>
+                </div>
                 <p className="text-xs text-gray-500 italic mt-1">Table {tabC}: {t.caption}</p>
               </div>
             )
