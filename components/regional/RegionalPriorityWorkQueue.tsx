@@ -61,7 +61,7 @@ export function RegionalPriorityWorkQueue({ tickets, generatedAt, suppliers = []
 
   return (
     <div className="space-y-5">
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+      <section className="grid grid-cols-2 gap-2.5 sm:grid-cols-2 sm:gap-3 lg:grid-cols-3 xl:grid-cols-5">
         <MetricButton active={filter === 'assign'} icon={<UserPlus size={21} />} tone="blue" label="Needs Assignment"
           value={counts.assign} sub={counts.assign ? `${counts.assign} to assign` : 'All assigned'} subActive={counts.assign > 0} onClick={() => pick('assign')} />
         <MetricButton active={filter === 'quotes'} icon={<ReceiptText size={21} />} tone="purple" label="Quotes to Approve"
@@ -115,13 +115,13 @@ function MetricButton({ active, icon, label, value, sub, subActive, onClick }: {
   return (
     <button type="button" onClick={onClick}
       className={`block rounded-2xl text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 ${active ? 'ring-2 ring-blue-500/70' : ''}`}>
-      <Card className={`h-full p-4 transition hover:-translate-y-0.5 hover:ring-blue-500/30 ${stateBorder} ${active ? 'ring-blue-500/60' : ''}`}>
-        <div className="flex items-center gap-4">
-          <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-full ring-1 ${iconChip}`}>{icon}</span>
+      <Card className={`h-full p-3 sm:p-4 transition hover:-translate-y-0.5 hover:ring-blue-500/30 ${stateBorder} ${active ? 'ring-blue-500/60' : ''}`}>
+        <div className="flex items-center gap-2.5 sm:gap-4">
+          <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-full ring-1 sm:h-12 sm:w-12 ${iconChip}`}>{icon}</span>
           <div className="min-w-0">
-            <p className="truncate text-xs font-semibold text-[var(--text-muted)]">{label}</p>
-            <p className={`mt-1 text-2xl font-bold leading-none ${stateText}`}>{value}</p>
-            <p className={`mt-1 truncate text-xs font-semibold ${subActive ? stateText : 'text-[var(--text-faint)]'}`}>{sub}</p>
+            <p className="truncate text-[11px] font-semibold text-[var(--text-muted)] sm:text-xs">{label}</p>
+            <p className={`mt-0.5 text-xl font-bold leading-none sm:mt-1 sm:text-2xl ${stateText}`}>{value}</p>
+            <p className={`mt-0.5 truncate text-[11px] font-semibold sm:mt-1 sm:text-xs ${subActive ? stateText : 'text-[var(--text-faint)]'}`}>{sub}</p>
           </div>
         </div>
       </Card>

@@ -49,7 +49,8 @@ export function AiBriefing({ headline: initHeadline, body: initBody, scope, scop
   return (
     <>
       <p className={className}>
-        {condensed}
+        {/* Mobile: clamp to a short preview beside the donut. Web: full inline sentence. */}
+        <span className="block line-clamp-2 sm:inline sm:line-clamp-none">{condensed}</span>
         {hasMore && (
           <>{' '}
             <button type="button" onClick={() => setOpen(true)}
