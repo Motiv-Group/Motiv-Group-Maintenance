@@ -51,9 +51,9 @@ describe('resolveTransition — full status × action × role matrix', () => {
 describe('individual role capabilities', () => {
   const allowed: [TicketStatus, string, TicketStatus][] = [
     ['open', 'reject', 'cancelled'],
-    ['quoted', 'approve_quote', 'accepted'],
+    // SEC-018: approve_quote/reject_quote removed — quote decisions run through
+    // /api/tickets/[id]/quote-decision, not the transition engine.
     ['quoted', 'request_revision', 'quote_revision'],
-    ['quoted', 'reject_quote', 'declined'],
     ['submitted_for_signoff', 'approve', 'approved_closeout'],
     ['submitted_for_signoff', 'request_evidence', 'evidence_requested'],
     ['submitted_for_signoff', 'raise_snag', 'snag'],
@@ -168,8 +168,8 @@ describe('unknown / malformed input', () => {
     expect(resolveTransition('open', 'teleport', 'regional_manager')).toBeNull()
   })
   it('valid action but wrong source status → null', () => {
-    // approve_quote is only valid from `quoted`.
-    expect(resolveTransition('open', 'approve_quote', 'regional_manager')).toBeNull()
+    // request_revision is only valid from `quoted`, not from `open`.
+    expect(resolveTransition('open', 'request_revision', 'regional_manager')).toBeNull()
   })
 })
 

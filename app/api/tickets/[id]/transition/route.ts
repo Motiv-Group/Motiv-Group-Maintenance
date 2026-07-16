@@ -179,15 +179,8 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
         updates.quote_submitted_at = now; updates.quote_value = amount; updates.quote_decision_required = true; updates.quote_decision_status = 'pending'
         break
       }
-      case 'approve_quote':
-        updates.quote_decision_status = 'approved'; updates.quote_decided_at = now
-        // Stamp updated_at so the audit trail shows the real decision time (no trigger on quotes).
-        await admin.from('quotes').update({ status: 'accepted', updated_at: now }).eq('ticket_id', ticketId).eq('status', 'pending')
-        break
-      case 'reject_quote':
-        updates.quote_decision_status = 'rejected'; updates.quote_decided_at = now
-        await admin.from('quotes').update({ status: 'declined', updated_at: now }).eq('ticket_id', ticketId).eq('status', 'pending')
-        break
+      // SEC-018: approve_quote / reject_quote removed — quote decisions run through
+      // /api/tickets/[id]/quote-decision only (single-award + invite-close logic).
       case 'schedule': {
         const when = body.scheduledAt ? new Date(body.scheduledAt) : new Date(now)
         if (isNaN(when.getTime())) return NextResponse.json({ error: 'Invalid date' }, { status: 400 })
@@ -396,7 +389,7 @@ async function hasAccess(admin: Admin, role: WorkflowRole, userId: string, ticke
 
 // Targeted notifications for the moves that need someone else to act next.
 async function notify(admin: Admin, action: string, ticket: any, actorName: string | null, opts?: { scheduleProposed?: boolean; scheduledAt?: string; declineReason?: string | null }) {
-  const toSupplier = ['validate', 'request_quote', 'require_assessment', 'approve_quote', 'request_evidence', 'raise_snag', 'assign_snag', 'approve_variation', 'reject_variation', 'accept_schedule', 'approve_snag', 'decline_snag_schedule', 'approve', 'close_out']
+  const toSupplier = ['validate', 'request_quote', 'require_assessment', 'request_evidence', 'raise_snag', 'assign_snag', 'approve_variation', 'reject_variation', 'accept_schedule', 'approve_snag', 'decline_snag_schedule', 'approve', 'close_out']
   const toRegion   = ['submit_quote', 'submit_completion', 'submit_variation', 'resolve_snag', 'resubmit', 'accept_snag', 'start_snag']
   // The store manager is told whenever a visit is scheduled / agreed so they can
   // expect the supplier on site.
