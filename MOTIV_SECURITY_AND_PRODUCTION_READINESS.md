@@ -54,7 +54,14 @@
 | SEC-044 | csp-report rate-limit keyed per IP; raw body no longer sent to Sentry | `csp-report/route.ts` |
 | SEC-028 | supplier-onboard email-exists pre-check removed (user enumeration) | `supplier/onboard/route.ts` |
 
-**Still open (next sessions):** the migration apply (owner) · FK/CHECK/index migrations (need live orphan/index inspection — OWN-DB2) · cross-tenant/RLS negative test suite (FABLE) · SEC-018 approve_quote reconciliation · SEC-014/019-024/035/037/038/042/043/045 · all OPS-001…008 owner items.
+**Still open (next sessions):** SEC-018 approve_quote reconciliation · SEC-014/024/037/038/042/043/045 · OPS owner items.
+
+### Session 2 addendum (2026-07-16)
+- **RLS migration APPLIED to dev+prod + folded into schema.sql** (commit `bcc00df`); escalation audit clean. **SEC-001/002/004/006 → `VERIFIED`** via owner live-DB checks (EV-6/7/8).
+- **D-6 (owner's live pg_indexes):** SEC-023 → `NOT APPLICABLE` (indexes already exist), SEC-035 → `VERIFIED` (unique already exists). tickets/ratings/technicians empty.
+- **FK/CHECK migration WRITTEN** — `supabase/migrations/20260718_fk_check_hardening.sql` (SEC-019/020/021/022 → `WAITING FOR OWNER` apply, dev→prod). No orphan risk (empty tables).
+- **POPIA consent checkbox DONE** (OPS-006 code half, commit `ae38831`) — required consent gate on individual signup + version/timestamp in metadata. Legal copy (OPS-005) still owner/lawyer.
+- **⚠️ DEPLOY GAP:** all code fixes (batches 1–2 + consent) are on `road-to-9.5`, **not yet on prod**. The DB-layer criticals are protected on prod (migration applied), but the **code-layer fixes — including the SEC-003/005 suppliers leak — remain live-open until `road-to-9.5` is merged to `main` and deployed.** PR: <https://github.com/Motiv-Group/Motiv-Group-Maintenance/compare/main...road-to-9.5?expand=1>
 
 ---
 
