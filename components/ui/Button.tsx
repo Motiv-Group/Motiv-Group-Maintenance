@@ -17,11 +17,13 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       danger:    'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
       ghost:     'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 focus:ring-gray-400',
       // Auth-screen primary action — colour comes from the --auth-btn CSS var set
-      // by AuthShell (admin-configurable hex), defaulting to blue; hover just
-      // brightens it so any hue works. The disabled state is an explicit neutral,
-      // not a dimmed colour, so an incomplete form reads clearly as disabled.
-      // (Key kept as `gold`.)
-      gold:      'bg-[var(--auth-btn,#2563eb)] text-white font-semibold shadow-sm hover:brightness-110 focus:ring-[var(--auth-btn,#2563eb)] disabled:opacity-100 disabled:bg-[#1c1f27] disabled:text-gray-400 disabled:shadow-none disabled:hover:brightness-100',
+      // by AuthShell (admin-configurable hex), defaulting to a premium blue. A
+      // subtle top-light gradient + inset highlight + restrained blue shadow give
+      // it depth; hover brightens + lifts 1px; the disabled state is an explicit
+      // neutral (not a dimmed colour) so an incomplete form reads clearly as
+      // disabled. Any admin hue still works — the overlay is a white fade. (Key
+      // kept as `gold`.)
+      gold:      'relative rounded-[10px] text-white font-semibold bg-[var(--auth-btn,#2f6fed)] [background-image:linear-gradient(180deg,rgba(255,255,255,0.16),rgba(255,255,255,0)_58%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_10px_24px_-10px_rgba(47,111,237,0.44)] transition-[filter,transform,box-shadow] hover:brightness-105 hover:-translate-y-px hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.24),0_14px_30px_-10px_rgba(47,111,237,0.56)] active:translate-y-0 active:brightness-95 focus:ring-[var(--auth-btn,#2f6fed)] disabled:bg-none disabled:bg-[#1c1f27] disabled:text-gray-400 disabled:shadow-none disabled:translate-y-0 disabled:brightness-100 disabled:hover:brightness-100 disabled:hover:translate-y-0',
     }
 
     const sizes = {

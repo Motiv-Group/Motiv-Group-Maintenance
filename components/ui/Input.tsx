@@ -23,7 +23,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             htmlFor={id}
             className={cn(
               'block text-sm font-medium mb-1.5',
-              auth ? 'text-gray-300' : 'text-gray-700 dark:text-gray-300'
+              auth ? 'text-[13px] mb-2 text-gray-300' : 'text-gray-700 dark:text-gray-300'
             )}
           >
             {label}
@@ -36,10 +36,14 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             'w-full rounded-lg text-sm transition-colors focus:outline-none',
             auth
               ? cn(
-                  // gray-400 placeholder clears WCAG 4.5:1 on the #20222b field.
-                  'px-4 py-3 border bg-[#20222b] text-white placeholder:text-gray-400',
-                  'focus:ring-2 focus:ring-blue-500 focus:border-blue-500/60',
-                  error ? 'border-red-500/70' : 'border-[#343742]'
+                  // 48px premium field; identical email/password default. gray-400
+                  // placeholder clears WCAG 4.5:1 on the #20242E field.
+                  'h-12 px-3.5 border rounded-[10px] bg-[#20242E] text-[#F4F6FA] placeholder:text-gray-400',
+                  'transition-[color,border-color,box-shadow] hover:border-white/20',
+                  'focus:border-[#4C8DFF] focus:shadow-[0_0_0_3px_rgba(76,141,255,0.14)]',
+                  error
+                    ? 'border-[#E5714E] focus:border-[#E5714E] focus:shadow-[0_0_0_3px_rgba(229,113,78,0.16)]'
+                    : 'border-white/[0.09]'
                 )
               : cn(
                   'px-3 py-2 border shadow-sm placeholder-gray-400',

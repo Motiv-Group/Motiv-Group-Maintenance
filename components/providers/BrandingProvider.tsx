@@ -52,7 +52,7 @@ export const DEFAULT_BRANDING: BrandingValue = {
   navWordmarkShift: 0.18,
   authLogoScale: 1,
   authLogoScaleMobile: 0.6,
-  authLogoGap: 12,
+  authLogoGap: 28,
   authButtonColor: '#2563eb',
 }
 
