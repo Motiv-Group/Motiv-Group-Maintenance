@@ -556,10 +556,10 @@ Legend: **API** = route handler check · **DB** = RLS/policy · **Storage** = bu
 | ID | Question | Recommendation | Impact | Status |
 |---|---|---|---|---|
 | D1 | Should the browser (RLS-bound) client EVER write tickets/quotes/signoffs directly, or is the service-role admin client always the writer? | Admin client only — drop browser write policies (code review found no legitimate browser writer) | Unblocks SEC-002/004/006 fix cleanly | ✅ RESOLVED — admin-client-only; browser write policies dropped (20260717, VERIFIED) |
-| D2 | Is `executive` intended read-only, or does it have company-scoped write? | Decide + align code/docs (SEC-045) | Authorization correctness | OPEN |
+| D2 | Is `executive` intended read-only, or does it have company-scoped write? | Decide + align code/docs (SEC-045) | Authorization correctness | ✅ RESOLVED 2026-07-16 — **read-only**; executive removed from all ticket-workflow writes (SEC-045 FIX IMPLEMENTED) |
 | D3 | Should Motiv-pool suppliers (company_id null) be visible in `/api/suppliers`? | Explicit allowlist, not implicit | SEC-003/005 fix shape | ✅ RESOLVED — GET scoped to caller's company only; pool rows excluded (SEC-003/005 VERIFIED) |
-| D4 | Hard-delete vs soft-delete for user/company erasure (POPIA)? | Soft-delete + anonymise; document | SEC-024 / FK ON DELETE | OPEN |
-| D5 | `app_settings` global vs per-tenant? | Global now (single tenant); restrict writes to a platform-owner id (SEC-014) | Multi-tenant future | OPEN |
+| D4 | Hard-delete vs soft-delete for user/company erasure (POPIA)? | Soft-delete + anonymise; document | SEC-024 / FK ON DELETE | ✅ RESOLVED 2026-07-16 — **soft-delete + anonymise** (already in `account/delete`: PII scrubbed, email scrambled, auth banned, history kept). Hard-delete unsupported by design → NO-ACTION FKs intentional. SEC-024 RISK ACCEPTED |
+| D5 | `app_settings` global vs per-tenant? | Global now (single tenant); restrict writes to a platform-owner id (SEC-014) | Multi-tenant future | ✅ RESOLVED 2026-07-16 — **global + platform-owner-only writes** via `PLATFORM_OWNER_USER_ID` (SEC-014 FIX IMPLEMENTED) |
 | D6 | SLA priority timings (P1/P2 windows) | Decide → align sla_rules + FALLBACK_SLA, bump SLA_VERSION | SLA correctness | OPEN |
 
 ---

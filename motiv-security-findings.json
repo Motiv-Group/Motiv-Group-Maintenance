@@ -434,7 +434,7 @@
       "verified": false,
       "verifiedConfirmed": null,
       "verifiedVotes": "",
-      "status": "NOT STARTED"
+      "status": "FIX IMPLEMENTED"
     },
     {
       "id": "SEC-015",
@@ -712,7 +712,7 @@
       "verified": false,
       "verifiedConfirmed": null,
       "verifiedVotes": "",
-      "status": "NOT STARTED"
+      "status": "RISK ACCEPTED"
     },
     {
       "id": "SEC-025",
@@ -1295,7 +1295,7 @@
       "verified": false,
       "verifiedConfirmed": null,
       "verifiedVotes": "",
-      "status": "NOT STARTED"
+      "status": "FIX IMPLEMENTED"
     },
     {
       "id": "SEC-046",
