@@ -138,9 +138,9 @@ export default function LoginPage() {
   }
 
   return (
-    <AuthShell logoHeight={152} cardMaxWidth={410}>
+    <AuthShell logoHeight={152} cardMaxWidth={424}>
       <h1 className="text-[25px] font-semibold leading-tight text-white mb-1.5">Welcome back</h1>
-      <p className="text-[13.5px] text-gray-400 mb-5">Sign in to continue to your workspace.</p>
+      <p className="text-[13.5px] text-[#9299A8] mb-5">Sign in to continue to your workspace.</p>
 
       {/* Clearing the error on any field change keeps it from lingering while the
           user corrects their details. Fields carry their own message rows, so the

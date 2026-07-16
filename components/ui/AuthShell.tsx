@@ -29,7 +29,7 @@ export function AuthShell({
   /** Shift the whole logo+card module up by this many px (balance on tall screens). */
   raise?: number
   /** Exact module max-width in px (overrides `maxWidth`). Used by the login page
-   *  for its tuned 410px card; capped to the viewport on mobile via calc(). */
+   *  for its tuned 424px card; capped to the viewport on mobile via calc(). */
   cardMaxWidth?: number
 }) {
   const branding = useBranding()
@@ -47,7 +47,7 @@ export function AuthShell({
   return (
     // --auth-btn drives the primary auth buttons (Button variant "gold"); admin-set hex.
     <div className="dark" style={{ '--auth-btn': branding.authButtonColor } as CSSProperties}>
-      <div className="relative min-h-screen bg-[#090B10] flex flex-col items-center justify-center px-4 py-10">
+      <div className="relative min-h-screen bg-[#080A0F] flex flex-col items-center justify-center px-4 py-10">
         {bgUrl && (
           // eslint-disable-next-line @next/next/no-img-element -- arbitrary storage URL; plain img avoids remote-domain config
           <img src={bgUrl} alt="" aria-hidden draggable={false}
@@ -75,7 +75,7 @@ export function AuthShell({
 
           {/* Premium card: lifted tonal gradient, hairline border, top-edge inset
               highlight + soft drop shadow. Solid + refined, no glow around it. */}
-          <div className="rounded-[15px] border border-white/10 p-[26px] sm:p-[30px] [background:linear-gradient(180deg,#171b24_0%,#12151d_100%)] shadow-[0_24px_70px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.05)]">
+          <div className="rounded-[15px] border border-white/10 p-[26px] sm:p-[30px] [background:linear-gradient(180deg,#181c26_0%,#12161f_100%)] shadow-[0_24px_70px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.05)]">
             {children}
           </div>
 

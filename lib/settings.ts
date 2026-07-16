@@ -71,7 +71,7 @@ export const LOGO_LAYOUT_DEFAULT: LogoLayout = {
   navWordmarkNudge: 0,
   authLogoScale: 1,
   authLogoScaleMobile: 0.6,
-  authLogoGap: 12,
+  authLogoGap: 22,
 }
 
 // Clamp ranges — also the slider bounds in the Customize UI. Keep in sync.

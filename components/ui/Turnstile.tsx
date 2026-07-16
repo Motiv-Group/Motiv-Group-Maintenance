@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { cn } from '@/lib/utils'
 
 // Cloudflare Turnstile CAPTCHA widget (OPS-003). Renders only when
 // NEXT_PUBLIC_TURNSTILE_SITE_KEY is set — so the whole auth flow keeps working
@@ -38,6 +39,12 @@ export function Turnstile({ onToken }: { onToken: (token: string | null) => void
   const cbRef = useRef(onToken)
   useEffect(() => { cbRef.current = onToken })
 
+  // App-level status so we can show a quiet loading line and a styled error
+  // instead of leaking Cloudflare's raw error block into the premium card.
+  //  loading → script still fetching; ready → widget mounted (its own
+  //  interaction-only UI takes over); error → the widget failed to load.
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+
   useEffect(() => {
     if (!SITE_KEY) return
     let cancelled = false
@@ -47,10 +54,20 @@ export function Turnstile({ onToken }: { onToken: (token: string | null) => void
       widgetId.current = window.turnstile.render(boxRef.current, {
         sitekey: SITE_KEY,
         theme: 'auto',
+        // Flexible fills the container width so the (rare) visible challenge
+        // lines up with the inputs; interaction-only keeps it invisible unless a
+        // human check is actually required — no grey block on a normal load.
+        size: 'flexible',
+        appearance: 'interaction-only',
         callback: (token: string) => cbRef.current(token),
-        'expired-callback': () => cbRef.current(null),
-        'error-callback': () => cbRef.current(null),
+        'expired-callback': () => {
+          cbRef.current(null)
+          try { if (widgetId.current !== null) window.turnstile?.reset(widgetId.current) } catch { /* gone */ }
+        },
+        'error-callback': () => { cbRef.current(null); setStatus('error') },
       })
+      // Widget mounted — hand off to its own UI; drop the loading line.
+      setStatus('ready')
     }
 
     if (window.turnstile) {
@@ -63,6 +80,7 @@ export function Turnstile({ onToken }: { onToken: (token: string | null) => void
         script.async = true
         script.defer = true
         script.setAttribute('data-turnstile', '')
+        script.addEventListener('error', () => { if (!cancelled) setStatus('error') })
         document.head.appendChild(script)
       }
       script.addEventListener('load', render)
@@ -77,9 +95,51 @@ export function Turnstile({ onToken }: { onToken: (token: string | null) => void
     }
   }, [])
 
+  const retry = () => {
+    setStatus('loading')
+    try {
+      if (widgetId.current !== null && window.turnstile) {
+        window.turnstile.reset(widgetId.current)
+        setStatus('ready')
+      }
+    } catch { /* will re-render on next mount */ }
+  }
+
   if (!SITE_KEY) return null
-  // No reserved height: Cloudflare's Managed widget passes invisibly most of the
-  // time (just a hidden token input, ~0px tall), so it shouldn't leave a grey
-  // block dominating the card. `empty:hidden` collapses it before it renders.
-  return <div ref={boxRef} className="empty:hidden" />
+
+  return (
+    <div>
+      {/* Widget host. Collapses to nothing when the check passes invisibly
+          (empty:hidden). When a real challenge iframe IS injected it fills the
+          input width and gets a soft dark frame + 10px radius to match the
+          fields — never a harsh contrasting border. Hidden while erroring so
+          Cloudflare's own error UI never shows through our styled message. */}
+      <div
+        ref={boxRef}
+        className={cn(
+          'empty:hidden overflow-hidden rounded-[10px]',
+          '[&:has(iframe)]:border [&:has(iframe)]:border-white/[0.08] [&:has(iframe)]:bg-[#20242E]/50',
+          status === 'error' && 'hidden',
+        )}
+      />
+      {status === 'loading' && (
+        <div className="flex items-center gap-2 text-xs text-gray-500">
+          <span className="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-[1.5px] border-gray-600 border-t-gray-300" />
+          Verifying your browser…
+        </div>
+      )}
+      {status === 'error' && (
+        <div className="flex items-center justify-between gap-3 rounded-[10px] border border-[#E5714E]/40 bg-[#E5714E]/10 px-3 py-2 text-xs text-[#F0A98C]">
+          <span>Verification couldn’t load. Check your connection.</span>
+          <button
+            type="button"
+            onClick={retry}
+            className="shrink-0 font-medium text-[#F4B79E] underline underline-offset-2 hover:text-white"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+    </div>
+  )
 }
