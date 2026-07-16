@@ -87,8 +87,13 @@ export default function LoginPage() {
     if (authError) {
       // Surfaced to the console (not the UI) so a stuck login can be diagnosed.
       console.warn('[login] sign-in failed:', authError.status, authError.message)
+      const msg = authError.message.toLowerCase()
       setError(
-        authError.message.toLowerCase().includes('email not confirmed')
+        // A CAPTCHA rejection must NOT read as "wrong password" — that sent us on a
+        // wild goose chase. Surface it distinctly so misconfig is obvious.
+        msg.includes('captcha')
+          ? 'Security check failed. Refresh the page, complete the “I’m human” box, then try again.'
+          : msg.includes('email not confirmed')
           ? 'Please confirm your email first — check your inbox.'
           : 'Email or password is incorrect.'
       )
