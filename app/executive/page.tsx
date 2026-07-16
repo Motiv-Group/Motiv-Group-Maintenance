@@ -98,7 +98,33 @@ export default async function ExecutiveEstatePage() {
             icon={<BarChart3 size={15} className="text-[#f59e0b]" />}
             action={<Link href="/executive/regions" className="text-xs text-blue-500 hover:underline flex items-center gap-1">View all <ArrowRight size={12} /></Link>}
           >
-            <div className="overflow-x-auto -mx-1">
+            {/* Mobile: stacked cards (the 10-column table is desktop-only, scrolls from sm). */}
+            <div className="space-y-2 sm:hidden">
+              {data.regions.slice(0, 8).map(({ rank, region, regionName, trend }) => (
+                <div key={region.regionId} className="rounded-xl border border-[var(--border)] p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span className="font-mono text-[11px] text-[var(--text-faint)]">#{rank}</span>
+                      <span className="truncate text-sm font-semibold text-[var(--text)]">{regionName}</span>
+                    </span>
+                    <Pill status={region.status} />
+                  </div>
+                  <div className="mt-2 flex items-center justify-between gap-2 text-xs">
+                    <span className={`font-semibold ${STATUS_TEXT[region.status]}`}>{region.finalPortfolioHealth}% health</span>
+                    <TrendArrow t={{ dir: trend.dir, label: `${trend.pct}%`, good: trend.dir === 'up' }} />
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-[var(--text-muted)]">
+                    <span>Stores: <span className="text-[var(--text)]">{region.activeStores}</span></span>
+                    <span>Red/Crit: <span className="tabular-nums text-[var(--text)]">{region.counts.at_risk}/{region.counts.critical}</span></span>
+                    <span>Open: <span className="text-[var(--text)]">{region.openTickets}</span></span>
+                    <span>Cost: <span className="text-[var(--text)]">{fmtK(region.costExposure)}</span></span>
+                  </div>
+                  {region.mainReason && <p className="mt-1.5 line-clamp-2 text-[11px] text-[var(--text-muted)]">{region.mainReason}</p>}
+                </div>
+              ))}
+              {data.regions.length === 0 && <p className="py-4 text-center text-xs text-[var(--text-faint)]">No regions yet</p>}
+            </div>
+            <div className="hidden overflow-x-auto -mx-1 sm:block">
               <table className="w-full text-sm min-w-[640px]">
                 <thead>
                   <tr className="text-left text-[11px] text-[var(--text-faint)] border-b border-[var(--border)]">
@@ -145,7 +171,31 @@ export default async function ExecutiveEstatePage() {
             icon={<ShieldAlert size={15} className="text-red-400" />}
             action={<Link href="/executive/stores" className="text-xs text-blue-500 hover:underline flex items-center gap-1">View all <ArrowRight size={12} /></Link>}
           >
-            <div className="overflow-x-auto -mx-1">
+            {/* Mobile: stacked cards; the table is desktop-only (scrolls from sm). */}
+            <div className="space-y-2 sm:hidden">
+              {data.topRiskStores.slice(0, 6).map((s, i) => (
+                <div key={s.storeId} className="rounded-xl border border-[var(--border)] p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span className="font-mono text-[11px] text-[var(--text-faint)]">#{i + 1}</span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-semibold text-[var(--text)]">{s.storeName}</span>
+                        <span className="block truncate text-[10px] text-[var(--text-faint)]">{s.regionName}</span>
+                      </span>
+                    </span>
+                    <span className={`shrink-0 text-sm font-semibold ${STATUS_TEXT[s.finalStatus]}`}>{s.finalHealthScore}%</span>
+                  </div>
+                  {s.mainIssue && <p className="mt-1.5 line-clamp-2 text-[11px] text-[var(--text-muted)]">{s.mainIssue}</p>}
+                  <div className="mt-1.5 flex gap-3 text-[11px] text-[var(--text-muted)]">
+                    <span>Open: <span className="text-[var(--text)]">{s.openTickets}</span></span>
+                    <span>Ovd: <span className="text-[var(--text)]">{s.overdueTickets}</span></span>
+                    <span>Exp: <span className="text-[var(--text)]">{fmtK(s.costExposure)}</span></span>
+                  </div>
+                </div>
+              ))}
+              {data.topRiskStores.length === 0 && <p className="py-4 text-center text-xs text-[var(--text-faint)]">No stores yet</p>}
+            </div>
+            <div className="hidden overflow-x-auto -mx-1 sm:block">
               <table className="w-full text-sm min-w-[420px]">
                 <thead>
                   <tr className="text-left text-[11px] text-[var(--text-faint)] border-b border-[var(--border)]">
