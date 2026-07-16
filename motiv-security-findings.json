@@ -1068,7 +1068,7 @@
       "verified": false,
       "verifiedConfirmed": null,
       "verifiedVotes": "",
-      "status": "NOT STARTED"
+      "status": "WAITING FOR OWNER"
     },
     {
       "id": "SEC-038",
