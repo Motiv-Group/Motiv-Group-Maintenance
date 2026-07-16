@@ -1192,6 +1192,27 @@ export interface Database {
           isOneToOne: false
           referencedRelation: "tickets"
           referencedColumns: ["id"]
+        },
+        {
+          foreignKeyName: "ratings_company_id_fkey"
+          columns: ["company_id"]
+          isOneToOne: false
+          referencedRelation: "companies"
+          referencedColumns: ["id"]
+        },
+        {
+          foreignKeyName: "ratings_supplier_id_fkey"
+          columns: ["supplier_id"]
+          isOneToOne: false
+          referencedRelation: "suppliers"
+          referencedColumns: ["id"]
+        },
+        {
+          foreignKeyName: "ratings_rated_by_fkey"
+          columns: ["rated_by"]
+          isOneToOne: false
+          referencedRelation: "user_profiles"
+          referencedColumns: ["id"]
         }
       ]
       }
@@ -2509,7 +2530,22 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+        {
+          foreignKeyName: "technicians_supplier_id_fkey"
+          columns: ["supplier_id"]
+          isOneToOne: false
+          referencedRelation: "suppliers"
+          referencedColumns: ["id"]
+        },
+        {
+          foreignKeyName: "technicians_company_id_fkey"
+          columns: ["company_id"]
+          isOneToOne: false
+          referencedRelation: "companies"
+          referencedColumns: ["id"]
+        }
+      ]
       }
       ticket_blockers: {
         Row: {
@@ -3606,6 +3642,27 @@ export interface Database {
           columns: ["store_id"]
           isOneToOne: false
           referencedRelation: "stores"
+          referencedColumns: ["id"]
+        },
+        {
+          foreignKeyName: "tickets_technician_id_fkey"
+          columns: ["technician_id"]
+          isOneToOne: false
+          referencedRelation: "technicians"
+          referencedColumns: ["id"]
+        },
+        {
+          foreignKeyName: "tickets_asset_id_fkey"
+          columns: ["asset_id"]
+          isOneToOne: false
+          referencedRelation: "assets"
+          referencedColumns: ["id"]
+        },
+        {
+          foreignKeyName: "tickets_assigned_user_id_fkey"
+          columns: ["assigned_user_id"]
+          isOneToOne: false
+          referencedRelation: "user_profiles"
           referencedColumns: ["id"]
         }
       ]
