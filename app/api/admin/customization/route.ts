@@ -1,4 +1,5 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { isPlatformOwner } from '@/lib/platform-owner'
 import { NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { rateLimit } from '@/lib/rate-limit'
@@ -44,7 +45,7 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient()
   const { data: me } = await admin.from('user_profiles').select('role').eq('id', user.id).single()
-  if (me?.role !== 'system_admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (me?.role !== 'system_admin' || !isPlatformOwner(user.id)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const parsed = await parseJsonBody(request, BodySchema)
   if (!parsed.ok) return parsed.error
