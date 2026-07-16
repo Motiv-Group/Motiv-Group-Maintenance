@@ -52,7 +52,7 @@
       "verified": true,
       "verifiedConfirmed": true,
       "verifiedVotes": "3/3",
-      "status": "WAITING FOR OWNER"
+      "status": "READY FOR VERIFICATION"
     },
     {
       "id": "SEC-002",
@@ -84,7 +84,7 @@
       "verified": true,
       "verifiedConfirmed": true,
       "verifiedVotes": "3/3",
-      "status": "WAITING FOR OWNER"
+      "status": "READY FOR VERIFICATION"
     },
     {
       "id": "SEC-003",
@@ -143,7 +143,7 @@
       "verified": false,
       "verifiedConfirmed": null,
       "verifiedVotes": "",
-      "status": "WAITING FOR OWNER"
+      "status": "READY FOR VERIFICATION"
     },
     {
       "id": "SEC-005",
@@ -202,7 +202,7 @@
       "verified": true,
       "verifiedConfirmed": true,
       "verifiedVotes": "3/3",
-      "status": "WAITING FOR OWNER"
+      "status": "READY FOR VERIFICATION"
     },
     {
       "id": "SEC-007",
@@ -348,7 +348,7 @@
       "verified": false,
       "verifiedConfirmed": null,
       "verifiedVotes": "",
-      "status": "WAITING FOR OWNER"
+      "status": "READY FOR VERIFICATION"
     },
     {
       "id": "SEC-012",
@@ -378,7 +378,7 @@
       "verified": false,
       "verifiedConfirmed": null,
       "verifiedVotes": "",
-      "status": "WAITING FOR OWNER"
+      "status": "READY FOR VERIFICATION"
     },
     {
       "id": "SEC-013",
@@ -406,7 +406,7 @@
       "verified": false,
       "verifiedConfirmed": null,
       "verifiedVotes": "",
-      "status": "WAITING FOR OWNER"
+      "status": "READY FOR VERIFICATION"
     },
     {
       "id": "SEC-014",
@@ -1324,7 +1324,7 @@
       "verified": false,
       "verifiedConfirmed": null,
       "verifiedVotes": "",
-      "status": "WAITING FOR OWNER"
+      "status": "READY FOR VERIFICATION"
     },
     {
       "id": "SEC-047",
@@ -1352,7 +1352,7 @@
       "verified": false,
       "verifiedConfirmed": null,
       "verifiedVotes": "",
-      "status": "WAITING FOR OWNER"
+      "status": "READY FOR VERIFICATION"
     },
     {
       "id": "SEC-048",

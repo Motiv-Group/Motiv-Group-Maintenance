@@ -34,7 +34,7 @@
 
 > Claude worked this list while the owner was away. **Nothing is `VERIFIED`** — code fixes are `FIX IMPLEMENTED` (built + tested green, not yet exercised against a live DB); the migration is `WAITING FOR OWNER` to apply. See the **Manual verification checklist (§1b)** for exactly what the owner must test.
 
-**① RLS hardening migration WRITTEN — `supabase/migrations/20260717_rls_hardening.sql` (commit `318720c`). Status: `WAITING FOR OWNER` to apply (dev → prod).** Closes SEC-001, SEC-002, SEC-004, SEC-006, SEC-011, SEC-012, SEC-013, SEC-046, SEC-047. Verified (grep) that the app writes every affected table only via the service-role admin client (except `tickets` INSERT + `notifications` UPDATE, which are preserved), so dropping the browser write policies breaks no app path. **Not yet folded into `schema.sql`** — that happens after the owner confirms it is applied (per the schema convention). Includes a post-apply owner audit query for already-escalated accounts.
+**① RLS hardening migration APPLIED + FOLDED — `20260717_rls_hardening.sql` applied to dev + prod by owner 2026-07-16; escalation-audit query returned only legitimate `system_admin`s (prod admin@motivgroup.co.za, dev owner) — no account was escalated via SEC-001. Folded into `schema.sql` + file deleted (commit `bcc00df`); schema:check ✓, types unchanged.** Closes SEC-001, SEC-002, SEC-004, SEC-006, SEC-011, SEC-012, SEC-013, SEC-046, SEC-047 **at the DB layer** — these move to `READY FOR VERIFICATION` (→ `VERIFIED` once the owner runs the §1b·B/C live negative tests).
 
 **② Code fixes IMPLEMENTED (built + `tsc`/`lint`/354 tests/`build` green). Status: `FIX IMPLEMENTED`** (commits `318720c`, `2cbc8b5`):
 
