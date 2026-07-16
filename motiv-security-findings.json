@@ -113,7 +113,7 @@
       "verified": true,
       "verifiedConfirmed": true,
       "verifiedVotes": "3/3",
-      "status": "FIX IMPLEMENTED"
+      "status": "VERIFIED"
     },
     {
       "id": "SEC-004",
@@ -172,7 +172,7 @@
       "verified": true,
       "verifiedConfirmed": true,
       "verifiedVotes": "3/3",
-      "status": "FIX IMPLEMENTED"
+      "status": "VERIFIED"
     },
     {
       "id": "SEC-006",

@@ -7,6 +7,7 @@ import { SLA_VERSION } from '@/lib/sla'
 import { z } from 'zod'
 import { parseJsonBody } from '@/lib/validate'
 import { logAudit } from '@/lib/audit'
+import { verifyTurnstile } from '@/lib/turnstile'
 import type { Database } from '@/lib/database.types'
 
 const BodySchema = z.object({
@@ -22,6 +23,7 @@ const BodySchema = z.object({
   token: z.string().optional().nullable(),
   address: z.string().optional().nullable(),
   email: z.string().optional(),
+  captcha_token: z.string().optional().nullable(),
 })
 
 // Supplier onboarding — TWO entry paths, one wizard:
@@ -135,6 +137,12 @@ export async function POST(request: Request) {
   }
 
   // ── Path B: self-signup (no token) ─────────────────────────────────────────
+  // OPS-003: CAPTCHA — this path creates the auth user via the admin API (which
+  // bypasses Supabase's built-in CAPTCHA), so verify the Turnstile token here.
+  // (The invited path above is already gated by the one-time invite token.)
+  if (!(await verifyTurnstile(b.captcha_token, request.headers.get('x-forwarded-for'))))
+    return bad('Captcha verification failed — please try again.')
+
   const email = String(b.email ?? '').trim().toLowerCase()
   if (!isValidEmail(email)) return bad('Enter a valid email address')
 

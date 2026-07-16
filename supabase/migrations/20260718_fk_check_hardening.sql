@@ -54,11 +54,11 @@ alter table public.technicians add  constraint technicians_company_id_fkey
 create index if not exists technicians_supplier_idx on public.technicians (supplier_id);
 create index if not exists technicians_company_idx  on public.technicians (company_id);
 
--- ── Safe CHECK constraints (SEC-022) — bounded, well-defined value sets only ─
+-- ── Safe CHECK constraint (SEC-022) — bounded, well-defined value set only ───
 -- (Broad status/priority columns are intentionally NOT constrained here: their
---  live value sets are wide and drift; those belong on lookup-table FKs later.)
+--  live value sets are wide and drift; those belong on lookup-table FKs later.
+--  The ticket_chat_messages.author_role CHECK lives with the ticket_chat table
+--  migration — _archive/20260716_ticket_chat.sql — since not every DB has that
+--  table yet, e.g. dev.)
 alter table public.ratings drop constraint if exists ratings_score_chk;
 alter table public.ratings add  constraint ratings_score_chk check (score between 1 and 5);
-alter table public.ticket_chat_messages drop constraint if exists ticket_chat_messages_author_role_chk;
-alter table public.ticket_chat_messages add  constraint ticket_chat_messages_author_role_chk
-  check (author_role in ('regional_manager', 'supplier'));

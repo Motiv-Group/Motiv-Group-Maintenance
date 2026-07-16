@@ -12,6 +12,7 @@ import { PasswordInput } from '@/components/ui/PasswordInput'
 import { Button } from '@/components/ui/Button'
 import { AuthShell } from '@/components/ui/AuthShell'
 import { AuthError, AuthFooter } from '@/components/ui/AuthBits'
+import { Turnstile, isTurnstileEnabled } from '@/components/ui/Turnstile'
 import { Check } from 'lucide-react'
 
 interface LoginForm {
@@ -31,6 +32,9 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [forwarding, setForwarding] = useState(false)
   const [remember, setRemember] = useState(true)
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
+  // Bumped to remount the widget for a fresh token (Turnstile tokens are single-use).
+  const [captchaKey, setCaptchaKey] = useState(0)
 
   const { register, handleSubmit, setValue, formState: { errors } } = useForm<LoginForm>({ mode: 'onChange' })
 
@@ -70,11 +74,15 @@ export default function LoginPage() {
   }, [router])
 
   async function onSubmit(values: LoginForm) {
+    if (isTurnstileEnabled() && !captchaToken) { setError('Please complete the “I’m human” check.'); return }
     setLoading(true)
     setError('')
 
     const supabase = createClient()
-    const { data, error: authError } = await supabase.auth.signInWithPassword(values)
+    const { data, error: authError } = await supabase.auth.signInWithPassword({
+      ...values,
+      options: captchaToken ? { captchaToken } : undefined,
+    })
 
     if (authError) {
       // Surfaced to the console (not the UI) so a stuck login can be diagnosed.
@@ -84,6 +92,7 @@ export default function LoginPage() {
           ? 'Please confirm your email first — check your inbox.'
           : 'Email or password is incorrect.'
       )
+      setCaptchaToken(null); setCaptchaKey(k => k + 1) // fresh token for the retry
       setLoading(false)
       return
     }
@@ -174,6 +183,8 @@ export default function LoginPage() {
             Forgot password?
           </Link>
         </div>
+
+        <Turnstile key={captchaKey} onToken={setCaptchaToken} />
 
         <AuthError message={error} />
 

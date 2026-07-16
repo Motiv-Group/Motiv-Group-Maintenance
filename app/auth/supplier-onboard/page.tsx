@@ -10,6 +10,7 @@ import { SLA_VERSION } from '@/lib/sla'
 import { PasswordInput } from '@/components/ui/PasswordInput'
 import { AuthShell } from '@/components/ui/AuthShell'
 import { AuthError } from '@/components/ui/AuthBits'
+import { Turnstile, isTurnstileEnabled } from '@/components/ui/Turnstile'
 import { Truck, ArrowLeft, ArrowRight, Check, FileText } from 'lucide-react'
 
 // Supplier onboarding wizard — 3 steps, two entry paths:
@@ -33,6 +34,8 @@ export default function SupplierOnboardPage() {
   const [token, setToken] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
+  const [captchaKey, setCaptchaKey] = useState(0) // remount widget for a fresh single-use token
 
   // Step 1 — account
   const [email, setEmail] = useState('')
@@ -100,6 +103,7 @@ export default function SupplierOnboardPage() {
   async function submit() {
     const err = validateStep(3)
     if (err) { setError(err); return }
+    if (isTurnstileEnabled() && !captchaToken) { setError('Please complete the “I’m human” check.'); return }
     setLoading(true); setError('')
     const res = await fetch('/api/supplier/onboard', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -109,10 +113,11 @@ export default function SupplierOnboardPage() {
         phone, address, trades: [...trades],
         vat_registered: vatRegistered, vat_number: vatNumber,
         sla_agreed: slaAgreed, sla_signed_name: signedName,
+        captcha_token: captchaToken || undefined,
       }),
     })
     const d = await res.json().catch(() => ({}))
-    if (!res.ok) { setError(d.error || 'Could not create your account.'); setLoading(false); return }
+    if (!res.ok) { setError(d.error || 'Could not create your account.'); setCaptchaToken(null); setCaptchaKey(k => k + 1); setLoading(false); return }
 
     // Sign straight in with the password they just chose.
     const supabase = createClient()
@@ -247,6 +252,8 @@ export default function SupplierOnboardPage() {
               I have read and agree to the <Link href="/sla" target="_blank" className="text-blue-600 dark:text-blue-400 underline">Service Level Agreement</Link> (v{SLA_VERSION}) on behalf of {companyName.trim() || 'my company'}.
             </span>
           </label>
+
+          <Turnstile key={captchaKey} onToken={setCaptchaToken} />
         </div>
       )}
 
