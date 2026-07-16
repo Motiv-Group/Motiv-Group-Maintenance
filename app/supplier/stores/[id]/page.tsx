@@ -6,7 +6,6 @@ import { Mail, Phone, MapPin, Building2 } from 'lucide-react'
 import { Card, SectionCard } from '@/components/exec/ui'
 import { CategoryIcon } from '@/components/client/ticketBadges'
 import { MapLink } from '@/components/ui/MapLink'
-import { AssignRMForm } from '@/components/admin/AssignRMForm'
 import {
   STATUS_COLORS, STATUS_LABELS,
   PRIORITY_COLORS, PRIORITY_LABELS,
@@ -28,8 +27,8 @@ export default async function AdminStoreDetailPage(props: { params: Promise<{ id
     : { data: null }
   const companyId = prof?.company_id ?? null
 
-  // v3: the store lives on `stores`; regional managers are user_profiles rows.
-  const [{ data: storeRow }, { data: tickets }, { data: regionalManagers }] = await Promise.all([
+  // v3: the store lives on `stores`.
+  const [{ data: storeRow }, { data: tickets }] = await Promise.all([
     admin
       .from('stores')
       .select('id, name, sub_store, branch_code, address, region_id, company_id')
@@ -40,25 +39,10 @@ export default async function AdminStoreDetailPage(props: { params: Promise<{ id
       .select('*, quotes(id, amount, status)')
       .eq('store_id', params.id)
       .order('created_at', { ascending: false }),
-    companyId
-      ? admin
-          .from('user_profiles')
-          .select('id, full_name, company_name')
-          .eq('role', 'regional_manager')
-          .eq('company_id', companyId)
-          .order('full_name')
-      : Promise.resolve({ data: [] as any[] }),
   ])
 
   // Tenant guard — the store must belong to the caller's company.
   if (!storeRow || !companyId || storeRow.company_id !== companyId) notFound()
-
-  // v3: a store links to its RM through its region (regional_users). Resolve the
-  // current RM (if any) for this store's region.
-  const { data: regionRms } = storeRow.region_id
-    ? await admin.from('regional_users').select('user_id').eq('region_id', storeRow.region_id)
-    : { data: [] as { user_id: string }[] }
-  const currentRmId = (regionRms ?? [])[0]?.user_id ?? null
 
   // Store-manager contact details live on user_profiles via the store_users link.
   const { data: smLink } = await admin
@@ -70,15 +54,10 @@ export default async function AdminStoreDetailPage(props: { params: Promise<{ id
   const store = {
     ...storeRow,
     company_name: storeRow.name,
-    regional_manager_id: currentRmId,
     full_name: sm?.full_name ?? null,
     email: sm?.email ?? null,
     phone: sm?.phone ?? null,
   }
-
-  const currentRm = currentRmId
-    ? (regionalManagers ?? []).find((rm: any) => rm.id === currentRmId)
-    : null
 
   return (
     <div className="space-y-5">
@@ -125,14 +104,6 @@ export default async function AdminStoreDetailPage(props: { params: Promise<{ id
           )}
         </div>
       </SectionCard>
-
-      {/* Assign Regional Manager */}
-      <AssignRMForm
-        storeId={store.id}
-        currentRmId={store.regional_manager_id}
-        currentRmName={currentRm?.full_name ?? currentRm?.company_name ?? null}
-        regionalManagers={regionalManagers ?? []}
-      />
 
       {/* Tickets */}
       <div>
