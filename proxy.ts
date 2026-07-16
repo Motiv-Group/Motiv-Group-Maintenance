@@ -10,11 +10,16 @@ function buildCsp(nonce: string): string {
     "default-src 'self'",
     // 'strict-dynamic' + nonce: only nonce'd scripts (and what they load) run.
     // 'unsafe-eval' is dev-only (react-refresh); prod has neither unsafe-*.
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ''}`,
+    // challenges.cloudflare.com = Cloudflare Turnstile (signup/login CAPTCHA). Its
+    // api.js is injected by our own nonce'd bundle so strict-dynamic trusts it; the
+    // host token is ignored under strict-dynamic but kept for clarity. The widget
+    // renders in an iframe (frame-src) and calls home (connect-src).
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://challenges.cloudflare.com${isDev ? " 'unsafe-eval'" : ''}`,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https://*.supabase.co",
     "font-src 'self' data:",
-    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.ingest.sentry.io",
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.ingest.sentry.io https://challenges.cloudflare.com",
+    "frame-src 'self' https://challenges.cloudflare.com",
     "worker-src 'self' blob:",
     "object-src 'none'",
     "frame-ancestors 'none'",
