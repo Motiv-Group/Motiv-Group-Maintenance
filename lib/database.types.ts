@@ -390,7 +390,15 @@ export interface Database {
           facts?: Json | null
           created_at?: string
         }
-        Relationships: []
+        Relationships: [
+        {
+          foreignKeyName: "daily_briefings_company_id_fkey"
+          columns: ["company_id"]
+          isOneToOne: false
+          referencedRelation: "companies"
+          referencedColumns: ["id"]
+        }
+      ]
       }
       dashboard_snapshots: {
         Row: {
@@ -2027,7 +2035,15 @@ export interface Database {
           year?: number
           last_number?: number
         }
-        Relationships: []
+        Relationships: [
+        {
+          foreignKeyName: "store_ticket_counters_store_id_fkey"
+          columns: ["store_id"]
+          isOneToOne: false
+          referencedRelation: "stores"
+          referencedColumns: ["id"]
+        }
+      ]
       }
       store_users: {
         Row: {
@@ -2354,6 +2370,13 @@ export interface Database {
           isOneToOne: false
           referencedRelation: "suppliers"
           referencedColumns: ["id"]
+        },
+        {
+          foreignKeyName: "supplier_sla_acceptances_user_id_fkey"
+          columns: ["user_id"]
+          isOneToOne: false
+          referencedRelation: "user_profiles"
+          referencedColumns: ["id"]
         }
       ]
       }
@@ -2418,6 +2441,13 @@ export interface Database {
           columns: ["supplier_id"]
           isOneToOne: false
           referencedRelation: "suppliers"
+          referencedColumns: ["id"]
+        },
+        {
+          foreignKeyName: "supplier_verification_docs_uploaded_by_fkey"
+          columns: ["uploaded_by"]
+          isOneToOne: false
+          referencedRelation: "user_profiles"
           referencedColumns: ["id"]
         }
       ]
@@ -2826,6 +2856,13 @@ export interface Database {
           isOneToOne: false
           referencedRelation: "tickets"
           referencedColumns: ["id"]
+        },
+        {
+          foreignKeyName: "ticket_events_company_id_fkey"
+          columns: ["company_id"]
+          isOneToOne: false
+          referencedRelation: "companies"
+          referencedColumns: ["id"]
         }
       ]
       }
@@ -3110,6 +3147,20 @@ export interface Database {
           columns: ["supplier_id"]
           isOneToOne: false
           referencedRelation: "suppliers"
+          referencedColumns: ["id"]
+        },
+        {
+          foreignKeyName: "ticket_suppliers_quote_id_fkey"
+          columns: ["quote_id"]
+          isOneToOne: false
+          referencedRelation: "quotes"
+          referencedColumns: ["id"]
+        },
+        {
+          foreignKeyName: "ticket_suppliers_company_id_fkey"
+          columns: ["company_id"]
+          isOneToOne: false
+          referencedRelation: "companies"
           referencedColumns: ["id"]
         }
       ]

@@ -556,7 +556,7 @@
       "verified": false,
       "verifiedConfirmed": null,
       "verifiedVotes": "",
-      "status": "NOT STARTED"
+      "status": "FIX IMPLEMENTED"
     },
     {
       "id": "SEC-019",
@@ -1068,7 +1068,7 @@
       "verified": false,
       "verifiedConfirmed": null,
       "verifiedVotes": "",
-      "status": "WAITING FOR OWNER"
+      "status": "VERIFIED"
     },
     {
       "id": "SEC-038",

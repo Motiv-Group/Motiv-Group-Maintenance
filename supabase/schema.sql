@@ -1065,6 +1065,17 @@ alter table public.ratings add foreign key (rated_by) references public.user_pro
 alter table public.technicians add foreign key (supplier_id) references public.suppliers(id) on delete set null;
 alter table public.technicians add foreign key (company_id) references public.companies(id) on delete set null;
 
+-- Child-table FK hardening (20260719 / SEC-037). Live added these NOT VALID (tables
+-- may already hold rows); on a fresh rebuild they are plain FKs. ON DELETE matched
+-- to nullability: SET NULL where nullable, CASCADE where NOT NULL.
+alter table public.ticket_suppliers add foreign key (quote_id) references public.quotes(id) on delete set null;
+alter table public.ticket_suppliers add foreign key (company_id) references public.companies(id) on delete set null;
+alter table public.ticket_events add foreign key (company_id) references public.companies(id) on delete set null;
+alter table public.daily_briefings add foreign key (company_id) references public.companies(id) on delete cascade;
+alter table public.supplier_sla_acceptances add foreign key (user_id) references public.user_profiles(id) on delete cascade;
+alter table public.supplier_verification_docs add foreign key (uploaded_by) references public.user_profiles(id) on delete cascade;
+alter table public.store_ticket_counters add foreign key (store_id) references public.stores(id) on delete cascade;
+
 -- ---------------------------------------------------------------------------
 -- FUNCTIONS (RLS helpers + triggers)
 -- ---------------------------------------------------------------------------
