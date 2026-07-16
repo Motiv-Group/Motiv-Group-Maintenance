@@ -8,8 +8,9 @@
 --
 -- NOTE: reconstructed from information_schema + pg_policies. Column types/defaults,
 -- PKs, FKs, RLS policies, functions, triggers and storage are faithful. Secondary
--- INDEXES and CHECK constraints are NOT captured here - run pg_dump --schema-only
--- if you need a byte-perfect copy.
+-- INDEXES and CHECK constraints are mostly NOT captured (explicitly-added ones
+-- appear in the INDEXES section near the end) - run pg_dump --schema-only if you
+-- need a byte-perfect copy.
 -- ============================================================================
 
 -- ---------------------------------------------------------------------------

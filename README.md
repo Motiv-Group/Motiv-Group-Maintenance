@@ -1,164 +1,136 @@
 # Motiv — Maintenance App
 
-A mobile-first maintenance ticketing and quoting platform built with Next.js + Supabase.
+A mobile-first maintenance ticketing and quoting platform for the South African market. Next.js 16 (App Router) + TypeScript + Tailwind CSS + Supabase (Postgres, Auth, Storage, Realtime), wrapped for Android with Capacitor (the wrapper loads the deployed site — see `capacitor.config.ts`).
+
+> For architecture, conventions and the full domain model, see `CLAUDE.md`. For production readiness status, see `docs/PATH_TO_9.5.md`.
 
 ---
 
 ## Quick Start
 
 ### 1. Install Node.js
-Download and install from https://nodejs.org (LTS version)
+Download and install from https://nodejs.org (LTS version).
 
 ### 2. Install dependencies
-Open a terminal in this folder and run:
 ```bash
 npm install
 ```
 
 ### 3. Set up Supabase
 
-1. Go to https://app.supabase.com and create a free account
-2. Create a new project (any name, pick a strong database password)
-3. Once the project is ready, go to **SQL Editor** (left sidebar)
-4. Open the file `supabase/migrations/001_initial_schema.sql` from this folder
-5. Copy the entire contents and paste into the SQL Editor, then click **Run**
-6. Go to **Project Settings → API** and copy:
+1. Go to https://app.supabase.com and create a project
+2. Open **SQL Editor** (left sidebar)
+3. Paste the entire contents of `supabase/schema.sql` and click **Run**
+   — this file is the canonical, always-current schema (tables, RLS, functions,
+   triggers, storage buckets). `supabase/migrations/` holds only not-yet-applied
+   migrations (currently none; history is archived in `supabase/migrations/_archive/`).
+4. Go to **Project Settings → API** and copy:
    - Project URL
    - `anon` public key
-   - `service_role` secret key (click to reveal)
+   - `service_role` secret key
 
 ### 4. Configure environment
-Copy `.env.local.example` to `.env.local`:
 ```bash
-cp .env.local.example .env.local
+cp .env.example .env.local
 ```
 
-Open `.env.local` and fill in your Supabase values:
+Required:
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
 SUPABASE_SERVICE_ROLE_KEY=eyJ...
-NEXT_PUBLIC_ADMIN_EMAILS=your@email.com,partner@email.com
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
-Optional — auto-sent store-manager invites (regional managers creating store
-accounts). Without these the account is still created and the UI shows manual
-share buttons (Copy / WhatsApp / Email):
-```
-RESEND_API_KEY=re_...                 # email channel (https://resend.com)
-EMAIL_FROM=Motiv <noreply@yourdomain> # verified Resend sender
-# WhatsApp reuses the existing WhatsApp Cloud API vars:
-WHATSAPP_ACCESS_TOKEN=...
-WHATSAPP_PHONE_NUMBER_ID=...
-```
+Everything else (VAPID web-push, WhatsApp intake, Groq, Sentry, Upstash rate
+limiting, Resend email, cron secret, Vercel/infra dashboard tokens) is optional
+and documented inline in `.env.example` — the app degrades gracefully when a
+group is unset.
+
 > WhatsApp note: the Cloud API only delivers free-form text inside the 24-hour
-> customer-care window; cold invites need a pre-approved template. Server WA
-> send is therefore best-effort — email is the reliable auto-channel, and the
-> manual WhatsApp share button always works.
+> customer-care window; cold sends need a pre-approved template. Email (Resend)
+> is the reliable auto-channel; manual share buttons always work.
 
-### 5. Set up admin accounts
+### 5. Create the platform admin
 
-Admin accounts are created manually in Supabase:
-1. Go to **Authentication → Users** in Supabase
-2. Click **Add user** → enter the admin email + password
-3. Go to **SQL Editor** and run:
+Accounts are invited through the app by role, but the first `system_admin` is
+created manually:
+1. **Authentication → Users** in Supabase → **Add user** (email + password)
+2. **SQL Editor**:
 ```sql
-UPDATE public.profiles
-SET role = 'admin'
+UPDATE public.user_profiles
+SET role = 'system_admin'
 WHERE email = 'your@email.com';
 ```
-Repeat for each admin.
+
+From `/admin` the system admin then invites Executives, Regional Managers and
+Store Managers (and links them in the **Hierarchy** tab); suppliers register
+through the supplier onboarding flow. Public self-signup only creates
+`individual` accounts (enforced by a DB trigger).
 
 ### 6. Run the app
 ```bash
 npm run dev
 ```
 
-Open http://localhost:3000 in your browser. On mobile, open your computer's local IP address (e.g. http://192.168.1.5:3000) to test the mobile experience.
+Open http://localhost:3000. On a phone, use your computer's LAN IP
+(e.g. http://192.168.1.5:3000) to test the mobile experience.
+
+### Commands
+
+| Command | What it does |
+|---|---|
+| `npm run dev` | dev server |
+| `npm run build` | production build |
+| `npm run lint` | ESLint |
+| `npx tsc --noEmit` | type-check |
+| `npm test` | vitest suite (`lib/**/*.test.ts`, `tests/`) |
+| `npm run schema:check` | static schema.sql consistency check |
+| `npm run gen:types` | regenerate `lib/database.types.ts` from schema |
 
 ---
 
-## App Structure
+## Roles
+
+| Role | Home | Who |
+|---|---|---|
+| `store_manager` | `/client` | store/branch staff logging tickets |
+| `regional_manager` | `/regional` | oversees a region's stores; validates tickets, awards quotes, signs off work |
+| `supplier` | `/supplier` | contractor/maintenance companies quoting and doing the work (competitive — multiple supplier orgs can be invited per ticket) |
+| `executive` | `/executive` | estate-wide read-only dashboards |
+| `individual` | `/individual` | general public — standalone home jobs (only self-signup role) |
+| `system_admin` | `/admin` | platform owner — accounts, hierarchy, branding, infra dashboards |
+
+Route access is enforced in `proxy.ts` (Next 16's `middleware.ts` rename).
+
+## Ticket Flow (v3)
 
 ```
-app/
-  auth/
-    login/          → Login page
-    signup/         → Client signup (all fields)
-  client/
-    page.tsx        → Client dashboard
-    tickets/        → List of tickets
-    tickets/new/    → Submit new ticket (photos, priority, description)
-    tickets/[id]/   → Ticket detail + view/accept quotes
-    notifications/  → Notification centre
-  admin/
-    page.tsx        → Admin dashboard (stats + recent tickets)
-    tickets/        → All tickets with filters
-    tickets/[id]/   → Ticket detail + send quote + update status
-    notifications/  → Notification centre
-  api/
-    tickets/        → POST — create ticket
-    quotes/         → POST — send quote
-    quotes/[id]/respond/  → PATCH — accept/decline quote
-    notifications/  → GET/PATCH — fetch + mark read
-
-components/
-  ui/               → Shared: Button, Input, Badge, Navbar
-  client/           → Store-manager ticket views
-  admin/            → SendQuoteForm (+ platform-admin: AddAccountForm, HierarchyView)
-  workflow/         → WorkflowActions (drives /api/tickets/[id]/transition)
-
-lib/
-  supabase/         → Browser + server Supabase clients
-  types.ts          → TypeScript types
-  utils.ts          → Helpers, labels, colours
+Store manager logs ticket (web or WhatsApp voice note)
+  → Regional manager validates & invites suppliers to quote
+  → Invited suppliers submit quotes (competitive)
+  → RM (or executive/individual) approves a quote → ticket awarded
+  → Supplier schedules & does the work
+  → Supplier submits signoff (COC + before/after photos + invoice)
+  → RM approves close-out → completed, or raises a snag → snag loop
 ```
 
----
-
-## Ticket Flow
-
-```
-Client submits ticket
-  → Admins receive in-app notification
-  → Admin views ticket (client info, photos, priority)
-  → Admin sends quote
-      → Client receives in-app notification
-      → Client accepts or declines quote
-          → Admins receive in-app notification
-          → Admin updates ticket status as work progresses
-```
+The full state machine (23 statuses incl. assessment, variation review,
+evidence requests, disputes, snags) lives in `lib/workflow.ts` — the single
+source of truth for statuses, roles and transitions.
 
 ---
 
-## Deploying to Production (Vercel — free)
+## Deploying to Production (Vercel)
 
-1. Push this folder to a GitHub repository
-2. Go to https://vercel.com and import the repo
-3. Add all `.env.local` variables as Environment Variables in Vercel
-4. Deploy — Vercel gives you a public URL
-5. Update `NEXT_PUBLIC_APP_URL` to your Vercel URL
-6. Go to Supabase → **Authentication → URL Configuration** and add your Vercel URL to **Redirect URLs**
+1. Push to GitHub and import the repo in Vercel
+2. Add all `.env.local` variables as Vercel Environment Variables
+3. Deploy
+4. Point `NEXT_PUBLIC_APP_URL`, `capacitor.config.ts` `server.url`, and
+   Supabase **Authentication → URL Configuration** (Site URL + Redirect URLs)
+   at the live domain — all three must match
+5. `vercel.json` schedules the single daily cron (`/api/cron/v3-snapshots`);
+   set `CRON_SECRET` so it can authenticate
 
----
-
-## Adding Email Notifications (optional, recommended)
-
-1. Sign up at https://resend.com (free tier)
-2. Add `RESEND_API_KEY=re_...` to your environment variables
-3. Use Supabase Database Webhooks or Edge Functions to call Resend when a new notification row is inserted
-
-This is a nice-to-have enhancement — the app works fully with in-app notifications without it.
-
----
-
-## Future Features (MVP → V2)
-
-- [ ] Email notifications via Resend
-- [ ] PDF quote generation
-- [ ] Client can upload additional photos after ticket creation
-- [ ] Admin can assign tickets to specific team members
-- [ ] Payment integration (Yoco / PayFast)
-- [ ] SLA tracking and due dates
-- [ ] Bulk ticket export
+See `docs/PREVIEW_DEPLOYMENTS.md` for the preview→dev-database setup and
+`docs/INFRASTRUCTURE_TIERS.md` for free-tier limits and the deferred backlog.

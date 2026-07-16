@@ -4,9 +4,16 @@ The single reference for Motiv's **fonts and colours**. Use these tokens
 everywhere instead of hard-coding hex or picking ad-hoc fonts, so the app stays
 visually consistent in light and dark mode.
 
-> Sources of truth in code: `tailwind.config.ts` (brand palette), `app/globals.css`
-> (surface/text CSS vars), `lib/utils.ts` (status/priority badge colours),
-> `lib/categoryVisual.ts` (maintenance-category icon colours).
+> Sources of truth in code: `lib/settings.ts` (`BRAND_DEFAULT_HEX` — factory
+> palette), `app/globals.css` (brand RGB-channel vars + surface/text CSS vars),
+> `tailwind.config.ts` (Tailwind `brand-*` wiring), `lib/utils.ts`
+> (status/priority badge colours), `lib/categoryVisual.ts` (maintenance-category
+> icon colours).
+>
+> **The palette is runtime-overridable.** The admin **Customize** tab
+> (`/admin/customization`, stored in `app_settings`) can replace every brand
+> stop, logo and app name without a redeploy — the values below are the
+> **factory defaults**, injected as CSS vars by `app/layout.tsx`.
 
 ---
 
@@ -32,27 +39,27 @@ wired into Tailwind's `fontFamily` in `tailwind.config.ts`, so plain `font-sans`
 
 ## Colour
 
-### Brand palette — navy & gold (`tailwind.config.ts` → `brand-*`)
+### Brand palette — warm charcoal & gold/cream (factory defaults)
 
-Deep navy is the primary/structural colour (nav bars, headers); the golds are the
-warm brand accent.
+Warm charcoal is the primary/structural colour (dark nav, chrome); the
+gold/cream tints are the warm brand accent range. Defined as RGB channels in
+`globals.css` (`--brand-*`) so Tailwind opacity modifiers work; hex mirror in
+`lib/settings.ts` `BRAND_DEFAULT_HEX`.
 
-| Token | Hex | Use |
+| Token | Factory hex | Use |
 |-------|-----|-----|
 | `brand-50` | `#f8f5ed` | lightest cream tint |
 | `brand-100` | `#e8dfc4` | pale gold tint |
 | `brand-300` | `#c9b99a` | muted gold |
 | `brand-400` | `#b5a07d` | muted gold (darker) |
-| `brand-500` | `#1a3347` | mid navy |
-| `brand-600` | `#0d1f2d` | **primary navy** — nav bars, chrome (light + dark) |
-| `brand-700` | `#0a1922` | navy border/hover |
-| `brand-900` | `#060f15` | deepest navy |
+| `brand-500` | `#1b1d24` | mid charcoal |
+| `brand-600` | `#0e1016` | **primary charcoal** — dark-mode nav/chrome, native splash bg |
+| `brand-700` | `#090a0e` | charcoal border/hover |
+| `brand-900` | `#050608` | deepest charcoal |
 
-### Gold accent
-
-| Value | Use |
-|-------|-----|
-| `#C6A35D` | **Brand gold** — active nav tab, avatar chip, highlights, "AI" pill. Used inline as `text-[#C6A35D]` / `bg-[#C6A35D]`. |
+> The soft gold (`brand-300/400` range) is **decorative only** — interactive
+> elements use **blue** for actions and **green** for select/accept/approve
+> (active nav tab is `text-blue-400`). Don't put gold on buttons or links.
 
 ### Surface & text — theme CSS vars (`app/globals.css`)
 
@@ -61,22 +68,23 @@ toggle works. `Card` in `components/exec/ui.tsx` is the shared surface.
 
 | Var | Light | Dark |
 |-----|-------|------|
-| `--app-bg` | `#eef2f7` | `#0a0e17` |
-| `--surface` | `#ffffff` | `#1f2937` |
-| `--surface-2` | `#f8fafc` | `#0e1422` |
-| `--border` | `rgba(15,23,42,.10)` | `rgba(255,255,255,.07)` |
-| `--hover` | `rgba(15,23,42,.045)` | `rgba(255,255,255,.05)` |
-| `--input-bg` | `#f1f5f9` | `rgba(0,0,0,.22)` |
-| `--text` | `#0f172a` | `#f8fafc` |
-| `--text-muted` | `#475569` | `#94a3b8` |
-| `--text-faint` | `#64748b` | `#64748b` |
+| `--app-bg` | `#f0f1f4` | `#0b0c11` |
+| `--surface` | `#ffffff` | `#17181e` |
+| `--surface-2` | `#f7f8fa` | `#101116` |
+| `--nav-bg` | `#ffffff` | `#0e1016` |
+| `--border` | `rgba(17,18,24,.115)` | `rgba(255,255,255,.07)` |
+| `--hover` | `rgba(17,18,24,.045)` | `rgba(255,255,255,.05)` |
+| `--input-bg` | `#f1f2f4` | `rgba(0,0,0,.22)` |
+| `--text` | `#14151a` | `#f6f6f7` |
+| `--text-muted` | `#4b4d57` | `#9a9ca6` |
+| `--text-faint` | `#565a64` | `#9498a3` |
 
 ### Semantic / action colours (Tailwind scales)
 
 | Role | Colour | Where |
 |------|--------|-------|
-| Primary action / links | `blue-600` | Start Quick Log, Next, links |
-| Success / submit / "clear" | `emerald-600` | Submit ticket, on-track KPIs |
+| Primary action / links | `blue-600` | Start Quick Log, Next, links, active nav tab (`blue-400` on dark chrome) |
+| Success / submit / approve | `emerald-600` / `green-600` | Submit ticket, accept/approve, on-track KPIs |
 | Needs attention / has-work | `amber-500/600` | KPI cards with a count, input-needed |
 | Urgent / overdue / error | `red-500/600` | SLA breach, urgent, form errors |
 | Scheduled | `indigo-500` | visits, scheduled status |
@@ -95,7 +103,9 @@ General/Other = grey, Multiple (multi-trade) = purple.
 
 ## Rules of thumb
 
-1. Reference tokens, not hex: `bg-[var(--surface)]`, `text-brand-600`, `text-[#C6A35D]`.
+1. Reference tokens, not hex: `bg-[var(--surface)]`, `bg-brand-600`.
 2. Style **both** light and dark — every surface/text colour has a dark counterpart.
-3. Nav bars are always `brand-600` navy in both themes.
+3. Nav/chrome: light mode uses `--nav-bg` white, dark mode charcoal `#0e1016`.
 4. New status/priority/category colours go in the central maps, not inline.
+5. Remember the palette can be re-branded at runtime — never assume the factory
+   hex at runtime; read the CSS vars.
