@@ -95,7 +95,7 @@ export function SuppliersTab({ data }: { data: EstateDashboardData }) {
                       <td className="px-2 text-[var(--text-muted)]">{Math.round(s.perf.firstTimeFixRate * 100)}%</td>
                       <td className="px-2 text-[var(--text-muted)]">{s.perf.assignedTickets ? Math.round(s.perf.repeatDefectInvolvement / s.perf.assignedTickets * 100) : 0}%</td>
                       <td className="px-2 text-[var(--text-muted)] whitespace-nowrap">{fmtK(s.costExposure)}</td><td className="px-2 text-[var(--text-muted)]">{s.perf.escalationCount}</td>
-                      <td className="px-2"><span className={`text-[11px] px-2 py-1 rounded-lg ring-1 ${s.perf.band === 'controlled' ? 'text-[var(--text-muted)] ring-white/10' : 'text-[#f59e0b] ring-[#f59e0b]/40'}`}>{s.perf.band === 'controlled' ? 'Monitor' : 'Review'}</span></td>
+                      <td className="px-2"><span className={`text-[11px] px-2 py-1 rounded-lg ring-1 ${s.perf.band === 'controlled' ? 'text-[var(--text-muted)] ring-black/10 dark:ring-white/10' : 'text-[#f59e0b] ring-[#f59e0b]/40'}`}>{s.perf.band === 'controlled' ? 'Monitor' : 'Review'}</span></td>
                     </tr>
                   ))}
                   {!shown.length && <tr><td colSpan={14} className="py-6 text-center text-[var(--text-faint)]">No suppliers match this filter.</td></tr>}
@@ -120,7 +120,7 @@ export function SuppliersTab({ data }: { data: EstateDashboardData }) {
               {topCost.map((s, i) => (
                 <div key={s.id} className="py-1.5">
                   <div className="flex justify-between text-xs mb-1"><span className="text-[var(--text-muted)]">{i + 1}. {s.name}</span><span className="text-[var(--text-muted)]">{fmtK(s.costExposure)}</span></div>
-                  <div className="h-2 rounded-full bg-white/10 overflow-hidden"><div className="h-full bg-[#f59e0b]" style={{ width: `${(s.costExposure / maxCost) * 100}%` }} /></div>
+                  <div className="h-2 rounded-full bg-black/10 dark:bg-white/10 overflow-hidden"><div className="h-full bg-[#f59e0b]" style={{ width: `${(s.costExposure / maxCost) * 100}%` }} /></div>
                 </div>
               ))}
               {!topCost.length && <p className="text-sm text-[var(--text-faint)]">No exposure.</p>}
@@ -190,7 +190,7 @@ function Bucket({ color, label, n, total }: { color: string; label: string; n: n
   return (
     <div className="flex items-center gap-3">
       <span className={`w-2.5 h-2.5 rounded-full ${color}`} /><span className="text-[var(--text-muted)] w-20">{label}</span>
-      <span className="flex-1 h-2 rounded-full bg-white/10 overflow-hidden"><span className={`block h-full ${color}`} style={{ width: `${total ? (n / total) * 100 : 0}%` }} /></span>
+      <span className="flex-1 h-2 rounded-full bg-black/10 dark:bg-white/10 overflow-hidden"><span className={`block h-full ${color}`} style={{ width: `${total ? (n / total) * 100 : 0}%` }} /></span>
       <span className="text-[var(--text)] w-8 text-right">{n}</span>
     </div>
   )
@@ -202,9 +202,9 @@ function SupplierDetail({ s, onClose }: { s: Supplier; onClose?: () => void }) {
     <div className="space-y-4">
       <DrawerHeader onClose={onClose} title={<div className="flex items-center gap-2 flex-wrap"><h3 className="text-lg font-bold text-[var(--text)]">{s.name}</h3><Pill status={s.perf.band} /></div>} />
       <div className="grid grid-cols-3 gap-2 text-center">
-        <div className="rounded-lg bg-white/5 px-2 py-2"><div className="text-[10px] text-[var(--text-faint)]">Open</div><div className="text-sm font-semibold text-[var(--text)]">{s.open}</div></div>
-        <div className="rounded-lg bg-white/5 px-2 py-2"><div className="text-[10px] text-[var(--text-faint)]">Overdue</div><div className="text-sm font-semibold text-red-400">{s.overdue}</div></div>
-        <div className="rounded-lg bg-white/5 px-2 py-2"><div className="text-[10px] text-[var(--text-faint)]">Cost</div><div className="text-sm font-semibold text-[var(--text)]">{fmtK(s.costExposure)}</div></div>
+        <div className="rounded-lg bg-black/[0.04] dark:bg-white/5 px-2 py-2"><div className="text-[10px] text-[var(--text-faint)]">Open</div><div className="text-sm font-semibold text-[var(--text)]">{s.open}</div></div>
+        <div className="rounded-lg bg-black/[0.04] dark:bg-white/5 px-2 py-2"><div className="text-[10px] text-[var(--text-faint)]">Overdue</div><div className="text-sm font-semibold text-red-400">{s.overdue}</div></div>
+        <div className="rounded-lg bg-black/[0.04] dark:bg-white/5 px-2 py-2"><div className="text-[10px] text-[var(--text-faint)]">Cost</div><div className="text-sm font-semibold text-[var(--text)]">{fmtK(s.costExposure)}</div></div>
       </div>
       <div>
         <div className="text-xs font-semibold text-[var(--text-muted)] mb-3">SLA Breakdown</div>

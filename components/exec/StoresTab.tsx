@@ -113,7 +113,7 @@ export function StoresTab({ data, initialStatus = 'all' }: { data: EstateDashboa
                       <td className="px-2 text-[var(--text-muted)]">{s.openTickets}</td><td className="px-2 text-red-400">{s.overdueTickets}</td>
                       <td className="px-2 text-[var(--text-muted)]">{s.pendingDecisions}</td><td className="px-2 text-[var(--text-muted)] whitespace-nowrap">{fmtK(s.costExposure)}</td>
                       <td className="px-2 text-xs text-[var(--text-muted)] max-w-[200px] truncate">{s.mainIssue}</td>
-                      <td className="px-2"><span className={`text-[11px] px-2 py-1 rounded-lg ring-1 ${s.finalStatus === 'controlled' ? 'text-[var(--text-muted)] ring-white/10' : 'text-[#f59e0b] ring-[#f59e0b]/40'}`}>{s.finalStatus === 'controlled' ? 'Monitor' : 'Review'}</span></td>
+                      <td className="px-2"><span className={`text-[11px] px-2 py-1 rounded-lg ring-1 ${s.finalStatus === 'controlled' ? 'text-[var(--text-muted)] ring-black/10 dark:ring-white/10' : 'text-[#f59e0b] ring-[#f59e0b]/40'}`}>{s.finalStatus === 'controlled' ? 'Monitor' : 'Review'}</span></td>
                     </tr>
                   ))}
                   {!shown.length && <tr><td colSpan={12} className="py-6 text-center text-[var(--text-faint)]">No stores match this filter.</td></tr>}
@@ -147,11 +147,11 @@ export function StoresTab({ data, initialStatus = 'all' }: { data: EstateDashboa
 }
 
 function Perf({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
-  return <div className="flex items-center gap-3 py-2 border-b border-[var(--border)] last:border-0"><span className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">{icon}</span><div className="min-w-0"><div className="text-[11px] text-[var(--text-faint)]">{label}</div><div className="text-sm text-[var(--text)] truncate">{value}</div></div></div>
+  return <div className="flex items-center gap-3 py-2 border-b border-[var(--border)] last:border-0"><span className="w-8 h-8 rounded-lg bg-black/[0.04] dark:bg-white/5 flex items-center justify-center shrink-0">{icon}</span><div className="min-w-0"><div className="text-[11px] text-[var(--text-faint)]">{label}</div><div className="text-sm text-[var(--text)] truncate">{value}</div></div></div>
 }
 
 function Snap({ label, value, bad }: { label: string; value: React.ReactNode; bad?: boolean }) {
-  return <div className="rounded-lg bg-white/5 px-3 py-2"><div className="text-[10px] text-[var(--text-faint)]">{label}</div><div className={`text-sm font-semibold ${bad ? 'text-red-400' : 'text-[var(--text)]'}`}>{value}</div></div>
+  return <div className="rounded-lg bg-black/[0.04] dark:bg-white/5 px-3 py-2"><div className="text-[10px] text-[var(--text-faint)]">{label}</div><div className={`text-sm font-semibold ${bad ? 'text-red-400' : 'text-[var(--text)]'}`}>{value}</div></div>
 }
 
 function StoreDetail({ s, onClose }: { s: StoreCard; onClose?: () => void }) {
