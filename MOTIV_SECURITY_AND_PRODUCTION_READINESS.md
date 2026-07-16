@@ -11,20 +11,20 @@
 - **Updated:** 2026-07-15
 - **Commit reviewed:** `561406b` · **Branch:** `road-to-9.5` · **Environment:** repository (dev); migrations reported applied to live by owner
 - **Method:** 10-agent parallel code review + 3-lens adversarial verification of every critical/high security finding (each survived ≥2 of 3 skeptics). Plus manual re-verification of the account-takeover finding against schema, grants and triggers.
-- **Overall production-readiness score: 4.0 / 10** (raw weighted 5.3, **capped to 4.0** by a confirmed cross-tenant vulnerability + open criticals — see §21). **Target: 9.5.**
-- **Recommendation: 🔴 NOT READY — do not launch to real/commercial users until the P0/P1 blockers below are fixed and verified.**
+- **Overall production-readiness score: 7.0 / 10** (was 4.0 — the confirmed-cross-tenant + open-critical caps have **lifted** now that SEC-001/002/003/004/005/006 are VERIFIED-closed on prod. Raw weighted ≈7.15, **now capped to 7.0** by "no verified backup/restore" + limited tenant-isolation tests — see §21). **Target: 9.5.**
+- **Recommendation: 🟡 READY WITH CONDITIONS — the exploitable security holes are closed + verified. Before real/commercial customers: DB backups (OPS-001), owner auth-hardening (OPS-003), legal/POPIA (OPS-005/006).**
 
 | Dimension | Score | Note |
 |---|---:|---|
-| Application security | 4.0 | 2 open criticals (privilege escalation, RLS self-complete) |
-| Authorization & tenant isolation | 3.5 | confirmed cross-tenant supplier-directory leak + self-escalation |
-| Database security & integrity | 5.0 | RLS WITH-CHECK family holes; missing FKs/CHECKs/indexes; strong SECURITY DEFINER + deny-all |
-| Authentication & sessions | 8.0 | signup clamp, HMAC tokens, open-redirect guard; minor user-enumeration |
-| Reliability & recovery | 5.5 | **no DB backups**; non-atomic multi-writes |
+| Application security | 7.5 | criticals closed + VERIFIED + deployed; residual mediums fixed |
+| Authorization & tenant isolation | 7.5 | escalation + cross-tenant leak closed/verified; a few mediums deployed |
+| Database security & integrity | 7.0 | RLS hardened + folded; FK migration pending apply |
+| Authentication & sessions | 8.0 | signup clamp, HMAC tokens, open-redirect guard, consent gate |
+| Reliability & recovery | 5.5 | **no DB backups** (paid); non-atomic multi-writes (SEC-038) |
 | Infrastructure & deployment | 7.0 | strong CI/CSP/headers; no backups/monitoring drain |
 | Code quality & maintainability | 7.5 | centralised labels/workflow engine; a few god-components |
-| Testing & CI/CD | 7.0 | 354 tests + blocking CI; **no tenant-isolation/RLS tests** |
-| Privacy & operational readiness | 5.0 | PII in logs; POPIA officer + consent pending |
+| Testing & CI/CD | 7.0 | 366 tests + blocking CI + some tenant tests; suite not yet comprehensive |
+| Privacy & operational readiness | 6.5 | PII logs fixed, consent gate added; POPIA officer + legal copy pending |
 
 **Findings by severity (code review):** 🔴 2 critical · 🟠 4 high · 🟡 19 medium · 🔵 17 low · ⚪ 7 info (+ 8 owner/ops items). **Verified real (adversarial):** 5/5 critical+high security findings CONFIRMED (0 refuted).
 
@@ -588,6 +588,10 @@ _None accepted yet. Claude may recommend acceptance; only the owner may accept a
 | EV-8 | Owner audit | escalation-audit query returned only legitimate system_admins (0 unexpected) — dev + prod | SQL Editor screenshot | SEC-001 | 2026-07-16 |
 
 **SEC-001, SEC-002, SEC-004, SEC-006 → `VERIFIED`** (2026-07-16) on the strength of EV-6/7/8: the browser write policies are provably absent and the role/company-freeze trigger is provably present on prod, and the escalation audit is clean. SEC-011/012/013/046/047 were applied by the same migration (still `READY FOR VERIFICATION` — a one-line `pg_policies` query on those tables would close them).
+
+| EV-9 | Owner live-DB verify | `GET /api/suppliers` as a null-company supplier on prod → **403 Forbidden** (was: every tenant's directory). **SEC-003, SEC-005 → `VERIFIED`** | browser-console screenshot | SEC-003/005 | 2026-07-16 |
+
+**All six criticals/highs (SEC-001…006) are now VERIFIED-closed on prod** → the two score caps (confirmed cross-tenant vuln, open critical) are lifted; overall moves 4.0 → 7.0.
 
 ---
 
