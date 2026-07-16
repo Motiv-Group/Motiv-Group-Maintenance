@@ -138,13 +138,14 @@ export default function LoginPage() {
   }
 
   return (
-    <AuthShell logoHeight={186} maxWidth="md">
-      <h1 className="text-xl sm:text-2xl font-semibold text-white mb-1">Welcome back</h1>
-      <p className="text-sm text-gray-300 mb-6">Sign in to continue to your workspace.</p>
+    <AuthShell logoHeight={152} cardMaxWidth={410}>
+      <h1 className="text-[25px] font-semibold leading-tight text-white mb-1.5">Welcome back</h1>
+      <p className="text-[13.5px] text-gray-400 mb-5">Sign in to continue to your workspace.</p>
 
       {/* Clearing the error on any field change keeps it from lingering while the
-          user corrects their details. */}
-      <form onSubmit={handleSubmit(onSubmit)} onChange={() => { if (error) setError('') }} className="space-y-3">
+          user corrects their details. Fields carry their own message rows, so the
+          form gap is tight — the premium rhythm comes from the per-element margins. */}
+      <form onSubmit={handleSubmit(onSubmit)} onChange={() => { if (error) setError('') }} className="space-y-1.5">
         <Input
           id="email"
           type="email"
@@ -168,10 +169,10 @@ export default function LoginPage() {
           {...register('password', { required: 'Password is required' })}
         />
 
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between pt-0.5">
           {/* Custom checkbox — matches the button radius + brand blue instead of
               the browser-default control. */}
-          <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer select-none">
+          <label className="flex items-center gap-2 text-[13px] text-gray-200 cursor-pointer select-none">
             <span className="relative inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center">
               <input
                 type="checkbox"
@@ -184,26 +185,26 @@ export default function LoginPage() {
             </span>
             Remember me
           </label>
-          <Link href="/auth/forgot-password" className="text-sm text-blue-400 hover:text-blue-300 hover:underline">
+          <Link href="/auth/forgot-password" className="text-[13px] text-blue-400 hover:text-blue-300 hover:underline">
             Forgot password?
           </Link>
         </div>
 
-        <Turnstile key={captchaKey} onToken={setCaptchaToken} />
+        <div className="pt-1"><Turnstile key={captchaKey} onToken={setCaptchaToken} /></div>
 
         <AuthError message={error} />
 
         {/* Always clickable — required-field validation runs on submit. Gating on
             react-hook-form isValid left the button stuck disabled when the browser
             auto-filled the fields (e.g. after logout), which RHF never sees. */}
-        <Button type="submit" variant="gold" loading={loading} size="lg" className="w-full">
+        <Button type="submit" variant="gold" loading={loading} className="w-full h-12 rounded-[10px] text-[14px] mt-1">
           Log in
         </Button>
       </form>
 
-      <p className="mt-5 text-center text-sm text-gray-400">
+      <p className="mt-[18px] text-center text-[13px] text-gray-300">
         New to MOTIV?{' '}
-        <Link href="/auth/signup" className="text-blue-400 hover:text-blue-300 hover:underline font-medium">
+        <Link href="/auth/signup" className="font-semibold text-blue-300 hover:text-blue-200 hover:underline">
           Create an account
         </Link>
       </p>

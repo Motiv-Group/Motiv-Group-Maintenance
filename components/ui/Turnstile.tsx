@@ -78,5 +78,8 @@ export function Turnstile({ onToken }: { onToken: (token: string | null) => void
   }, [])
 
   if (!SITE_KEY) return null
-  return <div ref={boxRef} className="my-1 min-h-[65px]" />
+  // No reserved height: Cloudflare's Managed widget passes invisibly most of the
+  // time (just a hidden token input, ~0px tall), so it shouldn't leave a grey
+  // block dominating the card. `empty:hidden` collapses it before it renders.
+  return <div ref={boxRef} className="empty:hidden" />
 }
