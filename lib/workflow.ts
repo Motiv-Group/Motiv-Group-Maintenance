@@ -108,9 +108,13 @@ export const TRANSITIONS: Record<TicketStatus, Transition[]> = {
     { action: 'submit_quote', label: 'Submit quote', to: 'quoted', roles: ['supplier'] },
   ],
   quoted: [
-    { action: 'approve_quote',   label: 'Approve quote',  to: 'accepted',       roles: ['regional_manager', 'individual'] },
+    // SEC-018: quote APPROVE / DECLINE go through /api/tickets/[id]/quote-decision
+    // ONLY — it awards a single supplier + closes the other invites + sets supplier_id.
+    // The old engine actions approve_quote/reject_quote were a divergent second path
+    // (marked ALL pending quotes accepted, never set supplier_id, left invites open)
+    // and were unreachable from the UI — removed. 'request_revision' (ask for a fresh
+    // quote) stays as a plain transition.
     { action: 'request_revision',label: 'Request revision',to: 'quote_revision', roles: ['regional_manager', 'individual'] },
-    { action: 'reject_quote',    label: 'Reject quote',   to: 'declined',       roles: ['regional_manager', 'individual'] },
   ],
   quote_revision: [
     { action: 'submit_quote', label: 'Resubmit quote', to: 'quoted', roles: ['supplier'] },
