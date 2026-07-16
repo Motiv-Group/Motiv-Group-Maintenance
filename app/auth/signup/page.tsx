@@ -17,6 +17,10 @@ import { User, Truck, Mail, ArrowRight, Check } from 'lucide-react'
 // Store Managers, Regional Managers and Executives are invited by an admin.
 type Choice = 'individual' | 'supplier'
 
+// POPIA (OPS-006): the version of the privacy/terms the user agreed to at signup.
+// Bump this when the legal copy changes so a re-consent can be required later.
+const CONSENT_VERSION = '2026-07'
+
 interface SignupForm {
   full_name: string
   email:     string
@@ -24,6 +28,7 @@ interface SignupForm {
   address:   string
   password:  string
   confirm_password: string
+  consent:   boolean
 }
 
 export default function SignupPage() {
@@ -62,6 +67,9 @@ export default function SignupPage() {
           sub_store: null,
           branch_code: null,
           role: 'individual',
+          // POPIA (OPS-006): record affirmative consent + version at signup.
+          consent_version: CONSENT_VERSION,
+          consent_accepted_at: new Date().toISOString(),
         },
       },
     })
@@ -164,6 +172,17 @@ export default function SignupPage() {
               </li>
             ))}
           </ul>
+
+          {/* POPIA consent — required; gates the submit button (isValid). */}
+          <label className="flex items-start gap-2.5 text-[13px] leading-snug text-gray-300 mt-1">
+            <input type="checkbox" className="mt-0.5 h-4 w-4 shrink-0 accent-emerald-600"
+              {...register('consent', { required: true })} />
+            <span>
+              I agree to the{' '}
+              <Link href="/privacy" target="_blank" className="text-blue-400 hover:text-blue-300 hover:underline">Privacy Policy</Link>{' '}and{' '}
+              <Link href="/terms" target="_blank" className="text-blue-400 hover:text-blue-300 hover:underline">Terms of Service</Link>, and consent to Motiv processing my personal information to provide the service.
+            </span>
+          </label>
 
           <AuthError message={error} />
 
