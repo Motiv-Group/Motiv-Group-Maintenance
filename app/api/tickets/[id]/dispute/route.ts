@@ -160,9 +160,11 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   // The dispute has two sides: the supplier, and the "resolver / client". The
   // resolver is the RM/executive — or, on a standalone Individual ticket, the
   // owner themselves (they play the resolver role).
+  // SEC-045: executive is read-only — it can VIEW a dispute (GET) but not raise/
+  // resolve/post to one. The resolver side is the RM, or the Individual owner.
   const actingRole: 'supplier' | 'regional_manager' | null =
     role === 'supplier' ? 'supplier'
-    : (role === 'regional_manager' || role === 'executive' || isIndividual) ? 'regional_manager'
+    : (role === 'regional_manager' || isIndividual) ? 'regional_manager'
     : null
   if (!actingRole) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 

@@ -42,7 +42,7 @@
       "evidence": "schema.sql:1741 `create policy \"own profile update\" on public.user_profiles for update using ((id = auth.uid()));` (no with check). grant file:24 `grant select, insert, update, delete on all tables in schema public to authenticated;`. app_role() schema.sql:1170 `select role from public.user_profiles where id = auth.uid();`.",
       "rootCause": "UPDATE policy relies on the implicit WITH CHECK=USING, but USING pins only the row identity (id), not the mutable privileged columns, so column-level tampering passes.",
       "requiredSecureOutcome": "A non-privileged user must be unable to change their own role or company_id; role/tenant changes may only occur via trusted service-role paths.",
-      "fixApproach": "Add an explicit WITH CHECK to the update policy that freezes privileged columns, e.g. WITH CHECK (id = auth.uid() AND role = (select role from public.user_profiles where id = auth.uid()) AND company_id IS NOT DISTINCT FROM (select company_id from public.user_profiles where id = auth.uid())); OR, more robustly, add a BEFORE UPDATE trigger on user_profiles that rejects any change to role/company_id unless the session is service_role, and narrow the authenticated UPDATE grant to a column list excluding role/company_id. Claude can write the migration + fold into schema.sql (FABLE); OWNER must apply it to live AND immediately audit `select id,email,role,company_id from user_profiles where role in ('system_admin','executive')` for any already-escalated accounts.",
+      "fixApproach": "Add an explicit WITH CHECK to the update policy that freezes privileged columns, e.g. WITH CHECK (id = auth.uid() AND role = (select role from public.user_profiles where id = auth.uid()) AND company_id IS NOT DISTINCT FROM (select company_id from public.user_profiles where id = auth.uid())); OR, more robustly, add a BEFORE UPDATE trigger on user_profiles that rejects any change to role/company_id unless the session is service_role, and narrow the authenticated UPDATE grant to a column list excluding role/company_id. Claude can write the migration + fold into schema.sql (CLAUDE); OWNER must apply it to live AND immediately audit `select id,email,role,company_id from user_profiles where role in ('system_admin','executive')` for any already-escalated accounts.",
       "testsRequired": [
         "As a freshly signed-up individual, PATCH own user_profiles role->system_admin via PostgREST and assert 403/no-op",
         "Assert store_manager cannot change own company_id",
@@ -92,7 +92,7 @@
       "category": "tenant-isolation",
       "severity": "high",
       "confidence": "confirmed",
-      "owner": "FABLE",
+      "owner": "CLAUDE",
       "productionBlocker": true,
       "files": [
         "app/api/suppliers/route.ts"
@@ -121,7 +121,7 @@
       "category": "business-logic",
       "severity": "high",
       "confidence": "confirmed",
-      "owner": "FABLE",
+      "owner": "CLAUDE",
       "productionBlocker": true,
       "files": [
         "supabase/schema.sql"
@@ -151,7 +151,7 @@
       "category": "tenant-isolation",
       "severity": "high",
       "confidence": "confirmed",
-      "owner": "FABLE",
+      "owner": "CLAUDE",
       "productionBlocker": true,
       "files": [
         "app/api/suppliers/route.ts"
@@ -210,7 +210,7 @@
       "category": "authorization",
       "severity": "medium",
       "confidence": "likely",
-      "owner": "FABLE",
+      "owner": "CLAUDE",
       "productionBlocker": false,
       "files": [
         "app/api/tickets/[id]/transition/route.ts"
@@ -240,7 +240,7 @@
       "category": "tenant-isolation",
       "severity": "medium",
       "confidence": "likely",
-      "owner": "FABLE",
+      "owner": "CLAUDE",
       "productionBlocker": false,
       "files": [
         "app/api/tickets/[id]/transition/route.ts",
@@ -270,7 +270,7 @@
       "category": "tenant-isolation",
       "severity": "medium",
       "confidence": "confirmed",
-      "owner": "FABLE",
+      "owner": "CLAUDE",
       "productionBlocker": false,
       "files": [
         "app/api/suppliers/route.ts"
@@ -299,7 +299,7 @@
       "category": "tenant-isolation",
       "severity": "medium",
       "confidence": "confirmed",
-      "owner": "FABLE",
+      "owner": "CLAUDE",
       "productionBlocker": false,
       "files": [
         "app/api/suppliers/bulk/route.ts"
@@ -327,7 +327,7 @@
       "category": "authorization",
       "severity": "medium",
       "confidence": "confirmed",
-      "owner": "FABLE",
+      "owner": "CLAUDE",
       "productionBlocker": true,
       "files": [
         "supabase/schema.sql"
@@ -356,7 +356,7 @@
       "category": "authorization",
       "severity": "medium",
       "confidence": "confirmed",
-      "owner": "FABLE",
+      "owner": "CLAUDE",
       "productionBlocker": true,
       "files": [
         "supabase/schema.sql"
@@ -386,7 +386,7 @@
       "category": "input-validation",
       "severity": "medium",
       "confidence": "confirmed",
-      "owner": "FABLE",
+      "owner": "CLAUDE",
       "productionBlocker": false,
       "files": [
         "supabase/schema.sql"
@@ -434,7 +434,7 @@
       "verified": false,
       "verifiedConfirmed": null,
       "verifiedVotes": "",
-      "status": "NOT STARTED"
+      "status": "FIX IMPLEMENTED"
     },
     {
       "id": "SEC-015",
@@ -442,7 +442,7 @@
       "category": "tenant-isolation",
       "severity": "medium",
       "confidence": "confirmed",
-      "owner": "FABLE",
+      "owner": "CLAUDE",
       "productionBlocker": false,
       "files": [
         "app/api/suppliers/route.ts",
@@ -472,7 +472,7 @@
       "category": "authorization",
       "severity": "medium",
       "confidence": "architectural-risk",
-      "owner": "FABLE",
+      "owner": "CLAUDE",
       "productionBlocker": false,
       "files": [
         "app/api/tickets/[id]/transition/route.ts",
@@ -503,7 +503,7 @@
       "category": "input-validation",
       "severity": "medium",
       "confidence": "confirmed",
-      "owner": "FABLE",
+      "owner": "CLAUDE",
       "productionBlocker": false,
       "files": [
         "app/api/tickets/[id]/transition/route.ts",
@@ -533,7 +533,7 @@
       "category": "business-logic",
       "severity": "medium",
       "confidence": "architectural-risk",
-      "owner": "FABLE",
+      "owner": "CLAUDE",
       "productionBlocker": false,
       "files": [
         "app/api/tickets/[id]/transition/route.ts",
@@ -564,7 +564,7 @@
       "category": "db-integrity",
       "severity": "medium",
       "confidence": "confirmed",
-      "owner": "FABLE",
+      "owner": "CLAUDE",
       "productionBlocker": false,
       "files": [
         "supabase/schema.sql"
@@ -590,7 +590,7 @@
       "category": "db-integrity",
       "severity": "medium",
       "confidence": "confirmed",
-      "owner": "FABLE",
+      "owner": "CLAUDE",
       "productionBlocker": false,
       "files": [
         "supabase/schema.sql"
@@ -616,7 +616,7 @@
       "category": "tenant-isolation",
       "severity": "medium",
       "confidence": "confirmed",
-      "owner": "FABLE",
+      "owner": "CLAUDE",
       "productionBlocker": false,
       "files": [
         "supabase/schema.sql"
@@ -642,7 +642,7 @@
       "category": "db-integrity",
       "severity": "medium",
       "confidence": "config-weakness",
-      "owner": "FABLE",
+      "owner": "CLAUDE",
       "productionBlocker": false,
       "files": [
         "supabase/schema.sql"
@@ -680,7 +680,7 @@
       "evidence": "The only explicit tickets index is tickets_created_by_idx (schema.sql:1346). No index on company_id/store_id/region_id/supplier_id/status is declared. quotes has no ticket_id index declared, yet the quotes read policy (1517) and every quote fetch filter on ticket_id. notifications has notifications_user_archived_idx (user_id, archived_at, created_at) (1356) but not (user_id, read) used by unread counts. Postgres does NOT auto-index FK columns. The schema header (schema.sql:9-12) states secondary indexes are NOT captured, so live cannot be confirmed from this file.",
       "rootCause": "",
       "requiredSecureOutcome": "",
-      "fixApproach": "OWNER: run `select indexname, indexdef from pg_indexes where schemaname='public' and tablename in ('tickets','quotes','notifications')` on live and paste back. FABLE: add any missing btree indexes — tickets(company_id), tickets(store_id), tickets(region_id), tickets(supplier_id), tickets(status), quotes(ticket_id), notifications(user_id, read) — and fold them into schema.sql.",
+      "fixApproach": "OWNER: run `select indexname, indexdef from pg_indexes where schemaname='public' and tablename in ('tickets','quotes','notifications')` on live and paste back. CLAUDE: add any missing btree indexes — tickets(company_id), tickets(store_id), tickets(region_id), tickets(supplier_id), tickets(status), quotes(ticket_id), notifications(user_id, read) — and fold them into schema.sql.",
       "testsRequired": [],
       "scoreImpact": "",
       "verified": false,
@@ -712,7 +712,7 @@
       "verified": false,
       "verifiedConfirmed": null,
       "verifiedVotes": "",
-      "status": "NOT STARTED"
+      "status": "RISK ACCEPTED"
     },
     {
       "id": "SEC-025",
@@ -720,7 +720,7 @@
       "category": "privacy",
       "severity": "medium",
       "confidence": "confirmed",
-      "owner": "FABLE",
+      "owner": "CLAUDE",
       "productionBlocker": false,
       "files": [
         "app/api/webhooks/whatsapp/route.ts"
@@ -746,7 +746,7 @@
       "category": "tenant-isolation",
       "severity": "low",
       "confidence": "confirmed",
-      "owner": "FABLE",
+      "owner": "CLAUDE",
       "productionBlocker": false,
       "files": [
         "app/api/tickets/[id]/view/route.ts"
@@ -774,7 +774,7 @@
       "category": "tenant-isolation",
       "severity": "low",
       "confidence": "confirmed",
-      "owner": "FABLE",
+      "owner": "CLAUDE",
       "productionBlocker": false,
       "files": [
         "app/api/tickets/[id]/seen/route.ts"
@@ -802,7 +802,7 @@
       "category": "user-enumeration",
       "severity": "low",
       "confidence": "likely",
-      "owner": "FABLE",
+      "owner": "CLAUDE",
       "productionBlocker": false,
       "files": [
         "app/api/supplier/onboard/route.ts"
@@ -828,7 +828,7 @@
       "category": "business-logic",
       "severity": "low",
       "confidence": "likely",
-      "owner": "FABLE",
+      "owner": "CLAUDE",
       "productionBlocker": false,
       "files": [
         "app/api/supplier/assign-rm/route.ts"
@@ -854,7 +854,7 @@
       "category": "storage",
       "severity": "low",
       "confidence": "config-weakness",
-      "owner": "FABLE",
+      "owner": "CLAUDE",
       "productionBlocker": false,
       "files": [
         "supabase/schema.sql"
@@ -882,7 +882,7 @@
       "category": "authorization",
       "severity": "low",
       "confidence": "missing-control",
-      "owner": "FABLE",
+      "owner": "CLAUDE",
       "productionBlocker": false,
       "files": [
         "app/api/tickets/[id]/transition/route.ts"
@@ -910,7 +910,7 @@
       "category": "business-logic",
       "severity": "low",
       "confidence": "architectural-risk",
-      "owner": "FABLE",
+      "owner": "CLAUDE",
       "productionBlocker": false,
       "files": [
         "app/api/supplier/ticket-action/route.ts"
@@ -938,7 +938,7 @@
       "category": "db-integrity",
       "severity": "low",
       "confidence": "confirmed",
-      "owner": "FABLE",
+      "owner": "CLAUDE",
       "productionBlocker": false,
       "files": [
         "supabase/schema.sql",
@@ -968,7 +968,7 @@
       "category": "evidence-integrity",
       "severity": "low",
       "confidence": "confirmed",
-      "owner": "FABLE",
+      "owner": "CLAUDE",
       "productionBlocker": false,
       "files": [
         "app/api/supplier/ticket-action/route.ts",
@@ -997,7 +997,7 @@
       "category": "db-integrity",
       "severity": "low",
       "confidence": "confirmed",
-      "owner": "FABLE",
+      "owner": "CLAUDE",
       "productionBlocker": false,
       "files": [
         "supabase/schema.sql"
@@ -1023,7 +1023,7 @@
       "category": "reliability",
       "severity": "low",
       "confidence": "confirmed",
-      "owner": "FABLE",
+      "owner": "CLAUDE",
       "productionBlocker": false,
       "files": [
         "app/api/tickets/route.ts",
@@ -1062,7 +1062,7 @@
       "evidence": "Header at schema.sql:9-12: 'Secondary INDEXES and CHECK constraints are NOT captured here - run pg_dump --schema-only if you need a byte-perfect copy.' Combined with the grep showing zero table CHECKs and only ~12 explicit indexes in the file, the canonical mirror is by its own admission incomplete for exactly the two areas this review targets.",
       "rootCause": "",
       "requiredSecureOutcome": "",
-      "fixApproach": "OWNER: run `pg_dump --schema-only` (or the existing supabase/diagnostics/export_live_schema.sql) and share. FABLE: reconcile CHECKs + indexes into schema.sql so the mirror is authoritative, and update the header disclaimer once captured.",
+      "fixApproach": "OWNER: run `pg_dump --schema-only` (or the existing supabase/diagnostics/export_live_schema.sql) and share. CLAUDE: reconcile CHECKs + indexes into schema.sql so the mirror is authoritative, and update the header disclaimer once captured.",
       "testsRequired": [],
       "scoreImpact": "",
       "verified": false,
@@ -1076,7 +1076,7 @@
       "category": "monitoring",
       "severity": "low",
       "confidence": "confirmed",
-      "owner": "FABLE",
+      "owner": "CLAUDE",
       "productionBlocker": false,
       "files": [
         "instrumentation.ts",
@@ -1106,7 +1106,7 @@
       "category": "reliability",
       "severity": "low",
       "confidence": "confirmed",
-      "owner": "FABLE",
+      "owner": "CLAUDE",
       "productionBlocker": false,
       "files": [
         "vercel.json",
@@ -1190,7 +1190,7 @@
       "category": "monitoring",
       "severity": "low",
       "confidence": "likely",
-      "owner": "FABLE",
+      "owner": "CLAUDE",
       "productionBlocker": false,
       "files": [
         "app/api/csp-report/route.ts"
@@ -1247,7 +1247,7 @@
       "category": "privacy",
       "severity": "info",
       "confidence": "confirmed",
-      "owner": "FABLE",
+      "owner": "CLAUDE",
       "productionBlocker": false,
       "files": [
         "supabase/schema.sql"
@@ -1275,7 +1275,7 @@
       "category": "code-quality",
       "severity": "info",
       "confidence": "confirmed",
-      "owner": "FABLE",
+      "owner": "CLAUDE",
       "productionBlocker": false,
       "files": [
         "supabase/schema.sql"
@@ -1295,7 +1295,7 @@
       "verified": false,
       "verifiedConfirmed": null,
       "verifiedVotes": "",
-      "status": "NOT STARTED"
+      "status": "FIX IMPLEMENTED"
     },
     {
       "id": "SEC-046",
@@ -1303,7 +1303,7 @@
       "category": "business-logic",
       "severity": "info",
       "confidence": "confirmed",
-      "owner": "FABLE",
+      "owner": "CLAUDE",
       "productionBlocker": false,
       "files": [
         "supabase/schema.sql",
@@ -1332,7 +1332,7 @@
       "category": "business-logic",
       "severity": "info",
       "confidence": "confirmed",
-      "owner": "FABLE",
+      "owner": "CLAUDE",
       "productionBlocker": false,
       "files": [
         "lib/workflow.ts",
@@ -1386,7 +1386,7 @@
       "category": "secrets",
       "severity": "info",
       "confidence": "confirmed",
-      "owner": "FABLE",
+      "owner": "CLAUDE",
       "productionBlocker": false,
       "files": [
         "next.config.mjs",

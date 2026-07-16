@@ -86,31 +86,31 @@ export interface Transition {
 // become multiple transitions sharing a `from` status.
 export const TRANSITIONS: Record<TicketStatus, Transition[]> = {
   open: [
-    { action: 'validate',     label: 'Validate & assign', to: 'assigned',       roles: ['regional_manager', 'executive'] },
-    { action: 'request_info', label: 'Request more info',  to: 'info_requested', roles: ['regional_manager', 'executive'] },
-    { action: 'reject',       label: 'Reject / cancel',    to: 'cancelled',      roles: ['regional_manager', 'executive', 'individual'] },
+    { action: 'validate',     label: 'Validate & assign', to: 'assigned',       roles: ['regional_manager'] },
+    { action: 'request_info', label: 'Request more info',  to: 'info_requested', roles: ['regional_manager'] },
+    { action: 'reject',       label: 'Reject / cancel',    to: 'cancelled',      roles: ['regional_manager', 'individual'] },
   ],
   info_requested: [
     { action: 'resubmit', label: 'Resubmit request', to: 'open',       roles: ['store_manager'] },
-    { action: 'reject',   label: 'Cancel',           to: 'cancelled',  roles: ['regional_manager', 'executive'] },
+    { action: 'reject',   label: 'Cancel',           to: 'cancelled',  roles: ['regional_manager'] },
   ],
   assigned: [
     { action: 'require_assessment', label: 'Send for assessment', to: 'assessment',      roles: ['regional_manager', 'supplier'] },
     { action: 'request_quote',      label: 'Request quote',       to: 'quote_requested', roles: ['regional_manager', 'supplier'] },
-    { action: 'proceed_no_quote',   label: 'Proceed (no quote)',  to: 'accepted',        roles: ['regional_manager', 'executive'] },
-    { action: 'reject',             label: 'Cancel',              to: 'cancelled',       roles: ['regional_manager', 'executive'] },
+    { action: 'proceed_no_quote',   label: 'Proceed (no quote)',  to: 'accepted',        roles: ['regional_manager'] },
+    { action: 'reject',             label: 'Cancel',              to: 'cancelled',       roles: ['regional_manager'] },
   ],
   assessment: [
     { action: 'request_quote',    label: 'Request quote',      to: 'quote_requested', roles: ['regional_manager', 'supplier'] },
-    { action: 'proceed_no_quote', label: 'Proceed (no quote)', to: 'accepted',        roles: ['regional_manager', 'executive'] },
+    { action: 'proceed_no_quote', label: 'Proceed (no quote)', to: 'accepted',        roles: ['regional_manager'] },
   ],
   quote_requested: [
     { action: 'submit_quote', label: 'Submit quote', to: 'quoted', roles: ['supplier'] },
   ],
   quoted: [
-    { action: 'approve_quote',   label: 'Approve quote',  to: 'accepted',       roles: ['regional_manager', 'executive', 'individual'] },
-    { action: 'request_revision',label: 'Request revision',to: 'quote_revision', roles: ['regional_manager', 'executive', 'individual'] },
-    { action: 'reject_quote',    label: 'Reject quote',   to: 'declined',       roles: ['regional_manager', 'executive', 'individual'] },
+    { action: 'approve_quote',   label: 'Approve quote',  to: 'accepted',       roles: ['regional_manager', 'individual'] },
+    { action: 'request_revision',label: 'Request revision',to: 'quote_revision', roles: ['regional_manager', 'individual'] },
+    { action: 'reject_quote',    label: 'Reject quote',   to: 'declined',       roles: ['regional_manager', 'individual'] },
   ],
   quote_revision: [
     { action: 'submit_quote', label: 'Resubmit quote', to: 'quoted', roles: ['supplier'] },
@@ -121,7 +121,7 @@ export const TRANSITIONS: Record<TicketStatus, Transition[]> = {
     { action: 'start_work', label: 'Mark as In progress', to: 'in_progress', roles: ['supplier'] },
   ],
   scheduled: [
-    { action: 'accept_schedule',  label: 'Accept proposed time', to: 'scheduled',   roles: ['regional_manager', 'executive'] },
+    { action: 'accept_schedule',  label: 'Accept proposed time', to: 'scheduled',   roles: ['regional_manager'] },
     { action: 'start_work',       label: 'Mark as In progress',  to: 'in_progress', roles: ['supplier'] },
   ],
   in_progress: [
@@ -130,21 +130,21 @@ export const TRANSITIONS: Record<TicketStatus, Transition[]> = {
   variation_review: [
     // A VO is raised AFTER the COC/POC is approved. Approving it returns to the
     // close-out stage (raise more or the RM closes out); declining → vo_declined.
-    { action: 'approve_variation', label: 'Approve variation', to: 'approved_closeout', roles: ['regional_manager', 'executive', 'individual'] },
-    { action: 'reject_variation',  label: 'Reject variation',  to: 'vo_declined',       roles: ['regional_manager', 'executive', 'individual'] },
+    { action: 'approve_variation', label: 'Approve variation', to: 'approved_closeout', roles: ['regional_manager', 'individual'] },
+    { action: 'reject_variation',  label: 'Reject variation',  to: 'vo_declined',       roles: ['regional_manager', 'individual'] },
   ],
   vo_declined: [
     // Supplier re-submits a revised VO, or the RM finalises the close-out.
     { action: 'submit_variation', label: 'Re-submit Variation', to: 'variation_review', roles: ['supplier'] },
-    { action: 'close_out',        label: 'Final close-out',     to: 'completed',        roles: ['regional_manager', 'executive', 'individual'] },
+    { action: 'close_out',        label: 'Final close-out',     to: 'completed',        roles: ['regional_manager', 'individual'] },
   ],
   submitted_for_signoff: [
     // Approving the COC/POC no longer completes the ticket — it moves to the
     // close-out stage, where the supplier may raise a variation order before the
     // RM does the final close-out.
-    { action: 'approve',          label: 'Approve COC & POC',     to: 'approved_closeout',  roles: ['regional_manager', 'executive', 'individual'] },
-    { action: 'request_evidence', label: 'Request more evidence', to: 'evidence_requested', roles: ['regional_manager', 'executive', 'individual'] },
-    { action: 'raise_snag',       label: 'Raise snag',            to: 'snag',               roles: ['regional_manager', 'executive', 'individual'] },
+    { action: 'approve',          label: 'Approve COC & POC',     to: 'approved_closeout',  roles: ['regional_manager', 'individual'] },
+    { action: 'request_evidence', label: 'Request more evidence', to: 'evidence_requested', roles: ['regional_manager', 'individual'] },
+    { action: 'raise_snag',       label: 'Raise snag',            to: 'snag',               roles: ['regional_manager', 'individual'] },
   ],
   evidence_requested: [
     { action: 'submit_completion', label: 'Resubmit completion', to: 'submitted_for_signoff', roles: ['supplier'] },
@@ -153,8 +153,8 @@ export const TRANSITIONS: Record<TicketStatus, Transition[]> = {
     { action: 'accept_snag', label: 'Accept snag', to: 'snag_assigned', roles: ['supplier'] },
   ],
   snag_assigned: [
-    { action: 'approve_snag',          label: 'Approve snag schedule', to: 'snag_assigned',    roles: ['regional_manager', 'executive', 'individual'] },
-    { action: 'decline_snag_schedule', label: 'Decline snag schedule', to: 'snag',             roles: ['regional_manager', 'executive', 'individual'] },
+    { action: 'approve_snag',          label: 'Approve snag schedule', to: 'snag_assigned',    roles: ['regional_manager', 'individual'] },
+    { action: 'decline_snag_schedule', label: 'Decline snag schedule', to: 'snag',             roles: ['regional_manager', 'individual'] },
     { action: 'start_snag',            label: 'Snag in progress',      to: 'snag_in_progress', roles: ['supplier'] },
   ],
   snag_in_progress: [
@@ -167,12 +167,12 @@ export const TRANSITIONS: Record<TicketStatus, Transition[]> = {
     // COC/POC approved. The supplier can raise a variation order for extra work;
     // the RM does the final close-out.
     { action: 'submit_variation', label: 'Raise Variation', to: 'variation_review', roles: ['supplier'] },
-    { action: 'close_out',        label: 'Final close-out', to: 'completed',        roles: ['regional_manager', 'executive', 'individual'] },
+    { action: 'close_out',        label: 'Final close-out', to: 'completed',        roles: ['regional_manager', 'individual'] },
   ],
   // Every invited supplier declined — the RM re-assigns (via /assign, not a
   // workflow transition) or cancels the ticket.
   suppliers_declined: [
-    { action: 'reject', label: 'Cancel', to: 'cancelled', roles: ['regional_manager', 'executive'] },
+    { action: 'reject', label: 'Cancel', to: 'cancelled', roles: ['regional_manager'] },
   ],
   completed:  [],
   cancelled:  [],
