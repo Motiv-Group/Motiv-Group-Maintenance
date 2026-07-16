@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import * as Sentry from '@sentry/nextjs'
 
 /**
  * Log the real error server-side and return a GENERIC 500 to the client.
@@ -11,6 +12,9 @@ import { NextResponse } from 'next/server'
  */
 export function serverError(err: unknown, message = 'Something went wrong'): NextResponse {
   console.error('[api]', err)
+  // SEC-040: handled 500s must be visible in production, not just the ephemeral
+  // Vercel logs. captureException no-ops when Sentry is unconfigured (dev/no DSN).
+  Sentry.captureException(err)
   return NextResponse.json({ error: message }, { status: 500 })
 }
 
