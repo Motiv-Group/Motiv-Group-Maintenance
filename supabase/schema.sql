@@ -1054,6 +1054,17 @@ alter table public.user_profiles add foreign key (role) references public.roles(
 alter table public.user_profiles add foreign key (id) references auth.users(id) on delete cascade;
 alter table public.user_profiles add foreign key (company_id) references public.companies(id);
 
+-- FK hardening (20260718 / SEC-019/020/021): tickets/ratings/technicians were
+-- missing FKs (empty tables at apply time → no orphan risk). All nullable → set null.
+alter table public.tickets add foreign key (technician_id) references public.technicians(id) on delete set null;
+alter table public.tickets add foreign key (asset_id) references public.assets(id) on delete set null;
+alter table public.tickets add foreign key (assigned_user_id) references public.user_profiles(id) on delete set null;
+alter table public.ratings add foreign key (company_id) references public.companies(id) on delete set null;
+alter table public.ratings add foreign key (supplier_id) references public.suppliers(id) on delete set null;
+alter table public.ratings add foreign key (rated_by) references public.user_profiles(id) on delete set null;
+alter table public.technicians add foreign key (supplier_id) references public.suppliers(id) on delete set null;
+alter table public.technicians add foreign key (company_id) references public.companies(id) on delete set null;
+
 -- ---------------------------------------------------------------------------
 -- FUNCTIONS (RLS helpers + triggers)
 -- ---------------------------------------------------------------------------
@@ -1356,6 +1367,35 @@ create index if not exists verification_docs_supplier_idx on public.supplier_ver
 create index if not exists ticket_events_ticket_idx on public.ticket_events (ticket_id, created_at);
 -- Notifications archive/grouping (20260711).
 create index if not exists notifications_user_archived_idx on public.notifications (user_id, archived_at, created_at desc);
+
+-- FK / hot-path indexes — reconciled from live pg_indexes (2026-07-16, SEC-023/039)
+-- plus the FK migration (20260718). Previously present in prod but not recorded here.
+create index if not exists tickets_company_idx on public.tickets (company_id);
+create index if not exists tickets_store_idx on public.tickets (store_id);
+create index if not exists tickets_region_idx on public.tickets (region_id);
+create index if not exists tickets_supplier_idx on public.tickets (supplier_id);
+create index if not exists tickets_status_idx on public.tickets (status);
+create index if not exists tickets_technician_idx on public.tickets (technician_id);
+create index if not exists tickets_asset_idx on public.tickets (asset_id);
+create index if not exists tickets_assigned_user_idx on public.tickets (assigned_user_id);
+create index if not exists quotes_ticket_idx on public.quotes (ticket_id);
+create index if not exists signoffs_ticket_idx on public.signoffs (ticket_id);
+create index if not exists snags_company_idx on public.snags (company_id);
+create index if not exists notifications_user_idx on public.notifications (user_id, read);
+create unique index if not exists ticket_suppliers_ticket_id_supplier_id_key on public.ticket_suppliers (ticket_id, supplier_id);
+create index if not exists ticket_suppliers_ticket_idx on public.ticket_suppliers (ticket_id);
+create index if not exists ticket_suppliers_supplier_idx on public.ticket_suppliers (supplier_id);
+create index if not exists ratings_supplier_idx on public.ratings (supplier_id);
+create index if not exists ratings_company_idx on public.ratings (company_id);
+create index if not exists technicians_supplier_idx on public.technicians (supplier_id);
+create index if not exists technicians_company_idx on public.technicians (company_id);
+
+-- ---------------------------------------------------------------------------
+-- CHECK constraints (folded from 20260718 + ticket_chat). Bounded value sets only.
+-- ---------------------------------------------------------------------------
+alter table public.ratings add constraint ratings_score_chk check (score between 1 and 5);
+alter table public.ticket_chat_messages add constraint ticket_chat_messages_author_role_chk
+  check (author_role in ('regional_manager', 'supplier'));
 
 -- ---------------------------------------------------------------------------
 -- TRIGGERS
