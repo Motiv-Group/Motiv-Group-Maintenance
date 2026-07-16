@@ -564,6 +564,11 @@ _None accepted yet. Claude may recommend acceptance; only the owner may accept a
 | EV-3 | Manual verify | SEC-001 four-legs re-checked (policy+grant+trigger+role FK) | conversation transcript | SEC-001 | 2026-07-15 |
 | EV-4 | Build health | tsc/lint/354 tests/build green on `561406b` | local run | — | 2026-07-15 |
 | EV-5 | Control confirmed | project progress server-computed generated column | schema.sql:1871-1876 | SEC-048 | 2026-07-15 |
+| EV-6 | Owner live-DB verify | `pg_policies` on tickets/quotes/signoffs/ticket_variations shows SELECT + tickets-insert ONLY (no browser write policy) — prod | SQL Editor screenshot | SEC-002/004/006 | 2026-07-16 |
+| EV-7 | Owner live-DB verify | `pg_trigger` shows `trg_enforce_profile_privileged` on user_profiles — prod | SQL Editor screenshot | SEC-001 | 2026-07-16 |
+| EV-8 | Owner audit | escalation-audit query returned only legitimate system_admins (0 unexpected) — dev + prod | SQL Editor screenshot | SEC-001 | 2026-07-16 |
+
+**SEC-001, SEC-002, SEC-004, SEC-006 → `VERIFIED`** (2026-07-16) on the strength of EV-6/7/8: the browser write policies are provably absent and the role/company-freeze trigger is provably present on prod, and the escalation audit is clean. SEC-011/012/013/046/047 were applied by the same migration (still `READY FOR VERIFICATION` — a one-line `pg_policies` query on those tables would close them).
 
 ---
 

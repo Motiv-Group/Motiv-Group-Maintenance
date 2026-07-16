@@ -52,7 +52,7 @@
       "verified": true,
       "verifiedConfirmed": true,
       "verifiedVotes": "3/3",
-      "status": "READY FOR VERIFICATION"
+      "status": "VERIFIED"
     },
     {
       "id": "SEC-002",
@@ -84,7 +84,7 @@
       "verified": true,
       "verifiedConfirmed": true,
       "verifiedVotes": "3/3",
-      "status": "READY FOR VERIFICATION"
+      "status": "VERIFIED"
     },
     {
       "id": "SEC-003",
@@ -143,7 +143,7 @@
       "verified": false,
       "verifiedConfirmed": null,
       "verifiedVotes": "",
-      "status": "READY FOR VERIFICATION"
+      "status": "VERIFIED"
     },
     {
       "id": "SEC-005",
@@ -202,7 +202,7 @@
       "verified": true,
       "verifiedConfirmed": true,
       "verifiedVotes": "3/3",
-      "status": "READY FOR VERIFICATION"
+      "status": "VERIFIED"
     },
     {
       "id": "SEC-007",
