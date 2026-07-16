@@ -5,7 +5,9 @@ const config: CapacitorConfig = {
   appName: 'Motiv',
   webDir: 'out',
   server: {
-    url: 'https://motivgroup.co.za',
+    // The Android wrapper loads the deployed web app. Must match NEXT_PUBLIC_APP_URL
+    // + the Supabase Auth Site/redirect URLs. Rebuild + re-sign the APK after a change.
+    url: 'https://maintenance.motivgroup.co.za',
     cleartext: false,
   },
   android: {
