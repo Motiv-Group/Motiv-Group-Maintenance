@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { parseJsonBody } from '@/lib/validate'
 import { rateLimit } from '@/lib/rate-limit'
 import { supplierCtx } from '@/lib/supplier/ctx'
-import { signManyUrls } from '@/lib/storage'
+import { bucketAndPath, signManyUrls } from '@/lib/storage'
 
 const KINDS = ['cipc', 'vat_cert', 'insurance', 'qualification', 'other'] as const
 
@@ -45,7 +45,13 @@ export async function POST(request: Request) {
   const kind = String(b.kind ?? '')
   const url = String(b.url ?? '')
   if (!(KINDS as readonly string[]).includes(kind)) return NextResponse.json({ error: 'Invalid document type' }, { status: 400 })
-  if (!url || !url.includes('supplier-docs')) return NextResponse.json({ error: 'Invalid document reference' }, { status: 400 })
+  // The reference must resolve to the supplier-docs bucket AND to the caller's
+  // own folder (uploads are always stored under `${user.id}/…`) — otherwise a
+  // crafted reference could get another user's object signed on read-back.
+  const bp = url ? bucketAndPath(url) : null
+  if (!bp || bp.bucket !== 'supplier-docs' || !bp.path.startsWith(`${ctx.userId}/`)) {
+    return NextResponse.json({ error: 'Invalid document reference' }, { status: 400 })
+  }
 
   const { error } = await ctx.admin.from('supplier_verification_docs').insert({
     supplier_id: ctx.supplierIds[0], uploaded_by: ctx.userId, kind, url,

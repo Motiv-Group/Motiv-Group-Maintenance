@@ -28,7 +28,7 @@ export default async function AdminStoreDetailPage(props: { params: Promise<{ id
   const companyId = prof?.company_id ?? null
 
   // v3: the store lives on `stores`.
-  const [{ data: storeRow }, { data: tickets }] = await Promise.all([
+  const [{ data: storeRow }, { data: allTickets }, { data: supplierLinks }] = await Promise.all([
     admin
       .from('stores')
       .select('id, name, sub_store, branch_code, address, region_id, company_id')
@@ -36,13 +36,26 @@ export default async function AdminStoreDetailPage(props: { params: Promise<{ id
       .single(),
     admin
       .from('tickets')
-      .select('*, quotes(id, amount, status)')
+      .select('*')
       .eq('store_id', params.id)
       .order('created_at', { ascending: false }),
+    admin.from('supplier_users').select('supplier_id').eq('user_id', user!.id),
   ])
 
   // Tenant guard — the store must belong to the caller's company.
   if (!storeRow || !companyId || storeRow.company_id !== companyId) notFound()
+
+  // Suppliers compete: only show tickets this supplier was awarded or invited to
+  // quote on (mirrors the gate on the ticket detail page) — never the whole
+  // store history, which would leak other suppliers' work.
+  const supplierIds = (supplierLinks ?? []).map(l => l.supplier_id)
+  const { data: inviteRows } = supplierIds.length
+    ? await admin.from('ticket_suppliers').select('ticket_id').in('supplier_id', supplierIds)
+    : { data: [] as { ticket_id: string }[] }
+  const invitedIds = new Set((inviteRows ?? []).map(r => r.ticket_id))
+  const tickets = (allTickets ?? []).filter(
+    t => (t.supplier_id && supplierIds.includes(t.supplier_id)) || invitedIds.has(t.id)
+  )
 
   // Store-manager contact details live on user_profiles via the store_users link.
   const { data: smLink } = await admin
