@@ -23,7 +23,7 @@
 | Reliability & recovery | 5.5 | **no DB backups** (paid); non-atomic multi-writes (SEC-038) |
 | Infrastructure & deployment | 7.0 | strong CI/CSP/headers; no backups/monitoring drain |
 | Code quality & maintainability | 7.5 | centralised labels/workflow engine; a few god-components |
-| Testing & CI/CD | 7.0 | 366 tests + blocking CI + some tenant tests; suite not yet comprehensive |
+| Testing & CI/CD | 7.5 | 378 tests + blocking CI + a dedicated tenant-isolation suite; RLS-level still owner-verified |
 | Privacy & operational readiness | 6.5 | PII logs fixed, consent gate added; POPIA officer + legal copy pending |
 
 **Findings by severity (code review):** 🔴 2 critical · 🟠 4 high · 🟡 19 medium · 🔵 17 low · ⚪ 7 info (+ 8 owner/ops items). **Verified real (adversarial):** 5/5 critical+high security findings CONFIRMED (0 refuted).
@@ -86,7 +86,7 @@
 **D. Owner infra — split FREE-now vs PAID-later** (owner decided 2026-07-16: do the free-tier items now, defer paid-tier until upgrading).
 
 _Do NOW (free tier):_
-- [ ] **OPS-003 Auth hardening** (Supabase free supports all of these *except* leaked-password): redirect allowlist (no wildcards), Confirm-email ON, min-password ≥8 server-side, custom SMTP sender. **CAPTCHA: widget code is DONE + deployed-ready (Cloudflare Turnstile on login/signup/supplier-onboard, commit `c11c2c9`)** — owner enablement = (1) deploy the branch, (2) get free Turnstile keys, (3) set `NEXT_PUBLIC_TURNSTILE_SITE_KEY`+`TURNSTILE_SECRET_KEY` in Vercel + redeploy, (4) enable CAPTCHA in Supabase (Attack Protection) with the same secret. Fail-safe: no keys → widget hidden, auth unchanged.
+- [x] **OPS-003 Auth hardening — DONE 2026-07-16:** redirect allowlist, Confirm-email ON, min-password ≥8 server-side, custom SMTP sender all set by owner. ⚠️ **CAPTCHA was enabled in Supabase BEFORE the widget keys were live → login outage** (Supabase demanded a token the site wasn't sending). Fix = set the Vercel Turnstile keys + redeploy, OR temporarily disable Supabase CAPTCHA; then re-enable in the correct order. **CAPTCHA: widget code is DONE + deployed (PR #36) (Cloudflare Turnstile on login/signup/supplier-onboard, commit `c11c2c9`)** — owner enablement = (1) deploy the branch, (2) get free Turnstile keys, (3) set `NEXT_PUBLIC_TURNSTILE_SITE_KEY`+`TURNSTILE_SECRET_KEY` in Vercel + redeploy, (4) enable CAPTCHA in Supabase (Attack Protection) with the same secret. Fail-safe: no keys → widget hidden, auth unchanged.
 - [ ] **OPS-004 uptime monitor** — a free UptimeRobot check on the public URL + key API routes. (Sentry is already wired/free.)
 - [ ] **Apply `supabase/migrations/20260718_fk_check_hardening.sql`** (dev → prod) — the FK/CHECK migration Claude just wrote (D-6 payoff).
 - [ ] POPIA **signup consent checkbox** — Claude can code this now (free).

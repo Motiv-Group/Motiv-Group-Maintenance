@@ -582,7 +582,7 @@
       "verified": false,
       "verifiedConfirmed": null,
       "verifiedVotes": "",
-      "status": "WAITING FOR OWNER"
+      "status": "VERIFIED"
     },
     {
       "id": "SEC-020",
@@ -608,7 +608,7 @@
       "verified": false,
       "verifiedConfirmed": null,
       "verifiedVotes": "",
-      "status": "WAITING FOR OWNER"
+      "status": "VERIFIED"
     },
     {
       "id": "SEC-021",
@@ -634,7 +634,7 @@
       "verified": false,
       "verifiedConfirmed": null,
       "verifiedVotes": "",
-      "status": "WAITING FOR OWNER"
+      "status": "VERIFIED"
     },
     {
       "id": "SEC-022",
@@ -660,7 +660,7 @@
       "verified": false,
       "verifiedConfirmed": null,
       "verifiedVotes": "",
-      "status": "WAITING FOR OWNER"
+      "status": "VERIFIED"
     },
     {
       "id": "SEC-023",
