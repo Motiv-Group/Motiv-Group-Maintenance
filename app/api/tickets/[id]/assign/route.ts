@@ -33,7 +33,8 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   const admin = createAdminClient()
   const { data: prof } = await admin.from('user_profiles').select('role, company_id, full_name').eq('id', user.id).single()
   const isIndividual = prof?.role === 'individual'
-  if (!prof || (!isIndividual && (!prof.company_id || (prof.role !== 'regional_manager' && prof.role !== 'executive')))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  // SEC-045: executive is read-only — only regional_manager (or the individual owner) may assign.
+  if (!prof || (!isIndividual && (!prof.company_id || prof.role !== 'regional_manager'))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { data: ticket } = await admin.from('tickets').select('*').eq('id', params.id).single()
   if (!ticket) return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
