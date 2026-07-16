@@ -129,12 +129,12 @@ export function Turnstile({ onToken }: { onToken: (token: string | null) => void
         </div>
       )}
       {status === 'error' && (
-        <div className="flex items-center justify-between gap-3 rounded-[10px] border border-[#E5714E]/40 bg-[#E5714E]/10 px-3 py-2 text-xs text-[#F0A98C]">
+        <div className="flex items-center justify-between gap-4 rounded-[10px] border border-[#E5714E]/40 bg-[#E5714E]/10 px-3 py-2.5 text-[13px] text-[#F0A98C]">
           <span>Verification couldn’t load. Check your connection.</span>
           <button
             type="button"
             onClick={retry}
-            className="shrink-0 font-medium text-[#F4B79E] underline underline-offset-2 hover:text-white"
+            className="shrink-0 font-semibold text-[#F4B79E] underline underline-offset-2 transition-colors hover:text-white"
           >
             Retry
           </button>

@@ -23,7 +23,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       // neutral (not a dimmed colour) so an incomplete form reads clearly as
       // disabled. Any admin hue still works — the overlay is a white fade. (Key
       // kept as `gold`.)
-      gold:      'relative rounded-[10px] text-white font-semibold bg-[var(--auth-btn,#2f6fed)] [background-image:linear-gradient(180deg,rgba(255,255,255,0.16),rgba(255,255,255,0)_58%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_10px_24px_-10px_rgba(47,111,237,0.36)] transition-[filter,transform,box-shadow] hover:brightness-105 hover:-translate-y-px hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.24),0_14px_30px_-10px_rgba(47,111,237,0.46)] active:translate-y-0 active:brightness-95 focus:ring-[var(--auth-btn,#2f6fed)] disabled:bg-none disabled:bg-[#1c1f27] disabled:text-gray-400 disabled:shadow-none disabled:translate-y-0 disabled:brightness-100 disabled:hover:brightness-100 disabled:hover:translate-y-0',
+      gold:      'relative rounded-[10px] text-white font-semibold bg-[var(--auth-btn,#2f6fed)] [background-image:linear-gradient(180deg,rgba(255,255,255,0.16),rgba(255,255,255,0)_58%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_10px_24px_-10px_rgba(47,111,237,0.44)] transition-[filter,transform,box-shadow] hover:brightness-105 hover:-translate-y-px hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.24),0_14px_30px_-10px_rgba(47,111,237,0.56)] active:translate-y-0 active:brightness-95 focus:ring-[var(--auth-btn,#2f6fed)] disabled:bg-none disabled:bg-[#1c1f27] disabled:text-gray-400 disabled:shadow-none disabled:translate-y-0 disabled:brightness-100 disabled:hover:brightness-100 disabled:hover:translate-y-0',
     }
 
     const sizes = {
