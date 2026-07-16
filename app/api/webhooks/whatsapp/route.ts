@@ -520,7 +520,8 @@ async function handleWebhook(payload: WaPayload) {
       return;
     }
 
-    console.log(`[WhatsApp] Message received — type: ${message.type}, from: ${message.from}`);
+    // SEC-025: do not log the sender's phone number (PII → server logs / POPIA).
+    console.log(`[WhatsApp] Message received — type: ${message.type}`);
 
     const from            = message.from;
     const normalisedPhone = normalisePhone(from);
@@ -623,7 +624,8 @@ async function handleNewTicket(
 ) {
   const extracted = await extractFromMessage(from, message);
   if (!extracted) return;
-  console.log(`[WhatsApp] Extracted:`, extracted);
+  // SEC-025: log only the non-identifying shape, never the free-text title/description (PII/content).
+  console.log(`[WhatsApp] Extracted — is_issue: ${extracted.is_issue}, category: ${extracted.category ?? 'n/a'}, impact: ${extracted.operational_impact ?? 'n/a'}, confidence: ${extracted.confidence ?? 'n/a'}`);
 
   // Not a maintenance issue (greeting, small talk, question, etc.) → show the
   // menu instead of drafting a ticket from it.
@@ -641,7 +643,8 @@ async function handleNewTicket(
     .eq('phone', normalisedPhone)
     .maybeSingle();
 
-  console.log(`[WhatsApp] Profile lookup — phone: "${normalisedPhone}", role: ${senderProfile?.role ?? 'none'}`);
+  // SEC-025: do not log the phone number; the role alone is enough for ops debugging.
+  console.log(`[WhatsApp] Profile lookup — ${senderProfile ? `matched (role: ${senderProfile.role})` : 'no match'}`);
 
   if (!senderProfile) {
     await sendWhatsAppReply(from, '⚠️ Your number is not registered in Motiv. Please contact your administrator.');

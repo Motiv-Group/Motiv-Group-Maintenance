@@ -19,23 +19,30 @@ const BodySchema = z.object({
   notes: z.string().optional().nullable(),
 })
 
-async function requireAdmin() {
+// SEC-003/005/009/010/015: the `suppliers` table is company-scoped (FK company_id,
+// RLS, and every other route filters by it). This collection route must both READ
+// and WRITE within the caller's own company. requireAdmin() therefore captures
+// company_id and rejects any supplier-role user without one (e.g. an unverified
+// self-signup / Motiv-pool supplier), so it can never read or create global rows.
+async function requireAdmin(): Promise<{ user: { id: string }; companyId: string } | null> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
-  const { data: profile } = await supabase.from('user_profiles').select('role').eq('id', user.id).single()
+  const { data: profile } = await supabase.from('user_profiles').select('role, company_id').eq('id', user.id).single()
   if (profile?.role !== 'supplier') return null
-  return user
+  if (!profile.company_id) return null
+  return { user, companyId: profile.company_id }
 }
 
 export async function GET() {
-  const user = await requireAdmin()
-  if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const ctx = await requireAdmin()
+  if (!ctx) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const adminClient = createAdminClient()
   const { data, error } = await adminClient
     .from('suppliers')
     .select('*')
+    .eq('company_id', ctx.companyId)
     .order('company_name')
 
   if (error) return serverError(error)
@@ -43,8 +50,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const user = await requireAdmin()
-  if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const ctx = await requireAdmin()
+  if (!ctx) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const user = ctx.user
 
   if (!(await rateLimit(`suppliers:${user.id}`, 30, 60_000)))
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
@@ -65,6 +73,7 @@ export async function POST(request: Request) {
   const { data, error } = await adminClient
     .from('suppliers')
     .insert({
+      company_id: ctx.companyId,
       company_name: company_name.trim(),
       contact_name: contact_name?.trim() || null,
       email: email?.trim() || null,

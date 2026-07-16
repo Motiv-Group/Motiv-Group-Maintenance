@@ -14,7 +14,10 @@ export const runtime = 'nodejs'
 // (content-type application/csp-report); the modern `report-to` posts an array of
 // `{ type: 'csp-violation', body: {...} }` (application/reports+json). Handle both.
 export async function POST(request: Request) {
-  if (!(await rateLimit('csp-report', 60, 60_000))) return new NextResponse(null, { status: 429 })
+  // SEC-044: key the limit per client IP (a global key lets one noisy client
+  // exhaust the whole quota / suppress everyone else's reports).
+  const ip = (request.headers.get('x-forwarded-for') || '').split(',')[0].trim() || 'unknown'
+  if (!(await rateLimit(`csp-report:${ip}`, 30, 60_000))) return new NextResponse(null, { status: 429 })
 
   let payload: unknown = null
   try { payload = await request.json() } catch { return new NextResponse(null, { status: 204 }) }
@@ -30,10 +33,12 @@ export async function POST(request: Request) {
     const blocked = r.blockedURL || r['blocked-uri'] || r.blockedUri || ''
     const doc = r.documentURL || r['document-uri'] || r.documentUri || ''
     console.warn('[csp-report]', directive, '| blocked:', blocked, '| doc:', doc)
+    // SEC-044: only forward the whitelisted, non-sensitive fields — never the raw
+    // attacker-controllable report object.
     Sentry.captureMessage(`CSP violation: ${directive}`, {
       level: 'warning',
       tags: { csp_directive: String(directive) },
-      extra: { blocked, doc, report: r },
+      extra: { blocked: String(blocked).slice(0, 500), doc: String(doc).slice(0, 500) },
     })
   }
 

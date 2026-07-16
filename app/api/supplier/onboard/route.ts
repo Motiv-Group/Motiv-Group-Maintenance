@@ -138,9 +138,10 @@ export async function POST(request: Request) {
   const email = String(b.email ?? '').trim().toLowerCase()
   if (!isValidEmail(email)) return bad('Enter a valid email address')
 
-  // Friendly pre-check (authoritative uniqueness is enforced by createUser below).
-  const { data: existing } = await admin.from('user_profiles').select('id').ilike('email', email).maybeSingle()
-  if (existing) return bad('An account already exists for this email — please log in.')
+  // SEC-028: no friendly email-exists pre-check here — it was a user-enumeration
+  // fast-path. Uniqueness is enforced authoritatively by createUser below, which
+  // returns the same generic "account already exists" message (the supplier row is
+  // rolled back on that failure).
 
   // 1) the supplier company row: standalone, pending review, NOT in the Motiv pool yet.
   const { data: sup, error: supErr } = await admin.from('suppliers').insert({

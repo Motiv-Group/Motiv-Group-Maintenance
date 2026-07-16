@@ -1310,6 +1310,8 @@ begin new.updated_at = now(); return new; end; $function$
 revoke execute on function public.append_session_photo(uuid, text) from anon, authenticated;
 revoke execute on function public.handle_new_user()                 from anon, authenticated;
 revoke execute on function public.assign_store_job_ref()            from anon, authenticated;
+revoke execute on function public.log_ticket_event()                from anon, authenticated;  -- 20260717 / SEC-047
+revoke execute on function public.archive_ticket_notifications()    from anon, authenticated;  -- 20260717 / SEC-047
 
 -- Log every ticket status change for the audit trail (20260710).
 create or replace function public.log_ticket_event()
@@ -1458,11 +1460,9 @@ drop policy if exists "approvals read" on public.approvals;
 create policy "approvals read" on public.approvals for select
   using (((company_id = app_company_id()) AND app_can_see_ticket(ticket_id)));
 
+-- "approvals write" REMOVED by RLS hardening (20260717 / SEC-011): approvals are
+-- written only via the service-role admin client; no browser write policy.
 drop policy if exists "approvals write" on public.approvals;
-create policy "approvals write" on public.approvals for all
-  using ((company_id = app_company_id()) AND (app_is_company_wide() OR (app_role() = 'regional_manager'::text
-    AND exists (select 1 from public.tickets t where t.id = approvals.ticket_id and t.region_id in (select app_region_ids())))))
-  with check (company_id = app_company_id());
 
 drop policy if exists "audit read" on public.audit_logs;
 create policy "audit read" on public.audit_logs for select
@@ -1485,10 +1485,8 @@ drop policy if exists "decisions read" on public.decision_items;
 create policy "decisions read" on public.decision_items for select
   using (((company_id = app_company_id()) AND app_is_company_wide()));
 
+-- "decisions write" REMOVED by RLS hardening (20260717 / SEC-011): admin client only.
 drop policy if exists "decisions write" on public.decision_items;
-create policy "decisions write" on public.decision_items for all
-  using (((company_id = app_company_id()) AND app_is_company_wide()))
-  with check ((company_id = app_company_id()));
 
 drop policy if exists "estate_health read" on public.estate_health_scores;
 create policy "estate_health read" on public.estate_health_scores for select
@@ -1500,7 +1498,8 @@ create policy "notif read" on public.notifications for select
 
 drop policy if exists "notif update" on public.notifications;
 create policy "notif update" on public.notifications for update
-  using ((user_id = auth.uid()));
+  using ((user_id = auth.uid()))
+  with check ((user_id = auth.uid()));  -- 20260717 / SEC-013: pin user_id on the new row
 
 drop policy if exists "push manage" on public.push_subscriptions;
 create policy "push manage" on public.push_subscriptions for all
@@ -1521,13 +1520,11 @@ drop policy if exists "quotes owner read" on public.quotes;
 create policy "quotes owner read" on public.quotes for select
   using (public.app_owns_standalone_ticket(ticket_id));
 
+-- "quotes update" / "quotes write" REMOVED by RLS hardening (20260717 / SEC-004,006):
+-- quotes are written only via the admin client; a see-ticket store user must not be
+-- able to edit a supplier's quote amount/status or insert quotes directly.
 drop policy if exists "quotes update" on public.quotes;
-create policy "quotes update" on public.quotes for update
-  using (((company_id = app_company_id()) AND app_can_see_ticket(ticket_id)));
-
 drop policy if exists "quotes write" on public.quotes;
-create policy "quotes write" on public.quotes for insert
-  with check (((company_id = app_company_id()) AND app_can_see_ticket(ticket_id)));
 
 drop policy if exists "regional_health read" on public.regional_health_scores;
 create policy "regional_health read" on public.regional_health_scores for select
@@ -1582,10 +1579,9 @@ drop policy if exists "signoffs owner read" on public.signoffs;
 create policy "signoffs owner read" on public.signoffs for select
   using (public.app_owns_standalone_ticket(ticket_id));
 
+-- "signoffs write" REMOVED by RLS hardening (20260717 / SEC-006): completion
+-- certificates are written only via the admin client; no browser forge/alter/delete.
 drop policy if exists "signoffs write" on public.signoffs;
-create policy "signoffs write" on public.signoffs for all
-  using (((company_id = app_company_id()) AND app_can_see_ticket(ticket_id)))
-  with check ((company_id = app_company_id()));
 
 drop policy if exists "sla manage" on public.sla_rules;
 create policy "sla manage" on public.sla_rules for all
@@ -1594,7 +1590,7 @@ create policy "sla manage" on public.sla_rules for all
 
 drop policy if exists "sla read" on public.sla_rules;
 create policy "sla read" on public.sla_rules for select
-  using (((company_id IS NULL) OR (company_id = app_company_id())));
+  using ((auth.uid() is not null) AND ((company_id IS NULL) OR (company_id = app_company_id())));  -- 20260717 / SEC-046: no anon read of global rows
 
 drop policy if exists "snag_schedule_events read" on public.snag_schedule_events;
 create policy "snag_schedule_events read" on public.snag_schedule_events for select
@@ -1606,10 +1602,8 @@ create policy "snags read" on public.snags for select
    FROM stores s
   WHERE (s.region_id IN ( SELECT app_region_ids() AS app_region_ids)))))));
 
+-- "snags write" REMOVED by RLS hardening (20260717 / SEC-011): admin client only.
 drop policy if exists "snags write" on public.snags;
-create policy "snags write" on public.snags for all
-  using (((company_id = app_company_id()) AND (app_is_company_wide() OR (app_role() = 'regional_manager'::text))))
-  with check ((company_id = app_company_id()));
 
 drop policy if exists "store_health read" on public.store_health_scores;
 create policy "store_health read" on public.store_health_scores for select
@@ -1628,23 +1622,21 @@ drop policy if exists "stores read" on public.stores;
 create policy "stores read" on public.stores for select
   using (((company_id = app_company_id()) AND (app_is_company_wide() OR (region_id IN ( SELECT app_region_ids() AS app_region_ids)) OR (id IN ( SELECT app_store_ids() AS app_store_ids)))));
 
+-- "supplier_escalations admin" REMOVED by RLS hardening (20260717 / SEC-012):
+-- admin client only — a supplier must not delete escalations raised against itself.
 drop policy if exists "supplier_escalations admin" on public.supplier_escalations;
-create policy "supplier_escalations admin" on public.supplier_escalations for all
-  using ((company_id = app_company_id()))
-  with check ((company_id = app_company_id()));
 
 drop policy if exists "supplier_escalations read" on public.supplier_escalations;
 create policy "supplier_escalations read" on public.supplier_escalations for select
   using ((company_id = app_company_id()));
 
+-- "supplier_invites admin" REMOVED by RLS hardening (20260717 / SEC-012): admin client only.
 drop policy if exists "supplier_invites admin" on public.supplier_invites;
-create policy "supplier_invites admin" on public.supplier_invites for all
-  using ((company_id = app_company_id()))
-  with check ((company_id = app_company_id()));
 
 drop policy if exists "supplier_invites read" on public.supplier_invites;
 create policy "supplier_invites read" on public.supplier_invites for select
-  using ((company_id = app_company_id()));
+  using ((company_id = app_company_id())
+         AND (app_role() = ANY (ARRAY['system_admin'::text, 'regional_manager'::text, 'executive'::text])));  -- 20260717 / SEC-012: hide invite token from non-admins
 
 drop policy if exists "supplier_perf read" on public.supplier_performance_scores;
 create policy "supplier_perf read" on public.supplier_performance_scores for select
@@ -1671,9 +1663,8 @@ drop policy if exists "ticket_evidence read" on public.ticket_evidence;
 create policy "ticket_evidence read" on public.ticket_evidence for select
   using (app_can_see_ticket(ticket_id));
 
+-- "ticket_evidence write" REMOVED by RLS hardening (20260717 / SEC-013): admin client only.
 drop policy if exists "ticket_evidence write" on public.ticket_evidence;
-create policy "ticket_evidence write" on public.ticket_evidence for insert
-  with check (app_can_see_ticket(ticket_id));
 
 drop policy if exists "ticket_quote_requests read" on public.ticket_quote_requests;
 create policy "ticket_quote_requests read" on public.ticket_quote_requests for select
@@ -1695,14 +1686,13 @@ drop policy if exists "ticket_updates read" on public.ticket_updates;
 create policy "ticket_updates read" on public.ticket_updates for select
   using (app_can_see_ticket(ticket_id));
 
+-- "ticket_updates write" REMOVED by RLS hardening (20260717 / SEC-013): admin client
+-- only — author_id was unbound (comment/audit impersonation).
 drop policy if exists "ticket_updates write" on public.ticket_updates;
-create policy "ticket_updates write" on public.ticket_updates for insert
-  with check (app_can_see_ticket(ticket_id));
 
+-- "ticket_variations admin" REMOVED by RLS hardening (20260717 / SEC-006): admin client
+-- only — no browser CRUD of variation orders / forced status='approved'.
 drop policy if exists "ticket_variations admin" on public.ticket_variations;
-create policy "ticket_variations admin" on public.ticket_variations for all
-  using ((company_id = app_company_id()))
-  with check ((company_id = app_company_id()));
 
 drop policy if exists "ticket_variations read" on public.ticket_variations;
 create policy "ticket_variations read" on public.ticket_variations for select
@@ -1725,9 +1715,11 @@ drop policy if exists "tickets owner read" on public.tickets;
 create policy "tickets owner read" on public.tickets for select
   using (((created_by = auth.uid()) AND (company_id IS NULL)));
 
+-- "tickets update" REMOVED by RLS hardening (20260717 / SEC-002): all ticket UPDATEs
+-- run via the service-role admin client. The browser only INSERTs (policy above), so
+-- the update policy was pure attack surface — an assigned supplier could self-complete
+-- their ticket / rewrite quote_value directly via PostgREST.
 drop policy if exists "tickets update" on public.tickets;
-create policy "tickets update" on public.tickets for update
-  using (((company_id = app_company_id()) AND (app_is_company_wide() OR (region_id IN ( SELECT app_region_ids() AS app_region_ids)) OR (supplier_id IN ( SELECT app_supplier_ids() AS app_supplier_ids)))));
 
 drop policy if exists "company members read" on public.user_profiles;
 create policy "company members read" on public.user_profiles for select
@@ -1737,9 +1729,39 @@ drop policy if exists "own profile read" on public.user_profiles;
 create policy "own profile read" on public.user_profiles for select
   using ((id = auth.uid()));
 
+-- Self-service profile update. The BEFORE-UPDATE trigger below (20260717 / SEC-001)
+-- freezes role/company_id for non-service-role callers, so a user cannot escalate
+-- their own row to system_admin (or switch tenant) via PostgREST.
 drop policy if exists "own profile update" on public.user_profiles;
 create policy "own profile update" on public.user_profiles for update
-  using ((id = auth.uid()));
+  using ((id = auth.uid()))
+  with check ((id = auth.uid()));
+
+-- 20260717 / SEC-001: reject any change to user_profiles.role / company_id unless the
+-- caller is a service-role/internal process. SECURITY INVOKER (default) so current_user
+-- reflects the actual caller ('authenticated' for the browser, 'service_role' for the
+-- admin client). Privileged role changes go through admin-client server routes only.
+create or replace function public.enforce_profile_privileged_columns()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  if (new.role is distinct from old.role
+      or new.company_id is distinct from old.company_id)
+     and current_user not in ('service_role', 'postgres', 'supabase_admin', 'supabase_auth_admin')
+  then
+    raise exception 'user_profiles.role/company_id may only be changed by a service-role process (attempted by %)', current_user
+      using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+revoke execute on function public.enforce_profile_privileged_columns() from public, anon, authenticated;
+drop trigger if exists trg_enforce_profile_privileged on public.user_profiles;
+create trigger trg_enforce_profile_privileged
+  before update on public.user_profiles
+  for each row execute function public.enforce_profile_privileged_columns();
 
 -- Ticket audit trail — company-scoped read; writes only via the SECURITY DEFINER
 -- trigger (20260710). The app reads it via the service-role client.
