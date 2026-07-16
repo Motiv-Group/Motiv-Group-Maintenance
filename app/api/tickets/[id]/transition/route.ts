@@ -96,6 +96,12 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   }
   if (!(await hasAccess(admin, role, user.id, ticket))) return NextResponse.json({ error: 'Not your ticket' }, { status: 403 })
 
+  // A supplier may never (re)target tickets.supplier_id — assignment is an
+  // internal (RM/admin) act. Without this clamp an invited supplier could pass
+  // supplierId on require_assessment/request_quote and award themselves the
+  // ticket (hasAccess passes on a mere invite).
+  if (role === 'supplier') body.supplierId = null
+
   const tr = resolveTransition(ticket.status, action, role)
   if (!tr) return NextResponse.json({ error: `You can't ${action} a ticket that is "${statusLabel(ticket.status)}".` }, { status: 400 })
 

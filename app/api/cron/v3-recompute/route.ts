@@ -1,23 +1,20 @@
-import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { runRepeatDefectRecompute } from '@/lib/health/recompute'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
-// GET /api/cron/v3-recompute — recompute persisted repeat-defect flags (all companies)
-// and purge old archived notifications. Auth: Vercel cron secret OR a signed-in
-// executive / system_admin.
+// GET /api/cron/v3-recompute — recompute persisted repeat-defect flags (all
+// companies). NOT scheduled (Hobby cron limit) — kept as a manual/executive
+// trigger; the daily v3-snapshots cron runs the same recompute (and the
+// notification purge that used to live here). Auth: Vercel cron secret OR a
+// signed-in executive / system_admin.
 export async function GET(request: Request) {
   if (!(await authorize(request))) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   try {
     const summary = await runRepeatDefectRecompute()
-    // Delete completed-ticket notifications (archived) more than 3 days ago, globally.
-    const cutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
-    const { count: purgedNotifications } = await createAdminClient()
-      .from('notifications').delete({ count: 'exact' })
-      .not('archived_at', 'is', null).lt('archived_at', cutoff)
-    return NextResponse.json({ ok: true, summary, purgedNotifications: purgedNotifications ?? 0 })
+    return NextResponse.json({ ok: true, summary })
   } catch (e) {
     console.error('[cron]', e)
     return NextResponse.json({ ok: false, error: 'Recompute failed' }, { status: 500 })
