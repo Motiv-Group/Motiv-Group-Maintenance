@@ -2,7 +2,7 @@
 
 > **Authoritative working document.** All findings, fixes, owner actions, decisions, evidence and scoring live here. Do not delete completed findings — mark them `VERIFIED` only when evidence exists (code change alone is not enough). Machine-readable companions: [`motiv-security-findings.json`](motiv-security-findings.json) (full per-finding detail) and [`motiv-remediation-backlog.csv`](motiv-remediation-backlog.csv). A plain-English companion audit is [`docs/PRODUCTION_AUDIT_2026-07-15.md`](docs/PRODUCTION_AUDIT_2026-07-15.md).
 
-**Ownership labels:** `FABLE` = Claude can fix in-repo (you apply migrations / merge PRs) · `OWNER` = only you can do it (purchase, dashboard, legal, credential, live-DB inspection) · `SHARED` = Claude implements + you apply/decide · `THIRD_PARTY` = independent pen-test / lawyer / upstream.
+**Ownership labels:** `CLAUDE` = Claude can fix in-repo (you apply migrations / merge PRs) · `OWNER` = only you can do it (purchase, dashboard, legal, credential, live-DB inspection) · `SHARED` = Claude implements + you apply/decide · `THIRD_PARTY` = independent pen-test / lawyer / upstream.
 
 ---
 
@@ -103,7 +103,7 @@ _Defer until PAID (record here; do when upgrading — see `docs/INFRASTRUCTURE_T
 
 **Objective:** Owner applies the **RLS hardening migration** (already written: `supabase/migrations/20260717_rls_hardening.sql`) to dev then prod, and runs the escalation-audit query — this is what actually closes SEC-001/002/004/006/011/012/013 in production.
 **Why this is next:** The code + migration are done and green; only the owner-side apply + audit remains, and it is what lifts the two score caps (open critical + confirmed cross-tenant) blocking everything.
-**FABLE will (after apply is confirmed):** Fold the migration into `schema.sql`, regen types, delete the file; add the cross-tenant/RLS negative test suite (§15); then continue the FABLE queue (§14) at order 7 (FK/CHECK/index migrations) once OWN-DB2 live output is provided.
+**CLAUDE will (after apply is confirmed):** Fold the migration into `schema.sql`, regen types, delete the file; add the cross-tenant/RLS negative test suite (§15); then continue the CLAUDE queue (§14) at order 7 (FK/CHECK/index migrations) once OWN-DB2 live output is provided.
 **Owner must:** Apply the migration (dev→prod) + run the audit query in §1b·A, and report the audit result.
 **Expected evidence:** Owner confirmation of apply + audit result; the §1b·B browser negative tests failing to escalate/tamper.
 **Completion condition:** SEC-001/002/004/006 move to `VERIFIED` once §1b·B passes on a live/staging DB and the audit query returns no unexpected privileged accounts.
@@ -149,14 +149,14 @@ _Defer until PAID (record here; do when upgrading — see `docs/INFRASTRUCTURE_T
 
 | Area | Now | Target | Deduction reason | Required improvement | Owner |
 |---|---:|---:|---|---|---|
-| Authorization & tenant isolation | 3.5 | 9.5 | Confirmed cross-tenant leak (SEC-003/005) + self-escalation (SEC-001) | RLS hardening migration + suppliers route fix + negative tenant tests | FABLE/OWNER |
-| Application security | 4.0 | 9.5 | 2 open criticals reachable from the browser | Close SEC-001/002; verify with negative tests | FABLE/OWNER |
-| Database security & integrity | 5.0 | 9.0 | Permissive RLS write policies; missing FKs/CHECKs/indexes; schema.sql omits CHECK/index | RLS migration; FK/CHECK/index migration; reconcile schema.sql from live pg_dump | FABLE/SHARED |
-| Reliability & recovery | 5.5 | 9.0 | No DB backups/PITR; non-atomic multi-writes | Supabase Pro + PITR + restore drill; wrap critical multi-writes in RPC/txn | OWNER/FABLE |
-| Testing & CI/CD | 7.0 | 9.0 | No tenant-isolation / RLS negative tests; no restore test | Add cross-tenant + RLS-policy test suite; run restore drill | FABLE/OWNER |
+| Authorization & tenant isolation | 3.5 | 9.5 | Confirmed cross-tenant leak (SEC-003/005) + self-escalation (SEC-001) | RLS hardening migration + suppliers route fix + negative tenant tests | CLAUDE/OWNER |
+| Application security | 4.0 | 9.5 | 2 open criticals reachable from the browser | Close SEC-001/002; verify with negative tests | CLAUDE/OWNER |
+| Database security & integrity | 5.0 | 9.0 | Permissive RLS write policies; missing FKs/CHECKs/indexes; schema.sql omits CHECK/index | RLS migration; FK/CHECK/index migration; reconcile schema.sql from live pg_dump | CLAUDE/SHARED |
+| Reliability & recovery | 5.5 | 9.0 | No DB backups/PITR; non-atomic multi-writes | Supabase Pro + PITR + restore drill; wrap critical multi-writes in RPC/txn | OWNER/CLAUDE |
+| Testing & CI/CD | 7.0 | 9.0 | No tenant-isolation / RLS negative tests; no restore test | Add cross-tenant + RLS-policy test suite; run restore drill | CLAUDE/OWNER |
 | Infrastructure & deployment | 7.0 | 9.0 | No uptime/log alerting; no staging | Uptime monitor + log drain; staging env | OWNER |
-| Privacy & operational readiness | 5.0 | 9.0 | PII in logs; POPIA officer + consent pending | Strip PII logs (SEC-025); register Info Officer + consent checkbox (OPS-006) | FABLE/OWNER |
-| Authentication & sessions | 8.0 | 9.5 | Minor user-enumeration; dashboard hardening owner-side | Fix SEC-028; OPS-003 auth settings | FABLE/OWNER |
+| Privacy & operational readiness | 5.0 | 9.0 | PII in logs; POPIA officer + consent pending | Strip PII logs (SEC-025); register Info Officer + consent checkbox (OPS-006) | CLAUDE/OWNER |
+| Authentication & sessions | 8.0 | 9.5 | Minor user-enumeration; dashboard hardening owner-side | Fix SEC-028; OPS-003 auth settings | CLAUDE/OWNER |
 | Independent validation | — | — | No independent pen test (caps overall ≤ 9.4) | Commission pen test after P0/P1 land | THIRD_PARTY |
 
 ---
@@ -167,7 +167,7 @@ _Defer until PAID (record here; do when upgrading — see `docs/INFRASTRUCTURE_T
 |---|---|---|---|---|---|---|
 | SEC-001 | Any authenticated user PATCHes own `user_profiles` → system_admin | 🔴 critical | Full account + multi-tenant takeover | WITH CHECK + trigger on user_profiles; narrow UPDATE grant | SHARED | NOT STARTED |
 | SEC-002 | Assigned supplier self-completes ticket / rewrites quote_value via `tickets` UPDATE RLS | 🔴 critical | Workflow + separation-of-duties bypass; financial tamper | Drop browser UPDATE policy on tickets | SHARED | NOT STARTED |
-| SEC-003/005 | `GET /api/suppliers` returns every tenant's supplier directory | 🟠 high | Cross-tenant PII/VAT disclosure | `.eq('company_id', …)` or delete dead route | FABLE | NOT STARTED |
+| SEC-003/005 | `GET /api/suppliers` returns every tenant's supplier directory | 🟠 high | Cross-tenant PII/VAT disclosure | `.eq('company_id', …)` or delete dead route | CLAUDE | NOT STARTED |
 | SEC-004/006 | `quotes`/`signoffs`/`ticket_variations` writable via PostgREST by see-ticket users | 🟠 high | Forged completions; quote-amount tampering | Drop browser write policies; keep SELECT | SHARED | NOT STARTED |
 | OPS-001 | No database backups / PITR | 🔴 critical (pre-data) | Unrecoverable data loss | Supabase Pro + PITR + restore drill | OWNER | NOT STARTED |
 | OPS-005 | Legal pages are placeholders | 🟠 high | Cannot commercially launch | Real copy + lawyer | THIRD_PARTY | NOT STARTED |
@@ -182,53 +182,53 @@ _Defer until PAID (record here; do when upgrading — see `docs/INFRASTRUCTURE_T
 |---|---|---|---|---|---|---|---|
 | SEC-001 | 🔴C | confirmed ✅ | authorization | Any authenticated user can escalate to system_admin by PATCHing their own user_profiles row (account & tenant takeover) | SHARED | Y | NOT STARTED |
 | SEC-002 | 🔴C | likely ✅ | rls-policy | tickets UPDATE RLS policy lets an assigned supplier self-complete their own ticket (workflow + separation-of-duties bypass) | SHARED | Y | NOT STARTED |
-| SEC-003 | 🟠H | confirmed ✅ | tenant-isolation | GET /api/suppliers returns every tenant's supplier directory (missing company_id filter) | FABLE | Y | NOT STARTED |
-| SEC-004 | 🟠H | confirmed | business-logic | Store manager (client) can tamper with supplier quote amount/status — quotes UPDATE has no WITH CHECK | FABLE | Y | NOT STARTED |
-| SEC-005 | 🟠H | confirmed ✅ | tenant-isolation | GET /api/suppliers leaks every tenant's supplier directory (no company_id filter, RLS bypassed) | FABLE | Y | NOT STARTED |
+| SEC-003 | 🟠H | confirmed ✅ | tenant-isolation | GET /api/suppliers returns every tenant's supplier directory (missing company_id filter) | CLAUDE | Y | NOT STARTED |
+| SEC-004 | 🟠H | confirmed | business-logic | Store manager (client) can tamper with supplier quote amount/status — quotes UPDATE has no WITH CHECK | CLAUDE | Y | NOT STARTED |
+| SEC-005 | 🟠H | confirmed ✅ | tenant-isolation | GET /api/suppliers leaks every tenant's supplier directory (no company_id filter, RLS bypassed) | CLAUDE | Y | NOT STARTED |
 | SEC-006 | 🟠H | likely ✅ | rls-policy | signoffs (FOR ALL), quotes (UPDATE) and ticket_variations (FOR ALL) writable directly by see-ticket users — forged completions & quote-amount tampering | SHARED | Y | NOT STARTED |
-| SEC-007 | 🟡M | likely | authorization | Losing/closed competitor supplier keeps write access to another supplier's awarded ticket (hasAccess ignores invite status) | FABLE | · | NOT STARTED |
-| SEC-008 | 🟡M | likely | tenant-isolation | supplierId / supplierIds written to ticket without validating the supplier belongs to the ticket's company or region (cross-tenant assignment) | FABLE | · | NOT STARTED |
-| SEC-009 | 🟡M | confirmed | tenant-isolation | POST /api/suppliers creates supplier rows with NULL company_id (no tenant tag on write) | FABLE | · | NOT STARTED |
-| SEC-010 | 🟡M | confirmed | tenant-isolation | POST /api/suppliers/bulk imports up to 500 suppliers with NULL company_id | FABLE | · | NOT STARTED |
-| SEC-011 | 🟡M | confirmed | authorization | Lower-privilege company members can forge approvals / decision_items / signoffs / snags — FOR ALL policies weaken WITH CHECK to company_id only | FABLE | Y | NOT STARTED |
-| SEC-012 | 🟡M | confirmed | authorization | No role gate on supplier_escalations / supplier_invites / ticket_variations — any company member can CRUD; invite tokens exposed company-wide | FABLE | Y | NOT STARTED |
-| SEC-013 | 🟡M | confirmed | input-validation | ticket_updates insert does not bind author_id/author_role to the caller — comment/audit impersonation | FABLE | · | NOT STARTED |
+| SEC-007 | 🟡M | likely | authorization | Losing/closed competitor supplier keeps write access to another supplier's awarded ticket (hasAccess ignores invite status) | CLAUDE | · | NOT STARTED |
+| SEC-008 | 🟡M | likely | tenant-isolation | supplierId / supplierIds written to ticket without validating the supplier belongs to the ticket's company or region (cross-tenant assignment) | CLAUDE | · | NOT STARTED |
+| SEC-009 | 🟡M | confirmed | tenant-isolation | POST /api/suppliers creates supplier rows with NULL company_id (no tenant tag on write) | CLAUDE | · | NOT STARTED |
+| SEC-010 | 🟡M | confirmed | tenant-isolation | POST /api/suppliers/bulk imports up to 500 suppliers with NULL company_id | CLAUDE | · | NOT STARTED |
+| SEC-011 | 🟡M | confirmed | authorization | Lower-privilege company members can forge approvals / decision_items / signoffs / snags — FOR ALL policies weaken WITH CHECK to company_id only | CLAUDE | Y | NOT STARTED |
+| SEC-012 | 🟡M | confirmed | authorization | No role gate on supplier_escalations / supplier_invites / ticket_variations — any company member can CRUD; invite tokens exposed company-wide | CLAUDE | Y | NOT STARTED |
+| SEC-013 | 🟡M | confirmed | input-validation | ticket_updates insert does not bind author_id/author_role to the caller — comment/audit impersonation | CLAUDE | · | NOT STARTED |
 | SEC-014 | 🟡M | architectural-risk | tenant-isolation | app_settings is gated by role only, with no tenant scope — cross-tenant admin overwrite | SHARED | · | NOT STARTED |
-| SEC-015 | 🟡M | confirmed | tenant-isolation | POST /api/suppliers and /api/suppliers/bulk create suppliers with no company_id (untenanted writes) | FABLE | · | NOT STARTED |
-| SEC-016 | 🟡M | architectural-risk | authorization | Ticket supplier assignment/invite never validates the supplier_id belongs to the ticket's company (or Motiv pool) | FABLE | · | NOT STARTED |
-| SEC-017 | 🟡M | confirmed | input-validation | transition-engine submit_quote accepts Infinity / over-cap amounts (weaker than parseAmount) | FABLE | · | NOT STARTED |
-| SEC-018 | 🟡M | architectural-risk | business-logic | transition approve_quote diverges from /quote-decision: leaves invites open, never sets supplier_id, marks ALL pending quotes accepted | FABLE | · | NOT STARTED |
-| SEC-019 | 🟡M | confirmed | db-integrity | tickets.assigned_user_id, asset_id, technician_id have no foreign keys | FABLE | · | NOT STARTED |
-| SEC-020 | 🟡M | confirmed | db-integrity | ratings table missing FKs on company_id, supplier_id, contractor_id, rated_by | FABLE | · | NOT STARTED |
-| SEC-021 | 🟡M | confirmed | tenant-isolation | technicians table has zero foreign keys (company_id, supplier_id unenforced) | FABLE | · | NOT STARTED |
-| SEC-022 | 🟡M | config-weakness | db-integrity | No CHECK constraints on enum-like text columns (status/priority/type/severity/author_role) — typos persist silently | FABLE | · | NOT STARTED |
+| SEC-015 | 🟡M | confirmed | tenant-isolation | POST /api/suppliers and /api/suppliers/bulk create suppliers with no company_id (untenanted writes) | CLAUDE | · | NOT STARTED |
+| SEC-016 | 🟡M | architectural-risk | authorization | Ticket supplier assignment/invite never validates the supplier_id belongs to the ticket's company (or Motiv pool) | CLAUDE | · | NOT STARTED |
+| SEC-017 | 🟡M | confirmed | input-validation | transition-engine submit_quote accepts Infinity / over-cap amounts (weaker than parseAmount) | CLAUDE | · | NOT STARTED |
+| SEC-018 | 🟡M | architectural-risk | business-logic | transition approve_quote diverges from /quote-decision: leaves invites open, never sets supplier_id, marks ALL pending quotes accepted | CLAUDE | · | NOT STARTED |
+| SEC-019 | 🟡M | confirmed | db-integrity | tickets.assigned_user_id, asset_id, technician_id have no foreign keys | CLAUDE | · | NOT STARTED |
+| SEC-020 | 🟡M | confirmed | db-integrity | ratings table missing FKs on company_id, supplier_id, contractor_id, rated_by | CLAUDE | · | NOT STARTED |
+| SEC-021 | 🟡M | confirmed | tenant-isolation | technicians table has zero foreign keys (company_id, supplier_id unenforced) | CLAUDE | · | NOT STARTED |
+| SEC-022 | 🟡M | config-weakness | db-integrity | No CHECK constraints on enum-like text columns (status/priority/type/severity/author_role) — typos persist silently | CLAUDE | · | NOT STARTED |
 | SEC-023 | 🟡M | unverifiable | efficiency | FK / hot-path indexes not present in schema.sql and likely absent (tickets by company_id/store_id/region_id/supplier_id/status, quotes.ticket_id, notifications(user_id,read)) | SHARED | · | NOT STARTED |
 | SEC-024 | 🟡M | confirmed | db-integrity | FKs are almost entirely NO ACTION; user-account erasure chain is effectively blocked | SHARED | · | NOT STARTED |
-| SEC-025 | 🟡M | confirmed | privacy | WhatsApp webhook writes caller PII (phone numbers + free-text ticket content) to server logs | FABLE | · | NOT STARTED |
-| SEC-026 | 🔵L | confirmed | tenant-isolation | /view omits tenant (company) match and has no rate limit — cross-company writes into ticket_views audit table | FABLE | · | NOT STARTED |
-| SEC-027 | 🔵L | confirmed | tenant-isolation | /seen omits tenant match and has no rate limit — cross-company writes into ticket_reads | FABLE | · | NOT STARTED |
-| SEC-028 | 🔵L | likely | user-enumeration | Supplier self-signup onboarding reveals whether an email is already registered (user enumeration) | FABLE | · | NOT STARTED |
-| SEC-029 | 🔵L | likely | business-logic | supplier/assign-rm clear-path deletes ALL regional_user links for the store's region | FABLE | · | NOT STARTED |
-| SEC-030 | 🔵L | config-weakness | storage | Private-bucket storage upload policies are unscoped (bucket + logged-in only) | FABLE | · | NOT STARTED |
-| SEC-031 | 🔵L | missing-control | authorization | schedule action lets a supplier set technician_id to any technician UUID (no roster ownership check) | FABLE | · | NOT STARTED |
-| SEC-032 | 🔵L | architectural-risk | business-logic | Supplier add_update flips ticket status open→in_progress outside the workflow engine | FABLE | · | NOT STARTED |
-| SEC-033 | 🔵L | confirmed | db-integrity | ticket_suppliers has no unique(ticket_id,supplier_id); assign route doesn't de-duplicate supplierIds (duplicate supplier assignment) | FABLE | · | NOT STARTED |
-| SEC-034 | 🔵L | confirmed | evidence-integrity | Evidence can be uploaded after close-out (no workflow-state gate on add_evidence / ticket_evidence) | FABLE | · | NOT STARTED |
-| SEC-035 | 🔵L | confirmed | db-integrity | Additional child columns without FKs (ticket_suppliers.quote_id/company_id, daily_briefings.company_id, supplier_sla_acceptances.user_id, supplier_verification_docs.uploaded_by, ticket_events.company_id, store_ticket_counters.store_id) | FABLE | · | NOT STARTED |
-| SEC-036 | 🔵L | confirmed | reliability | Multi-write workflows are non-atomic (ticket insert + notification fan-out, project milestone + file) — partial writes possible | FABLE | · | NOT STARTED |
+| SEC-025 | 🟡M | confirmed | privacy | WhatsApp webhook writes caller PII (phone numbers + free-text ticket content) to server logs | CLAUDE | · | NOT STARTED |
+| SEC-026 | 🔵L | confirmed | tenant-isolation | /view omits tenant (company) match and has no rate limit — cross-company writes into ticket_views audit table | CLAUDE | · | NOT STARTED |
+| SEC-027 | 🔵L | confirmed | tenant-isolation | /seen omits tenant match and has no rate limit — cross-company writes into ticket_reads | CLAUDE | · | NOT STARTED |
+| SEC-028 | 🔵L | likely | user-enumeration | Supplier self-signup onboarding reveals whether an email is already registered (user enumeration) | CLAUDE | · | NOT STARTED |
+| SEC-029 | 🔵L | likely | business-logic | supplier/assign-rm clear-path deletes ALL regional_user links for the store's region | CLAUDE | · | NOT STARTED |
+| SEC-030 | 🔵L | config-weakness | storage | Private-bucket storage upload policies are unscoped (bucket + logged-in only) | CLAUDE | · | NOT STARTED |
+| SEC-031 | 🔵L | missing-control | authorization | schedule action lets a supplier set technician_id to any technician UUID (no roster ownership check) | CLAUDE | · | NOT STARTED |
+| SEC-032 | 🔵L | architectural-risk | business-logic | Supplier add_update flips ticket status open→in_progress outside the workflow engine | CLAUDE | · | NOT STARTED |
+| SEC-033 | 🔵L | confirmed | db-integrity | ticket_suppliers has no unique(ticket_id,supplier_id); assign route doesn't de-duplicate supplierIds (duplicate supplier assignment) | CLAUDE | · | NOT STARTED |
+| SEC-034 | 🔵L | confirmed | evidence-integrity | Evidence can be uploaded after close-out (no workflow-state gate on add_evidence / ticket_evidence) | CLAUDE | · | NOT STARTED |
+| SEC-035 | 🔵L | confirmed | db-integrity | Additional child columns without FKs (ticket_suppliers.quote_id/company_id, daily_briefings.company_id, supplier_sla_acceptances.user_id, supplier_verification_docs.uploaded_by, ticket_events.company_id, store_ticket_counters.store_id) | CLAUDE | · | NOT STARTED |
+| SEC-036 | 🔵L | confirmed | reliability | Multi-write workflows are non-atomic (ticket insert + notification fan-out, project milestone + file) — partial writes possible | CLAUDE | · | NOT STARTED |
 | SEC-037 | 🔵L | unverifiable | db-integrity | schema.sql explicitly does not capture CHECK constraints or secondary indexes — integrity review of those is unverifiable against live | SHARED | · | NOT STARTED |
-| SEC-038 | 🔵L | confirmed | monitoring | Handled API 500s never reach Sentry; no log drain → weak error observability | FABLE | · | NOT STARTED |
-| SEC-039 | 🔵L | confirmed | reliability | Archived-notification purge lives only in the unscheduled v3-recompute cron → notifications table grows unbounded | FABLE | · | NOT STARTED |
+| SEC-038 | 🔵L | confirmed | monitoring | Handled API 500s never reach Sentry; no log drain → weak error observability | CLAUDE | · | NOT STARTED |
+| SEC-039 | 🔵L | confirmed | reliability | Archived-notification purge lives only in the unscheduled v3-recompute cron → notifications table grows unbounded | CLAUDE | · | NOT STARTED |
 | SEC-040 | 🔵L | config-weakness | dependencies | xlsx (SheetJS) pinned to a CDN tarball is invisible to npm audit + Dependabot, and parses untrusted uploads | SHARED | · | NOT STARTED |
 | SEC-041 | 🔵L | confirmed | dependencies | Four moderate npm advisories via next's transitive postcss; non-blocking in CI | THIRD_PARTY | · | NOT STARTED |
-| SEC-042 | 🔵L | likely | monitoring | Unauthenticated /api/csp-report forwards arbitrary POST bodies to Sentry at up to 60/min globally | FABLE | · | NOT STARTED |
+| SEC-042 | 🔵L | likely | monitoring | Unauthenticated /api/csp-report forwards arbitrary POST bodies to Sentry at up to 60/min globally | CLAUDE | · | NOT STARTED |
 | SEC-043 | ⚪I | architectural-risk | authorization | Executive role (documented read-only) is granted ticket write actions across its company | SHARED | · | NOT STARTED |
-| SEC-044 | ⚪I | confirmed | privacy | sla_rules read policy exposes global (company_id IS NULL) rows to anonymous users | FABLE | · | NOT STARTED |
-| SEC-045 | ⚪I | confirmed | code-quality | Deny-all tables and SECURITY DEFINER functions reviewed — no defects found (confirmation) | FABLE | · | NOT STARTED |
-| SEC-046 | ⚪I | confirmed | business-logic | CONTROL CONFIRMED: project progress is server-computed and not client-settable | FABLE | · | NOT STARTED |
-| SEC-047 | ⚪I | confirmed | business-logic | CONTROL CONFIRMED: separation of duties holds in the workflow engine (supplier cannot sign off own work or resolve own dispute) | FABLE | · | NOT STARTED |
+| SEC-044 | ⚪I | confirmed | privacy | sla_rules read policy exposes global (company_id IS NULL) rows to anonymous users | CLAUDE | · | NOT STARTED |
+| SEC-045 | ⚪I | confirmed | code-quality | Deny-all tables and SECURITY DEFINER functions reviewed — no defects found (confirmation) | CLAUDE | · | NOT STARTED |
+| SEC-046 | ⚪I | confirmed | business-logic | CONTROL CONFIRMED: project progress is server-computed and not client-settable | CLAUDE | · | NOT STARTED |
+| SEC-047 | ⚪I | confirmed | business-logic | CONTROL CONFIRMED: separation of duties holds in the workflow engine (supplier cannot sign off own work or resolve own dispute) | CLAUDE | · | NOT STARTED |
 | SEC-048 | ⚪I | confirmed | db-integrity | audit_logs / ticket_events are immutable to end users, but there is no DB-level append-only/tamper-evidence guard | SHARED | · | NOT STARTED |
-| SEC-049 | ⚪I | confirmed | secrets | Secrets hygiene, security headers, keystore, and service worker checks passed | FABLE | · | NOT STARTED |
+| SEC-049 | ⚪I | confirmed | secrets | Secrets hygiene, security headers, keystore, and service worker checks passed | CLAUDE | · | NOT STARTED |
 | OPS-001 | 🔴C | n/a | Reliability/DR | No database backups or point-in-time recovery | OWNER | Y | NOT STARTED |
 | OPS-002 | 🟠H | n/a | Licensing | Vercel Hobby is non-commercial license | OWNER | Y | NOT STARTED |
 | OPS-003 | 🟠H | n/a | Auth config | Supabase Auth dashboard not hardened | OWNER | Y | NOT STARTED |
@@ -261,7 +261,7 @@ _Status values: NOT STARTED · INVESTIGATING · BLOCKED · WAITING FOR OWNER · 
 
 **Required secure outcome.** A non-privileged user must be unable to change their own role or company_id; role/tenant changes may only occur via trusted service-role paths.
 
-**Fix (SHARED).** Add an explicit WITH CHECK to the update policy that freezes privileged columns, e.g. WITH CHECK (id = auth.uid() AND role = (select role from public.user_profiles where id = auth.uid()) AND company_id IS NOT DISTINCT FROM (select company_id from public.user_profiles where id = auth.uid())); OR, more robustly, add a BEFORE UPDATE trigger on user_profiles that rejects any change to role/company_id unless the session is service_role, and narrow the authenticated UPDATE grant to a column list excluding role/company_id. Claude can write the migration + fold into schema.sql (FABLE); OWNER must apply it to live AND immediately audit `select id,email,role,company_id from user_profiles where role in ('system_admin','executive')` for any already-escalated accounts.
+**Fix (SHARED).** Add an explicit WITH CHECK to the update policy that freezes privileged columns, e.g. WITH CHECK (id = auth.uid() AND role = (select role from public.user_profiles where id = auth.uid()) AND company_id IS NOT DISTINCT FROM (select company_id from public.user_profiles where id = auth.uid())); OR, more robustly, add a BEFORE UPDATE trigger on user_profiles that rejects any change to role/company_id unless the session is service_role, and narrow the authenticated UPDATE grant to a column list excluding role/company_id. Claude can write the migration + fold into schema.sql (CLAUDE); OWNER must apply it to live AND immediately audit `select id,email,role,company_id from user_profiles where role in ('system_admin','executive')` for any already-escalated accounts.
 
 **Tests required.** `As a freshly signed-up individual, PATCH own user_profiles role->system_admin via PostgREST and assert 403/no-op` · `Assert store_manager cannot change own company_id` · `Assert service-role/onboarding paths can still set privileged roles`
 
@@ -290,7 +290,7 @@ _Status values: NOT STARTED · INVESTIGATING · BLOCKED · WAITING FOR OWNER · 
 
 ### SEC-003 — GET /api/suppliers returns every tenant's supplier directory (missing company_id filter)
 **Category:** tenant-isolation · **Severity:** high · **Confidence:** confirmed · **Adversarial verify:** CONFIRMED 3/3
-**Status:** NOT STARTED · **Owner:** FABLE · **Production blocker:** Yes · **Score impact:** Cross-tenant data exposure — treat as launch blocker for multi-tenant confidentiality.
+**Status:** NOT STARTED · **Owner:** CLAUDE · **Production blocker:** Yes · **Score impact:** Cross-tenant data exposure — treat as launch blocker for multi-tenant confidentiality.
 **Affected files:** app/api/suppliers/route.ts · **Lines:** 22-43 (requireAdmin 22-29; GET 31-43; unfiltered query 36-39) · **Component:** Sub-Suppliers directory API
 
 **Problem.** requireAdmin() selects only `role` (line 26) and checks `profile?.role !== 'supplier'` (line 27) — it does NOT read or require company_id. GET then runs `createAdminClient().from('suppliers').select('*').order('company_name')` (lines 36-39) with NO `.eq('company_id', ...)` filter. Because createAdminClient() is the service-role client that bypasses RLS, any supplier-role user (any tenant) receives the full cross-tenant suppliers table.
@@ -303,7 +303,7 @@ _Status values: NOT STARTED · INVESTIGATING · BLOCKED · WAITING FOR OWNER · 
 
 **Required secure outcome.** A supplier-role user may only read suppliers where company_id equals their own profile.company_id.
 
-**Fix (FABLE).** Make requireAdmin() select `role, company_id` and return the companyId (as [id]/route.ts already does); in GET add `.eq('company_id', ctx.companyId)`. Consider adding a rateLimit to GET as defense-in-depth. Optionally enforce a DB-side company_id NOT NULL so the admin path can't silently drop the tenant tag.
+**Fix (CLAUDE).** Make requireAdmin() select `role, company_id` and return the companyId (as [id]/route.ts already does); in GET add `.eq('company_id', ctx.companyId)`. Consider adding a rateLimit to GET as defense-in-depth. Optionally enforce a DB-side company_id NOT NULL so the admin path can't silently drop the tenant tag.
 
 **Tests required.** `Supplier user in company A calls GET /api/suppliers and receives only company A's suppliers (company B rows absent)` · `Row with NULL company_id is not returned to any tenant`
 
@@ -311,7 +311,7 @@ _Status values: NOT STARTED · INVESTIGATING · BLOCKED · WAITING FOR OWNER · 
 
 ### SEC-004 — Store manager (client) can tamper with supplier quote amount/status — quotes UPDATE has no WITH CHECK
 **Category:** business-logic · **Severity:** high · **Confidence:** confirmed
-**Status:** NOT STARTED · **Owner:** FABLE · **Production blocker:** Yes · **Score impact:** see below
+**Status:** NOT STARTED · **Owner:** CLAUDE · **Production blocker:** Yes · **Score impact:** see below
 **Affected files:** supabase/schema.sql · **Lines:** schema.sql:1524-1526 · **Component:** quotes RLS
 
 **Problem.** `create policy "quotes update" on public.quotes for update using (((company_id = app_company_id()) AND app_can_see_ticket(ticket_id)));` (schema.sql:1524-1526) has no WITH CHECK, so it defaults to the USING expression. app_can_see_ticket() (1196-1209) returns true for store users whose store owns the ticket (t.store_id IN app_store_ids()). Because `authenticated` holds table-wide UPDATE, a store_manager can PATCH the supplier's quote row — including `amount`, `amount_incl_vat`, `status`, `decline_reason` (schema.sql:223-229) — directly via PostgREST.
@@ -324,7 +324,7 @@ _Status values: NOT STARTED · INVESTIGATING · BLOCKED · WAITING FOR OWNER · 
 
 **Required secure outcome.** Only the awarded/owning supplier (or an admin) may modify a quote; the client store may read and accept/decline via a controlled path, not free-form column writes.
 
-**Fix (FABLE).** Restrict the quotes UPDATE policy to the supplier who owns the quote (supplier_id IN app_supplier_ids()) or admin roles, and add an explicit WITH CHECK; route client accept/decline through a server API that only flips status. Also tighten `quotes write` (INSERT, 1528-1530) so only suppliers/admins can insert quotes, not any ticket-visible store user.
+**Fix (CLAUDE).** Restrict the quotes UPDATE policy to the supplier who owns the quote (supplier_id IN app_supplier_ids()) or admin roles, and add an explicit WITH CHECK; route client accept/decline through a server API that only flips status. Also tighten `quotes write` (INSERT, 1528-1530) so only suppliers/admins can insert quotes, not any ticket-visible store user.
 
 **Tests required.** `As store_manager on own ticket, PATCH quotes.amount -> expect denied` · `As owning supplier, PATCH own quote.amount -> allowed` · `As store_manager, INSERT a quote row -> denied`
 
@@ -332,7 +332,7 @@ _Status values: NOT STARTED · INVESTIGATING · BLOCKED · WAITING FOR OWNER · 
 
 ### SEC-005 — GET /api/suppliers leaks every tenant's supplier directory (no company_id filter, RLS bypassed)
 **Category:** tenant-isolation · **Severity:** high · **Confidence:** confirmed · **Adversarial verify:** CONFIRMED 3/3
-**Status:** NOT STARTED · **Owner:** FABLE · **Production blocker:** Yes · **Score impact:** Confirmed cross-tenant PII disclosure — production blocker for go-live.
+**Status:** NOT STARTED · **Owner:** CLAUDE · **Production blocker:** Yes · **Score impact:** Confirmed cross-tenant PII disclosure — production blocker for go-live.
 **Affected files:** app/api/suppliers/route.ts · **Lines:** 22-29 (requireAdmin), 31-43 (GET) · **Component:** Sub-supplier directory API (v2 leftover)
 
 **Problem.** GET /api/suppliers authenticates only on role: requireAdmin() checks profile.role==='supplier' and returns the user WITHOUT capturing company_id (lines 22-29). The handler then runs `adminClient.from('suppliers').select('*').order('company_name')` with NO `.eq('company_id', ...)` filter (lines 36-39) on the service-role client, which bypasses RLS. So ANY supplier-role user — including an unverified self-signup 'pool' supplier still pending admin review — can read the full suppliers row for EVERY company on the platform: company_name, contact_name, email, phone, address, trade, VAT number, qualification_number, qualification_expiry, and notes. Every other route that touches this table is correctly tenant-scoped (suppliers/[id]/route.ts PATCH/DELETE use `.eq('company_id', ctx.companyId)`; regional/suppliers/[id]/route.ts checks `sup.company_id !== companyId`; provision.add_supplier sets company_id), which confirms `suppliers` is meant to be company-scoped and this route is the inconsistency.
@@ -345,7 +345,7 @@ _Status values: NOT STARTED · INVESTIGATING · BLOCKED · WAITING FOR OWNER · 
 
 **Required secure outcome.** A supplier-role user can only read suppliers rows belonging to their own company (and, if intended, the Motiv pool) — never another tenant's directory.
 
-**Fix (FABLE).** Either delete the dead route file (the UI page already redirects away) or scope it: capture company_id in requireAdmin() and add `.eq('company_id', companyId)` to the GET. Given suppliers[].company_id can be NULL for Motiv-pool rows, decide explicitly whether pool suppliers should be visible.
+**Fix (CLAUDE).** Either delete the dead route file (the UI page already redirects away) or scope it: capture company_id in requireAdmin() and add `.eq('company_id', companyId)` to the GET. Given suppliers[].company_id can be NULL for Motiv-pool rows, decide explicitly whether pool suppliers should be visible.
 
 **Tests required.** `Supplier A (company X) GETs /api/suppliers and receives only company X's suppliers` · `Self-signup pending-review supplier (company_id null) cannot read any company's suppliers`
 
@@ -472,13 +472,13 @@ Legend: **API** = route handler check · **DB** = RLS/policy · **Storage** = bu
 | RLS-1 | user_profiles | UPDATE policy no WITH CHECK → role/company escalation (SEC-001) | WITH CHECK + BEFORE-UPDATE trigger + narrow grant | low (policy only) | SHARED | NOT STARTED |
 | RLS-2 | tickets | UPDATE policy lets supplier self-complete (SEC-002) | Drop browser UPDATE policy (admin client is sole writer) | low | SHARED | NOT STARTED |
 | RLS-3 | quotes/signoffs/ticket_variations | Browser write bypass (SEC-004/006) | Drop browser write policies; keep SELECT | low | SHARED | NOT STARTED |
-| RLS-4 | approvals/decision_items/snags/supplier_escalations/supplier_invites | WITH CHECK weaker than USING; no role gate (SEC-011/012) | Mirror USING into WITH CHECK + role predicate | low | FABLE | NOT STARTED |
-| RLS-5 | ticket_updates/ticket_evidence | author_id/uploaded_by not bound to caller (SEC-013) | Add author_id = auth.uid() to WITH CHECK | low | FABLE | NOT STARTED |
+| RLS-4 | approvals/decision_items/snags/supplier_escalations/supplier_invites | WITH CHECK weaker than USING; no role gate (SEC-011/012) | Mirror USING into WITH CHECK + role predicate | low | CLAUDE | NOT STARTED |
+| RLS-5 | ticket_updates/ticket_evidence | author_id/uploaded_by not bound to caller (SEC-013) | Add author_id = auth.uid() to WITH CHECK | low | CLAUDE | NOT STARTED |
 | FK-1 | tickets/ratings/technicians | Missing FKs (SEC-019/020/021) | Add FKs + indexes; clean orphans first | medium (verify orphans) | SHARED | NOT STARTED |
 | CHK-1 | status/priority/score enums | No CHECK constraints (SEC-022) | Add CHECKs from live DISTINCT values | medium (enumerate live first) | SHARED | NOT STARTED |
 | IDX-1 | tickets/quotes/notifications | FK/hot-path indexes likely absent (SEC-023) | Add btree indexes; verify pg_indexes live first | low | SHARED | NOT STARTED |
 | SCHEMA-1 | schema.sql | Omits CHECK/indexes → drift unverifiable (SEC-039) | Reconcile from live pg_dump; update header | none | SHARED | NOT STARTED |
-| UNIQ-1 | ticket_suppliers | No unique(ticket_id,supplier_id) (SEC-035) | Add unique index; de-dup route | low | FABLE | NOT STARTED |
+| UNIQ-1 | ticket_suppliers | No unique(ticket_id,supplier_id) (SEC-035) | Add unique index; de-dup route | low | CLAUDE | NOT STARTED |
 
 > **High-risk changes (FK-1, CHK-1) require: backup first · verify no orphans/invalid values on live · rollback = drop the constraint · post-migration verify count.** Never run destructive production migrations automatically.
 
@@ -493,18 +493,18 @@ Legend: **API** = route handler check · **DB** = RLS/policy · **Storage** = bu
 | OPS-003 | Supabase Auth dashboard not hardened | Redirect allowlist, confirm-email, server-side min password, signup CAPTCHA, and custom SMTP are dashboard settings not in the repo. | HIGH | Yes | Set Site/redirect allowlist (no wildcards), Confirm-email ON, min-pw ≥8 server-side, hCaptcha/Turnstile on signup, custom SMTP sender. | NOT STARTED |
 | OPS-004 | No uptime monitoring or log drain/alerting | Handled 500s only hit ephemeral Vercel logs; no 5xx/auth-failure alerting; no uptime probe. | MED | No | Add uptime monitor on public URL + key APIs; Vercel log drain with 5xx + auth-failure alerts. | NOT STARTED |
 | OPS-005 | Legal pages are placeholder templates | /privacy /terms /sla contain bracketed template copy; commercial launch needs real, lawyer-reviewed content. | HIGH | Yes | Draft real content + lawyer sign-off. | NOT STARTED |
-| OPS-006 | POPIA Information Officer not registered; no signup consent | SA privacy law requires a registered Information Officer + a consent record at signup. | HIGH | Yes | OWNER: register Information Officer with the Information Regulator; FABLE: add signup consent checkbox with stored timestamp. | NOT STARTED |
+| OPS-006 | POPIA Information Officer not registered; no signup consent | SA privacy law requires a registered Information Officer + a consent record at signup. | HIGH | Yes | OWNER: register Information Officer with the Information Regulator; CLAUDE: add signup consent checkbox with stored timestamp. | NOT STARTED |
 | OPS-007 | No independent penetration test / security assessment | Scoring caps overall at 9.4 until an authorized independent assessment is completed for a high-risk multi-tenant app. | MED | No | Commission an independent pen test after the P0/P1 code fixes land. | NOT STARTED |
 | OPS-008 | No staging environment / migration rehearsal + no incident runbook | Migrations + framework upgrades hit prod without rehearsal; no documented key-rotation/rollback/restore runbook. | MED | No | Stand up a 2nd Vercel project + Supabase branch; write an incident runbook. | NOT STARTED |
 | OWN-DB1 | Run `select id,email,role,company_id from user_profiles where role in ('system_admin','executive')` on live after SEC-001 fix | Detect any already-escalated accounts | HIGH | Yes | Paste result back (redact emails) | NOT STARTED |
-| OWN-DB2 | Run `select indexname,indexdef from pg_indexes where schemaname='public'` + `export_live_schema.sql` | Verify indexes/CHECKs before IDX-1/CHK-1/SCHEMA-1 | MED | No | Paste output for FABLE to reconcile | NOT STARTED |
-| OWN-APPLY | Apply each FABLE migration to dev→prod via Supabase SQL Editor + merge PRs | Migrations are applied manually here; main is branch-protected | HIGH | Yes | Copy migration → SQL Editor → Run; then click merge | ongoing |
+| OWN-DB2 | Run `select indexname,indexdef from pg_indexes where schemaname='public'` + `export_live_schema.sql` | Verify indexes/CHECKs before IDX-1/CHK-1/SCHEMA-1 | MED | No | Paste output for CLAUDE to reconcile | NOT STARTED |
+| OWN-APPLY | Apply each CLAUDE migration to dev→prod via Supabase SQL Editor + merge PRs | Migrations are applied manually here; main is branch-protected | HIGH | Yes | Copy migration → SQL Editor → Run; then click merge | ongoing |
 
 > Never paste full secrets/tokens/passwords into chat or this file. Use the Supabase/Vercel dashboards directly.
 
 ---
 
-## 14. FABLE implementation queue (risk order)
+## 14. CLAUDE implementation queue (risk order)
 
 | Order | ID(s) | Task | Sev | Depends on | Status |
 |---:|---|---|---|---|---|
@@ -528,13 +528,13 @@ Legend: **API** = route handler check · **DB** = RLS/policy · **Storage** = bu
 | Suite | Have | Missing (add) | Owner |
 |---|---|---|---|
 | Workflow transitions | ✓ 277-case matrix | — | — |
-| API authZ (tickets) | ✓ 18 cases | extend to suppliers/provision/assign | FABLE |
-| **Cross-tenant / RLS negative** | ❌ | supplier-can't-PATCH-ticket; individual-can't-escalate-role; SM-can't-edit-quote; A-can't-read-B-suppliers; forge-signoff denied | FABLE |
-| Health engine | partial (storeHealth/sla) | regional/estate/ticket/supplierPerf/repeatDefects/decisions | FABLE |
-| File upload | ❌ | MIME/size reject; per-user path; signed-URL 403 | FABLE |
-| Business workflow e2e | ❌ | evidence-required, SoD, project progress | FABLE |
+| API authZ (tickets) | ✓ 18 cases | extend to suppliers/provision/assign | CLAUDE |
+| **Cross-tenant / RLS negative** | ❌ | supplier-can't-PATCH-ticket; individual-can't-escalate-role; SM-can't-edit-quote; A-can't-read-B-suppliers; forge-signoff denied | CLAUDE |
+| Health engine | partial (storeHealth/sla) | regional/estate/ticket/supplierPerf/repeatDefects/decisions | CLAUDE |
+| File upload | ❌ | MIME/size reject; per-user path; signed-URL 403 | CLAUDE |
+| Business workflow e2e | ❌ | evidence-required, SoD, project progress | CLAUDE |
 | Migrations / restore | ❌ | migration apply + **restore drill** | OWNER |
-| Production smoke | ❌ (manual) | Playwright signed-URL 403 + role dashboards | FABLE/OWNER |
+| Production smoke | ❌ (manual) | Playwright signed-URL 403 + role dashboards | CLAUDE/OWNER |
 
 ---
 
@@ -543,7 +543,7 @@ Legend: **API** = route handler check · **DB** = RLS/policy · **Storage** = bu
 | Item | Finding | Status |
 |---|---|---|
 | No secrets committed; `.env`/keystore gitignored (only `.example`) | SEC-051 ✓ | VERIFIED (review) |
-| `lib/auth-token.ts` weak fallback `'motiv-insecure-fallback'` if SERVICE_ROLE_KEY unset | (prior audit P3-2) | throw-on-missing (FABLE) |
+| `lib/auth-token.ts` weak fallback `'motiv-insecure-fallback'` if SERVICE_ROLE_KEY unset | (prior audit P3-2) | throw-on-missing (CLAUDE) |
 | `.env.example` complete; `NEXT_PUBLIC_ADMIN_EMAILS` marked deprecated | ✓ | OK |
 | Rotate any key ever pasted/leaked; `WHATSAPP_APP_SECRET` set once Meta registered | OPS/owner | pending |
 
@@ -555,9 +555,9 @@ Legend: **API** = route handler check · **DB** = RLS/policy · **Storage** = bu
 
 | ID | Question | Recommendation | Impact | Status |
 |---|---|---|---|---|
-| D1 | Should the browser (RLS-bound) client EVER write tickets/quotes/signoffs directly, or is the service-role admin client always the writer? | Admin client only — drop browser write policies (code review found no legitimate browser writer) | Unblocks SEC-002/004/006 fix cleanly | OPEN |
+| D1 | Should the browser (RLS-bound) client EVER write tickets/quotes/signoffs directly, or is the service-role admin client always the writer? | Admin client only — drop browser write policies (code review found no legitimate browser writer) | Unblocks SEC-002/004/006 fix cleanly | ✅ RESOLVED — admin-client-only; browser write policies dropped (20260717, VERIFIED) |
 | D2 | Is `executive` intended read-only, or does it have company-scoped write? | Decide + align code/docs (SEC-045) | Authorization correctness | OPEN |
-| D3 | Should Motiv-pool suppliers (company_id null) be visible in `/api/suppliers`? | Explicit allowlist, not implicit | SEC-003/005 fix shape | OPEN |
+| D3 | Should Motiv-pool suppliers (company_id null) be visible in `/api/suppliers`? | Explicit allowlist, not implicit | SEC-003/005 fix shape | ✅ RESOLVED — GET scoped to caller's company only; pool rows excluded (SEC-003/005 VERIFIED) |
 | D4 | Hard-delete vs soft-delete for user/company erasure (POPIA)? | Soft-delete + anonymise; document | SEC-024 / FK ON DELETE | OPEN |
 | D5 | `app_settings` global vs per-tenant? | Global now (single tenant); restrict writes to a platform-owner id (SEC-014) | Multi-tenant future | OPEN |
 | D6 | SLA priority timings (P1/P2 windows) | Decide → align sla_rules + FALLBACK_SLA, bump SLA_VERSION | SLA correctness | OPEN |
@@ -599,7 +599,9 @@ _None accepted yet. Claude may recommend acceptance; only the owner may accept a
 
 | Date | Commit | Change | Findings | By |
 |---|---|---|---|---|
-| 2026-07-15 | 561406b | Programme created from 10-agent audit + adversarial verify | all | FABLE |
+| 2026-07-15 | 561406b | Programme created from 10-agent audit + adversarial verify | all | CLAUDE |
+| 2026-07-16 | (road-to-9.5→main PR#33-37) | RLS + FK migrations applied dev+prod & VERIFIED; ~19 code fixes deployed; tenant-isolation suite (378 tests); Turnstile CAPTCHA live; POPIA consent + PII-log fixes; OPS-003 free auth-hardening done | SEC-001..006 VERIFIED; 019-022/035 done; 003/005/026/027/etc deployed | CLAUDE |
+| 2026-07-16 | (this update) | Ownership label FABLE→CLAUDE; readiness gates + §21 score (7.0) + decisions D1/D3 reconciled to verified state | docs | CLAUDE |
 
 ---
 
@@ -609,20 +611,20 @@ Weighted model (evidence-based). Raw weighted = Σ(weight×score):
 
 | Category | Weight | Score | Weighted |
 |---|---:|---:|---:|
-| Application security | 20% | 4.0 | 0.80 |
-| Authorization & tenant isolation | 20% | 3.5 | 0.70 |
-| Database security & integrity | 15% | 5.0 | 0.75 |
+| Application security | 20% | 7.5 | 1.50 |
+| Authorization & tenant isolation | 20% | 7.5 | 1.50 |
+| Database security & integrity | 15% | 7.0 | 1.05 |
 | Reliability & recovery | 10% | 5.5 | 0.55 |
 | Infrastructure & deployment | 10% | 7.0 | 0.70 |
 | Authentication & sessions | 8% | 8.0 | 0.64 |
 | Code quality & maintainability | 7% | 7.5 | 0.53 |
-| Testing & CI/CD | 7% | 7.0 | 0.49 |
-| Privacy & operational readiness | 3% | 5.0 | 0.15 |
-| **Raw weighted** | | | **5.31** |
+| Testing & CI/CD | 7% | 7.5 | 0.53 |
+| Privacy & operational readiness | 3% | 6.5 | 0.20 |
+| **Raw weighted** | | | **7.19** |
 
-**Caps applied (methodology):** confirmed cross-tenant vulnerability → **max 4.0** (SEC-003/005); open critical vulnerability → max 5.0 (SEC-001/002); no verified backup/restore → max 7.5; no tenant-isolation tests → max 7.0; no independent assessment → max 9.4. **Binding cap = 4.0.**
+**Caps applied (methodology):** SEC-001…006 are now VERIFIED-closed on prod, so the confirmed-cross-tenant (max 4.0) and open-critical (max 5.0) caps **no longer apply**. Remaining caps: no verified backup/restore → **max 7.5** (OPS-001, paid); no independent assessment → max 9.4 (OPS-007). **Binding cap = 7.5.**
 
-**Overall production-readiness score: 4.0 / 10.** The cap — not the raw 5.31 — governs, because a confirmed cross-tenant data leak and browser-reachable privilege escalation are present. Closing SEC-001/002/003/004/005/006 lifts the caps; the score then rises toward the raw weighted and, after backups + tenant tests + monitoring + pen test, toward 9.5.
+**Overall production-readiness score: 7.0 / 10** (raw 7.19, held just under the 7.5 backup cap; rounded to 7.0 pending broader route observability + region-isolation verification). Path to 9.5: DB backups + restore drill (lifts the 7.5 cap), then monitoring/alerting, remaining behavioral fixes (SEC-018/038), and an independent pen test (lifts the 9.4 cap).
 
 **A verified 9.5 additionally requires (not code-review alone):** passing tenant-isolation + RLS-policy tests, verified backups + a successful restore drill, live monitoring + alerting, secure deployment controls, and an independent security assessment.
 
@@ -631,23 +633,23 @@ Weighted model (evidence-based). Raw weighted = Σ(weight×score):
 ## 22. Final readiness gates
 
 ### Security
-- [ ] No open critical vulnerabilities (SEC-001, SEC-002)
-- [ ] No unmitigated high vulnerabilities (SEC-003/004/005/006)
-- [ ] Server-side authorization verified · [ ] Company isolation verified · [ ] Region · [ ] Store · [ ] Supplier · [ ] Project (✓ control) isolation verified
-- [ ] File uploads + evidence protection verified (signed-URL 403) · [ ] Secrets rotated where needed · [x] Security headers · [ ] Rate limiting on /view /seen · [x] Audit logging present
+- [x] No open critical vulnerabilities (SEC-001, SEC-002 VERIFIED closed on prod)
+- [x] No unmitigated high vulnerabilities (SEC-003/004/005/006 VERIFIED)
+- [x] Server-side authorization verified (route authZ + tenant-isolation test suite) · [x] Company isolation · [ ] Region (partial) · [x] Store · [x] Supplier · [x] Project (control confirmed) isolation verified
+- [ ] File uploads + evidence protection verified (signed-URL 403 — owner live check pending) · [x] Secrets: none committed (EV/SEC-051) · [x] Security headers · [x] Rate limiting on /view /seen (SEC-026/027) · [x] Audit logging present · [x] Signup CAPTCHA live (OPS-003)
 
 ### Database
-- [ ] RLS write policies hardened (WITH CHECK / drop browser writes) · [ ] Least-privilege grants · [ ] Tenant enforcement tested · [ ] Constraints (FK/CHECK) added · [ ] schema.sql reconciled from live · [ ] Backups confirmed · [ ] **Restore drill completed** · [x] Audit records immutable to end users
+- [x] RLS write policies hardened (browser write policies dropped, 20260717, VERIFIED live) · [x] Tenant enforcement tested (tenant-isolation suite) · [x] Constraints (FK/CHECK) added (20260718, applied dev+prod) · [x] schema.sql reconciled from live (indexes/CHECKs folded) · [ ] Least-privilege grants (table-wide grant still broad; mitigated by RLS+trigger) · [ ] Backups confirmed (OPS-001, paid) · [ ] **Restore drill completed** · [x] Audit records immutable to end users
 
 ### Reliability
-- [ ] Error handling → Sentry on handled 500s · [ ] Monitoring + alerting operational · [ ] Rollback/runbook documented · [ ] Critical workflows e2e tested · [ ] Multi-write atomicity addressed
+- [x] Error handling → Sentry on handled cron 500s (SEC-040; broader routes still TODO) · [ ] Monitoring + alerting operational (uptime pending) · [ ] Rollback/runbook documented · [ ] Critical workflows e2e tested (unit-level done) · [ ] Multi-write atomicity addressed (SEC-038 open)
 
 ### Delivery
-- [x] CI checks passing (tsc/lint/test/build/audit) · [ ] Authorization + tenant-isolation tests passing · [ ] Secret scan · [x] Prod/dev separation (verify no silent prod writes) · [ ] Owner blockers (OPS-001..006) resolved · [ ] Independent security review
+- [x] CI checks passing (tsc/lint/378 tests/build/audit) · [x] Authorization + tenant-isolation tests passing · [x] Secret scan (none committed) · [x] Prod/dev separation · [ ] Owner blockers (OPS-001/005/006 paid+legal) resolved · [ ] Independent security review (OPS-007)
 
 ---
 
 ## 23. Deliverables produced this session
-1. This programme file · 2. [`motiv-security-findings.json`](motiv-security-findings.json) (49 findings, full detail + verification verdicts) · 3. [`motiv-remediation-backlog.csv`](motiv-remediation-backlog.csv) · 4. Architecture map (§3) · 5. Threat model (§4) · 6. Role matrix (§9) · 7. Tenant register (§10) · 8. Endpoint inventory (§11) · 9. DB plan (§12) · 10. Owner list (§13) · 11. FABLE queue (§14) · 12. Test-gap matrix (§15) · 13. Scoring (§21) · 14. Readiness gates (§22). Plain-English companion: [`docs/PRODUCTION_AUDIT_2026-07-15.md`](docs/PRODUCTION_AUDIT_2026-07-15.md).
+1. This programme file · 2. [`motiv-security-findings.json`](motiv-security-findings.json) (49 findings, full detail + verification verdicts) · 3. [`motiv-remediation-backlog.csv`](motiv-remediation-backlog.csv) · 4. Architecture map (§3) · 5. Threat model (§4) · 6. Role matrix (§9) · 7. Tenant register (§10) · 8. Endpoint inventory (§11) · 9. DB plan (§12) · 10. Owner list (§13) · 11. CLAUDE queue (§14) · 12. Test-gap matrix (§15) · 13. Scoring (§21) · 14. Readiness gates (§22). Plain-English companion: [`docs/PRODUCTION_AUDIT_2026-07-15.md`](docs/PRODUCTION_AUDIT_2026-07-15.md).
 
 _End-of-session summary at the bottom of the owner's chat. Do not mark any item VERIFIED without recorded evidence._
