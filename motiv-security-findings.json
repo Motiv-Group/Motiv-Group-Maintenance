@@ -582,7 +582,7 @@
       "verified": false,
       "verifiedConfirmed": null,
       "verifiedVotes": "",
-      "status": "NOT STARTED"
+      "status": "WAITING FOR OWNER"
     },
     {
       "id": "SEC-020",
@@ -608,7 +608,7 @@
       "verified": false,
       "verifiedConfirmed": null,
       "verifiedVotes": "",
-      "status": "NOT STARTED"
+      "status": "WAITING FOR OWNER"
     },
     {
       "id": "SEC-021",
@@ -634,7 +634,7 @@
       "verified": false,
       "verifiedConfirmed": null,
       "verifiedVotes": "",
-      "status": "NOT STARTED"
+      "status": "WAITING FOR OWNER"
     },
     {
       "id": "SEC-022",
@@ -660,7 +660,7 @@
       "verified": false,
       "verifiedConfirmed": null,
       "verifiedVotes": "",
-      "status": "NOT STARTED"
+      "status": "WAITING FOR OWNER"
     },
     {
       "id": "SEC-023",
@@ -686,7 +686,7 @@
       "verified": false,
       "verifiedConfirmed": null,
       "verifiedVotes": "",
-      "status": "NOT STARTED"
+      "status": "NOT APPLICABLE"
     },
     {
       "id": "SEC-024",
@@ -1015,7 +1015,7 @@
       "verified": false,
       "verifiedConfirmed": null,
       "verifiedVotes": "",
-      "status": "NOT STARTED"
+      "status": "VERIFIED"
     },
     {
       "id": "SEC-036",

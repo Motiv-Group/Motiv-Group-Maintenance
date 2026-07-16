@@ -76,7 +76,19 @@
 **C. Prove the suppliers leak is closed (via the app / API, logged in as a supplier):**
 - [ ] `GET /api/suppliers` returns **only your own company's** suppliers (no other tenant's rows).
 
-**D. Owner infra (see §13):** buy Supabase Pro + enable PITR (OPS-001), run a **backup-restore drill** (OPS-002 area), Vercel Pro (OPS-002), Auth dashboard hardening (OPS-003), uptime + log-drain alerts (OPS-004), legal copy + POPIA officer (OPS-005/006). Provide `pg_indexes` + `export_live_schema.sql` output (OWN-DB2) so Claude can finish the FK/CHECK/index migrations.
+**D. Owner infra — split FREE-now vs PAID-later** (owner decided 2026-07-16: do the free-tier items now, defer paid-tier until upgrading).
+
+_Do NOW (free tier):_
+- [ ] **OPS-003 Auth hardening** (Supabase free supports all of these *except* leaked-password): redirect allowlist (no wildcards), Confirm-email ON, min-password ≥8 server-side, **CAPTCHA on signup** (hCaptcha/Turnstile — free), custom SMTP sender.
+- [ ] **OPS-004 uptime monitor** — a free UptimeRobot check on the public URL + key API routes. (Sentry is already wired/free.)
+- [ ] **Apply `supabase/migrations/20260718_fk_check_hardening.sql`** (dev → prod) — the FK/CHECK migration Claude just wrote (D-6 payoff).
+- [ ] POPIA **signup consent checkbox** — Claude can code this now (free).
+
+_Defer until PAID (record here; do when upgrading — see `docs/INFRASTRUCTURE_TIERS.md`):_
+- [ ] **OPS-001 Supabase Pro** (~$25/mo) → daily backups + **PITR** + a **restore drill**. *(Required before real customer data.)*
+- [ ] **OPS-002 Vercel Pro** (~$20/mo) → commercial license + log drains + sub-daily crons.
+- [ ] Leaked-password protection (Supabase Pro), Vercel **log-drain** 5xx/auth alerts (Pro).
+- [ ] **OPS-005 legal copy** + lawyer, **OPS-006 Information Officer** registration (external/THIRD_PARTY), **OPS-007 pen test** (external).
 
 ---
 
