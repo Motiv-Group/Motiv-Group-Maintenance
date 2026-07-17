@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import { redirect } from 'next/navigation'
-import { ClipboardCheck, FileText, Calendar, Clock, CheckCircle2, Info, ChevronDown } from 'lucide-react'
+import { ClipboardCheck, FileText, Calendar, Clock, CheckCircle2, Info } from 'lucide-react'
 import { SubmitCompletionForm } from '@/components/supplier/SubmitCompletionForm'
 import { BackLink } from '@/components/ui/BackLink'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
@@ -21,8 +21,10 @@ import { Card } from '@/components/exec/ui'
 import { WorkflowActions } from '@/components/workflow/WorkflowActions'
 import { RmPipeline } from '@/components/regional/RmPipeline'
 import { SupplierAttachments } from '@/components/workflow/SupplierAttachments'
-import { CompletionBody, CompletionFooterNote } from '@/components/workflow/CompletionBody'
+import { CompletionFooterNote } from '@/components/workflow/CompletionBody'
 import { QuoteSummary, type QuoteSummaryStatus } from '@/components/workflow/QuoteSummary'
+import { ArchiveGroup } from '@/components/ticket/ArchiveGroup'
+import { SignoffCard } from '@/components/ticket/SignoffCard'
 import { MarkInProgressButton, DeclineWorkButton, AcceptSnagCard, StartSnagButton, SupplierVariationGate, SupplierQuoteBar, SupplierQuoteSubmittedActions } from '@/components/supplier/SupplierJobActions'
 import { PopupForm } from '@/components/supplier/PopupForm'
 import { RaiseDisputeButton, RaiseDisputeMore, DisputeThread, DisputeControls } from '@/components/dispute/DisputeBox'
@@ -35,84 +37,6 @@ import { formatCurrency, formatDateTime, supplierStatusMeta, storeLabel, OPERATI
 
 // Shown when the RM declined a quote without typing a reason.
 const DEFAULT_DECLINE_REASON = 'Thank you for your submission. Although your quotation was not selected for this request, we value your participation and look forward to inviting you to future opportunities.'
-
-// Tone for the submitted-completion (sign-off) card — mirrors QuoteSummary.
-const SIGNOFF_META: Record<string, { label: string; ring: string; bg: string; head: string; badge: string; iconCls: string }> = {
-  accepted: { label: 'Approved', ring: 'ring-emerald-500/40', bg: 'bg-emerald-500/5', head: 'bg-emerald-500/10 border-emerald-500/20', badge: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400', iconCls: 'text-emerald-500' },
-  rejected: { label: 'Rejected', ring: 'ring-red-500/40', bg: 'bg-red-500/5', head: 'bg-red-500/10 border-red-500/20', badge: 'bg-red-500/15 text-red-700 dark:text-red-400', iconCls: 'text-red-500' },
-  evidence_requested: { label: 'More info requested', ring: 'ring-amber-500/40', bg: 'bg-amber-500/5', head: 'bg-amber-500/10 border-amber-500/20', badge: 'bg-amber-500/15 text-amber-700 dark:text-amber-400', iconCls: 'text-amber-500' },
-  submitted: { label: 'Under review', ring: 'ring-[#f59e0b]/40', bg: 'bg-[#f59e0b]/5', head: 'bg-[#f59e0b]/10 border-[#f59e0b]/20', badge: 'bg-[#f59e0b]/15 text-amber-700 dark:text-[#f59e0b]', iconCls: 'text-[#f59e0b]' },
-}
-
-// A labelled sub-group inside the Archived block — a small uppercase heading over
-// its cards so mixed archived items (quotes, requests, submissions…) stay separated
-// and scannable without cluttering the section.
-function ArchiveGroup({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-2">
-      <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-faint)]">{label}</p>
-      {children}
-    </div>
-  )
-}
-
-// One COC & POC submission card — reused across the COC/POC, Snag and Completion
-// blocks. `snag` enriches a rejected submission with the "why it was sent back" reason.
-function SignoffCard({ s, snag, ticketId, collapsible = false, defaultOpen = false, title, reason, footer }: { s: any; snag?: { description?: string | null; required_correction?: string | null; severity?: string | null } | null; ticketId: string; collapsible?: boolean; defaultOpen?: boolean; title?: string; reason?: string | null; footer?: React.ReactNode }) {
-  const meta = SIGNOFF_META[s.status] ?? SIGNOFF_META.submitted
-  const before = (s.before_urls ?? []) as string[]
-  const after = (s.after_urls ?? []) as string[]
-  // Prefer the durable round reason; fall back to the reason on the signoff row.
-  const reasonText = reason ?? s.reject_reason
-  // Header ("Submission #N" / Completion · date/time + status badge) doubles as the
-  // click-to-expand summary when collapsible; the detail drops down below.
-  const header = (
-    <>
-      <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)] min-w-0"><ClipboardCheck size={15} className={`${meta.iconCls} shrink-0`} /><span className="truncate">{title ?? 'Completion'} · {formatDateTime(s.created_at)}</span></span>
-      <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 shrink-0 ${meta.badge}`}>{meta.label}</span>
-    </>
-  )
-  const body = (
-    <>
-        {s.status === 'rejected' && (reasonText || snag?.description || snag?.required_correction) && (
-          <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3 space-y-1">
-            <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Why it was sent back</p>
-            {(reasonText || snag?.description) && <p className="text-sm text-[var(--text)]">{reasonText || snag?.description}</p>}
-            {snag?.required_correction && <p className="text-sm text-[var(--text-muted)]"><span className="font-medium text-[var(--text)]">Required correction:</span> {snag.required_correction}</p>}
-            {snag?.severity && <p className="text-[11px] text-[var(--text-muted)] capitalize">Severity: {String(snag.severity).replace(/_/g, ' ')}</p>}
-          </div>
-        )}
-        {s.status === 'evidence_requested' && reasonText && (
-          <div className="rounded-lg bg-amber-500/10 ring-1 ring-amber-500/30 p-3">
-            <p className="text-[11px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400">Why more evidence was requested</p>
-            <p className="text-sm text-[var(--text)]">{reasonText}</p>
-          </div>
-        )}
-        <CompletionBody ticketId={ticketId} beforeUrls={before} afterUrls={after} cocUrl={s.coc_url} invoiceUrl={s.invoice_url} notes={s.notes} uploadedAt={s.created_at} />
-    </>
-  )
-  // Collapsed by default — tap the "Completion · … / Under review" row to reveal
-  // the proof-of-completion, COC and notes.
-  if (collapsible) {
-    return (
-      <details open={defaultOpen} className="group rounded-xl bg-[var(--surface)] ring-1 ring-[var(--border)] overflow-hidden">
-        <summary className="flex items-center gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
-          <span className="flex min-w-0 flex-1 items-center justify-between gap-2">{header}</span>
-          <ChevronDown size={16} className="shrink-0 text-[var(--text-faint)] transition-transform group-open:rotate-180" />
-        </summary>
-        <div className={`p-4 space-y-4 border-t border-[var(--border)]`}>{body}</div>
-        {footer && <div className={`border-t border-[var(--border)] px-4 py-3`}>{footer}</div>}
-      </details>
-    )
-  }
-  return (
-    <div className={`rounded-xl bg-[var(--surface)] ring-1 ring-[var(--border)] overflow-hidden`}>
-      <div className={`flex items-center justify-between gap-2 px-4 py-2.5 border-b border-[var(--border)]`}>{header}</div>
-      <div className="p-4 space-y-4">{body}</div>
-      {footer && <div className={`border-t border-[var(--border)] px-4 py-3`}>{footer}</div>}
-    </div>
-  )
-}
 
 export default async function SupplierTicketDetailPage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -403,13 +327,13 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
     : null
   const completionTab = (liveEvidence || pendingSignoffs.length > 0 || acceptedSignoff)
     ? (<div className="space-y-3">
-        {liveEvidence && <SignoffCard s={liveEvidence} ticketId={t.id} title={submissionLabel(liveEvidence)} reason={roundBySignoff.get(liveEvidence.id)?.reason ?? liveEvidence.reject_reason} collapsible defaultOpen />}
-        {pendingSignoffs.map(s => <SignoffCard key={s.id} s={s} ticketId={t.id} title={submissionLabel(s)} collapsible defaultOpen footer={<CompletionFooterNote>You will be notified once the Regional Manager has reviewed and signed off.</CompletionFooterNote>} />)}
-        {acceptedSignoff && <SignoffCard s={acceptedSignoff} ticketId={t.id} collapsible />}
+        {liveEvidence && <SignoffCard s={liveEvidence} ticketId={t.id} icon={ClipboardCheck} chevron title={submissionLabel(liveEvidence)} reason={roundBySignoff.get(liveEvidence.id)?.reason ?? liveEvidence.reject_reason} collapsible defaultOpen />}
+        {pendingSignoffs.map(s => <SignoffCard key={s.id} s={s} ticketId={t.id} icon={ClipboardCheck} chevron title={submissionLabel(s)} collapsible defaultOpen footer={<CompletionFooterNote>You will be notified once the Regional Manager has reviewed and signed off.</CompletionFooterNote>} />)}
+        {acceptedSignoff && <SignoffCard s={acceptedSignoff} ticketId={t.id} icon={ClipboardCheck} chevron title="Completion" collapsible />}
       </div>)
     : null
   const snagTab = liveSnag
-    ? <SignoffCard s={liveSnag} snag={latestSnag} ticketId={t.id} title={submissionLabel(liveSnag)} reason={roundBySignoff.get(liveSnag.id)?.reason ?? liveSnag.reject_reason} />
+    ? <SignoffCard s={liveSnag} snag={latestSnag} ticketId={t.id} icon={ClipboardCheck} badgeLabel="Rejected" title={submissionLabel(liveSnag)} reason={roundBySignoff.get(liveSnag.id)?.reason ?? liveSnag.reject_reason} />
     : null
   const voTab = variations.length > 0
     ? (<div className="space-y-3">{variations.map((v, i, arr) => {
@@ -511,7 +435,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
         {archivedSuperseded.length > 0 && (
           <ArchiveGroup label="Submissions">
             {archivedSuperseded.map(s => (
-              <SignoffCard key={s.id} s={s} ticketId={t.id} title={submissionLabel(s)} reason={roundBySignoff.get(s.id)?.reason ?? s.reject_reason} snag={s.status === 'rejected' && s.id === rejectedSignoffs[0]?.id ? latestSnag : null} collapsible />
+              <SignoffCard key={s.id} s={s} ticketId={t.id} icon={ClipboardCheck} chevron badgeLabel={s.status === 'rejected' ? 'Rejected' : undefined} title={submissionLabel(s)} reason={roundBySignoff.get(s.id)?.reason ?? s.reject_reason} snag={s.status === 'rejected' && s.id === rejectedSignoffs[0]?.id ? latestSnag : null} collapsible />
             ))}
           </ArchiveGroup>
         )}

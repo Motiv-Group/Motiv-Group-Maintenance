@@ -2,30 +2,28 @@
 
 // Supplier equivalent of the SM/RM Priority Work Queue: filtering KPI cards over
 // the supplier's active jobs, then an urgency-sorted queue with a phase-aware CTA
-// per row. Same look/behaviour as components/regional/RegionalPriorityWorkQueue.tsx,
-// with supplier lifecycle phases (submit quote → mark in progress → upload evidence
-// → sign-off). Uses `myStatus` isolation so a supplier only ever sees their own
-// quote state, never another supplier's progress.
+// per row. Same look/behaviour as components/regional/RegionalPriorityWorkQueue.tsx
+// (shared internals in components/workqueue/shared.tsx), with supplier lifecycle
+// phases (submit quote → mark in progress → upload evidence → sign-off). Uses
+// `myStatus` isolation so a supplier only ever sees their own quote state, never
+// another supplier's progress.
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { AlertCircle, AlertOctagon, AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, ClipboardList, ReceiptText, Camera, MessageSquare } from 'lucide-react'
+import { AlertOctagon, AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, ReceiptText, Camera } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import type { SupplierTicketRow } from '@/lib/health/data'
-import { Card } from '@/components/exec/ui'
-import { CategoryIcon } from '@/components/client/ticketBadges'
 import { Modal } from '@/components/ui/Modal'
 import { SendQuoteForm } from '@/components/admin/SendQuoteForm'
 import { SubmitCompletionForm } from '@/components/supplier/SubmitCompletionForm'
 import { SupplierVariationGate, AcceptSnagCard } from '@/components/supplier/SupplierJobActions'
 import { DisputeReviewButton, RaiseDisputeMore } from '@/components/dispute/DisputeBox'
-import { supplierStatusMeta, formatDate, formatDateTime, formatJobId, humanizeDuration, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
+import { supplierStatusMeta, formatJobId } from '@/lib/utils'
+import {
+  byUrgencyThenNewest, EmptyQueue, isActive, isCriticalPriority, MetricButton,
+  QueueCard, queueCtaClass, QueueRowBadges, QueueRowNextStep, QueueRowShell, QueueRowTitle,
+} from '@/components/workqueue/shared'
 
 type QueueFilter = 'all' | 'to_quote' | 'attend' | 'evidence' | 'snags' | 'sla'
-type Tone = 'red' | 'purple' | 'gold' | 'green' | 'orange' | 'blue'
-
-const URGENCY_RANK: Record<string, number> = { urgent: 0, P1: 0, high: 1, P2: 1, medium: 2, P3: 2, low: 3, P4: 3 }
-const INACTIVE = new Set(['completed', 'cancelled', 'declined'])
-const isActive = (s: string) => !INACTIVE.has(s)
 
 // The status THIS supplier should see — never another supplier's progress (e.g.
 // "Quoted" because someone else quoted). Mirrors app/supplier/page.tsx + SupplierTickets.
@@ -62,9 +60,7 @@ export function SupplierPriorityWorkQueue({ tickets, generatedAt, company }: { t
   const rows = useMemo(() =>
     activeTickets
       .filter(t => matchesFilter(t, filter))
-      .sort((a, b) =>
-        (URGENCY_RANK[String(a.priority)] ?? 9) - (URGENCY_RANK[String(b.priority)] ?? 9)
-        || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .sort(byUrgencyThenNewest)
       // Cap the queue at the top 5 — the rest live behind "View all tickets".
       .slice(0, 5),
     [activeTickets, filter])
@@ -84,59 +80,22 @@ export function SupplierPriorityWorkQueue({ tickets, generatedAt, company }: { t
           value={counts.sla} sub={counts.sla ? `${counts.sla} breaching` : 'On track'} subActive={counts.sla > 0} onClick={() => pick('sla')} />
       </section>
 
-      <Card className="overflow-hidden p-0">
-        <div className="flex items-start gap-3 border-b border-[var(--border)] px-5 py-5">
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-blue-600/15 text-blue-600 dark:text-blue-300">
-            <ClipboardList size={21} />
-          </span>
-          <div>
-            <h2 className="text-lg font-bold text-[var(--text)]">Priority Work Queue</h2>
-            <p className="mt-0.5 text-xs text-[var(--text-muted)]">Sorted by urgency, then most recent</p>
-          </div>
-        </div>
-
-        <div className="px-4 py-4 sm:px-5">
-          <div className="overflow-hidden rounded-2xl border border-[var(--border)]">
-            {rows.length ? rows.map(t => <QueueRow key={t.id} ticket={t} nowMs={nowMs} company={company} />) : (
-              <div className="px-4 py-10"><EmptyQueue filter={filter} /></div>
-            )}
-            <div className="border-t border-[var(--border)] px-4 py-4">
-              <Link href="/supplier/tickets" className="inline-flex items-center gap-2 text-sm font-bold text-blue-600 hover:underline dark:text-blue-400">
-                View all tickets <ArrowRight size={15} />
-              </Link>
-            </div>
-          </div>
-        </div>
-      </Card>
+      <QueueCard viewAllHref="/supplier/tickets">
+        {rows.length ? rows.map(t => <QueueRow key={t.id} ticket={t} nowMs={nowMs} company={company} />) : (
+          <div className="px-4 py-10"><EmptyQueue copy={emptyCopy(filter)} /></div>
+        )}
+      </QueueCard>
     </div>
   )
 }
 
-function MetricButton({ active, icon, label, value, sub, subActive, onClick }: {
-  active: boolean; icon: React.ReactNode; tone?: Tone; label: string; value: number; sub: string; subActive: boolean; onClick: () => void
-}) {
-  const zero = value === 0
-  // Icon chip, value, border and the (active) sub-line all share ONE state colour:
-  // green when the count is 0 (all clear), amber when there's work outstanding.
-  const stateText = zero ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'
-  const iconChip = zero ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 ring-emerald-500/20' : 'bg-amber-500/15 text-amber-600 dark:text-amber-400 ring-amber-500/20'
-  const stateBorder = zero ? 'border-2 border-[var(--border)] dark:border-white/10' : 'border-2 border-amber-500/70'
-
-  return (
-    <button type="button" onClick={onClick}
-      className={`block rounded-2xl text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 ${active ? 'ring-2 ring-blue-500/70' : ''}`}>
-      <Card className={`h-full p-4 transition hover:-translate-y-0.5 hover:ring-blue-500/30 ${stateBorder} ${active ? 'ring-blue-500/60' : ''}`}>
-        <div className="flex items-center gap-4">
-          <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-full ring-1 ${iconChip}`}>{icon}</span>
-          <div className="min-w-0">
-            <p className="truncate text-xs font-semibold text-[var(--text-muted)]">{label}</p>
-            <p className={`mt-1 text-2xl font-bold leading-none ${stateText}`}>{value}</p>
-            <p className={`mt-1 truncate text-xs font-semibold ${subActive ? stateText : 'text-[var(--text-faint)]'}`}>{sub}</p>
-          </div>
-        </div>
-      </Card>
-    </button>
-  )
+function emptyCopy(filter: QueueFilter): string {
+  return filter === 'to_quote' ? 'No jobs waiting for a quote.'
+    : filter === 'attend' ? 'No awarded jobs to start.'
+    : filter === 'evidence' ? 'No evidence outstanding.'
+    : filter === 'snags' ? 'No open snags.'
+    : filter === 'sla' ? 'No jobs are breaching SLA.'
+    : 'No active jobs right now.'
 }
 
 function QueueRow({ ticket, nowMs, company }: { ticket: SupplierTicketRow; nowMs: number; company?: string }) {
@@ -160,45 +119,17 @@ function QueueRow({ ticket, nowMs, company }: { ticket: SupplierTicketRow; nowMs
     : needsEvidence(ticket) ? 'Upload evidence'
     : isSnag(ticket) ? 'View snag'
     : 'View Ticket'
-  // Genuinely critical (P1 / urgent) jobs get a RED action button so they stand out.
-  const critical = ['P1', 'urgent'].includes(String(ticket.priority))
-  const ctaCls = `relative z-20 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-bold transition lg:w-40 ${critical ? 'border-red-500/60 bg-red-500/10 text-red-600 hover:bg-red-500/15 dark:text-red-300' : 'border-blue-500/60 text-blue-600 hover:bg-blue-500/10 dark:text-blue-300'}`
+  const ctaCls = queueCtaClass(isCriticalPriority(ticket.priority))
   const jobId = ticket.jobRef ?? formatJobId(ticket.jobNumber)
 
   return (
-    <div className="relative grid gap-4 border-b border-[var(--border)] px-4 py-4 transition last:border-b-0 hover:bg-[var(--hover)] lg:grid-cols-[1fr_200px_1.1fr_160px] lg:items-center">
-      <Link href={ticketUrl} aria-label={`View ${ticket.category || ticket.title} ticket`} className="absolute inset-0 z-10" />
+    <QueueRowShell href={ticketUrl} ariaLabel={`View ${ticket.category || ticket.title} ticket`}>
+      <QueueRowTitle category={ticket.category} title={ticket.title} priority={String(ticket.priority)} jobId={jobId} subtitle={who} />
 
-      <div className="flex min-w-0 items-center gap-3">
-        <CategoryIcon category={ticket.category ?? ticket.title} priority={ticket.priority} />
-        <div className="min-w-0">
-          {jobId && <p className="truncate font-mono text-[10px] text-[var(--text-faint)]">{jobId}</p>}
-          <p className="truncate text-base font-bold text-[var(--text)]">{ticket.category || ticket.title}</p>
-          <p className="truncate text-sm text-[var(--text-muted)]">{who}</p>
-        </div>
-      </div>
+      <QueueRowBadges priority={String(ticket.priority)} statusCls={statusCls} statusLabel={statusLabel}
+        disputeUnread={ticket.disputeUnread} note={ticket.awardedToMe ? 'Awarded to you' : 'Invited to quote'} />
 
-      <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className={`inline-flex w-[72px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${priorityBadgeClass(String(ticket.priority))}`}>{PRIORITY_LEVEL_LABELS[String(ticket.priority)] ?? 'Medium'}</span>
-          <span className={`inline-flex w-[120px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${statusCls}`}>{statusLabel}</span>
-          {ticket.disputeUnread && <span className="relative z-20 inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-blue-500/15 px-1.5 py-1 text-[10px] font-bold text-blue-700 dark:text-blue-400"><MessageSquare size={10} /> New message</span>}
-        </div>
-        <p className="mt-1.5 truncate text-sm text-[var(--text-muted)]">{ticket.awardedToMe ? 'Awarded to you' : 'Invited to quote'}</p>
-      </div>
-
-      <div className="min-w-0 border-l-0 border-[var(--border)] lg:border-l lg:pl-6">
-        <p className="truncate text-xs text-[var(--text-muted)]">Next step · Logged {formatDate(ticket.createdAt)}</p>
-        <p className="truncate text-sm font-bold text-[var(--text)]">{nextStep(ticket)}</p>
-        {breached ? (
-          <p className="mt-1 flex items-center gap-1.5 text-sm font-bold text-red-600 dark:text-red-400"><AlertCircle size={14} /> SLA breached</p>
-        ) : (
-          <>
-            <p className="mt-1 flex items-center gap-1.5 text-sm text-[var(--text-muted)]"><CalendarClock size={14} /> SLA in {humanizeDuration(slaMs)}</p>
-            <p className="truncate text-xs text-[var(--text-muted)]">Next deadline · {formatDateTime(slaDeadline)}</p>
-          </>
-        )}
-      </div>
+      <QueueRowNextStep createdAt={ticket.createdAt} nextStep={nextStep(ticket)} breached={breached} slaMs={slaMs} slaDeadline={slaDeadline} />
 
       <div className="flex lg:justify-end">
         {cta === 'View dispute'
@@ -215,7 +146,7 @@ function QueueRow({ ticket, nowMs, company }: { ticket: SupplierTicketRow; nowMs
           ? <ViewSnagCta ticket={ticket} className={ctaCls} company={company} />
           : <Link href={ticketUrl} className={ctaCls}>{cta} {cta === 'View Ticket' && <ArrowRight size={15} />}</Link>}
       </div>
-    </div>
+    </QueueRowShell>
   )
 }
 
@@ -343,30 +274,6 @@ function CloseOutCta({ ticket, className }: { ticket: SupplierTicketRow; classNa
       )}
     </>
   )
-}
-
-function EmptyQueue({ filter }: { filter: QueueFilter }) {
-  const copy = filter === 'to_quote' ? 'No jobs waiting for a quote.'
-    : filter === 'attend' ? 'No awarded jobs to start.'
-    : filter === 'evidence' ? 'No evidence outstanding.'
-    : filter === 'snags' ? 'No open snags.'
-    : filter === 'sla' ? 'No jobs are breaching SLA.'
-    : 'No active jobs right now.'
-  return (
-    <div className="grid min-h-28 place-items-center rounded-xl border border-dashed border-[var(--border)] px-4 py-6 text-center">
-      <div>
-        <div className="mx-auto mb-2 grid h-10 w-10 place-items-center rounded-full bg-[var(--surface-2)] text-[var(--text-faint)]"><CheckCircle2 size={24} /></div>
-        <p className="text-sm font-semibold text-[var(--text-muted)]">{copy}</p>
-      </div>
-    </div>
-  )
-}
-
-function priorityBadgeClass(p: string): string {
-  if (p === 'urgent' || p === 'P1') return 'bg-red-500/15 text-red-600 dark:text-red-400'
-  if (p === 'high' || p === 'P2') return 'bg-orange-500/15 text-orange-600 dark:text-orange-400'
-  if (p === 'medium' || p === 'P3') return 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
-  return 'bg-slate-500/15 text-slate-600 dark:text-slate-300'
 }
 
 function matchesFilter(t: SupplierTicketRow, filter: QueueFilter): boolean {
