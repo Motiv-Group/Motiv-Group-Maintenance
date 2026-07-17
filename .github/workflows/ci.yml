@@ -9,6 +9,11 @@ on:
     branches: [main]
   push:
     branches: [main]
+  # Weekly scheduled run (Mon 05:00 UTC) so a NEW dependency advisory surfaces
+  # within days even when no PRs are moving — the audit step below is the point;
+  # the rest of the pipeline just proves main still builds green.
+  schedule:
+    - cron: '0 5 * * 1'
 
 # A newer push to the same branch/PR cancels the older in-flight run.
 concurrency:
@@ -33,6 +38,17 @@ jobs:
       # pinned in package.json.
       - name: Install dependencies
         run: npm ci
+
+      # Next.js incremental build cache — keyed on lockfile + source hash, with
+      # a lockfile-only restore key so most pushes still get a warm cache. Cuts
+      # the `next build` step's minutes; safe because next validates its cache.
+      - name: Restore Next.js build cache
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: nextjs-${{ hashFiles('package-lock.json') }}-${{ hashFiles('**/*.ts', '**/*.tsx') }}
+          restore-keys: |
+            nextjs-${{ hashFiles('package-lock.json') }}-
 
       # Cheap checks first so a red PR fails fast before the slow build.
       - name: Type-check

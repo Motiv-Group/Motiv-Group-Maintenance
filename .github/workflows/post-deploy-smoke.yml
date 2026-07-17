@@ -1,0 +1,28 @@
+name: Post-deploy smoke
+
+# Vercel's GitHub integration creates a Deployment per deploy and reports its
+# state — this fires on every successful deploy (production AND previews) and
+# does two cheap end-to-end checks against the real URL:
+#   1. the app actually serves a page (login redirect counts — follow redirects)
+#   2. the cron route rejects unauthenticated callers (auth regression canary)
+on:
+  deployment_status:
+
+jobs:
+  smoke:
+    if: github.event.deployment_status.state == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Homepage responds
+        run: |
+          url="${{ github.event.deployment_status.environment_url }}"
+          code=$(curl -sL -o /dev/null -w '%{http_code}' --max-time 30 "$url")
+          echo "GET $url -> $code"
+          [ "$code" = "200" ] || { echo "::error::homepage returned $code"; exit 1; }
+
+      - name: Cron route rejects unauthenticated
+        run: |
+          url="${{ github.event.deployment_status.environment_url }}/api/cron/v3-snapshots"
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "$url")
+          echo "GET $url -> $code"
+          [ "$code" = "401" ] || { echo "::error::cron route returned $code (expected 401)"; exit 1; }
