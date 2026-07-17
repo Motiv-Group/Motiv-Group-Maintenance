@@ -4,6 +4,7 @@ import { extractText } from 'unpdf'
 import * as XLSX from 'xlsx'
 import { extractTotalsFromText, extractValidUntil, type ExtractedTotals } from '@/lib/quote-extract'
 import { rateLimit } from '@/lib/rate-limit'
+import { fetchWithRetry } from '@/lib/fetch-retry'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -157,7 +158,7 @@ Return ONLY a JSON object with these keys:
 Do NOT output any monetary amounts. Return only the JSON object.`
 
 async function llmDescribe(text: string, today: string): Promise<{ description: string | null; valid_until: string | null }> {
-  const res = await fetch(`${GROQ_BASE}/chat/completions`, {
+  const res = await fetchWithRetry(`${GROQ_BASE}/chat/completions`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -170,7 +171,7 @@ async function llmDescribe(text: string, today: string): Promise<{ description: 
         { role: 'user',   content: text.slice(0, 24000) },
       ],
     }),
-  })
+  }, { timeoutMs: 30_000, retries: 1, label: 'groq-quote-text' })
   if (!res.ok) throw new Error(`Groq LLM error: ${await res.text()}`)
   const json = await res.json() as { choices: Array<{ message: { content: string } }> }
   const parsed = parseJsonResponse(json.choices[0].message.content)
@@ -203,7 +204,7 @@ async function extractFromImages(files: File[], today: string): Promise<ParsedQu
     })
   )
 
-  const res = await fetch(`${GROQ_BASE}/chat/completions`, {
+  const res = await fetchWithRetry(`${GROQ_BASE}/chat/completions`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -222,7 +223,7 @@ async function extractFromImages(files: File[], today: string): Promise<ParsedQu
         },
       ],
     }),
-  })
+  }, { timeoutMs: 45_000, retries: 1, label: 'groq-quote-vision' })
 
   if (!res.ok) throw new Error(`Groq vision error: ${await res.text()}`)
 

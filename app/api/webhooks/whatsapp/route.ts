@@ -9,6 +9,7 @@ import { getBriefingForUser } from '@/lib/briefing/generate';
 import { briefingToText } from '@/lib/briefing/facts';
 import https from 'https';
 import crypto from 'crypto';
+import { fetchWithRetry } from '@/lib/fetch-retry';
 
 // ─── ENV ────────────────────────────────────────────────────────────────────
 const WA_TOKEN       = process.env.WHATSAPP_ACCESS_TOKEN!;
@@ -85,16 +86,17 @@ function normalisePhone(from: string): string {
 
 /** Download a Meta media file as an ArrayBuffer */
 async function downloadMedia(mediaId: string): Promise<{ arrayBuffer: ArrayBuffer; mimeType: string }> {
-  const metaRes = await fetch(
+  const metaRes = await fetchWithRetry(
     `https://graph.facebook.com/v21.0/${mediaId}`,
-    { headers: { Authorization: `Bearer ${WA_TOKEN}` } }
+    { headers: { Authorization: `Bearer ${WA_TOKEN}` } },
+    { timeoutMs: 15_000, retries: 1, label: 'wa-media-lookup' }
   );
   if (!metaRes.ok) throw new Error(`Meta media lookup failed: ${metaRes.status}`);
   const { url, mime_type } = await metaRes.json() as { url: string; mime_type: string };
 
   // Use Node https — undici has a known TLS socket issue with Meta's CDN
   const arrayBuffer = await new Promise<ArrayBuffer>((resolve, reject) => {
-    https.get(url, { headers: { Authorization: `Bearer ${WA_TOKEN}` } }, (res) => {
+    const req = https.get(url, { headers: { Authorization: `Bearer ${WA_TOKEN}` }, timeout: 30_000 }, (res) => {
       if (res.statusCode && res.statusCode >= 400) {
         reject(new Error(`Media download failed: ${res.statusCode}`));
         res.resume();
@@ -110,7 +112,9 @@ async function downloadMedia(mediaId: string): Promise<{ arrayBuffer: ArrayBuffe
         resolve(merged.buffer);
       });
       res.on('error', reject);
-    }).on('error', reject);
+    });
+    req.on('timeout', () => req.destroy(new Error('Media download timed out (30s)')));
+    req.on('error', reject);
   });
 
   return { arrayBuffer, mimeType: mime_type };
@@ -153,11 +157,11 @@ async function transcribeAndExtract(arrayBuffer: ArrayBuffer, mimeType: string):
   // stays auto-detected so the Afrikaans mix is captured, then the LLM translates.
   form.append('prompt', WHISPER_PROMPT);
 
-  const res = await fetch(`${GROQ_BASE}/audio/transcriptions`, {
+  const res = await fetchWithRetry(`${GROQ_BASE}/audio/transcriptions`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${GROQ_API_KEY}` },
     body: form,
-  });
+  }, { timeoutMs: 45_000, retries: 1, label: 'groq-transcribe' });
   if (!res.ok) throw new Error(`Groq transcription failed: ${await res.text()}`);
 
   const transcript = (await res.text()).trim();
@@ -168,7 +172,7 @@ async function transcribeAndExtract(arrayBuffer: ArrayBuffer, mimeType: string):
 
 /** Extract ticket fields from plain text using Groq LLaMA */
 async function extractTicketFields(text: string): Promise<ExtractedTicket> {
-  const res = await fetch(`${GROQ_BASE}/chat/completions`, {
+  const res = await fetchWithRetry(`${GROQ_BASE}/chat/completions`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -180,7 +184,7 @@ async function extractTicketFields(text: string): Promise<ExtractedTicket> {
         { role: 'user', content: text },
       ],
     }),
-  });
+  }, { timeoutMs: 30_000, retries: 1, label: 'groq-extract' });
 
   if (!res.ok) throw new Error(`Groq extraction failed: ${await res.text()}`);
 
@@ -190,7 +194,8 @@ async function extractTicketFields(text: string): Promise<ExtractedTicket> {
   return sanitiseExtracted(raw, text);
 }
 
-function sanitiseExtracted(raw: Partial<ExtractedTicket>, fallbackDescription?: string): ExtractedTicket {
+// Exported for unit tests (pure function — clamps free-text LLM output to enums).
+export function sanitiseExtracted(raw: Partial<ExtractedTicket>, fallbackDescription?: string): ExtractedTicket {
   const validPriorities: Priority[] = ['low', 'medium', 'high', 'urgent'];
   // Constrain free-text model output to our exact enums; fall back safely so a
   // bad/missing value never blocks ticket creation.
@@ -213,7 +218,8 @@ function sanitiseExtracted(raw: Partial<ExtractedTicket>, fallbackDescription?: 
 // Operational impact → v3 ticket priority (P1–P4) + severity. Mirrors the
 // health engine's derivation so WhatsApp tickets rank like web-form tickets.
 type V3Priority = 'P1' | 'P2' | 'P3' | 'P4';
-function impactToPriority(impact: OpImpact): { priority: V3Priority; severity: 'low' | 'medium' | 'high' | 'critical' } {
+// Exported for unit tests (pure function — mirrors the health engine's derivation).
+export function impactToPriority(impact: OpImpact): { priority: V3Priority; severity: 'low' | 'medium' | 'high' | 'critical' } {
   switch (impact) {
     case 'cannot_trade':
     case 'safety_risk':       return { priority: 'P1', severity: 'critical' };
@@ -230,11 +236,11 @@ const P_EMOJI: Record<V3Priority, string> = { P1: '🔴', P2: '🟠', P3: '🟡'
  *  looked like "nothing happened"). Returns true on a 2xx. */
 async function waPost(payload: object, label: string): Promise<boolean> {
   try {
-    const res = await fetch(`https://graph.facebook.com/v21.0/${WA_PHONE_ID}/messages`, {
+    const res = await fetchWithRetry(`https://graph.facebook.com/v21.0/${WA_PHONE_ID}/messages`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${WA_TOKEN}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
-    });
+    }, { timeoutMs: 15_000, retries: 1, label: `wa-send:${label}` });
     if (!res.ok) {
       console.error(`[WhatsApp] ${label} failed ${res.status}:`, await res.text().catch(() => ''));
       return false;
