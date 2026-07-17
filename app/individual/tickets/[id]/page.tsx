@@ -38,22 +38,25 @@ export default async function IndividualTicketDetailPage(props: { params: Promis
   // Disputes — the Individual owner is the resolver (the "client" side). Sign
   // message evidence for the private buckets. Newer per-dispute columns are
   // merged separately so the block still works before that migration.
-  const disputeExtraById = new Map(((disputeExtra ?? []) as any[]).map(x => [x.id, x]))
-  const disputes = ((disputeRows ?? []) as any[]).map(d => ({ ...d, ...(disputeExtraById.get(d.id) ?? {}) }))
-  const disputeMsgs = (disputeMsgRows ?? []) as any[]
-  await Promise.all(disputeMsgs.map(async (m) => { m.evidence_urls = await signManyUrls(Array.isArray(m.evidence_urls) ? m.evidence_urls : []) }))
+  const disputeExtraById = new Map((disputeExtra ?? []).map(x => [x.id, x]))
+  const disputes = (disputeRows ?? []).map(d => ({ ...d, ...(disputeExtraById.get(d.id) ?? {}) }))
+  // evidence_urls is a Json column holding a string[] — sign each stored path.
+  const disputeMsgs = await Promise.all((disputeMsgRows ?? []).map(async (m) => ({
+    ...m,
+    evidence_urls: await signManyUrls(Array.isArray(m.evidence_urls) ? (m.evidence_urls as string[]) : []),
+  })))
   const msgsByDispute = (id: string) => disputeMsgs.filter(m => m.dispute_id === id)
   const openDispute = disputes.find(d => d.status === 'open') ?? null
   const resolvedDisputes = disputes.filter(d => d.status === 'resolved')
-  const disputeSubject = (d: any) => d.origin === 'variation' ? 'Variation order · declined' : d.origin === 'snag' ? 'Snag' : 'Evidence request'
-  const latestSnag = ((snags ?? []) as any[])[0] ?? null
+  const disputeSubject = (d: { origin: string }) => d.origin === 'variation' ? 'Variation order · declined' : d.origin === 'snag' ? 'Snag' : 'Evidence request'
+  const latestSnag = (snags ?? [])[0] ?? null
   const snagAwaitingApproval = t.status === 'snag_assigned' && latestSnag?.schedule_status === 'proposed' && !!latestSnag?.scheduled_at
 
-  const inviteRows = (invites ?? []) as any[]
-  const quoteRows = (quotes ?? []) as any[]
-  const supplierIds = Array.from(new Set([...inviteRows.map(r => r.supplier_id), ...quoteRows.map(q => q.supplier_id)].filter(Boolean)))
-  const { data: supRows } = supplierIds.length ? await admin.from('suppliers').select('id, company_name').in('id', supplierIds) : { data: [] as any[] }
-  const nameById = new Map(((supRows ?? []) as any[]).map(s => [s.id, s.company_name]))
+  const inviteRows = invites ?? []
+  const quoteRows = quotes ?? []
+  const supplierIds = Array.from(new Set([...inviteRows.map(r => r.supplier_id), ...quoteRows.map(q => q.supplier_id)].filter((id): id is string => !!id)))
+  const { data: supRows } = supplierIds.length ? await admin.from('suppliers').select('id, company_name').in('id', supplierIds) : { data: [] as { id: string; company_name: string }[] }
+  const nameById = new Map((supRows ?? []).map(s => [s.id, s.company_name]))
 
   const sm = rmStatusMeta(t.status)
   // Buckets are private — stored URLs must be signed or they 403 (every other
@@ -61,17 +64,17 @@ export default async function IndividualTicketDetailPage(props: { params: Promis
   const photos = Array.isArray(t.photo_urls) ? await signManyUrls(t.photo_urls as string[]) : []
   const quoteStatusOf = (s: string): QuoteSummaryStatus => s === 'accepted' ? 'accepted' : s === 'declined' ? 'declined' : 'pending'
   const acceptedQuote = quoteRows.find(q => q.status === 'accepted') ?? null
-  const pendingSignoff = ((signoffs ?? []) as any[]).find(s => ['submitted', 'awaiting_regional', 'awaiting_store'].includes(s.status)) ?? null
-  const acceptedSignoff = ((signoffs ?? []) as any[]).find(s => s.status === 'accepted') ?? null
+  const pendingSignoff = (signoffs ?? []).find(s => ['submitted', 'awaiting_regional', 'awaiting_store'].includes(s.status)) ?? null
+  const acceptedSignoff = (signoffs ?? []).find(s => s.status === 'accepted') ?? null
   const isTerminal = isTerminalStatus(t.status)
 
-  const motivSuppliers = ((motiv ?? []) as any[]).map(s => ({ id: s.id, name: s.company_name as string }))
+  const motivSuppliers = (motiv ?? []).map(s => ({ id: s.id, name: s.company_name }))
   const declinedSupplierIds = inviteRows.filter(r => ['declined', 'closed'].includes(r.status)).map(r => r.supplier_id)
   const awaitingById: Record<string, 'invited' | 'quoted'> = {}
   for (const r of inviteRows) if (r.status === 'invited' || r.status === 'quoted') awaitingById[r.supplier_id] = r.status
   const supplierStatusRows = inviteRows.map(r => ({ name: nameById.get(r.supplier_id) ?? 'Supplier', status: r.status, invitedAt: r.invited_at, declineReason: r.decline_reason }))
   const reviewQuotes: ReviewQuote[] = quoteRows.filter(q => q.status === 'pending').map(q => ({
-    id: q.id, supplierName: nameById.get(q.supplier_id) ?? 'Supplier', amount: q.amount, amountInclVat: q.amount_incl_vat ?? null,
+    id: q.id, supplierName: (q.supplier_id ? nameById.get(q.supplier_id) : undefined) ?? 'Supplier', amount: q.amount, amountInclVat: q.amount_incl_vat ?? null,
     description: q.description ?? null, fileUrl: q.file_url ?? null, createdAt: q.created_at, proposedScheduleAt: q.proposed_schedule_at ?? null,
   }))
   const canAssign = ASSIGNABLE.includes(t.status)
@@ -108,7 +111,7 @@ export default async function IndividualTicketDetailPage(props: { params: Promis
           {supplierStatusRows.length > 0 && <SupplierStatusList rows={supplierStatusRows} />}
           {reviewQuotes.length > 0 && <QuoteReviewCard ticketId={t.id} quotes={reviewQuotes} />}
           {acceptedQuote && (
-            <QuoteSummary title={`Approved · ${nameById.get(acceptedQuote.supplier_id) ?? 'Supplier'}`} status="accepted"
+            <QuoteSummary title={`Approved · ${(acceptedQuote.supplier_id ? nameById.get(acceptedQuote.supplier_id) : undefined) ?? 'Supplier'}`} status="accepted"
               quote={{ id: acceptedQuote.id, amount: acceptedQuote.amount, amountInclVat: acceptedQuote.amount_incl_vat ?? null, description: acceptedQuote.description ?? null, fileUrl: acceptedQuote.file_url ?? null, validUntil: acceptedQuote.valid_until ?? null, createdAt: acceptedQuote.created_at }} />
           )}
         </Card>

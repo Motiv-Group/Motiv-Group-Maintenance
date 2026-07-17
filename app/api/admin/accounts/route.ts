@@ -10,6 +10,8 @@ import { parseJsonBody } from '@/lib/validate'
 
 type Admin = ReturnType<typeof createAdminClient>
 
+const errMsg = (e: unknown, fallback: string): string => (e instanceof Error ? e.message : fallback)
+
 const BodySchema = z.object({
   action: z.string().optional(),
   companyName: z.any().optional(),
@@ -36,17 +38,17 @@ const BodySchema = z.object({
 async function findOrCreateCompany(admin: Admin, name: string): Promise<string | null> {
   const clean = name.trim(); if (!clean) return null
   const { data: existing } = await admin.from('companies').select('id').ilike('name', clean).maybeSingle()
-  if ((existing as any)?.id) return (existing as any).id
+  if (existing?.id) return existing.id
   const { data: c } = await admin.from('companies').insert({ name: clean }).select('id').single()
-  return (c as any)?.id ?? null
+  return c?.id ?? null
 }
 async function findOrCreateRegion(admin: Admin, companyId: string, name: string, code: string): Promise<string | null> {
   const clean = name.trim(); if (!clean) return null
   const c = String(code || name).toUpperCase().replace(/\s+/g, '').slice(0, 12)
   const { data: existing } = await admin.from('regions').select('id').eq('company_id', companyId).or(`region_code.eq.${c},name.ilike.${clean}`).maybeSingle()
-  if ((existing as any)?.id) return (existing as any).id
+  if (existing?.id) return existing.id
   const { data: r } = await admin.from('regions').insert({ company_id: companyId, name: clean, region_code: c }).select('id').single()
-  return (r as any)?.id ?? null
+  return r?.id ?? null
 }
 
 // POST /api/admin/accounts — system-admin provisions the SM/RM/Executive hierarchy.
@@ -85,7 +87,7 @@ export async function POST(request: Request) {
       const name = str(body.companyName)
       if (!name) return bad('Company name is required.')
       const { data: existing } = await admin.from('companies').select('id').ilike('name', name).maybeSingle()
-      if ((existing as any)?.id) return bad('A company with that name already exists — pick it from the list.')
+      if (existing?.id) return bad('A company with that name already exists — pick it from the list.')
       const { data: company, error } = await admin.from('companies').insert({ name }).select('id, name').single()
       if (error || !company) return bad(error?.message ?? 'Could not create company.')
       await logAudit(admin, { actorId: user.id, companyId: company.id, action: 'admin.create_company', entityType: 'company', entityId: company.id, metadata: { name } })
@@ -115,7 +117,7 @@ export async function POST(request: Request) {
         const inv = await inviteUser({ email: body.email, role: 'executive', companyId: company.id, roleLabel: 'Executive', baseUrl: origin, link: {}, profile: { fullName, phone: normalisePhone(body.phone), address: str(body.address) } })
         await logAudit(admin, { actorId: user.id, companyId: company.id, action: 'admin.create_executive', entityType: 'user', entityId: inv.userId, metadata: { email: body.email, companyName } })
         return done({ actionLink: inv.actionLink, emailed: inv.emailed, message: inv.emailed ? 'Executive created — activation link emailed.' : 'Executive created. Email not sent — copy the activation link below.' })
-      } catch (e: any) { await admin.from('companies').delete().eq('id', company.id); return bad(e?.message ?? 'Invite failed.') }
+      } catch (e) { await admin.from('companies').delete().eq('id', company.id); return bad(errMsg(e, 'Invite failed.')) }
     }
 
     if (action === 'invite_rm') {
@@ -128,8 +130,8 @@ export async function POST(request: Request) {
       const projectId = str(body.projectId)
       if (projectId) {
         const { data: project } = await admin.from('projects').select('id, name, company_id').eq('id', projectId).single()
-        if (!project || (project as any).company_id !== companyId) return bad('That project is not in the selected company.')
-        invitedTo = (project as any).name
+        if (!project || project.company_id !== companyId) return bad('That project is not in the selected company.')
+        invitedTo = project.name
       }
 
       let regionId = str(body.regionId)
@@ -175,7 +177,7 @@ export async function POST(request: Request) {
         const inv = await inviteUser({ email: body.email, role: 'store_manager', companyId, roleLabel: 'Store Manager', baseUrl: origin, link: { storeId: store.id }, profile: { fullName, phone: normalisePhone(body.phone), address: str(body.address), subStore, branchCode: bcode } })
         await logAudit(admin, { actorId: user.id, companyId, action: 'admin.invite_sm', entityType: 'user', entityId: inv.userId, metadata: { email: body.email, storeId: store.id } })
         return done({ actionLink: inv.actionLink, emailed: inv.emailed, message: inv.emailed ? 'Store Manager invited — activation link emailed.' : 'Created. Email not sent — copy the activation link below.' })
-      } catch (e: any) { await admin.from('stores').delete().eq('id', store.id); return bad(e?.message ?? 'Invite failed.') }
+      } catch (e) { await admin.from('stores').delete().eq('id', store.id); return bad(errMsg(e, 'Invite failed.')) }
     }
 
     // Bulk import: one CSV of the chosen role. Company/region resolved by name.
@@ -207,13 +209,13 @@ export async function POST(request: Request) {
             if (!storeName || !branchCode) throw new Error('Store name and branch code required')
             const { data: region } = await admin.from('regions').select('region_code').eq('id', regionId).single()
             const bcode = branchCode.toUpperCase(), subStore = str(row.branch_name) || storeName
-            const { data: store, error: sErr } = await admin.from('stores').insert({ company_id: companyId, region_id: regionId, region_code: (region as any)?.region_code, branch_code: bcode, name: storeName, sub_store: subStore }).select('id').single()
+            const { data: store, error: sErr } = await admin.from('stores').insert({ company_id: companyId, region_id: regionId, region_code: region?.region_code, branch_code: bcode, name: storeName, sub_store: subStore }).select('id').single()
             if (sErr || !store) throw new Error(/duplicate/i.test(sErr?.message ?? '') ? 'Branch code already exists' : (sErr?.message ?? 'Could not create store'))
-            try { await inviteUser({ email, role: 'store_manager', companyId, roleLabel: 'Store Manager', baseUrl: origin, link: { storeId: (store as any).id }, profile: { ...prof, subStore, branchCode: bcode } }) }
-            catch (e) { await admin.from('stores').delete().eq('id', (store as any).id); throw e }
+            try { await inviteUser({ email, role: 'store_manager', companyId, roleLabel: 'Store Manager', baseUrl: origin, link: { storeId: store.id }, profile: { ...prof, subStore, branchCode: bcode } }) }
+            catch (e) { await admin.from('stores').delete().eq('id', store.id); throw e }
           }
           results.push({ label, ok: true })
-        } catch (e: any) { results.push({ label, ok: false, error: e?.message ?? 'Failed' }) }
+        } catch (e) { results.push({ label, ok: false, error: errMsg(e, 'Failed') }) }
       }
       revalidatePath('/admin/accounts'); revalidatePath('/admin/hierarchy')
       await logAudit(admin, { actorId: user.id, action: 'admin.bulk_import', metadata: { role, total: rows.length, succeeded: results.filter(r => r.ok).length, failed: results.filter(r => !r.ok).length } })
@@ -254,7 +256,7 @@ export async function POST(request: Request) {
     }
 
     return bad('Unknown action')
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message ?? 'Failed' }, { status: 400 })
+  } catch (e) {
+    return NextResponse.json({ error: errMsg(e, 'Failed') }, { status: 400 })
   }
 }

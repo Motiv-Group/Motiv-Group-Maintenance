@@ -415,7 +415,8 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
               <Calendar size={18} className="text-amber-600 dark:text-amber-400 shrink-0" />
               <div className="min-w-0">
                 <p className="text-[11px] uppercase tracking-wide font-semibold text-amber-700 dark:text-amber-400">Snag fix scheduled</p>
-                <p className="text-sm font-bold text-[var(--text)]">{formatDateTime(latestSnag.scheduled_at)}</p>
+                {/* snagFixApproved implies latestSnag.scheduled_at is set */}
+                <p className="text-sm font-bold text-[var(--text)]">{formatDateTime(latestSnag!.scheduled_at!)}</p>
               </div>
             </div>
           )}

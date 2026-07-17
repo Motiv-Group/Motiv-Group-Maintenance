@@ -19,17 +19,17 @@ import {
 import type { Ticket, Quote } from '@/lib/types'
 
 function TicketRow({ ticket, storeName }: { ticket: Ticket; storeName?: string }) {
-  const latestQuote = ((ticket as any).quotes ?? [])
-    .filter((q: any) => q.status !== 'declined')
-    .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
+  const latestQuote = (ticket.quotes ?? [])
+    .filter(q => q.status !== 'declined')
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
 
   return (
     <Link href={`/regional/tickets/${ticket.id}`}>
       <div className="bg-slate-50 dark:bg-gray-800 border border-[var(--border)] dark:border-gray-700 rounded-xl px-4 py-3 hover:border-brand-400 dark:hover:border-gray-400 transition-colors">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            {((ticket as any).job_ref ?? formatJobId((ticket as any).job_number)) && (
-              <p className="text-[10px] font-mono text-gray-400 dark:text-gray-500 mb-0.5">{(ticket as any).job_ref ?? formatJobId((ticket as any).job_number)}</p>
+            {(ticket.job_ref ?? formatJobId(ticket.job_number)) && (
+              <p className="text-[10px] font-mono text-gray-400 dark:text-gray-500 mb-0.5">{ticket.job_ref ?? formatJobId(ticket.job_number)}</p>
             )}
             <p className="font-medium text-sm text-gray-900 dark:text-white truncate">{ticket.title}</p>
             {storeName && (
@@ -146,12 +146,12 @@ export default async function RegionalStoreDetailPage(props: { params: Promise<{
     .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
 
   // Stats
-  const acceptedQ   = allQuotes.filter((q: any) => q.status === 'accepted').length
-  const declinedQ   = allQuotes.filter((q: any) => q.status === 'declined').length
-  const pendingQ    = allQuotes.filter((q: any) => q.status === 'pending').length
+  const acceptedQ   = allQuotes.filter(q => q.status === 'accepted').length
+  const declinedQ   = allQuotes.filter(q => q.status === 'declined').length
+  const pendingQ    = allQuotes.filter(q => q.status === 'pending').length
   const snagQ       = snagTickets.length
-  const acceptedValue = allQuotes.filter((q: any) => q.status === 'accepted').reduce((s: number, q: any) => s + (q.amount ?? 0), 0)
-  const pendingValue  = allQuotes.filter((q: any) => q.status === 'pending').reduce((s: number, q: any) => s + (q.amount ?? 0), 0)
+  const acceptedValue = allQuotes.filter(q => q.status === 'accepted').reduce((s, q) => s + (q.amount ?? 0), 0)
+  const pendingValue  = allQuotes.filter(q => q.status === 'pending').reduce((s, q) => s + (q.amount ?? 0), 0)
   const acceptanceRate = (acceptedQ + declinedQ) > 0
     ? Math.round((acceptedQ / (acceptedQ + declinedQ)) * 100)
     : null
@@ -301,7 +301,7 @@ export default async function RegionalStoreDetailPage(props: { params: Promise<{
             <AlertTriangle size={16} className="text-red-500" />
             Urgent ({urgentOpenTickets.length})
           </h2>
-          <RecentTicketsStack tickets={urgentOpenTickets as any} variant="client" basePath="/regional/tickets" />
+          <RecentTicketsStack tickets={urgentOpenTickets} variant="client" basePath="/regional/tickets" />
         </div>
       )}
 
@@ -312,7 +312,7 @@ export default async function RegionalStoreDetailPage(props: { params: Promise<{
             <AlertCircle size={16} className="text-blue-500" />
             Open Tickets ({normalOpenTickets.length})
           </h2>
-          <RecentTicketsStack tickets={normalOpenTickets as any} variant="client" basePath="/regional/tickets" />
+          <RecentTicketsStack tickets={normalOpenTickets} variant="client" basePath="/regional/tickets" />
         </div>
       )}
 
@@ -384,7 +384,7 @@ export default async function RegionalStoreDetailPage(props: { params: Promise<{
         >
           {archivedTickets.map(t => {
             const isCompleted = t.status === 'completed'
-            const acceptedQuote = ((t as any).quotes ?? []).find((q: any) => q.status === 'accepted')
+            const acceptedQuote = (t.quotes ?? []).find(q => q.status === 'accepted')
             return (
               <Link key={t.id} href={`/regional/tickets/${t.id}`}>
                 <div className="bg-gray-50 dark:bg-gray-800/50 border border-[var(--border)] dark:border-gray-700 rounded-xl px-4 py-3 flex items-center justify-between gap-3 hover:border-brand-400 dark:hover:border-gray-400 transition-colors">
