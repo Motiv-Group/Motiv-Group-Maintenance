@@ -19,7 +19,9 @@ import { Card } from '@/components/exec/ui'
 import { WorkflowActions } from '@/components/workflow/WorkflowActions'
 import { RmPipeline } from '@/components/regional/RmPipeline'
 import { RmQuotePanel, RmReviewPanel, ReQuoteButton, AcceptScheduleCard, AcceptSnagScheduleCard, VariationReviewCard, CloseOutButton, RmTicketActionBar, RmCompletionReview } from '@/components/regional/RmTicketActions'
-import { CompletionBody, CompletionFooterNote } from '@/components/workflow/CompletionBody'
+import { CompletionFooterNote } from '@/components/workflow/CompletionBody'
+import { ArchiveGroup } from '@/components/ticket/ArchiveGroup'
+import { SignoffCard } from '@/components/ticket/SignoffCard'
 import { EditedLine } from '@/components/ui/EditedLine'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { RmTicketTabs } from '@/components/regional/RmTicketTabs'
@@ -94,87 +96,6 @@ function RmDeclinedQuoteCard({ q, ticketId, canReQuote, open = false }: { q: any
         )}
       </div>
     </details>
-  )
-}
-
-// One COC/POC submission card — reused across the under-review, sent-back (snag)
-// and approved blocks so the RM sees the full submission history. A sent-back card
-// shows the reason it was returned (why another COC/POC was needed).
-function RmSignoffCard({ s, tone, ticketId, collapsible = false, defaultOpen = false, title, reason, freshEvidence = false, footer }: { s: any; tone: 'review' | 'snag' | 'approved' | 'evidence'; ticketId: string; collapsible?: boolean; defaultOpen?: boolean; title?: string; reason?: string | null; freshEvidence?: boolean; footer?: React.ReactNode }) {
-  // Prefer the durable round reason; fall back to the reason stored on the signoff.
-  const reasonText = reason ?? s.reject_reason
-  const meta = tone === 'approved'
-    ? { ring: 'ring-emerald-500/40', bg: 'bg-emerald-500/5', head: 'bg-emerald-500/10 border-emerald-500/20', badge: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400', label: 'Approved', Icon: CheckCircle2, iconCls: 'text-emerald-500', title: 'Approved completion' }
-    : tone === 'snag'
-    ? { ring: 'ring-red-500/40', bg: 'bg-red-500/5', head: 'bg-red-500/10 border-red-500/20', badge: 'bg-red-500/15 text-red-700 dark:text-red-400', label: 'Sent back', Icon: FileText, iconCls: 'text-red-500', title: 'Snagged completion' }
-    : tone === 'evidence'
-    ? { ring: 'ring-amber-500/40', bg: 'bg-amber-500/5', head: 'bg-amber-500/10 border-amber-500/20', badge: 'bg-amber-500/15 text-amber-700 dark:text-amber-400', label: 'More info requested', Icon: FileText, iconCls: 'text-amber-500', title: 'Sent back for more evidence' }
-    : { ring: 'ring-[#f59e0b]/40', bg: 'bg-[#f59e0b]/5', head: 'bg-[#f59e0b]/10 border-[#f59e0b]/20', badge: 'bg-[#f59e0b]/15 text-amber-700 dark:text-[#f59e0b]', label: 'Under review', Icon: FileText, iconCls: 'text-[#f59e0b]', title: 'Submitted completion' }
-  const before = (s.before_urls ?? []) as string[]
-  const after = (s.after_urls ?? []) as string[]
-  // Header doubles as the click-to-expand summary when collapsible.
-  const header = (
-    <>
-      {/* Timestamp is desktop-only — on phones it eats the title's space. */}
-      <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)] min-w-0"><meta.Icon size={15} className={`${meta.iconCls} shrink-0`} /><span className="truncate">{title ?? meta.title}<span className="hidden sm:inline"> · {formatDateTime(s.created_at)}</span></span></span>
-      <span className="flex items-center gap-1.5 shrink-0">
-        {freshEvidence && <span className="text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 bg-emerald-500/15 text-emerald-700 dark:text-emerald-400">New evidence</span>}
-        <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 ${meta.badge}`}>{meta.label}</span>
-      </span>
-    </>
-  )
-  const body = (
-    <>
-        {tone === 'snag' && reasonText && (
-          <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3">
-            <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Why it was sent back</p>
-            <p className="text-sm text-[var(--text)]">{reasonText}</p>
-          </div>
-        )}
-        {tone === 'evidence' && reasonText && (
-          <div className="rounded-lg bg-amber-500/10 ring-1 ring-amber-500/30 p-3">
-            <p className="text-[11px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400">Why more evidence was requested</p>
-            <p className="text-sm text-[var(--text)]">{reasonText}</p>
-          </div>
-        )}
-        {/* Resubmission after a "more evidence" request — the new after photos, COC
-            and notes are highlighted in green so the RM can spot what's new. */}
-        {freshEvidence && (
-          <div className="rounded-lg bg-emerald-500/10 ring-1 ring-emerald-500/30 p-3">
-            <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">New evidence submitted</p>
-            <p className="text-sm text-[var(--text)]">The supplier uploaded the additional evidence you requested — the new after photos, COC and notes are shown in green below.</p>
-          </div>
-        )}
-        <CompletionBody ticketId={ticketId} beforeUrls={before} afterUrls={after} cocUrl={s.coc_url} invoiceUrl={s.invoice_url} notes={s.notes} uploadedAt={s.created_at} />
-    </>
-  )
-  if (collapsible) {
-    return (
-      <details open={defaultOpen} className={`rounded-xl bg-[var(--surface)] ring-1 ring-[var(--border)] overflow-hidden`}>
-        <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">{header}</summary>
-        <div className={`p-4 space-y-4 border-t border-[var(--border)]`}>{body}</div>
-        {footer && <div className={`border-t border-[var(--border)] px-4 py-3`}>{footer}</div>}
-      </details>
-    )
-  }
-  return (
-    <div className={`rounded-xl bg-[var(--surface)] ring-1 ring-[var(--border)] overflow-hidden`}>
-      <div className={`flex items-center justify-between gap-2 px-4 py-2.5 border-b border-[var(--border)]`}>{header}</div>
-      <div className="p-4 space-y-4">{body}</div>
-      {footer && <div className={`border-t border-[var(--border)] px-4 py-3`}>{footer}</div>}
-    </div>
-  )
-}
-
-// A labelled sub-group inside the Archive — a small uppercase heading over its
-// cards so mixed archived items (quotes, requests, submissions…) stay separated
-// and scannable without cluttering the section.
-function ArchiveGroup({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-2">
-      <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-faint)]">{label}</p>
-      {children}
-    </div>
   )
 }
 
@@ -650,7 +571,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
       {supersededSubmissions.length > 0 && (
         <ArchiveGroup label="Submissions">
           {supersededSubmissions.map((s: any) => (
-            <RmSignoffCard key={s.id} s={s} tone={submissionTone(s)} ticketId={t.id} title={submissionLabel(s)} reason={roundBySignoff.get(s.id)?.reason ?? s.reject_reason} collapsible />
+            <SignoffCard key={s.id} s={s} tone={submissionTone(s)} ticketId={t.id} title={submissionLabel(s)} reason={roundBySignoff.get(s.id)?.reason ?? s.reject_reason} collapsible hideTimestampOnMobile />
           ))}
         </ArchiveGroup>
       )}
@@ -765,10 +686,10 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
   const reviewSignoff: any = t.status === 'submitted_for_signoff' ? (pendingSignoffs[0] ?? null) : null
   const completionContent = (acceptedSignoff || reviewSignoff || liveEvidence || liveSnagSubmission) ? (
     <div className="space-y-3">
-      {reviewSignoff && <RmSignoffCard s={reviewSignoff} tone="review" ticketId={t.id} title={submissionLabel(reviewSignoff)} freshEvidence={isEvidenceResubmission} collapsible defaultOpen footer={<CompletionFooterNote>Approve, request more evidence, or raise a snag from the Next action panel above.</CompletionFooterNote>} />}
-      {liveEvidence && <RmSignoffCard s={liveEvidence} tone="evidence" ticketId={t.id} title={submissionLabel(liveEvidence)} reason={roundBySignoff.get(liveEvidence.id)?.reason ?? liveEvidence.reject_reason} collapsible defaultOpen footer={<CompletionFooterNote>Awaiting the supplier&apos;s updated evidence — this moves to History once they re-submit.</CompletionFooterNote>} />}
-      {liveSnagSubmission && <RmSignoffCard s={liveSnagSubmission} tone="snag" ticketId={t.id} title={submissionLabel(liveSnagSubmission)} reason={roundBySignoff.get(liveSnagSubmission.id)?.reason ?? liveSnagSubmission.reject_reason} collapsible defaultOpen footer={<CompletionFooterNote>Awaiting the supplier&apos;s snag fix — this moves to History once they re-submit.</CompletionFooterNote>} />}
-      {acceptedSignoff && <RmSignoffCard s={acceptedSignoff} tone="approved" ticketId={t.id} collapsible defaultOpen />}
+      {reviewSignoff && <SignoffCard s={reviewSignoff} tone="review" ticketId={t.id} title={submissionLabel(reviewSignoff)} freshEvidence={isEvidenceResubmission} collapsible defaultOpen hideTimestampOnMobile footer={<CompletionFooterNote>Approve, request more evidence, or raise a snag from the Next action panel above.</CompletionFooterNote>} />}
+      {liveEvidence && <SignoffCard s={liveEvidence} tone="evidence" ticketId={t.id} title={submissionLabel(liveEvidence)} reason={roundBySignoff.get(liveEvidence.id)?.reason ?? liveEvidence.reject_reason} collapsible defaultOpen hideTimestampOnMobile footer={<CompletionFooterNote>Awaiting the supplier&apos;s updated evidence — this moves to History once they re-submit.</CompletionFooterNote>} />}
+      {liveSnagSubmission && <SignoffCard s={liveSnagSubmission} tone="snag" ticketId={t.id} title={submissionLabel(liveSnagSubmission)} reason={roundBySignoff.get(liveSnagSubmission.id)?.reason ?? liveSnagSubmission.reject_reason} collapsible defaultOpen hideTimestampOnMobile footer={<CompletionFooterNote>Awaiting the supplier&apos;s snag fix — this moves to History once they re-submit.</CompletionFooterNote>} />}
+      {acceptedSignoff && <SignoffCard s={acceptedSignoff} tone="approved" ticketId={t.id} collapsible defaultOpen hideTimestampOnMobile />}
     </div>
   ) : null
 
