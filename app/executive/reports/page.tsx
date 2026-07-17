@@ -27,7 +27,9 @@ export default async function ExecutiveReportsPage() {
       <article className="bg-white text-slate-900 rounded-2xl p-8 space-y-6 print:p-0">
         <header className="border-b border-slate-200 pb-4">
           <h2 className="text-2xl font-bold">Estate Maintenance Report</h2>
-          <p className="text-sm text-[var(--text-faint)]">Generated {formatDateTime(d.generatedAt)}</p>
+          {/* Explicit slate (not --text-* vars): this article is force-white in both
+              themes, so muted vars would resolve near-white in dark mode → invisible. */}
+          <p className="text-sm text-slate-500">Generated {formatDateTime(d.generatedAt)}</p>
         </header>
 
         <section>
@@ -66,11 +68,11 @@ function ReportTable({ title, head, rows }: { title: string; head: string[]; row
       <h3 className="font-bold mb-2">{title}</h3>
       <div className="overflow-x-auto">
         <table className="w-full text-xs border-collapse">
-          <thead><tr className="text-left text-[var(--text-faint)] border-b border-slate-200">{head.map(h => <th key={h} className="py-1.5 pr-3 font-semibold">{h}</th>)}</tr></thead>
+          <thead><tr className="text-left text-slate-500 border-b border-slate-200">{head.map(h => <th key={h} className="py-1.5 pr-3 font-semibold">{h}</th>)}</tr></thead>
           <tbody>
             {rows.length ? rows.map((r, i) => (
               <tr key={i} className="border-b border-slate-100 align-top">{r.map((c, j) => <td key={j} className="py-1.5 pr-3">{c}</td>)}</tr>
-            )) : <tr><td colSpan={head.length} className="py-3 text-[var(--text-muted)]">Nothing to report.</td></tr>}
+            )) : <tr><td colSpan={head.length} className="py-3 text-slate-600">Nothing to report.</td></tr>}
           </tbody>
         </table>
       </div>

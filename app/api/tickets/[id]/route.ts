@@ -43,8 +43,9 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
 
-  // Access: SM owner (creator or store-linked), the ticket's RM, or an executive.
-  let allowed = role === 'executive' || role === 'system_admin'
+  // Access: SM owner (creator or store-linked), the ticket's RM, or system_admin.
+  // SEC-045: executive is read-only — not an editor.
+  let allowed = role === 'system_admin'
   if (!allowed && role === 'regional_manager') {
     allowed = await rmOwnsTicket(admin, user.id, ticket)
   }
@@ -76,7 +77,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     staff_impact_flag: impact === 'staff_inconvenience',
   }
   // Managers can set priority directly (manual override); SM/owner keeps it derived from impact.
-  const isManager = role === 'regional_manager' || role === 'executive' || role === 'system_admin'
+  const isManager = role === 'regional_manager' || role === 'system_admin'
   const priority = (isManager && ['P1', 'P2', 'P3', 'P4'].includes(String(body.priority)))
     ? String(body.priority)
     : computePriority({ severity, operational_impact: impact, ...flags })

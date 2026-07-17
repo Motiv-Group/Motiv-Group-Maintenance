@@ -7,6 +7,7 @@ import { SLA_VERSION } from '@/lib/sla'
 import { z } from 'zod'
 import { parseJsonBody } from '@/lib/validate'
 import { logAudit } from '@/lib/audit'
+import { verifyTurnstile } from '@/lib/turnstile'
 import type { Database } from '@/lib/database.types'
 
 const BodySchema = z.object({
@@ -22,6 +23,7 @@ const BodySchema = z.object({
   token: z.string().optional().nullable(),
   address: z.string().optional().nullable(),
   email: z.string().optional(),
+  captcha_token: z.string().optional().nullable(),
 })
 
 // Supplier onboarding — TWO entry paths, one wizard:
@@ -135,12 +137,19 @@ export async function POST(request: Request) {
   }
 
   // ── Path B: self-signup (no token) ─────────────────────────────────────────
+  // OPS-003: CAPTCHA — this path creates the auth user via the admin API (which
+  // bypasses Supabase's built-in CAPTCHA), so verify the Turnstile token here.
+  // (The invited path above is already gated by the one-time invite token.)
+  if (!(await verifyTurnstile(b.captcha_token, request.headers.get('x-forwarded-for'))))
+    return bad('Captcha verification failed — please try again.')
+
   const email = String(b.email ?? '').trim().toLowerCase()
   if (!isValidEmail(email)) return bad('Enter a valid email address')
 
-  // Friendly pre-check (authoritative uniqueness is enforced by createUser below).
-  const { data: existing } = await admin.from('user_profiles').select('id').ilike('email', email).maybeSingle()
-  if (existing) return bad('An account already exists for this email — please log in.')
+  // SEC-028: no friendly email-exists pre-check here — it was a user-enumeration
+  // fast-path. Uniqueness is enforced authoritatively by createUser below, which
+  // returns the same generic "account already exists" message (the supplier row is
+  // rolled back on that failure).
 
   // 1) the supplier company row: standalone, pending review, NOT in the Motiv pool yet.
   const { data: sup, error: supErr } = await admin.from('suppliers').insert({

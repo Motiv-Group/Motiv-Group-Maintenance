@@ -17,7 +17,7 @@ const fmtM = (n: number) => n >= 1_000_000 ? `R ${(n / 1_000_000).toFixed(1)}M` 
 const BAND_PILL: Record<DecisionItem['band'], string> = {
   High: 'bg-red-500/15 text-red-400 ring-1 ring-red-500/30',
   Medium: 'bg-blue-500/15 text-blue-500 ring-1 ring-[#f59e0b]/30',
-  Low: 'bg-white/5 text-[var(--text-muted)] ring-1 ring-white/10',
+  Low: 'bg-black/[0.04] dark:bg-white/5 text-[var(--text-muted)] ring-1 ring-black/10 dark:ring-white/10',
 }
 const bandStatus = (b: DecisionItem['band']) => b === 'High' ? 'at_risk' : b === 'Medium' ? 'attention' : 'controlled'
 

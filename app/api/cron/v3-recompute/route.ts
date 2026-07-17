@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import * as Sentry from '@sentry/nextjs'
 import { runRepeatDefectRecompute } from '@/lib/health/recompute'
 
 export const dynamic = 'force-dynamic'
@@ -17,6 +18,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: true, summary })
   } catch (e) {
     console.error('[cron]', e)
+    Sentry.captureException(e)   // SEC-040: handled 500s must reach Sentry
     return NextResponse.json({ ok: false, error: 'Recompute failed' }, { status: 500 })
   }
 }

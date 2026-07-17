@@ -33,7 +33,8 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   const admin = createAdminClient()
   const { data: prof } = await admin.from('user_profiles').select('role, company_id, full_name').eq('id', user.id).single()
   const isIndividual = prof?.role === 'individual'
-  if (!prof || (!isIndividual && (!prof.company_id || (prof.role !== 'regional_manager' && prof.role !== 'executive')))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  // SEC-045: executive is read-only — only regional_manager (or the individual owner) may assign.
+  if (!prof || (!isIndividual && (!prof.company_id || prof.role !== 'regional_manager'))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { data: ticket } = await admin.from('tickets').select('*').eq('id', params.id).single()
   if (!ticket) return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
@@ -49,6 +50,14 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   if (!isCommercialPhase(ticket.status)) {
     return NextResponse.json({ error: 'Suppliers can only be assigned before a quote is approved.' }, { status: 400 })
   }
+
+  // SEC-008/016: every selected supplier must belong to the ticket's company or be a
+  // shared Motiv-pool supplier — reject arbitrary or cross-tenant supplier UUIDs
+  // (the admin client bypasses RLS, so this is the only tenant guard on assignment).
+  const { data: supRows } = await admin.from('suppliers').select('id, company_id, is_motiv').in('id', supplierIds)
+  const inScope = (s: any) => s.company_id === ticket.company_id || s.company_id === null || s.is_motiv === true
+  const validIds = new Set((supRows ?? []).filter(inScope).map((s: any) => s.id))
+  if (validIds.size !== supplierIds.length) return NextResponse.json({ error: 'One or more selected suppliers are not available for this ticket.' }, { status: 400 })
 
   const now = new Date().toISOString()
   // Individual tickets have no company SLA config — use a default quote window.

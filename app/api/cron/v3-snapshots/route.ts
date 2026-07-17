@@ -1,5 +1,6 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import * as Sentry from '@sentry/nextjs'
 import { runEstateSnapshots } from '@/lib/health/snapshots'
 import { runRepeatDefectRecompute } from '@/lib/health/recompute'
 import { runMorningBriefingPush } from '@/lib/briefing/push'
@@ -21,9 +22,9 @@ export async function GET(request: Request) {
     let briefings: { users: number; sent: number; skipped: number } | { error: string } | null = null
     try { briefings = await runMorningBriefingPush() }
     catch (e: any) { briefings = { error: e?.message ?? 'briefing push failed' } }
-    // Purge archived completed-ticket notifications older than 3 days (folded in
-    // here — previously only in the unscheduled v3-recompute route, so it never
-    // ran). Isolated so a purge failure can't fail the snapshot.
+    // SEC-041: purge old archived notifications here (this is the SCHEDULED cron;
+    // v3-recompute is not in vercel.json — previously the purge lived only there,
+    // so it never ran). Isolated so it can't fail the snapshot.
     let purgedNotifications = 0
     try {
       const cutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
@@ -31,10 +32,11 @@ export async function GET(request: Request) {
         .from('notifications').delete({ count: 'exact' })
         .not('archived_at', 'is', null).lt('archived_at', cutoff)
       purgedNotifications = count ?? 0
-    } catch (e) { console.error('[cron] notification purge failed', e) }
+    } catch (e) { Sentry.captureException(e) }
     return NextResponse.json({ ok: true, repeat, summary, briefings, purgedNotifications })
   } catch (e) {
     console.error('[cron]', e)
+    Sentry.captureException(e)   // SEC-040: handled 500s must reach Sentry
     return NextResponse.json({ ok: false, error: 'Snapshot failed' }, { status: 500 })
   }
 }

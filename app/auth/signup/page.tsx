@@ -11,11 +11,16 @@ import { PasswordInput } from '@/components/ui/PasswordInput'
 import { Button } from '@/components/ui/Button'
 import { AuthShell } from '@/components/ui/AuthShell'
 import { AuthError, AuthFooter } from '@/components/ui/AuthBits'
+import { Turnstile, isTurnstileEnabled } from '@/components/ui/Turnstile'
 import { User, Truck, Mail, ArrowRight, Check } from 'lucide-react'
 
 // Self-service signup is for Individuals (general public) and Suppliers only.
 // Store Managers, Regional Managers and Executives are invited by an admin.
 type Choice = 'individual' | 'supplier'
+
+// POPIA (OPS-006): the version of the privacy/terms the user agreed to at signup.
+// Bump this when the legal copy changes so a re-consent can be required later.
+const CONSENT_VERSION = '2026-07'
 
 interface SignupForm {
   full_name: string
@@ -24,6 +29,7 @@ interface SignupForm {
   address:   string
   password:  string
   confirm_password: string
+  consent:   boolean
 }
 
 export default function SignupPage() {
@@ -32,6 +38,8 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [sentTo, setSentTo] = useState<string | null>(null)
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
+  const [captchaKey, setCaptchaKey] = useState(0) // remount widget for a fresh single-use token
 
   // mode:'onChange' makes isValid reactive so the submit button can gate on the
   // required fields being valid.
@@ -48,12 +56,14 @@ export default function SignupPage() {
   ]
 
   async function onSubmit(values: SignupForm) {
+    if (isTurnstileEnabled() && !captchaToken) { setError('Please complete the “I’m human” check.'); return }
     setLoading(true); setError('')
     const supabase = createClient()
     const { data, error: authError } = await supabase.auth.signUp({
       email: values.email,
       password: values.password,
       options: {
+        captchaToken: captchaToken ?? undefined,
         data: {
           full_name: values.full_name,
           phone:     values.phone,
@@ -62,10 +72,13 @@ export default function SignupPage() {
           sub_store: null,
           branch_code: null,
           role: 'individual',
+          // POPIA (OPS-006): record affirmative consent + version at signup.
+          consent_version: CONSENT_VERSION,
+          consent_accepted_at: new Date().toISOString(),
         },
       },
     })
-    if (authError) { setError(authError.message); setLoading(false); return }
+    if (authError) { setError(authError.message); setCaptchaToken(null); setCaptchaKey(k => k + 1); setLoading(false); return }
 
     // Email confirmation on → no session yet; show a "check your email" screen.
     if (!data.session) { setSentTo(values.email); setLoading(false); return }
@@ -164,6 +177,19 @@ export default function SignupPage() {
               </li>
             ))}
           </ul>
+
+          {/* POPIA consent — required; gates the submit button (isValid). */}
+          <label className="flex items-start gap-2.5 text-[13px] leading-snug text-gray-300 mt-1">
+            <input type="checkbox" className="mt-0.5 h-4 w-4 shrink-0 accent-emerald-600"
+              {...register('consent', { required: true })} />
+            <span>
+              I agree to the{' '}
+              <Link href="/privacy" target="_blank" className="text-blue-400 hover:text-blue-300 hover:underline">Privacy Policy</Link>{' '}and{' '}
+              <Link href="/terms" target="_blank" className="text-blue-400 hover:text-blue-300 hover:underline">Terms of Service</Link>, and consent to Motiv processing my personal information to provide the service.
+            </span>
+          </label>
+
+          <Turnstile key={captchaKey} onToken={setCaptchaToken} />
 
           <AuthError message={error} />
 

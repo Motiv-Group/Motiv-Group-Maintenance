@@ -1,5 +1,6 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import * as Sentry from '@sentry/nextjs'
 import { serverError } from '@/lib/api-error'
 import { revalidatePath } from 'next/cache'
 import { rateLimit } from '@/lib/rate-limit'
@@ -90,16 +91,23 @@ export async function POST(request: Request) {
   }).select().single()
   if (error) return serverError(error)
 
-  // notify the region's manager(s)
+  // SEC-038: the ticket is now committed. Notifying the region's manager(s) is a
+  // BEST-EFFORT side effect — it must never fail the ticket-create response, or the
+  // caller would see an error and retry, creating a DUPLICATE ticket. Isolate it in
+  // try/catch (any failure is captured, not surfaced) and fire push fire-and-forget.
   if (store.region_id) {
-    const { data: rms } = await admin.from('regional_users').select('user_id').eq('region_id', store.region_id)
-    const ids = (rms ?? []).map(r => r.user_id)
-    if (ids.length) {
-      await admin.from('notifications').insert(ids.map(id => ({
-        company_id: profile.company_id, user_id: id, ticket_id: ticket.id, type: 'new_ticket', title: title,
-        message: `${store.name} just logged a ${priorityWord(priority)} priority ticket in your region: "${title}".`, link: `/regional/tickets/${ticket.id}`,
-      })))
-      void sendPushToMany(ids, { title: 'New Ticket', body: `${store.name}: ${title}`, url: `/regional/tickets/${ticket.id}` })
+    try {
+      const { data: rms } = await admin.from('regional_users').select('user_id').eq('region_id', store.region_id)
+      const ids = (rms ?? []).map(r => r.user_id)
+      if (ids.length) {
+        await admin.from('notifications').insert(ids.map(id => ({
+          company_id: profile.company_id, user_id: id, ticket_id: ticket.id, type: 'new_ticket', title: title,
+          message: `${store.name} just logged a ${priorityWord(priority)} priority ticket in your region: "${title}".`, link: `/regional/tickets/${ticket.id}`,
+        })))
+        void sendPushToMany(ids, { title: 'New Ticket', body: `${store.name}: ${title}`, url: `/regional/tickets/${ticket.id}` })
+      }
+    } catch (e) {
+      Sentry.captureException(e) // notify failure is non-fatal; the ticket still exists
     }
   }
 

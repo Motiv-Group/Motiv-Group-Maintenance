@@ -21,12 +21,16 @@ export function AuthShell({
   logoHeight = 120,
   maxWidth = 'sm',
   raise = 0,
+  cardMaxWidth,
 }: {
   children: ReactNode
   logoHeight?: number
   maxWidth?: 'sm' | 'md' | 'lg'
   /** Shift the whole logo+card module up by this many px (balance on tall screens). */
   raise?: number
+  /** Exact module max-width in px (overrides `maxWidth`). Used by the login page
+   *  for its tuned 424px card; capped to the viewport on mobile via calc(). */
+  cardMaxWidth?: number
 }) {
   const branding = useBranding()
   // Background photo is chosen AFTER mount (not during SSR) so server and client
@@ -43,20 +47,24 @@ export function AuthShell({
   return (
     // --auth-btn drives the primary auth buttons (Button variant "gold"); admin-set hex.
     <div className="dark" style={{ '--auth-btn': branding.authButtonColor } as CSSProperties}>
-      <div className="relative min-h-screen bg-[#0b0c11] flex flex-col items-center justify-center px-4 py-10">
+      <div className="relative min-h-screen bg-[#080A0F] flex flex-col items-center justify-center px-4 py-10">
         {bgUrl && (
           // eslint-disable-next-line @next/next/no-img-element -- arbitrary storage URL; plain img avoids remote-domain config
           <img src={bgUrl} alt="" aria-hidden draggable={false}
             className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-25 transition-opacity duration-700" />
         )}
-        {/* Subtle neutral glow — depth without colour; logo remains the focus. */}
+        {/* Barely-there neutral glow behind the module — depth, not a spotlight;
+            the logo stays the brightest element. */}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_45%_at_50%_26%,rgba(255,255,255,0.055),transparent_72%)]"
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(58%_42%_at_50%_27%,rgba(255,255,255,0.038),transparent_74%)]"
         />
         <div
-          className={`relative w-full ${widthClass}`}
-          style={raise ? { transform: `translateY(-${raise}px)` } : undefined}
+          className={`relative w-full ${cardMaxWidth ? '' : widthClass}`}
+          style={{
+            ...(raise ? { transform: `translateY(-${raise}px)` } : {}),
+            ...(cardMaxWidth ? { maxWidth: `min(${cardMaxWidth}px, calc(100% - 0px))` } : {}),
+          }}
         >
           {/* Logo — gap above the card is admin-tunable (Customize tab); the two
               read as one centred group. The per-page logoGap prop is the built-in
@@ -65,7 +73,9 @@ export function AuthShell({
             <MotivLockup height={logoHeight} />
           </div>
 
-          <div className="rounded-2xl border border-white/15 bg-[#181a21] p-7 shadow-2xl shadow-black/50 ring-1 ring-white/5 sm:p-8">
+          {/* Premium card: lifted tonal gradient, hairline border, top-edge inset
+              highlight + soft drop shadow. Solid + refined, no glow around it. */}
+          <div className="rounded-[15px] border border-white/10 p-[26px] sm:p-[30px] [background:linear-gradient(180deg,#181c26_0%,#12161f_100%)] shadow-[0_24px_70px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.05)]">
             {children}
           </div>
 

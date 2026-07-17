@@ -45,7 +45,9 @@ export async function POST(request: Request) {
       const text = String(body.body ?? '').trim()
       if (!text) return NextResponse.json({ error: 'Update text required' }, { status: 400 })
       await admin.from('ticket_updates').insert({ ticket_id: ticketId, author_id: user.id, author_role: 'supplier', body: text })
-      await admin.from('tickets').update({ last_supplier_update_at: now, status: ticket.status === 'open' ? 'in_progress' : ticket.status }).eq('id', ticketId)
+      // SEC-034: posting an update must NOT change ticket status — status moves only
+      // through the workflow engine (the supplier has a proper start_work transition).
+      await admin.from('tickets').update({ last_supplier_update_at: now }).eq('id', ticketId)
       // Tell the region's RMs there's a new update on the ticket (in-app + push), so
       // it's noticed without them re-opening the ticket. A photo update shows a
       // friendlier preview than the raw "📷 Progress photo: <url>" body.
@@ -63,6 +65,9 @@ export async function POST(request: Request) {
       break
     }
     case 'add_evidence': {
+      // SEC-036: no new evidence on a closed ticket (evidence must be immutable once
+      // the job is completed/cancelled/declined).
+      if (['completed', 'cancelled', 'declined'].includes(ticket.status)) return NextResponse.json({ error: 'This ticket is closed.' }, { status: 400 })
       const kind = String(body.kind) // before_photo | after_photo | coc | invoice
       const url = String(body.url ?? '')
       if (!url) return NextResponse.json({ error: 'url required' }, { status: 400 })

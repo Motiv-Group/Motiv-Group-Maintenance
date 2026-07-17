@@ -7,8 +7,8 @@ import { PlusCircle, ImagePlus, Camera, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { uploadTicketPhotos } from '@/lib/upload'
 import { Card } from '@/components/exec/ui'
+import { Modal } from '@/components/ui/Modal'
 import { OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
-import { useScrollLock } from '@/lib/useScrollLock'
 
 const CATEGORIES = ['Electrical', 'Plumbing', 'HVAC', 'Refrigeration', 'Gas', 'Structural', 'Appliances', 'Painting', 'General', 'Cleaning', 'Other']
 const IMPACTS = Object.entries(OPERATIONAL_IMPACT_LABELS).map(([v, label]) => ({ v, label }))
@@ -24,8 +24,6 @@ export default function LogJobPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  useScrollLock(!!preview)
-
   const previews = useMemo(() => files.map(f => URL.createObjectURL(f)), [files])
   useEffect(() => () => { previews.forEach(u => URL.revokeObjectURL(u)) }, [previews])
 
@@ -35,7 +33,7 @@ export default function LogJobPage() {
     setFiles(prev => [...prev, ...imgs].slice(0, MAX_PHOTOS))
   }
 
-  const input = 'w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-[var(--text)] placeholder-[var(--text-faint)] focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500/60'
+  const input = 'w-full px-3.5 py-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--border)] text-[var(--text)] placeholder-[var(--text-faint)] focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500/60'
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -87,14 +85,14 @@ export default function LogJobPage() {
             <div
               onDragOver={e => e.preventDefault()}
               onDrop={e => { e.preventDefault(); addFiles(Array.from(e.dataTransfer.files)) }}
-              className="rounded-xl border border-dashed border-slate-300 dark:border-slate-600 p-3"
+              className="rounded-xl border border-dashed border-[var(--border)] p-3"
             >
               <div className="grid grid-cols-2 gap-3">
-                <label className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-[var(--text)] text-sm font-medium transition ${remaining ? 'cursor-pointer hover:border-emerald-500/60' : 'opacity-50 cursor-not-allowed'}`}>
+                <label className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl bg-[var(--input-bg)] border border-[var(--border)] text-[var(--text)] text-sm font-medium transition ${remaining ? 'cursor-pointer hover:border-emerald-500/60' : 'opacity-50 cursor-not-allowed'}`}>
                   <ImagePlus size={16} /> Browse
                   <input type="file" accept="image/*" multiple disabled={!remaining} className="hidden" onChange={e => { addFiles(Array.from(e.target.files ?? [])); e.target.value = '' }} />
                 </label>
-                <label className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-[var(--text)] text-sm font-medium transition ${remaining ? 'cursor-pointer hover:border-emerald-500/60' : 'opacity-50 cursor-not-allowed'}`}>
+                <label className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl bg-[var(--input-bg)] border border-[var(--border)] text-[var(--text)] text-sm font-medium transition ${remaining ? 'cursor-pointer hover:border-emerald-500/60' : 'opacity-50 cursor-not-allowed'}`}>
                   <Camera size={16} /> Take Photo
                   <input type="file" accept="image/*" capture="environment" disabled={!remaining} className="hidden" onChange={e => { addFiles(Array.from(e.target.files ?? [])); e.target.value = '' }} />
                 </label>
@@ -120,11 +118,18 @@ export default function LogJobPage() {
       </Card>
 
       {preview && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onClick={() => setPreview(null)}>
-          {/* eslint-disable-next-line @next/next/no-img-element -- ephemeral blob: preview URL; next/image can't optimize it */}
-          <img src={preview} alt="Photo preview" className="max-h-full max-w-full rounded-lg" />
-          <button type="button" onClick={() => setPreview(null)} className="absolute top-4 right-4 p-2 rounded-full bg-white/10 text-white hover:bg-white/20" title="Close"><X size={22} /></button>
-        </div>
+        <Modal onClose={() => setPreview(null)} maxWidth="max-w-2xl">
+          {close => (
+            <>
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-base font-bold text-[var(--text)]">Photo preview</h3>
+                <button type="button" onClick={close} aria-label="Close" className="-m-1 rounded-lg p-1.5 text-[var(--text-faint)] transition hover:bg-[var(--hover)] hover:text-[var(--text)]"><X size={18} /></button>
+              </div>
+              {/* eslint-disable-next-line @next/next/no-img-element -- ephemeral blob: preview URL; next/image can't optimize it */}
+              <img src={preview} alt="Photo preview" className="mx-auto max-h-[70vh] w-auto max-w-full rounded-lg" />
+            </>
+          )}
+        </Modal>
       )}
     </div>
   )

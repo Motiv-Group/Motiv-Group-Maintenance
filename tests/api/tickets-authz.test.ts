@@ -205,12 +205,13 @@ describe('DELETE /api/tickets/[id] — delete authZ', () => {
 // POST /api/tickets/[id]/transition — lifecycle move
 // ===========================================================================
 describe('POST /api/tickets/[id]/transition — authZ', () => {
-  // 'quoted' + 'approve_quote' is a valid move for individual/regional/executive.
-  const approve = { action: 'approve_quote' }
+  // 'quoted' + 'request_revision' is a valid transition for individual/regional.
+  // (Quote approve/decline moved to /quote-decision — SEC-018.)
+  const revise = { action: 'request_revision' }
 
   it('401 when unauthenticated', async () => {
     seed({ user: null })
-    const res = await TRANSITION(jsonRequest(approve), params)
+    const res = await TRANSITION(jsonRequest(revise), params)
     expect(res.status).toBe(401)
   })
 
@@ -219,18 +220,18 @@ describe('POST /api/tickets/[id]/transition — authZ', () => {
       profile: { role: 'regional_manager', company_id: null },
       ticket: { id: 'ticket-1', created_by: OWNER, company_id: null, status: 'quoted', priority: 'P3' },
     })
-    const res = await TRANSITION(jsonRequest(approve), params)
+    const res = await TRANSITION(jsonRequest(revise), params)
     expect(res.status).toBe(403)
   })
 
-  it('individual owner approving a quote on their standalone ticket → 200 (the cdc7dec regression)', async () => {
+  it('individual owner acting on their standalone ticket → 200 (the cdc7dec regression)', async () => {
     seed({
       profile: { role: 'individual', company_id: null },
       ticket: { id: 'ticket-1', created_by: OWNER, company_id: null, region_id: null, store_id: null, supplier_id: null, status: 'quoted', priority: 'P3' },
     })
-    const res = await TRANSITION(jsonRequest(approve), params)
+    const res = await TRANSITION(jsonRequest(revise), params)
     expect(res.status).toBe(200)
-    expect(await res.json()).toMatchObject({ ok: true, status: 'accepted' })
+    expect(await res.json()).toMatchObject({ ok: true, status: 'quote_revision' })
   })
 
   it('individual who is NOT the owner → 403 (hasAccess denies)', async () => {
@@ -238,7 +239,7 @@ describe('POST /api/tickets/[id]/transition — authZ', () => {
       profile: { role: 'individual', company_id: null },
       ticket: { id: 'ticket-1', created_by: OTHER, company_id: null, region_id: null, store_id: null, status: 'quoted', priority: 'P3' },
     })
-    const res = await TRANSITION(jsonRequest(approve), params)
+    const res = await TRANSITION(jsonRequest(revise), params)
     expect(res.status).toBe(403)
   })
 
@@ -247,7 +248,7 @@ describe('POST /api/tickets/[id]/transition — authZ', () => {
       profile: { role: 'store_manager', company_id: 'company-A' },
       ticket: { id: 'ticket-1', created_by: OWNER, company_id: 'company-B', store_id: 's1', status: 'quoted', priority: 'P3' },
     })
-    const res = await TRANSITION(jsonRequest(approve), params)
+    const res = await TRANSITION(jsonRequest(revise), params)
     expect(res.status).toBe(404)
   })
 
@@ -257,7 +258,7 @@ describe('POST /api/tickets/[id]/transition — authZ', () => {
       ticket: { id: 'ticket-1', created_by: OWNER, company_id: null, supplier_id: 'sup-9', status: 'quoted', priority: 'P3' },
       // supplier_users + ticket_suppliers stay empty → not their ticket.
     })
-    const res = await TRANSITION(jsonRequest(approve), params)
+    const res = await TRANSITION(jsonRequest(revise), params)
     expect(res.status).toBe(403)
   })
 

@@ -2,6 +2,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { parseJsonBody } from '@/lib/validate'
+import { rateLimit } from '@/lib/rate-limit'
 
 // POST /api/tickets/[id]/view  { itemType, itemLabel } — record that the current user
 // opened a specific item on a ticket (a photo, quote, COC…), for the audit trail. Only
@@ -18,6 +19,8 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+  if (!(await rateLimit(`view:${user.id}`, 120, 60_000)))
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
   const parsed = await parseJsonBody(request, BodySchema)
   if (!parsed.ok) return parsed.error
@@ -31,6 +34,9 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   if (!prof?.company_id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   const { data: ticket } = await admin.from('tickets').select('id, company_id').eq('id', params.id).single()
   if (!ticket) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  // SEC-026: only a user in the ticket's own company may record a view on it —
+  // otherwise any company user could forge cross-tenant rows in the ticket_views audit.
+  if (ticket.company_id !== prof.company_id) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   // ignoreDuplicates keeps the FIRST view's timestamp (unique on ticket+viewer+type+label).
   await admin.from('ticket_views').upsert(
