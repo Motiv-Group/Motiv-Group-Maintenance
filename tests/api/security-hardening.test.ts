@@ -36,7 +36,6 @@ const H = vi.hoisted(() => {
 vi.mock('@/lib/supabase/server', () => ({ createClient: () => H.client, createAdminClient: () => H.admin }))
 vi.mock('@/lib/rate-limit', () => ({ rateLimit: async () => true }))
 
-import { GET as SUPPLIERS_GET } from '@/app/api/suppliers/route'
 import { POST as VIEW } from '@/app/api/tickets/[id]/view/route'
 import { POST as SEEN } from '@/app/api/tickets/[id]/seen/route'
 
@@ -48,35 +47,11 @@ beforeEach(() => { H.state.user = { id: ME }; H.state.tables = {} })
 function tables(t: Record<string, { rows?: any[] }>) { H.state.tables = t }
 
 // ===========================================================================
-// GET /api/suppliers — SEC-003/005/009/015 (must be company-scoped)
+// GET /api/suppliers — SEC-003/005/009/015. The route was first company-scoped
+// (main's SEC batch), then DELETED outright by the 2026-07-16 audit branch: it
+// had zero callers (its UI was removed in 4a143c9), and a dead scoped route is
+// still attack surface. The scoping tests that lived here went with it.
 // ===========================================================================
-describe('GET /api/suppliers — tenant scoping', () => {
-  it('403 when unauthenticated', async () => {
-    H.state.user = null
-    const res = await SUPPLIERS_GET()
-    expect(res.status).toBe(403)
-  })
-
-  it('403 for a non-supplier role', async () => {
-    tables({ user_profiles: { rows: [{ role: 'store_manager', company_id: 'A' }] } })
-    const res = await SUPPLIERS_GET()
-    expect(res.status).toBe(403)
-  })
-
-  it('403 for a supplier with NO company_id (pool / unverified) — cannot read any directory', async () => {
-    tables({ user_profiles: { rows: [{ role: 'supplier', company_id: null }] }, suppliers: { rows: [{ id: 's1', company_id: 'A' }] } })
-    const res = await SUPPLIERS_GET()
-    expect(res.status).toBe(403)
-  })
-
-  it('200 for a supplier with a company_id (scoped read)', async () => {
-    tables({ user_profiles: { rows: [{ role: 'supplier', company_id: 'A' }] }, suppliers: { rows: [{ id: 's1', company_id: 'A', company_name: 'X' }] } })
-    const res = await SUPPLIERS_GET()
-    expect(res.status).toBe(200)
-    const body = await res.json()
-    expect(Array.isArray(body.suppliers)).toBe(true)
-  })
-})
 
 // ===========================================================================
 // POST /api/tickets/[id]/view — SEC-026 (tenant check)

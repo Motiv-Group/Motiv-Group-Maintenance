@@ -3,13 +3,13 @@ import { jsonRequest } from '../helpers/supabase-mock'
 
 // ---------------------------------------------------------------------------
 // Integration authZ tests for POST /api/tickets/[id]/quote-decision — the RM
-// (or executive / individual owner) approving, declining, or re-requesting a
-// supplier's quote.
+// (or the individual owner on standalone tickets) approving, declining, or
+// re-requesting a supplier's quote. Executive is read-only (SEC-045).
 //
 // Supabase is mocked so no DB is required — each table returns a fixed fixture
 // (the handler authorizes on the ROWS a table yields, not on the filter).
 // Business rules under test:
-//   • only regional_manager / executive / individual may decide (supplier and
+//   • only regional_manager / individual-owner may decide (supplier, executive and
 //     store_manager → 403)
 //   • the quote must still be pending — approving/declining an already-decided
 //     quote → 409 (idempotency / no double-award)
@@ -144,7 +144,7 @@ describe('POST /api/tickets/[id]/quote-decision — auth + input', () => {
 })
 
 // ===========================================================================
-// Role gate — only regional_manager / executive / individual may decide
+// Role gate — only regional_manager / individual-owner may decide (SEC-045)
 // ===========================================================================
 describe('POST /api/tickets/[id]/quote-decision — role gate', () => {
   it('supplier → 403 (suppliers never decide quotes)', async () => {
@@ -182,13 +182,13 @@ describe('POST /api/tickets/[id]/quote-decision — tenant/ownership', () => {
     expect(res.status).toBe(404)
   })
 
-  it("executive on a DIFFERENT company's ticket → 404 (existence not leaked)", async () => {
+  it('executive → 403 even on their own company (SEC-045: executive is read-only for the workflow)', async () => {
     seed({
       profile: { role: 'executive', company_id: 'company-A' },
       ticket: { id: 'ticket-1', company_id: 'company-B', region_id: 'region-1', created_by: OWNER, title: 'Broken door', status: 'quoted', priority: 'P3' },
     })
     const res = await POST(jsonRequest(approve), params)
-    expect(res.status).toBe(404)
+    expect(res.status).toBe(403)
   })
 
   it('regional_manager in the right company but NOT linked to the ticket region → 403', async () => {
@@ -265,14 +265,13 @@ describe('POST /api/tickets/[id]/quote-decision — happy paths', () => {
     expect(await res.json()).toMatchObject({ ok: true })
   })
 
-  it('executive (same company) approving a pending quote → 200 (no region link required)', async () => {
+  it('executive (same company) approving a pending quote → 403 (SEC-045: read-only role)', async () => {
     seed({
       profile: { role: 'executive', company_id: 'company-A' },
       tables: { regional_users: { rows: [] } },
     })
     const res = await POST(jsonRequest(approve), params)
-    expect(res.status).toBe(200)
-    expect(await res.json()).toMatchObject({ ok: true })
+    expect(res.status).toBe(403)
   })
 
   it('individual owner approving a quote on their standalone ticket → 200', async () => {

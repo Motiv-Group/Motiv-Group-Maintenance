@@ -305,14 +305,14 @@ describe('POST dispute resolve — withdraw/retract', () => {
     expect(await res.json()).toMatchObject({ ok: true })
   })
 
-  it('executive of the same company (with region link) retracting → 200', async () => {
+  it('executive retracting → 403 (SEC-045: executive is read-only — can view a dispute, not resolve it)', async () => {
     seed({
       profile: { role: 'executive', company_id: 'company-A' },
       ticket: companyTicket,
       tables: { ...asRegionRM, ticket_disputes: { rows: [openDispute] } },
     })
     const res = await POST(jsonRequest({ action: 'retract' }), params)
-    expect(res.status).toBe(200)
+    expect(res.status).toBe(403)
   })
 
   it('individual owner resolving on their company-null ticket → 200 (individual-as-resolver path)', async () => {
