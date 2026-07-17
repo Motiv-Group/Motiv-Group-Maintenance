@@ -1,6 +1,6 @@
-// v7 — offline fallback + static-asset caching (was: push-only)
+// v8 — offline fallback + static-asset caching + prompted update (was: push-only)
 
-const CACHE = 'motiv-v7'
+const CACHE = 'motiv-v8'
 // Precached at install: the offline page + the icons it/the OS need.
 const PRECACHE = ['/offline.html', '/icon-192.png', '/icon-512.png']
 
@@ -8,10 +8,16 @@ self.addEventListener('install', function (event) {
   event.waitUntil(
     caches.open(CACHE).then(function (cache) { return cache.addAll(PRECACHE) })
   )
-  // Take over immediately — don't wait for all tabs to close. Safe with our
-  // caching strategy: _next/static asset URLs are content-hashed, so entries
-  // from an older deploy are simply never requested again.
-  self.skipWaiting()
+  // NB: no unconditional skipWaiting() here. A freshly-installed SW parks in the
+  // "waiting" state so the running page isn't swapped out mid-session; the page
+  // shows an update toast and only posts SKIP_WAITING (below) when the user opts
+  // in. Content-hashed _next/static URLs make the deferred swap safe.
+})
+
+// Client opt-in to take over: the update toast posts this once the user clicks
+// Refresh. activate → clients.claim() then triggers a single controllerchange.
+self.addEventListener('message', function (event) {
+  if (event.data === 'SKIP_WAITING') self.skipWaiting()
 })
 
 self.addEventListener('activate', function (event) {
