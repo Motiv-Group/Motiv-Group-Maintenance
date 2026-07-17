@@ -6,7 +6,9 @@ SLA** tracking, blocker ownership, supplier performance, repeat-defect
 detection and an auto-generated **Executive Decisions Required** list.
 
 This document is the implementation reference. The engine is pure TypeScript in
-`lib/dashboards/`; the DB layer is the migration `supabase/migrations/20260616_dashboards_v2.sql`.
+**`lib/health/`** (the original `lib/dashboards/` v2 copy was deleted — v3 in
+`lib/health/` is the only engine); the DB layer is folded into the canonical
+`supabase/schema.sql`.
 
 ---
 
@@ -23,16 +25,13 @@ rules, so good averages can't hide dangerous outliers.
 
 ---
 
-## 2. Data model (migration `20260616_dashboards_v2.sql`)
-
-New / changed:
+## 2. Data model (see `supabase/schema.sql` — canonical)
 
 | Table | Purpose |
 |---|---|
-| `regions` | A store belongs to a region; a region has an assigned regional manager. Estate rolls up region → estate. |
-| `profiles.region_id` | Store → region link (new column). `role` enum gains `executive`. |
+| `regions` | A store belongs to a region (`stores.region_id`); RMs map to regions via the `regional_users` join table. Estate rolls up region → estate. |
 | `sla_rules` | Per-priority SLA targets. Global default row (`region_id NULL`) seeded with SA-market defaults; override per region as clients onboard. |
-| `tickets` (+~50 cols) | Classification (`category`, `severity`, impact flags), supplier link (`supplier_id`), dual-SLA timestamps, quote lifecycle, blocker, evidence flags, repeat-defect group, freshness markers, cached health. All nullable/defaulted — existing tickets keep working. `region_id` auto-filled from the store by trigger. |
+| `tickets` (+~50 cols) | Classification (`category`, `severity`, impact flags), supplier link (`supplier_id`), dual-SLA timestamps, quote lifecycle, blocker, evidence flags, repeat-defect group, freshness markers, cached health. All nullable/defaulted — existing tickets keep working. `region_id`/`region_code` are copied from the store by the create-ticket API. |
 | `repeat_defect_groups` | Recurring category at a store (+ dominant supplier, root-cause/action). |
 | `ticket_sla_events` | Audit-grade SLA event history. |
 | `ticket_blockers` | Blocker history (type, owner, started/resolved). |
@@ -40,7 +39,7 @@ New / changed:
 | `approvals` | Quote/variation/completion/funding approvals with due dates. |
 | `store_health_scores` | Daily store snapshot (6 sub-scores + calculated/override/final). |
 | `regional_health_scores` | Daily region snapshot (avg, penalty, final, RAG counts). |
-| `executive_estate_health_scores` | Daily estate snapshot (weighted, penalty, distribution, trend inputs). |
+| `estate_health_scores` | Daily estate snapshot (weighted, penalty, distribution, trend inputs). |
 | `supplier_performance_scores` | Daily supplier snapshot (SLA, first-fix, evidence, score/band). |
 | `dashboard_snapshots` | JSON payload per scope (estate/region/store) for fast loads + month-end. |
 | `audit_logs` | Generic action log. |
@@ -52,7 +51,7 @@ writes.
 
 ---
 
-## 3. Store Health logic (`lib/dashboards/storeHealth.ts`)
+## 3. Store Health logic (`lib/health/storeHealth.ts`)
 
 ```
 Store Health (0-100) =
@@ -60,7 +59,8 @@ Store Health (0-100) =
   + Repeat Defect (15) + Commercial Blocker (10) + Data Quality (10)
 ```
 
-Bands: **85-100 Green / 70-84 Amber / 50-69 Red / 0-49 Critical**.
+Bands (`lib/health/constants.ts` `statusForScore`): **95–100 Controlled /
+80–94 Attention / 51–79 At Risk / 0–50 Critical**.
 
 Sub-scores are deductive (start at the weight, subtract for risk). Then
 **override rules** can only *worsen* the band (and the number is capped into the
@@ -74,8 +74,8 @@ worse band so score & RAG always agree):
 - No update on a critical ticket >48h → **Red**
 - Trading-impact issue overdue → **Red**
 
-Stored fields: `calculated_health_score`, `calculated_rag_status`,
-`override_applied`, `override_reason`, `final_health_score`, `final_rag_status`.
+Stored fields: `calculated_health_score`, `calculated_status`,
+`override_applied`, `override_reason`, `final_health_score`, `final_status`.
 
 ## 4. Regional Portfolio Health (`regionalHealth.ts`)
 
@@ -133,26 +133,25 @@ so legacy tickets still score.
 
 Tunable weights/thresholds/penalties live in `constants.ts`.
 
-## 8. API endpoints
+## 8. Data access
 
-- `GET /api/dashboards/regional` — full regional payload (regional_manager only)
-- `GET /api/dashboards/executive` — full estate payload (executive only)
-- `GET /api/cron/recompute` — refresh active-ticket caches (cron/exec)
-- `GET /api/cron/snapshots` — daily health snapshots (cron/exec)
-
-The dashboard payloads contain every sub-list (top-risk, ranking, suppliers,
-repeat defects, decisions, backlog), so additional read endpoints can slice the
-same payload if needed.
+There are no `/api/dashboards/*` endpoints — role pages call the server-only
+assemblers in `lib/health/data.ts` directly (`assembleEstateDashboard`,
+`assembleRegionalDashboard`, `assembleStoreManagerDashboard`,
+`assembleSupplierDashboard`). Each payload contains every sub-list (top-risk,
+ranking, suppliers, repeat defects, decisions, backlog).
 
 ## 9. Scheduled jobs (`vercel.json`)
 
-- Hourly `0 * * * *` → `/api/cron/recompute`
-- Daily `30 0 * * *` → `/api/cron/snapshots`
+- Daily `0 5 * * *` → `/api/cron/v3-snapshots` — repeat-defect recompute +
+  health snapshots + morning-briefing push + archived-notification purge,
+  bundled into the single cron the Vercel Hobby plan allows.
+- `/api/cron/v3-recompute` exists as a **manual/executive trigger only** (not
+  scheduled).
 
 Authorised by `Authorization: Bearer $CRON_SECRET` (Vercel Cron) or a signed-in
-executive. Higher-frequency jobs (15-min urgent SLA) can be added on a paid
-Vercel plan. Event-based recompute can call `recomputeActiveTickets()` from the
-relevant write route handlers.
+executive/system_admin. Higher-frequency jobs (15-min urgent SLA) need a paid
+Vercel plan — see the deferred backlog in `docs/INFRASTRUCTURE_TIERS.md`.
 
 ## 10. UI layout
 
@@ -179,7 +178,8 @@ Regional reporting continues through the existing `ReportBuilder`.
 
 Green = Controlled · Amber = Attention Required · Red = At Risk · Critical =
 Immediate Intervention. Ticket labels as in §6. Shared classes in
-`constants.ts` (`RAG_COLORS`, `RAG_STROKE`, `RAG_LABELS`, `PORTFOLIO_LABELS`).
+`lib/health/constants.ts` (`STATUS_COLORS`, `STATUS_STROKE`, `STATUS_RANK`,
+`statusForScore`).
 
 ---
 
@@ -207,18 +207,21 @@ by constructing `Ticket` fixtures and asserting the returned scores/labels.
 ## 14. Developer / operations checklist
 
 **Apply the schema (manual, per repo convention):**
-1. Open Supabase → SQL Editor. Paste & run `supabase/migrations/20260616_dashboards_v2.sql`. Idempotent; safe to re-run. It backfills one region per existing RM and links stores + tickets.
+1. The dashboards schema is already part of `supabase/schema.sql` — a fresh
+   environment just runs that one file in the Supabase SQL Editor.
 
 **Create an executive user:**
-2. Create the auth user (Supabase Auth or signup), then in SQL:
-   `update public.profiles set role = 'executive' where email = '<exec email>';`
-   (The signup trigger only ever self-assigns `individual`; executive/RM/SM/supplier are set by a trusted server path — admin invite / onboard — see migration 20260721. Preferred: create execs from the platform-admin Accounts page.)
+2. Preferred: create execs from the platform-admin Accounts page. Manual SQL
+   fallback: `update public.user_profiles set role = 'executive' where email = '<exec email>';`
+   (The signup trigger only ever self-assigns `individual`; executive/RM/SM are
+   set by the trusted admin invite paths.)
 
 **Configure:**
 3. Set `CRON_SECRET` in Vercel env so the cron routes authorise.
 4. (Optional) Per-region SLA overrides: insert rows into `sla_rules` with the region's `region_id`. Global defaults already seeded.
-5. Assign stores to regions / set a region's RM via `regions.regional_manager_id` and `profiles.region_id` as you onboard.
-6. Run `/api/cron/snapshots` once (as executive) to seed the first snapshot; trends light up from the next day.
+5. Assign stores to regions (`stores.region_id`) and link RMs via the
+   `regional_users` join table — both managed from the admin Hierarchy tab.
+6. Run `/api/cron/v3-snapshots` once (as executive) to seed the first snapshot; trends light up from the next day.
 
 **Verify:** log in as executive → `/executive`; as RM → `/regional`. KPIs and
 gauges should populate from live tickets even before snapshots exist.

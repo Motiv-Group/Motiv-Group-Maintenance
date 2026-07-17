@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic'
 import { FileBarChart } from 'lucide-react'
 import { requireRegionalV3 } from '@/lib/health/guard'
 import { assembleRegionalDashboard } from '@/lib/health/data'
-import { PrintButton } from '@/components/dashboards/PrintButton'
+import { PrintButton } from '@/components/ui/PrintButton'
 import { STATUS_LABELS } from '@/lib/health/constants'
 import { formatCurrency, formatDateTime } from '@/lib/utils'
 

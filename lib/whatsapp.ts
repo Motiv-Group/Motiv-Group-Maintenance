@@ -7,10 +7,13 @@
 // message template — not set up here. So treat this as best-effort and always
 // offer a manual share fallback (wa.me link) in the UI.
 
+import { fetchWithRetry } from '@/lib/fetch-retry'
+
 /**
  * Send a plain WhatsApp text message. `to` may be any phone format; it's
  * reduced to digits (Cloud API expects no leading +). Returns true on a 2xx,
- * false otherwise. Never throws.
+ * false otherwise. Never throws. Timeout + one retry so a hung Graph call
+ * can't stall the caller.
  */
 export async function sendWhatsAppText(to: string, body: string): Promise<boolean> {
   const token   = process.env.WHATSAPP_ACCESS_TOKEN
@@ -21,7 +24,7 @@ export async function sendWhatsAppText(to: string, body: string): Promise<boolea
   if (!digits) return false
 
   try {
-    const res = await fetch(`https://graph.facebook.com/v21.0/${phoneId}/messages`, {
+    const res = await fetchWithRetry(`https://graph.facebook.com/v21.0/${phoneId}/messages`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -33,7 +36,7 @@ export async function sendWhatsAppText(to: string, body: string): Promise<boolea
         type: 'text',
         text: { body },
       }),
-    })
+    }, { timeoutMs: 15_000, retries: 1, label: 'wa-send:text' })
     return res.ok
   } catch {
     return false

@@ -4,7 +4,7 @@ import { FileBarChart } from 'lucide-react'
 import { requireExecutiveV3 } from '@/lib/health/guard'
 import { assembleEstateDashboard } from '@/lib/health/data'
 import { STATUS_LABELS } from '@/lib/health/constants'
-import { PrintButton } from '@/components/dashboards/PrintButton'
+import { PrintButton } from '@/components/ui/PrintButton'
 import { formatCurrency, formatDateTime } from '@/lib/utils'
 
 const fmtK = (n: number) => n >= 1000 ? `R ${(n / 1000).toFixed(0)}K` : formatCurrency(n)

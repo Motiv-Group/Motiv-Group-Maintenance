@@ -26,19 +26,26 @@ export async function sendEmail({ to, subject, html, text }: SendEmailArgs): Pro
   const from   = process.env.EMAIL_FROM
   if (!apiKey || !from) return false
 
-  try {
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ from, to, subject, html, ...(text ? { text } : {}) }),
-    })
-    return res.ok
-  } catch {
-    return false
+  // Inline timeout+retry (not lib/fetch-retry) — this module must stay pure /
+  // client-importable (see header note), so no Sentry import here.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ from, to, subject, html, ...(text ? { text } : {}) }),
+        signal: AbortSignal.timeout(15_000),
+      })
+      if (res.status >= 500 && attempt === 0) continue
+      return res.ok
+    } catch {
+      // retry once on network error/timeout, then give up quietly (best-effort)
+    }
   }
+  return false
 }
 
 /** Escape untrusted text before dropping it into an email's HTML body. */

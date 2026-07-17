@@ -1,4 +1,5 @@
 import type { ReportModel } from '@/lib/report-data'
+import { fetchWithRetry } from '@/lib/fetch-retry'
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY
 const GROQ_BASE    = 'https://api.groq.com/openai/v1'
@@ -35,7 +36,7 @@ Return ONLY a JSON object:
 Provide commentary for every section heading listed above.`
 
   try {
-    const res = await fetch(`${GROQ_BASE}/chat/completions`, {
+    const res = await fetchWithRetry(`${GROQ_BASE}/chat/completions`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -45,7 +46,7 @@ Provide commentary for every section heading listed above.`
         max_tokens: 1200,
         messages: [{ role: 'system', content: sys }, { role: 'user', content: user }],
       }),
-    })
+    }, { timeoutMs: 30_000, retries: 1, label: 'groq-report' })
     if (!res.ok) return model
     const json = await res.json() as { choices: Array<{ message: { content: string } }> }
     const parsed = JSON.parse(json.choices[0].message.content) as {

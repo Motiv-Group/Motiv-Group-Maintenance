@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation'
 import { resolveRange, buildSupplierModel } from '@/lib/report-data'
 import { addNarrative } from '@/lib/report-groq'
 import { ReportDocument } from '@/components/reports/ReportDocument'
-import { PrintButton } from '@/components/reports/PrintButton'
+import { PrintButton } from '@/components/ui/PrintButton'
 
 export default async function SupplierReportView(
   props: {
@@ -28,7 +28,7 @@ export default async function SupplierReportView(
 
   return (
     <div className="py-2">
-      <PrintButton />
+      <PrintButton sticky />
       <ReportDocument model={model} />
     </div>
   )

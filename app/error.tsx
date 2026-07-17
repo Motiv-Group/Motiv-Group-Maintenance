@@ -1,12 +1,16 @@
 'use client'
 
 import { useEffect } from 'react'
+import * as Sentry from '@sentry/nextjs'
 
 // Route-segment error boundary. Renders INSIDE the root layout, so it must NOT
 // render its own <html>/<body> — the layout already provides them. Errors in the
 // root layout itself are caught by app/global-error.tsx instead.
 export default function Error({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
+    // Client render errors aren't covered by onRequestError — report explicitly
+    // (no-ops when the DSN is unset).
+    Sentry.captureException(error)
     console.error(error)
   }, [error])
 

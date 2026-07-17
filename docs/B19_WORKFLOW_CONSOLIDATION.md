@@ -13,7 +13,7 @@ state **directly**, re-implementing the same concerns inline:
 - `assign` (invite suppliers to quote)
 - `submit-quote`
 - `dispute` (`resolveDispute` applies status changes)
-- `decline-invite` (invite-level only; no ticket state — lowest risk)
+- ~~`decline-invite`~~ (deleted 2026-07-16 — had zero callers; the supplier UI posts to `/api/supplier/decline-work`)
 
 The transition route has a clean helper, `lifecycleFields(to, now, tgt)`, that maps a
 destination status → blocker/pause columns. **None of the other routes reuse it** — they
@@ -78,7 +78,7 @@ merge. Behaviour-preserving; the point is that each route ends up calling the sa
    the blocker/notify/log concerns move).
 6. **`dispute`** → `resolveDispute` reuses `resolveBlockerState` + `stampFreshness`.
 
-`decline-invite` needs nothing (no ticket state / no notifications) — leave as-is.
+`decline-invite` was deleted 2026-07-16 (dead — superseded by `/api/supplier/decline-work`).
 
 ## 6. Test strategy
 

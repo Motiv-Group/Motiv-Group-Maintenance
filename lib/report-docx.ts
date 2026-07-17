@@ -10,7 +10,8 @@ const GREY = '64748B'
 
 async function fetchPng(url: string): Promise<Uint8Array | null> {
   try {
-    const r = await fetch(url)
+    // External chart-render service — bound it so a hang can't stall the report.
+    const r = await fetch(url, { signal: AbortSignal.timeout(20_000) })
     if (!r.ok) return null
     return new Uint8Array(await r.arrayBuffer())
   } catch { return null }

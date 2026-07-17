@@ -23,7 +23,8 @@ export async function GET(request: Request) {
     try { briefings = await runMorningBriefingPush() }
     catch (e: any) { briefings = { error: e?.message ?? 'briefing push failed' } }
     // SEC-041: purge old archived notifications here (this is the SCHEDULED cron;
-    // v3-recompute is not in vercel.json). Isolated so it can't fail the snapshot.
+    // v3-recompute is not in vercel.json — previously the purge lived only there,
+    // so it never ran). Isolated so it can't fail the snapshot.
     let purgedNotifications = 0
     try {
       const cutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
