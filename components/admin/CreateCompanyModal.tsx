@@ -6,6 +6,8 @@ import { Building2, ImagePlus, X } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { errMsg } from '@/components/ui/errMsg'
 
+function revoke(url: string | null) { if (url) URL.revokeObjectURL(url) }
+
 const input = 'w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)] outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500/60'
 
 // "Create company" pop-up: company name + optional logo. Creates the company,
@@ -19,13 +21,12 @@ export function CreateCompanyModal({ onClose }: { onClose: () => void }) {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
+  const previewRef = useRef<string | null>(null)
 
-  useEffect(() => {
-    if (!file) { setPreview(null); return }
-    const url = URL.createObjectURL(file)
-    setPreview(url)
-    return () => URL.revokeObjectURL(url)
-  }, [file])
+  // Revoke the last object URL on unmount (no setState — lint-safe).
+  useEffect(() => () => revoke(previewRef.current), [])
+
+  function setPreviewUrl(url: string | null) { revoke(previewRef.current); previewRef.current = url; setPreview(url) }
 
   function pickFile(f: File | undefined) {
     if (!f) return
@@ -33,8 +34,10 @@ export function CreateCompanyModal({ onClose }: { onClose: () => void }) {
     // already limits to images) rather than silently dropping the file.
     if (f.type && !f.type.startsWith('image/')) { setErr('Logo must be an image.'); return }
     if (f.size > 8 * 1024 * 1024) { setErr('Logo is over 8MB.'); return }
-    setErr(''); setFile(f)
+    setErr(''); setFile(f); setPreviewUrl(URL.createObjectURL(f))
   }
+
+  function clearFile() { setFile(null); setPreviewUrl(null) }
 
   async function submit(close: () => void, e: React.FormEvent) {
     e.preventDefault()
@@ -94,7 +97,7 @@ export function CreateCompanyModal({ onClose }: { onClose: () => void }) {
                   {file ? 'Change' : 'Upload logo'}
                 </button>
                 {file && (
-                  <button type="button" onClick={() => setFile(null)} className="inline-flex items-center gap-1 text-xs text-[var(--text-muted)] hover:text-[var(--text)]"><X size={13} /> Remove</button>
+                  <button type="button" onClick={clearFile} className="inline-flex items-center gap-1 text-xs text-[var(--text-muted)] hover:text-[var(--text)]"><X size={13} /> Remove</button>
                 )}
               </div>
               <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={e => { pickFile(e.target.files?.[0]); e.target.value = '' }} />
