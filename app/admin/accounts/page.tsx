@@ -45,30 +45,31 @@ export default async function AdminAccountsPage() {
     db.from('stores').select('id, branch_code, region_id'),
     db.from('projects').select('id, name, company_id').is('archived_at', null).order('name'),
   ])
-  const companyName = new Map(((companies ?? []) as any[]).map(c => [c.id, c.name]))
-  const companyOpts: CompanyOpt[] = ((companies ?? []) as any[]).map(c => ({ id: c.id, name: c.name }))
-  const regionOpts: RegionOpt[] = ((regions ?? []) as any[]).map(r => ({ id: r.id, name: r.name, companyId: r.company_id, code: r.region_code }))
-  const projectOpts: ProjectOpt[] = ((projects ?? []) as any[]).map(p => ({ id: p.id, name: p.name, companyId: p.company_id }))
+  type UserRow = NonNullable<typeof users>[number]
+  const companyName = new Map((companies ?? []).map(c => [c.id, c.name]))
+  const companyOpts: CompanyOpt[] = (companies ?? []).map(c => ({ id: c.id, name: c.name }))
+  const regionOpts: RegionOpt[] = (regions ?? []).map(r => ({ id: r.id, name: r.name, companyId: r.company_id, code: r.region_code }))
+  const projectOpts: ProjectOpt[] = (projects ?? []).map(p => ({ id: p.id, name: p.name, companyId: p.company_id }))
 
   // Per-user "Region / Branch": RMs → their region name(s); SMs → their store branch code.
-  const regionLabelById = new Map(((regions ?? []) as any[]).map(r => [r.id, `${r.name} (${r.region_code})`]))
-  const storeById = new Map(((stores ?? []) as any[]).map(s => [s.id, s]))
+  const regionLabelById = new Map((regions ?? []).map(r => [r.id, `${r.name} (${r.region_code})`]))
+  const storeById = new Map((stores ?? []).map(s => [s.id, s]))
   const rmRegions = new Map<string, string[]>()
-  for (const r of ((ru ?? []) as any[])) { const a = rmRegions.get(r.user_id) ?? []; const l = regionLabelById.get(r.region_id); if (l) a.push(l); rmRegions.set(r.user_id, a) }
+  for (const r of (ru ?? [])) { const a = rmRegions.get(r.user_id) ?? []; const l = regionLabelById.get(r.region_id); if (l) a.push(l); rmRegions.set(r.user_id, a) }
   const smBranch = new Map<string, string>()
-  for (const s of ((su ?? []) as any[])) { const store = storeById.get(s.store_id); if (store?.branch_code && !smBranch.has(s.user_id)) smBranch.set(s.user_id, store.branch_code) }
-  const locationFor = (u: any): string => {
+  for (const s of (su ?? [])) { const store = storeById.get(s.store_id); if (store?.branch_code && !smBranch.has(s.user_id)) smBranch.set(s.user_id, store.branch_code) }
+  const locationFor = (u: UserRow): string => {
     if (u.role === 'regional_manager') return (rmRegions.get(u.id) ?? []).join(', ') || '—'
     if (u.role === 'store_manager') return smBranch.get(u.id) ?? '—'
     return '—'
   }
-  const rows = ((users ?? []) as any[]).sort((a, b) => roleRank(a.role) - roleRank(b.role) || (a.full_name ?? '').localeCompare(b.full_name ?? ''))
+  const rows = (users ?? []).sort((a, b) => roleRank(a.role) - roleRank(b.role) || (a.full_name ?? '').localeCompare(b.full_name ?? ''))
 
   // Engagement: last sign-in per user + a "signed in this week / never" summary.
   const signIns = await loadLastSignIns(db)
   const activeWeek = rows.filter(u => { const d = daysAgo(signIns.get(u.id) ?? null); return d != null && d <= 7 }).length
   const neverSignedIn = rows.filter(u => !signIns.get(u.id)).length
-  const lastSignInCell = (u: any) => {
+  const lastSignInCell = (u: UserRow) => {
     const iso = signIns.get(u.id) ?? null
     if (!iso) return <span className="text-amber-600 dark:text-amber-400">Never</span>
     const d = daysAgo(iso)

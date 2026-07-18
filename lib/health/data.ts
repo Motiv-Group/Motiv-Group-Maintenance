@@ -6,10 +6,11 @@
 // ============================================================
 import 'server-only'
 import { createAdminClient } from '@/lib/supabase/server'
+import type { Database } from '@/lib/database.types'
 import type { HealthTicket, Priority, SlaTargets, SlaRuleResolver } from './types'
 import { isActive } from './types'
 import { FALLBACK_SLA } from './constants'
-import { calculateStoreHealth, type StoreHealthResult, type StoreInput } from './storeHealth'
+import { calculateStoreHealth, type StoreHealthResult } from './storeHealth'
 import { calculateTicketHealth } from './ticketHealth'
 import { calculateRegionalPortfolioHealth, type RegionalHealthResult, type RegionalSignals } from './regionalHealth'
 import { calculateEstateHealth, type EstateHealthResult } from './estateHealth'
@@ -28,13 +29,16 @@ function dueInfo(t: HealthTicket, rules: SlaRuleResolver, now: Date): { dueAt: s
 import type { TicketStatus } from '@/lib/types'
 
 type DB = ReturnType<typeof createAdminClient>
+type TicketRow = Database['public']['Tables']['tickets']['Row']
+/** Full DB ticket row viewed through the engine's HealthTicket unions (priority text → P1..P4 etc). */
+type Ticket = TicketRow & HealthTicket
 const DAY = 24 * 3600_000
 const HIGH_VALUE = 25_000
 
 // ── SLA resolver: company row → platform default row → hardcoded fallback ──
 export async function loadSlaResolver(db: DB, companyId: string | null): Promise<SlaRuleResolver> {
   const { data } = await db.from('sla_rules').select('*').or(companyId ? `company_id.eq.${companyId},company_id.is.null` : 'company_id.is.null')
-  const rows = (data ?? []) as any[]
+  const rows = data ?? []
   const pick = (p: Priority): SlaTargets => {
     const company = rows.find(r => r.company_id === companyId && r.priority === p)
     const global = rows.find(r => r.company_id === null && r.priority === p)
@@ -49,7 +53,9 @@ export async function loadSlaResolver(db: DB, companyId: string | null): Promise
 }
 
 const TICKET_COLS = '*'
-function asTicket(r: any): HealthTicket { return r as HealthTicket }
+// The DB stores priority/impact/decision fields as plain text; the engine narrows them
+// to their literal unions. Same object at runtime — this is a type-level view only.
+function asTicket(r: TicketRow): Ticket { return r as Ticket }
 
 // ── regional signal computation from a region's tickets ──
 function regionSignals(tickets: HealthTicket[], rules: SlaRuleResolver, now: Date): RegionalSignals {
@@ -120,13 +126,13 @@ export async function assembleEstateDashboard(companyId: string, now: Date = new
     db.from('suppliers').select('id, company_name').eq('company_id', companyId),
   ])
 
-  const regionName = new Map((regionsRaw ?? []).map((r: any) => [r.id, r.name]))
-  const stores = (storesRaw ?? []) as any[]
+  const regionName = new Map((regionsRaw ?? []).map(r => [r.id, r.name]))
+  const stores = storesRaw ?? []
   const storeName = new Map(stores.map(s => [s.id, storeLabel(s.name, s.sub_store)]))
   const storeBranch = new Map(stores.map(s => [s.id, s.branch_code ?? null]))
   const storeAddr = new Map(stores.map(s => [s.id, s.address ?? null]))
-  const tickets = ((ticketsRaw ?? []) as any[]).map(asTicket)
-  const supplierName = new Map((suppliersRaw ?? []).map((s: any) => [s.id, s.company_name]))
+  const tickets = (ticketsRaw ?? []).map(asTicket)
+  const supplierName = new Map((suppliersRaw ?? []).map(s => [s.id, s.company_name]))
 
   // trend baselines + escalations (snapshots written by the daily crons)
   const [supplierPrev, storePrev, supplierSlaSeries, escalations] = await Promise.all([
@@ -141,8 +147,8 @@ export async function assembleEstateDashboard(companyId: string, now: Date = new
 
   // store health
   const cards: StoreCard[] = stores.map(s => {
-    const res = calculateStoreHealth({ id: s.id, region_id: s.region_id } as StoreInput, ticketsByStore.get(s.id) ?? [], rules, now)
-    return { ...res, storeName: storeName.get(s.id) ?? 'Store', branchCode: storeBranch.get(s.id) ?? null, location: storeAddr.get(s.id) ?? null, regionName: regionName.get(s.region_id) ?? '—' }
+    const res = calculateStoreHealth({ id: s.id, region_id: s.region_id }, ticketsByStore.get(s.id) ?? [], rules, now)
+    return { ...res, storeName: storeName.get(s.id) ?? 'Store', branchCode: storeBranch.get(s.id) ?? null, location: storeAddr.get(s.id) ?? null, regionName: regionName.get(s.region_id ?? '') ?? '—' }
   })
 
   // regional rollup
@@ -260,7 +266,7 @@ async function loadEstateTrends(
 ): Promise<EstateTrends> {
   const yesterday = new Date(now.getTime() - DAY).toISOString().slice(0, 10)
   const { data } = await db.from('estate_health_scores').select('*').eq('company_id', companyId).eq('snapshot_date', yesterday).maybeSingle()
-  const p: any = data ?? null
+  const p = data ?? null
   return {
     openWork: delta(cur.openWork, p?.open_tickets),
     slaPressure: delta(cur.slaPressure, p ? (p.supplier_sla_breaches ?? 0) + (p.internal_sla_breaches ?? 0) : null),
@@ -275,7 +281,7 @@ async function loadSupplierPrevScore(db: DB, companyId: string, now: Date): Prom
   const { data } = await db.from('supplier_performance_scores')
     .select('supplier_id, performance_score').eq('company_id', companyId).eq('snapshot_date', yesterday)
   const m = new Map<string, number>()
-  for (const r of (data ?? []) as any[]) if (r.supplier_id != null && r.performance_score != null) m.set(r.supplier_id, Number(r.performance_score))
+  for (const r of data ?? []) if (r.supplier_id != null && r.performance_score != null) m.set(r.supplier_id, Number(r.performance_score))
   return m
 }
 
@@ -285,7 +291,7 @@ async function loadStorePrevHealth(db: DB, companyId: string, now: Date): Promis
   const { data } = await db.from('store_health_scores')
     .select('store_id, final_health_score').eq('company_id', companyId).eq('snapshot_date', yesterday)
   const m = new Map<string, number>()
-  for (const r of (data ?? []) as any[]) if (r.store_id != null && r.final_health_score != null) m.set(r.store_id, Number(r.final_health_score))
+  for (const r of data ?? []) if (r.store_id != null && r.final_health_score != null) m.set(r.store_id, Number(r.final_health_score))
   return m
 }
 
@@ -296,7 +302,7 @@ async function loadSupplierSlaSeries(db: DB, companyId: string, now: Date): Prom
     .select('snapshot_date, performance_score').eq('company_id', companyId).gte('snapshot_date', from)
     .order('snapshot_date', { ascending: true })
   const byDate = new Map<string, number[]>()
-  for (const r of (data ?? []) as any[]) {
+  for (const r of data ?? []) {
     if (r.performance_score == null) continue
     const arr = byDate.get(r.snapshot_date) ?? []; arr.push(Number(r.performance_score)); byDate.set(r.snapshot_date, arr)
   }
@@ -312,7 +318,7 @@ async function loadEscalations(db: DB, companyId: string, supplierName: Map<stri
   const { data } = await db.from('supplier_escalations')
     .select('id, supplier_id, issue, action_required, status, escalated_by, escalated_at')
     .eq('company_id', companyId).order('escalated_at', { ascending: false }).limit(20)
-  return ((data ?? []) as any[]).map(r => ({
+  return (data ?? []).map(r => ({
     id: r.id, supplierId: r.supplier_id, supplierName: supplierName.get(r.supplier_id) ?? 'Supplier',
     issue: r.issue, actionRequired: r.action_required ?? null, status: r.status,
     escalatedBy: r.escalated_by ?? null, escalatedAt: r.escalated_at,
@@ -325,7 +331,7 @@ async function loadRegionPrevHealth(db: DB, companyId: string, now: Date): Promi
   const { data } = await db.from('regional_health_scores')
     .select('region_id, final_portfolio_health').eq('company_id', companyId).eq('snapshot_date', yesterday)
   const m = new Map<string, number>()
-  for (const r of (data ?? []) as any[]) if (r.region_id != null && r.final_portfolio_health != null) m.set(r.region_id, Number(r.final_portfolio_health))
+  for (const r of data ?? []) if (r.region_id != null && r.final_portfolio_health != null) m.set(r.region_id, Number(r.final_portfolio_health))
   return m
 }
 
@@ -388,39 +394,39 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
     db.from('stores').select('id, name, sub_store, branch_code, address, region_id').eq('company_id', companyId).in('region_id', regionIds).eq('active', true).is('closed_at', null),
     db.from('suppliers').select('id, company_name, active, contact_name, email, phone, trade, trades').eq('company_id', companyId),
   ])
-  const regionName = new Map((regionsRaw ?? []).map((r: any) => [r.id, r.name]))
-  const stores = (storesRaw ?? []) as any[]
+  const regionName = new Map((regionsRaw ?? []).map(r => [r.id, r.name]))
+  const stores = storesRaw ?? []
   const storeIds = stores.map(s => s.id)
   // Tickets are keyed off store membership (the durable store→region link), NOT the
   // denormalised tickets.region_id — so a ticket logged BEFORE its store was linked
   // to this region (region_id still null/stale) still surfaces for the RM.
   const { data: ticketsRaw } = storeIds.length
     ? await db.from('tickets').select(TICKET_COLS).eq('company_id', companyId).in('store_id', storeIds)
-    : { data: [] as any[] }
+    : { data: null }
   const storeName = new Map(stores.map(s => [s.id, storeLabel(s.name, s.sub_store)]))
   const storeBranch = new Map(stores.map(s => [s.id, s.branch_code ?? null]))
   const storeAddr = new Map(stores.map(s => [s.id, s.address ?? null]))
-  const tickets = ((ticketsRaw ?? []) as any[]).map(asTicket)
-  const supplierName = new Map((suppliersRaw ?? []).map((s: any) => [s.id, s.company_name]))
+  const tickets = (ticketsRaw ?? []).map(asTicket)
+  const supplierName = new Map((suppliersRaw ?? []).map(s => [s.id, s.company_name]))
 
   // Quote milestones per ticket: first quote received + when one was accepted.
   const ticketIds = tickets.map(t => t.id)
-  const { data: quoteRows } = ticketIds.length ? await db.from('quotes').select('ticket_id, status, created_at, amount').in('ticket_id', ticketIds) : { data: [] as any[] }
+  const { data: quoteRows } = ticketIds.length ? await db.from('quotes').select('ticket_id, status, created_at, amount').in('ticket_id', ticketIds) : { data: null }
   // Tickets with an OPEN dispute → the badge reads "Dispute" everywhere.
-  const { data: openDisputeRows } = ticketIds.length ? await db.from('ticket_disputes').select('ticket_id').eq('status', 'open').in('ticket_id', ticketIds) : { data: [] as any[] }
-  const disputedIds = new Set<string>(((openDisputeRows ?? []) as any[]).map(d => d.ticket_id))
+  const { data: openDisputeRows } = ticketIds.length ? await db.from('ticket_disputes').select('ticket_id').eq('status', 'open').in('ticket_id', ticketIds) : { data: null }
+  const disputedIds = new Set<string>((openDisputeRows ?? []).map(d => d.ticket_id))
   // Latest dispute-message author per open-dispute ticket → "new message" flag (a
   // message from the supplier awaits the RM's reply).
-  const { data: dmsgR } = disputedIds.size ? await db.from('ticket_dispute_messages').select('ticket_id, author_role, created_at').in('ticket_id', [...disputedIds]).order('created_at', { ascending: false }) : { data: [] as any[] }
+  const { data: dmsgR } = disputedIds.size ? await db.from('ticket_dispute_messages').select('ticket_id, author_role, created_at').in('ticket_id', [...disputedIds]).order('created_at', { ascending: false }) : { data: null }
   const latestDisputeAuthor = new Map<string, string>()
-  for (const m of (dmsgR ?? []) as any[]) if (!latestDisputeAuthor.has(m.ticket_id)) latestDisputeAuthor.set(m.ticket_id, m.author_role)
+  for (const m of dmsgR ?? []) if (!latestDisputeAuthor.has(m.ticket_id)) latestDisputeAuthor.set(m.ticket_id, m.author_role)
   // Suppliers on each ticket — invited/quoted (already engaged) vs declined/closed —
   // so the Today queue's "Assign supplier" picker can grey out the engaged ones and
   // flag the ones who declined this ticket before.
-  const { data: ticketSupplierRows } = ticketIds.length ? await db.from('ticket_suppliers').select('ticket_id, supplier_id, status').in('ticket_id', ticketIds) : { data: [] as any[] }
+  const { data: ticketSupplierRows } = ticketIds.length ? await db.from('ticket_suppliers').select('ticket_id, supplier_id, status').in('ticket_id', ticketIds) : { data: null }
   const engagedByTicket = new Map<string, Record<string, 'invited' | 'quoted'>>()
   const declinedByTicket = new Map<string, string[]>()
-  for (const r of (ticketSupplierRows ?? []) as any[]) {
+  for (const r of ticketSupplierRows ?? []) {
     if (r.status === 'invited' || r.status === 'quoted') {
       const m = engagedByTicket.get(r.ticket_id) ?? {}; m[r.supplier_id] = r.status; engagedByTicket.set(r.ticket_id, m)
     } else if (r.status === 'declined' || r.status === 'closed') {
@@ -430,7 +436,7 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
   const firstQuoteAt = new Map<string, string>(); const acceptedQuoteAt = new Map<string, string>()
   // Region-wide quote value totals (R) by status, for the RM "Quote Value" KPI.
   let acceptedQuoteValue = 0, pendingQuoteValue = 0
-  for (const q of (quoteRows ?? []) as any[]) {
+  for (const q of quoteRows ?? []) {
     const cur = firstQuoteAt.get(q.ticket_id)
     if (!cur || new Date(q.created_at) < new Date(cur)) firstQuoteAt.set(q.ticket_id, q.created_at)
     if (q.status === 'accepted') { acceptedQuoteAt.set(q.ticket_id, q.created_at); acceptedQuoteValue += Number(q.amount ?? 0) }
@@ -439,8 +445,8 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
   // Variation orders: an APPROVED VO adds to the Accepted quote value; a PENDING VO
   // (awaiting the RM's approval) is tracked as its own "VO pending" total.
   let voPendingValue = 0
-  const { data: variationRows } = ticketIds.length ? await db.from('ticket_variations').select('status, amount').in('ticket_id', ticketIds) : { data: [] as any[] }
-  for (const v of (variationRows ?? []) as any[]) {
+  const { data: variationRows } = ticketIds.length ? await db.from('ticket_variations').select('status, amount').in('ticket_id', ticketIds) : { data: null }
+  for (const v of variationRows ?? []) {
     if (v.status === 'approved') acceptedQuoteValue += Number(v.amount ?? 0)
     else if (v.status === 'pending') voPendingValue += Number(v.amount ?? 0)
   }
@@ -451,19 +457,19 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
       const s = isActive(t.status) ? computeTicketSla(t, rules(t.priority), now) : null
       return {
       id: t.id, title: t.title ?? 'Untitled',
-      category: (t as any).category ?? null, scheduledAt: (t as any).scheduled_at ?? null,
+      category: t.category ?? null, scheduledAt: t.scheduled_at ?? null,
       storeName: storeName.get(t.store_id) ?? 'Store', branchCode: storeBranch.get(t.store_id) ?? null,
-      status: t.status, priority: t.priority, jobRef: (t as any).job_ref ?? null, jobNumber: (t as any).job_number ?? null, createdAt: t.created_at,
-      quoteRequestedAt: (t as any).quote_requested_at ?? null,
+      status: t.status, priority: t.priority, jobRef: t.job_ref ?? null, jobNumber: t.job_number ?? null, createdAt: t.created_at,
+      quoteRequestedAt: t.quote_requested_at ?? null,
       quoteReceivedAt: firstQuoteAt.get(t.id) ?? null,
-      quoteAcceptedAt: ((t as any).quote_decision_status === 'approved' ? (t as any).quote_decided_at : null) ?? acceptedQuoteAt.get(t.id) ?? null,
+      quoteAcceptedAt: (t.quote_decision_status === 'approved' ? t.quote_decided_at : null) ?? acceptedQuoteAt.get(t.id) ?? null,
       breached: !!s && (s.supplierBreached || s.internalBreached),
       supplierBreached: !!s?.supplierBreached, internalBreached: !!s?.internalBreached,
       slaDueAt: s?.nextActionDueAt ?? null,
       ...dueInfo(t, rules, now),
-      infoAdded: t.status === 'open' && !!(t as any).info_request_reason,
-      supplierAssigned: !!(t as any).supplier_id,
-      voNoneConfirmed: !!(t as any).vo_none_confirmed_at,
+      infoAdded: t.status === 'open' && !!t.info_request_reason,
+      supplierAssigned: !!t.supplier_id,
+      voNoneConfirmed: !!t.vo_none_confirmed_at,
       disputed: disputedIds.has(t.id),
       disputeUnread: disputedIds.has(t.id) && latestDisputeAuthor.get(t.id) === 'supplier',
       engagedSupplierIds: engagedByTicket.get(t.id) ?? {},
@@ -471,21 +477,21 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
       }
     })
 
-  const byStore = new Map<string, HealthTicket[]>()
+  const byStore = new Map<string, Ticket[]>()
   for (const t of tickets) { const a = byStore.get(t.store_id) ?? []; a.push(t); byStore.set(t.store_id, a) }
 
   // SM contact per store — derived from the most recent store_manager who logged a
   // ticket there (no canonical store→manager link exists in the schema).
-  const creatorIds = Array.from(new Set(tickets.map(t => (t as any).created_by).filter(Boolean)))
+  const creatorIds = Array.from(new Set(tickets.map(t => t.created_by).filter((id): id is string => !!id)))
   const { data: profRows } = creatorIds.length
     ? await db.from('user_profiles').select('id, full_name, email, phone, role').in('id', creatorIds)
-    : { data: [] as any[] }
+    : { data: null }
   const smProfile = new Map<string, StoreManagerContact>()
-  for (const p of (profRows ?? []) as any[]) if (p.role === 'store_manager') smProfile.set(p.id, { name: p.full_name ?? null, email: p.email ?? null, phone: p.phone ?? null })
+  for (const p of profRows ?? []) if (p.role === 'store_manager') smProfile.set(p.id, { name: p.full_name ?? null, email: p.email ?? null, phone: p.phone ?? null })
   const storeSm = new Map<string, StoreManagerContact>()
   for (const t of [...tickets].sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at))) {
     if (storeSm.has(t.store_id)) continue
-    const sm = smProfile.get((t as any).created_by)
+    const sm = t.created_by ? smProfile.get(t.created_by) : undefined
     if (sm) storeSm.set(t.store_id, sm)
   }
 
@@ -495,10 +501,10 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
     // Last activity = the store's most recent ticket touch (supplier/internal update,
     // else the ticket's updated/created time) — powers the Stores table column.
     const lastActivityAt = stTickets.reduce<string | null>((acc, t) => {
-      const at = (t as any).last_supplier_update_at ?? (t as any).last_internal_update_at ?? (t as any).updated_at ?? t.created_at
+      const at = t.last_supplier_update_at ?? t.last_internal_update_at ?? t.updated_at ?? t.created_at
       return at && (!acc || new Date(at) > new Date(acc)) ? at : acc
     }, null)
-    return { ...res, storeName: storeName.get(s.id) ?? 'Store', branchCode: storeBranch.get(s.id) ?? null, location: storeAddr.get(s.id) ?? null, regionName: regionName.get(s.region_id) ?? '—', sm: storeSm.get(s.id) ?? null, lastActivityAt }
+    return { ...res, storeName: storeName.get(s.id) ?? 'Store', branchCode: storeBranch.get(s.id) ?? null, location: storeAddr.get(s.id) ?? null, regionName: regionName.get(s.region_id ?? '') ?? '—', sm: storeSm.get(s.id) ?? null, lastActivityAt }
   })
   const portfolio = calculateRegionalPortfolioHealth('portfolio', cards, regionSignals(tickets, rules, now))
 
@@ -531,14 +537,14 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
   // Avg star rating per supplier (company-wide).
   const { data: ratingRows } = await db.from('ratings').select('supplier_id, score').eq('company_id', companyId)
   const ratingAgg = new Map<string, { sum: number; n: number }>()
-  for (const r of (ratingRows ?? []) as any[]) {
+  for (const r of ratingRows ?? []) {
     if (!r.supplier_id || r.score == null) continue
     const a = ratingAgg.get(r.supplier_id) ?? { sum: 0, n: 0 }; a.sum += Number(r.score); a.n++; ratingAgg.set(r.supplier_id, a)
   }
   // Every active supplier in the company appears in the directory — those with no
   // tickets show neutral stats (score 100) — so a freshly added supplier is visible
   // immediately, not only once it lands on a ticket.
-  const suppliers = ((suppliersRaw ?? []) as any[])
+  const suppliers = (suppliersRaw ?? [])
     .filter(s => s.active !== false)
     .map(s => {
       const ts = bySupplier.get(s.id) ?? []
@@ -602,8 +608,8 @@ export async function assembleStoreManagerDashboard(companyId: string, storeIds:
     db.from('tickets').select(TICKET_COLS).eq('company_id', companyId).in('store_id', storeIds),
     db.from('companies').select('name').eq('id', companyId).maybeSingle(),
   ])
-  const stores = (storesRaw ?? []) as any[]
-  const tickets = ((ticketsRaw ?? []) as any[]).map(asTicket)
+  const stores = storesRaw ?? []
+  const tickets = (ticketsRaw ?? []).map(asTicket)
   const primary = stores[0]
   const health = primary ? calculateStoreHealth({ id: primary.id, region_id: primary.region_id }, tickets.filter(t => t.store_id === primary.id), rules, now) : null
 
@@ -621,16 +627,16 @@ export async function assembleStoreManagerDashboard(companyId: string, storeIds:
     // info_requested is tracked via awaitingInput (its own KPI), not the open count
     const { dueAt, overdue } = dueInfo(t, rules, now)
     // "Info added" = the SM resubmitted after the RM requested info (back at open, reason kept).
-    const infoAdded = t.status === 'open' && !!(t as any).info_request_reason
-    visible.push({ id: t.id, title: t.title ?? 'Untitled', description: (t as any).description ?? null, category: t.category ?? null, status: v, rawStatus: t.status, priority: t.priority, operationalImpact: t.operational_impact ?? null, createdAt: t.created_at, supplierAssigned: !!t.supplier_id, jobRef: (t as any).job_ref ?? null, jobNumber: (t as any).job_number ?? null, dueAt, overdue, infoAdded,
-      photoUrls: Array.isArray((t as any).photo_urls) ? (t as any).photo_urls as string[] : [],
-      infoDocUrls: Array.isArray((t as any).info_doc_urls) ? (t as any).info_doc_urls as string[] : [],
-      infoRequestReason: (t as any).info_request_reason ?? null })
+    const infoAdded = t.status === 'open' && !!t.info_request_reason
+    visible.push({ id: t.id, title: t.title ?? 'Untitled', description: t.description ?? null, category: t.category ?? null, status: v, rawStatus: t.status, priority: t.priority, operationalImpact: t.operational_impact ?? null, createdAt: t.created_at, supplierAssigned: !!t.supplier_id, jobRef: t.job_ref ?? null, jobNumber: t.job_number ?? null, dueAt, overdue, infoAdded,
+      photoUrls: Array.isArray(t.photo_urls) ? t.photo_urls : [],
+      infoDocUrls: Array.isArray(t.info_doc_urls) ? t.info_doc_urls : [],
+      infoRequestReason: t.info_request_reason ?? null })
   }
   visible.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
   return {
     storeName: stores.length ? storeLabel(stores[0].name, stores[0].sub_store) : 'Store',
-    company: (companyRow as any)?.name ?? '',
+    company: companyRow?.name ?? '',
     branch: primary?.sub_store || primary?.name || 'Store',
     branchCode: primary?.branch_code ?? '',
     health, open, scheduled, inProgress, completed, cancelled, awaitingInput, tickets: visible, generatedAt: now.toISOString(),
@@ -691,7 +697,7 @@ export async function assembleSupplierDashboard(companyId: string | null, suppli
     db.from('tickets').select(TICKET_COLS).in('supplier_id', supplierIds),
     db.from('ticket_suppliers').select('ticket_id, status, responded_at, declined_by, requote_requested_at').in('supplier_id', supplierIds).in('status', ['invited', 'quoted', 'awarded', 'declined', 'closed']),
   ])
-  const owned = (bySupplier ?? []) as any[]
+  const owned = bySupplier ?? []
   const ownedIds = new Set(owned.map(t => t.id))
   // The supplier's invite status per ticket (newest row wins if duplicated).
   const myInviteStatus = new Map<string, string>()
@@ -703,21 +709,21 @@ export async function assembleSupplierDashboard(companyId: string | null, suppli
   // The RM asked this supplier to (re-)submit a quote after a decline → drives the
   // "Re-quote requested" flag on the Quotes tab.
   const requoteAt = new Map<string, string>()
-  for (const r of (invRows ?? []) as any[]) {
+  for (const r of invRows ?? []) {
     myInviteStatus.set(r.ticket_id, r.status)
     if (['declined', 'closed'].includes(r.status) && r.responded_at) declinedInviteAt.set(r.ticket_id, r.responded_at)
     if (r.declined_by === 'supplier' || r.declined_by === 'regional_manager') declinedByOf.set(r.ticket_id, r.declined_by)
     if (r.requote_requested_at) requoteAt.set(r.ticket_id, r.requote_requested_at)
   }
   const extraIds = Array.from(new Set((invRows ?? []).map(r => r.ticket_id))).filter(id => !ownedIds.has(id))
-  const { data: invitedTickets } = extraIds.length ? await db.from('tickets').select(TICKET_COLS).in('id', extraIds) : { data: [] as any[] }
-  const rawAll = [...owned, ...((invitedTickets ?? []) as any[])]
-  const rawById = new Map(rawAll.map((r: any) => [r.id, r]))
+  const { data: invitedTickets } = extraIds.length ? await db.from('tickets').select(TICKET_COLS).in('id', extraIds) : { data: null }
+  const rawAll = [...owned, ...(invitedTickets ?? [])]
+  const rawById = new Map(rawAll.map(r => [r.id, r]))
   const tickets = rawAll.map(asTicket)
   const storeIds = Array.from(new Set(tickets.map(t => t.store_id)))
-  const { data: storesRaw } = storeIds.length ? await db.from('stores').select('id, name, sub_store, branch_code').in('id', storeIds) : { data: [] as any[] }
-  const storeName = new Map((storesRaw ?? []).map((s: any) => [s.id, storeLabel(s.name, s.sub_store)]))
-  const storeBranch = new Map((storesRaw ?? []).map((s: any) => [s.id, s.branch_code ?? null]))
+  const { data: storesRaw } = storeIds.length ? await db.from('stores').select('id, name, sub_store, branch_code').in('id', storeIds) : { data: null }
+  const storeName = new Map((storesRaw ?? []).map(s => [s.id, storeLabel(s.name, s.sub_store)]))
+  const storeBranch = new Map((storesRaw ?? []).map(s => [s.id, s.branch_code ?? null]))
   const titleOf = new Map(tickets.map(t => [t.id, t.title ?? 'Ticket']))
 
   const [{ data: quotesRaw }, { data: signoffsRaw }, { data: ratingRows }, { data: companyRow }] = await Promise.all([
@@ -727,16 +733,16 @@ export async function assembleSupplierDashboard(companyId: string | null, suppli
     companyId ? db.from('companies').select('name').eq('id', companyId).maybeSingle() : Promise.resolve({ data: null as { name: string } | null }),
   ])
   // Manager names for the "decided by" line on each sign-off.
-  const reviewerIds = [...new Set(((signoffsRaw ?? []) as any[]).map(s => s.reviewed_by).filter(Boolean))]
-  const { data: reviewerRows } = reviewerIds.length ? await db.from('user_profiles').select('id, full_name').in('id', reviewerIds) : { data: [] as any[] }
-  const reviewerName = new Map(((reviewerRows ?? []) as any[]).map(r => [r.id, r.full_name]))
+  const reviewerIds = [...new Set((signoffsRaw ?? []).map(s => s.reviewed_by).filter((id): id is string => !!id))]
+  const { data: reviewerRows } = reviewerIds.length ? await db.from('user_profiles').select('id, full_name').in('id', reviewerIds) : { data: null }
+  const reviewerName = new Map((reviewerRows ?? []).map(r => [r.id, r.full_name]))
   // Latest snag reason per ticket (the newest rejected signoff's reject_reason) —
   // shown on the Snags page cards.
   const snagReasonByTicket = new Map<string, string>()
-  for (const s of ((signoffsRaw ?? []) as any[]).slice().sort((a, b) => +new Date(a.created_at) - +new Date(b.created_at))) {
+  for (const s of (signoffsRaw ?? []).slice().sort((a, b) => +new Date(a.created_at) - +new Date(b.created_at))) {
     if (s.status === 'rejected' && s.reject_reason) snagReasonByTicket.set(s.ticket_id, s.reject_reason)
   }
-  const ratingScores = ((ratingRows ?? []) as any[]).map(r => Number(r.score)).filter(n => Number.isFinite(n))
+  const ratingScores = (ratingRows ?? []).map(r => Number(r.score)).filter(n => Number.isFinite(n))
   // Suppliers start at a full 5★ and degrade as real ratings arrive.
   const rating = { avg: ratingScores.length ? ratingScores.reduce((s, n) => s + n, 0) / ratingScores.length : 5, count: ratingScores.length }
   // Earliest accepted quote per ticket — fallback for the approval date.
@@ -745,7 +751,7 @@ export async function assembleSupplierDashboard(companyId: string | null, suppli
   const firstQuoteAt = new Map<string, string>()
   // declinedQuoteAt = when this supplier's quote was declined (quote.updated_at).
   const declinedQuoteAt = new Map<string, string>()
-  for (const q of (quotesRaw ?? []) as any[]) {
+  for (const q of quotesRaw ?? []) {
     if (q.status === 'accepted') acceptedQuoteAt.set(q.ticket_id, q.created_at)
     if (q.status === 'declined') {
       const prev = declinedQuoteAt.get(q.ticket_id)
@@ -756,21 +762,21 @@ export async function assembleSupplierDashboard(companyId: string | null, suppli
     if (!cur || new Date(q.created_at) < new Date(cur)) firstQuoteAt.set(q.ticket_id, q.created_at)
   }
   // Awarded jobs with an OPEN dispute → the badge reads "Dispute".
-  const ownedIdList = Array.from(ownedIds) as string[]
-  const { data: openDisputeRows } = ownedIdList.length ? await db.from('ticket_disputes').select('ticket_id').eq('status', 'open').in('ticket_id', ownedIdList) : { data: [] as any[] }
-  const disputedIds = new Set<string>(((openDisputeRows ?? []) as any[]).map(d => d.ticket_id))
+  const ownedIdList = Array.from(ownedIds)
+  const { data: openDisputeRows } = ownedIdList.length ? await db.from('ticket_disputes').select('ticket_id').eq('status', 'open').in('ticket_id', ownedIdList) : { data: null }
+  const disputedIds = new Set<string>((openDisputeRows ?? []).map(d => d.ticket_id))
   // Latest dispute-message author per open-dispute ticket → "new message" flag (a
   // message from the RM awaits the supplier's reply).
-  const { data: dmsgS } = disputedIds.size ? await db.from('ticket_dispute_messages').select('ticket_id, author_role, created_at').in('ticket_id', [...disputedIds]).order('created_at', { ascending: false }) : { data: [] as any[] }
+  const { data: dmsgS } = disputedIds.size ? await db.from('ticket_dispute_messages').select('ticket_id, author_role, created_at').in('ticket_id', [...disputedIds]).order('created_at', { ascending: false }) : { data: null }
   const latestDisputeAuthor = new Map<string, string>()
-  for (const m of (dmsgS ?? []) as any[]) if (!latestDisputeAuthor.has(m.ticket_id)) latestDisputeAuthor.set(m.ticket_id, m.author_role)
+  for (const m of dmsgS ?? []) if (!latestDisputeAuthor.has(m.ticket_id)) latestDisputeAuthor.set(m.ticket_id, m.author_role)
 
   const todayEnd = new Date(now); todayEnd.setHours(23, 59, 59, 999)
   let open = 0, overdue = 0, dueToday = 0, pendingQuotes = 0, awaitingSignoff = 0, evidenceMissing = 0, scheduled = 0
   const rows: SupplierTicketRow[] = []
   for (const t of tickets) {
     const active = isActive(t.status)
-    const raw: any = rawById.get(t.id) ?? {}
+    const raw: Partial<TicketRow> = rawById.get(t.id) ?? {}
     // Out of this supplier's active work if they were declined/closed off the ticket,
     // OR the ticket has been awarded to a *different* supplier.
     const awardedToOther = !!raw.supplier_id && !ownedIds.has(t.id)
@@ -797,7 +803,7 @@ export async function assembleSupplierDashboard(companyId: string | null, suppli
       : sla.supplierBreached ? 'Breached' : sla.supplierStatus === 'paused' ? 'Paused (internal)' : sla.atRisk ? 'At risk' : sla.supplierStatus === 'not_started' ? 'Not started' : 'Running'
     const approvedAt = (raw.quote_decision_status === 'approved' ? raw.quote_decided_at : null) ?? acceptedQuoteAt.get(t.id) ?? null
     rows.push({
-      id: t.id, storeName: storeName.get(t.store_id) ?? (raw.company_id ? 'Store' : 'Individual'), branchCode: storeBranch.get(t.store_id) ?? null, title: t.title ?? 'Ticket', category: (t as any).category ?? null, priority: t.priority, status: t.status,
+      id: t.id, storeName: storeName.get(t.store_id) ?? (raw.company_id ? 'Store' : 'Individual'), branchCode: storeBranch.get(t.store_id) ?? null, title: t.title ?? 'Ticket', category: t.category ?? null, priority: t.priority, status: t.status,
       jobRef: raw.job_ref ?? null, jobNumber: raw.job_number ?? null, description: raw.description ?? null,
       ageDays: Math.floor((now.getTime() - new Date(t.created_at).getTime()) / DAY), createdAt: t.created_at, slaLabel: lbl, nextActionDueAt: sla.nextActionDueAt,
       acknowledged: !!t.first_response_at, evidenceRequired: !!t.evidence_required,
@@ -823,14 +829,16 @@ export async function assembleSupplierDashboard(companyId: string | null, suppli
   rows.sort((a, b) => (a.active === b.active ? 0 : a.active ? -1 : 1) || (a.acknowledged === b.acknowledged ? 0 : a.acknowledged ? 1 : -1) || a.ageDays - b.ageDays)
 
   const storeOf = (ticketId: string) => rawById.get(ticketId)?.store_id
+  // DB stores priority as plain text; the row shapes narrow it to the engine's P1..P4.
+  const priorityOf = (rq: Partial<TicketRow>) => rq.priority as Priority
   return {
     perf: calculateSupplierPerformance(supplierIds[0], tickets, rules, now),
-    company: (companyRow as any)?.name ?? '',
+    company: companyRow?.name ?? '',
     kpis: { open, overdue, dueToday, pendingQuotes, awaitingSignoff, evidenceMissing, scheduled },
     tickets: rows,
-    quotes: (quotesRaw ?? []).map((q: any) => { const rq: any = rawById.get(q.ticket_id) ?? {}; return { id: q.id, ticketId: q.ticket_id, ticketTitle: titleOf.get(q.ticket_id) ?? 'Ticket', ticketStatus: rq.status ?? '', storeName: storeName.get(storeOf(q.ticket_id)) ?? (rq.company_id ? 'Store' : 'Individual'), branchCode: storeBranch.get(storeOf(q.ticket_id)) ?? null, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, status: q.status, createdAt: q.created_at, category: rq.category ?? null, priority: rq.priority, jobRef: rq.job_ref ?? null, description: rq.description ?? null, validUntil: q.valid_until ?? null, proposedScheduleAt: q.proposed_schedule_at ?? null, reQuoteRequested: !!requoteAt.get(q.ticket_id) } }),
+    quotes: (quotesRaw ?? []).map(q => { const rq: Partial<TicketRow> = rawById.get(q.ticket_id) ?? {}; return { id: q.id, ticketId: q.ticket_id, ticketTitle: titleOf.get(q.ticket_id) ?? 'Ticket', ticketStatus: rq.status ?? '', storeName: storeName.get(storeOf(q.ticket_id) ?? '') ?? (rq.company_id ? 'Store' : 'Individual'), branchCode: storeBranch.get(storeOf(q.ticket_id) ?? '') ?? null, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, status: q.status, createdAt: q.created_at, category: rq.category ?? null, priority: priorityOf(rq), jobRef: rq.job_ref ?? null, description: rq.description ?? null, validUntil: q.valid_until ?? null, proposedScheduleAt: q.proposed_schedule_at ?? null, reQuoteRequested: !!requoteAt.get(q.ticket_id) } }),
     // A completed ticket drops off the Sign-off tab entirely (nothing left to do).
-    signoffs: (signoffsRaw ?? []).filter((s: any) => (rawById.get(s.ticket_id)?.status) !== 'completed').map((s: any) => { const rq: any = rawById.get(s.ticket_id) ?? {}; return { id: s.id, ticketId: s.ticket_id, ticketTitle: titleOf.get(s.ticket_id) ?? 'Ticket', ticketStatus: rq.status ?? '', storeName: storeName.get(storeOf(s.ticket_id)) ?? (rq.company_id ? 'Store' : 'Individual'), branchCode: storeBranch.get(storeOf(s.ticket_id)) ?? null, status: s.status, createdAt: s.created_at, category: rq.category ?? null, priority: rq.priority, description: rq.description ?? null, jobRef: rq.job_ref ?? null, photoCount: ((s.before_urls ?? []).length + (s.after_urls ?? []).length), certCount: (s.coc_url ? 1 : 0) + (s.invoice_url ? 1 : 0), decidedAt: s.reviewed_at ?? null, decidedBy: s.reviewed_by ? (reviewerName.get(s.reviewed_by) ?? null) : null } }),
+    signoffs: (signoffsRaw ?? []).filter(s => (rawById.get(s.ticket_id)?.status) !== 'completed').map(s => { const rq: Partial<TicketRow> = rawById.get(s.ticket_id) ?? {}; return { id: s.id, ticketId: s.ticket_id, ticketTitle: titleOf.get(s.ticket_id) ?? 'Ticket', ticketStatus: rq.status ?? '', storeName: storeName.get(storeOf(s.ticket_id) ?? '') ?? (rq.company_id ? 'Store' : 'Individual'), branchCode: storeBranch.get(storeOf(s.ticket_id) ?? '') ?? null, status: s.status, createdAt: s.created_at, category: rq.category ?? null, priority: priorityOf(rq), description: rq.description ?? null, jobRef: rq.job_ref ?? null, photoCount: ((s.before_urls ?? []).length + (s.after_urls ?? []).length), certCount: (s.coc_url ? 1 : 0) + (s.invoice_url ? 1 : 0), decidedAt: s.reviewed_at ?? null, decidedBy: s.reviewed_by ? (reviewerName.get(s.reviewed_by) ?? null) : null } }),
     rating,
     generatedAt: now.toISOString(),
   }

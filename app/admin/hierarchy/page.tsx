@@ -11,7 +11,7 @@ export default async function AdminHierarchyPage() {
   const { userId } = await requireMasterAdmin()
   const db = createAdminClient()
   const { data: mine } = await db.from('user_profiles').select('company_id').eq('id', userId).single()
-  const myCompanyId = (mine as any)?.company_id ?? null
+  const myCompanyId = mine?.company_id ?? null
   const [{ data: companies }, { data: regions }, { data: stores }, { data: users }, { data: ru }, { data: su }] = await Promise.all([
     db.from('companies').select('id, name').eq('active', true).order('name'),
     db.from('regions').select('id, name, region_code, company_id').eq('active', true).order('name'),
@@ -20,27 +20,30 @@ export default async function AdminHierarchyPage() {
     db.from('regional_users').select('user_id, region_id'),
     db.from('store_users').select('user_id, store_id'),
   ])
-  const prof = new Map(((users ?? []) as any[]).map(u => [u.id, u]))
-  const rmByRegion = new Map<string, any[]>()
-  for (const r of ((ru ?? []) as any[])) { const p = prof.get(r.user_id); if (p?.role === 'regional_manager') { const a = rmByRegion.get(r.region_id) ?? []; a.push(p); rmByRegion.set(r.region_id, a) } }
-  const smByStore = new Map<string, any>()
-  for (const s of ((su ?? []) as any[])) { const p = prof.get(s.user_id); if (p?.role === 'store_manager' && !smByStore.has(s.store_id)) smByStore.set(s.store_id, p) }
-  const storesByRegion = new Map<string, any[]>()
-  const unassignedByCompany = new Map<string, any[]>()
-  for (const s of ((stores ?? []) as any[])) {
+  type UserRow = NonNullable<typeof users>[number]
+  type StoreRow = NonNullable<typeof stores>[number]
+  type RegionRow = NonNullable<typeof regions>[number]
+  const prof = new Map((users ?? []).map(u => [u.id, u]))
+  const rmByRegion = new Map<string, UserRow[]>()
+  for (const r of (ru ?? [])) { const p = prof.get(r.user_id); if (p?.role === 'regional_manager') { const a = rmByRegion.get(r.region_id) ?? []; a.push(p); rmByRegion.set(r.region_id, a) } }
+  const smByStore = new Map<string, UserRow>()
+  for (const s of (su ?? [])) { const p = prof.get(s.user_id); if (p?.role === 'store_manager' && !smByStore.has(s.store_id)) smByStore.set(s.store_id, p) }
+  const storesByRegion = new Map<string, StoreRow[]>()
+  const unassignedByCompany = new Map<string, StoreRow[]>()
+  for (const s of (stores ?? [])) {
     if (!s.region_id) { const a = unassignedByCompany.get(s.company_id) ?? []; a.push(s); unassignedByCompany.set(s.company_id, a); continue }
     const a = storesByRegion.get(s.region_id) ?? []; a.push(s); storesByRegion.set(s.region_id, a)
   }
-  const storeNode = (s: any) => {
+  const storeNode = (s: StoreRow) => {
     const sm = smByStore.get(s.id)
     return { id: s.id, name: s.name, subStore: s.sub_store ?? null, branchCode: s.branch_code ?? null, sm: sm ? { name: sm.full_name ?? '—', email: sm.email ?? '' } : null }
   }
-  const regionsByCompany = new Map<string, any[]>()
-  for (const r of ((regions ?? []) as any[])) { const a = regionsByCompany.get(r.company_id) ?? []; a.push(r); regionsByCompany.set(r.company_id, a) }
+  const regionsByCompany = new Map<string, RegionRow[]>()
+  for (const r of (regions ?? [])) { const a = regionsByCompany.get(r.company_id) ?? []; a.push(r); regionsByCompany.set(r.company_id, a) }
 
-  const tree: CompanyNode[] = ((companies ?? []) as any[]).map(c => ({
+  const tree: CompanyNode[] = (companies ?? []).map(c => ({
     id: c.id, name: c.name,
-    execs: ((users ?? []) as any[]).filter(u => u.role === 'executive' && u.company_id === c.id).map(u => ({ id: u.id, name: u.full_name ?? '—', email: u.email ?? '' })),
+    execs: (users ?? []).filter(u => u.role === 'executive' && u.company_id === c.id).map(u => ({ id: u.id, name: u.full_name ?? '—', email: u.email ?? '' })),
     regions: (regionsByCompany.get(c.id) ?? []).map(r => ({
       id: r.id, name: r.name, code: r.region_code,
       rms: (rmByRegion.get(r.id) ?? []).map(u => ({ id: u.id, name: u.full_name ?? '—', email: u.email ?? '' })),
@@ -62,8 +65,8 @@ export default async function AdminHierarchyPage() {
       </div>
       <AdminSelfCompany
         currentCompanyId={myCompanyId}
-        currentCompanyName={((companies ?? []) as any[]).find(c => c.id === myCompanyId)?.name ?? null}
-        companies={((companies ?? []) as any[]).map(c => ({ id: c.id, name: c.name }))}
+        currentCompanyName={(companies ?? []).find(c => c.id === myCompanyId)?.name ?? null}
+        companies={(companies ?? []).map(c => ({ id: c.id, name: c.name }))}
       />
       <HierarchyView companies={tree} regionsByCompany={regionRefs} />
     </div>

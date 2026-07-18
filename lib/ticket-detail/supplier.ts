@@ -20,6 +20,10 @@ import type { HealthTicket, Priority } from '@/lib/health/types'
 import { buildTicketTimeline } from '@/lib/ticket-timeline'
 import { supplierStatusMeta, storeLabel } from '@/lib/utils'
 import type { QuoteSummaryStatus } from '@/components/workflow/QuoteSummary'
+import type { Database } from '@/lib/database.types'
+
+// Newer per-dispute columns fetched by the second ticket_disputes query below.
+type DisputeExtra = Pick<Database['public']['Tables']['ticket_disputes']['Row'], 'id' | 'signoff_id' | 'pending_outcome' | 'pending_by'>
 
 // Shown when the RM declined a quote without typing a reason.
 const DEFAULT_DECLINE_REASON = 'Thank you for your submission. Although your quotation was not selected for this request, we value your participation and look forward to inviting you to future opportunities.'
@@ -75,53 +79,56 @@ export async function loadSupplierTicketDetail(ticketId: string) {
   // Private-bucket signing: rewrite every stored ticket-photo / COC / attachment /
   // evidence URL to a short-lived signed URL in place, so all the render sites below
   // (ticket photos, signoff cards, quotes, variations, disputes) get readable links.
-  if (Array.isArray(t.photo_urls)) t.photo_urls = await signManyUrls(t.photo_urls as string[])
+  if (Array.isArray(t.photo_urls)) t.photo_urls = await signManyUrls(t.photo_urls)
   await Promise.all([
-    ...((signoffRows ?? []) as any[]).map(async s => {
+    ...(signoffRows ?? []).map(async s => {
       if (Array.isArray(s.before_urls)) s.before_urls = await signManyUrls(s.before_urls)
       if (Array.isArray(s.after_urls)) s.after_urls = await signManyUrls(s.after_urls)
       s.coc_url = await signedUrl(s.coc_url)
       s.invoice_url = await signedUrl(s.invoice_url)
     }),
-    ...((myQuotes ?? []) as any[]).map(async q => { q.file_url = await signedUrl(q.file_url) }),
-    ...((variationRows ?? []) as any[]).map(async v => { if (Array.isArray(v.file_urls)) v.file_urls = await signManyUrls(v.file_urls) }),
-    ...((disputeMsgRows ?? []) as any[]).map(async m => { if (Array.isArray(m.evidence_urls)) m.evidence_urls = await signManyUrls(m.evidence_urls) }),
+    ...(myQuotes ?? []).map(async q => { q.file_url = await signedUrl(q.file_url) }),
+    ...(variationRows ?? []).map(async v => { if (Array.isArray(v.file_urls)) v.file_urls = await signManyUrls(v.file_urls) }),
+    // evidence_urls is a Json column that always stores a string[] of URLs.
+    ...(disputeMsgRows ?? []).map(async m => { if (Array.isArray(m.evidence_urls)) m.evidence_urls = await signManyUrls(m.evidence_urls as string[]) }),
   ])
   // Client organisation that owns the store (shown in the ticket detail).
-  const companyName = (companyRow as any)?.name ?? null
+  const companyName = companyRow?.name ?? null
   // This supplier's own trade-company name — used in the "declined by …" block.
-  const myInviteSupplierId = (invite as any)?.supplier_id ?? null
+  const myInviteSupplierId = invite?.supplier_id ?? null
   const supplierCompanyName = myInviteSupplierId
     ? ((await admin.from('suppliers').select('company_name').eq('id', myInviteSupplierId).maybeSingle()).data?.company_name ?? null)
     : null
   // When this supplier was requested to quote (their invite, else the ticket's request time).
-  const quoteRequestedAt = (invite as any)?.invited_at ?? t.quote_requested_at ?? null
+  const quoteRequestedAt = invite?.invited_at ?? t.quote_requested_at ?? null
   // Latest completion the supplier submitted (COC + proof-of-completion photos).
   // Most recent snag — explains why a completion was rejected / sent back.
-  const latestSnag = ((snagRows ?? []) as any[])[0] ?? null
-  const snagScheduledAt = ((snagRows ?? []) as any[]).find(s => s.scheduled_at)?.scheduled_at ?? null
+  const latestSnag = (snagRows ?? [])[0] ?? null
+  const snagScheduledAt = (snagRows ?? []).find(s => s.scheduled_at)?.scheduled_at ?? null
   // Snag-fix callout shows ONLY once the RM has approved the date (then it replaces the
   // original Scheduled callout). The original visit is hidden while any snag schedule is
   // in play (proposed or agreed). Latest declined schedule feeds the audit trail + Archive.
   const snagFixApproved = !!latestSnag?.scheduled_at && latestSnag.schedule_status === 'agreed' && ['assigned', 'in_progress'].includes(latestSnag.status)
-  const snagScheduleActive = !!latestSnag?.scheduled_at && ['proposed', 'agreed'].includes(latestSnag.schedule_status) && ['assigned', 'in_progress'].includes(latestSnag.status)
-  const declinedSnag = ((snagRows ?? []) as any[]).find(s => s.schedule_declined_at) ?? null
-  const technicians = (technicianRows ?? []) as { id: string; name: string }[]
+  const snagScheduleActive = !!latestSnag?.scheduled_at && ['proposed', 'agreed'].includes(latestSnag.schedule_status ?? '') && ['assigned', 'in_progress'].includes(latestSnag.status)
+  // Predicate narrows schedule_declined_at to string — the render site formats it directly.
+  type SnagRow = NonNullable<typeof snagRows>[number]
+  const declinedSnag = (snagRows ?? []).find((s): s is SnagRow & { schedule_declined_at: string } => !!s.schedule_declined_at) ?? null
+  const technicians = technicianRows ?? []
   // Access: the awarded supplier OR a supplier invited to quote (competitive model).
   const awarded = !!t.supplier_id && supplierIds.includes(t.supplier_id)
   // Per-ticket RM↔supplier chat is available to the awarded supplier's users.
   const chatUnread = awarded ? await ticketChatUnread(admin, t.id, userId) : false
   if (!awarded && !invite) return { kind: 'redirect' as const, to: '/supplier/tickets' }
   // Declined off the ticket (not re-invited) — show "Declined" to the supplier.
-  const declinedForMe = !awarded && !!invite && ['declined', 'closed'].includes((invite as any).status)
+  const declinedForMe = !awarded && !!invite && ['declined', 'closed'].includes(invite.status)
   const storeName = storeLabel(store?.name, store?.sub_store)
   // "Store · Branch" label shown on the raise-dispute pop-up's subject card.
-  const disputeStore = [storeName, (store as any)?.branch_code].filter(Boolean).join(' · ') || null
+  const disputeStore = [storeName, store?.branch_code].filter(Boolean).join(' · ') || null
   const editorName = t.edited_by ? ((await admin.from('user_profiles').select('full_name').eq('id', t.edited_by).single()).data?.full_name ?? null) : null
   // Standalone Individual (home) job — no company/store. Load the customer's name +
   // contact so the supplier can arrange the home visit.
   const customer = (!t.company_id && t.created_by)
-    ? ((await admin.from('user_profiles').select('full_name, phone, address').eq('id', t.created_by).maybeSingle()).data as { full_name: string | null; phone: string | null; address: string | null } | null)
+    ? (await admin.from('user_profiles').select('full_name, phone, address').eq('id', t.created_by).maybeSingle()).data
     : null
 
   // SLA due date (final resolution deadline) + overdue state.
@@ -136,7 +143,7 @@ export async function loadSupplierTicketDetail(ticketId: string) {
   const breached = isActive(t.status) && sla.supplierBreached
 
   // Their latest submitted quote (if any) for this ticket.
-  const latestQuote = ((myQuotes ?? []) as any[])[0] ?? null
+  const latestQuote = (myQuotes ?? [])[0] ?? null
   // The scheduled visit shows neatly inside the accepted quote (below) and as the
   // indigo callout in the ticket detail; the technician name rides along with it.
   const scheduledTechName = t.technician_id ? (technicians.find(x => x.id === t.technician_id)?.name ?? null) : null
@@ -152,8 +159,9 @@ export async function loadSupplierTicketDetail(ticketId: string) {
   const inviteOpen = !invite || !['declined', 'closed', 'awarded'].includes(invite.status)
   // Allow a fresh quote, a revision, or a re-quote after the RM declined-to-requote.
   const canSubmitQuote = quoteableStatus && inviteOpen && (!latestQuote || revisionRequested || latestQuote.status === 'declined')
-  const declineReason = (invite as any)?.decline_reason ?? null
-  const declinedBy = ((invite as any)?.declined_by ?? null) as 'supplier' | 'regional_manager' | null
+  const declineReason = invite?.decline_reason ?? null
+  // declined_by is a plain text column holding one of these two role strings.
+  const declinedBy = (invite?.declined_by ?? null) as 'supplier' | 'regional_manager' | null
   // Who declined → shown in the "Quote request declined by …" block title. The
   // client's manager declining shows as "the client" from the supplier's side.
   const declinedByLabel = declinedBy === 'supplier'
@@ -169,12 +177,12 @@ export async function loadSupplierTicketDetail(ticketId: string) {
   const supplierStatus = awarded ? t.status : (latestQuote?.status === 'pending' ? 'quoted' : 'quote_requested')
   // The RM asked this supplier to (re-)submit a quote — either a soft decline of their
   // quote, or a re-assign after they'd previously declined (requote_requested_at).
-  const reQuoteByRm = !!(invite as any)?.requote_requested_at && (invite as any)?.status === 'invited'
+  const reQuoteByRm = !!invite?.requote_requested_at && invite?.status === 'invited'
   // Map a quote's DB status to the read-only summary tone (accepted shows "Approved").
   const quoteStatusOf = (s: string): QuoteSummaryStatus => s === 'accepted' ? 'accepted' : s === 'declined' ? 'declined' : 'pending'
   // Active quotes stay in the Quotes block; declined ones (by the RM or the supplier)
   // move to a collapsed "Archived quotes" block below.
-  const myQuoteRows = (myQuotes ?? []) as any[]
+  const myQuoteRows = myQuotes ?? []
   const activeQuotes = myQuoteRows.filter(q => q.status !== 'declined')
   const declinedMyQuotes = myQuoteRows.filter(q => q.status === 'declined')
   // Reason the RM declined the previous quote — shown on the re-quote prompt.
@@ -186,26 +194,26 @@ export async function loadSupplierTicketDetail(ticketId: string) {
   const quotesLivePhase = ['assigned', 'assessment', 'quote_requested', 'quote_revision', 'quoted', 'accepted', 'scheduled'].includes(t.status)
   // Durable audit events for THIS supplier: every request-decline (survives re-invite)
   // and every quote-request round. RM quote-declines already come from the quote rows.
-  const myDeclines = ((declineRows ?? []) as any[]).map(d => ({ name: supplierCompanyName ?? 'you', at: d.declined_at })).filter(d => d.at)
+  const myDeclines = (declineRows ?? []).map(d => ({ name: supplierCompanyName ?? 'you', at: d.declined_at })).filter(d => d.at)
   // Each quote-request round shown once as "Quote requested". Rounds attributed to
   // this supplier are theirs; unattributed (legacy NULL) rounds only count as the
   // INITIAL invite (the earliest one) — later NULL rounds were re-assigns of OTHER
   // suppliers and must not show a spurious "Quote requested" on this supplier's trail.
-  const allRequestRows = (requoteRows ?? []) as any[]
+  const allRequestRows = requoteRows ?? []
   const earliestRequestAt = allRequestRows.reduce<string | null>((m, r) => (r.requested_at && (!m || r.requested_at < m) ? r.requested_at : m), null)
   const myQuoteRequests = allRequestRows
-    .filter(r => supplierIds.includes(r.supplier_id) || (r.supplier_id === null && r.requested_at === earliestRequestAt))
+    .filter(r => (r.supplier_id !== null && supplierIds.includes(r.supplier_id)) || (r.supplier_id === null && r.requested_at === earliestRequestAt))
     .map(r => r.requested_at).filter(Boolean)
   // Trail starts at this supplier's EARLIEST involvement (first request / quote /
   // decline) — a re-invite resets invited_at to "now", so anchoring to it would hide
   // durable events from earlier rounds; the first quote request is the true start.
-  const trailStartMs = [(invite as any)?.invited_at, ...myDeclines.map(d => d.at), ...myQuoteRequests, ...myQuoteRows.map(q => q.created_at)]
+  const trailStartMs = [invite?.invited_at, ...myDeclines.map(d => d.at), ...myQuoteRequests, ...myQuoteRows.map(q => q.created_at)]
     .filter(Boolean).map(x => +new Date(x as string)).sort((a, b) => a - b)[0]
-  const trailStartAt = trailStartMs ? new Date(trailStartMs).toISOString() : ((invite as any)?.invited_at ?? t.quote_requested_at)
+  const trailStartAt = trailStartMs ? new Date(trailStartMs).toISOString() : (invite?.invited_at ?? t.quote_requested_at)
 
   // COC/POC submissions split across blocks by state: under review → COC & POC,
   // rejected/snagged → Snag (kept for traceability), accepted → Completion.
-  const allSignoffs = (signoffRows ?? []) as any[]
+  const allSignoffs = signoffRows ?? []
   const pendingSignoffs = allSignoffs.filter(s => ['submitted', 'awaiting_regional', 'awaiting_store'].includes(s.status))
   const rejectedSignoffs = allSignoffs.filter(s => s.status === 'rejected')
   const evidenceRequestedSignoffs = allSignoffs.filter(s => s.status === 'evidence_requested')
@@ -218,8 +226,8 @@ export async function loadSupplierTicketDetail(ticketId: string) {
   ;[...allSignoffs].sort((a, b) => +new Date(a.created_at) - +new Date(b.created_at)).forEach((s, i) => submissionNo.set(s.id, i + 1))
   const supersededSubmissions = [...evidenceRequestedSignoffs, ...rejectedSignoffs].sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at))
   const roundBySignoff = new Map<string, { round_no: number; kind: string; reason: string | null }>()
-  for (const r of ((roundRows ?? []) as any[])) if (r.signoff_id) roundBySignoff.set(r.signoff_id, { round_no: r.round_no, kind: r.kind, reason: r.reason ?? null })
-  const submissionLabel = (s: any) => `Submission #${roundBySignoff.get(s.id)?.round_no ?? submissionNo.get(s.id) ?? '?'}`
+  for (const r of (roundRows ?? [])) if (r.signoff_id) roundBySignoff.set(r.signoff_id, { round_no: r.round_no, kind: r.kind, reason: r.reason ?? null })
+  const submissionLabel = (s: { id: string }) => `Submission #${roundBySignoff.get(s.id)?.round_no ?? submissionNo.get(s.id) ?? '?'}`
   // While the ticket is actively snagged, the latest snagged submission is the LIVE
   // snag — shown in its own block above Quotes so the supplier sees what to fix. Older
   // superseded rounds (and the snag once resubmitted) stay in the Archived block.
@@ -232,23 +240,24 @@ export async function loadSupplierTicketDetail(ticketId: string) {
   // Variation orders raised on this ticket (drives the scheduled-phase VO gate and
   // the "no more variation orders" label). The most recent decline reason feeds the
   // vo_declined banner.
-  const variations = (variationRows ?? []) as any[]
+  const variations = variationRows ?? []
   const variationCount = variations.length
   const latestVoRejectReason = variations.find(v => v.status === 'rejected')?.reject_reason ?? null
 
   // Decline the work — offered before award only (invite still invited/quoted).
-  const canDecline = !awarded && !declinedForMe && !!invite && ['invited', 'quoted'].includes((invite as any).status)
+  const canDecline = !awarded && !declinedForMe && !!invite && ['invited', 'quoted'].includes(invite.status)
 
   // Snag / evidence disputes. While one is OPEN the snag/evidence step is paused;
   // resolved ones live in the Archive. Messages are grouped by their dispute.
-  const disputeExtraById = new Map(((disputeExtra ?? []) as any[]).map(x => [x.id, x]))
-  const disputes = ((disputeRows ?? []) as any[]).map(d => ({ ...d, ...(disputeExtraById.get(d.id) ?? {}) }))
-  const disputeMsgs = (disputeMsgRows ?? []) as any[]
-  const msgsByDispute = (id: string) => disputeMsgs.filter(m => m.dispute_id === id).map(m => ({ ...m, evidence_urls: Array.isArray(m.evidence_urls) ? m.evidence_urls : [] }))
+  const disputeExtraById = new Map((disputeExtra ?? []).map((x): [string, DisputeExtra] => [x.id, x]))
+  const disputes = (disputeRows ?? []).map(d => ({ ...d, ...disputeExtraById.get(d.id) }))
+  const disputeMsgs = disputeMsgRows ?? []
+  // evidence_urls is a Json column that always stores a string[] of URLs.
+  const msgsByDispute = (id: string) => disputeMsgs.filter(m => m.dispute_id === id).map(m => ({ ...m, evidence_urls: Array.isArray(m.evidence_urls) ? m.evidence_urls as string[] : [] }))
   const openDispute = disputes.find(d => d.status === 'open') ?? null
   const resolvedDisputes = disputes.filter(d => d.status === 'resolved')
   // What each dispute is about — the disputed "Submission #N" + snag / evidence request.
-  const disputeSubject = (d: any) => {
+  const disputeSubject = (d: { origin: string; signoff_id?: string | null }) => {
     if (d.origin === 'variation') return 'Variation order · declined'
     const n = d.signoff_id ? submissionNo.get(d.signoff_id) : null
     const what = d.origin === 'snag' ? 'snag' : 'evidence request'
@@ -287,7 +296,7 @@ export async function loadSupplierTicketDetail(ticketId: string) {
   })()
 
   // ── Lower tabbed section (mirrors the RM ticket detail). Data the tab JSX consumes. ──
-  const totalPhotos = Array.isArray(t.photo_urls) ? (t.photo_urls as string[]).length : 0
+  const totalPhotos = Array.isArray(t.photo_urls) ? t.photo_urls.length : 0
   // Quotes tab: active quotes (pending / approved). While the supplier is still
   // (re-)quoting, also show the declined quote(s) with the reason; once a quote is
   // approved or the request closes, declined quotes move to History instead.
@@ -300,19 +309,19 @@ export async function loadSupplierTicketDetail(ticketId: string) {
   const supplierTimelineInput = !awarded
     ? {
         createdAt: t.created_at, startAt: trailStartAt,
-        quoteRequestedAt: (invite as any)?.invited_at ?? t.quote_requested_at,
+        quoteRequestedAt: invite?.invited_at ?? t.quote_requested_at,
         quoteRequests: myQuoteRequests.map(at => ({ at })),
-        requoteRequestedAt: (invite as any)?.requote_requested_at ?? null,
+        requoteRequestedAt: invite?.requote_requested_at ?? null,
         quoteSubmittedAt: latestQuote?.created_at ?? null,
         editedAt: t.edited_at, editedByName: editorName, editNote: t.edit_note,
         infoRequestedAt: t.info_requested_at, infoAddedAt: t.info_added_at, infoRequestReason: t.info_request_reason,
-        quotes: (myQuotes ?? []) as any[], supplierDeclines: myDeclines, views: (viewRows ?? []) as any[],
-        supplierDeclinedAt: declinedForMe ? ((invite as any)?.responded_at ?? latestQuote?.updated_at ?? t.updated_at) : null,
+        quotes: myQuotes ?? [], supplierDeclines: myDeclines, views: viewRows ?? [],
+        supplierDeclinedAt: declinedForMe ? (invite?.responded_at ?? latestQuote?.updated_at ?? t.updated_at) : null,
       }
     : {
         createdAt: t.created_at, status: t.status, updatedAt: t.updated_at, startAt: trailStartAt,
         quoteRequestedAt: t.quote_requested_at, quoteRequests: myQuoteRequests.map(at => ({ at })),
-        requoteRequestedAt: (invite as any)?.requote_requested_at ?? null,
+        requoteRequestedAt: invite?.requote_requested_at ?? null,
         quoteSubmittedAt: latestQuote?.created_at ?? t.quote_submitted_at,
         quoteApprovedAt: t.quote_decision_status === 'approved' ? t.quote_decided_at : null,
         scheduledAt: t.scheduled_at, completedAt: t.completed_at,
@@ -321,11 +330,13 @@ export async function loadSupplierTicketDetail(ticketId: string) {
         snagScheduledAt, workStartedAt: t.attended_at ?? null,
         snagAcceptedAt: latestSnag?.assigned_at ?? null, snagProposedAt: latestSnag?.assigned_at ?? null, snagApprovedAt: latestSnag?.schedule_agreed_at ?? null,
         snagDeclinedAt: declinedSnag?.schedule_declined_at ?? null, snagDeclineReason: declinedSnag?.schedule_decline_reason ?? null,
-        snagScheduleEvents: (snagEventRows ?? []) as any[],
-        quotes: (myQuotes ?? []) as any[], variations: (variationRows ?? []) as any[],
+        snagScheduleEvents: snagEventRows ?? [],
+        quotes: myQuotes ?? [], variations: variationRows ?? [],
         disputes: disputes.map(d => ({ origin: d.origin, status: d.status, outcome: d.outcome, created_at: d.created_at, resolved_at: d.resolved_at, reason: d.resolution_note })),
-        disputeMessages: disputeMsgs.map((m: any) => ({ author_role: m.author_role, body: m.body, created_at: m.created_at })),
-        supplierDeclines: myDeclines, signoffs: (signoffRows ?? []) as any[], updates: (updates ?? []) as any[], views: (viewRows ?? []) as any[],
+        disputeMessages: disputeMsgs.map(m => ({ author_role: m.author_role, body: m.body, created_at: m.created_at })),
+        supplierDeclines: myDeclines, signoffs: signoffRows ?? [],
+        updates: (updates ?? []).map(u => ({ body: u.body ?? '', author_role: u.author_role, created_at: u.created_at })),
+        views: viewRows ?? [],
       }
   // Default (neutral) labels + actor — the RM-voice rmFriendlyLabel says "You
   // requested quotes", which is wrong from the supplier's side (the client/RM
@@ -342,7 +353,7 @@ export async function loadSupplierTicketDetail(ticketId: string) {
     variations, variationCount, latestVoRejectReason, canDecline,
     disputes, msgsByDispute, openDispute, resolvedDisputes, disputeSubject,
     nextAction, timelineItems,
-    totalPhotos, quoteTabRows, historyDeclinedQuotes, updates: (updates ?? []) as any[], declineRows: (declineRows ?? []) as any[],
+    totalPhotos, quoteTabRows, historyDeclinedQuotes, updates: updates ?? [], declineRows: declineRows ?? [],
   }
   return { kind: 'ok' as const, data }
 }
