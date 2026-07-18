@@ -39,6 +39,9 @@ export default function SignupPage() {
   const [error, setError] = useState('')
   const [sentTo, setSentTo] = useState<string | null>(null)
   const [captchaToken, setCaptchaToken] = useState<string | null>(null)
+  // Widget load failure → fail OPEN client-side (Supabase enforcement is the
+  // real gate); otherwise a blocked/unallowed-hostname widget locks everyone out.
+  const [captchaFailed, setCaptchaFailed] = useState(false)
   const [captchaKey, setCaptchaKey] = useState(0) // remount widget for a fresh single-use token
 
   // mode:'onChange' makes isValid reactive so the submit button can gate on the
@@ -56,7 +59,7 @@ export default function SignupPage() {
   ]
 
   async function onSubmit(values: SignupForm) {
-    if (isTurnstileEnabled() && !captchaToken) { setError('Please complete the “I’m human” check.'); return }
+    if (isTurnstileEnabled() && !captchaToken && !captchaFailed) { setError('Please complete the “I’m human” check.'); return }
     setLoading(true); setError('')
     const supabase = createClient()
     const { data, error: authError } = await supabase.auth.signUp({
@@ -189,7 +192,7 @@ export default function SignupPage() {
             </span>
           </label>
 
-          <Turnstile key={captchaKey} onToken={setCaptchaToken} />
+          <Turnstile key={captchaKey} onToken={setCaptchaToken} onLoadFailed={setCaptchaFailed} />
 
           <AuthError message={error} />
 

@@ -31,19 +31,34 @@ declare global {
 
 const SCRIPT_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
 
-export function Turnstile({ onToken }: { onToken: (token: string | null) => void }) {
+export function Turnstile({ onToken, onLoadFailed }: {
+  onToken: (token: string | null) => void
+  /** Fires true when the widget itself cannot load/run (script blocked, hostname
+   *  not on the site key's allowlist — e.g. Vercel previews — or Cloudflare
+   *  down), false again if a retry recovers. Callers use it to FAIL OPEN
+   *  client-side: submit without a token rather than hard-locking the form.
+   *  Safe because Supabase-side CAPTCHA enforcement is the real gate — where
+   *  it's on (production), a tokenless attempt still fails with the distinct
+   *  captcha error; where it's off (dev/preview), login proceeds. */
+  onLoadFailed?: (failed: boolean) => void
+}) {
   const boxRef = useRef<HTMLDivElement>(null)
   const widgetId = useRef<string | null>(null)
   // Keep the latest callback in a ref so the render effect can run once (mount)
   // without re-subscribing when the parent passes a fresh function each render.
   const cbRef = useRef(onToken)
-  useEffect(() => { cbRef.current = onToken })
+  const failRef = useRef(onLoadFailed)
+  useEffect(() => { cbRef.current = onToken; failRef.current = onLoadFailed })
 
   // App-level status so we can show a quiet loading line and a styled error
   // instead of leaking Cloudflare's raw error block into the premium card.
   //  loading → script still fetching; ready → widget mounted (its own
   //  interaction-only UI takes over); error → the widget failed to load.
-  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [status, setStatusRaw] = useState<'loading' | 'ready' | 'error'>('loading')
+  const setStatus = (s: 'loading' | 'ready' | 'error') => {
+    setStatusRaw(s)
+    failRef.current?.(s === 'error')
+  }
 
   useEffect(() => {
     if (!SITE_KEY) return
@@ -130,7 +145,7 @@ export function Turnstile({ onToken }: { onToken: (token: string | null) => void
       )}
       {status === 'error' && (
         <div className="flex items-center justify-between gap-4 rounded-[10px] border border-[#E5714E]/40 bg-[#E5714E]/10 px-3 py-2.5 text-[13px] text-[#F0A98C]">
-          <span>Verification couldn’t load. Check your connection.</span>
+          <span>Verification couldn’t load — you can continue without it.</span>
           <button
             type="button"
             onClick={retry}
