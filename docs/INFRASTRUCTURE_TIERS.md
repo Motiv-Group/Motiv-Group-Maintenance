@@ -43,7 +43,8 @@ just a limits one. Budget for Pro before charging customers or marketing publicl
 | 6 | **In-app Upstash command/bandwidth graphs** (on `/admin/upstash`) | Redis REST API has no usage stats — needs the separate **Upstash Management API + a new credential** | Show DBSIZE + live `motiv-rl` key count; link to the Upstash console for graphs | Wire Upstash Management API (or paid) |
 | 7 | **In-app Resend send/delivery analytics** (on `/admin/resend`) | Free Resend API exposes **domains/keys, not send/open/bounce metrics** | Show domains + `EMAIL_FROM` config; link to the Resend dashboard for volume | Resend paid / analytics API |
 | 8 | **In-app Supabase egress/MAU/usage metrics** (on `/admin/supabase`) | Supabase usage/egress needs the **Management API + a PAT**; free usage reports are dashboard-only | Show DB size, storage size and row counts via `admin_db_stats()`; link to Supabase reports | Supabase Management API / **Pro** |
-| 9 | *(add the next tier-blocked item here)* | | | |
+| 9 | **Large multi-photo uploads in one request** (`POST /api/uploads` allows up to 10×15 MB, but Vercel serverless caps the request body at ~4.5 MB) | Vercel serverless request-body limit (~4.5 MB), independent of the app's per-file cap | Small/few photos work; the route now returns per-file `errors[]` so failures are visible. Planned code fix: upload one file per request (chunk the batch in `lib/upload.ts`) and/or client-side image compression | Code change (per-file upload / compression) — or Vercel **Pro/Fluid** for a larger body limit |
+| 10 | *(add the next tier-blocked item here)* | | | |
 
 _Note: after deleting the legacy `/api/cron/snapshots`, there is now **one free Hobby cron
 slot** — but Hobby is still daily-only, so item #1 (hourly) stays blocked until Pro._
