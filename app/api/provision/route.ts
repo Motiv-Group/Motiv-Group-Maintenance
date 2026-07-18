@@ -235,6 +235,7 @@ export async function POST(request: Request) {
         if (existing) {
           const { data: sup, error } = await admin.from('suppliers').insert({ company_id: companyId, company_name: supName, email: supEmail }).select('id').single()
           if (error || !sup) return NextResponse.json({ error: error?.message ?? 'Failed' }, { status: 400 })
+          await admin.from('company_suppliers').upsert({ company_id: companyId, supplier_id: sup.id, source: 'admin_invite', invited_by: user.id }, { onConflict: 'company_id,supplier_id', ignoreDuplicates: true })
           await logAudit(admin, { actorId: user.id, companyId, action: 'provision.invite_supplier', entityType: 'supplier', entityId: sup.id, metadata: { email: supEmail, existing: true } })
           const { subject, html, text } = await buildEmail('supplier_added', { company: myCompany?.name ?? supName, inviter: me?.full_name ?? null, loginUrl: `${origin.replace(/\/$/, '')}/auth/login` })
           const emailed = await sendEmail({ to: supEmail, subject, html, text })
@@ -250,6 +251,7 @@ export async function POST(request: Request) {
           await admin.from('suppliers').delete().eq('id', sup.id) // roll back the orphan supplier
           return NextResponse.json({ error: invErr.message }, { status: 400 })
         }
+        await admin.from('company_suppliers').upsert({ company_id: companyId, supplier_id: sup.id, source: 'admin_invite', invited_by: user.id }, { onConflict: 'company_id,supplier_id', ignoreDuplicates: true })
         await logAudit(admin, { actorId: user.id, companyId, action: 'provision.invite_supplier', entityType: 'supplier', entityId: sup.id, metadata: { email: supEmail, hasMessage: !!message } })
         const link = `${origin.replace(/\/$/, '')}/auth/supplier-onboard?token=${token}`
         const { subject, html, text } = await buildEmail('supplier_invite', { link, base: origin.replace(/\/$/, ''), inviterCompany: myCompany?.name ?? null, message })

@@ -87,6 +87,7 @@ create table if not exists public.companies (
   id                           uuid not null default gen_random_uuid(),
   name                         text not null,
   active                       boolean not null default true,
+  logo_url                     text,   -- optional uploaded logo (public branding bucket); monogram fallback when null
   created_at                   timestamptz not null default now(),
   updated_at                   timestamptz not null default now()
 );
@@ -2148,3 +2149,44 @@ create table if not exists public.ticket_chat_reads (
 -- RLS: deny-all to end users (no policies). Mirrors ticket_disputes / ticket_dispute_messages.
 alter table public.ticket_chat_messages enable row level security;
 alter table public.ticket_chat_reads    enable row level security;
+
+-- ---------------------------------------------------------------------------
+-- COMPANY <-> SUPPLIER MEMBERSHIP (migration 20260719_admin_company_suppliers_logos)
+-- ---------------------------------------------------------------------------
+-- Many-to-many: one supplier org can belong to several companies. A supplier
+-- invited by company A stays a distinct org; company B inviting the same supplier
+-- adds a second link row (the supplier is NOT duplicated). Populated when a
+-- system-admin invites a supplier under a company (source 'admin_invite') or an
+-- RM invites a supplier to one of that company's tickets (source 'rm_ticket').
+-- Self-signup ("Motiv") suppliers carry source 'self' on the supplier row and get
+-- no company link until invited. Cross-supplier isolation preserved — the link
+-- only records membership. All writes go via the service-role client (no browser
+-- write policy). Companies read their own links; suppliers read their own.
+create table if not exists public.company_suppliers (
+  company_id  uuid not null references public.companies(id) on delete cascade,
+  supplier_id uuid not null references public.suppliers(id) on delete cascade,
+  source      text not null default 'admin_invite',  -- admin_invite | rm_ticket | self
+  invited_by  uuid references public.user_profiles(id) on delete set null,
+  created_at  timestamptz not null default now(),
+  primary key (company_id, supplier_id)
+);
+create index if not exists company_suppliers_supplier_idx on public.company_suppliers (supplier_id);
+
+alter table public.company_suppliers enable row level security;
+
+drop policy if exists "company_suppliers read" on public.company_suppliers;
+create policy "company_suppliers read" on public.company_suppliers for select
+  using (
+    company_id = public.app_company_id()
+    or supplier_id in (select public.app_supplier_ids() as app_supplier_ids)
+  );
+
+-- Backfill (idempotent): existing suppliers.company_id rows + distinct RM ticket
+-- invites become persistent memberships.
+insert into public.company_suppliers (company_id, supplier_id, source)
+select company_id, id, 'admin_invite' from public.suppliers where company_id is not null
+on conflict (company_id, supplier_id) do nothing;
+insert into public.company_suppliers (company_id, supplier_id, source)
+select distinct company_id, supplier_id, 'rm_ticket' from public.ticket_suppliers
+where company_id is not null and supplier_id is not null
+on conflict (company_id, supplier_id) do nothing;

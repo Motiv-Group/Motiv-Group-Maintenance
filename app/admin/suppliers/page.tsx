@@ -7,19 +7,22 @@ import { signManyUrls } from '@/lib/storage'
 import { Card } from '@/components/exec/ui'
 import { formatDateTime } from '@/lib/utils'
 import { SupplierReviewActions } from '@/components/admin/SupplierReviewActions'
+import { SupplierTabs } from '@/components/admin/SupplierTabs'
+import { SupplierDirectory, type DirectorySupplier } from '@/components/admin/SupplierDirectory'
 
 const DOC_LABEL: Record<string, string> = {
   cipc: 'CIPC registration', vat_cert: 'VAT certificate', insurance: 'Liability insurance',
   qualification: 'Trade qualification', other: 'Other document',
 }
 
-// Review queue for SELF-SIGNUP suppliers: check details + verification docs,
-// then approve (→ verified + Motiv pool) or reject.
+// Admin Suppliers: a Directory of every supplier across companies + the Motiv
+// pool (view details, add a supplier to a company), and a Review queue for
+// self-signup suppliers awaiting verification.
 export default async function AdminSuppliersPage() {
   await requireMasterAdmin()
   const admin = createAdminClient()
 
-  const [{ data: pending }, { data: recent }] = await Promise.all([
+  const [{ data: pending }, { data: recent }, { data: allSuppliers }, { data: links }, { data: companies }] = await Promise.all([
     admin.from('suppliers')
       .select('id, company_name, contact_name, email, phone, address, trades, trade, vat_number, created_at')
       .eq('source', 'self_signup').eq('verification_status', 'pending_review').order('created_at', { ascending: true }),
@@ -27,8 +30,12 @@ export default async function AdminSuppliersPage() {
       .select('id, company_name, verification_status, created_at')
       .eq('source', 'self_signup').in('verification_status', ['verified', 'rejected'])
       .order('created_at', { ascending: false }).limit(10),
+    admin.from('suppliers').select('id, company_name, contact_name, email, phone, trades, trade, verification_status, source, is_motiv').eq('active', true),
+    admin.from('company_suppliers').select('supplier_id, company_id'),
+    admin.from('companies').select('id, name').eq('active', true).order('name'),
   ])
 
+  // ── Review queue ───────────────────────────────────────────────────────────
   const rows = pending ?? []
   const supplierIds = rows.map(r => r.id)
   const { data: docRows } = supplierIds.length
@@ -38,31 +45,37 @@ export default async function AdminSuppliersPage() {
   const signed = await signManyUrls(docs.map(d => d.url))
   docs.forEach((d, i) => { d.url = signed[i] ?? d.url })
   const docsBySupplier = new Map<string, typeof docs>()
-  for (const d of docs) {
-    const list = docsBySupplier.get(d.supplier_id) ?? []
-    list.push(d); docsBySupplier.set(d.supplier_id, list)
-  }
-
-  // SLA acceptance per pending supplier (signature proof for the reviewer).
+  for (const d of docs) { const list = docsBySupplier.get(d.supplier_id) ?? []; list.push(d); docsBySupplier.set(d.supplier_id, list) }
   const { data: slaRows } = supplierIds.length
     ? await admin.from('supplier_sla_acceptances').select('supplier_id, sla_version, signed_name, accepted_at').in('supplier_id', supplierIds)
     : { data: null }
   const slaBySupplier = new Map((slaRows ?? []).map(s => [s.supplier_id, s] as const))
 
-  return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><Truck size={22} className="text-blue-600 dark:text-blue-400" /> Supplier review</h1>
-        <p className="text-sm text-[var(--text-muted)] mt-0.5">Self-signup suppliers awaiting verification. Approving adds them to the Motiv pool.</p>
-      </div>
+  // ── Directory ────────────────────────────────────────────────────────────────
+  const companyName = new Map((companies ?? []).map(c => [c.id, c.name]))
+  const companyOpts = (companies ?? []).map(c => ({ id: c.id, name: c.name }))
+  const companiesBySupplier = new Map<string, { id: string; name: string }[]>()
+  for (const l of (links ?? [])) {
+    const name = companyName.get(l.company_id); if (!name) continue
+    const a = companiesBySupplier.get(l.supplier_id) ?? []; a.push({ id: l.company_id, name }); companiesBySupplier.set(l.supplier_id, a)
+  }
+  const directory: DirectorySupplier[] = (allSuppliers ?? []).map(s => ({
+    id: s.id, name: s.company_name, contact: s.contact_name ?? null, email: s.email ?? null, phone: s.phone ?? null,
+    trades: (s.trades as string[] | null) ?? (s.trade ? [s.trade] : []),
+    verified: s.verification_status === 'verified',
+    pendingReview: s.verification_status === 'pending_review',
+    isMotiv: s.source === 'self_signup' || s.is_motiv === true,
+    companies: (companiesBySupplier.get(s.id) ?? []).sort((a, b) => a.name.localeCompare(b.name)),
+  })).sort((a, b) => a.name.localeCompare(b.name))
 
+  const reviewPanel = (
+    <div className="space-y-5">
       {!rows.length && (
         <Card className="p-6 sm:p-8 text-center">
           <ShieldCheck className="mx-auto mb-2 text-emerald-500" size={24} />
           <p className="text-sm text-[var(--text-muted)]">No suppliers waiting for review.</p>
         </Card>
       )}
-
       {rows.map(s => {
         const sla = slaBySupplier.get(s.id)
         const sdocs = docsBySupplier.get(s.id) ?? []
@@ -77,7 +90,6 @@ export default async function AdminSuppliersPage() {
               </div>
               <SupplierReviewActions supplierId={s.id} companyName={s.company_name} />
             </div>
-
             <div className="grid gap-3 sm:grid-cols-3 text-sm">
               <div>
                 <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Trades</div>
@@ -98,7 +110,6 @@ export default async function AdminSuppliersPage() {
                 </div>
               </div>
             </div>
-
             <div>
               <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Verification documents ({sdocs.length})</div>
               {sdocs.length ? (
@@ -115,7 +126,6 @@ export default async function AdminSuppliersPage() {
           </Card>
         )
       })}
-
       {!!(recent ?? []).length && (
         <Card className="p-5">
           <h2 className="text-sm font-semibold text-[var(--text)] mb-2">Recently reviewed</h2>
@@ -131,6 +141,21 @@ export default async function AdminSuppliersPage() {
           </ul>
         </Card>
       )}
+    </div>
+  )
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><Truck size={22} className="text-blue-600 dark:text-blue-400" /> Suppliers</h1>
+        <p className="text-sm text-[var(--text-muted)] mt-0.5">Every supplier across companies and the Motiv pool. Review self-signups before they receive work.</p>
+      </div>
+      <SupplierTabs
+        pendingCount={rows.length}
+        defaultTab={rows.length ? 'review' : 'directory'}
+        directory={<SupplierDirectory suppliers={directory} companies={companyOpts} />}
+        review={reviewPanel}
+      />
     </div>
   )
 }
