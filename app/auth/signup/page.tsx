@@ -18,9 +18,7 @@ import { User, Truck, Mail, ArrowRight, Check } from 'lucide-react'
 // Store Managers, Regional Managers and Executives are invited by an admin.
 type Choice = 'individual' | 'supplier'
 
-// POPIA (OPS-006): the version of the privacy/terms the user agreed to at signup.
-// Bump this when the legal copy changes so a re-consent can be required later.
-const CONSENT_VERSION = '2026-07'
+import { CONSENT_VERSION } from '@/lib/consent'
 
 interface SignupForm {
   full_name: string

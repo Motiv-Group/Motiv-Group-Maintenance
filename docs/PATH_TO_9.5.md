@@ -24,7 +24,7 @@ Launch-blocking **code is largely done** (private buckets + signed URLs, RLS eve
 
 **2 — Owner infra/ops:** leaked-password (Pro), custom SMTP, uptime + log-drain alerts, enforce SSL + pooler, staging env, backup-restore drill, incident runbook, HSTS-preload submit — *You* · C1–C6, C8, O-items in Appendix A.
 
-**3 — POPIA/legal:** register Information Officer; signup consent checkbox (Code) — C11.
+**3 — POPIA/legal:** register Information Officer (You) — C11. ✅ Consent checkbox DONE 2026-07-18 on BOTH self-signup paths (public signup already had it since the login redesign; supplier-onboard step 3 added — required client+server, `consent_version`+`consent_accepted_at` recorded in auth metadata, shared `lib/consent.ts` CONSENT_VERSION).
 
 **4 — Open code (Claude can do now):** B19 workflow consolidation (design ready) · B14 UI phase-2 remnants · true schema-drift CI (C9) · DOC6 legacy `lib/types.ts` shapes (non-mechanical) · minor: consolidate the two `errMsg` helpers into `lib/` · regen `database.types.ts` with DB functions (drops the uploads rpc cast) · optional CI wiring for the e2e suite. ✅ The **entire 2026-07-16 audit code programme is CLOSED** (PRs #43–#49, 2026-07-16→18): all 7 security findings, tests 354→520 + e2e 15/15 green, reliability (timeouts/purge/Sentry), offline PWA + update toast (device-verified), CI hardening (weekly audit + build cache + live-verified post-deploy smoke), all maintainability splits/dedupes, `any` 522→0 with no-explicit-any=error, docs truth pass, Turnstile fail-open (preview lockout fixed).
 
@@ -130,7 +130,7 @@ Detail + status for every lettered/numbered item is in the Phase A/B/C tables be
 | C8 | Submit domain to HSTS preload list (header already opts in) | CSP | You | 🔲 |
 | C9 | Schema-drift CI: run `export_live_schema.sql` vs `schema.sql` and diff (monthly or CI) | DB | Code | 🟡 2026-07-07 — the literal "diff live vs schema.sql" isn't cleanly automatable (schema.sql is a **curated** reconstruction, not a byte-perfect dump; true live diff needs a prod DB-URL secret). Shipped the achievable + testable half: `scripts/check-schema.mjs` (`npm run schema:check`, wired into CI) statically verifies **every FK/policy/alter/trigger references a table schema.sql defines** — catches a folded migration that forgot a CREATE or typo'd a name. **It immediately caught 2 real bugs**: `push_subscriptions.user_id` + `user_profiles.id` FKs were malformed `references public.null(null)` placeholders (unresolved `auth.users` targets) → fixed to `references auth.users(id) on delete cascade`. ⏳ true live-DB drift (pg_dump vs baseline, needs `SUPABASE_DB_URL` secret) still deferred/owner. |
 | C10 | Quarterly: Supabase Security Advisor re-run + manual `xlsx` (SheetJS) advisory check | DB/Deps | You | 🔲 |
-| C11 | POPIA: appoint + register Information Officer with the Information Regulator; signup consent checkbox with stored timestamp | Legal | ⛔ You + Code (checkbox) | 🔲 |
+| C11 | POPIA: appoint + register Information Officer with the Information Regulator; signup consent checkbox with stored timestamp | Legal | ⛔ You (officer) · Code ✅ | 🟡 checkbox ✅ 2026-07-18 (both self-signup paths, version + timestamp in auth metadata); officer registration = owner |
 | C12 | Independent penetration test | Validation | You | 🔲 |
 | C13 | Usability pass with 3–5 real store managers + suppliers on phones; re-test low-end Android via Capacitor | UI | You | 🔲 |
 

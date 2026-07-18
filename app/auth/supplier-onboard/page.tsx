@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { isValidEmail, isValidPhone } from '@/lib/csv'
 import { TRADES } from '@/lib/trades'
 import { SLA_VERSION } from '@/lib/sla'
+import { CONSENT_VERSION } from '@/lib/consent'
 import { PasswordInput } from '@/components/ui/PasswordInput'
 import { AuthShell } from '@/components/ui/AuthShell'
 import { AuthError } from '@/components/ui/AuthBits'
@@ -53,9 +54,10 @@ export default function SupplierOnboardPage() {
   const [trades, setTrades] = useState<Set<string>>(new Set())
   const [vatRegistered, setVatRegistered] = useState(false)
   const [vatNumber, setVatNumber] = useState('')
-  // Step 3 — SLA
+  // Step 3 — SLA + POPIA consent
   const [slaAgreed, setSlaAgreed] = useState(false)
   const [signedName, setSignedName] = useState('')
+  const [consent, setConsent] = useState(false)
 
   // Invited path: validate the token + prefill. No token = self-signup, no error.
   useEffect(() => {
@@ -93,6 +95,7 @@ export default function SupplierOnboardPage() {
     if (s === 3) {
       if (!slaAgreed) return 'Tick the box to accept the Service Level Agreement.'
       if (!signedName.trim()) return 'Type your full name as your signature.'
+      if (!consent) return 'Tick the box to accept the Privacy Policy and Terms of Service.'
     }
     return ''
   }
@@ -116,6 +119,7 @@ export default function SupplierOnboardPage() {
         phone, address, trades: [...trades],
         vat_registered: vatRegistered, vat_number: vatNumber,
         sla_agreed: slaAgreed, sla_signed_name: signedName,
+        consent, consent_version: CONSENT_VERSION,
         captcha_token: captchaToken || undefined,
       }),
     })
@@ -253,6 +257,15 @@ export default function SupplierOnboardPage() {
             <input type="checkbox" checked={slaAgreed} onChange={e => setSlaAgreed(e.target.checked)} className="mt-0.5 h-5 w-5 accent-emerald-600" />
             <span className="text-sm text-gray-700 dark:text-gray-300">
               I have read and agree to the <Link href="/sla" target="_blank" className="text-blue-600 dark:text-blue-400 underline">Service Level Agreement</Link> (v{SLA_VERSION}) on behalf of {companyName.trim() || 'my company'}.
+            </span>
+          </label>
+
+          {/* POPIA (C11) consent — mirrors the public signup checkbox; required
+              server-side too (the onboard route rejects without it). */}
+          <label className="flex items-start gap-3 cursor-pointer rounded-xl border border-gray-200 dark:border-white/10 p-3.5">
+            <input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} className="mt-0.5 h-5 w-5 accent-emerald-600" />
+            <span className="text-sm text-gray-700 dark:text-gray-300">
+              I agree to the <Link href="/privacy" target="_blank" className="text-blue-600 dark:text-blue-400 underline">Privacy Policy</Link> and <Link href="/terms" target="_blank" className="text-blue-600 dark:text-blue-400 underline">Terms of Service</Link>, and consent to Motiv processing my personal information to provide the service.
             </span>
           </label>
 

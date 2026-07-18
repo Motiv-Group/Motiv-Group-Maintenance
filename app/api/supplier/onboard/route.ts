@@ -19,6 +19,9 @@ const BodySchema = z.object({
   vat_number: z.string().optional().nullable(),
   sla_agreed: z.boolean().optional(),
   sla_signed_name: z.string().optional(),
+  // POPIA (C11): affirmative consent to the privacy policy + terms.
+  consent: z.boolean().optional(),
+  consent_version: z.string().optional(),
   phone: z.string().optional().nullable(),
   token: z.string().optional().nullable(),
   address: z.string().optional().nullable(),
@@ -95,6 +98,9 @@ export async function POST(request: Request) {
   // SLA — the binding step. No signature, no account.
   const signedName = String(b.sla_signed_name ?? '').trim()
   if (b.sla_agreed !== true || !signedName) return bad('You must accept the Service Level Agreement (type your full name and tick the box).')
+  // POPIA (C11) — affirmative consent is required before an account is created.
+  if (b.consent !== true) return bad('You must accept the Privacy Policy and Terms of Service.')
+  const consentMeta = { consent_version: b.consent_version ?? null, consent_accepted_at: new Date().toISOString() }
   const ip = (request.headers.get('x-forwarded-for') ?? '').split(',')[0].trim() || null
   const phone = normalisePhone(b.phone)
 
@@ -106,7 +112,7 @@ export async function POST(request: Request) {
 
     const { data: created, error: createErr } = await admin.auth.admin.createUser({
       email, password: b.password, email_confirm: true,
-      user_metadata: { role: 'supplier', company_id: inv.company_id, full_name: b.contact_name.trim() },
+      user_metadata: { role: 'supplier', company_id: inv.company_id, full_name: b.contact_name.trim(), ...consentMeta },
     })
     if (createErr || !created?.user) {
       const msg = createErr?.message ?? 'Could not create account'
@@ -163,7 +169,7 @@ export async function POST(request: Request) {
   // 2) the login (service-role path grants the supplier role — see header note).
   const { data: created, error: createErr } = await admin.auth.admin.createUser({
     email, password: b.password, email_confirm: true,
-    user_metadata: { role: 'supplier', full_name: b.contact_name.trim() },
+    user_metadata: { role: 'supplier', full_name: b.contact_name.trim(), ...consentMeta },
   })
   if (createErr || !created?.user) {
     await admin.from('suppliers').delete().eq('id', sup.id) // roll back the orphan row
