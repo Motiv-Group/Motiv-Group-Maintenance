@@ -5,7 +5,8 @@ import { revalidatePath } from 'next/cache'
 import { rateLimit } from '@/lib/rate-limit'
 import { sendPushToMany } from '@/lib/push'
 import { loadSlaResolver } from '@/lib/health/data'
-import { isCommercialPhase } from '@/lib/workflow'
+import { isCommercialPhase, computeQuoteDue, stampFreshness } from '@/lib/workflow'
+import { logQuoteRequest } from '@/lib/services/ticket-workflow'
 import { rmOwnsTicket } from '@/lib/rm-ticket-access'
 import { z } from 'zod'
 import { parseJsonBody } from '@/lib/validate'
@@ -61,13 +62,15 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
 
   const now = new Date().toISOString()
   // Individual tickets have no company SLA config — use a default quote window.
+  // B19 note: the individual branch stays inline (computeQuoteDue needs an SlaTargets
+  // and has no individual-default parameter); the company branch uses the shared helper.
   let quoteDueAt: string
   if (isIndividual) {
     quoteDueAt = new Date(Date.now() + 48 * 60 * 60_000).toISOString()
   } else {
     const rules = await loadSlaResolver(admin, ticket.company_id)
     const tgt = rules(ticket.priority as 'P1' | 'P2' | 'P3' | 'P4')
-    quoteDueAt = new Date(Date.now() + tgt.quote_due_mins * 60_000).toISOString()
+    quoteDueAt = computeQuoteDue(now, tgt)
   }
 
   // Split the selection: suppliers previously declined/closed on this ticket are
@@ -94,18 +97,25 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     status: 'assigned', supplier_id: null, quote_required: true, quote_requested_at: now, quote_due_at: quoteDueAt,
     // Set-once: the FIRST quote request stays in the audit trail across re-assigns.
     first_quote_requested_at: ticket.first_quote_requested_at ?? now,
+    // B19 note: blocker columns stay inline (NOT resolveBlockerState('assigned')) — this
+    // route historically leaves internal_action_due_at untouched, while the shared helper
+    // nulls it; behaviour is preserved verbatim pending dedupe.
     current_blocker: 'supplier_action', blocker_owner_type: 'supplier', blocker_started_at: now, sla_paused: false,
-    last_internal_update_at: now, updated_at: now,
+    ...stampFreshness(isIndividual ? 'individual' : 'regional_manager', now), updated_at: now,
   }).eq('id', ticket.id)
   // Durable log of this request round — one row PER supplier (re)invited, so the
   // audit trail reads "Quote requested from <supplier>" for each. Kept even after
   // invite rows are reset on a later re-assign.
   const requestedThisRound = [...reinvite, ...fresh]
-  if (requestedThisRound.length) {
-    await admin.from('ticket_quote_requests').insert(requestedThisRound.map(supplier_id => ({ company_id: ticket.company_id, ticket_id: ticket.id, supplier_id, requested_at: now })))
+  for (const supplier_id of requestedThisRound) {
+    await logQuoteRequest(admin, ticket, supplier_id, now)
   }
 
   // Notify the invited suppliers — re-invited ones hear it's a re-quote request.
+  // B19 note: stays inline (NOT notifyNextActors) — the service routes supplier
+  // notifications via tickets.supplier_id (which assign nulls); this is a multi-org
+  // invite fan-out with distinct re-invite vs fresh copy and its own push title.
+  // Preserved verbatim pending dedupe.
   const { data: su } = await admin.from('supplier_users').select('user_id, supplier_id').in('supplier_id', supplierIds)
   const reSet = new Set(reinvite)
   const reUsers = Array.from(new Set((su ?? []).filter(r => reSet.has(r.supplier_id)).map(r => r.user_id)))
