@@ -1,6 +1,8 @@
 # Motiv Security and Production-Readiness Programme
 
-> **Authoritative working document.** All findings, fixes, owner actions, decisions, evidence and scoring live here. Do not delete completed findings — mark them `VERIFIED` only when evidence exists (code change alone is not enough). Machine-readable companions: [`motiv-security-findings.json`](motiv-security-findings.json) (full per-finding detail) and [`motiv-remediation-backlog.csv`](motiv-remediation-backlog.csv). A plain-English companion audit is [`docs/PRODUCTION_AUDIT_2026-07-15.md`](docs/PRODUCTION_AUDIT_2026-07-15.md).
+> **ARCHIVED (2026-07-18).** This programme concluded 2026-07-16 (summary below). It is kept as the evidence trail for the SEC-xxx findings (pen-test prep). It is NO LONGER the authoritative readiness doc — that is **`docs/PATH_TO_9.5.md`** (living tracker) + **`docs/AUDIT_2026-07-16.md`** (the 2026-07-16→18 audit that followed this programme and closed every code item, overall ~8.3).
+>
+> *(Original header:)* **Authoritative working document.** All findings, fixes, owner actions, decisions, evidence and scoring live here. Do not delete completed findings — mark them `VERIFIED` only when evidence exists (code change alone is not enough). Machine-readable companions: [`motiv-security-findings.json`](motiv-security-findings.json) (full per-finding detail) and [`motiv-remediation-backlog.csv`](motiv-remediation-backlog.csv). A plain-English companion audit is [`docs/PRODUCTION_AUDIT_2026-07-15.md`](docs/PRODUCTION_AUDIT_2026-07-15.md).
 
 **Ownership labels:** `CLAUDE` = Claude can fix in-repo (you apply migrations / merge PRs) · `OWNER` = only you can do it (purchase, dashboard, legal, credential, live-DB inspection) · `SHARED` = Claude implements + you apply/decide · `THIRD_PARTY` = independent pen-test / lawyer / upstream.
 
