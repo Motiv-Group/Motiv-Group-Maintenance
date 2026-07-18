@@ -1,6 +1,8 @@
 # B19 — Workflow Consolidation Design
 
-> **Status:** design (not yet implemented). Tracked as B19 in `docs/PATH_TO_9.5.md`.
+> **Status: IMPLEMENTED 2026-07-18** (6 sequential commits on `b19-workflow-consolidation`; suite 520→554, e2e 15/15 green vs the dev project).
+> **What landed:** the pure engine helpers (`resolveBlockerState`, `computeQuoteDue`, `stampFreshness`) live in `lib/workflow.ts` with 34 unit tests; the side-effect service (`notifyNextActors`, `logQuoteRequest`) lives in `lib/services/ticket-workflow.ts`; the transition route runs fully on both; the four other routes adopted every concern that was byte-identical (freshness everywhere, quote-due + quote-log in assign/quote-decision).
+> **Key discovery:** several "duplicates" were actually SILENT BEHAVIORAL DIVERGENCES (bespoke notification copy per route, blocker columns deliberately not stamped on submit-quote/assign/quote-decision/dispute, individual-vs-company quote-due defaults). Per §2's no-behavior-change rule they stay route-local — but each is now annotated in-code with a B19 note, so the divergence is documented instead of accidental. Unifying them would be a deliberate BEHAVIOR-change project, not a refactor.
 > **Goal:** stop ticket state-changes drifting into N slightly-different versions across routes.
 
 ## 1. Problem

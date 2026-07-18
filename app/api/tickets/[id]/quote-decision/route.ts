@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { rateLimit } from '@/lib/rate-limit'
 import { sendPushToMany } from '@/lib/push'
 import { loadSlaResolver } from '@/lib/health/data'
+import { computeQuoteDue, stampFreshness } from '@/lib/workflow'
+import { logQuoteRequest } from '@/lib/services/ticket-workflow'
 import { z } from 'zod'
 import { parseJsonBody } from '@/lib/validate'
 import { rmOwnsTicket } from '@/lib/rm-ticket-access'
@@ -61,6 +63,10 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   const now = new Date().toISOString()
 
   const reason = body.reason ?? null
+  // B19 note: stays inline (NOT notifyNextActors) — the service routes supplier
+  // notifications via tickets.supplier_id, but quote decisions target the QUOTE's
+  // supplier org (quote.supplier_id, which the ticket may not carry yet/any more)
+  // with bespoke decision copy and push titles. Preserved verbatim pending dedupe.
   const { data: su } = await admin.from('supplier_users').select('user_id').eq('supplier_id', quote.supplier_id ?? '')
   const ids = (su ?? []).map(r => r.user_id)
   const notify = async (message: string, pushTitle: string) => {
@@ -92,6 +98,11 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     const hasPending = (pend ?? []).length > 0
     const { data: allInvites } = await admin.from('ticket_suppliers').select('status').eq('ticket_id', ticket.id)
     const allDeclined = !hasPending && (allInvites ?? []).length > 0 && (allInvites ?? []).every(i => ['declined', 'closed'].includes(i.status))
+    // B19 note: blocker columns stay inline (NOT resolveBlockerState) — this route
+    // historically stamps pause_ended_at on the un-pausing branches and leaves
+    // internal_action_due_at untouched, while the shared helper nulls
+    // internal_action_due_at (and for 'quoted' would stamp it from SLA targets this
+    // route doesn't load). Behaviour is preserved verbatim pending dedupe.
     const stateFields = hasPending
       ? { status: 'quoted', quote_required: true, quote_decision_required: true, quote_decision_status: 'pending',
           current_blocker: 'quote_approval', blocker_owner_type: 'regional_manager', blocker_started_at: now,
@@ -102,7 +113,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       : { status: 'quote_requested', quote_required: true, quote_decision_required: false, quote_decision_status: null,
           current_blocker: 'supplier_action', blocker_owner_type: 'supplier', blocker_started_at: now, sla_paused: false, pause_ended_at: now }
     await admin.from('tickets').update({
-      ...stateFields, supplier_id: null, last_internal_update_at: now, updated_at: now,
+      ...stateFields, supplier_id: null, ...stampFreshness(isIndividual ? 'individual' : 'regional_manager', now), updated_at: now,
     }).eq('id', ticket.id)
     const supplierMsg = reason
       ? `Your quote wasn't selected for this job — ${reason}.`
@@ -115,21 +126,27 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   if (action === 'requote') {
     // Ask the (previously declined) supplier to submit a revised quote — re-invite
     // them and stamp requote_requested_at so their page shows the re-quote prompt.
+    // B19 note: the individual branch stays inline (computeQuoteDue needs an SlaTargets
+    // and has no individual-default parameter); the company branch uses the shared helper.
     const quoteDueAt = isIndividual
       ? new Date(Date.now() + 48 * 60 * 60_000).toISOString()
-      : new Date(Date.now() + (await loadSlaResolver(admin, ticket.company_id))(ticket.priority as 'P1' | 'P2' | 'P3' | 'P4').quote_due_mins * 60_000).toISOString()
+      : computeQuoteDue(now, (await loadSlaResolver(admin, ticket.company_id))(ticket.priority as 'P1' | 'P2' | 'P3' | 'P4'))
     await admin.from('ticket_suppliers').update({ status: 'invited', declined_by: null, requote_requested_at: now, responded_at: now }).eq('ticket_id', ticket.id).eq('supplier_id', quote.supplier_id ?? '')
     await admin.from('tickets').update({
       status: 'quote_requested', supplier_id: null, quote_required: true, quote_requested_at: now, quote_due_at: quoteDueAt,
       // Set-once: keep the FIRST quote request in the audit trail.
       first_quote_requested_at: ticket.first_quote_requested_at ?? now,
       quote_decision_required: false, quote_decision_status: null,
+      // B19 note: blocker columns stay inline (NOT resolveBlockerState) — this route
+      // historically leaves internal_action_due_at and pause_ended_at untouched here,
+      // while the shared helper nulls internal_action_due_at; preserved verbatim
+      // pending dedupe.
       current_blocker: 'supplier_action', blocker_owner_type: 'supplier', blocker_started_at: now, sla_paused: false,
-      last_internal_update_at: now, updated_at: now,
+      ...stampFreshness(isIndividual ? 'individual' : 'regional_manager', now), updated_at: now,
     }).eq('id', ticket.id)
     // Durable per-round log, attributed to this supplier → a "Revised quote
     // requested" event on their audit trail that survives re-assignment.
-    await admin.from('ticket_quote_requests').insert({ company_id: ticket.company_id, ticket_id: ticket.id, requested_at: now, supplier_id: quote.supplier_id })
+    await logQuoteRequest(admin, ticket, quote.supplier_id, now)
     await notify('Please submit a revised quote for this job when you get a chance.', 'Revise your quote')
     revalidatePath('/regional'); revalidatePath(`/regional/tickets/${ticket.id}`); revalidatePath('/supplier')
     return NextResponse.json({ ok: true })
@@ -149,11 +166,18 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     status: scheduled ? 'scheduled' : 'accepted', supplier_id: quote.supplier_id, quote_value: (ticket.quote_value ?? null),
     ...(scheduled ? { scheduled_at: proposedAt } : {}),
     quote_decision_required: false, quote_decision_status: 'approved', quote_decided_at: now,
+    // B19 note: blocker columns stay inline (NOT resolveBlockerState) — this route
+    // historically stamps pause_ended_at and leaves internal_action_due_at untouched,
+    // while the shared helper nulls internal_action_due_at; preserved verbatim
+    // pending dedupe.
     current_blocker: 'supplier_action', blocker_owner_type: 'supplier', blocker_started_at: now, sla_paused: false, pause_ended_at: now,
-    last_internal_update_at: now, updated_at: now,
+    ...stampFreshness(isIndividual ? 'individual' : 'regional_manager', now), updated_at: now,
   }).eq('id', ticket.id)
 
   // Notify the winning supplier (su/ids already resolved for this quote's supplier) + the store.
+  // B19 note: stays inline (NOT notifyNextActors) — bespoke approval copy/titles for
+  // the quote's supplier org and the store creator; the service has no matching
+  // action and routes via tickets.supplier_id. Preserved verbatim pending dedupe.
   await notify('Great news — your quote was approved. You can go ahead and start the work.', 'Quote approved')
   if (!isIndividual && ticket.created_by) {
     await admin.from('notifications').insert([{ company_id: ticket.company_id, user_id: ticket.created_by, ticket_id: ticket.id, type: 'ticket_update', title: `${ticket.title ?? 'Untitled'}`, message: 'Good news — your request was approved and a supplier has been assigned.', link: `/client/tickets/${ticket.id}` }])

@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { parseJsonBody } from '@/lib/validate'
 import { rmOwnsTicket } from '@/lib/rm-ticket-access'
 import { signManyUrls } from '@/lib/storage'
+import { stampFreshness } from '@/lib/workflow'
 import type { Database } from '@/lib/database.types'
 
 const BodySchema = z.object({
@@ -35,6 +36,10 @@ async function supplierIds(admin: Admin, supplierId: string | null): Promise<str
   const { data } = await admin.from('supplier_users').select('user_id').eq('supplier_id', supplierId)
   return (data ?? []).map(r => r.user_id)
 }
+// B19 note: dispute notifications stay inline (NOT notifyNextActors) — the service
+// is keyed by transition actions with fixed copy, while every dispute message is
+// bespoke, and the resolver side may be the Individual owner (notifyResolver's
+// company-null branch). Preserved verbatim pending dedupe.
 // Notify the "resolver / client" side of a dispute: the region's RM(s), or — on a
 // standalone Individual (company-null) ticket — the owner, who plays the resolver.
 async function notifyResolver(admin: Admin, ticket: TicketRow, title: string, message: string) {
@@ -65,23 +70,29 @@ async function resolveDispute(admin: Admin, ticket: TicketRow, dispute: DisputeR
     ? (isVariation ? 'Variation-order decline retracted — reopened for review' : `${what[0].toUpperCase()}${what.slice(1)} dropped — the submission is back under review for approval`)
     : (isVariation ? 'Variation-order decline upheld — stays declined' : `${what[0].toUpperCase()}${what.slice(1)} upheld — stands`)
   await admin.from('ticket_dispute_messages').insert({ dispute_id: dispute.id, ticket_id: ticketId, author_id: actorId, author_role: actorRole, body: `Dispute resolved — ${label}${note ? `: ${note}` : '.'}`, evidence_urls: [], created_at: now })
+  // B19 note: blocker columns stay inline-absent (NOT resolveBlockerState) — these
+  // status writes historically touch NO blocker/pause columns, while the shared
+  // helper would stamp the internalDecision/signoff blocker sets (incl. an
+  // internal_action_due_at from SLA targets this route doesn't load). Behaviour is
+  // preserved verbatim pending dedupe. A 'withdrawn' outcome is always applied by
+  // the resolver side, so the freshness stamp is the fixed internal one.
   if (outcome === 'withdrawn') {
     if (isVariation) {
       // Reopen the latest declined variation for the RM to re-decide.
       const { data: v } = await admin.from('ticket_variations').select('id').eq('ticket_id', ticketId).eq('status', 'rejected').order('created_at', { ascending: false }).limit(1).maybeSingle()
       if (v?.id) await admin.from('ticket_variations').update({ status: 'pending', reject_reason: null, reviewed_at: null, reviewed_by: null }).eq('id', v.id)
-      await admin.from('tickets').update({ status: 'variation_review', updated_at: now, last_internal_update_at: now }).eq('id', ticketId)
+      await admin.from('tickets').update({ status: 'variation_review', updated_at: now, ...stampFreshness('regional_manager', now) }).eq('id', ticketId)
     } else {
       // Drop the snag / evidence request → put the submission back UNDER REVIEW so the
       // RM approves it manually (do NOT auto-accept the COC/POC).
       const { data: latest } = await admin.from('signoffs').select('id').eq('ticket_id', ticketId).order('created_at', { ascending: false }).limit(1).maybeSingle()
       if (latest?.id) await admin.from('signoffs').update({ status: 'submitted', reject_reason: null, reviewed_by: null, reviewed_at: null }).eq('id', latest.id)
       await admin.from('snags').update({ status: 'resolved' }).eq('ticket_id', ticketId).in('status', ['open', 'assigned', 'in_progress'])
-      await admin.from('tickets').update({ status: 'submitted_for_signoff', signoff_status: 'submitted', evidence_request_reason: null, updated_at: now, last_internal_update_at: now }).eq('id', ticketId)
+      await admin.from('tickets').update({ status: 'submitted_for_signoff', signoff_status: 'submitted', evidence_request_reason: null, updated_at: now, ...stampFreshness('regional_manager', now) }).eq('id', ticketId)
     }
   } else {
     // Upheld — the request stands; the ticket keeps its state so the supplier resumes.
-    await admin.from('tickets').update({ updated_at: now, ...(actorRole === 'supplier' ? { last_supplier_update_at: now } : { last_internal_update_at: now }) }).eq('id', ticketId)
+    await admin.from('tickets').update({ updated_at: now, ...stampFreshness(actorRole, now) }).eq('id', ticketId)
   }
   // Notify the party who didn't trigger this.
   const summary = outcome === 'withdrawn'
@@ -213,7 +224,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       if (latestSignoff?.id) await admin.from('ticket_disputes').update({ signoff_id: latestSignoff.id }).eq('id', disp.id)
     }
     await admin.from('ticket_dispute_messages').insert({ dispute_id: disp.id, ticket_id: ticketId, author_id: user.id, author_role: 'supplier', body: messageBody || null, evidence_urls: evidence, created_at: now })
-    await admin.from('tickets').update({ last_supplier_update_at: now, updated_at: now }).eq('id', ticketId)
+    await admin.from('tickets').update({ ...stampFreshness(actingRole, now), updated_at: now }).eq('id', ticketId)
     await notifyResolver(admin, ticket, title, 'The supplier has raised a dispute. Please review it and respond.')
   } else if (action === 'reply') {
     if (!openDispute) return NextResponse.json({ error: 'No open dispute on this ticket.' }, { status: 409 })
@@ -222,7 +233,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     if (!messageBody && !evidence.length) return NextResponse.json({ error: 'Add a message or attach evidence.' }, { status: 400 })
     await admin.from('ticket_dispute_messages').insert({ dispute_id: openDispute.id, ticket_id: ticketId, author_id: user.id, author_role: actingRole, body: messageBody || null, evidence_urls: evidence, created_at: now })
     if (actingRole === 'supplier') {
-      await admin.from('tickets').update({ last_supplier_update_at: now }).eq('id', ticketId)
+      await admin.from('tickets').update(stampFreshness(actingRole, now)).eq('id', ticketId)
       await notifyResolver(admin, ticket, title, 'The supplier added a new reply to the dispute.')
     } else {
       await push(admin, await supplierIds(admin, ticket.supplier_id), ticket.company_id ?? '', ticketId, title, 'The manager has replied to your dispute.', `/supplier/tickets/${ticketId}`)
@@ -248,7 +259,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     if (pErr) return NextResponse.json({ error: 'Proposals are not available yet — the latest database migration needs to be applied.' }, { status: 503 })
     const label = proposed === 'withdrawn' ? `proposed to resolve the dispute — drop the ${what}` : `proposed to uphold the ${what} — it stands`
     await admin.from('ticket_dispute_messages').insert({ dispute_id: openDispute.id, ticket_id: ticketId, author_id: user.id, author_role: actingRole, body: `${roleName(actingRole)} ${label}. Awaiting the other party's agreement.${note ? ` — ${note}` : ''}`, evidence_urls: [], created_at: now })
-    await admin.from('tickets').update({ updated_at: now, ...(actingRole === 'supplier' ? { last_supplier_update_at: now } : { last_internal_update_at: now }) }).eq('id', ticketId)
+    await admin.from('tickets').update({ updated_at: now, ...stampFreshness(actingRole, now) }).eq('id', ticketId)
     if (actingRole === 'supplier') await notifyResolver(admin, ticket, title, 'The supplier has proposed resolving the dispute. Confirm to drop the request.')
     else await push(admin, await supplierIds(admin, ticket.supplier_id), ticket.company_id ?? '', ticketId, title, 'The manager has proposed upholding the request. Confirm to agree.', `/supplier/tickets/${ticketId}`)
   } else if (action === 'confirm') {
