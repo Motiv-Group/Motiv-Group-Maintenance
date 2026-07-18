@@ -3366,6 +3366,7 @@ export interface Database {
           asset_id: string | null
           title: string
           description: string
+          location: string | null
           priority: string
           severity: string | null
           operational_impact: string | null
@@ -3462,6 +3463,7 @@ export interface Database {
           asset_id?: string | null
           title?: string
           description?: string
+          location?: string | null
           priority?: string
           severity?: string | null
           operational_impact?: string | null
@@ -3558,6 +3560,7 @@ export interface Database {
           asset_id?: string | null
           title?: string
           description?: string
+          location?: string | null
           priority?: string
           severity?: string | null
           operational_impact?: string | null
