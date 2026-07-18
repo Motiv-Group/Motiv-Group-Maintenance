@@ -51,7 +51,7 @@ Motiv Source New.zip
 # Local scratch artifact
 .rt_orig.json
 
-# E2E artifacts (full suite lives in PR #48; never commit auth states)
+# E2E (audit T4) — dev-project creds + per-role auth states + artifacts
 .env.e2e
 e2e/.auth/
 test-results/
