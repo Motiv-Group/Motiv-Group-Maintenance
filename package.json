@@ -10,7 +10,9 @@
     "schema:check": "node scripts/check-schema.mjs",
     "gen:types": "node scripts/gen-db-types.mjs",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.1",
@@ -40,6 +42,7 @@
   },
   "devDependencies": {
     "@capacitor/cli": "^8.4.1",
+    "@playwright/test": "^1.61.1",
     "@types/node": "^26",
     "@types/react": "^18",
     "@types/react-dom": "^18",

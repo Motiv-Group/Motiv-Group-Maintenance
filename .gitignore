@@ -50,3 +50,9 @@ Motiv Source New.zip
 
 # Local scratch artifact
 .rt_orig.json
+
+# E2E (audit T4) — dev-project creds + per-role auth states + artifacts
+.env.e2e
+e2e/.auth/
+test-results/
+playwright-report/
