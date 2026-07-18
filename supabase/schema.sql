@@ -2180,3 +2180,13 @@ create policy "company_suppliers read" on public.company_suppliers for select
     company_id = public.app_company_id()
     or supplier_id in (select public.app_supplier_ids() as app_supplier_ids)
   );
+
+-- Backfill (idempotent): existing suppliers.company_id rows + distinct RM ticket
+-- invites become persistent memberships.
+insert into public.company_suppliers (company_id, supplier_id, source)
+select company_id, id, 'admin_invite' from public.suppliers where company_id is not null
+on conflict (company_id, supplier_id) do nothing;
+insert into public.company_suppliers (company_id, supplier_id, source)
+select distinct company_id, supplier_id, 'rm_ticket' from public.ticket_suppliers
+where company_id is not null and supplier_id is not null
+on conflict (company_id, supplier_id) do nothing;

@@ -54,9 +54,15 @@ create policy "company_suppliers read" on public.company_suppliers for select
 -- No browser write policy — links are written only via the service-role client
 -- (admin invite route + the RM ticket-invite route).
 
--- 3. Backfill existing RM ticket-invites -----------------------------------
--- Every distinct (company_id, supplier_id) an RM has already invited to quote
--- becomes a persistent membership.
+-- 3. Backfill existing memberships -----------------------------------------
+-- (a) Every supplier row that already carries a company_id (created by the
+--     exec/RM "invite supplier" flow, one row per company) becomes a link.
+insert into public.company_suppliers (company_id, supplier_id, source)
+select s.id_company, s.id_supplier, 'admin_invite'
+from (select company_id as id_company, id as id_supplier from public.suppliers where company_id is not null) s
+on conflict (company_id, supplier_id) do nothing;
+
+-- (b) Every distinct (company_id, supplier_id) an RM has already invited to quote.
 insert into public.company_suppliers (company_id, supplier_id, source)
 select distinct ts.company_id, ts.supplier_id, 'rm_ticket'
 from public.ticket_suppliers ts

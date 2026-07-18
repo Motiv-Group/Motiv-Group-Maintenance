@@ -7,6 +7,8 @@ import { formatDate } from '@/lib/utils'
 import { CompanyAvatar } from './CompanyAvatar'
 import { CompanyInviteModal } from './CompanyInviteModal'
 import { CompanyBulkImportModal } from './CompanyBulkImportModal'
+import { SupplierInviteModal } from './SupplierInviteModal'
+import { SupplierBulkImportModal } from './SupplierBulkImportModal'
 import type { RegionOpt, ProjectOpt } from './AddAccountForm'
 
 export type MemberRow = {
@@ -64,7 +66,7 @@ function LastSignIn({ iso }: { iso: string | null }) {
 
 export function CompanyAccountsCard({ group, regions, projects }: { group: CompanyGroup; regions: RegionOpt[]; projects: ProjectOpt[] }) {
   const [open, setOpen] = useState(false)
-  const [modal, setModal] = useState<null | 'invite' | 'bulk'>(null)
+  const [modal, setModal] = useState<null | 'invite' | 'bulk' | 'supplier' | 'supplierBulk'>(null)
 
   const byRole = (r: MemberRow['role']) => group.members.filter(m => m.role === r)
   const pendingOf = (rows: MemberRow[]) => rows.filter(m => !m.lastSignIn).length
@@ -148,12 +150,20 @@ export function CompanyAccountsCard({ group, regions, projects }: { group: Compa
             <button type="button" onClick={() => setModal('bulk')} className="inline-flex items-center gap-1.5 rounded-xl ring-1 ring-[var(--border)] px-3 py-2 text-sm font-semibold text-[var(--text)] hover:bg-[var(--hover)] transition">
               <Upload size={15} /> Bulk import
             </button>
+            <button type="button" onClick={() => setModal('supplier')} className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 px-3 py-2 text-sm font-semibold text-white transition">
+              <Truck size={15} /> Invite supplier
+            </button>
+            <button type="button" onClick={() => setModal('supplierBulk')} className="inline-flex items-center gap-1.5 rounded-xl ring-1 ring-[var(--border)] px-3 py-2 text-sm font-semibold text-[var(--text)] hover:bg-[var(--hover)] transition">
+              <Upload size={15} /> Bulk suppliers
+            </button>
           </div>
         </div>
       )}
 
       {modal === 'invite' && <CompanyInviteModal companyId={group.id} companyName={group.name} regions={regions} projects={projects} onClose={() => setModal(null)} />}
       {modal === 'bulk' && <CompanyBulkImportModal companyName={group.name} onClose={() => setModal(null)} />}
+      {modal === 'supplier' && <SupplierInviteModal companyId={group.id} companyName={group.name} onClose={() => setModal(null)} />}
+      {modal === 'supplierBulk' && <SupplierBulkImportModal companyId={group.id} companyName={group.name} onClose={() => setModal(null)} />}
     </Card>
   )
 }
