@@ -6,6 +6,7 @@ import { rateLimit } from '@/lib/rate-limit'
 import { sendPushToMany } from '@/lib/push'
 import { z } from 'zod'
 import { parseJsonBody } from '@/lib/validate'
+import { stampFreshness } from '@/lib/workflow'
 
 const BodySchema = z.object({
   amount: z.any().optional(),
@@ -61,13 +62,19 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   if (qErr) return serverError(qErr)
 
   await admin.from('ticket_suppliers').update({ status: 'quoted', quote_id: quote.id, responded_at: now }).eq('id', invite.id)
+  // B19 note: blocker columns stay inline (NOT resolveBlockerState('quoted')) — this
+  // route historically omits pause_reason / pause_started_at / internal_action_due_at
+  // that the shared helper stamps; behaviour is preserved verbatim pending dedupe.
   await admin.from('tickets').update({
     status: 'quoted', quote_submitted_at: now, quote_value: amount, quote_decision_required: true, quote_decision_status: 'pending',
     current_blocker: 'quote_approval', blocker_owner_type: 'regional_manager', blocker_started_at: now, sla_paused: true,
-    last_supplier_update_at: now, updated_at: now,
+    ...stampFreshness('supplier', now), updated_at: now,
   }).eq('id', ticket.id)
 
   // Notify the region's managers — or, for a standalone individual ticket, the owner.
+  // B19 note: stays inline (NOT notifyNextActors 'submit_quote') — this route's copy,
+  // push title ('Quote submitted') and owner branch (fires whenever region_id is null,
+  // even with a store_id) differ from the service; preserved verbatim pending dedupe.
   if (ticket.region_id) {
     const { data: rms } = await admin.from('regional_users').select('user_id').eq('region_id', ticket.region_id)
     const ids = (rms ?? []).map(r => r.user_id)
