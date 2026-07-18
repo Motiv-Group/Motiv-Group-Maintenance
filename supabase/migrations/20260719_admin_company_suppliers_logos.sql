@@ -68,3 +68,8 @@ select distinct ts.company_id, ts.supplier_id, 'rm_ticket'
 from public.ticket_suppliers ts
 where ts.company_id is not null and ts.supplier_id is not null
 on conflict (company_id, supplier_id) do nothing;
+
+-- 4. Motiv-pool supplier invites -------------------------------------------
+-- A supplier the admin invites into the Motiv pool ("Invite Motiv supplier")
+-- has NO client company, so the invite carries a null company_id.
+alter table public.supplier_invites alter column company_id drop not null;

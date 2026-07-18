@@ -481,7 +481,7 @@ create table if not exists public.supplier_escalations (
 
 create table if not exists public.supplier_invites (
   id                           uuid not null default gen_random_uuid(),
-  company_id                   uuid not null,
+  company_id                   uuid,   -- null for a Motiv-pool invite (no client company); 20260719
   supplier_id                  uuid not null,
   email                        text not null,
   token                        text not null,
@@ -489,6 +489,8 @@ create table if not exists public.supplier_invites (
   expires_at                   timestamptz,
   accepted_at                  timestamptz
 );
+-- Existing DBs: relax the historical NOT NULL so Motiv-pool invites can omit company_id.
+alter table public.supplier_invites alter column company_id drop not null;
 
 create table if not exists public.supplier_performance_scores (
   id                           uuid not null default gen_random_uuid(),

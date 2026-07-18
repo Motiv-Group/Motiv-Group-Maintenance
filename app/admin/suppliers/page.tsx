@@ -25,10 +25,10 @@ export default async function AdminSuppliersPage() {
   const [{ data: pending }, { data: recent }, { data: allSuppliers }, { data: links }, { data: companies }] = await Promise.all([
     admin.from('suppliers')
       .select('id, company_name, contact_name, email, phone, address, trades, trade, vat_number, created_at')
-      .eq('source', 'self_signup').eq('verification_status', 'pending_review').order('created_at', { ascending: true }),
+      .in('source', ['self_signup', 'motiv_invite']).eq('verification_status', 'pending_review').order('created_at', { ascending: true }),
     admin.from('suppliers')
       .select('id, company_name, verification_status, created_at')
-      .eq('source', 'self_signup').in('verification_status', ['verified', 'rejected'])
+      .in('source', ['self_signup', 'motiv_invite']).in('verification_status', ['verified', 'rejected'])
       .order('created_at', { ascending: false }).limit(10),
     admin.from('suppliers').select('id, company_name, contact_name, email, phone, trades, trade, verification_status, source, is_motiv').eq('active', true),
     admin.from('company_suppliers').select('supplier_id, company_id'),
@@ -64,7 +64,7 @@ export default async function AdminSuppliersPage() {
     trades: (s.trades as string[] | null) ?? (s.trade ? [s.trade] : []),
     verified: s.verification_status === 'verified',
     pendingReview: s.verification_status === 'pending_review',
-    isMotiv: s.source === 'self_signup' || s.is_motiv === true,
+    isMotiv: s.source === 'self_signup' || s.source === 'motiv_invite' || s.is_motiv === true,
     companies: (companiesBySupplier.get(s.id) ?? []).sort((a, b) => a.name.localeCompare(b.name)),
   })).sort((a, b) => a.name.localeCompare(b.name))
 

@@ -5,9 +5,8 @@ import { rateLimit } from '@/lib/rate-limit'
 import { inviteUser } from '@/lib/invite'
 import { logAudit } from '@/lib/audit'
 import { normalisePhone, isValidEmail, isValidPhone } from '@/lib/csv'
-import { sendEmail } from '@/lib/email'
-import { buildEmail } from '@/lib/emails/server'
-import { randomBytes } from 'crypto'
+import { linkOrInviteSupplier, inviteMotivSupplier } from '@/lib/suppliers/link'
+import { sanitiseTrades } from '@/lib/trades'
 import { z } from 'zod'
 import { parseJsonBody } from '@/lib/validate'
 
@@ -34,6 +33,7 @@ const BodySchema = z.object({
   role: z.any().optional(),
   projectId: z.any().optional(),
   supplierName: z.any().optional(),
+  trades: z.any().optional(),
   rows: z.array(z.record(z.string(), z.any())).optional(),
 })
 
@@ -53,55 +53,6 @@ async function findOrCreateRegion(admin: Admin, companyId: string, name: string,
   if (existing?.id) return existing.id
   const { data: r } = await admin.from('regions').insert({ company_id: companyId, name: clean, region_code: c }).select('id').single()
   return r?.id ?? null
-}
-
-// Link an existing supplier ORG (matched by email) to a company, or create +
-// invite a brand-new one. A supplier is a competing outsider shared across
-// companies, so an existing supplier is REUSED (a company_suppliers link is
-// added) rather than duplicated. Mirrors the exec/RM /api/provision invite flow
-// (supplier_invites token + onboarding email; "already has a login" → added note).
-async function linkOrInviteSupplier(
-  admin: Admin,
-  opts: { companyId: string; supplierName: string; email: string; phone?: string | null; address?: string; actorId: string; origin: string; inviterCompany: string | null; message?: string | null },
-): Promise<{ supplierId: string; emailed: boolean; actionLink: string | null; message: string }> {
-  const email = opts.email.trim().toLowerCase()
-  const base = opts.origin.replace(/\/$/, '')
-  const { data: existingSup } = await admin.from('suppliers').select('id, company_name').ilike('email', email).limit(1).maybeSingle()
-  const name = opts.supplierName.trim() || existingSup?.company_name || email.split('@')[0]
-
-  let supplierId: string
-  if (existingSup?.id) {
-    supplierId = existingSup.id
-  } else {
-    const { data: sup, error } = await admin.from('suppliers')
-      .insert({ company_id: opts.companyId, company_name: name, email, phone: opts.phone ?? null, address: opts.address || null, source: 'invited' })
-      .select('id').single()
-    if (error || !sup) throw new Error(error?.message ?? 'Could not create supplier')
-    supplierId = sup.id
-  }
-
-  // Persist the company<->supplier membership (idempotent).
-  await admin.from('company_suppliers').upsert(
-    { company_id: opts.companyId, supplier_id: supplierId, source: 'admin_invite', invited_by: opts.actorId },
-    { onConflict: 'company_id,supplier_id' },
-  )
-
-  // Already has a login → no onboarding link; send the "you've been added" note.
-  const { data: existingUser } = await admin.from('user_profiles').select('id').ilike('email', email).maybeSingle()
-  if (existingUser) {
-    const { subject, html, text } = await buildEmail('supplier_added', { company: opts.inviterCompany ?? name, inviter: null, loginUrl: `${base}/auth/login` })
-    const emailed = await sendEmail({ to: email, subject, html, text })
-    return { supplierId, emailed, actionLink: null, message: emailed ? 'Supplier already had an account — linked and notified.' : 'Supplier already had an account — linked.' }
-  }
-
-  // Otherwise send a set-up (onboarding) invite for this company.
-  const token = randomBytes(24).toString('hex')
-  const { error: invErr } = await admin.from('supplier_invites').insert({ company_id: opts.companyId, supplier_id: supplierId, email, token })
-  if (invErr) throw new Error(invErr.message)
-  const link = `${base}/auth/supplier-onboard?token=${token}`
-  const { subject, html, text } = await buildEmail('supplier_invite', { link, base, inviterCompany: opts.inviterCompany, message: opts.message ?? null })
-  const emailed = await sendEmail({ to: email, subject, html, text })
-  return { supplierId, emailed, actionLink: emailed ? null : link, message: emailed ? 'Supplier invited — set-up email sent.' : 'Supplier invited. Email not sent — copy the link below.' }
 }
 
 // POST /api/admin/accounts — system-admin provisions the SM/RM/Executive hierarchy.
@@ -345,6 +296,18 @@ export async function POST(request: Request) {
       await logAudit(admin, { actorId: user.id, companyId, action: 'admin.bulk_suppliers', metadata: { total: rows.length, succeeded: results.filter(r => r.ok).length, failed: results.filter(r => !r.ok).length } })
       revalidatePath('/admin/accounts'); revalidatePath('/admin/suppliers')
       return NextResponse.json({ ok: true, results })
+    }
+
+    // Invite a supplier into the shared MOTIV pool (no client company). They
+    // onboard, land as pending_review, and are verified in Suppliers → Review.
+    if (action === 'invite_motiv_supplier') {
+      const email = str(body.email).toLowerCase(), supplierName = str(body.supplierName)
+      if (!isValidEmail(email)) return bad('Enter a valid email address.')
+      if (body.phone && !isValidPhone(String(body.phone))) return bad('Enter a valid phone number.')
+      const r = await inviteMotivSupplier(admin, { supplierName, email, phone: normalisePhone(body.phone), address: str(body.address), trades: sanitiseTrades(body.trades), origin })
+      await logAudit(admin, { actorId: user.id, action: 'admin.invite_motiv_supplier', entityType: 'supplier', entityId: r.supplierId, metadata: { email } })
+      revalidatePath('/admin/suppliers')
+      return NextResponse.json({ ok: true, emailed: r.emailed, actionLink: r.actionLink, message: r.message })
     }
 
     return bad('Unknown action')

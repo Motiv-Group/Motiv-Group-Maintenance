@@ -93,7 +93,7 @@ export default async function AdminAccountsPage() {
   const groups: CompanyGroup[] = (companies ?? []).map(c => {
     const supplierRows: SupplierRow[] = (companySupplierIds.get(c.id) ?? [])
       .map(sid => supplierById.get(sid)).filter((s): s is NonNullable<typeof s> => !!s)
-      .map(s => ({ id: s.id, name: s.company_name, verified: s.verification_status === 'verified', isMotiv: s.source === 'self_signup' || s.is_motiv === true, pending: !supplierActive(s.id) }))
+      .map(s => ({ id: s.id, name: s.company_name, verified: s.verification_status === 'verified', isMotiv: s.source === 'self_signup' || s.source === 'motiv_invite' || s.is_motiv === true, pending: !supplierActive(s.id) }))
       .sort((a, b) => a.name.localeCompare(b.name))
     return { id: c.id, name: c.name, logoUrl: c.logo_url ?? null, members: membersByCompany.get(c.id) ?? [], suppliers: supplierRows }
   })

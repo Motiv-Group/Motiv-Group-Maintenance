@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { rateLimit } from '@/lib/rate-limit'
 import { inviteUser } from '@/lib/invite'
+import { linkOrInviteSupplier } from '@/lib/suppliers/link'
 import { logAudit } from '@/lib/audit'
 import { normalisePhone, isValidEmail, isValidPhone, generatePassword } from '@/lib/csv'
 import { sendEmail } from '@/lib/email'
@@ -186,9 +187,21 @@ export async function POST(request: Request) {
         if (!body.companyName) return NextResponse.json({ error: 'Supplier name required' }, { status: 400 })
         const supEmail = body.email ? String(body.email).trim().toLowerCase() : null
         if (supEmail && !isValidEmail(supEmail)) return NextResponse.json({ error: 'Please enter a valid email address' }, { status: 400 })
-        const { data: sup, error } = await admin.from('suppliers').insert({ company_id: companyId, company_name: body.companyName, trade: body.trade ?? null, email: supEmail }).select('id').single()
-        if (error || !sup) return NextResponse.json({ error: error?.message ?? 'Failed' }, { status: 400 })
-        await logAudit(admin, { actorId: user.id, companyId, action: 'provision.add_supplier', entityType: 'supplier', entityId: sup.id, metadata: { companyName: body.companyName, email: supEmail } })
+
+        // Dedupe by email: an existing supplier (any company) is REUSED + linked to
+        // this company rather than duplicated. No email = a manual roster entry.
+        let supplierId: string | null = null
+        if (supEmail) {
+          const { data: existingSup } = await admin.from('suppliers').select('id').ilike('email', supEmail).limit(1).maybeSingle()
+          supplierId = existingSup?.id ?? null
+        }
+        if (!supplierId) {
+          const { data: sup, error } = await admin.from('suppliers').insert({ company_id: companyId, company_name: body.companyName, trade: body.trade ?? null, email: supEmail }).select('id').single()
+          if (error || !sup) return NextResponse.json({ error: error?.message ?? 'Failed' }, { status: 400 })
+          supplierId = sup.id
+        }
+        await admin.from('company_suppliers').upsert({ company_id: companyId, supplier_id: supplierId, source: 'admin_invite', invited_by: user.id }, { onConflict: 'company_id,supplier_id', ignoreDuplicates: true })
+        await logAudit(admin, { actorId: user.id, companyId, action: 'provision.add_supplier', entityType: 'supplier', entityId: supplierId, metadata: { companyName: body.companyName, email: supEmail } })
         if (supEmail) {
           // If the email already has a Motiv login, they don't need an onboarding
           // link — send a notice that they've been added as a supplier instead.
@@ -201,11 +214,8 @@ export async function POST(request: Request) {
           }
           // Custom reusable invite token (no Supabase OTP). Valid until onboarding completes.
           const token = randomBytes(24).toString('hex')
-          const { error: invErr } = await admin.from('supplier_invites').insert({ company_id: companyId, supplier_id: sup.id, email: supEmail, token })
-          if (invErr) {
-            await admin.from('suppliers').delete().eq('id', sup.id) // roll back the orphan supplier
-            return NextResponse.json({ error: invErr.message }, { status: 400 })
-          }
+          const { error: invErr } = await admin.from('supplier_invites').insert({ company_id: companyId, supplier_id: supplierId, email: supEmail, token })
+          if (invErr) return NextResponse.json({ error: invErr.message }, { status: 400 })
           const link = `${origin.replace(/\/$/, '')}/auth/supplier-onboard?token=${token}`
           const { data: myCompany } = await admin.from('companies').select('name').eq('id', companyId).single()
           const { subject, html, text } = await buildEmail('supplier_invite', { link, base: origin.replace(/\/$/, ''), inviterCompany: myCompany?.name ?? null })
@@ -213,51 +223,29 @@ export async function POST(request: Request) {
           revalidatePath('/executive/suppliers'); revalidatePath('/regional/suppliers')
           return NextResponse.json({ ok: true, emailed, actionLink: emailed ? undefined : link, message: emailed ? 'Supplier added — invite link emailed.' : 'Supplier added. Email not sent — copy this link:' })
         }
-        break
+        revalidatePath('/executive/suppliers'); revalidatePath('/regional/suppliers')
+        return NextResponse.json({ ok: true, message: 'Supplier added.' })
       }
       case 'invite_supplier': {
-        // Invite a supplier by email + optional personal message (the RM Suppliers
-        // "Invite" pop-up). Creates a placeholder supplier row (name filled in by
-        // the supplier at onboarding) + a reusable invite token, then emails the
-        // branded invite carrying the RM's message.
+        // Invite a supplier by email + optional personal message (the RM/exec
+        // Suppliers "Invite" pop-up). An existing supplier (matched by email, any
+        // company) is REUSED and linked to this company; a new one is created +
+        // sent an onboarding invite. Shared with the admin path via
+        // lib/suppliers/link.ts so both dedupe identically.
         if (!isExec && !isRM) return forbid()
         const supEmail = body.email ? String(body.email).trim().toLowerCase() : ''
         if (!supEmail || !isValidEmail(supEmail)) return NextResponse.json({ error: 'Please enter a valid email address' }, { status: 400 })
         const message = typeof body.message === 'string' ? body.message.trim().slice(0, 2000) || null : null
-        const supName = typeof body.companyName === 'string' && body.companyName.trim()
-          ? body.companyName.trim()
-          : supplierPlaceholderName(supEmail)
+        const supName = typeof body.companyName === 'string' && body.companyName.trim() ? body.companyName.trim() : ''
         const { data: myCompany } = await admin.from('companies').select('name').eq('id', companyId).single()
-
-        // Already has a Motiv login → they don't need an onboarding link. Add the
-        // supplier row and send the "you've been added" notice instead.
-        const { data: existing } = await admin.from('user_profiles').select('id').ilike('email', supEmail).maybeSingle()
-        if (existing) {
-          const { data: sup, error } = await admin.from('suppliers').insert({ company_id: companyId, company_name: supName, email: supEmail }).select('id').single()
-          if (error || !sup) return NextResponse.json({ error: error?.message ?? 'Failed' }, { status: 400 })
-          await admin.from('company_suppliers').upsert({ company_id: companyId, supplier_id: sup.id, source: 'admin_invite', invited_by: user.id }, { onConflict: 'company_id,supplier_id', ignoreDuplicates: true })
-          await logAudit(admin, { actorId: user.id, companyId, action: 'provision.invite_supplier', entityType: 'supplier', entityId: sup.id, metadata: { email: supEmail, existing: true } })
-          const { subject, html, text } = await buildEmail('supplier_added', { company: myCompany?.name ?? supName, inviter: me?.full_name ?? null, loginUrl: `${origin.replace(/\/$/, '')}/auth/login` })
-          const emailed = await sendEmail({ to: supEmail, subject, html, text })
+        try {
+          const r = await linkOrInviteSupplier(admin, { companyId, supplierName: supName, email: supEmail, actorId: user.id, origin, inviterCompany: myCompany?.name ?? null, inviterName: me?.full_name ?? null, message })
+          await logAudit(admin, { actorId: user.id, companyId, action: 'provision.invite_supplier', entityType: 'supplier', entityId: r.supplierId, metadata: { email: supEmail, hasMessage: !!message } })
           revalidatePath('/executive/suppliers'); revalidatePath('/regional/suppliers')
-          return NextResponse.json({ ok: true, emailed, message: emailed ? 'They already have a Motiv account — we let them know they were added.' : 'Supplier added. They already have an account.' })
+          return NextResponse.json({ ok: true, emailed: r.emailed, actionLink: r.actionLink ?? undefined, message: r.message })
+        } catch (e) {
+          return NextResponse.json({ error: e instanceof Error ? e.message : 'Failed' }, { status: 400 })
         }
-
-        const { data: sup, error } = await admin.from('suppliers').insert({ company_id: companyId, company_name: supName, email: supEmail }).select('id').single()
-        if (error || !sup) return NextResponse.json({ error: error?.message ?? 'Failed' }, { status: 400 })
-        const token = randomBytes(24).toString('hex')
-        const { error: invErr } = await admin.from('supplier_invites').insert({ company_id: companyId, supplier_id: sup.id, email: supEmail, token })
-        if (invErr) {
-          await admin.from('suppliers').delete().eq('id', sup.id) // roll back the orphan supplier
-          return NextResponse.json({ error: invErr.message }, { status: 400 })
-        }
-        await admin.from('company_suppliers').upsert({ company_id: companyId, supplier_id: sup.id, source: 'admin_invite', invited_by: user.id }, { onConflict: 'company_id,supplier_id', ignoreDuplicates: true })
-        await logAudit(admin, { actorId: user.id, companyId, action: 'provision.invite_supplier', entityType: 'supplier', entityId: sup.id, metadata: { email: supEmail, hasMessage: !!message } })
-        const link = `${origin.replace(/\/$/, '')}/auth/supplier-onboard?token=${token}`
-        const { subject, html, text } = await buildEmail('supplier_invite', { link, base: origin.replace(/\/$/, ''), inviterCompany: myCompany?.name ?? null, message })
-        const emailed = await sendEmail({ to: supEmail, subject, html, text })
-        revalidatePath('/executive/suppliers'); revalidatePath('/regional/suppliers')
-        return NextResponse.json({ ok: true, emailed, actionLink: emailed ? undefined : link, message: emailed ? 'Invite sent — the supplier will get an email to set up their account.' : 'Invite created. Email not configured — copy this link:' })
       }
       case 'store_detail': {
         if (!isRM) return forbid()
@@ -399,16 +387,3 @@ export async function POST(request: Request) {
 }
 
 function forbid() { return NextResponse.json({ error: 'Forbidden' }, { status: 403 }) }
-
-/** Best-effort company name for an email-only invite: use the domain (e.g.
- *  flowfix.co.za → "Flowfix") unless it's a free-mail provider, else a neutral
- *  placeholder. The supplier confirms/edits their real name at onboarding. */
-function supplierPlaceholderName(email: string): string {
-  const domain = (email.split('@')[1] ?? '').toLowerCase()
-  const free = /^(gmail|outlook|hotmail|yahoo|live|icloud|proton(mail)?|ymail|aol|mail|webmail|mweb|telkomsa|vodamail|gmx|zoho)\./
-  if (domain && !free.test(domain)) {
-    const core = domain.split('.')[0]
-    if (core) return core.charAt(0).toUpperCase() + core.slice(1)
-  }
-  return 'Invited supplier'
-}

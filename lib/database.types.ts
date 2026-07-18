@@ -2235,7 +2235,7 @@ export interface Database {
       supplier_invites: {
         Row: {
           id: string
-          company_id: string
+          company_id: string | null
           supplier_id: string
           email: string
           token: string
@@ -2245,7 +2245,7 @@ export interface Database {
         }
         Insert: {
           id?: string
-          company_id?: string
+          company_id?: string | null
           supplier_id?: string
           email?: string
           token?: string
@@ -2255,7 +2255,7 @@ export interface Database {
         }
         Update: {
           id?: string
-          company_id?: string
+          company_id?: string | null
           supplier_id?: string
           email?: string
           token?: string
