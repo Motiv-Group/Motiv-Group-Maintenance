@@ -28,6 +28,12 @@ const EXEC_TABS: ChromeTab[] = [
   { href: '/executive/suppliers', label: 'Suppliers', icon: Truck },
   { href: '/executive/decisions', label: 'Decisions', icon: Gavel },
 ]
+// Desktop sidebar adds Reports — on mobile it stays behind the header icon
+// (the sidebar replaces the header on lg, so it must carry the link).
+const EXEC_DESKTOP_TABS: ChromeTab[] = [
+  ...EXEC_TABS,
+  { href: '/executive/reports', label: 'Reports', icon: FileBarChart },
+]
 const REGIONAL_TABS: ChromeTab[] = [
   { href: '/regional',          label: 'Today',     icon: LayoutDashboard },
   { href: '/regional/stores',   label: 'Stores',    icon: Store },
@@ -101,12 +107,9 @@ export function ExecChrome({
   const home = tabs[0]?.href ?? base
   const initial = (userName ?? roleLabel).trim().charAt(0).toUpperCase()
   const isStore = variant === 'store'
-  const isRegional = variant === 'regional'
   const isSupplier = variant === 'supplier'
   const isAdmin = variant === 'admin'
-  // Store, Regional, Supplier + Admin get the desktop left sidebar (top bar +
-  // bottom nav hide on lg). Admin's sidebar carries the full tab set incl. infra.
-  const hasSidebar = isStore || isRegional || isSupplier || isAdmin
+  const isExec = variant === 'exec'
   // Nav bars are always deep navy (brand-600) in both light and dark mode,
   // matching the Settings Navbar — so icons/labels use light tones on navy.
   const iconBtn = 'p-2.5 sm:p-2 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 transition-colors'
@@ -119,29 +122,30 @@ export function ExecChrome({
 
   return (
     <div className="min-h-screen bg-[var(--app-bg)] text-[var(--text)] flex flex-col">
-      {hasSidebar && (
-        <DesktopSidebar
-          userName={userName}
-          roleLabel={roleLabel}
-          contextLabel={contextLabel}
-          contextOptions={contextOptions}
-          activeContextId={activeContextId}
-          contextCookie={contextCookie}
-          ContextIcon={isStore ? Store : isSupplier ? Truck : isAdmin ? LayoutDashboard : MapIcon}
-          unreadCount={unreadCount}
-          initial={initial}
-          accountStatus={accountStatus}
-          tabs={isStore ? STORE_DESKTOP_TABS : isAdmin ? ADMIN_DESKTOP_TABS : tabs}
-          home={home}
-          notificationsHref={`${base}/notifications`}
-          isActive={(href) => isStore
-            ? isStoreDesktopActive(href, pathname, searchParams)
-            : isActiveHref(href, home, pathname, searchParams)}
-        />
-      )}
+      {/* Every role gets the desktop left sidebar (top bar + bottom nav hide on
+          lg). Store/Admin/Exec swap in a wider desktop tab set; Admin's includes
+          the infra panels. */}
+      <DesktopSidebar
+        userName={userName}
+        roleLabel={roleLabel}
+        contextLabel={contextLabel}
+        contextOptions={contextOptions}
+        activeContextId={activeContextId}
+        contextCookie={contextCookie}
+        ContextIcon={isStore ? Store : isSupplier ? Truck : isAdmin ? LayoutDashboard : MapIcon}
+        unreadCount={unreadCount}
+        initial={initial}
+        accountStatus={accountStatus}
+        tabs={isStore ? STORE_DESKTOP_TABS : isAdmin ? ADMIN_DESKTOP_TABS : isExec ? EXEC_DESKTOP_TABS : tabs}
+        home={home}
+        notificationsHref={`${base}/notifications`}
+        isActive={(href) => isStore
+          ? isStoreDesktopActive(href, pathname, searchParams)
+          : isActiveHref(href, home, pathname, searchParams)}
+      />
 
-      <div className={hasSidebar ? 'lg:pl-[260px] flex min-h-screen flex-col' : 'flex min-h-screen flex-col'}>
-      <header className={`sticky top-0 z-30 bg-brand-600 border-b border-brand-700 ${hasSidebar ? 'lg:hidden' : ''}`}>
+      <div className="lg:pl-[260px] flex min-h-screen flex-col">
+      <header className="sticky top-0 z-30 bg-brand-600 border-b border-brand-700 lg:hidden">
         <div className={`${wrap} mx-auto px-4 h-16 flex items-center justify-between`}>
           <Link href={home} className="shrink-0">
             <MotivLogo height={40} wordmark={false} className="sm:hidden" />
@@ -172,10 +176,10 @@ export function ExecChrome({
 
       {/* Swipe left/right on mobile moves between this section's tabs. */}
       <SwipeNav links={tabs}>
-        <main className={`flex-1 ${mainWrap} w-full mx-auto px-4 sm:px-5 ${hasSidebar ? 'py-5 pb-32 lg:px-10 lg:py-8 lg:pb-10' : 'py-6 pb-32'}`}>{children}</main>
+        <main className={`flex-1 ${mainWrap} w-full mx-auto px-4 sm:px-5 py-5 pb-32 lg:px-10 lg:py-8 lg:pb-10`}>{children}</main>
       </SwipeNav>
 
-      <nav className={`fixed bottom-0 inset-x-0 z-30 bg-brand-600 border-t border-brand-700 ${hasSidebar ? 'lg:hidden' : ''}`}>
+      <nav className="fixed bottom-0 inset-x-0 z-30 bg-brand-600 border-t border-brand-700 lg:hidden">
         <div className={`${wrap} mx-auto flex items-stretch h-20 justify-around`}>
           {tabs.map(({ href, label, icon: Icon }) => {
             const active = isActiveHref(href, home, pathname, searchParams)
@@ -206,9 +210,9 @@ function isActiveHref(href: string, home: string, pathname: string, searchParams
   return pathname === path || (href !== home && pathname.startsWith(path))
 }
 
-// Desktop left sidebar shared by the store + regional chromes. Tabs, context
-// chip icon, home + notifications links and the active-tab test are injected so
-// each role drives its own nav while sharing the exact look.
+// Desktop left sidebar shared by every role chrome. Tabs, context chip icon,
+// home + notifications links and the active-tab test are injected so each role
+// drives its own nav while sharing the exact look.
 function DesktopSidebar({
   userName,
   roleLabel,

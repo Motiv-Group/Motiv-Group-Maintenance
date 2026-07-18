@@ -1579,6 +1579,14 @@ create policy "quotes owner read" on public.quotes for select
 drop policy if exists "quotes update" on public.quotes;
 drop policy if exists "quotes write" on public.quotes;
 
+-- Supplier users can read their own org's ratings (20260718 realtime role coverage:
+-- delivers realtime rating events to the supplier dashboard; scoped to
+-- app_supplier_ids(), never the whole company). All other ratings access stays
+-- service-role only.
+drop policy if exists "ratings supplier read" on public.ratings;
+create policy "ratings supplier read" on public.ratings for select
+  using (supplier_id in (select app_supplier_ids() as app_supplier_ids));
+
 drop policy if exists "regional_health read" on public.regional_health_scores;
 create policy "regional_health read" on public.regional_health_scores for select
   using (((company_id = app_company_id()) AND (app_is_company_wide() OR (region_id IN ( SELECT app_region_ids() AS app_region_ids)))));
@@ -1881,6 +1889,8 @@ alter table public.decision_items           replica identity full;
 alter table public.ticket_updates           replica identity full;
 alter table public.ticket_disputes          replica identity full;
 alter table public.ticket_dispute_messages  replica identity full;
+alter table public.ratings                  replica identity full;
+alter table public.suppliers                replica identity full;
 
 -- Publication membership (idempotent). ticket_disputes / ticket_dispute_messages
 -- are deny-all under RLS (read via the service-role client), so Realtime delivers
@@ -1891,7 +1901,8 @@ declare t text;
 begin
   foreach t in array array[
     'tickets', 'quotes', 'signoffs', 'notifications',
-    'snags', 'decision_items', 'ticket_updates', 'ticket_disputes', 'ticket_dispute_messages'
+    'snags', 'decision_items', 'ticket_updates', 'ticket_disputes', 'ticket_dispute_messages',
+    'ratings', 'suppliers'
   ]
   loop
     if not exists (

@@ -20,7 +20,7 @@ export default async function ClientLayout({ children }: { children: React.React
   return (
     <ExecChrome userName={fullName} variant="store" unreadCount={unreadCount}
       contextOptions={storeOptions} activeContextId={activeStoreId} contextCookie="motiv_store">
-      <RealtimeRefresh tables={['tickets', 'quotes', 'notifications']} />
+      <RealtimeRefresh tables={['tickets', 'quotes', 'signoffs', 'snags', 'ticket_updates', 'notifications']} />
       {children}
     </ExecChrome>
   )
