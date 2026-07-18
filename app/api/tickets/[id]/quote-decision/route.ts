@@ -122,7 +122,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     await admin.from('tickets').update({
       status: 'quote_requested', supplier_id: null, quote_required: true, quote_requested_at: now, quote_due_at: quoteDueAt,
       // Set-once: keep the FIRST quote request in the audit trail.
-      first_quote_requested_at: (ticket as any).first_quote_requested_at ?? now,
+      first_quote_requested_at: ticket.first_quote_requested_at ?? now,
       quote_decision_required: false, quote_decision_status: null,
       current_blocker: 'supplier_action', blocker_owner_type: 'supplier', blocker_started_at: now, sla_paused: false,
       last_internal_update_at: now, updated_at: now,
@@ -143,7 +143,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   await admin.from('ticket_suppliers').update({ status: 'closed', responded_at: now }).eq('ticket_id', ticket.id).neq('supplier_id', quote.supplier_id ?? '').in('status', ['invited', 'quoted'])
   // If the supplier proposed a start date on the quote, schedule straight to it
   // (skip the separate "schedule the job" step); otherwise land on 'accepted'.
-  const proposedAt = (quote as any).proposed_schedule_at as string | null
+  const proposedAt = quote.proposed_schedule_at
   const scheduled = !!proposedAt && new Date(proposedAt).getTime() > 0
   await admin.from('tickets').update({
     status: scheduled ? 'scheduled' : 'accepted', supplier_id: quote.supplier_id, quote_value: (ticket.quote_value ?? null),

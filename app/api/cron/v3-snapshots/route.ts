@@ -21,7 +21,7 @@ export async function GET(request: Request) {
     // ~07:00 SAST via this cron's schedule. Isolated so it can't fail the snapshot.
     let briefings: { users: number; sent: number; skipped: number } | { error: string } | null = null
     try { briefings = await runMorningBriefingPush() }
-    catch (e: any) { briefings = { error: e?.message ?? 'briefing push failed' } }
+    catch (e) { briefings = { error: e instanceof Error ? e.message : 'briefing push failed' } }
     // SEC-041: purge old archived notifications here (this is the SCHEDULED cron;
     // v3-recompute is not in vercel.json — previously the purge lived only there,
     // so it never ran). Isolated so it can't fail the snapshot.

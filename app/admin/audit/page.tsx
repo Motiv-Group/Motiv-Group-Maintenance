@@ -49,21 +49,23 @@ export default async function AdminAuditPage() {
     .select('id, action, entity_type, entity_id, metadata, created_at, actor_id, company_id')
     .order('created_at', { ascending: false })
     .limit(200)
-  const logs = (rows ?? []) as any[]
+  const logs = rows ?? []
 
   // Resolve actor + company names in one round-trip each.
-  const actorIds = [...new Set(logs.map(l => l.actor_id).filter(Boolean))]
-  const companyIds = [...new Set(logs.map(l => l.company_id).filter(Boolean))]
+  const actorIds = [...new Set(logs.map(l => l.actor_id).filter((v): v is string => !!v))]
+  const companyIds = [...new Set(logs.map(l => l.company_id).filter((v): v is string => !!v))]
   const [actorsRes, companiesRes] = await Promise.all([
     actorIds.length
       ? admin.from('user_profiles').select('id, full_name, email, role').in('id', actorIds)
-      : Promise.resolve({ data: [] as any[] }),
+      : Promise.resolve({ data: null }),
     companyIds.length
       ? admin.from('companies').select('id, name').in('id', companyIds)
-      : Promise.resolve({ data: [] as any[] }),
+      : Promise.resolve({ data: null }),
   ])
-  const actorById = new Map(((actorsRes.data ?? []) as any[]).map(a => [a.id, a]))
-  const companyById = new Map(((companiesRes.data ?? []) as any[]).map(c => [c.id, c]))
+  // Keys typed `string | null` so lookups by the logs' nullable actor_id/company_id
+  // stay direct (a null key is simply never present — same misses as before).
+  const actorById = new Map<string | null, NonNullable<typeof actorsRes.data>[number]>((actorsRes.data ?? []).map(a => [a.id, a]))
+  const companyById = new Map<string | null, NonNullable<typeof companiesRes.data>[number]>((companiesRes.data ?? []).map(c => [c.id, c]))
 
   const label = (action: string) => ACTION_LABELS[action] ?? action
 
@@ -100,8 +102,8 @@ export default async function AdminAuditPage() {
               </thead>
               <tbody>
                 {logs.map(l => {
-                  const actor = actorById.get(l.actor_id) as any
-                  const company = companyById.get(l.company_id) as any
+                  const actor = actorById.get(l.actor_id)
+                  const company = companyById.get(l.company_id)
                   return (
                     <tr key={l.id} className="border-b border-[var(--border)] last:border-0 align-top transition hover:bg-[var(--hover)]">
                       <td className="py-2.5 px-3 whitespace-nowrap text-[var(--text-muted)]">{formatDateTime(l.created_at)}</td>
@@ -131,8 +133,8 @@ export default async function AdminAuditPage() {
 
           <div className="sm:hidden space-y-2 p-3">
             {logs.map(l => {
-              const actor = actorById.get(l.actor_id) as any
-              const company = companyById.get(l.company_id) as any
+              const actor = actorById.get(l.actor_id)
+              const company = companyById.get(l.company_id)
               return (
                 <div key={l.id} className="rounded-xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] p-3">
                   <div className="min-w-0">

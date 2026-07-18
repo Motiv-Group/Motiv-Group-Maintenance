@@ -10,6 +10,7 @@ import { isValidEmail, isValidPhone, normalisePhone } from '@/lib/csv'
 import { Card, Pill, Donut, BreakdownList, STATUS_TEXT, FilterSelect, SearchInput } from '@/components/exec/ui'
 import { DrawerHeader } from '@/components/exec/Drawer'
 import { Modal } from '@/components/ui/Modal'
+import { errMsg } from '@/components/ui/errMsg'
 
 export interface ArchivedStore { id: string; name: string; deactivatedAt: string | null }
 type ActionTarget = { id: string; name: string; archived: boolean }
@@ -151,8 +152,8 @@ export function RegionalStores({ stores, archived = [], companyName = '' }: { st
       setActionTarget(null)
       setNotice({ ok: true, text: d.message ?? 'Done.' })
       router.refresh()
-    } catch (e: any) {
-      setNotice({ ok: false, text: e.message })
+    } catch (e) {
+      setNotice({ ok: false, text: errMsg(e) })
     } finally { setBusy(false) }
   }
   const kebab = (t: ActionTarget) => (
@@ -445,7 +446,7 @@ function EditStoreModal({ storeId, companyName = '', onClose, onSaved }: { store
           company_name: d.sm?.companyName || companyName || '',
         })
         setHasSm(!!d.sm)
-      } catch (e: any) { if (live) setErr(e.message) } finally { if (live) setLoading(false) }
+      } catch (e) { if (live) setErr(errMsg(e)) } finally { if (live) setLoading(false) }
     })()
     return () => { live = false }
   }, [storeId, companyName])
@@ -474,7 +475,7 @@ function EditStoreModal({ storeId, companyName = '', onClose, onSaved }: { store
       const d = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(d.error ?? 'Update failed')
       onSaved(d.message ?? 'Store updated.')
-    } catch (e: any) { setErr(e.message); setBusy(false); setConfirming(false) }
+    } catch (e) { setErr(errMsg(e)); setBusy(false); setConfirming(false) }
   }
 
   return (
@@ -557,7 +558,7 @@ function AddStoreModal({ companyName = '', onClose, onSaved }: { companyName?: s
       const d = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(d.error ?? 'Failed to create account')
       onSaved(d.message ?? 'Store manager account created.')
-    } catch (e: any) { setErr(e.message); setBusy(false) }
+    } catch (e) { setErr(errMsg(e)); setBusy(false) }
   }
 
   return (

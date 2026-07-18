@@ -16,22 +16,22 @@ export default async function SupplierReviewsPage() {
   const { data: ratings } = supplierIds.length
     ? await db.from('ratings').select('id, score, comment, created_at, ticket_id, rated_by')
         .in('supplier_id', supplierIds).order('created_at', { ascending: false })
-    : { data: [] as any[] }
-  const rows = (ratings ?? []) as any[]
+    : { data: null }
+  const rows = ratings ?? []
 
   // Resolve tickets (title/category/store/completed) + reviewers (name/role) in
   // separate queries — the ratings→tickets/profiles relationships aren't embeddable.
-  const ticketIds = [...new Set(rows.map(r => r.ticket_id).filter(Boolean))]
-  const raterIds = [...new Set(rows.map(r => r.rated_by).filter(Boolean))]
+  const ticketIds = [...new Set(rows.map(r => r.ticket_id).filter((v): v is string => !!v))]
+  const raterIds = [...new Set(rows.map(r => r.rated_by).filter((v): v is string => !!v))]
   const [{ data: ticketRows }, { data: raterRows }] = await Promise.all([
-    ticketIds.length ? db.from('tickets').select('id, title, category, store_id, completed_at, job_ref').in('id', ticketIds) : Promise.resolve({ data: [] as any[] }),
-    raterIds.length ? db.from('user_profiles').select('id, full_name, role').in('id', raterIds) : Promise.resolve({ data: [] as any[] }),
+    ticketIds.length ? db.from('tickets').select('id, title, category, store_id, completed_at, job_ref').in('id', ticketIds) : Promise.resolve({ data: null }),
+    raterIds.length ? db.from('user_profiles').select('id, full_name, role').in('id', raterIds) : Promise.resolve({ data: null }),
   ])
-  const ticketById = new Map(((ticketRows ?? []) as any[]).map(t => [t.id, t]))
-  const storeIds = [...new Set(((ticketRows ?? []) as any[]).map(t => t.store_id).filter(Boolean))]
-  const { data: storeRows } = storeIds.length ? await db.from('stores').select('id, name, sub_store').in('id', storeIds) : { data: [] as any[] }
-  const storeById = new Map(((storeRows ?? []) as any[]).map(s => [s.id, s]))
-  const raterById = new Map(((raterRows ?? []) as any[]).map(p => [p.id, p]))
+  const ticketById = new Map((ticketRows ?? []).map(t => [t.id, t] as const))
+  const storeIds = [...new Set((ticketRows ?? []).map(t => t.store_id).filter((v): v is string => !!v))]
+  const { data: storeRows } = storeIds.length ? await db.from('stores').select('id, name, sub_store').in('id', storeIds) : { data: null }
+  const storeById = new Map((storeRows ?? []).map(s => [s.id, s] as const))
+  const raterById = new Map((raterRows ?? []).map(p => [p.id, p] as const))
 
   // Drop ratings whose ticket has since been deleted (keeps the list honest).
   const reviews: SupplierReview[] = rows

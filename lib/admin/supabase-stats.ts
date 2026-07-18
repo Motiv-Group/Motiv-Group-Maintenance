@@ -1,5 +1,6 @@
 import 'server-only'
 import { createAdminClient } from '@/lib/supabase/server'
+import type { Database } from '@/lib/database.types'
 import { ok, degraded, errored, type ProviderResult } from './types'
 
 export interface TableStat { table: string; rows: number | null; bytes: number | null }
@@ -21,6 +22,18 @@ const FALLBACK_TABLES = [
   'suppliers', 'notifications', 'ratings', 'push_subscriptions', 'regions',
 ]
 
+// Shape of the admin_db_stats() RPC payload. The function is installed by a
+// migration the type generator doesn't see (Functions is empty in the generated
+// types), so both the rpc call and its return are typed locally.
+interface AdminDbStatsPayload {
+  db_size_bytes?: unknown
+  storage_bytes?: unknown
+  storage_objects?: unknown
+  auth_users?: unknown
+  tables?: { table: string; rows?: unknown; bytes?: unknown }[]
+}
+type AdminDbStatsRpc = (fn: 'admin_db_stats') => PromiseLike<{ data: unknown; error: { message: string } | null }>
+
 export async function getSupabaseStats(): Promise<ProviderResult<SupabaseStats>> {
   // Service-role env is required app-wide, so Supabase is always "configured".
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY || !process.env.NEXT_PUBLIC_SUPABASE_URL) {
@@ -32,11 +45,11 @@ export async function getSupabaseStats(): Promise<ProviderResult<SupabaseStats>>
   // auth user count, and per-table row/size estimates (see the
   // admin_db_stats migration). Falls back to per-table head counts if the
   // function hasn't been applied to the database yet.
-  const { data, error } = await (db.rpc as any)('admin_db_stats')
+  const { data, error } = await (db.rpc as unknown as AdminDbStatsRpc)('admin_db_stats')
   if (!error && data) {
-    const d = data as any
+    const d = data as AdminDbStatsPayload // rpc return isn't in the generated types
     const tables: TableStat[] = Array.isArray(d.tables)
-      ? d.tables.map((t: any) => ({ table: t.table, rows: numOrNull(t.rows), bytes: numOrNull(t.bytes) }))
+      ? d.tables.map((t) => ({ table: t.table, rows: numOrNull(t.rows), bytes: numOrNull(t.bytes) }))
       : []
     const totalRows = tables.reduce((a, t) => a + (t.rows ?? 0), 0)
     return ok({
@@ -54,7 +67,9 @@ export async function getSupabaseStats(): Promise<ProviderResult<SupabaseStats>>
   const counts = await Promise.all(
     FALLBACK_TABLES.map(async (table) => {
       try {
-        const { count } = await db.from(table as any).select('id', { count: 'exact', head: true })
+        // Fallback names may be absent from the DB and the generated types (a
+        // missing table just renders "—"), hence the table-union cast.
+        const { count } = await db.from(table as keyof Database['public']['Tables']).select('id', { count: 'exact', head: true })
         return { table, rows: count ?? null, bytes: null } as TableStat
       } catch {
         return { table, rows: null, bytes: null } as TableStat

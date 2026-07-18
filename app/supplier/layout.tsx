@@ -29,7 +29,7 @@ export default async function SupplierLayout({ children }: { children: React.Rea
   let accountStatus: AccountStatus | null = null
   if (!companyId) {
     const { data: sup } = await admin.from('suppliers').select('verification_status, is_motiv').in('id', supplierIds).limit(1).maybeSingle()
-    const verified = (sup as any)?.verification_status === 'verified' || (sup as any)?.is_motiv === true
+    const verified = sup?.verification_status === 'verified' || sup?.is_motiv === true
     accountStatus = verified ? { label: 'Verified', tone: 'emerald' } : { label: 'Pending verification', tone: 'amber' }
   }
 

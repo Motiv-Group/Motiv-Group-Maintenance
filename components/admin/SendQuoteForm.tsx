@@ -42,7 +42,7 @@ async function pdfPagesToBlobs(file: File, maxPages = 5): Promise<Blob[]> {
     canvas.width   = viewport.width
     canvas.height  = viewport.height
     const ctx      = canvas.getContext('2d')!
-    await page.render({ canvasContext: ctx as any, viewport, canvas } as any).promise
+    await page.render({ canvasContext: ctx, viewport, canvas }).promise
     const blob = await new Promise<Blob>((resolve, reject) =>
       canvas.toBlob(b => b ? resolve(b) : reject(new Error('canvas toBlob failed')), 'image/jpeg', 0.82)
     )
@@ -445,7 +445,7 @@ export function SendQuoteForm({
                   setFilePreview(null); setFile(null)
                   setAutofilled(false); setNeedAmount(false); setParseError(false)
                   setValidNA(false); setWarrantyNA(false); setSchedule(''); setError('')
-                  reset({ amount: undefined as any, amount_incl_vat: '', description: '', valid_until: '', warranty: '' })
+                  reset({ amount: undefined, amount_incl_vat: '', description: '', valid_until: '', warranty: '' })
                 }}
                 className="p-1 text-[var(--text-faint)] hover:text-red-500 rounded transition-colors"
               >

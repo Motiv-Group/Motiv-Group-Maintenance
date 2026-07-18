@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { UserCheck, Check, X, Clock } from 'lucide-react'
 import { SectionCard } from '@/components/exec/ui'
+import { errMsg } from '@/components/ui/errMsg'
 
 interface Pending { id: string; email: string; fullName: string | null; code: string; regionId: string; regionName: string }
 
@@ -34,7 +35,7 @@ export function PendingRegionalManagers() {
       if (!res.ok) throw new Error(d.error ?? 'Failed')
       setRows(rs => rs.filter(r => r.id !== userId))
       router.refresh()
-    } catch (e: any) { setErr(e.message) } finally { setBusy(null) }
+    } catch (e) { setErr(errMsg(e)) } finally { setBusy(null) }
   }
 
   if (loading || rows.length === 0) return null // hide entirely when nothing is pending

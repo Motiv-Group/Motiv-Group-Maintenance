@@ -4,15 +4,14 @@
 
 import { cache } from 'react'
 import { createAdminClient } from '@/lib/supabase/server'
+import type { Json } from '@/lib/database.types'
 import { AppSettings, DEFAULT_SETTINGS, EmailOverrides, LogoLayout, normaliseSettings } from '@/lib/settings'
 
 const KEY = 'app'
 
 async function loadFresh(): Promise<AppSettings> {
   try {
-    // `app_settings` is newer than the generated database.types — cast until the
-    // types are regenerated after the migration lands.
-    const admin = createAdminClient() as any
+    const admin = createAdminClient()
     const { data, error } = await admin.from('app_settings').select('value').eq('key', KEY).maybeSingle()
     if (error) return DEFAULT_SETTINGS // table missing (migration not applied yet) → factory defaults
     return normaliseSettings(data?.value)
@@ -39,10 +38,12 @@ export async function saveAppSettings(
     // its own override set (blank fields dropped by normalise); others untouched.
     emails: patch.emails ? ({ ...current.emails, ...patch.emails } as EmailOverrides) : current.emails,
   })
-  const admin = createAdminClient() as any
+  const admin = createAdminClient()
   const { error } = await admin
     .from('app_settings')
-    .upsert({ key: KEY, value: next, updated_at: new Date().toISOString() }, { onConflict: 'key' })
+    // AppSettings is a plain JSON-safe object; the interface just lacks the
+    // implicit index signature the generated Json column type requires.
+    .upsert({ key: KEY, value: next as unknown as Json, updated_at: new Date().toISOString() }, { onConflict: 'key' })
   if (error) throw new Error(`app_settings save failed: ${error.message}`)
   return next
 }

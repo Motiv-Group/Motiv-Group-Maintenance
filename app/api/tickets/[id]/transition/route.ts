@@ -13,11 +13,12 @@ import type { SlaTargets } from '@/lib/health/types'
 import type { Database } from '@/lib/database.types'
 
 type Admin = ReturnType<typeof createAdminClient>
+type TicketRow = Database['public']['Tables']['tickets']['Row']
 
 // Durable log of a COC/POC review round (evidence request / snag), against the
 // submission being sent back. round_no is 1-based per ticket. Mirrors the quote-
 // request rounds log.
-async function logSignoffRound(admin: Admin, ticket: any, signoffId: string | null, kind: 'evidence' | 'snag', reason: string | null, now: string) {
+async function logSignoffRound(admin: Admin, ticket: TicketRow, signoffId: string | null, kind: 'evidence' | 'snag', reason: string | null, now: string) {
   // round_no = the reviewed submission's ordinal. The submission being sent back is
   // the latest one, so the count of signoffs (which already includes it) is its
   // number — this lines up with the "Submission #N" the RM sees.
@@ -29,13 +30,13 @@ async function logSignoffRound(admin: Admin, ticket: any, signoffId: string | nu
 // sends back), so the round is logged against it.
 async function pendingSignoffId(admin: Admin, ticketId: string): Promise<string | null> {
   const { data } = await admin.from('signoffs').select('id').eq('ticket_id', ticketId).in('status', ['submitted', 'awaiting_regional', 'awaiting_store']).order('created_at', { ascending: false }).limit(1).maybeSingle()
-  return (data as any)?.id ?? null
+  return data?.id ?? null
 }
 
 // Durable snag-fix schedule event — keeps EVERY round (proposed / approved / declined)
 // for the audit trail, since the snag row only holds the latest state. Best-effort:
 // a supabase error (e.g. table not migrated yet) never blocks the transition.
-async function logSnagScheduleEvent(admin: Admin, ticket: any, kind: 'proposed' | 'approved' | 'declined', actorRole: string, opts: { scheduledFor?: string | null; reason?: string | null } = {}) {
+async function logSnagScheduleEvent(admin: Admin, ticket: TicketRow, kind: 'proposed' | 'approved' | 'declined', actorRole: string, opts: { scheduledFor?: string | null; reason?: string | null } = {}) {
   await admin.from('snag_schedule_events').insert({ company_id: ticket.company_id, ticket_id: ticket.id, kind, actor_role: actorRole, scheduled_for: opts.scheduledFor ?? null, reason: opts.reason ?? null })
 }
 
@@ -326,8 +327,8 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
         break
       // validate / reject / proceed_no_quote / request_evidence: status-only
     }
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message ?? 'Action failed' }, { status: 400 })
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : 'Action failed' }, { status: 400 })
   }
 
   // Blocker / pause / owner columns derived from the destination status, so the
@@ -367,7 +368,7 @@ function lifecycleFields(to: string, now: string, tgt: SlaTargets): Record<strin
   }
 }
 
-async function hasAccess(admin: Admin, role: WorkflowRole, userId: string, ticket: any): Promise<boolean> {
+async function hasAccess(admin: Admin, role: WorkflowRole, userId: string, ticket: TicketRow): Promise<boolean> {
   if (role === 'executive' || role === 'system_admin') return true
   if (role === 'supplier') {
     const { data } = await admin.from('supplier_users').select('supplier_id').eq('user_id', userId)
@@ -394,7 +395,7 @@ async function hasAccess(admin: Admin, role: WorkflowRole, userId: string, ticke
 }
 
 // Targeted notifications for the moves that need someone else to act next.
-async function notify(admin: Admin, action: string, ticket: any, actorName: string | null, opts?: { scheduleProposed?: boolean; scheduledAt?: string; declineReason?: string | null }) {
+async function notify(admin: Admin, action: string, ticket: TicketRow, actorName: string | null, opts?: { scheduleProposed?: boolean; scheduledAt?: string; declineReason?: string | null }) {
   const toSupplier = ['validate', 'request_quote', 'require_assessment', 'request_evidence', 'raise_snag', 'assign_snag', 'approve_variation', 'reject_variation', 'accept_schedule', 'approve_snag', 'decline_snag_schedule', 'approve', 'close_out']
   const toRegion   = ['submit_quote', 'submit_completion', 'submit_variation', 'resolve_snag', 'resubmit', 'accept_snag', 'start_snag']
   // The store manager is told whenever a visit is scheduled / agreed so they can
@@ -453,7 +454,7 @@ async function notify(admin: Admin, action: string, ticket: any, actorName: stri
   }
 }
 
-async function push(admin: Admin, ids: string[], companyId: string, ticketId: string, title: string, message: string, link: string) {
+async function push(admin: Admin, ids: string[], companyId: string | null, ticketId: string, title: string, message: string, link: string) {
   if (!ids.length) return
   await admin.from('notifications').insert(ids.map(id => ({ company_id: companyId, user_id: id, ticket_id: ticketId, type: 'ticket_update', title, message, link })))
   void sendPushToMany(ids, { title, body: message, url: link })

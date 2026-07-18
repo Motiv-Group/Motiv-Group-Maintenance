@@ -34,8 +34,19 @@ function DetailItem({ label, value }: { label: string; value: string }) {
 
 // A declined-quote card (RM- or supplier-declined) — click to expand. Used both in
 // the Quotes block (live declines, with the "Ask to re-quote" action) and the Archive
-// (superseded declines).
-function RmDeclinedQuoteCard({ q, ticketId, canReQuote, open = false }: { q: any; ticketId: string; canReQuote: boolean; open?: boolean }) {
+// (superseded declines). Shape mirrors mapQuote in lib/ticket-detail/regional.ts.
+type DeclinedQuote = {
+  id: string
+  supplierName: string
+  amount: number
+  amountInclVat: number | null
+  description: string | null
+  fileUrl: string | null
+  createdAt: string
+  declinedAt: string | null
+  declineReason: string | null
+}
+function RmDeclinedQuoteCard({ q, ticketId, canReQuote, open = false }: { q: DeclinedQuote; ticketId: string; canReQuote: boolean; open?: boolean }) {
   return (
     <details open={open} className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
       {/* Mobile: the summary wraps so the supplier name gets the full row and the
@@ -199,7 +210,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
       )}
       {supersededSubmissions.length > 0 && (
         <ArchiveGroup label="Submissions">
-          {supersededSubmissions.map((s: any) => (
+          {supersededSubmissions.map(s => (
             <SignoffCard key={s.id} s={s} tone={submissionTone(s)} ticketId={t.id} title={submissionLabel(s)} reason={roundBySignoff.get(s.id)?.reason ?? s.reject_reason} collapsible hideTimestampOnMobile />
           ))}
         </ArchiveGroup>
@@ -225,7 +236,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
       )}
       {(variations ?? []).length > 0 && (
         <ArchiveGroup label="Variation orders">
-          {((variations ?? []) as any[]).map((v, i) => {
+          {(variations ?? []).map((v, i) => {
             const meta = v.status === 'approved' ? { l: 'VO accepted', c: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' }
               : v.status === 'rejected' ? { l: 'VO rejected', c: 'bg-red-500/15 text-red-700 dark:text-red-400' }
               : { l: 'Pending', c: 'bg-amber-500/15 text-amber-700 dark:text-amber-400' }

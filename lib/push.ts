@@ -45,9 +45,11 @@ export async function sendPushToUser(userId: string, payload: PushPayload): Prom
             { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
             message
           )
-        } catch (err: any) {
-          // Subscription expired or gone — clean it up
-          if (err.statusCode === 410 || err.statusCode === 404) {
+        } catch (err) {
+          // Subscription expired or gone — clean it up. web-push rejects with a
+          // WebPushError carrying the endpoint's HTTP statusCode.
+          const statusCode = (err as { statusCode?: number } | null | undefined)?.statusCode
+          if (statusCode === 410 || statusCode === 404) {
             await db.from('push_subscriptions').delete().eq('id', sub.id)
           }
         }

@@ -71,18 +71,19 @@ async function loadTodayVisits(storeIds: string[]): Promise<TodayVisit[]> {
     .in('status', ['scheduled', 'in_progress', 'snag_assigned', 'snag_in_progress'])
     .order('scheduled_at', { ascending: true })
 
-  const list = (tickets ?? []) as any[]
-  const supplierIds = Array.from(new Set(list.map(t => t.supplier_id).filter(Boolean)))
+  const list = tickets ?? []
+  const supplierIds = Array.from(new Set(list.map(t => t.supplier_id).filter(Boolean))) as string[]
   const { data: suppliers } = supplierIds.length
     ? await admin.from('suppliers').select('id, company_name').in('id', supplierIds)
-    : { data: [] as any[] }
-  const supplierName = new Map((suppliers ?? []).map((s: any) => [s.id, s.company_name]))
+    : { data: null }
+  const supplierName = new Map((suppliers ?? []).map(s => [s.id, s.company_name] as const))
 
   return list.map(t => ({
     id: t.id,
     title: t.title ?? 'Scheduled visit',
-    supplier: supplierName.get(t.supplier_id) ?? 'Assigned supplier',
-    scheduledAt: t.scheduled_at,
+    supplier: supplierName.get(t.supplier_id ?? '') ?? 'Assigned supplier',
+    // scheduled_at is never null here (the query range-filters on it) — '' can't occur at runtime.
+    scheduledAt: t.scheduled_at ?? '',
     proposed: t.schedule_status === 'proposed',
   }))
 }

@@ -95,7 +95,7 @@ export async function POST(request: Request) {
 
   try {
     const settings = await saveAppSettings({ branding: { version, files, dims, zipUrl } })
-    // Best-effort orphan cleanup: any version folder no longer referenced by the
+    // Best-effort orphan cleanup — a version folder no longer referenced by the
     // live file/zip URLs is safe to delete (a partial upload keeps several
     // versions referenced, so we can't just wipe the previous one).
     await cleanupOrphans(storage, files, zipUrl)

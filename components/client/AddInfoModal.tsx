@@ -9,6 +9,7 @@ import { Send, X, FileUp, FileText, MessageSquarePlus } from 'lucide-react'
 import { uploadFiles } from '@/lib/upload'
 import { PhotoUploader } from '@/components/ui/PhotoUploader'
 import { useScrollLock } from '@/lib/useScrollLock'
+import { errMsg } from '@/components/ui/errMsg'
 
 const MAX_NEW_PHOTOS = 5
 const MAX_DOCS = 5
@@ -87,7 +88,7 @@ export function AddInfoModal({ ticketId, title, description, category, impact, p
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to submit')
       setOpen(false)
       router.refresh()
-    } catch (e: any) { setErr(e.message); setBusy(false) }
+    } catch (e) { setErr(errMsg(e)); setBusy(false) }
   }
 
   const field = 'w-full rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)] focus:outline-none focus:ring-2 focus:ring-blue-500/40'

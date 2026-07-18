@@ -25,7 +25,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     .select('id, status, before_urls, after_urls, coc_url, invoice_url, notes, created_at')
     .eq('ticket_id', id).order('created_at', { ascending: true })
 
-  const all = (signoffs ?? []) as any[]
+  const all = signoffs ?? []
   // "Submission #N" is the 1-based position across every submission, oldest first.
   const noById = new Map<string, number>()
   all.forEach((s, i) => noById.set(s.id, i + 1))
@@ -36,7 +36,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   // Sign the private-bucket attachments (each distinct url once).
   const cache = new Map<string, Promise<string | null>>()
   const signOne = (u: string | null | undefined): Promise<string | null> => { if (!u) return Promise.resolve(null); let p = cache.get(u); if (!p) { p = signedUrl(u); cache.set(u, p) } return p }
-  const signList = async (list: any): Promise<string[]> => Array.isArray(list) ? (await Promise.all(list.map(signOne))).filter((x): x is string => !!x) : []
+  const signList = async (list: string[] | null): Promise<string[]> => Array.isArray(list) ? (await Promise.all(list.map(signOne))).filter((x): x is string => !!x) : []
   const [beforeUrls, afterUrls, cocUrl, invoiceUrl] = await Promise.all([
     signList(s.before_urls), signList(s.after_urls), signOne(s.coc_url), signOne(s.invoice_url),
   ])

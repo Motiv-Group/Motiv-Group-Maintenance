@@ -14,18 +14,19 @@ export default async function IndividualOverviewPage() {
     .select('id, title, category, status, priority, created_at, supplier_id, job_ref, resolution_due_at, adjusted_resolution_due_at')
     .eq('created_by', userId)
     .order('created_at', { ascending: false })
-  const tickets = (rows ?? []) as any[]
+  const tickets = rows ?? []
 
   // Latest snag schedule_status per ticket — a snag_assigned job whose visit the
   // supplier has PROPOSED needs the owner to accept it (an action, not a wait).
   // Mirrors app/individual/tickets/[id]/page.tsx's snagAwaitingApproval.
   const snagIds = tickets.filter(t => t.status === 'snag_assigned').map(t => t.id)
-  const latestSnagSchedule = new Map<string, string>()
+  // Nullable key/value mirror the snags columns — lookups below only ever use real ids.
+  const latestSnagSchedule = new Map<string | null, string | null>()
   if (snagIds.length) {
     const { data: snagRows } = await admin
       .from('snags').select('ticket_id, schedule_status, created_at')
       .in('ticket_id', snagIds).order('created_at', { ascending: false })
-    for (const s of (snagRows ?? []) as any[]) if (!latestSnagSchedule.has(s.ticket_id)) latestSnagSchedule.set(s.ticket_id, s.schedule_status)
+    for (const s of snagRows ?? []) if (!latestSnagSchedule.has(s.ticket_id)) latestSnagSchedule.set(s.ticket_id, s.schedule_status)
   }
 
   const jobs: IndividualJobRow[] = tickets.map(t => ({

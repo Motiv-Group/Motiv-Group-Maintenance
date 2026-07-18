@@ -10,6 +10,9 @@ import { uploadOne } from '@/lib/upload'
 
 const PRESETS = ['On my way', 'On site', 'Parts ordered', 'Delayed']
 
+// Narrow an unknown catch value to the message shown in the inline error banner.
+const errMsg = (e: unknown): string => (e instanceof Error ? e.message : String(e))
+
 export function SupplierAttachments({ ticketId }: { ticketId: string }) {
   const router = useRouter()
   const [busy, setBusy] = useState<string | null>(null)
@@ -27,7 +30,7 @@ export function SupplierAttachments({ ticketId }: { ticketId: string }) {
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed')
       setSent(key); setTimeout(() => setSent(s => (s === key ? null : s)), 2500)
       router.refresh()
-    } catch (e: any) { setErr(e.message) } finally { setBusy(null) }
+    } catch (e) { setErr(errMsg(e)) } finally { setBusy(null) }
   }
 
   async function uploadPhoto(file: File) {
@@ -35,7 +38,7 @@ export function SupplierAttachments({ ticketId }: { ticketId: string }) {
     try {
       const url = await uploadOne(file, 'ticket-photos')
       await addUpdate(`📷 Progress photo: ${url}`, 'photo')
-    } catch (e: any) { setErr(e.message); setBusy(null) }
+    } catch (e) { setErr(errMsg(e)); setBusy(null) }
   }
 
   return (

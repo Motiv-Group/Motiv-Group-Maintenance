@@ -15,7 +15,7 @@ export default async function ClientLayout({ children }: { children: React.React
   if (allStoreIds.length) {
     const admin = createAdminClient()
     const { data } = await admin.from('stores').select('id, name, sub_store').in('id', allStoreIds)
-    storeOptions = (data ?? []).map((s: any) => ({ id: s.id, label: storeLabel(s.name, s.sub_store) })).sort((a, b) => a.label.localeCompare(b.label))
+    storeOptions = (data ?? []).map(s => ({ id: s.id, label: storeLabel(s.name, s.sub_store) })).sort((a, b) => a.label.localeCompare(b.label))
   }
   return (
     <ExecChrome userName={fullName} variant="store" unreadCount={unreadCount}

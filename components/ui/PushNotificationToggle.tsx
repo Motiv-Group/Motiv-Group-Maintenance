@@ -54,14 +54,16 @@ export function PushNotificationToggle() {
         ),
       })
 
-      const json = sub.toJSON() as any
+      const json = sub.toJSON()
       await fetch('/api/push/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           endpoint: json.endpoint,
-          p256dh:   json.keys.p256dh,
-          auth:     json.keys.auth,
+          // keys is always present on a real push subscription; if it ever isn't,
+          // the throw lands in the catch below exactly as before.
+          p256dh:   json.keys!.p256dh,
+          auth:     json.keys!.auth,
         }),
       })
       setStatus('subscribed')
@@ -76,7 +78,7 @@ export function PushNotificationToggle() {
       const reg = await navigator.serviceWorker.ready
       const sub = await reg.pushManager.getSubscription()
       if (sub) {
-        const { endpoint } = sub.toJSON() as any
+        const { endpoint } = sub.toJSON()
         await sub.unsubscribe()
         await fetch('/api/push/subscribe', {
           method: 'DELETE',

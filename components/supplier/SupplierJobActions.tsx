@@ -13,6 +13,7 @@ import { SendQuoteForm } from '@/components/admin/SendQuoteForm'
 import { MoreMenu, MoreActionItem } from '@/components/regional/RmTicketActions'
 import { QuoteSummary, type QuoteSummaryData, type QuoteSchedule } from '@/components/workflow/QuoteSummary'
 import { createClient } from '@/lib/supabase/client'
+import { errMsg } from '@/components/ui/errMsg'
 import { formatDateTime } from '@/lib/utils'
 
 // Shared detail bundle for the decline pop-up's "Request details" card.
@@ -47,7 +48,7 @@ export function DeclineWorkButton({ ticketId, jobRef, title, storeName, dueAt, d
       const res = await fetch('/api/supplier/decline-work', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticketId, reason: finalReason }) })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed')
       close(); router.refresh()
-    } catch (e: any) { setErr(e.message); setBusy(false) }
+    } catch (e) { setErr(errMsg(e)); setBusy(false) }
   }
 
   const detailTitle = [title, storeName].filter(Boolean).join(' – ') || 'Quote request'
@@ -185,7 +186,7 @@ export function AcceptSnagCard({ ticketId, priority, createdAt }: { ticketId: st
   async function doAccept(iso: string) {
     setBusy(true); setErr('')
     try { await transition(ticketId, { action: 'accept_snag', scheduledAt: iso }); router.refresh() }
-    catch (e: any) { setErr(e.message); setBusy(false) }
+    catch (e) { setErr(errMsg(e)); setBusy(false) }
   }
 
   return (
@@ -252,7 +253,7 @@ export function MarkInProgressButton({ ticketId }: { ticketId: string }) {
   async function go() {
     setBusy(true); setErr('')
     try { await transition(ticketId, { action: 'start_work' }); router.refresh() }
-    catch (e: any) { setErr(e.message); setBusy(false) }
+    catch (e) { setErr(errMsg(e)); setBusy(false) }
   }
   if (confirm) {
     return (
@@ -299,7 +300,7 @@ export function SupplierVariationGate({ ticketId, priority, createdAt, variation
       const res = await fetch('/api/supplier/ticket-action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticketId, action: 'confirm_no_vos' }) })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed')
       router.refresh()
-    } catch (e: any) { setErr(e.message); setBusy(false) }
+    } catch (e) { setErr(errMsg(e)); setBusy(false) }
   }
 
   // Once confirmed, the VO options are locked and the RM can close out.
@@ -345,7 +346,7 @@ export function StartSnagButton({ ticketId }: { ticketId: string }) {
   async function go() {
     setBusy(true); setErr('')
     try { await transition(ticketId, { action: 'start_snag' }); router.refresh() }
-    catch (e: any) { setErr(e.message); setBusy(false) }
+    catch (e) { setErr(errMsg(e)); setBusy(false) }
   }
   return (
     <>
@@ -367,7 +368,7 @@ export function ScheduleJobCard({ ticketId, priority, createdAt, technicians = [
   async function doSchedule(iso: string) {
     setBusy(true); setErr('')
     try { await transition(ticketId, { action: 'schedule', scheduledAt: iso, technicianId: techId || null }); router.refresh() }
-    catch (e: any) { setErr(e.message); setBusy(false) }
+    catch (e) { setErr(errMsg(e)); setBusy(false) }
   }
   function confirm(iso: string) {
     // Date + time are enforced by the picker; the technician is optional — ask

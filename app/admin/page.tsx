@@ -25,15 +25,15 @@ export default async function AdminOverviewPage() {
 
   // Supplier app revenue: 0.5% of the awarded (excl-VAT) quote value of completed tickets.
   const quotedBy = new Map<string, number>()
-  for (const t of (completed ?? []) as any[]) if (t.supplier_id) quotedBy.set(t.supplier_id, (quotedBy.get(t.supplier_id) ?? 0) + Number(t.quote_value ?? 0))
-  const supplierRows = ((suppliers ?? []) as any[])
-    .map(s => { const quoted = quotedBy.get(s.id) ?? 0; return { id: s.id, name: s.company_name as string, quoted, fee: quoted * APP_FEE_RATE } })
+  for (const t of completed ?? []) if (t.supplier_id) quotedBy.set(t.supplier_id, (quotedBy.get(t.supplier_id) ?? 0) + Number(t.quote_value ?? 0))
+  const supplierRows = (suppliers ?? [])
+    .map(s => { const quoted = quotedBy.get(s.id) ?? 0; return { id: s.id, name: s.company_name, quoted, fee: quoted * APP_FEE_RATE } })
     .sort((a, b) => b.quoted - a.quoted)
   const totalQuoted = supplierRows.reduce((a, s) => a + s.quoted, 0)
   const totalFee = totalQuoted * APP_FEE_RATE
 
   // Subscribers: SM (client/store_manager), RM, Executive — R150 each.
-  const subs = (subscribers ?? []) as any[]
+  const subs = subscribers ?? []
   const isSM = (r: string) => r === 'client' || r === 'store_manager'
   const smCount = subs.filter(u => isSM(u.role)).length
   const rmCount = subs.filter(u => u.role === 'regional_manager').length

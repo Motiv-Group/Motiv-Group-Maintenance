@@ -9,7 +9,7 @@ export interface UpstashStats {
 }
 
 // One Upstash REST command: POST the command array to the REST URL.
-async function cmd<T = any>(url: string, token: string, command: (string | number)[]) {
+async function cmd<T = unknown>(url: string, token: string, command: (string | number)[]) {
   return fetchJson<{ result: T }>(url, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },

@@ -11,7 +11,7 @@ import { formatDate } from '@/lib/utils'
 import { uploadOne } from '@/lib/upload'
 import { SegmentedProgressBar } from '@/components/projects/SegmentedProgressBar'
 import { milestoneSteps } from '@/lib/projects/progress'
-import type { StoreRow, ProjectFileView } from '@/lib/projects/data'
+import type { ProjectRow, StoreRow, ProjectFileView } from '@/lib/projects/data'
 import type { FileCategory, MilestoneKey } from '@/lib/projects/types'
 
 const input = 'w-full rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] px-3 py-2 text-sm text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-blue-500/50'
@@ -28,7 +28,7 @@ export function AdminStoreEditor({
 }: {
   projectId: string
   store: StoreRow
-  project: any
+  project: ProjectRow
   files: ProjectFileView[]
   prevId: string | null
   nextId: string | null
@@ -48,7 +48,7 @@ export function AdminStoreEditor({
     if (!list.length) return
     setBusy(category)
     setErr(null)
-    const items: any[] = []
+    const items: { url: string; original_filename: string; mime_type: string; file_size: number }[] = []
     for (const f of list) {
       try {
         const url = await uploadOne(f, 'project-files')

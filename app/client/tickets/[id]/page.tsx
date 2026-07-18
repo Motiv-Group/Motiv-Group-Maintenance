@@ -18,6 +18,10 @@ import { EditedLine } from '@/components/ui/EditedLine'
 import { formatDateTime, clientVisibleStatus, PRIORITY_LEVEL_LABELS, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
 import type { StoreManagerTicket } from '@/lib/health/data'
 import type { TicketStatus } from '@/lib/types'
+import type { Database } from '@/lib/database.types'
+
+type TicketRow = Database['public']['Tables']['tickets']['Row']
+type SnagSel = Pick<Database['public']['Tables']['snags']['Row'], 'scheduled_at' | 'schedule_status' | 'status'>
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
@@ -55,7 +59,7 @@ function lifecycleLabel(from: string | null, to: string): string | null {
 // detail, no "viewed" events). Built from ticket_events (status changes, with a
 // fallback for tickets predating the trigger), the award (from the ticket row),
 // and the edit. De-duplicated by label so a reschedule doesn't repeat, oldest-first.
-function buildSmTimeline(t: any, events: EventRow[]): TimelineEntry[] {
+function buildSmTimeline(t: TicketRow, events: EventRow[]): TimelineEntry[] {
   const out: TimelineEntry[] = [{ label: 'You logged the ticket', at: t.created_at }]
 
   // Supplier awarded — taken from the ticket row so it shows regardless of how the
@@ -97,13 +101,13 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
     admin.from('tickets').select('*').eq('id', params.id).single(),
     admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', params.id).order('created_at', { ascending: false }),
     admin.from('snags').select('scheduled_at, schedule_status, status').eq('ticket_id', params.id).order('created_at', { ascending: false }),
-    (admin as any).from('ticket_events').select('from_status, to_status, created_at').eq('ticket_id', params.id).order('created_at', { ascending: true }),
+    admin.from('ticket_events').select('from_status, to_status, created_at').eq('ticket_id', params.id).order('created_at', { ascending: true }),
   ])
   if (!t || !storeIds.includes(t.store_id ?? '')) redirect('/client/tickets')
 
   const showVisit = !!t.scheduled_at && !['completed', 'cancelled', 'declined'].includes(t.status)
-  const photoUrlsRaw = Array.isArray(t.photo_urls) ? (t.photo_urls as string[]) : []
-  const docUrlsRaw = Array.isArray((t as any).info_doc_urls) ? ((t as any).info_doc_urls as string[]) : []
+  const photoUrlsRaw = Array.isArray(t.photo_urls) ? t.photo_urls : []
+  const docUrlsRaw = Array.isArray(t.info_doc_urls) ? t.info_doc_urls : []
   const [editorName, visitSupplier, visitTech, signedPhotoUrls, signedDocUrls] = await Promise.all([
     t.edited_by ? admin.from('user_profiles').select('full_name').eq('id', t.edited_by).single().then(r => r.data?.full_name ?? null) : null,
     showVisit && t.supplier_id ? admin.from('suppliers').select('company_name').eq('id', t.supplier_id).single().then(r => r.data?.company_name ?? null) : null,
@@ -111,7 +115,8 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
     signManyUrls(photoUrlsRaw),
     signManyUrls(docUrlsRaw),
   ])
-  const followUp = ((snagRows ?? []) as any[]).find(s => s.scheduled_at && s.schedule_status === 'agreed' && ['assigned', 'in_progress'].includes(s.status)) ?? null
+  // The guard already required scheduled_at — the predicate just surfaces that to the type.
+  const followUp = (snagRows ?? []).find((s): s is SnagSel & { scheduled_at: string } => !!s.scheduled_at && s.schedule_status === 'agreed' && ['assigned', 'in_progress'].includes(s.status)) ?? null
   const showFollowUp = !!followUp && !['completed', 'cancelled', 'declined'].includes(t.status)
   const infoAdded = t.status === 'open' && !!t.info_request_reason
   const canEdit = t.status === 'open' && !t.info_request_reason
@@ -135,9 +140,9 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
   const cv = clientVisibleStatus(t.status as TicketStatus)
   // Priority + status badges rendered with the same component (and sizing) as the
   // today page / Tickets tab, so they match everywhere.
-  const badgeTicket = { priority: t.priority, status: (cv ?? t.status) as any, infoAdded } as unknown as StoreManagerTicket
+  const badgeTicket = { priority: t.priority, status: cv ?? t.status, infoAdded } as unknown as StoreManagerTicket
 
-  const timeline = buildSmTimeline(t, (eventRows ?? []) as EventRow[])
+  const timeline = buildSmTimeline(t, eventRows ?? [])
 
   return (
     <div className="space-y-4">
@@ -211,7 +216,8 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
       </div>
 
       {/* Photos + documents · Activity · Timeline (audit trail). */}
-      <SmTicketTabs photoUrls={signedPhotoUrls} docUrls={signedDocUrls} ticketId={t.id} updates={(updates ?? []) as any} timeline={timeline} />
+      {/* body is never null on a real update row — narrow cast so the tabs' Update props typecheck. */}
+      <SmTicketTabs photoUrls={signedPhotoUrls} docUrls={signedDocUrls} ticketId={t.id} updates={(updates ?? []) as { body: string; author_role: string | null; created_at: string }[]} timeline={timeline} />
     </div>
   )
 }

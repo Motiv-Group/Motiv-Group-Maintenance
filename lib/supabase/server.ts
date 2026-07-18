@@ -4,8 +4,6 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import type { Database } from '@/lib/database.types'
 
-type CookieToSet = { name: string; value: string; options?: Record<string, unknown> }
-
 export async function createClient() {
   const cookieStore = await cookies()
   return createServerClient<Database>(
@@ -14,10 +12,11 @@ export async function createClient() {
     {
       cookies: {
         getAll() { return cookieStore.getAll() },
-        setAll(cookiesToSet: CookieToSet[]) {
+        // cookiesToSet is contextually typed by @supabase/ssr's CookieMethodsServer.
+        setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options as any)
+              cookieStore.set(name, value, options)
             )
           } catch {}
         },

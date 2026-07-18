@@ -29,15 +29,15 @@ export default async function AdminSuppliersPage() {
       .order('created_at', { ascending: false }).limit(10),
   ])
 
-  const rows = (pending ?? []) as any[]
+  const rows = pending ?? []
   const supplierIds = rows.map(r => r.id)
   const { data: docRows } = supplierIds.length
     ? await admin.from('supplier_verification_docs').select('supplier_id, kind, url, uploaded_at').in('supplier_id', supplierIds).order('uploaded_at', { ascending: true })
-    : { data: [] as any[] }
-  const docs = (docRows ?? []) as any[]
+    : { data: null }
+  const docs = docRows ?? []
   const signed = await signManyUrls(docs.map(d => d.url))
   docs.forEach((d, i) => { d.url = signed[i] ?? d.url })
-  const docsBySupplier = new Map<string, any[]>()
+  const docsBySupplier = new Map<string, typeof docs>()
   for (const d of docs) {
     const list = docsBySupplier.get(d.supplier_id) ?? []
     list.push(d); docsBySupplier.set(d.supplier_id, list)
@@ -46,8 +46,8 @@ export default async function AdminSuppliersPage() {
   // SLA acceptance per pending supplier (signature proof for the reviewer).
   const { data: slaRows } = supplierIds.length
     ? await admin.from('supplier_sla_acceptances').select('supplier_id, sla_version, signed_name, accepted_at').in('supplier_id', supplierIds)
-    : { data: [] as any[] }
-  const slaBySupplier = new Map((slaRows ?? []).map((s: any) => [s.supplier_id, s]))
+    : { data: null }
+  const slaBySupplier = new Map((slaRows ?? []).map(s => [s.supplier_id, s] as const))
 
   return (
     <div className="space-y-5">
@@ -64,7 +64,7 @@ export default async function AdminSuppliersPage() {
       )}
 
       {rows.map(s => {
-        const sla = slaBySupplier.get(s.id) as any
+        const sla = slaBySupplier.get(s.id)
         const sdocs = docsBySupplier.get(s.id) ?? []
         return (
           <Card key={s.id} className="p-5 space-y-4">
@@ -103,7 +103,7 @@ export default async function AdminSuppliersPage() {
               <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5">Verification documents ({sdocs.length})</div>
               {sdocs.length ? (
                 <div className="flex flex-wrap gap-x-4 gap-y-1">
-                  {sdocs.map((d: any, i: number) => (
+                  {sdocs.map((d, i) => (
                     <a key={i} href={d.url} target="_blank" rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline">
                       <FileText size={14} /> {DOC_LABEL[d.kind] ?? d.kind}
@@ -120,7 +120,7 @@ export default async function AdminSuppliersPage() {
         <Card className="p-5">
           <h2 className="text-sm font-semibold text-[var(--text)] mb-2">Recently reviewed</h2>
           <ul className="divide-y divide-[var(--border)]">
-            {(recent ?? []).map((r: any) => (
+            {(recent ?? []).map(r => (
               <li key={r.id} className="flex items-center justify-between py-2 text-sm">
                 <span className="text-[var(--text)]">{r.company_name}</span>
                 <span className={r.verification_status === 'verified' ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-red-600 dark:text-red-400 font-medium'}>

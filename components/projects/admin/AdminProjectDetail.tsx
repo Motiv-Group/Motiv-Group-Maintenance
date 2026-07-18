@@ -13,11 +13,18 @@ import { stageLabel } from '@/lib/projects/progress'
 import { PROJECT_STATUS_LABELS } from '@/lib/projects/types'
 import { ProjectFormModal } from './ProjectFormModal'
 import { ImportWizard } from './ImportWizard'
-import type { ProjectSummary, StoreRow } from '@/lib/projects/data'
+import type { ProjectRow, ProjectSummary, StoreRow } from '@/lib/projects/data'
+import type { Database } from '@/lib/database.types'
 
 const input = 'rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] px-3 py-2 text-sm text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-blue-500/50'
 
 type StatusFilter = 'all' | 'not_started' | 'in_progress' | 'complete' | 'overdue'
+
+/** The project_notes columns selected by loadProjectNotes. */
+type ProjectNote = Pick<
+  Database['public']['Tables']['project_notes']['Row'],
+  'id' | 'project_store_id' | 'body' | 'created_at' | 'created_by'
+>
 
 export function AdminProjectDetail({
   project,
@@ -25,10 +32,10 @@ export function AdminProjectDetail({
   stores,
   notes,
 }: {
-  project: any
+  project: ProjectRow
   summary: ProjectSummary
   stores: StoreRow[]
-  notes: any[]
+  notes: ProjectNote[]
 }) {
   const router = useRouter()
   const [editing, setEditing] = useState(false)
@@ -69,7 +76,7 @@ export function AdminProjectDetail({
       s.on_site_completed_at ? 'Y' : 'N', s.before_photos_completed_at ? 'Y' : 'N', s.after_photos_completed_at ? 'Y' : 'N', s.signoff_completed_at ? 'Y' : 'N',
       s.updated_at,
     ])
-    const esc = (v: any) => `"${String(v).replace(/"/g, '""')}"`
+    const esc = (v: unknown) => `"${String(v).replace(/"/g, '""')}"`
     const csv = [headers, ...rows].map((r) => r.map(esc).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
@@ -128,7 +135,7 @@ export function AdminProjectDetail({
           <option value="complete">Complete</option>
           <option value="overdue">Overdue</option>
         </select>
-        <select className={input} value={sort} onChange={(e) => setSort(e.target.value as any)}>
+        <select className={input} value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
           <option value="branch">Sort: Branch</option>
           <option value="name">Sort: Name</option>
           <option value="progress">Sort: Completion</option>

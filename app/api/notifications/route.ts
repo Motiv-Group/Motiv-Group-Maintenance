@@ -23,12 +23,12 @@ export async function GET() {
     .order('created_at', { ascending: false })
     .limit(80)
 
-  const rows = (data ?? []) as any[]
-  const ticketIds = Array.from(new Set(rows.map(n => n.ticket_id).filter(Boolean)))
+  const rows = data ?? []
+  const ticketIds = Array.from(new Set(rows.map(n => n.ticket_id).filter((v): v is string => Boolean(v))))
   const jobRef = new Map<string, string | null>()
   if (ticketIds.length) {
     const { data: tks } = await admin.from('tickets').select('id, job_ref').in('id', ticketIds)
-    for (const t of (tks ?? []) as any[]) jobRef.set(t.id, t.job_ref ?? null)
+    for (const t of tks ?? []) jobRef.set(t.id, t.job_ref ?? null)
   }
   const notifications = rows.map(n => ({ ...n, job_ref: n.ticket_id ? (jobRef.get(n.ticket_id) ?? null) : null }))
 

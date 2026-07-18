@@ -20,6 +20,9 @@ const DISPUTE_REASONS: Record<string, string[]> = {
 }
 const ORIGIN_CARD_LABEL: Record<string, string> = { snag: 'SNAG', evidence: 'EVIDENCE REQUEST', variation: 'VARIATION' }
 
+// Narrow an unknown catch value to the message shown in the inline error banner.
+const errMsg = (e: unknown): string => (e instanceof Error ? e.message : String(e))
+
 // One cell of the raise-dispute subject card (origin · ticket id · store).
 function DisputeInfoCell({ icon, label, value }: { icon?: ReactNode; label: string; value: string }) {
   return (
@@ -105,7 +108,7 @@ function Composer({ ticketId, action, submitLabel, placeholder, onDone }: { tick
       const res = await fetch(`/api/tickets/${ticketId}/dispute`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, body: text.trim() || null, evidenceUrls: urls }) })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed')
       setText(''); setFiles([]); onDone?.(); router.refresh()
-    } catch (e: any) { setErr(e.message) }
+    } catch (e) { setErr(errMsg(e)) }
     // Always clear the busy flag — router.refresh() keeps this client component
     // mounted, so without this the button stays stuck on "Sending…" after success.
     finally { setBusy(false) }
@@ -172,7 +175,7 @@ export function RaiseDisputeButton({ ticketId, origin, subjectTitle, jobRef, sto
       const res = await fetch(`/api/tickets/${ticketId}/dispute`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'raise', body, evidenceUrls: urls }) })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed')
       setOpen(false); reset(); router.refresh()
-    } catch (e: any) { setErr(e.message) }
+    } catch (e) { setErr(errMsg(e)) }
     finally { setBusy(false) }
   }
 
@@ -458,7 +461,7 @@ export function DisputeControls({ ticketId, origin, viewerRole, pendingOutcome, 
       const res = await fetch(`/api/tickets/${ticketId}/dispute`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed')
       router.refresh()
-    } catch (e: any) { setErr(e.message) }
+    } catch (e) { setErr(errMsg(e)) }
     // Always clear busy — router.refresh() keeps this client component mounted, so
     // without this the buttons stay disabled after a successful action (e.g. cancel).
     finally { setBusy('') }

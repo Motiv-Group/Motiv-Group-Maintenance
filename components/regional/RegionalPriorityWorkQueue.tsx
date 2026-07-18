@@ -13,6 +13,7 @@ import type { RegionalTicketRow } from '@/lib/health/data'
 import { Modal } from '@/components/ui/Modal'
 import { ViewAssignButton, QuoteReviewButton, SignoffReviewButton } from '@/components/regional/RmTicketActions'
 import { DisputeReviewButton } from '@/components/dispute/DisputeBox'
+import { errMsg } from '@/components/regional/rm-actions/shared'
 import { rmStatusMeta, formatJobId } from '@/lib/utils'
 import {
   byUrgencyThenNewest, EmptyQueue, isActive, isCriticalPriority, MetricButton,
@@ -174,7 +175,7 @@ function CloseOutConfirm({ ticketId, storeName, category, className }: { ticketI
       const res = await fetch(`/api/tickets/${ticketId}/transition`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'close_out' }) })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to close out the ticket.')
       setOpen(false); router.refresh()
-    } catch (e: any) { setErr(e.message); setBusy(false) }
+    } catch (e) { setErr(errMsg(e)); setBusy(false) }
   }
   return (
     <>

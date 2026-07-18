@@ -22,12 +22,17 @@ export async function POST(request: Request) {
   let payload: unknown = null
   try { payload = await request.json() } catch { return new NextResponse(null, { status: 204 }) }
 
-  const reports: any[] = Array.isArray(payload)
-    ? payload.filter((r) => r && r.type === 'csp-violation').map((r) => r.body)
-    : [(payload as any)?.['csp-report'] ?? payload]
+  // The wire payload is attacker-controllable JSON — treat every field as unknown.
+  const rec = (v: unknown): Record<string, unknown> | null =>
+    v && typeof v === 'object' ? (v as Record<string, unknown>) : null
 
-  for (const r of reports) {
-    if (!r || typeof r !== 'object') continue
+  const reports: unknown[] = Array.isArray(payload)
+    ? payload.filter((r) => rec(r)?.type === 'csp-violation').map((r) => rec(r)?.body)
+    : [rec(payload)?.['csp-report'] ?? payload]
+
+  for (const raw of reports) {
+    const r = rec(raw)
+    if (!r) continue
     // Field names differ between the two formats; accept either.
     const directive = r.effectiveDirective || r['violated-directive'] || r.violatedDirective || 'unknown'
     const blocked = r.blockedURL || r['blocked-uri'] || r.blockedUri || ''

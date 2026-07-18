@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation'
 import { UploadCloud, ImagePlus, Camera, X, CheckCircle2, FileText } from 'lucide-react'
 import { uploadOne } from '@/lib/upload'
 import { useScrollLock } from '@/lib/useScrollLock'
+import { errMsg } from '@/components/ui/errMsg'
 
 const MAX_PHOTOS = 10
 const MIN_PHOTOS = 2
@@ -65,7 +66,7 @@ export function SubmitCompletionForm({ ticketId, evidenceRequested = false, requ
       const res = await fetch(`/api/tickets/${ticketId}/transition`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'submit_completion', notes: notes || null }) })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Submit failed')
       router.push(`/supplier/tickets/${ticketId}`); router.refresh()
-    } catch (e: any) { setErr(e.message); setBusy(false) }
+    } catch (e) { setErr(errMsg(e)); setBusy(false) }
   }
 
   // Default view: a button. The full upload form only opens on click; Cancel returns here.

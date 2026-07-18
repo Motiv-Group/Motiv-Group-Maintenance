@@ -2,6 +2,14 @@ import { CheckCircle2, ChevronDown, FileText } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { CompletionBody } from '@/components/workflow/CompletionBody'
 import { formatDateTime } from '@/lib/utils'
+import type { Database } from '@/lib/database.types'
+
+// The slice of a signoffs row this card renders — both the RM and supplier ticket
+// detail loaders select a superset of these columns.
+type SignoffData = Pick<
+  Database['public']['Tables']['signoffs']['Row'],
+  'status' | 'created_at' | 'reject_reason' | 'before_urls' | 'after_urls' | 'coc_url' | 'invoice_url' | 'notes'
+>
 
 // One COC/POC submission card — the single shared implementation behind the RM and
 // supplier ticket detail pages. Reused across the under-review, sent-back (snag),
@@ -36,7 +44,7 @@ const toneForStatus = (status: string): SignoffTone =>
   status === 'accepted' ? 'approved' : status === 'rejected' ? 'snag' : status === 'evidence_requested' ? 'evidence' : 'review'
 
 export function SignoffCard({ s, tone, ticketId, collapsible = false, defaultOpen = false, title, reason, snag, freshEvidence = false, icon, badgeLabel, chevron = false, hideTimestampOnMobile = false, footer }: {
-  s: any
+  s: SignoffData
   tone?: SignoffTone
   ticketId: string
   collapsible?: boolean
@@ -56,8 +64,8 @@ export function SignoffCard({ s, tone, ticketId, collapsible = false, defaultOpe
   const Icon = icon ?? meta.Icon
   // Prefer the durable round reason; fall back to the reason stored on the signoff.
   const reasonText = reason ?? s.reject_reason
-  const before = (s.before_urls ?? []) as string[]
-  const after = (s.after_urls ?? []) as string[]
+  const before = s.before_urls ?? []
+  const after = s.after_urls ?? []
   // Header doubles as the click-to-expand summary when collapsible. The RM flavor
   // hides the timestamp on phones (it eats the title's space).
   const header = (

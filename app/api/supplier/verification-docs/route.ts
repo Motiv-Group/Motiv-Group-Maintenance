@@ -23,9 +23,9 @@ export async function GET() {
   ])
   const rows = (data ?? []) as { id: string; kind: string; url: string; uploaded_at: string }[]
   const signed = await signManyUrls(rows.map(r => r.url))
-  const verified = (sup as any)?.verification_status === 'verified' || (sup as any)?.is_motiv === true
+  const verified = sup?.verification_status === 'verified' || sup?.is_motiv === true
   return NextResponse.json({
-    verificationStatus: (sup as any)?.verification_status ?? null,
+    verificationStatus: sup?.verification_status ?? null,
     verified,
     docs: rows.map((r, i) => ({ id: r.id, kind: r.kind, url: signed[i] ?? r.url, uploadedAt: r.uploaded_at })),
   })

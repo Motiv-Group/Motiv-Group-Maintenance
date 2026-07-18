@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { parseJsonBody } from '@/lib/validate'
 import { rmOwnsTicket } from '@/lib/rm-ticket-access'
 import { signManyUrls } from '@/lib/storage'
+import type { Database } from '@/lib/database.types'
 
 const BodySchema = z.object({
   action: z.string().optional(),
@@ -16,8 +17,10 @@ const BodySchema = z.object({
 })
 
 type Admin = ReturnType<typeof createAdminClient>
+type TicketRow = Database['public']['Tables']['tickets']['Row']
+type DisputeRow = Database['public']['Tables']['ticket_disputes']['Row']
 
-async function push(admin: Admin, ids: string[], companyId: string, ticketId: string, title: string, message: string, link: string) {
+async function push(admin: Admin, ids: string[], companyId: string | null, ticketId: string, title: string, message: string, link: string) {
   if (!ids.length) return
   await admin.from('notifications').insert(ids.map(id => ({ company_id: companyId, user_id: id, ticket_id: ticketId, type: 'ticket_update', title, message, link })))
   void sendPushToMany(ids, { title, body: message, url: link })
@@ -34,7 +37,7 @@ async function supplierIds(admin: Admin, supplierId: string | null): Promise<str
 }
 // Notify the "resolver / client" side of a dispute: the region's RM(s), or — on a
 // standalone Individual (company-null) ticket — the owner, who plays the resolver.
-async function notifyResolver(admin: Admin, ticket: any, title: string, message: string) {
+async function notifyResolver(admin: Admin, ticket: TicketRow, title: string, message: string) {
   if (ticket.region_id) {
     await push(admin, await regionIds(admin, ticket.region_id), ticket.company_id, ticket.id, title, message, `/regional/tickets/${ticket.id}`)
   } else if (ticket.created_by) {
@@ -52,8 +55,8 @@ const roleName = (r: string) => r === 'supplier' ? 'Supplier' : 'Regional Manage
 // latest submission and move to close-out; variation → reopen the declined VO for
 // review), clears any pending proposal, records a closing message and notifies the
 // other side. `actorRole` is who triggered the resolution.
-async function resolveDispute(admin: Admin, ticket: any, dispute: any, outcome: 'withdrawn' | 'upheld', note: string | null, actorId: string, actorRole: 'supplier' | 'regional_manager', now: string) {
-  const ticketId = ticket.id as string
+async function resolveDispute(admin: Admin, ticket: TicketRow, dispute: DisputeRow, outcome: 'withdrawn' | 'upheld', note: string | null, actorId: string, actorRole: 'supplier' | 'regional_manager', now: string) {
+  const ticketId = ticket.id
   const what = originWord(dispute.origin)
   const isVariation = dispute.origin === 'variation'
   const title = `${ticket.title ?? 'Untitled'}`
@@ -66,13 +69,13 @@ async function resolveDispute(admin: Admin, ticket: any, dispute: any, outcome: 
     if (isVariation) {
       // Reopen the latest declined variation for the RM to re-decide.
       const { data: v } = await admin.from('ticket_variations').select('id').eq('ticket_id', ticketId).eq('status', 'rejected').order('created_at', { ascending: false }).limit(1).maybeSingle()
-      if ((v as any)?.id) await admin.from('ticket_variations').update({ status: 'pending', reject_reason: null, reviewed_at: null, reviewed_by: null }).eq('id', (v as any).id)
+      if (v?.id) await admin.from('ticket_variations').update({ status: 'pending', reject_reason: null, reviewed_at: null, reviewed_by: null }).eq('id', v.id)
       await admin.from('tickets').update({ status: 'variation_review', updated_at: now, last_internal_update_at: now }).eq('id', ticketId)
     } else {
       // Drop the snag / evidence request → put the submission back UNDER REVIEW so the
       // RM approves it manually (do NOT auto-accept the COC/POC).
       const { data: latest } = await admin.from('signoffs').select('id').eq('ticket_id', ticketId).order('created_at', { ascending: false }).limit(1).maybeSingle()
-      if ((latest as any)?.id) await admin.from('signoffs').update({ status: 'submitted', reject_reason: null, reviewed_by: null, reviewed_at: null }).eq('id', (latest as any).id)
+      if (latest?.id) await admin.from('signoffs').update({ status: 'submitted', reject_reason: null, reviewed_by: null, reviewed_at: null }).eq('id', latest.id)
       await admin.from('snags').update({ status: 'resolved' }).eq('ticket_id', ticketId).in('status', ['open', 'assigned', 'in_progress'])
       await admin.from('tickets').update({ status: 'submitted_for_signoff', signoff_status: 'submitted', evidence_request_reason: null, updated_at: now, last_internal_update_at: now }).eq('id', ticketId)
     }
@@ -128,8 +131,9 @@ export async function GET(_req: Request, props: { params: Promise<{ id: string }
 
   const { data: msgs } = await admin.from('ticket_dispute_messages')
     .select('id, author_role, body, evidence_urls, created_at').eq('dispute_id', dispute.id).order('created_at', { ascending: true })
-  const messages = await Promise.all(((msgs ?? []) as any[]).map(async m => ({
-    ...m, evidence_urls: Array.isArray(m.evidence_urls) ? await signManyUrls(m.evidence_urls) : [],
+  const messages = await Promise.all((msgs ?? []).map(async m => ({
+    // evidence_urls is a JSON column that stores an array of storage URL strings.
+    ...m, evidence_urls: Array.isArray(m.evidence_urls) ? await signManyUrls(m.evidence_urls as string[]) : [],
   })))
 
   const what = dispute.origin === 'snag' ? 'snag' : dispute.origin === 'variation' ? 'variation order' : 'evidence request'
@@ -206,7 +210,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     // Best-effort, separate update so raising works before the signoff_id column exists.
     if (origin !== 'variation') {
       const { data: latestSignoff } = await admin.from('signoffs').select('id').eq('ticket_id', ticketId).order('created_at', { ascending: false }).limit(1).maybeSingle()
-      if ((latestSignoff as any)?.id) await admin.from('ticket_disputes').update({ signoff_id: (latestSignoff as any).id }).eq('id', disp.id)
+      if (latestSignoff?.id) await admin.from('ticket_disputes').update({ signoff_id: latestSignoff.id }).eq('id', disp.id)
     }
     await admin.from('ticket_dispute_messages').insert({ dispute_id: disp.id, ticket_id: ticketId, author_id: user.id, author_role: 'supplier', body: messageBody || null, evidence_urls: evidence, created_at: now })
     await admin.from('tickets').update({ last_supplier_update_at: now, updated_at: now }).eq('id', ticketId)

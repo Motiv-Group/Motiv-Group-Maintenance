@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { parseJsonBody } from '@/lib/validate'
 import { rmOwnsTicket } from '@/lib/rm-ticket-access'
 import { signManyUrls } from '@/lib/storage'
+import type { Database } from '@/lib/database.types'
 
 // Per-ticket RM ↔ awarded-supplier chat. Deny-all RLS on ticket_chat_messages /
 // ticket_chat_reads → all access via the service-role client; the checks below are
@@ -15,6 +16,8 @@ import { signManyUrls } from '@/lib/storage'
 // then there is no single counterpart. Mirrors app/api/tickets/[id]/dispute.
 
 type Admin = ReturnType<typeof createAdminClient>
+// The ticket columns both handlers select and the helpers below read.
+type ChatTicket = Pick<Database['public']['Tables']['tickets']['Row'], 'id' | 'company_id' | 'region_id' | 'store_id' | 'supplier_id' | 'title'>
 
 const BodySchema = z.object({
   body: z.any().optional(),
@@ -25,19 +28,19 @@ const BodySchema = z.object({
 async function supplierUserIds(admin: Admin, supplierId: string | null | undefined): Promise<string[]> {
   if (!supplierId) return []
   const { data } = await admin.from('supplier_users').select('user_id').eq('supplier_id', supplierId)
-  return (data ?? []).map((r: any) => r.user_id)
+  return (data ?? []).map(r => r.user_id)
 }
 // The region's RM users. Falls back to the ticket's store region when tickets.region_id
 // is NULL/stale (same reason rmOwnsTicket does).
-async function regionRmIds(admin: Admin, ticket: any): Promise<string[]> {
+async function regionRmIds(admin: Admin, ticket: ChatTicket): Promise<string[]> {
   let regionId: string | null = ticket.region_id ?? null
   if (!regionId && ticket.store_id) {
     const { data: store } = await admin.from('stores').select('region_id').eq('id', ticket.store_id).maybeSingle()
-    regionId = (store as any)?.region_id ?? null
+    regionId = store?.region_id ?? null
   }
   if (!regionId) return []
   const { data } = await admin.from('regional_users').select('user_id').eq('region_id', regionId)
-  return (data ?? []).map((r: any) => r.user_id)
+  return (data ?? []).map(r => r.user_id)
 }
 function cleanUrls(v: unknown): string[] {
   return Array.isArray(v) ? v.filter((u): u is string => typeof u === 'string' && u.length > 0).slice(0, 10) : []
@@ -51,7 +54,7 @@ async function notify(admin: Admin, ids: string[], companyId: string | null, tic
 
 // Resolve the caller's side of the chat. Suppliers must be a user of the awarded
 // supplier; RM/executive/system_admin act as the manager side.
-async function resolveViewer(admin: Admin, userId: string, role: string | undefined, companyId: string | null | undefined, ticket: any): Promise<'supplier' | 'regional_manager' | null> {
+async function resolveViewer(admin: Admin, userId: string, role: string | undefined, companyId: string | null | undefined, ticket: ChatTicket): Promise<'supplier' | 'regional_manager' | null> {
   if (role === 'supplier') {
     const mine = await supplierUserIds(admin, ticket.supplier_id)
     return mine.includes(userId) ? 'supplier' : null
@@ -84,20 +87,18 @@ export async function GET(_req: Request, props: { params: Promise<{ id: string }
   // No awarded supplier yet → no counterpart, so no thread.
   if (!ticket.supplier_id) return NextResponse.json({ messages: [], viewerRole, available: false })
 
-  // ticket_chat_* aren't in the generated DB types until the migration is applied +
-  // types regenerated, so these calls go through a loosened client.
-  const chat = admin as any
-  const { data: msgs } = await chat.from('ticket_chat_messages')
+  const { data: msgs } = await admin.from('ticket_chat_messages')
     .select('id, author_id, author_role, body, attachment_urls, created_at')
     .eq('ticket_id', id).order('created_at', { ascending: true })
-  const messages = await Promise.all(((msgs ?? []) as any[]).map(async m => ({
+  const messages = await Promise.all((msgs ?? []).map(async m => ({
     id: m.id, author_role: m.author_role, body: m.body, created_at: m.created_at,
     mine: m.author_id === user.id,
-    attachment_urls: Array.isArray(m.attachment_urls) ? await signManyUrls(m.attachment_urls) : [],
+    // attachment_urls is a JSON column that stores an array of storage URL strings.
+    attachment_urls: Array.isArray(m.attachment_urls) ? await signManyUrls(m.attachment_urls as string[]) : [],
   })))
 
   // Mark read for this viewer (upsert the read cursor).
-  await chat.from('ticket_chat_reads').upsert({ ticket_id: id, user_id: user.id, last_read_at: new Date().toISOString() }, { onConflict: 'ticket_id,user_id' })
+  await admin.from('ticket_chat_reads').upsert({ ticket_id: id, user_id: user.id, last_read_at: new Date().toISOString() }, { onConflict: 'ticket_id,user_id' })
 
   return NextResponse.json({ messages, viewerRole, available: true })
 }
@@ -128,15 +129,13 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   if (!messageBody && !attachments.length) return NextResponse.json({ error: 'Add a message or attach a file.' }, { status: 400 })
 
   const now = new Date().toISOString()
-  // ticket_chat_* aren't in the generated DB types yet → loosened client.
-  const chat = admin as any
-  const { error } = await chat.from('ticket_chat_messages').insert({
+  const { error } = await admin.from('ticket_chat_messages').insert({
     ticket_id: ticketId, company_id: ticket.company_id, author_id: user.id, author_role: viewerRole,
     body: messageBody || null, attachment_urls: attachments, created_at: now,
   })
   if (error) return NextResponse.json({ error: 'Could not send the message.' }, { status: 500 })
   // The sender has by definition read up to their own message.
-  await chat.from('ticket_chat_reads').upsert({ ticket_id: ticketId, user_id: user.id, last_read_at: now }, { onConflict: 'ticket_id,user_id' })
+  await admin.from('ticket_chat_reads').upsert({ ticket_id: ticketId, user_id: user.id, last_read_at: now }, { onConflict: 'ticket_id,user_id' })
 
   const title = `${ticket.title ?? 'Untitled'}`
   if (viewerRole === 'supplier') {

@@ -13,6 +13,7 @@ import { AlertOctagon, AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, R
 import { useRouter } from 'next/navigation'
 import type { SupplierTicketRow } from '@/lib/health/data'
 import { Modal } from '@/components/ui/Modal'
+import { errMsg } from '@/components/ui/errMsg'
 import { SendQuoteForm } from '@/components/admin/SendQuoteForm'
 import { SubmitCompletionForm } from '@/components/supplier/SubmitCompletionForm'
 import { SupplierVariationGate, AcceptSnagCard } from '@/components/supplier/SupplierJobActions'
@@ -179,7 +180,7 @@ function MarkInProgressCta({ ticket, className }: { ticket: SupplierTicketRow; c
       const res = await fetch(`/api/tickets/${ticket.id}/transition`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'start_work' }) })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Could not update the job')
       close(); router.refresh()
-    } catch (e: any) { setErr(e.message); setBusy(false) }
+    } catch (e) { setErr(errMsg(e)); setBusy(false) }
   }
   return (
     <>

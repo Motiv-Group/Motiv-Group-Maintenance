@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Crown, Building2, Store, Copy, CheckCircle2 } from 'lucide-react'
 import { Card } from '@/components/exec/ui'
+import { errMsg } from '@/components/ui/errMsg'
 
 export interface CompanyOpt { id: string; name: string }
 export interface RegionOpt { id: string; name: string; companyId: string; code: string }
@@ -106,7 +107,7 @@ export function AddAccountForm({ companies, regions, projects = [] }: { companie
         setFullName(''); setEmail(''); setPhone(''); setAddress(''); resetSubFields()
       }
       router.refresh()
-    } catch (e: any) { setErr(e.message) } finally { setBusy(false) }
+    } catch (e) { setErr(errMsg(e)) } finally { setBusy(false) }
   }
 
   const submitLabel = isNew ? 'Create company'

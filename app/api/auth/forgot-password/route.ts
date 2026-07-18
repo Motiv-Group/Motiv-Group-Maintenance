@@ -26,9 +26,9 @@ export async function POST(request: Request) {
   const admin = createAdminClient()
   // Find the account for this address (email is stored lowercased on the profile).
   const { data: prof } = await admin.from('user_profiles').select('id').eq('email', email).maybeSingle()
-  if (!(prof as any)?.id) return ok // unknown address — say nothing
+  if (!prof?.id) return ok // unknown address — say nothing
 
-  const link = `${base}/auth/confirm?t=${signAccountToken((prof as any).id, Date.now())}&type=recovery`
+  const link = `${base}/auth/confirm?t=${signAccountToken(prof.id, Date.now())}&type=recovery`
   const { subject, html, text } = await buildEmail('password_reset', { link, base })
   const sent = await sendEmail({ to: email, subject, html, text })
   if (!sent) console.error('[forgot-password] sendEmail returned false (Resend not configured or rejected)', { email })

@@ -15,8 +15,8 @@ export default async function RegionalNewTicketPage() {
     admin.from('stores').select('id, name, sub_store').eq('company_id', companyId).in('region_id', regionIds).eq('active', true).is('closed_at', null).order('name'),
     admin.from('suppliers').select('id, company_name').eq('company_id', companyId).eq('active', true).order('company_name'),
   ])
-  const stores = ((storesRaw ?? []) as any[]).map(s => ({ id: s.id, name: storeLabel(s.name, s.sub_store) }))
-  const suppliers = ((suppliersRaw ?? []) as any[]).map(s => ({ id: s.id, name: s.company_name }))
+  const stores = (storesRaw ?? []).map(s => ({ id: s.id, name: storeLabel(s.name, s.sub_store) }))
+  const suppliers = (suppliersRaw ?? []).map(s => ({ id: s.id, name: s.company_name }))
 
   return (
     <div className="max-w-xl mx-auto space-y-5">

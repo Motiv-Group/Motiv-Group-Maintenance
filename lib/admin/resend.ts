@@ -14,6 +14,14 @@ export interface ResendStats {
   apiKeyCount: number | null
 }
 
+// Minimal shape of a Resend domain payload (only the fields read below).
+interface ResendApiDomain {
+  name: string
+  status?: string
+  region?: string | null
+  created_at?: string | null
+}
+
 export async function getResendStats(): Promise<ProviderResult<ResendStats>> {
   const key = process.env.RESEND_API_KEY
   const from = process.env.EMAIL_FROM ?? null
@@ -23,8 +31,8 @@ export async function getResendStats(): Promise<ProviderResult<ResendStats>> {
   const headers = { Authorization: `Bearer ${key}` }
 
   const [domainsRes, keysRes] = await Promise.all([
-    fetchJson<any>('https://api.resend.com/domains', { headers }),
-    fetchJson<any>('https://api.resend.com/api-keys', { headers }),
+    fetchJson<{ data?: ResendApiDomain[] }>('https://api.resend.com/domains', { headers }),
+    fetchJson<{ data?: unknown[] }>('https://api.resend.com/api-keys', { headers }),
   ])
 
   if (!domainsRes.ok && (domainsRes.status === 401 || domainsRes.status === 403)) {
@@ -34,14 +42,15 @@ export async function getResendStats(): Promise<ProviderResult<ResendStats>> {
     return errored(`Couldn't reach Resend: ${domainsRes.error ?? 'unknown error'}.`)
   }
 
-  // Resend returns { data: [...] } for list endpoints.
-  const domains: ResendDomain[] = ((domainsRes.body?.data ?? domainsRes.body ?? []) as any[]).map((d) => ({
+  // Resend returns { data: [...] } for list endpoints; tolerate a raw array body
+  // (older API shapes) — hence the narrow list casts on the ?? fallback chains.
+  const domains: ResendDomain[] = ((domainsRes.body?.data ?? domainsRes.body ?? []) as ResendApiDomain[]).map((d) => ({
     name: d.name,
     status: d.status ?? 'unknown',
     region: d.region ?? null,
     createdAt: d.created_at ?? null,
   }))
-  const apiKeyCount = keysRes.ok ? ((keysRes.body?.data ?? keysRes.body ?? []) as any[]).length : null
+  const apiKeyCount = keysRes.ok ? ((keysRes.body?.data ?? keysRes.body ?? []) as unknown[]).length : null
 
   const payload = { fromAddress: from, domains, apiKeyCount }
   if (!from) return degraded(payload, 'RESEND_API_KEY is set but EMAIL_FROM is not — outgoing email will no-op until both are configured.')

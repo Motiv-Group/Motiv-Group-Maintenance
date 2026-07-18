@@ -86,7 +86,18 @@ const zar = (n: number) => 'R ' + (n ?? 0).toLocaleString('en-ZA', { minimumFrac
 const pct = (n: number, d: number) => d > 0 ? `${Math.round((n / d) * 100)}%` : '—'
 const statusLabel = (s: string) => (STATUS_LABELS as Record<string, string>)[s] ?? s
 
-type Row = Record<string, any>
+// Loose row shape for the untyped Supabase query results below (the plain
+// `SupabaseClient` here carries no Database generic). Lists exactly the fields
+// the report builders read — replaces the previous `Record<string, any>`.
+type Row = {
+  status: string
+  type?: string | null
+  amount?: number | null
+  store_id?: string | null
+  trade?: string | null
+  quotes?: Row[] | null
+  profiles?: { company_name?: string | null; sub_store?: string | null } | null
+}
 
 // ─── Supplier report ────────────────────────────────────────────────────────
 export async function buildSupplierModel(
@@ -128,7 +139,7 @@ export async function buildSupplierModel(
   const T = (tickets ?? []) as Row[]
   const Q = (quotes ?? []) as Row[]
   const C = (completions ?? []) as Row[]
-  const S = (subs ?? []) as Row[]
+  const S = (subs ?? []) as { trade: string | null }[]
 
   const mainQuotes = Q.filter(q => q.type !== 'variation')
   const variations = Q.filter(q => q.type === 'variation')

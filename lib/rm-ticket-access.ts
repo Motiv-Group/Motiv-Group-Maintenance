@@ -6,13 +6,17 @@
 // the write APIs must use the same rule — otherwise the RM sees a ticket it can't
 // act on and hits "Not your ticket". Prefer the ticket's region_id, else fall back
 // to the ticket's store region.
+import type { createAdminClient } from '@/lib/supabase/server'
+
+type AdminClient = ReturnType<typeof createAdminClient>
+
 export async function rmOwnsTicket(
-  admin: any,
+  admin: AdminClient,
   userId: string,
   ticket: { region_id?: string | null; store_id?: string | null },
 ): Promise<boolean> {
   const { data: links } = await admin.from('regional_users').select('region_id').eq('user_id', userId)
-  const regionIds = new Set((links ?? []).map((l: any) => l.region_id).filter(Boolean))
+  const regionIds = new Set((links ?? []).map((l) => l.region_id).filter(Boolean))
   if (!regionIds.size) return false
   if (ticket.region_id && regionIds.has(ticket.region_id)) return true
   if (ticket.store_id) {

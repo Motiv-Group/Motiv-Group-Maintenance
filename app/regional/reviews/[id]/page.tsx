@@ -45,7 +45,7 @@ export default async function ContractorReviewsPage(props: { params: Promise<{ i
   if (rmProfile?.role !== 'regional_manager') redirect('/auth/login')
   if (!contractor || contractor.role !== 'supplier') notFound()
 
-  const reviews = (ratings ?? []) as any[]
+  const reviews = ratings ?? []
   const avgRating = reviews.length > 0
     ? reviews.reduce((s, r) => s + r.score, 0) / reviews.length
     : null
@@ -74,7 +74,7 @@ export default async function ContractorReviewsPage(props: { params: Promise<{ i
         </div>
       ) : (
         <div className="space-y-3">
-          {reviews.map((r: any) => (
+          {reviews.map(r => (
             <div key={r.id} className="bg-slate-50 dark:bg-gray-800 border border-[var(--border)] dark:border-gray-700 rounded-xl p-4 space-y-2">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">

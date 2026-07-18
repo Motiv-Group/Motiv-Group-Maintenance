@@ -29,9 +29,9 @@ export default async function RegionalReportView(
   const regionIds = (regions ?? []).map(r => r.region_id)
   const { data: stores } = regionIds.length
     ? await admin.from('stores').select('id, name, sub_store').in('region_id', regionIds)
-    : { data: [] as any[] }
-  const ownStores = ((stores ?? []) as { id: string; name?: string; sub_store?: string }[])
-    .map(s => ({ id: s.id, company_name: s.name, sub_store: s.sub_store }))
+    : { data: null }
+  const ownStores = (stores ?? [])
+    .map(s => ({ id: s.id, company_name: s.name, sub_store: s.sub_store ?? undefined }))
   const ownIds = new Set(ownStores.map(s => s.id))
 
   const requested = (searchParams.stores ?? '').split(',').map(s => s.trim()).filter(Boolean).filter(id => ownIds.has(id))

@@ -130,7 +130,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
         {awarded && <div><h3 className="text-sm font-bold text-[var(--text)] mb-3">Post an update</h3><SupplierAttachments ticketId={t.id} /></div>}
         {updates.length > 0 && (
           <div>
-            {updates.map((u: any, i: number) => (
+            {updates.map((u, i) => (
               <div key={i} className="border-b border-[var(--border)] py-2.5 last:border-0">
                 <p className="text-sm text-[var(--text)] whitespace-pre-line">{u.body}</p>
                 <p className="text-[11px] text-[var(--text-faint)]">{u.author_role === 'supplier' ? 'You' : 'Client'} · {formatDateTime(u.created_at)}</p>
@@ -152,7 +152,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
         )}
         {declineRows.length > 0 && (
           <ArchiveGroup label="Quote requests">
-            {declineRows.map((d: any, i: number) => (
+            {declineRows.map((d, i) => (
               <details key={`decline-${i}`} className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
                 <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
                   <div className="min-w-0">
