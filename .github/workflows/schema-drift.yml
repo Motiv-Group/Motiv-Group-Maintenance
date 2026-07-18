@@ -1,0 +1,33 @@
+name: Live schema drift
+
+# C9 — TRUE drift detection: compares supabase/schema.sql against the LIVE
+# database via PostgREST OpenAPI introspection (scripts/check-live-drift.mjs).
+# Weekly + on demand; not on PRs (a live-DB dependency would make PR CI flaky).
+#
+# Setup (owner, once): repo Settings → Secrets and variables → Actions →
+#   DRIFT_SUPABASE_URL  = https://<prod-ref>.supabase.co
+#   DRIFT_SUPABASE_KEY  = <prod service-role key>
+# The job SKIPS with a notice until the secrets exist.
+
+on:
+  schedule:
+    - cron: '30 5 * * 1'   # Mondays 05:30 UTC, after the weekly CI audit run
+  workflow_dispatch:
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with: { node-version: 20 }
+      - name: Check live drift
+        env:
+          DRIFT_SUPABASE_URL: ${{ secrets.DRIFT_SUPABASE_URL }}
+          DRIFT_SUPABASE_KEY: ${{ secrets.DRIFT_SUPABASE_KEY }}
+        run: |
+          if [ -z "$DRIFT_SUPABASE_URL" ] || [ -z "$DRIFT_SUPABASE_KEY" ]; then
+            echo "::notice::DRIFT_SUPABASE_URL / DRIFT_SUPABASE_KEY secrets not set — skipping live drift check."
+            exit 0
+          fi
+          node scripts/check-live-drift.mjs

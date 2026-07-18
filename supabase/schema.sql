@@ -734,6 +734,7 @@ create table if not exists public.tickets (
   asset_id                     uuid,
   title                        text not null,
   description                  text not null,
+  location                     text,
   priority                     text not null default 'P3'::text,
   severity                     text default 'medium'::text,
   operational_impact           text default 'none'::text,
