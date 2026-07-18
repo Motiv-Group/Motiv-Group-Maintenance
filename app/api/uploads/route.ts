@@ -20,13 +20,50 @@ const MAX_USER_UPLOAD_BYTES = Number(process.env.MAX_USER_UPLOAD_BYTES) || 500 *
 
 const IMG = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
 const DOCS = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/plain', 'text/csv']
-const BUCKET_MIME: Record<string, string[]> = {
+// Per-bucket allowlist. MUST stay a subset of each bucket's `allowed_mime_types`
+// in supabase/schema.sql — Supabase Storage enforces that list even for
+// service-role writes, so a type this route accepts but the bucket rejects
+// still fails the upload. tests/api/uploads-validation.test.ts guards the two
+// against drift. Exported for that test.
+export const BUCKET_MIME: Record<string, string[]> = {
   'ticket-photos':     IMG,
   'ticket-docs':       [...IMG, ...DOCS],
   'completion-docs':   [...IMG, 'application/pdf'],
   'quote-attachments': [...IMG, 'application/pdf', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel'],
   'supplier-docs':     [...IMG, 'application/pdf'],
   'project-files':     [...IMG, 'application/pdf'],
+}
+
+// Extension → MIME fallback. Browsers/OSes sometimes report an empty or generic
+// `File.type` (drag-and-drop, some Android pickers, files copied without
+// extension metadata). We must NEVER send `application/octet-stream` to a bucket
+// whose `allowed_mime_types` only lists specific image/pdf types — storage
+// rejects it and the upload "fails" for no visible reason. So we resolve the
+// effective type from the extension when the browser's is missing/generic, and
+// both VALIDATE and UPLOAD with that effective type (guaranteed in-allowlist
+// when valid). `image/jpg` (non-standard, emitted by a few libraries) is
+// normalised to `image/jpeg`.
+const EXT_MIME: Record<string, string> = {
+  jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp',
+  pdf: 'application/pdf',
+  doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xls: 'application/vnd.ms-excel',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  txt: 'text/plain', csv: 'text/csv',
+}
+
+/** The MIME type we will validate against and store the object as. Prefers the
+ *  browser-reported type, falling back to the file extension when that is empty
+ *  or the generic octet-stream. Returns octet-stream only when truly unknown
+ *  (which then fails validation — an unidentifiable file can't be trusted). */
+export function effectiveType(f: File): string {
+  const raw = (f.type || '').trim().toLowerCase()
+  if (raw && raw !== 'application/octet-stream') {
+    return raw === 'image/jpg' ? 'image/jpeg' : raw
+  }
+  const ext = (f.name.split('.').pop() || '').toLowerCase()
+  return EXT_MIME[ext] ?? 'application/octet-stream'
 }
 
 export async function POST(req: NextRequest) {
@@ -51,11 +88,15 @@ export async function POST(req: NextRequest) {
   const admin = createAdminClient()
 
   // Per-file validation up front. Files that fail never reach storage, so they
-  // don't count toward the quota.
-  const isValid = (f: File) => f.size <= MAX_BYTES && (!f.type || allowed.includes(f.type))
-  const valid = files.filter(isValid)
-  const failed: string[] = files.filter((f) => !isValid(f)).map((f) => f.name || 'file')
-  const incoming = valid.reduce((sum, f) => sum + f.size, 0)
+  // don't count toward the quota. Validate against the EFFECTIVE type (see
+  // effectiveType) — never the raw browser type — so an empty/generic type on a
+  // recognisable file isn't waved through only to be rejected by the bucket at
+  // upload time. Pair the resolved type with the file so upload reuses it.
+  const typed = files.map((f) => ({ f, type: effectiveType(f) }))
+  const isValid = (t: { f: File; type: string }) => t.f.size <= MAX_BYTES && allowed.includes(t.type)
+  const valid = typed.filter(isValid)
+  const failed: string[] = typed.filter((t) => !isValid(t)).map((t) => t.f.name || 'file')
+  const incoming = valid.reduce((sum, t) => sum + t.f.size, 0)
 
   // Reserve quota atomically BEFORE uploading, so concurrent batches can't both
   // slip past the cap. Fail-open if the quota infra isn't present yet (migration
@@ -80,14 +121,16 @@ export async function POST(req: NextRequest) {
   }
 
   const urls: string[] = []
-  await Promise.all(valid.map(async (f) => {
+  await Promise.all(valid.map(async ({ f, type }) => {
     // Path is server-controlled and always prefixed with the caller's id.
     const safeName = (f.name || 'file').replace(/[^\w.\-]/g, '_')
     const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeName}`
     try {
       const buf = Buffer.from(await f.arrayBuffer())
+      // Store as the effective (validated) type — guaranteed to be in the
+      // bucket's allowed_mime_types, so storage never rejects a validated file.
       const { error } = await admin.storage.from(bucket).upload(path, buf, {
-        contentType: f.type || 'application/octet-stream',
+        contentType: type,
         upsert: true,
       })
       // A storage failure here leaves the reserved bytes counted (conservative —
