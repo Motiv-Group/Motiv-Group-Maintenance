@@ -8,9 +8,13 @@ import {
   isTerminalStatus,
   COMMERCIAL_SOURCE_STATUSES,
   isCommercialPhase,
+  resolveBlockerState,
+  computeQuoteDue,
+  stampFreshness,
   type TicketStatus,
   type WorkflowRole,
 } from './workflow'
+import type { SlaTargets } from './health/types'
 
 const ALL_ROLES: WorkflowRole[] = [
   'store_manager', 'supplier', 'regional_manager', 'executive', 'system_admin', 'individual',
@@ -232,4 +236,100 @@ describe('phase helpers', () => {
     expect(isCommercialPhase('in_progress')).toBe(false)
     expect(isCommercialPhase('completed')).toBe(false)
   })
+})
+
+// ---------------------------------------------------------------------------
+// Pure lifecycle helpers (B19 step 1) — extracted from the /transition route.
+// These pin the exact column payloads so the extraction (and later reuse from
+// other routes) can never drift from what the health engine expects.
+// ---------------------------------------------------------------------------
+const NOW = '2026-01-01T00:00:00.000Z'
+const SLA: SlaTargets = {
+  priority: 'P2',
+  first_response_mins: 60,
+  attendance_mins: 240,
+  quote_due_mins: 90,
+  resolution_mins: 1440,
+  internal_decision_mins: 240,
+}
+// NOW + internal_decision_mins (240) = 04:00
+const INTERNAL_DUE = '2026-01-01T04:00:00.000Z'
+
+describe('resolveBlockerState', () => {
+  const supplierBlocked = { current_blocker: 'supplier_action', blocker_owner_type: 'supplier', blocker_started_at: NOW, sla_paused: false, internal_action_due_at: null }
+  const internalDecision = { current_blocker: 'quote_approval', blocker_owner_type: 'regional_manager', blocker_started_at: NOW, sla_paused: true, pause_reason: 'awaiting_decision', pause_started_at: NOW, internal_action_due_at: INTERNAL_DUE }
+  const signoff = { current_blocker: 'completion_signoff', blocker_owner_type: 'regional_manager', blocker_started_at: NOW, sla_paused: true, pause_reason: 'awaiting_signoff', pause_started_at: NOW, internal_action_due_at: INTERNAL_DUE }
+  const cleared = { current_blocker: null, blocker_owner_type: null, blocker_started_at: null, sla_paused: false, pause_ended_at: NOW, internal_action_due_at: null }
+
+  // Explicit per-bucket destinations, mirroring the switch.
+  const internalDecisionStatuses: TicketStatus[] = ['quoted', 'variation_review']
+  const signoffStatuses: TicketStatus[] = ['submitted_for_signoff', 'approved_closeout']
+  const clearedStatuses: TicketStatus[] = ['completed', 'cancelled', 'declined']
+
+  for (const s of internalDecisionStatuses) {
+    it(`${s} → internal decision pause (RM owns, awaiting_decision, due in internal_decision_mins)`, () => {
+      expect(resolveBlockerState(s, NOW, SLA)).toEqual(internalDecision)
+    })
+  }
+  for (const s of signoffStatuses) {
+    it(`${s} → sign-off pause (RM owns, awaiting_signoff, due in internal_decision_mins)`, () => {
+      expect(resolveBlockerState(s, NOW, SLA)).toEqual(signoff)
+    })
+  }
+  for (const s of clearedStatuses) {
+    it(`${s} → cleared (no blocker, pause ended)`, () => {
+      expect(resolveBlockerState(s, NOW, SLA)).toEqual(cleared)
+    })
+  }
+  it('open → no blocker (and NO pause_ended_at — nothing was paused yet)', () => {
+    expect(resolveBlockerState('open', NOW, SLA)).toEqual({ current_blocker: null, blocker_owner_type: null, blocker_started_at: null, sla_paused: false, internal_action_due_at: null })
+  })
+  it('info_requested → store owns, no active blocker', () => {
+    expect(resolveBlockerState('info_requested', NOW, SLA)).toEqual({ current_blocker: null, blocker_owner_type: 'store', sla_paused: false, internal_action_due_at: null })
+  })
+
+  // Every other destination status falls through to the supplier-action default.
+  const explicit = new Set<string>([...internalDecisionStatuses, ...signoffStatuses, ...clearedStatuses, 'open', 'info_requested'])
+  for (const s of ALL_STATUSES.filter(s => !explicit.has(s))) {
+    it(`${s} → supplier-action default`, () => {
+      expect(resolveBlockerState(s, NOW, SLA)).toEqual(supplierBlocked)
+    })
+  }
+
+  it('unknown status → supplier-action default (never throws)', () => {
+    expect(resolveBlockerState('not_a_status', NOW, SLA)).toEqual(supplierBlocked)
+  })
+
+  it('blocker_started_at is (re)set to the injected now — idempotent restamp', () => {
+    const later = '2026-06-15T12:30:00.000Z'
+    const res = resolveBlockerState('in_progress', later, SLA)
+    expect(res.blocker_started_at).toBe(later)
+  })
+})
+
+describe('computeQuoteDue', () => {
+  it('adds quote_due_mins to now', () => {
+    expect(computeQuoteDue(NOW, SLA)).toBe('2026-01-01T01:30:00.000Z') // +90 mins
+  })
+  it('uses the target SLA, not a constant', () => {
+    expect(computeQuoteDue(NOW, { ...SLA, quote_due_mins: 24 * 60 })).toBe('2026-01-02T00:00:00.000Z')
+  })
+  it('zero minutes → due immediately (now)', () => {
+    expect(computeQuoteDue(NOW, { ...SLA, quote_due_mins: 0 })).toBe(NOW)
+  })
+})
+
+describe('stampFreshness', () => {
+  it('supplier stamps last_supplier_update_at only', () => {
+    expect(stampFreshness('supplier', NOW)).toEqual({ last_supplier_update_at: NOW })
+  })
+  it('store_manager stamps last_store_update_at only', () => {
+    expect(stampFreshness('store_manager', NOW)).toEqual({ last_store_update_at: NOW })
+  })
+  const internalRoles: WorkflowRole[] = ['regional_manager', 'executive', 'system_admin', 'individual']
+  for (const role of internalRoles) {
+    it(`${role} stamps last_internal_update_at only`, () => {
+      expect(stampFreshness(role, NOW)).toEqual({ last_internal_update_at: NOW })
+    })
+  }
 })

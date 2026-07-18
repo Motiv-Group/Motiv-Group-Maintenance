@@ -6,7 +6,7 @@ import { serverError, parseAmount } from '@/lib/api-error'
 import { revalidatePath } from 'next/cache'
 import { rateLimit } from '@/lib/rate-limit'
 import { sendPushToMany } from '@/lib/push'
-import { resolveTransition, statusLabel, type WorkflowRole } from '@/lib/workflow'
+import { resolveTransition, statusLabel, resolveBlockerState, computeQuoteDue, stampFreshness, type WorkflowRole } from '@/lib/workflow'
 import { rmOwnsTicket } from '@/lib/rm-ticket-access'
 import { loadSlaResolver } from '@/lib/health/data'
 import type { SlaTargets } from '@/lib/health/types'
@@ -115,7 +115,6 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   }
 
   const now = new Date().toISOString()
-  const addMins = (m: number) => new Date(new Date(now).getTime() + m * 60_000).toISOString()
   const updates: Record<string, unknown> = { status: tr.to, updated_at: now }
   // Set when a supplier schedules a custom time beyond the SLA window (a proposal
   // the RM must accept) — drives who gets notified below.
@@ -123,10 +122,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   // The supplier's proposed snag-fix date (stored on the snag, not the ticket).
   let snagFixAt: string | undefined
   // Stamp freshness against the acting side (drives the health Data-Quality + stale checks).
-  const freshness = role === 'supplier' ? { last_supplier_update_at: now }
-    : role === 'store_manager' ? { last_store_update_at: now }
-    : { last_internal_update_at: now }
-  Object.assign(updates, freshness)
+  Object.assign(updates, stampFreshness(role, now))
   // SLA targets for due-date / blocker timestamps (first-class signals for the health engine).
   const slaRules = await loadSlaResolver(admin, ticket.company_id)
   const tgt: SlaTargets = slaRules(ticket.priority as 'P1' | 'P2' | 'P3' | 'P4')
@@ -161,7 +157,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
         if (body.supplierId) updates.supplier_id = body.supplierId
         break
       case 'request_quote':
-        updates.quote_required = true; updates.quote_requested_at = now; updates.quote_due_at = addMins(tgt.quote_due_mins)
+        updates.quote_required = true; updates.quote_requested_at = now; updates.quote_due_at = computeQuoteDue(now, tgt)
         // Set-once so the FIRST quote request survives later re-requests in the trail.
         updates.first_quote_requested_at = ticket.first_quote_requested_at ?? now
         // Durable per-round log → a "Quote requested from <supplier>" audit event.
@@ -333,7 +329,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
 
   // Blocker / pause / owner columns derived from the destination status, so the
   // stored signals stay in lock-step with the health engine's own derivation.
-  Object.assign(updates, lifecycleFields(tr.to, now, tgt))
+  Object.assign(updates, resolveBlockerState(tr.to, now, tgt))
 
   const { error: upErr } = await admin.from('tickets').update(updates as Database['public']['Tables']['tickets']['Update']).eq('id', ticketId)
   if (upErr) return serverError(upErr)
@@ -347,25 +343,6 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     revalidatePath('/regional/reports'); revalidatePath('/executive/reports'); revalidatePath('/executive/stores'); revalidatePath('/regional/stores')
   }
   return NextResponse.json({ ok: true, status: tr.to })
-}
-
-// Map a destination status → the explicit blocker/pause columns the health
-// engine reads. Mirrors lib/health/sla.ts status buckets. Idempotent: each
-// transition (re)sets blocker_started_at = now for the new blocker state.
-function lifecycleFields(to: string, now: string, tgt: SlaTargets): Record<string, unknown> {
-  const addMins = (m: number) => new Date(new Date(now).getTime() + m * 60_000).toISOString()
-  const supplier = { current_blocker: 'supplier_action', blocker_owner_type: 'supplier', blocker_started_at: now, sla_paused: false, internal_action_due_at: null }
-  const internalDecision = { current_blocker: 'quote_approval', blocker_owner_type: 'regional_manager', blocker_started_at: now, sla_paused: true, pause_reason: 'awaiting_decision', pause_started_at: now, internal_action_due_at: addMins(tgt.internal_decision_mins) }
-  const signoff = { current_blocker: 'completion_signoff', blocker_owner_type: 'regional_manager', blocker_started_at: now, sla_paused: true, pause_reason: 'awaiting_signoff', pause_started_at: now, internal_action_due_at: addMins(tgt.internal_decision_mins) }
-  const cleared = { current_blocker: null, blocker_owner_type: null, blocker_started_at: null, sla_paused: false, pause_ended_at: now, internal_action_due_at: null }
-  switch (to) {
-    case 'quoted': case 'variation_review': return internalDecision
-    case 'submitted_for_signoff': case 'approved_closeout': return signoff
-    case 'completed': case 'cancelled': case 'declined': return cleared
-    case 'open': return { current_blocker: null, blocker_owner_type: null, blocker_started_at: null, sla_paused: false, internal_action_due_at: null }
-    case 'info_requested': return { current_blocker: null, blocker_owner_type: 'store', sla_paused: false, internal_action_due_at: null }
-    default: return supplier
-  }
 }
 
 async function hasAccess(admin: Admin, role: WorkflowRole, userId: string, ticket: TicketRow): Promise<boolean> {

@@ -5,6 +5,8 @@
 // consistent. Pure (no DB / React imports).
 // ============================================================
 
+import type { SlaTargets } from './health/types'
+
 export type WorkflowRole = 'store_manager' | 'supplier' | 'regional_manager' | 'executive' | 'system_admin' | 'individual'
 
 export type TicketStatus =
@@ -195,3 +197,42 @@ export function resolveTransition(status: string, action: string, role: Workflow
 }
 
 export function statusLabel(s: string): string { return STATUS_META[s as TicketStatus]?.label ?? s }
+
+// ============================================================
+// Pure lifecycle helpers (B19 step 1) — extracted verbatim from
+// app/api/tickets/[id]/transition/route.ts. Pure: no DB imports;
+// `now` is injected (same style as lib/health/*).
+// ============================================================
+
+// Map a destination status → the explicit blocker/pause columns the health
+// engine reads. Mirrors lib/health/sla.ts status buckets. Idempotent: each
+// transition (re)sets blocker_started_at = now for the new blocker state.
+export function resolveBlockerState(toStatus: string, now: string, sla: SlaTargets): Record<string, unknown> {
+  const addMins = (m: number) => new Date(new Date(now).getTime() + m * 60_000).toISOString()
+  const supplier = { current_blocker: 'supplier_action', blocker_owner_type: 'supplier', blocker_started_at: now, sla_paused: false, internal_action_due_at: null }
+  const internalDecision = { current_blocker: 'quote_approval', blocker_owner_type: 'regional_manager', blocker_started_at: now, sla_paused: true, pause_reason: 'awaiting_decision', pause_started_at: now, internal_action_due_at: addMins(sla.internal_decision_mins) }
+  const signoff = { current_blocker: 'completion_signoff', blocker_owner_type: 'regional_manager', blocker_started_at: now, sla_paused: true, pause_reason: 'awaiting_signoff', pause_started_at: now, internal_action_due_at: addMins(sla.internal_decision_mins) }
+  const cleared = { current_blocker: null, blocker_owner_type: null, blocker_started_at: null, sla_paused: false, pause_ended_at: now, internal_action_due_at: null }
+  switch (toStatus) {
+    case 'quoted': case 'variation_review': return internalDecision
+    case 'submitted_for_signoff': case 'approved_closeout': return signoff
+    case 'completed': case 'cancelled': case 'declined': return cleared
+    case 'open': return { current_blocker: null, blocker_owner_type: null, blocker_started_at: null, sla_paused: false, internal_action_due_at: null }
+    case 'info_requested': return { current_blocker: null, blocker_owner_type: 'store', sla_paused: false, internal_action_due_at: null }
+    default: return supplier
+  }
+}
+
+// The quote-due deadline stamped when a quote is (re)requested:
+// now + the priority's quote_due_mins SLA target.
+export function computeQuoteDue(now: string, sla: SlaTargets): string {
+  return new Date(new Date(now).getTime() + sla.quote_due_mins * 60_000).toISOString()
+}
+
+// Stamp freshness against the acting side (drives the health Data-Quality + stale checks).
+export function stampFreshness(role: WorkflowRole, now: string):
+  { last_supplier_update_at: string } | { last_store_update_at: string } | { last_internal_update_at: string } {
+  return role === 'supplier' ? { last_supplier_update_at: now }
+    : role === 'store_manager' ? { last_store_update_at: now }
+    : { last_internal_update_at: now }
+}
