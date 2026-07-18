@@ -19,25 +19,65 @@ export default async function AdminStoresPage() {
     : { data: null }
   const companyId = prof?.company_id ?? null
 
-  const { data: stores } = companyId
+  // ── Supplier-visibility gate (cross-supplier isolation) ──────────────────
+  // Suppliers are COMPETING OUTSIDERS inside one company. This directory must
+  // only list stores the caller's supplier org is ENGAGED with — i.e. stores
+  // holding at least one ticket AWARDED to them (tickets.supplier_id) or with
+  // a quote INVITE for them (ticket_suppliers → tickets → store_id). Listing
+  // the whole company estate (+ its RM roster) would hand every supplier a
+  // map of competitors' client sites and RM contacts.
+  const { data: supplierLinks } = user
+    ? await admin.from('supplier_users').select('supplier_id').eq('user_id', user.id)
+    : { data: null }
+  const supplierIds = (supplierLinks ?? []).map(l => l.supplier_id)
+
+  const [{ data: awardedTickets }, { data: inviteRows }] = supplierIds.length
+    ? await Promise.all([
+        admin.from('tickets').select('store_id').in('supplier_id', supplierIds),
+        admin.from('ticket_suppliers').select('ticket_id').in('supplier_id', supplierIds),
+      ])
+    : [{ data: null }, { data: null }]
+
+  const inviteTicketIds = (inviteRows ?? []).map(r => r.ticket_id)
+  const { data: invitedTickets } = inviteTicketIds.length
+    ? await admin.from('tickets').select('store_id').in('id', inviteTicketIds)
+    : { data: null }
+
+  const engagedStoreIds = Array.from(new Set(
+    [...(awardedTickets ?? []), ...(invitedTickets ?? [])]
+      .map(t => t.store_id)
+      .filter((id): id is string => !!id)
+  ))
+
+  // Tenant guard stays the outer layer (company_id); the engagement gate
+  // narrows within the company.
+  const { data: stores } = companyId && engagedStoreIds.length
     ? await admin
         .from('stores')
         .select('id, name, sub_store, branch_code, region_id')
         .eq('company_id', companyId)
+        .in('id', engagedStoreIds)
         .order('name')
     : { data: null }
 
-  const { data: regionalManagers } = companyId
+  // Only the RMs of the engaged stores' regions — never the company's full
+  // RM roster (competitor intel / PII).
+  const engagedRegionIds = Array.from(new Set(
+    (stores ?? []).map(s => s.region_id).filter((id): id is string => !!id)
+  ))
+  const { data: regionalUsers } = engagedRegionIds.length
+    ? await admin.from('regional_users').select('user_id, region_id').in('region_id', engagedRegionIds)
+    : { data: null }
+
+  const rmUserIds = Array.from(new Set((regionalUsers ?? []).map(l => l.user_id)))
+  const { data: regionalManagers } = companyId && rmUserIds.length
     ? await admin
         .from('user_profiles')
         .select('id, full_name, company_name')
         .eq('role', 'regional_manager')
         .eq('company_id', companyId)
+        .in('id', rmUserIds)
         .order('full_name')
-    : { data: null }
-
-  const { data: regionalUsers } = companyId
-    ? await admin.from('regional_users').select('user_id, region_id')
     : { data: null }
 
   type RmRow = NonNullable<typeof regionalManagers>[number]
@@ -81,7 +121,7 @@ export default async function AdminStoresPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-[var(--text)]">Store Accounts</h1>
-          <p className="text-sm text-[var(--text-muted)] mt-0.5">{storeList.length} store{storeList.length !== 1 ? 's' : ''} registered</p>
+          <p className="text-sm text-[var(--text-muted)] mt-0.5">{storeList.length} engaged store{storeList.length !== 1 ? 's' : ''}</p>
         </div>
       </div>
 
@@ -89,7 +129,7 @@ export default async function AdminStoresPage() {
         <div className="grid min-h-28 place-items-center rounded-xl border border-dashed border-[var(--border)] px-4 py-10 text-center">
           <div>
             <Store size={28} className="mx-auto text-[var(--text-faint)] mb-2" />
-            <p className="text-sm text-[var(--text-faint)]">No store accounts yet.</p>
+            <p className="text-sm text-[var(--text-faint)]">No stores yet — you&apos;ll see a store here once you&apos;re invited to quote or awarded work there.</p>
           </div>
         </div>
       ) : (
