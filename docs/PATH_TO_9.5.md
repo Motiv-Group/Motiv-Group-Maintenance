@@ -7,7 +7,7 @@
 > **Living doc.** Claude updates this whenever an item is completed or a new issue is found — check + update it every session.
 > 9.5 overall = **every section ≥ 9.0** *plus* independent validation (penetration test + backup-restore drill).
 
-**Overall score:** ~8.3 / 10 → target 9.5 (per `docs/AUDIT_2026-07-16.md` — all audit CODE items closed 2026-07-18; the remaining gap is owner-track)
+**Overall score:** ~8.4 / 10 → target 9.5 (per `docs/AUDIT_2026-07-16.md` — all audit CODE items closed 2026-07-18; the remaining gap is owner-track)
 **Last updated:** 2026-07-18
 **Audit baseline commit:** ff1bdeb (audit) / cdc7dec (same-day fixes)
 
@@ -51,30 +51,18 @@ Detail + status for every lettered/numbered item is in the Phase A/B/C tables be
 
 | Section | Now | Gap to close (short) |
 |---|---|---|
-| Security & authorisation | 8.0 | pen test (owner) · quarterly authZ re-audit |
-| Testing | 8.0 | e2e 15/15 green vs dev · optional CI wiring for e2e |
+| Security & authorisation | 8.5 | pen test (owner) · quarterly authZ re-audit |
+| Testing | 8.5 | 18 e2e (smoke + journeys) green + wired into PR CI |
 | CI/CD | 9.0 | deploy-automation depth |
 | Architecture & maintainability | 8.0 | keep files honest; B19 workflow consolidation still open |
 | Type safety | 9.0 | zero `any` in src; no-explicit-any = error |
 | PWA / mobile | 8.5 | offline + update-toast shipped and device-verified |
 | Reliability & operations | 7.0 | backups + restore drill (owner) · uptime/log alerts (owner) |
 | Database & RLS | 7.5 | restore drill (owner) · quarterly advisor |
-| Dependencies | 7.5 | React 19 bump plan · watch xlsx CDN tarball |
+| Dependencies | 8.0 | React 19 bump plan (xlsx repo-vendored) |
 | Docs accuracy | 8.5 | keep in sync each session |
 | Legal / POPIA | 4.0 | real content in /privacy /terms /sla · Info Officer · lawyer sign-off (owner) |
 | Infrastructure & operations | 6.0 | Vercel Pro + Supabase Pro + PITR · staging · SMTP · runbook (owner) |
-
----|---|---|
-| API security & authorisation | 8.5 | webhook fail-closed · body schema validation · rate-limit-fallback alert · audit logs · pen test |
-| Database & row-level security | 8.5 | owner-scoped Individual RLS · schema-drift CI · quarterly advisor · restore drill |
-| Security headers / CSP | 9.5 | hold; add CSP report endpoint · re-verify after Next upgrade · HSTS preload submit |
-| File storage | 9.0 | per-user path prefix · upload quotas · bucket-growth alert |
-| Individual-accounts | 8.0 | e2e verify · realtime decision · transition tests · self-signup abuse review |
-| Dependencies | 8.5 | ✅ Next 16 · ESLint 9 · Dependabot · `npm audit` blocking in CI (0-high). Remaining: moderate `postcss` (via next, clears on a future patch) · React-Compiler lint debt (B16) |
-| Legal / POPIA | 4.0 | real content in /privacy /terms /sla · Info Officer registered · lawyer sign-off · signup consent |
-| Infrastructure & operations | 6.0 | Vercel Pro + Supabase Pro + PITR · staging · uptime/log alerts · SMTP · runbook |
-| Code quality & tests | 8.5 | ✅ transition-matrix + route-authZ + uploads/WhatsApp tests (456 green) · CI pipeline. Remaining: Playwright smoke (T4) · webhook-handler/provision tests (T6) |
-| UI/UX | 8.0 | Phase 2 (work queue, chip diet, tab consolidation, etc.) · usability pass |
 
 ---
 
