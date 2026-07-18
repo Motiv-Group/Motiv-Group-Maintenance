@@ -29,6 +29,12 @@ const H = vi.hoisted(() => {
     // into a guard that catches the route sending a type the bucket refuses
     // (e.g. application/octet-stream). Null = accept anything (legacy behaviour).
     allowlist: Record<string, string[]> | null
+    // Throw-injection flags — reproduce the real-world causes of a bare 500:
+    // a missing service-role key (createAdminClient throws), a cookies/auth
+    // failure (getUser throws), and a flaky quota RPC (rpc rejects).
+    adminThrows: boolean
+    authThrows: boolean
+    rpcThrows: boolean
   } = {
     user: null,
     rateLimitOk: true,
@@ -37,11 +43,22 @@ const H = vi.hoisted(() => {
     uploads: [],
     uploadError: null,
     allowlist: null,
+    adminThrows: false,
+    authThrows: false,
+    rpcThrows: false,
   }
-  const admin = {
-    rpc: async (fn: string, args: any) => {
+  const admin: any = {
+    // Method form (NOT an arrow) that reads `this`, exactly like supabase-js's
+    // `rpc(fn){ return this.rest.rpc(...) }`. If the route DETACHES this method
+    // (`const r = admin.rpc; r()`), `this` is undefined and it throws the same
+    // synchronous TypeError that produced the production "500 undefined". So the
+    // route MUST call it bound (`admin.rpc.bind(admin)`) — if a future edit drops
+    // the bind, the quota tests below go red instead of shipping the 500.
+    rpc(this: unknown, fn: string, args: any) {
+      if (this !== admin) throw new TypeError("Cannot read properties of undefined (reading 'rest')")
       state.rpcCalls.push({ fn, args })
-      return state.rpc
+      if (state.rpcThrows) throw new Error('rpc network failure')
+      return Promise.resolve(state.rpc)
     },
     storage: {
       from: (bucket: string) => ({
@@ -65,14 +82,24 @@ const H = vi.hoisted(() => {
     },
   }
   const client = {
-    auth: { getUser: async () => ({ data: { user: state.user }, error: null }) },
+    auth: {
+      getUser: async () => {
+        if (state.authThrows) throw new Error('cookies unavailable')
+        return { data: { user: state.user }, error: null }
+      },
+    },
   }
   return { state, admin, client }
 })
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: async () => H.client,
-  createAdminClient: () => H.admin,
+  // createAdminClient throws synchronously in real life when the service-role
+  // key/URL env var is missing — model that so the route's guard is tested.
+  createAdminClient: () => {
+    if (H.state.adminThrows) throw new Error('supabaseKey is required.')
+    return H.admin
+  },
 }))
 vi.mock('@/lib/rate-limit', () => ({
   rateLimit: async () => H.state.rateLimitOk,
@@ -135,6 +162,9 @@ beforeEach(() => {
   H.state.rpcCalls = []
   H.state.uploads = []
   H.state.uploadError = null
+  H.state.adminThrows = false
+  H.state.authThrows = false
+  H.state.rpcThrows = false
   // Enforce the real per-bucket allowlist for every test — the storage mock now
   // rejects a type the bucket wouldn't accept, exactly like production.
   H.state.allowlist = BUCKET_ALLOWLIST
@@ -350,5 +380,75 @@ describe('POST /api/uploads — route ⇄ bucket config consistency', () => {
     for (const bucket of Object.keys(BUCKET_MIME)) {
       for (const t of BUCKET_MIME[bucket]) expect(allLive).toContain(t)
     }
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Never a bare 500 — the actual production failure was `[upload] /api/uploads
+// failed: 500 undefined`, i.e. the handler THREW (Next returned an empty-body
+// 500 the client couldn't read) instead of returning its own JSON. These tests
+// inject the real-world throw causes and assert the route always resolves with a
+// readable NextResponse — never rejects, never a bare 500. They go red against
+// the un-hardened handler (which awaited createAdminClient / the quota rpc with
+// no try/catch).
+// ---------------------------------------------------------------------------
+describe('POST /api/uploads — resilience: never a bare 500', () => {
+  it('missing service-role key (createAdminClient throws) → JSON 500, not a thrown error', async () => {
+    H.state.adminThrows = true
+    // Must RESOLVE (not reject) — a rejection would surface as Next\'s opaque 500.
+    const res = await POST(formRequest(makeForm('ticket-photos', [makeFile('a.jpg', 'image/jpeg')])))
+    expect(res.status).toBe(500)
+    const body = await res.json()
+    expect(typeof body.error).toBe('string')
+    expect(body.error.length).toBeGreaterThan(0)
+    expect(H.state.uploads).toHaveLength(0)
+  })
+
+  it('auth/cookies failure (getUser throws) → JSON 500, not a thrown error', async () => {
+    H.state.authThrows = true
+    const res = await POST(formRequest(makeForm('ticket-photos', [makeFile('a.jpg', 'image/jpeg')])))
+    expect(res.status).toBe(500)
+    expect(typeof (await res.json()).error).toBe('string')
+  })
+
+  it('calls the quota RPC BOUND to the client — a detached call would throw like prod', async () => {
+    // The this-aware rpc mock throws unless called bound to `admin`. If the route
+    // regresses to `const r = admin.rpc` (unbound), the call throws, gets caught
+    // by the fail-open guard, and rpcCalls stays empty → this assertion fails,
+    // catching the exact production "500 undefined" bug before it ships.
+    const res = await POST(formRequest(makeForm('ticket-photos', [makeFile('a.jpg', 'image/jpeg', 100)])))
+    expect(res.status).toBe(200)
+    expect(H.state.rpcCalls).toHaveLength(1)
+    expect(H.state.rpcCalls[0].fn).toBe('reserve_upload_quota')
+  })
+
+  it('a flaky quota RPC that REJECTS fails open (200), upload still proceeds', async () => {
+    H.state.rpcThrows = true
+    const res = await POST(formRequest(makeForm('ticket-photos', [makeFile('a.jpg', 'image/jpeg', 100)])))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.urls).toHaveLength(1)
+    expect(body.failed).toEqual([])
+  })
+
+  it('response carries a per-file reason so failures are diagnosable, not opaque', async () => {
+    const big = makeFile('huge.jpg', 'image/jpeg', MAX_BYTES + 1)
+    const pdf = makeFile('quote.pdf', 'application/pdf') // wrong type for ticket-photos
+    const res = await POST(formRequest(makeForm('ticket-photos', [big, pdf])))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.failed.sort()).toEqual(['huge.jpg', 'quote.pdf'])
+    const byName = Object.fromEntries((body.errors as Array<{ name: string; reason: string }>).map((e) => [e.name, e.reason]))
+    expect(byName['huge.jpg']).toMatch(/limit/i)
+    expect(byName['quote.pdf']).toMatch(/unsupported/i)
+  })
+
+  it('a storage-layer error is surfaced with its reason in errors[]', async () => {
+    H.state.uploadError = { message: 'Bucket not found' }
+    const res = await POST(formRequest(makeForm('ticket-photos', [makeFile('a.jpg', 'image/jpeg')])))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.failed).toEqual(['a.jpg'])
+    expect((body.errors as Array<{ name: string; reason: string }>)[0]).toMatchObject({ name: 'a.jpg', reason: 'Bucket not found' })
   })
 })

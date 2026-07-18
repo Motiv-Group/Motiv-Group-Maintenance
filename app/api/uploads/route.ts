@@ -67,81 +67,116 @@ export function effectiveType(f: File): string {
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!(await rateLimit(`upload:${user.id}`, 60, 60_000))) {
-    return NextResponse.json({ error: 'Too many uploads — try again shortly.' }, { status: 429 })
-  }
-
-  let form: FormData
-  try { form = await req.formData() } catch { return NextResponse.json({ error: 'Expected multipart form data' }, { status: 400 }) }
-
-  const bucket = String(form.get('bucket') ?? 'ticket-photos')
-  const allowed = BUCKET_MIME[bucket]
-  if (!allowed) return NextResponse.json({ error: 'Invalid bucket' }, { status: 400 })
-
-  const files = form.getAll('files').filter((f): f is File => f instanceof File)
-  if (!files.length) return NextResponse.json({ error: 'No files' }, { status: 400 })
-  if (files.length > MAX_FILES) return NextResponse.json({ error: `Too many files (max ${MAX_FILES})` }, { status: 400 })
-
-  const admin = createAdminClient()
-
-  // Per-file validation up front. Files that fail never reach storage, so they
-  // don't count toward the quota. Validate against the EFFECTIVE type (see
-  // effectiveType) — never the raw browser type — so an empty/generic type on a
-  // recognisable file isn't waved through only to be rejected by the bucket at
-  // upload time. Pair the resolved type with the file so upload reuses it.
-  const typed = files.map((f) => ({ f, type: effectiveType(f) }))
-  const isValid = (t: { f: File; type: string }) => t.f.size <= MAX_BYTES && allowed.includes(t.type)
-  const valid = typed.filter(isValid)
-  const failed: string[] = typed.filter((t) => !isValid(t)).map((t) => t.f.name || 'file')
-  const incoming = valid.reduce((sum, t) => sum + t.f.size, 0)
-
-  // Reserve quota atomically BEFORE uploading, so concurrent batches can't both
-  // slip past the cap. Fail-open if the quota infra isn't present yet (migration
-  // not applied) — a missing function must never hard-break uploads.
-  if (incoming > 0) {
-    // reserve_upload_quota isn't in the generated DB types (the Functions block is
-    // empty) — type this one RPC call narrowly instead of loosening the client.
-    const reserveQuota = admin.rpc as unknown as (
-      fn: 'reserve_upload_quota',
-      args: { p_user: string; p_bytes: number; p_cap: number },
-    ) => Promise<{ data: boolean | null; error: { message: string } | null }>
-    const { data: ok, error } = await reserveQuota('reserve_upload_quota', {
-      p_user: user.id, p_bytes: incoming, p_cap: MAX_USER_UPLOAD_BYTES,
-    })
-    if (error) {
-      console.error('[api/uploads] quota check unavailable, allowing:', error.message)
-    } else if (ok === false) {
-      return NextResponse.json({
-        error: 'Upload limit reached for your account. Please contact support to raise it.',
-      }, { status: 413 })
+  // The ENTIRE handler is wrapped so it can NEVER return a bare Next 500 (empty
+  // body the client can't read — the "500 undefined" we saw in production). Any
+  // unhandled throw — createAdminClient() with a missing SUPABASE_SERVICE_ROLE_KEY,
+  // a cookies()/auth failure, an unexpected storage exception — is converted to a
+  // structured JSON 500 the uploader can surface, with the real reason logged.
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!(await rateLimit(`upload:${user.id}`, 60, 60_000))) {
+      return NextResponse.json({ error: 'Too many uploads — try again shortly.' }, { status: 429 })
     }
-  }
 
-  const urls: string[] = []
-  await Promise.all(valid.map(async ({ f, type }) => {
-    // Path is server-controlled and always prefixed with the caller's id.
-    const safeName = (f.name || 'file').replace(/[^\w.\-]/g, '_')
-    const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeName}`
-    try {
-      const buf = Buffer.from(await f.arrayBuffer())
-      // Store as the effective (validated) type — guaranteed to be in the
-      // bucket's allowed_mime_types, so storage never rejects a validated file.
-      const { error } = await admin.storage.from(bucket).upload(path, buf, {
-        contentType: type,
-        upsert: true,
-      })
-      // A storage failure here leaves the reserved bytes counted (conservative —
-      // it can only make the cap stricter, and storage errors are rare).
-      if (error) { console.error('[api/uploads]', bucket, f.name, error.message); failed.push(f.name); return }
-      urls.push(admin.storage.from(bucket).getPublicUrl(path).data.publicUrl)
-    } catch (e) {
-      console.error('[api/uploads] exception', bucket, f.name, e instanceof Error ? e.message : e)
-      failed.push(f.name)
+    let form: FormData
+    try { form = await req.formData() } catch { return NextResponse.json({ error: 'Expected multipart form data' }, { status: 400 }) }
+
+    const bucket = String(form.get('bucket') ?? 'ticket-photos')
+    const allowed = BUCKET_MIME[bucket]
+    if (!allowed) return NextResponse.json({ error: 'Invalid bucket' }, { status: 400 })
+
+    const files = form.getAll('files').filter((f): f is File => f instanceof File)
+    if (!files.length) return NextResponse.json({ error: 'No files' }, { status: 400 })
+    if (files.length > MAX_FILES) return NextResponse.json({ error: `Too many files (max ${MAX_FILES})` }, { status: 400 })
+
+    // Service-role client. Constructing it THROWS when SUPABASE_SERVICE_ROLE_KEY
+    // (or the Supabase URL) is unset/empty — a common cause of a 500 on a fresh
+    // Preview/prod env where the anon-key login still works. The outer try turns
+    // that into a readable JSON 500 rather than an opaque crash.
+    const admin = createAdminClient()
+
+    // Per-file validation up front. Files that fail never reach storage, so they
+    // don't count toward the quota. Validate against the EFFECTIVE type (see
+    // effectiveType) — never the raw browser type — so an empty/generic type on a
+    // recognisable file isn't waved through only to be rejected by the bucket at
+    // upload time. Pair the resolved type with the file so upload reuses it.
+    // `errors` carries a per-file reason so the client/console can say WHY a file
+    // failed instead of a generic "failed to upload".
+    const typed = files.map((f) => ({ f, type: effectiveType(f) }))
+    const isValid = (t: { f: File; type: string }) => t.f.size <= MAX_BYTES && allowed.includes(t.type)
+    const valid = typed.filter(isValid)
+    const failed: string[] = []
+    const errors: Array<{ name: string; reason: string }> = []
+    for (const t of typed) {
+      if (isValid(t)) continue
+      const name = t.f.name || 'file'
+      failed.push(name)
+      errors.push({ name, reason: t.f.size > MAX_BYTES ? `File exceeds the ${MAX_BYTES / (1024 * 1024)} MB limit.` : 'Unsupported file type.' })
     }
-  }))
+    const incoming = valid.reduce((sum, t) => sum + t.f.size, 0)
 
-  return NextResponse.json({ urls, failed })
+    // Reserve quota atomically BEFORE uploading, so concurrent batches can't both
+    // slip past the cap. Fail-open if the quota infra isn't present yet (migration
+    // not applied) — a missing function must never hard-break uploads. Guarded so
+    // a REJECTED rpc (network blip) also fails open instead of 500ing the upload.
+    if (incoming > 0) {
+      try {
+        // BIND to the client. `admin.rpc` on its own is a DETACHED method and
+        // supabase-js implements rpc as `return this.rest.rpc(...)` — so calling
+        // it unbound throws a synchronous TypeError (`this` is undefined in strict
+        // ESM) on every upload that has files. That was the production
+        // "500 undefined". reserve_upload_quota isn't in the generated DB types
+        // (the Functions block is empty) — keep the narrow cast for this one call.
+        const reserveQuota = admin.rpc.bind(admin) as unknown as (
+          fn: 'reserve_upload_quota',
+          args: { p_user: string; p_bytes: number; p_cap: number },
+        ) => Promise<{ data: boolean | null; error: { message: string } | null }>
+        const { data: ok, error } = await reserveQuota('reserve_upload_quota', {
+          p_user: user.id, p_bytes: incoming, p_cap: MAX_USER_UPLOAD_BYTES,
+        })
+        if (error) {
+          console.error('[api/uploads] quota check unavailable, allowing:', error.message)
+        } else if (ok === false) {
+          return NextResponse.json({
+            error: 'Upload limit reached for your account. Please contact support to raise it.',
+          }, { status: 413 })
+        }
+      } catch (e) {
+        console.error('[api/uploads] quota check threw, allowing:', e instanceof Error ? e.message : e)
+      }
+    }
+
+    const urls: string[] = []
+    await Promise.all(valid.map(async ({ f, type }) => {
+      // Path is server-controlled and always prefixed with the caller's id.
+      const safeName = (f.name || 'file').replace(/[^\w.\-]/g, '_')
+      const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeName}`
+      const name = f.name || 'file'
+      try {
+        const buf = Buffer.from(await f.arrayBuffer())
+        // Store as the effective (validated) type — guaranteed to be in the
+        // bucket's allowed_mime_types, so storage never rejects a validated file.
+        const { error } = await admin.storage.from(bucket).upload(path, buf, {
+          contentType: type,
+          upsert: true,
+        })
+        // A storage failure here leaves the reserved bytes counted (conservative —
+        // it can only make the cap stricter, and storage errors are rare).
+        if (error) { console.error('[api/uploads]', bucket, name, error.message); failed.push(name); errors.push({ name, reason: error.message }); return }
+        urls.push(admin.storage.from(bucket).getPublicUrl(path).data.publicUrl)
+      } catch (e) {
+        const reason = e instanceof Error ? e.message : String(e)
+        console.error('[api/uploads] exception', bucket, name, reason)
+        failed.push(name); errors.push({ name, reason })
+      }
+    }))
+
+    return NextResponse.json({ urls, failed, errors })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    console.error('[api/uploads] unhandled error:', msg)
+    return NextResponse.json({ error: 'Upload failed on the server. Please try again.' }, { status: 500 })
+  }
 }
