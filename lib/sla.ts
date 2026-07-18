@@ -6,8 +6,8 @@ export const SLA_VERSION = '1.0'
 
 // True when a supplier must (re-)accept the current SLA — either they've never
 // accepted (pre-wizard invited suppliers have no acceptance row) or their latest
-// acceptance predates the current SLA_VERSION. Plain equality: any version change
-// re-prompts.
+// acceptance predates the current SLA_VERSION. Plain equality — every version
+// change re-prompts.
 export function slaNeedsAcceptance(acceptedVersion: string | null | undefined): boolean {
   return acceptedVersion !== SLA_VERSION
 }

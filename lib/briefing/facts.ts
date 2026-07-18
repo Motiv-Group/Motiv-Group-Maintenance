@@ -93,7 +93,8 @@ export function fallbackBriefing(role: BriefingRole, f: BriefingFacts, now: Date
     // in the "View insight" pop-up.
     const parts = [`Portfolio health is ${f.portfolioHealthScore}% (${human(f.portfolioStatus)}) across ${plural(stores, 'active store')}.`]
     if (attention > 0) {
-      const top = Array.isArray(f.topAttentionStores) ? (f.topAttentionStores as any[]) : []
+      // Built by regionFacts as {name, health, issue} rows (BriefingFacts erases the shape).
+      const top = Array.isArray(f.topAttentionStores) ? (f.topAttentionStores as { name?: unknown; health?: unknown }[]) : []
       const named = top.length ? ` — led by ${top.map(s => `${s.name} (${Math.round(Number(s.health))}%)`).join(', ')}` : ''
       parts.push(`${plural(attention, 'store')} need attention${named}.`)
     } else {

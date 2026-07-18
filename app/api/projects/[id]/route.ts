@@ -72,7 +72,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
 
   // Collect storage paths BEFORE the cascade removes the file rows.
   const { data: files } = await admin.from('project_files').select('storage_path').eq('project_id', id)
-  const paths = ((files ?? []) as any[]).map((f) => f.storage_path)
+  const paths = (files ?? []).map((f) => f.storage_path)
 
   const { error } = await admin.from('projects').delete().eq('id', id).eq('company_id', companyId)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

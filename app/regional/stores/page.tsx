@@ -16,14 +16,14 @@ export default async function RegionalStoresPage() {
     regionIds.length
       ? admin.from('stores').select('id, name, sub_store, closed_at')
           .eq('company_id', companyId).in('region_id', regionIds).eq('active', false).order('closed_at', { ascending: false })
-      : Promise.resolve({ data: [] as any[] }),
+      : Promise.resolve({ data: null }),
     admin.from('user_profiles').select('company_name').eq('id', userId).maybeSingle(),
     admin.from('companies').select('name').eq('id', companyId).maybeSingle(),
   ])
-  const archived: ArchivedStore[] = ((archivedRaw ?? []) as any[]).map(s => ({ id: s.id, name: storeLabel(s.name, s.sub_store), deactivatedAt: s.closed_at ?? null }))
+  const archived: ArchivedStore[] = (archivedRaw ?? []).map(s => ({ id: s.id, name: storeLabel(s.name, s.sub_store), deactivatedAt: s.closed_at ?? null }))
   // The RM's company applies to every store they manage — used to auto-fill the
   // company-name field on the add/edit store pop-ups.
-  const companyName = (rmProfile as any)?.company_name || (company as any)?.name || ''
+  const companyName = rmProfile?.company_name || company?.name || ''
 
   return <RegionalStores stores={data.stores} archived={archived} companyName={companyName} />
 }

@@ -110,7 +110,7 @@ export default function LogTicketPage() {
       })
       if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error ?? 'Failed to log ticket') }
       router.push('/client/tickets'); router.refresh()
-    } catch (e: any) { setError(e.message ?? 'Failed'); setLoading(false) }
+    } catch (e) { setError(e instanceof Error ? e.message : 'Failed'); setLoading(false) }
   }
 
   const impactLabel = impact ? OPERATIONAL_IMPACT_LABELS[impact] : ''

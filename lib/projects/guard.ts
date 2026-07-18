@@ -28,11 +28,11 @@ export async function projectAdminAuth(): Promise<ProjectAdminAuth> {
 /** Load a project owned by the company, or null (→ 404). */
 export async function loadOwnedProject(admin: Admin, companyId: string, projectId: string) {
   const { data } = await admin.from('projects').select('*').eq('id', projectId).eq('company_id', companyId).single()
-  return data as any | null
+  return data
 }
 
 /** Load a store owned by the company, or null (→ 404). */
 export async function loadOwnedStore(admin: Admin, companyId: string, storeId: string) {
   const { data } = await admin.from('project_stores').select('*').eq('id', storeId).eq('company_id', companyId).single()
-  return data as any | null
+  return data
 }

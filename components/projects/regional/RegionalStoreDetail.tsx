@@ -8,9 +8,9 @@ import { SegmentedProgressBar } from '@/components/projects/SegmentedProgressBar
 import { PhotoGallery } from './PhotoGallery'
 import { STORE_STATUS_LABEL, STORE_STATUS_PILL, OVERDUE_PILL } from '@/components/projects/statusStyles'
 import { milestoneSteps, stageLabel } from '@/lib/projects/progress'
-import type { StoreRow, ProjectFileView } from '@/lib/projects/data'
+import type { ProjectRow, StoreRow, ProjectFileView } from '@/lib/projects/data'
 
-export function RegionalStoreDetail({ projectId, store, project, files }: { projectId: string; store: StoreRow; project: any; files: ProjectFileView[] }) {
+export function RegionalStoreDetail({ projectId, store, project, files }: { projectId: string; store: StoreRow; project: ProjectRow; files: ProjectFileView[] }) {
   const before = files.filter((f) => f.category === 'before_photo')
   const after = files.filter((f) => f.category === 'after_photo')
   const signoff = files.filter((f) => f.category === 'signoff_photo' || f.category === 'signoff_document')

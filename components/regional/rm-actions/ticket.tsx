@@ -9,7 +9,7 @@ import { Pencil, Plus, Camera, Info, X, ChevronDown, MessageSquare, XCircle, Sen
 import { uploadFiles } from '@/lib/upload'
 import { formatDateTime } from '@/lib/utils'
 import { Modal } from './modal'
-import { post, type SupplierChoice } from './shared'
+import { post, errMsg, type SupplierChoice } from './shared'
 import { AssignSuppliersButton } from './assign'
 
 // ── "More" dropdown — a compact button (sits next to the primary action) that
@@ -170,7 +170,7 @@ export function RequestInfoButton({ ticketId, defaultOpen = false, onClose, trig
     const reason = [preset, message.trim()].filter(Boolean).join(' — ') || 'Please review the ticket and add any missing detail.'
     setBusy(true); setErr('')
     try { await post(`/api/tickets/${ticketId}/transition`, { action: 'request_info', reason }); setPreset(''); setMessage(''); close(); setBusy(false); router.refresh() }
-    catch (e: any) { setErr(e.message); setBusy(false) }
+    catch (e) { setErr(errMsg(e)); setBusy(false) }
   }
 
   const input = 'w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)]'
@@ -234,7 +234,7 @@ export function RequestEvidenceButton({ ticketId, defaultOpen = false, onClose, 
     if (!reason) { setErr('Tell the supplier what evidence you need.'); return }
     setBusy(true); setErr('')
     try { await post(`/api/tickets/${ticketId}/transition`, { action: 'request_evidence', reason }); setPreset(''); setOther(''); setBusy(false); close(); router.refresh() }
-    catch (e: any) { setErr(e.message); setBusy(false) }
+    catch (e) { setErr(errMsg(e)); setBusy(false) }
   }
 
   const input = 'w-full px-3 py-2 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm'
@@ -280,7 +280,7 @@ export function RaiseSnagButton({ ticketId, defaultOpen = false, onClose, trigge
     if (!description) { setErr('Describe the snag.'); return }
     setBusy(true); setErr('')
     try { await post(`/api/tickets/${ticketId}/transition`, { action: 'raise_snag', description }); setPreset(''); setOther(''); setBusy(false); close(); router.refresh() }
-    catch (e: any) { setErr(e.message); setBusy(false) }
+    catch (e) { setErr(errMsg(e)); setBusy(false) }
   }
 
   const input = 'w-full px-3 py-2 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm'
@@ -340,7 +340,7 @@ export function RmEditTicketForm({ ticketId, initial, defaultOpen = false, onClo
       const res = await fetch(`/api/tickets/${ticketId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, description, category, operational_impact: impact, priority }) })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to save')
       setBusy(false); close(); router.refresh()   // reset busy so a second edit isn't stuck on "Saving…"
-    } catch (e: any) { setErr(e.message); setBusy(false) }
+    } catch (e) { setErr(errMsg(e)); setBusy(false) }
   }
 
   return (
@@ -408,7 +408,7 @@ export function RmAddWorkForm({ ticketId, description, photoUrls, title, categor
       const res = await fetch(`/api/tickets/${ticketId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, description: newDescription, category, operational_impact: impact, photo_urls: [...photoUrls, ...newUrls], edit_note: 'added extra work' }) })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to add the extra work.')
       setBusy(false); setText(''); setFiles([]); close(); router.refresh()
-    } catch (e: any) { setErr(e.message); setBusy(false) }
+    } catch (e) { setErr(errMsg(e)); setBusy(false) }
   }
 
   return (
@@ -479,7 +479,7 @@ export function AcceptScheduleCard({ ticketId, scheduledAt }: { ticketId: string
   async function accept() {
     setBusy(true); setErr('')
     try { await post(`/api/tickets/${ticketId}/transition`, { action: 'accept_schedule' }); router.refresh() }
-    catch (e: any) { setErr(e.message); setBusy(false) }
+    catch (e) { setErr(errMsg(e)); setBusy(false) }
   }
   return (
     <div className="rounded-xl ring-1 ring-indigo-500/40 bg-indigo-500/5 p-4 space-y-2">
@@ -508,7 +508,7 @@ export function CancelTicketCard({ ticketId, jobRef, defaultOpen = false, onClos
     // Note is optional context appended to the required reason.
     const finalReason = [reason, note.trim()].filter(Boolean).join(' — ')
     try { await post(`/api/tickets/${ticketId}/transition`, { action: 'reject', reason: finalReason }); close(); setBusy(false); router.refresh() }
-    catch (e: any) { setErr(e.message); setBusy(false) }
+    catch (e) { setErr(errMsg(e)); setBusy(false) }
   }
 
   const input = 'w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)]'
@@ -566,7 +566,7 @@ export function CloseOutButton({ ticketId, voConfirmed }: { ticketId: string; vo
   async function closeOut() {
     setBusy(true); setErr('')
     try { await post(`/api/tickets/${ticketId}/transition`, { action: 'close_out' }); router.refresh() }
-    catch (e: any) { setErr(e.message); setBusy(false) }
+    catch (e) { setErr(errMsg(e)); setBusy(false) }
   }
   return (
     <div className="space-y-1.5">

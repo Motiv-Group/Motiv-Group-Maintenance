@@ -189,7 +189,7 @@ function ChatComposer({ ticketId, onSent }: { ticketId: string; onSent: () => vo
       const res = await fetch(`/api/tickets/${ticketId}/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body: text.trim() || null, attachmentUrls: urls }) })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to send')
       setText(''); setFiles([]); onSent()
-    } catch (e: any) { setErr(e.message) }
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)) }
     finally { setBusy(false) }
   }
 

@@ -11,7 +11,7 @@ export default async function AdminStorePage({ params }: { params: Promise<{ id:
   const { userId } = await requireMasterAdmin()
   const admin = createAdminClient()
   const { data: prof } = await admin.from('user_profiles').select('company_id').eq('id', userId).single()
-  const companyId = (prof as any)?.company_id ?? null
+  const companyId = prof?.company_id ?? null
   if (!companyId) notFound()
 
   const loaded = await loadProjectStore(companyId, storeId)
@@ -23,7 +23,7 @@ export default async function AdminStorePage({ params }: { params: Promise<{ id:
     .select('id, branch_code')
     .eq('project_id', id)
     .order('branch_code', { ascending: true })
-  const ids = (siblings ?? []).map((s: any) => s.id)
+  const ids = (siblings ?? []).map(s => s.id)
   const idx = ids.indexOf(storeId)
 
   return (

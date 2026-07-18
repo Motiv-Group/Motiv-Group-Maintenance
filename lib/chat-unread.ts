@@ -2,7 +2,11 @@
 // message authored by the OTHER party after the user's read cursor. Server-only
 // (uses the service-role admin client); drives the unread dot on the ticket-detail
 // header chat icon. Cheap: one read-cursor lookup + one head count.
-export async function ticketChatUnread(admin: any, ticketId: string, userId: string): Promise<boolean> {
+import type { createAdminClient } from '@/lib/supabase/server'
+
+type AdminClient = ReturnType<typeof createAdminClient>
+
+export async function ticketChatUnread(admin: AdminClient, ticketId: string, userId: string): Promise<boolean> {
   const { data: read } = await admin
     .from('ticket_chat_reads').select('last_read_at')
     .eq('ticket_id', ticketId).eq('user_id', userId).maybeSingle()

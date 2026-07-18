@@ -25,7 +25,7 @@ export default async function AdminStoresPage() {
         .select('id, name, sub_store, branch_code, region_id')
         .eq('company_id', companyId)
         .order('name')
-    : { data: [] as any[] }
+    : { data: null }
 
   const { data: regionalManagers } = companyId
     ? await admin
@@ -34,15 +34,16 @@ export default async function AdminStoresPage() {
         .eq('role', 'regional_manager')
         .eq('company_id', companyId)
         .order('full_name')
-    : { data: [] as any[] }
+    : { data: null }
 
   const { data: regionalUsers } = companyId
     ? await admin.from('regional_users').select('user_id, region_id')
-    : { data: [] as any[] }
+    : { data: null }
 
-  const rmMap = Object.fromEntries((regionalManagers ?? []).map(rm => [rm.id, rm]))
+  type RmRow = NonNullable<typeof regionalManagers>[number]
+  const rmMap = Object.fromEntries((regionalManagers ?? []).map(rm => [rm.id, rm] as const))
   // region_id → RM (first RM linked to that region)
-  const regionRmMap: Record<string, any> = {}
+  const regionRmMap: Record<string, RmRow> = {}
   for (const link of regionalUsers ?? []) {
     if (link.region_id && !regionRmMap[link.region_id] && rmMap[link.user_id]) {
       regionRmMap[link.region_id] = rmMap[link.user_id]
@@ -51,21 +52,25 @@ export default async function AdminStoresPage() {
 
   // Tickets don't reliably embed off `stores`, so fetch them separately and
   // count per store in JS (tickets link to the store via store_id).
-  const storeIds = (stores ?? []).map((s: any) => s.id)
+  const storeIds = (stores ?? []).map(s => s.id)
   const { data: tickets } = storeIds.length
     ? await supabase.from('tickets').select('id, status, store_id').in('store_id', storeIds)
-    : { data: [] as any[] }
-  const ticketsByStore: Record<string, any[]> = {}
+    : { data: null }
+  const ticketsByStore: Record<string, NonNullable<typeof tickets>> = {}
   for (const t of tickets ?? []) {
-    (ticketsByStore[t.store_id] ??= []).push(t)
+    // store_id is non-null here — rows were fetched with .in('store_id', storeIds)
+    (ticketsByStore[t.store_id as string] ??= []).push(t)
   }
 
-  const storeList = (stores ?? []).map((s: any) => {
+  // `email` is never selected off `stores` (no such column) — typed optional so the
+  // pre-existing `{store.email}` render below stays an empty slot, unchanged.
+  type StoreListItem = NonNullable<typeof stores>[number] & { company_name: string; openCount: number; totalTickets: number; rm: RmRow | null; email?: string }
+  const storeList: StoreListItem[] = (stores ?? []).map(s => {
     const storeTickets = ticketsByStore[s.id] ?? []
     return {
       ...s,
       company_name: s.name,
-      openCount:  storeTickets.filter((t: any) => !['completed','cancelled'].includes(t.status)).length,
+      openCount:  storeTickets.filter(t => !['completed','cancelled'].includes(t.status)).length,
       totalTickets: storeTickets.length,
       rm: s.region_id ? (regionRmMap[s.region_id] ?? null) : null,
     }
@@ -89,7 +94,7 @@ export default async function AdminStoresPage() {
         </div>
       ) : (
         <Card className="overflow-hidden p-0">
-          {storeList.map((store: any) => (
+          {storeList.map(store => (
             <Link
               key={store.id}
               href={`/supplier/stores/${store.id}`}

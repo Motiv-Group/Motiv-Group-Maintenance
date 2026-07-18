@@ -53,7 +53,7 @@ export default function LogJobPage() {
       })
       if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error ?? 'Failed to log job') }
       router.push('/individual/tickets'); router.refresh()
-    } catch (e: any) { setError(e.message ?? 'Failed'); setLoading(false) }
+    } catch (e) { setError(e instanceof Error ? e.message : 'Failed'); setLoading(false) }
   }
 
   return (

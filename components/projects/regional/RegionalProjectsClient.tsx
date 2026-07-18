@@ -8,11 +8,11 @@ import { PROJECT_STATUS_LABELS } from '@/lib/projects/types'
 import { PROJECT_STATUS_PILL } from '@/components/projects/statusStyles'
 import { AnimatedBar } from '@/components/projects/AnimatedBar'
 import { milestoneCounts, stageLabel, MILESTONE_LABELS } from '@/lib/projects/progress'
-import type { ProjectSummary, StoreRow } from '@/lib/projects/data'
+import type { ProjectRow, ProjectSummary, StoreRow } from '@/lib/projects/data'
 
 interface Featured {
   summary: ProjectSummary
-  project: any
+  project: ProjectRow
   stores: StoreRow[]
 }
 
@@ -156,7 +156,7 @@ function MilestoneCard({ f }: { f: Featured }) {
   )
 }
 
-function TimelineCard({ project }: { project: any }) {
+function TimelineCard({ project }: { project: ProjectRow }) {
   const startT = project.start_date ? new Date(project.start_date).getTime() : NaN
   const endT = project.end_date ? new Date(project.end_date).getTime() : NaN
   const hasRange = !Number.isNaN(startT) && !Number.isNaN(endT) && endT > startT

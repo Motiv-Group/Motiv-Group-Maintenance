@@ -10,6 +10,7 @@ import { Pencil, X, Save } from 'lucide-react'
 import { uploadFiles } from '@/lib/upload'
 import { PhotoUploader } from '@/components/ui/PhotoUploader'
 import { useScrollLock } from '@/lib/useScrollLock'
+import { errMsg } from '@/components/ui/errMsg'
 
 const CATEGORIES = ['Electrical', 'Plumbing', 'HVAC', 'Refrigeration', 'Gas', 'Structural', 'General', 'Cleaning', 'Other']
 const IMPACTS: { v: string; label: string }[] = [
@@ -90,7 +91,7 @@ export function EditTicketModal({ ticketId, title: t0, description: d0, category
       setOpen(false)
       previews.forEach(URL.revokeObjectURL); setPreviews([]); setFiles([])
       router.refresh()
-    } catch (e: any) { setErr(e.message); setBusy(false) }
+    } catch (e) { setErr(errMsg(e)); setBusy(false) }
   }
 
   const field = 'w-full rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)] focus:outline-none focus:ring-2 focus:ring-blue-500/40'

@@ -7,6 +7,7 @@ import { Card } from '@/components/exec/ui'
 import { Drawer, DrawerHeader } from '@/components/exec/Drawer'
 import { isValidEmail, isValidPhone } from '@/lib/csv'
 import { useScrollLock } from '@/lib/useScrollLock'
+import { errMsg } from '@/components/ui/errMsg'
 
 type Mode = 'exec-regions' | 'rm-stores' | 'suppliers'
 interface Opt { id: string; name: string }
@@ -116,7 +117,7 @@ function Form({ action, title, fields, select, cta }: { action: string; title: s
       if (!res.ok) throw new Error(d.error ?? 'Failed')
       setMsg({ ok: true, text: d.message ?? (d.actionLink ? (d.emailed ? 'Invited — email sent.' : 'Created. Email not configured — copy the link:') : 'Done.'), link: d.emailed ? undefined : d.actionLink })
       setVals({}); router.refresh()
-    } catch (e: any) { setMsg({ ok: false, text: e.message }) } finally { setBusy(false) }
+    } catch (e) { setMsg({ ok: false, text: errMsg(e) }) } finally { setBusy(false) }
   }
 
   return (

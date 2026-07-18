@@ -27,8 +27,8 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     .eq('id', fileId)
     .eq('company_id', companyId)
     .single()
-  if (!file || (file as any).project_id !== id) return NextResponse.json({ error: 'File not found' }, { status: 404 })
-  const f = file as any
+  if (!file || file.project_id !== id) return NextResponse.json({ error: 'File not found' }, { status: 404 })
+  const f = file
 
   const { error } = await admin.from('project_files').delete().eq('id', fileId)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

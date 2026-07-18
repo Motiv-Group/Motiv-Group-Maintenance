@@ -61,7 +61,13 @@ export async function POST(req: NextRequest) {
   // slip past the cap. Fail-open if the quota infra isn't present yet (migration
   // not applied) — a missing function must never hard-break uploads.
   if (incoming > 0) {
-    const { data: ok, error } = await (admin.rpc as any)('reserve_upload_quota', {
+    // reserve_upload_quota isn't in the generated DB types (the Functions block is
+    // empty) — type this one RPC call narrowly instead of loosening the client.
+    const reserveQuota = admin.rpc as unknown as (
+      fn: 'reserve_upload_quota',
+      args: { p_user: string; p_bytes: number; p_cap: number },
+    ) => Promise<{ data: boolean | null; error: { message: string } | null }>
+    const { data: ok, error } = await reserveQuota('reserve_upload_quota', {
       p_user: user.id, p_bytes: incoming, p_cap: MAX_USER_UPLOAD_BYTES,
     })
     if (error) {
@@ -88,8 +94,8 @@ export async function POST(req: NextRequest) {
       // it can only make the cap stricter, and storage errors are rare).
       if (error) { console.error('[api/uploads]', bucket, f.name, error.message); failed.push(f.name); return }
       urls.push(admin.storage.from(bucket).getPublicUrl(path).data.publicUrl)
-    } catch (e: any) {
-      console.error('[api/uploads] exception', bucket, f.name, e?.message)
+    } catch (e) {
+      console.error('[api/uploads] exception', bucket, f.name, e instanceof Error ? e.message : e)
       failed.push(f.name)
     }
   }))

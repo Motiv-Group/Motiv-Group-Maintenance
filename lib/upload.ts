@@ -29,8 +29,8 @@ export async function uploadFiles(
     }
     const data = await res.json()
     return { urls: data.urls ?? [], failed: data.failed ?? [] }
-  } catch (e: any) {
-    console.error('[upload] network error:', e?.message)
+  } catch (e) {
+    console.error('[upload] network error:', e instanceof Error ? e.message : e)
     return { urls: [], failed: files.map(f => f.name) }
   }
 }

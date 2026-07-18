@@ -47,8 +47,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const ws = wb.Sheets[wb.SheetNames[0]]
     if (!ws) return NextResponse.json({ error: 'The spreadsheet has no sheets' }, { status: 400 })
     matrix = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, blankrows: false }) as unknown[][]
-  } catch (e: any) {
-    return NextResponse.json({ error: `Could not read the spreadsheet: ${e?.message ?? 'unknown error'}` }, { status: 400 })
+  } catch (e) {
+    return NextResponse.json({ error: `Could not read the spreadsheet: ${e instanceof Error ? e.message : 'unknown error'}` }, { status: 400 })
   }
 
   const preview = parseImportMatrix(matrix)
@@ -56,7 +56,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // Which of the valid branch codes already exist on this project?
   const { data: existing } = await admin.from('project_stores').select('id, branch_code').eq('project_id', id)
   const existingByCode = new Map<string, string>()
-  for (const s of (existing ?? []) as any[]) existingByCode.set(String(s.branch_code).toUpperCase(), s.id)
+  for (const s of existing ?? []) existingByCode.set(String(s.branch_code).toUpperCase(), s.id)
 
   const newRows = preview.valid.filter((v) => !existingByCode.has(v.branch_code.toUpperCase()))
   const existingRows = preview.valid.filter((v) => existingByCode.has(v.branch_code.toUpperCase()))

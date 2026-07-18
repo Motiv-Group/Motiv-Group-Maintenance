@@ -9,7 +9,7 @@ import { Stars } from '@/components/ui/Stars'
 import { PhotoThumbs } from '@/components/ui/PhotoThumbs'
 import { formatCurrency, formatDateTime, rmStatusMeta, PRIORITY_LEVEL_LABELS, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
 import { Modal } from './modal'
-import { post, PANEL_META, type SupplierChoice } from './shared'
+import { post, errMsg, PANEL_META, type SupplierChoice } from './shared'
 
 // ── Assign suppliers (button → modal: searchable, sortable, paginated table) ─
 
@@ -67,7 +67,7 @@ export function AssignSuppliersButton({ ticketId, suppliers, motivSuppliers = []
   async function doAssign() {
     setBusy(true); setErr('')
     try { await post(`/api/tickets/${ticketId}/assign`, { supplierIds: [...sel] }); setOpen(false); setBusy(false); setConfirmReinvite(false); router.refresh() }
-    catch (e: any) { setErr(e.message); setBusy(false) }
+    catch (e) { setErr(errMsg(e)); setBusy(false) }
   }
   function assign() {
     if (!sel.size) { setErr('Select at least one supplier.'); return }

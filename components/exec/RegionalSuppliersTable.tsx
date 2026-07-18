@@ -18,6 +18,7 @@ import { Stars } from '@/components/ui/Stars'
 import { MapLink } from '@/components/ui/MapLink'
 import { Modal } from '@/components/ui/Modal'
 import { DrawerHeader } from '@/components/exec/Drawer'
+import { errMsg } from '@/components/ui/errMsg'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { isValidEmail } from '@/lib/csv'
 
@@ -326,7 +327,7 @@ function InviteSupplierModal({ onClose }: { onClose: () => void }) {
       if (!res.ok) throw new Error(d.error ?? 'Failed to send invite')
       setResult({ ok: true, text: d.message ?? 'Invite sent.', link: d.actionLink })
       router.refresh()
-    } catch (e: any) { setResult({ ok: false, text: e.message }); setBusy(false) }
+    } catch (e) { setResult({ ok: false, text: errMsg(e) }); setBusy(false) }
   }
 
   return (

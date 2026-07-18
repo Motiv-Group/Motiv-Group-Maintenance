@@ -27,11 +27,18 @@ const config = [
       'react-hooks/refs': 'error',
       'react-hooks/incompatible-library': 'error',
       'react-hooks/preserve-manual-memoization': 'error',
-      // TS3 (2026-07-17 audit): freeze the `any` count. `warn` (not error) so the
-      // remaining grandfathered escapes don't block CI, but every new one shows
-      // up in review output. Burn down toward zero; flip to 'error' when clean.
-      '@typescript-eslint/no-explicit-any': 'warn',
+      // TS4 (2026-07-18): the `any` burndown is complete — app/components/lib
+      // source is clean, so the rule is now `error` and any new explicit `any`
+      // fails CI.
+      '@typescript-eslint/no-explicit-any': 'error',
     },
+  },
+  {
+    // Test files are exempt: the vi.hoisted chainable Supabase mock (and vitest
+    // mocks generally) are inherently dynamic — typing them as `any` is the
+    // pragmatic choice and carries no runtime risk.
+    files: ['**/*.test.ts', '**/*.test.tsx', 'tests/**'],
+    rules: { '@typescript-eslint/no-explicit-any': 'off' },
   },
 ]
 

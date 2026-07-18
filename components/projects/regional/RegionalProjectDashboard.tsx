@@ -9,11 +9,11 @@ import { AnimatedBar } from '@/components/projects/AnimatedBar'
 import { SegmentedProgressBar } from '@/components/projects/SegmentedProgressBar'
 import { STORE_STATUS_LABEL, STORE_STATUS_PILL, OVERDUE_PILL } from '@/components/projects/statusStyles'
 import { milestoneSteps, milestoneCounts, stageLabel, MILESTONE_LABELS } from '@/lib/projects/progress'
-import type { ProjectSummary, StoreRow } from '@/lib/projects/data'
+import type { ProjectRow, ProjectSummary, StoreRow } from '@/lib/projects/data'
 
 type StatusFilter = 'all' | 'not_started' | 'in_progress' | 'complete' | 'overdue'
 
-export function RegionalProjectDashboard({ project, summary, stores }: { project: any; summary: ProjectSummary; stores: StoreRow[] }) {
+export function RegionalProjectDashboard({ project, summary, stores }: { project: ProjectRow; summary: ProjectSummary; stores: StoreRow[] }) {
   const [view, setView] = useState<'cards' | 'table'>('table')
   const [q, setQ] = useState('')
   const [status, setStatus] = useState<StatusFilter>('all')

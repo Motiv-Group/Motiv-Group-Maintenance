@@ -9,7 +9,7 @@ export default async function AdminProjectsPage() {
   const { userId } = await requireMasterAdmin()
   const admin = createAdminClient()
   const { data: prof } = await admin.from('user_profiles').select('company_id').eq('id', userId).single()
-  const companyId = (prof as any)?.company_id ?? null
+  const companyId = prof?.company_id ?? null
   const projects = companyId ? await loadProjects(companyId, true) : []
   return <AdminProjectsClient projects={projects} hasCompany={!!companyId} />
 }

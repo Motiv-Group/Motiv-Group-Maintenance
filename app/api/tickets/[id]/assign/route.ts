@@ -55,8 +55,8 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   // shared Motiv-pool supplier — reject arbitrary or cross-tenant supplier UUIDs
   // (the admin client bypasses RLS, so this is the only tenant guard on assignment).
   const { data: supRows } = await admin.from('suppliers').select('id, company_id, is_motiv').in('id', supplierIds)
-  const inScope = (s: any) => s.company_id === ticket.company_id || s.company_id === null || s.is_motiv === true
-  const validIds = new Set((supRows ?? []).filter(inScope).map((s: any) => s.id))
+  const inScope = (s: NonNullable<typeof supRows>[number]) => s.company_id === ticket.company_id || s.company_id === null || s.is_motiv === true
+  const validIds = new Set((supRows ?? []).filter(inScope).map(s => s.id))
   if (validIds.size !== supplierIds.length) return NextResponse.json({ error: 'One or more selected suppliers are not available for this ticket.' }, { status: 400 })
 
   const now = new Date().toISOString()
@@ -74,7 +74,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   // RE-INVITED (reset to 'invited', stamped as a re-quote request); never-involved
   // suppliers get a fresh invite; already-active invites are left untouched.
   const { data: existingInvites } = await admin.from('ticket_suppliers').select('supplier_id, status').eq('ticket_id', ticket.id).in('supplier_id', supplierIds)
-  const statusById = new Map((existingInvites ?? []).map((r: any) => [r.supplier_id, r.status]))
+  const statusById = new Map((existingInvites ?? []).map(r => [r.supplier_id, r.status]))
   const reinvite = supplierIds.filter(id => ['declined', 'closed'].includes(statusById.get(id) ?? ''))
   const fresh = supplierIds.filter(id => !statusById.has(id))
 
@@ -93,7 +93,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   await admin.from('tickets').update({
     status: 'assigned', supplier_id: null, quote_required: true, quote_requested_at: now, quote_due_at: quoteDueAt,
     // Set-once: the FIRST quote request stays in the audit trail across re-assigns.
-    first_quote_requested_at: (ticket as any).first_quote_requested_at ?? now,
+    first_quote_requested_at: ticket.first_quote_requested_at ?? now,
     current_blocker: 'supplier_action', blocker_owner_type: 'supplier', blocker_started_at: now, sla_paused: false,
     last_internal_update_at: now, updated_at: now,
   }).eq('id', ticket.id)

@@ -93,7 +93,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   revalidatePath(`/admin/projects/${id}`)
   if (storeId) revalidatePath(`/admin/projects/${id}/stores/${storeId}`)
-  return NextResponse.json({ ids: (inserted ?? []).map((r: any) => r.id) })
+  return NextResponse.json({ ids: (inserted ?? []).map(r => r.id) })
 }
 
 // PATCH /api/projects/[id]/files — reorder: { orders: [{ id, sort_order }] }.

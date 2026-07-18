@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Trash2 } from 'lucide-react'
 import { useScrollLock } from '@/lib/useScrollLock'
+import { errMsg } from '@/components/ui/errMsg'
 
 /**
  * Full-width delete button for the store manager's Next action card. Same shape
@@ -23,7 +24,7 @@ export function DeleteTicketButton({ ticketId }: { ticketId: string }) {
       const res = await fetch(`/api/tickets/${ticketId}`, { method: 'DELETE' })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to delete')
       router.push('/client/tickets'); router.refresh()
-    } catch (e: any) { setError(e.message); setBusy(false) }
+    } catch (e) { setError(errMsg(e)); setBusy(false) }
   }
 
   return (

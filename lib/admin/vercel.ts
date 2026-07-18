@@ -18,6 +18,21 @@ export interface VercelStats {
   latestProduction: VercelDeployment | null
 }
 
+// Minimal shapes of the Vercel REST payloads (only the fields read below).
+interface VercelApiDeployment {
+  uid?: string
+  id?: string
+  state?: string
+  readyState?: string
+  target?: string | null
+  createdAt?: number
+  created?: number
+  url?: string
+  meta?: { githubCommitMessage?: string; gitCommitMessage?: string; githubCommitRef?: string; gitBranch?: string }
+}
+interface VercelApiProject { name?: string }
+interface VercelApiDomain { name: string; verified?: boolean }
+
 function auth() {
   const token = process.env.VERCEL_API_TOKEN
   const projectId = process.env.VERCEL_PROJECT_ID
@@ -34,9 +49,9 @@ export async function getVercelStats(): Promise<ProviderResult<VercelStats>> {
   const headers = { Authorization: `Bearer ${token}` }
 
   const [dep, proj, dom] = await Promise.all([
-    fetchJson<any>(`https://api.vercel.com/v6/deployments?projectId=${encodeURIComponent(projectId)}&limit=8${teamQ(teamId)}`, { headers }),
-    fetchJson<any>(`https://api.vercel.com/v9/projects/${encodeURIComponent(projectId)}?${teamQ(teamId).slice(1)}`, { headers }),
-    fetchJson<any>(`https://api.vercel.com/v9/projects/${encodeURIComponent(projectId)}/domains?${teamQ(teamId).slice(1)}`, { headers }),
+    fetchJson<{ deployments?: VercelApiDeployment[] }>(`https://api.vercel.com/v6/deployments?projectId=${encodeURIComponent(projectId)}&limit=8${teamQ(teamId)}`, { headers }),
+    fetchJson<VercelApiProject>(`https://api.vercel.com/v9/projects/${encodeURIComponent(projectId)}?${teamQ(teamId).slice(1)}`, { headers }),
+    fetchJson<{ domains?: VercelApiDomain[] }>(`https://api.vercel.com/v9/projects/${encodeURIComponent(projectId)}/domains?${teamQ(teamId).slice(1)}`, { headers }),
   ])
 
   if (!dep.ok && dep.status === 403) {
@@ -46,7 +61,7 @@ export async function getVercelStats(): Promise<ProviderResult<VercelStats>> {
     return errored(`Couldn't reach Vercel: ${dep.error ?? 'unknown error'}.`)
   }
 
-  const deployments: VercelDeployment[] = ((dep.body?.deployments ?? []) as any[]).map((d) => ({
+  const deployments: VercelDeployment[] = (dep.body?.deployments ?? []).map((d) => ({
     uid: d.uid ?? d.id ?? '',
     state: d.state ?? d.readyState ?? 'UNKNOWN',
     target: d.target ?? null,
@@ -56,7 +71,7 @@ export async function getVercelStats(): Promise<ProviderResult<VercelStats>> {
     branch: d.meta?.githubCommitRef ?? d.meta?.gitBranch ?? null,
   }))
   const latestProduction = deployments.find((d) => d.target === 'production') ?? null
-  const domains = ((dom.body?.domains ?? []) as any[]).map((x) => ({ name: x.name, verified: !!x.verified }))
+  const domains = (dom.body?.domains ?? []).map((x) => ({ name: x.name, verified: !!x.verified }))
   const projectName = proj.ok ? (proj.body?.name ?? null) : null
 
   const anyPartial = !proj.ok || !dom.ok

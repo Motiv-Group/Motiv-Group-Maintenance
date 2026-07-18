@@ -22,7 +22,7 @@ export default async function SupplierOverviewPage() {
     const admin = createAdminClient()
     const { data: supRow } = await admin.from('suppliers')
       .select('verification_status, is_motiv').in('id', supplierIds).limit(1).maybeSingle()
-    pending = (supRow as any)?.verification_status !== 'verified' && !(supRow as any)?.is_motiv
+    pending = supRow?.verification_status !== 'verified' && !supRow?.is_motiv
   }
 
   const d = await assembleSupplierDashboard(companyId, supplierIds)

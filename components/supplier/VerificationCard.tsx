@@ -39,8 +39,8 @@ export function VerificationCard() {
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Could not save the document')
       const d = await fetch('/api/supplier/verification-docs').then(r => r.json())
       setDocs(d.docs ?? []); setVerified(!!d.verified)
-    } catch (e: any) {
-      setError(e.message ?? 'Upload failed — try again.')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Upload failed — try again.')
     } finally {
       setBusyKind(null)
     }

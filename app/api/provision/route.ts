@@ -77,11 +77,11 @@ export async function POST(request: Request) {
       case 'list_pending_rms': {
         if (!isExec) return forbid()
         const { data: regions } = await admin.from('regions').select('id, name, region_code').eq('company_id', companyId).eq('active', true)
-        const byCode = new Map((regions ?? []).map((r: any) => [String(r.region_code ?? '').toUpperCase(), r]))
+        const byCode = new Map((regions ?? []).map(r => [String(r.region_code ?? '').toUpperCase(), r]))
         const { data: pend } = await admin.from('user_profiles')
           .select('id, email, full_name, requested_region_code')
           .eq('role', 'regional_manager').is('company_id', null).not('requested_region_code', 'is', null)
-        const pending = (pend ?? []).map((p: any) => {
+        const pending = (pend ?? []).map(p => {
           const region = byCode.get(String(p.requested_region_code ?? '').toUpperCase())
           return { id: p.id, email: p.email, fullName: p.full_name, code: p.requested_region_code, regionId: region?.id ?? null, regionName: region?.name ?? null }
         }).filter(p => p.regionId) // only RMs whose code matches one of this exec's regions
@@ -269,7 +269,7 @@ export async function POST(request: Request) {
           const { data: p } = await admin.from('user_profiles').select('email, phone, full_name, company_name').eq('id', smId).single()
           sm = { userId: smId, email: p?.email ?? null, phone: p?.phone ?? null, fullName: p?.full_name ?? null, companyName: p?.company_name ?? null }
         }
-        return NextResponse.json({ store: { id: store.id, name: store.name, subStore: store.sub_store, branchCode: store.branch_code, address: (store as any).address ?? null, active: store.active, closedAt: store.closed_at }, sm })
+        return NextResponse.json({ store: { id: store.id, name: store.name, subStore: store.sub_store, branchCode: store.branch_code, address: store.address ?? null, active: store.active, closedAt: store.closed_at }, sm })
       }
       case 'update_store': {
         if (!isRM) return forbid()
@@ -282,13 +282,13 @@ export async function POST(request: Request) {
         const bcode = typeof body.branch_code === 'string' && body.branch_code.trim() ? body.branch_code.trim().toUpperCase() : null
         const subStore = typeof body.sub_store === 'string' && body.sub_store.trim() ? body.sub_store.trim() : null
         const address = typeof body.address === 'string' ? body.address.trim() || null : undefined
-        const patch: Record<string, any> = {}
+        const patch: Database['public']['Tables']['stores']['Update'] = {}
         if (typeof body.store_name === 'string' && body.store_name.trim()) patch.name = body.store_name.trim()
         if (subStore) patch.sub_store = subStore
         if (bcode) patch.branch_code = bcode
         if (address !== undefined) patch.address = address
         if (Object.keys(patch).length) {
-          const { error } = await admin.from('stores').update(patch as Database['public']['Tables']['stores']['Update']).eq('id', store.id)
+          const { error } = await admin.from('stores').update(patch).eq('id', store.id)
           if (error) return NextResponse.json({ error: error.message.includes('duplicate') ? 'Branch code already exists' : error.message }, { status: 400 })
         }
 
@@ -301,7 +301,7 @@ export async function POST(request: Request) {
         let emailed: boolean | undefined
         if (smId) {
           const { data: cur } = await admin.from('user_profiles').select('email, phone, full_name').eq('id', smId).single()
-          const profPatch: Record<string, any> = {}
+          const profPatch: Database['public']['Tables']['user_profiles']['Update'] = {}
 
           if (typeof body.full_name === 'string' && body.full_name.trim()) profPatch.full_name = body.full_name.trim()
           if (typeof body.company_name === 'string') profPatch.company_name = body.company_name.trim() || null
@@ -321,7 +321,7 @@ export async function POST(request: Request) {
             const { error: authErr } = await admin.auth.admin.updateUserById(smId, { email: newEmail, password, email_confirm: true })
             if (authErr) return NextResponse.json({ error: /already|registered|exists/i.test(authErr.message) ? 'That email already has an account' : authErr.message }, { status: 400 })
             profPatch.email = newEmail
-            if (Object.keys(profPatch).length) await admin.from('user_profiles').update(profPatch as Database['public']['Tables']['user_profiles']['Update']).eq('id', smId)
+            if (Object.keys(profPatch).length) await admin.from('user_profiles').update(profPatch).eq('id', smId)
             // Email the new credentials (invite link + username + password).
             const { data: company } = await admin.from('companies').select('name').eq('id', companyId).single()
             const { subject, html, text } = await buildEmail('store_welcome', {
@@ -330,7 +330,7 @@ export async function POST(request: Request) {
             })
             emailed = await sendEmail({ to: newEmail, subject, html, text })
           } else if (Object.keys(profPatch).length) {
-            await admin.from('user_profiles').update(profPatch as Database['public']['Tables']['user_profiles']['Update']).eq('id', smId)
+            await admin.from('user_profiles').update(profPatch).eq('id', smId)
           }
         }
         await logAudit(admin, { actorId: user.id, companyId, action: 'provision.update_store', entityType: 'store', entityId: store.id, metadata: { storeId: store.id, contactChanged: !!(newEmail || newPhoneRaw) } })
@@ -388,8 +388,8 @@ export async function POST(request: Request) {
       default:
         return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
     }
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message ?? 'Failed' }, { status: 400 })
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : 'Failed' }, { status: 400 })
   }
 
   revalidatePath('/executive/regions'); revalidatePath('/regional/stores'); revalidatePath('/executive/suppliers'); revalidatePath('/regional/suppliers')

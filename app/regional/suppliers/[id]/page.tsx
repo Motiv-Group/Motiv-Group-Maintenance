@@ -45,9 +45,9 @@ export default async function ContractorProfilePage(props: { params: Promise<{ i
 
   if (!contractor || contractor.role !== 'supplier') notFound()
 
-  const reviews   = (ratings ?? []) as any[]
+  const reviews   = ratings ?? []
   const avgRating = reviews.length > 0
-    ? reviews.reduce((s: number, r: any) => s + r.score, 0) / reviews.length
+    ? reviews.reduce((s, r) => s + r.score, 0) / reviews.length
     : null
 
   return (
@@ -146,7 +146,7 @@ export default async function ContractorProfilePage(props: { params: Promise<{ i
         )}
 
         {/* Last 3 reviews preview */}
-        {reviews.slice(0, 3).map((r: any) => (
+        {reviews.slice(0, 3).map(r => (
           <div key={r.id} className="border-t border-gray-100 dark:border-gray-700 pt-3 space-y-1">
             <div className="flex items-center justify-between gap-2">
               <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{r.tickets?.title ?? 'Unknown ticket'}</p>

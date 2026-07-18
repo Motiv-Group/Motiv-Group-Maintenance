@@ -19,6 +19,19 @@ export interface SentryStats {
   eventsLast24h: number | null
 }
 
+// Minimal shape of a Sentry issue payload (only the fields read below).
+interface SentryApiIssue {
+  id: string
+  title?: string
+  metadata?: { type?: string }
+  culprit?: string | null
+  level?: string | null
+  count?: string | null
+  userCount?: unknown
+  lastSeen?: string | null
+  permalink?: string | null
+}
+
 export async function getSentryStats(): Promise<ProviderResult<SentryStats>> {
   // Reads need project:read + event:read. Sentry ORG auth tokens (`sntrys_`) only
   // carry `org:ci` (source-map upload) and can never read issues, so this endpoint
@@ -34,7 +47,7 @@ export async function getSentryStats(): Promise<ProviderResult<SentryStats>> {
   const base = `${sentryApiHost()}/api/0/projects/${encodeURIComponent(org)}/${encodeURIComponent(project)}`
 
   const [issuesRes, statsRes] = await Promise.all([
-    fetchJson<any[]>(`${base}/issues/?query=is:unresolved&statsPeriod=14d&limit=10`, { headers }),
+    fetchJson<SentryApiIssue[]>(`${base}/issues/?query=is:unresolved&statsPeriod=14d&limit=10`, { headers }),
     fetchJson<[number, number][]>(`${base}/stats/?stat=received&resolution=1h&since=${Math.floor(Date.now() / 1000) - 86400}`, { headers }),
   ])
 
@@ -45,7 +58,7 @@ export async function getSentryStats(): Promise<ProviderResult<SentryStats>> {
     return errored(`Couldn't reach Sentry: ${issuesRes.error ?? 'unknown error'}. Check SENTRY_ORG/SENTRY_PROJECT slugs.`)
   }
 
-  const unresolved: SentryIssue[] = ((issuesRes.body ?? []) as any[]).map((i) => ({
+  const unresolved: SentryIssue[] = (issuesRes.body ?? []).map((i) => ({
     id: i.id,
     title: i.title ?? i.metadata?.type ?? 'Issue',
     culprit: i.culprit ?? null,

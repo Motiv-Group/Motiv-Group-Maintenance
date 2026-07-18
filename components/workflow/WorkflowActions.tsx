@@ -98,7 +98,7 @@ export function WorkflowActions({ ticketId, status, role, suppliers = [], exclud
       const d = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(d.error ?? 'Failed')
       setActive(null); setVals({}); router.refresh()
-    } catch (e: any) { setError(e.message) } finally { setBusy(false) }
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)) } finally { setBusy(false) }
   }
 
   function submitForm(e: React.FormEvent) {

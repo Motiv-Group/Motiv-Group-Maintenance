@@ -5,6 +5,7 @@
 // briefing so the dashboard never blocks or breaks.
 import 'server-only'
 import { createAdminClient } from '@/lib/supabase/server'
+import type { Json } from '@/lib/database.types'
 import {
   assembleStoreManagerDashboard, assembleRegionalDashboard, assembleSupplierDashboard, assembleEstateDashboard,
 } from '@/lib/health/data'
@@ -55,11 +56,13 @@ function factsToPrompt(facts: BriefingFacts): string {
     if (v == null || v === '') continue
     if (Array.isArray(v)) {
       if (!v.length) continue
-      const items = v.map((o: any) => {
+      const items = v.map((o: unknown) => {
         if (o && typeof o === 'object') {
-          const name = o.name ?? ''
-          const health = o.health != null ? ` (${Math.round(Number(o.health))}% health)` : ''
-          const issue = o.issue ? ` — ${o.issue}` : ''
+          // Facts arrays are built by the facts.ts builders as {name, health, issue} rows.
+          const s = o as { name?: unknown; health?: unknown; issue?: unknown }
+          const name = s.name ?? ''
+          const health = s.health != null ? ` (${Math.round(Number(s.health))}% health)` : ''
+          const issue = s.issue ? ` — ${s.issue}` : ''
           return `${name}${health}${issue}`.trim()
         }
         return String(o)
@@ -155,7 +158,8 @@ export async function getDailyBriefing({ companyId, scope, scopeId, role, facts,
     // Cache for the rest of the day; ignore conflicts from a concurrent first load.
     await db.from('daily_briefings').upsert({
       company_id: companyId, scope, scope_id: id, briefing_date: date, role,
-      headline: briefing.headline, body: briefing.body, source: briefing.source, facts: resolved as any,
+      // BriefingFacts is Record<string, unknown> holding only JSON-safe values.
+      headline: briefing.headline, body: briefing.body, source: briefing.source, facts: resolved as Json,
     }, { onConflict: 'company_id,scope,scope_id,briefing_date', ignoreDuplicates: true })
 
     return briefing

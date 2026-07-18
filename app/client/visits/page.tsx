@@ -23,25 +23,26 @@ export default async function StoreVisitsPage() {
       .in('status', ['scheduled', 'in_progress', 'snag_assigned', 'snag_in_progress'])
       .order('scheduled_at', { ascending: true })
 
-    const list = (tickets ?? []) as any[]
-    const supplierIds = Array.from(new Set(list.map(t => t.supplier_id).filter(Boolean)))
-    const techIds = Array.from(new Set(list.map(t => t.technician_id).filter(Boolean)))
+    const list = tickets ?? []
+    const supplierIds = Array.from(new Set(list.map(t => t.supplier_id).filter(Boolean))) as string[]
+    const techIds = Array.from(new Set(list.map(t => t.technician_id).filter(Boolean))) as string[]
     const [{ data: suppliers }, { data: stores }, { data: techs }] = await Promise.all([
-      supplierIds.length ? admin.from('suppliers').select('id, company_name').in('id', supplierIds) : Promise.resolve({ data: [] as any[] }),
+      supplierIds.length ? admin.from('suppliers').select('id, company_name').in('id', supplierIds) : Promise.resolve({ data: null }),
       admin.from('stores').select('id, name, sub_store').in('id', storeIds),
-      techIds.length ? admin.from('technicians').select('id, name').in('id', techIds) : Promise.resolve({ data: [] as any[] }),
+      techIds.length ? admin.from('technicians').select('id, name').in('id', techIds) : Promise.resolve({ data: null }),
     ])
-    const supplierName = new Map((suppliers ?? []).map((s: any) => [s.id, s.company_name]))
-    const storeName = new Map((stores ?? []).map((s: any) => [s.id, storeLabel(s.name, s.sub_store)]))
-    const techName = new Map((techs ?? []).map((t: any) => [t.id, t.name]))
+    const supplierName = new Map((suppliers ?? []).map(s => [s.id, s.company_name] as const))
+    const storeName = new Map((stores ?? []).map(s => [s.id, storeLabel(s.name, s.sub_store)] as const))
+    const techName = new Map((techs ?? []).map(t => [t.id, t.name] as const))
 
     // Only future-or-today visits (a job scheduled for the past has been attended).
     const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0)
     rows = list
-      .filter(t => new Date(t.scheduled_at).getTime() >= startOfToday.getTime())
+      // scheduled_at is never null here (the query filters nulls out) — the guard just narrows the type.
+      .filter((t): t is (typeof list)[number] & { scheduled_at: string } => !!t.scheduled_at && new Date(t.scheduled_at).getTime() >= startOfToday.getTime())
       .map(t => ({
-        id: t.id, title: t.title, storeName: storeName.get(t.store_id) ?? 'Store',
-        supplier: supplierName.get(t.supplier_id) ?? 'Assigned supplier',
+        id: t.id, title: t.title, storeName: storeName.get(t.store_id ?? '') ?? 'Store',
+        supplier: supplierName.get(t.supplier_id ?? '') ?? 'Assigned supplier',
         technician: t.technician_id ? techName.get(t.technician_id) ?? null : null,
         scheduledAt: t.scheduled_at, proposed: t.schedule_status === 'proposed',
       }))

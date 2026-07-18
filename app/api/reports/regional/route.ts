@@ -43,9 +43,9 @@ export async function POST(request: Request) {
   const regionIds = (regions ?? []).map(r => r.region_id)
   const { data: stores } = regionIds.length
     ? await admin.from('stores').select('id, name, sub_store, branch_code').in('region_id', regionIds)
-    : { data: [] as any[] }
-  const ownStores = ((stores ?? []) as { id: string; name?: string; sub_store?: string }[])
-    .map(s => ({ id: s.id, company_name: s.name, sub_store: s.sub_store }))
+    : { data: null }
+  // sub_store is nullable; buildRegionalModel's map only checks it for truthiness.
+  const ownStores = (stores ?? []).map(s => ({ id: s.id, company_name: s.name, sub_store: s.sub_store ?? undefined }))
   const ownIds = new Set(ownStores.map(s => s.id))
   const selected = (Array.isArray(storeIds) && storeIds.length
     ? storeIds.filter((id: string) => ownIds.has(id))

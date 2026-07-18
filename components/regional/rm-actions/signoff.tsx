@@ -10,7 +10,7 @@ import { PhotoThumbs } from '@/components/ui/PhotoThumbs'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { formatDateTime } from '@/lib/utils'
 import { Modal } from './modal'
-import { post } from './shared'
+import { post, errMsg } from './shared'
 import { MoreMenu, MoreActionItem, RequestEvidenceButton, RaiseSnagButton } from './ticket'
 
 // ── Generic review panel (COC/POC · snag · VO) — mirrors the quote panel ─────
@@ -189,7 +189,7 @@ export function SignoffReviewPanel({ ticketId, s, onDone }: { ticketId: string; 
       await post(`/api/ratings`, { ticketId, score, comment })
       await post(`/api/tickets/${ticketId}/transition`, { action: 'approve' })
       onDone?.(); router.refresh()
-    } catch (e: any) { setErr(e.message); setBusy(false) }
+    } catch (e) { setErr(errMsg(e)); setBusy(false) }
   }
 
   return (
@@ -266,7 +266,7 @@ export function VariationReviewCard({ ticketId }: { ticketId: string }) {
   async function act(action: 'approve_variation' | 'reject_variation', reasonText?: string) {
     setBusy(true); setErr('')
     try { await post(`/api/tickets/${ticketId}/transition`, { action, reason: reasonText }); router.refresh() }
-    catch (e: any) { setErr(e.message); setBusy(false) }
+    catch (e) { setErr(errMsg(e)); setBusy(false) }
   }
   function submitDecline() {
     if (!reason) { setErr('Choose a reason.'); return }
@@ -329,7 +329,7 @@ export function ApproveSignoffCard({ ticketId }: { ticketId: string }) {
       await post(`/api/ratings`, { ticketId, score, comment })
       await post(`/api/tickets/${ticketId}/transition`, { action: 'approve' })
       router.refresh()
-    } catch (e: any) { setErr(e.message); setBusy(false) }
+    } catch (e) { setErr(errMsg(e)); setBusy(false) }
   }
 
   return (
@@ -357,7 +357,7 @@ export function AcceptSnagScheduleCard({ ticketId, scheduledAt }: { ticketId: st
   async function approve() {
     setBusy(true); setErr('')
     try { await post(`/api/tickets/${ticketId}/transition`, { action: 'approve_snag' }); router.refresh() }
-    catch (e: any) { setErr(e.message); setBusy(false) }
+    catch (e) { setErr(errMsg(e)); setBusy(false) }
   }
   async function decline() {
     if (!reason) { setErr('Choose a reason.'); return }
@@ -365,7 +365,7 @@ export function AcceptSnagScheduleCard({ ticketId, scheduledAt }: { ticketId: st
     if (!finalReason) { setErr('Tell the supplier why.'); return }
     setBusy(true); setErr('')
     try { await post(`/api/tickets/${ticketId}/transition`, { action: 'decline_snag_schedule', reason: finalReason }); setDeclineOpen(false); setBusy(false); router.refresh() }
-    catch (e: any) { setErr(e.message); setBusy(false) }
+    catch (e) { setErr(errMsg(e)); setBusy(false) }
   }
 
   return (

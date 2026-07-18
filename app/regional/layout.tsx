@@ -14,7 +14,7 @@ export default async function RegionalLayout({ children }: { children: React.Rea
   if (allRegionIds.length) {
     const admin = createAdminClient()
     const { data } = await admin.from('regions').select('id, name').in('id', allRegionIds)
-    regionOptions = (data ?? []).map((r: any) => ({ id: r.id, label: r.name ?? 'Region' })).sort((a, b) => a.label.localeCompare(b.label))
+    regionOptions = (data ?? []).map(r => ({ id: r.id, label: r.name ?? 'Region' })).sort((a, b) => a.label.localeCompare(b.label))
   }
   return (
     <ExecChrome userName={fullName} variant="regional" unreadCount={unreadCount}

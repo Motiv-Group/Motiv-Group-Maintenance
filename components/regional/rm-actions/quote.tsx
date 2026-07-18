@@ -9,7 +9,7 @@ import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { QuoteSummary } from '@/components/workflow/QuoteSummary'
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils'
 import { Modal } from './modal'
-import { post, PANEL_META } from './shared'
+import { post, errMsg, PANEL_META } from './shared'
 
 // ── Quote review (approve / decline with reason) ────────────────
 export interface ReviewQuote { id: string; supplierName: string; amount: number; amountInclVat: number | null; description: string | null; fileUrl: string | null; createdAt: string; proposedScheduleAt?: string | null }
@@ -34,7 +34,7 @@ export function QuoteReviewCard({ ticketId, quotes }: { ticketId: string; quotes
       await post(`/api/tickets/${ticketId}/quote-decision`, { action, quoteId, reason: declineReason })
       router.refresh()
     }
-    catch (e: any) { setErr(e.message); setBusy(null) }
+    catch (e) { setErr(errMsg(e)); setBusy(null) }
   }
 
   const input = 'w-full px-3 py-2 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm'
@@ -120,7 +120,7 @@ export function RmQuotePanel({ ticketId, rows, canReQuote }: { ticketId: string;
       if (action === 'decline' && requote) await post(`/api/tickets/${ticketId}/quote-decision`, { action: 'requote', quoteId })
       setBusy(false); setOpenId(null); router.refresh()
     }
-    catch (e: any) { setErr(e.message); setBusy(false) }
+    catch (e) { setErr(errMsg(e)); setBusy(false) }
   }
   const input = 'w-full px-3 py-2 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm'
 
@@ -268,7 +268,7 @@ export function QuoteComparison({ ticketId, rows, onClose }: { ticketId: string;
       if (action === 'decline' && requote) await post(`/api/tickets/${ticketId}/quote-decision`, { action: 'requote', quoteId: qid })
       router.refresh()
     }
-    catch (e: any) { setErr(e.message); setBusy(false) }
+    catch (e) { setErr(errMsg(e)); setBusy(false) }
   }
 
   return (
@@ -411,7 +411,7 @@ export function ReQuoteButton({ ticketId, quoteId }: { ticketId: string; quoteId
       setBusy(false); setSent(true)
       setTimeout(() => setSent(false), 4000)   // clear the confirmation after a moment
       router.refresh()
-    } catch (e: any) { setErr(e.message); setBusy(false) }
+    } catch (e) { setErr(errMsg(e)); setBusy(false) }
   }
   return (
     <div>

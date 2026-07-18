@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Upload, CheckCircle2, XCircle, ChevronDown } from 'lucide-react'
 import { Card } from '@/components/exec/ui'
+import { errMsg } from '@/components/ui/errMsg'
 
 type Role = 'executive' | 'regional_manager' | 'store_manager'
 
@@ -45,7 +46,7 @@ export function BulkImportForm() {
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error ?? 'Import failed')
       setResults(data.results ?? []); router.refresh()
-    } catch (e: any) { setErr(e.message) } finally { setBusy(false) }
+    } catch (e) { setErr(errMsg(e)) } finally { setBusy(false) }
   }
 
   const cols = ROLES.find(r => r.value === role)!.cols

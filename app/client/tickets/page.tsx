@@ -10,6 +10,7 @@ export default async function StoreTicketsPage(props: { searchParams?: Promise<{
   const searchParams = await props.searchParams;
   const { companyId, storeIds } = await requireStoreManagerV3()
   const d = await assembleStoreManagerDashboard(companyId, storeIds)
-  const initialFilter = FILTERS.includes(searchParams?.status as any) ? (searchParams!.status as typeof FILTERS[number]) : 'all'
+  const status = searchParams?.status
+  const initialFilter = FILTERS.find(f => f === status) ?? 'all'
   return <StoreTicketsList tickets={d.tickets} initialFilter={initialFilter} storeName={d.branch || d.storeName} />
 }

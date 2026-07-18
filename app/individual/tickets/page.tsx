@@ -8,8 +8,11 @@ import { Card } from '@/components/exec/ui'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { isTerminalStatus } from '@/lib/workflow'
 import { rmStatusMeta, formatDateTime } from '@/lib/utils'
+import type { Database } from '@/lib/database.types'
 
-function Row({ t }: { t: any }) {
+type TicketRow = Pick<Database['public']['Tables']['tickets']['Row'], 'id' | 'title' | 'status' | 'priority' | 'created_at'>
+
+function Row({ t }: { t: TicketRow }) {
   const sm = rmStatusMeta(t.status)
   return (
     <Link href={`/individual/tickets/${t.id}`} className="flex items-center justify-between gap-2 px-3 py-3 border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)] transition">
@@ -33,7 +36,7 @@ export default async function IndividualTicketsPage() {
     .select('id, title, status, priority, created_at')
     .eq('created_by', userId)
     .order('created_at', { ascending: false })
-  const tickets = (rows ?? []) as any[]
+  const tickets = rows ?? []
   const active = tickets.filter(t => !isTerminalStatus(t.status))
   const done = tickets.filter(t => isTerminalStatus(t.status))
 

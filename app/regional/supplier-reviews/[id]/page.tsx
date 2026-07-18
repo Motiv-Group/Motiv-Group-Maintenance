@@ -16,7 +16,7 @@ export default async function SupplierReviewsPage(props: { params: Promise<{ id:
   if (!supplier || supplier.company_id !== companyId) redirect('/regional')
 
   const { data: ratingsRaw } = await admin.from('ratings').select('score, comment, created_at').eq('supplier_id', params.id).order('created_at', { ascending: false })
-  const rs = (ratingsRaw ?? []) as any[]
+  const rs = ratingsRaw ?? []
   const total = rs.length
   const avg = total ? rs.reduce((s, r) => s + Number(r.score), 0) / total : 0
   const dist = [5, 4, 3, 2, 1].map(n => ({ n, c: rs.filter(r => Number(r.score) === n).length }))
