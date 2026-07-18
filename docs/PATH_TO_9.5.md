@@ -7,7 +7,7 @@
 > **Living doc.** Claude updates this whenever an item is completed or a new issue is found — check + update it every session.
 > 9.5 overall = **every section ≥ 9.0** *plus* independent validation (penetration test + backup-restore drill).
 
-**Overall score:** ~8.3 / 10 → target 9.5 (per `docs/AUDIT_2026-07-16.md` — all audit CODE items closed 2026-07-18; the remaining gap is owner-track)
+**Overall score:** ~8.4 / 10 → target 9.5 (per `docs/AUDIT_2026-07-16.md` — all audit CODE items closed 2026-07-18; the remaining gap is owner-track)
 **Last updated:** 2026-07-18
 **Audit baseline commit:** ff1bdeb (audit) / cdc7dec (same-day fixes)
 
@@ -51,30 +51,18 @@ Detail + status for every lettered/numbered item is in the Phase A/B/C tables be
 
 | Section | Now | Gap to close (short) |
 |---|---|---|
-| Security & authorisation | 8.0 | pen test (owner) · quarterly authZ re-audit |
-| Testing | 8.0 | e2e 15/15 green vs dev · optional CI wiring for e2e |
+| Security & authorisation | 8.5 | pen test (owner) · quarterly authZ re-audit |
+| Testing | 8.5 | 18 e2e (smoke + journeys) green + wired into PR CI |
 | CI/CD | 9.0 | deploy-automation depth |
 | Architecture & maintainability | 8.0 | keep files honest; B19 workflow consolidation still open |
 | Type safety | 9.0 | zero `any` in src; no-explicit-any = error |
 | PWA / mobile | 8.5 | offline + update-toast shipped and device-verified |
 | Reliability & operations | 7.0 | backups + restore drill (owner) · uptime/log alerts (owner) |
 | Database & RLS | 7.5 | restore drill (owner) · quarterly advisor |
-| Dependencies | 7.5 | React 19 bump plan · watch xlsx CDN tarball |
+| Dependencies | 8.0 | React 19 bump plan (xlsx repo-vendored) |
 | Docs accuracy | 8.5 | keep in sync each session |
 | Legal / POPIA | 4.0 | real content in /privacy /terms /sla · Info Officer · lawyer sign-off (owner) |
 | Infrastructure & operations | 6.0 | Vercel Pro + Supabase Pro + PITR · staging · SMTP · runbook (owner) |
-
----|---|---|
-| API security & authorisation | 8.5 | webhook fail-closed · body schema validation · rate-limit-fallback alert · audit logs · pen test |
-| Database & row-level security | 8.5 | owner-scoped Individual RLS · schema-drift CI · quarterly advisor · restore drill |
-| Security headers / CSP | 9.5 | hold; add CSP report endpoint · re-verify after Next upgrade · HSTS preload submit |
-| File storage | 9.0 | per-user path prefix · upload quotas · bucket-growth alert |
-| Individual-accounts | 8.0 | e2e verify · realtime decision · transition tests · self-signup abuse review |
-| Dependencies | 8.5 | ✅ Next 16 · ESLint 9 · Dependabot · `npm audit` blocking in CI (0-high). Remaining: moderate `postcss` (via next, clears on a future patch) · React-Compiler lint debt (B16) |
-| Legal / POPIA | 4.0 | real content in /privacy /terms /sla · Info Officer registered · lawyer sign-off · signup consent |
-| Infrastructure & operations | 6.0 | Vercel Pro + Supabase Pro + PITR · staging · uptime/log alerts · SMTP · runbook |
-| Code quality & tests | 8.5 | ✅ transition-matrix + route-authZ + uploads/WhatsApp tests (456 green) · CI pipeline. Remaining: Playwright smoke (T4) · webhook-handler/provision tests (T6) |
-| UI/UX | 8.0 | Phase 2 (work queue, chip diet, tab consolidation, etc.) · usability pass |
 
 ---
 
@@ -146,6 +134,7 @@ Detail + status for every lettered/numbered item is in the Phase A/B/C tables be
 | N3 | **Supplier UI showed a fake company/store on Individual tickets** — Individuals correctly have NO company/store in the data (verified: profile `company_id` null, no store/region links, no tickets carry them), but the supplier side labelled their jobs with the supplier's OWN company + a "Store" fallback. Fixed across the whole supplier surface: detail page (load company by `t.company_id`, hide Store when null) **and** dashboard + tickets list + quotes/signoff rows + store-group headings + store panel now show **"Individual"** (no company/store) via a new `SupplierTicketRow.isIndividual` flag. | MEDIUM | ✅ 2026-07-06 |
 
 ## Done log
+- **2026-07-18 SECOND EXTERNAL AUDIT ROUND (PR #57)** — ChatGPT re-rated **8.0** (vs our ~8.3 — convergent). All 4 findings verified valid + fixed same-day: **X4** supplier store DIRECTORY scoped to engaged stores (list + detail; unengaged → 404; SM PII only with an awarded ticket — POPIA minimization); **journey e2e** (create→invite→quote→award→work→signoff→confirm-no-VOs→close-out, dispute block/resolve, snag chain — 3 serial API-driven tests asserting DB status per step) + the whole 18-test suite wired into PR CI (`e2e.yml`, secret-gated, serialized — **OWNER: add E2E_SUPABASE_URL/ANON_KEY/SERVICE_ROLE_KEY Actions secrets = the motiv-dev values from .env.e2e**); **xlsx vendored** (`vendor/xlsx-0.20.3.tgz`, sha512-verified vs lockfile — clean `npm ci` needs no CDN); docs consistency fixes. Verified: tsc, lint, 554 unit, **18/18 e2e**. Scores: security 8.5, testing 8.5, deps 8.0; overall **~8.4**.
 - **2026-07-18 C9 TRUE SCHEMA-DRIFT CI (PR #55)** — new `scripts/check-live-drift.mjs` (`npm run drift:check`): compares `supabase/schema.sql` against the LIVE catalog via PostgREST OpenAPI introspection (service key only — no pg password/secret needed). Weekly + manual GitHub workflow `schema-drift.yml` (owner adds `DRIFT_SUPABASE_URL/KEY` Actions secrets; skips with a notice until then). **First run found REAL prod⇄dev split-brain**: `snags.schedule_agreed_at/declined_at` on dev+schema but never applied to PROD (the long-standing B20 ⏳ item — now proven); `tickets.location` on PROD but never folded into schema.sql or applied to DEV. Fixed: `location` folded into schema.sql + types regenerated; idempotent repair migration `supabase/migrations/20260718_sync_snag_schedule_and_location.sql` — **OWNER: paste it into BOTH the prod and dev SQL editors, then run `npm run drift:check` against each (expect ✅), then tell Claude to archive the migration file.** Limitations documented in-script (catalog-level only; policies/functions via the advisor).
 - **2026-07-18 B19 WORKFLOW CONSOLIDATION (PR #54)** — executed the design doc's 6 steps as sequential verified commits. Pure helpers (`resolveBlockerState`/`computeQuoteDue`/`stampFreshness`) extracted verbatim into `lib/workflow.ts` (+34 unit tests → suite 554); side-effect service (`notifyNextActors`/`logQuoteRequest`) in `lib/services/ticket-workflow.ts`; transition route fully on both; submit-quote/assign/quote-decision/dispute adopted every byte-identical concern. Discovery: several inline "copies" were silent behavioral divergences (bespoke notify copy, deliberately-unstamped blocker columns, individual SLA defaults) — kept route-local per the design's no-behavior-change rule, now annotated in-code with B19 notes. Verified: tsc, lint, 554 tests, build, **e2e 15/15 vs dev project**. B19 CLOSED.
 - **2026-07-18 TURNSTILE FAIL-OPEN (PR #49, merged)** — Vercel previews received the PROD Turnstile site key, whose hostname allowlist lacks `*.vercel.app` → the widget couldn't load and login/signup/onboard hard-blocked = full preview lockout (would also fire in prod on a Cloudflare outage). Fix: the widget reports load-failure (`onLoadFailed`) and the three auth forms submit tokenless in that state — Supabase-side CAPTCHA enforcement remains the real gate (verified live with a forced bogus key: banner shown, gate open, server enforced). Owner confirmed preview login works. Optional cleanup: drop the TURNSTILE vars from Vercel's Preview scope, or allowlist vercel.app on the Cloudflare key.

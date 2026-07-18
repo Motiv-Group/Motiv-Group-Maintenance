@@ -1,0 +1,75 @@
+name: E2E role-matrix
+
+# Runs the Playwright suite (smoke + workflow journeys) against the DEV
+# Supabase project on every PR and push to main — the regression net for
+# page-level authZ (the S1-S4 class) and the ticket lifecycle.
+#
+# Setup (owner, once): repo Settings → Secrets and variables → Actions →
+#   E2E_SUPABASE_URL              = https://<dev-ref>.supabase.co   (motiv-dev!)
+#   E2E_SUPABASE_ANON_KEY         = <dev anon key>
+#   E2E_SUPABASE_SERVICE_ROLE_KEY = <dev service-role key>
+# Skips with a notice until the secrets exist. NEVER point these at production —
+# the suite seeds and tears down real rows (e2e/env.ts refuses the prod URL
+# locally, but CI has no .env.local to compare against, so the secrets are the
+# only guard here).
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# The dev-DB fixture is shared state — serialize runs so one run's teardown
+# can't delete the fixture out from under another.
+concurrency:
+  group: e2e-dev-db
+  cancel-in-progress: false
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Gate on secrets
+        id: gate
+        env:
+          U: ${{ secrets.E2E_SUPABASE_URL }}
+        run: |
+          if [ -z "$U" ]; then
+            echo "::notice::E2E_SUPABASE_* secrets not set — skipping e2e."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install dependencies
+        if: steps.gate.outputs.run == 'true'
+        run: npm ci
+
+      - name: Install Playwright chromium
+        if: steps.gate.outputs.run == 'true'
+        run: npx playwright install chromium --with-deps
+
+      - name: Run e2e suite
+        if: steps.gate.outputs.run == 'true'
+        env:
+          E2E_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+          E2E_SUPABASE_ANON_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY }}
+          E2E_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.E2E_SUPABASE_SERVICE_ROLE_KEY }}
+          E2E_SEED_ALLOWED: 'yes'
+        run: npm run test:e2e
+
+      - name: Upload traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: test-results/
+          retention-days: 7

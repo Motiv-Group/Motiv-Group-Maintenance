@@ -17,6 +17,7 @@ export default async function AdminStoreDetailPage(props: { params: Promise<{ id
   const params = await props.params;
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user) notFound()
 
   // Use the admin client scoped to the caller's company: a supplier has no RLS
   // grant to read `stores`, so the user client would 404 the page. Tenant safety
@@ -39,7 +40,7 @@ export default async function AdminStoreDetailPage(props: { params: Promise<{ id
       .select('*')
       .eq('store_id', params.id)
       .order('created_at', { ascending: false }),
-    admin.from('supplier_users').select('supplier_id').eq('user_id', user!.id),
+    admin.from('supplier_users').select('supplier_id').eq('user_id', user.id),
   ])
 
   // Tenant guard — the store must belong to the caller's company.
@@ -57,9 +58,24 @@ export default async function AdminStoreDetailPage(props: { params: Promise<{ id
     t => (t.supplier_id && supplierIds.includes(t.supplier_id)) || invitedIds.has(t.id)
   )
 
-  // Store-manager contact details live on user_profiles via the store_users link.
-  const { data: smLink } = await admin
-    .from('store_users').select('user_id').eq('store_id', params.id).limit(1).maybeSingle()
+  // ── Supplier-visibility gate (cross-supplier isolation) ──────────────────
+  // Suppliers are COMPETING OUTSIDERS inside one company: this page must only
+  // exist for a supplier ENGAGED with the store — at least one ticket here
+  // awarded to them or carrying a quote invite for them. Anything else 404s
+  // like a non-existent store, so an unengaged supplier can't even confirm
+  // the store exists (existence leak = competitor intel).
+  if (!tickets.length) notFound()
+  const hasAwarded = tickets.some(t => t.supplier_id && supplierIds.includes(t.supplier_id))
+
+  // Store-manager contact details live on user_profiles via the store_users
+  // link — but the SM's PII (name/email/phone) is only fetched once the
+  // supplier has an AWARDED ticket at this store. An invited-only supplier
+  // needs the site (name/branch/address) to quote, not the store manager's
+  // personal contact details.
+  const { data: smLink } = hasAwarded
+    ? await admin
+        .from('store_users').select('user_id').eq('store_id', params.id).limit(1).maybeSingle()
+    : { data: null }
   const { data: sm } = smLink?.user_id
     ? await admin.from('user_profiles').select('full_name, email, phone').eq('id', smLink.user_id).single()
     : { data: null as { full_name?: string | null; email?: string | null; phone?: string | null } | null }
@@ -114,6 +130,11 @@ export default async function AdminStoreDetailPage(props: { params: Promise<{ id
               <MapPin size={14} className="text-[var(--text-faint)]" />
               <MapLink address={store.address} className="hover:underline">{store.address}</MapLink>
             </div>
+          )}
+          {!hasAwarded && (
+            <p className="text-xs italic text-[var(--text-faint)]">
+              Store contact details unlock once work here is awarded to you.
+            </p>
           )}
         </div>
       </SectionCard>
