@@ -36,7 +36,7 @@ export default async function SupplierLayout({ children }: { children: React.Rea
   const unreadCount = await getUnreadCount()
   return (
     <ExecChrome userName={fullName} variant="supplier" unreadCount={unreadCount} accountStatus={accountStatus}>
-      <RealtimeRefresh tables={['tickets', 'quotes', 'signoffs', 'ratings', 'notifications', 'ticket_disputes', 'ticket_dispute_messages']} />
+      <RealtimeRefresh tables={['tickets', 'quotes', 'signoffs', 'snags', 'ticket_updates', 'ratings', 'notifications', 'ticket_disputes', 'ticket_dispute_messages']} />
       {needsSla ? <SlaReacceptGate signedNameDefault={fullName} /> : children}
     </ExecChrome>
   )

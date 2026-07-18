@@ -10,7 +10,7 @@ export default async function ExecutiveLayout({ children }: { children: React.Re
   const unreadCount = await getUnreadCount()
   return (
     <ExecChrome userName={fullName} unreadCount={unreadCount}>
-      <RealtimeRefresh tables={['tickets', 'quotes', 'signoffs', 'decision_items', 'notifications']} />
+      <RealtimeRefresh tables={['tickets', 'quotes', 'signoffs', 'snags', 'ticket_updates', 'decision_items', 'notifications']} />
       {children}
     </ExecChrome>
   )
