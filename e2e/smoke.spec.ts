@@ -54,7 +54,9 @@ test.describe('cross-supplier isolation', () => {
     const { awardedTicketId } = fixture()
     await page.goto(`/supplier/tickets/${awardedTicketId}`)
     // The loader redirects non-awarded/non-invited suppliers to /supplier/tickets.
-    await page.waitForURL(url => !url.pathname.includes(awardedTicketId), { timeout: 15_000 })
+    await page.waitForURL(url => !url.pathname.includes(awardedTicketId), { timeout: 30_000 })
+    // Belt + braces: wherever we landed, none of A's ticket content is present.
+    await expect(page.getByText('motiv-e2e awarded ticket')).toHaveCount(0)
   })
 
   test("supplier B's ticket list does not contain supplier A's ticket", async ({ page }) => {

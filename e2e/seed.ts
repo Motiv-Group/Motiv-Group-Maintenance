@@ -99,6 +99,20 @@ export async function seed(): Promise<SeedResult> {
   await link('supplier_users', { user_id: supA, supplier_id: supplierAId })
   await link('supplier_users', { user_id: supB, supplier_id: supplierBId })
 
+  // Accept the current SLA for both supplier users — otherwise the SLA
+  // interstitial intercepts every supplier page and the isolation probe would
+  // test the SLA wall instead of the real ticket gate. Version must match
+  // lib/sla.ts SLA_VERSION.
+  for (const [uid, sid] of [[supA, supplierAId], [supB, supplierBId]] as const) {
+    const { data: acc } = await admin.from('supplier_sla_acceptances')
+      .select('id').eq('user_id', uid).eq('sla_version', '1.0').limit(1).maybeSingle()
+    if (!acc) {
+      const { error } = await admin.from('supplier_sla_acceptances')
+        .insert({ user_id: uid, supplier_id: sid, sla_version: '1.0', signed_name: 'E2E supplier' })
+      if (error) throw new Error(`sla acceptance: ${error.message}`)
+    }
+  }
+
   // Tickets: one AWARDED to supplier A (invite for A only) — supplier B must not
   // see it; one open unassigned ticket for general rendering.
   const ticket = async (title: string, extra: Record<string, unknown>): Promise<string> => {

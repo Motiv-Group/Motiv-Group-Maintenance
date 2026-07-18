@@ -21,14 +21,34 @@ const HOME: Record<E2eRole, string> = {
 async function login(baseURL: string, email: string, expectedHome: string, out: string) {
   const browser = await chromium.launch()
   const page = await browser.newPage({ baseURL })
-  await page.goto('/auth/login')
-  await page.locator('input[type="email"]').fill(email)
-  await page.locator('input[type="password"]').fill(E2E_PASSWORD)
-  await page.locator('button[type="submit"]').click()
-  // proxy.ts redirects a logged-in user to their role home.
-  await page.waitForURL(`**${expectedHome}**`, { timeout: 20_000 })
-  await page.context().storageState({ path: out })
-  await browser.close()
+  const consoleLines: string[] = []
+  page.on('console', m => { if (m.type() === 'warning' || m.type() === 'error') consoleLines.push(m.text().slice(0, 200)) })
+  try {
+    await page.goto('/auth/login')
+    await page.locator('input[type="email"]').waitFor({ timeout: 60_000 })
+    await page.locator('input[type="email"]').fill(email)
+    await page.locator('input[type="password"]').fill(E2E_PASSWORD)
+    await page.locator('button[type="submit"]').click()
+    // proxy.ts / the login page push to the role home. 90s: the FIRST hit of a
+    // section in `next dev` cold-compiles it (Turbopack), which can far exceed
+    // a normal navigation budget.
+    await page.waitForURL(`**${expectedHome}**`, { timeout: 90_000 })
+    await page.context().storageState({ path: out })
+  } catch (e) {
+    // Diagnostics: where did we actually land, what did the form say, what
+    // did the console log — then rethrow so the run fails loudly.
+    mkdirSync(STATE_DIR, { recursive: true })
+    await page.screenshot({ path: resolve(STATE_DIR, `login-fail-${email.split('@')[0]}.png`) }).catch(() => {})
+    const formText = await page.locator('form').textContent().catch(() => null)
+    const firstLine = e instanceof Error ? e.message.split('\n')[0] : String(e)
+    throw new Error(
+      `login(${email}) expected ${expectedHome}, stuck at ${page.url()}\n` +
+      `form: ${formText?.slice(0, 200)}\nconsole: ${consoleLines.join(' | ')}\n` +
+      `(screenshot in e2e/.auth/) — original: ${firstLine}`
+    )
+  } finally {
+    await browser.close()
+  }
 }
 
 export default async function globalSetup(config: FullConfig) {

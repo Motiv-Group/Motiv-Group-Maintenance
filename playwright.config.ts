@@ -55,6 +55,12 @@ export default defineConfig({
       NEXT_PUBLIC_SUPABASE_ANON_KEY: env['E2E_SUPABASE_ANON_KEY'] ?? '',
       SUPABASE_SERVICE_ROLE_KEY: env['E2E_SUPABASE_SERVICE_ROLE_KEY'] ?? '',
       NEXT_PUBLIC_APP_URL: `http://localhost:${PORT}`,
+      // Next also loads .env.local (production values) into the dev server —
+      // blank the Turnstile keys so the login form doesn't demand a CAPTCHA
+      // the tests can't solve. (The dev Supabase project doesn't enforce
+      // captcha on sign-in; only the UI gate blocks.)
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: '',
+      TURNSTILE_SECRET_KEY: '',
     },
   },
 })
