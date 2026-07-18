@@ -35,6 +35,9 @@ export default function SupplierOnboardPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [captchaToken, setCaptchaToken] = useState<string | null>(null)
+  // Widget load failure → fail OPEN client-side (Supabase enforcement is the
+  // real gate); otherwise a blocked/unallowed-hostname widget locks everyone out.
+  const [captchaFailed, setCaptchaFailed] = useState(false)
   const [captchaKey, setCaptchaKey] = useState(0) // remount widget for a fresh single-use token
 
   // Step 1 — account
@@ -103,7 +106,7 @@ export default function SupplierOnboardPage() {
   async function submit() {
     const err = validateStep(3)
     if (err) { setError(err); return }
-    if (isTurnstileEnabled() && !captchaToken) { setError('Please complete the “I’m human” check.'); return }
+    if (isTurnstileEnabled() && !captchaToken && !captchaFailed) { setError('Please complete the “I’m human” check.'); return }
     setLoading(true); setError('')
     const res = await fetch('/api/supplier/onboard', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -253,7 +256,7 @@ export default function SupplierOnboardPage() {
             </span>
           </label>
 
-          <Turnstile key={captchaKey} onToken={setCaptchaToken} />
+          <Turnstile key={captchaKey} onToken={setCaptchaToken} onLoadFailed={setCaptchaFailed} />
         </div>
       )}
 

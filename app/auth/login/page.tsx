@@ -33,6 +33,9 @@ export default function LoginPage() {
   const [forwarding, setForwarding] = useState(false)
   const [remember, setRemember] = useState(true)
   const [captchaToken, setCaptchaToken] = useState<string | null>(null)
+  // Widget load failure → fail OPEN client-side (Supabase enforcement is the
+  // real gate); otherwise a blocked/unallowed-hostname widget locks everyone out.
+  const [captchaFailed, setCaptchaFailed] = useState(false)
   // Bumped to remount the widget for a fresh token (Turnstile tokens are single-use).
   const [captchaKey, setCaptchaKey] = useState(0)
 
@@ -74,7 +77,7 @@ export default function LoginPage() {
   }, [router])
 
   async function onSubmit(values: LoginForm) {
-    if (isTurnstileEnabled() && !captchaToken) { setError('Please complete the “I’m human” check.'); return }
+    if (isTurnstileEnabled() && !captchaToken && !captchaFailed) { setError('Please complete the “I’m human” check.'); return }
     setLoading(true)
     setError('')
 
@@ -190,7 +193,7 @@ export default function LoginPage() {
           </Link>
         </div>
 
-        <div className="pt-1"><Turnstile key={captchaKey} onToken={setCaptchaToken} /></div>
+        <div className="pt-1"><Turnstile key={captchaKey} onToken={setCaptchaToken} onLoadFailed={setCaptchaFailed} /></div>
 
         <AuthError message={error} />
 
