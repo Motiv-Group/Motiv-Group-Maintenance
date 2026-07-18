@@ -331,6 +331,7 @@ export interface Database {
           id: string
           name: string
           active: boolean
+          logo_url: string | null
           created_at: string
           updated_at: string
         }
@@ -338,6 +339,7 @@ export interface Database {
           id?: string
           name?: string
           active?: boolean
+          logo_url?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -345,8 +347,33 @@ export interface Database {
           id?: string
           name?: string
           active?: boolean
+          logo_url?: string | null
           created_at?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      company_suppliers: {
+        Row: {
+          company_id: string
+          supplier_id: string
+          source: string
+          invited_by: string | null
+          created_at: string
+        }
+        Insert: {
+          company_id?: string
+          supplier_id?: string
+          source?: string
+          invited_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          company_id?: string
+          supplier_id?: string
+          source?: string
+          invited_by?: string | null
+          created_at?: string
         }
         Relationships: []
       }

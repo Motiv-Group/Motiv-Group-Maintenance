@@ -93,6 +93,15 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     if (error) return serverError(error)
   }
 
+  // Persist the company<->supplier membership (Accounts view). ignoreDuplicates so
+  // an existing 'admin_invite' link is never downgraded to 'rm_ticket'.
+  if (ticket.company_id) {
+    await admin.from('company_suppliers').upsert(
+      supplierIds.map(supplier_id => ({ company_id: ticket.company_id as string, supplier_id, source: 'rm_ticket' })),
+      { onConflict: 'company_id,supplier_id', ignoreDuplicates: true },
+    )
+  }
+
   await admin.from('tickets').update({
     status: 'assigned', supplier_id: null, quote_required: true, quote_requested_at: now, quote_due_at: quoteDueAt,
     // Set-once: the FIRST quote request stays in the audit trail across re-assigns.
