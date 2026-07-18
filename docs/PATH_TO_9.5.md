@@ -7,8 +7,8 @@
 > **Living doc.** Claude updates this whenever an item is completed or a new issue is found — check + update it every session.
 > 9.5 overall = **every section ≥ 9.0** *plus* independent validation (penetration test + backup-restore drill).
 
-**Overall score:** 7.4 / 10 → target 9.5
-**Last updated:** 2026-07-17
+**Overall score:** ~8.3 / 10 → target 9.5 (per `docs/AUDIT_2026-07-16.md` — all audit CODE items closed 2026-07-18; the remaining gap is owner-track)
+**Last updated:** 2026-07-18
 **Audit baseline commit:** ff1bdeb (audit) / cdc7dec (same-day fixes)
 
 ## Open items to 9.5 — consolidated (start here)
@@ -26,7 +26,7 @@ Launch-blocking **code is largely done** (private buckets + signed URLs, RLS eve
 
 **3 — POPIA/legal:** register Information Officer; signup consent checkbox (Code) — C11.
 
-**4 — Open code (Claude can do now):** B19 workflow consolidation (design ready) · B14 UI phase-2 remnants · true schema-drift CI (C9) · from the **2026-07-16 full audit** (`docs/AUDIT_2026-07-16.md`): typed Supabase clients + `any` burndown (TS1–TS3) · Playwright role-matrix smoke (T4) · legacy `lib/types.ts` shapes cleanup (DOC6 — deferred: `Completion`/`admin_id` words appear in 30+ live files, needs careful non-mechanical pass). ✅ Done 2026-07-17 across waves 1–3 (PRs #43/#44/#45): ALL security findings (X1–X3, S1–S4) · T1/T2/T3/T6 tests (suite 354→520) · R1/R2/R3 reliability · P1 offline (device-verified) + P2 update toast · C1/C2 (live-verified)/C3 CI · M1–M6 maintainability (RmTicketActions split, ticket-page loaders, webhook split, dedupes) · docs truth pass.
+**4 — Open code (Claude can do now):** B19 workflow consolidation (design ready) · B14 UI phase-2 remnants · true schema-drift CI (C9) · DOC6 legacy `lib/types.ts` shapes (non-mechanical) · minor: consolidate the two `errMsg` helpers into `lib/` · regen `database.types.ts` with DB functions (drops the uploads rpc cast) · optional CI wiring for the e2e suite. ✅ The **entire 2026-07-16 audit code programme is CLOSED** (PRs #43–#49, 2026-07-16→18): all 7 security findings, tests 354→520 + e2e 15/15 green, reliability (timeouts/purge/Sentry), offline PWA + update toast (device-verified), CI hardening (weekly audit + build cache + live-verified post-deploy smoke), all maintainability splits/dedupes, `any` 522→0 with no-explicit-any=error, docs truth pass, Turnstile fail-open (preview lockout fixed).
 
 **5 — Live verification (coded, confirm on deploy ⏳):** Android WebView on device (B6) · signed-URL render + raw-URL 403 · realtime on `/individual` (B4) · `snags.schedule_agreed_at/declined_at` on live (B20) · CSP violation → Sentry (C7) · zod 400 spot-check (B8) · dispute e2e on Individual ticket (N4) · Individual address shown to supplier (N5).
 
@@ -47,8 +47,24 @@ Detail + status for every lettered/numbered item is in the Phase A/B/C tables be
 | Owner | `Code` = Claude · `You` = owner action · `Both` |
 
 ## Section scores (now → 9.5)
+> Synced 2026-07-18 with `docs/AUDIT_2026-07-16.md` (the audit is the scoring source of truth).
+
 | Section | Now | Gap to close (short) |
 |---|---|---|
+| Security & authorisation | 8.0 | pen test (owner) · quarterly authZ re-audit |
+| Testing | 8.0 | e2e 15/15 green vs dev · optional CI wiring for e2e |
+| CI/CD | 9.0 | deploy-automation depth |
+| Architecture & maintainability | 8.0 | keep files honest; B19 workflow consolidation still open |
+| Type safety | 9.0 | zero `any` in src; no-explicit-any = error |
+| PWA / mobile | 8.5 | offline + update-toast shipped and device-verified |
+| Reliability & operations | 7.0 | backups + restore drill (owner) · uptime/log alerts (owner) |
+| Database & RLS | 7.5 | restore drill (owner) · quarterly advisor |
+| Dependencies | 7.5 | React 19 bump plan · watch xlsx CDN tarball |
+| Docs accuracy | 8.5 | keep in sync each session |
+| Legal / POPIA | 4.0 | real content in /privacy /terms /sla · Info Officer · lawyer sign-off (owner) |
+| Infrastructure & operations | 6.0 | Vercel Pro + Supabase Pro + PITR · staging · SMTP · runbook (owner) |
+
+---|---|---|
 | API security & authorisation | 8.5 | webhook fail-closed · body schema validation · rate-limit-fallback alert · audit logs · pen test |
 | Database & row-level security | 8.5 | owner-scoped Individual RLS · schema-drift CI · quarterly advisor · restore drill |
 | Security headers / CSP | 9.5 | hold; add CSP report endpoint · re-verify after Next upgrade · HSTS preload submit |
