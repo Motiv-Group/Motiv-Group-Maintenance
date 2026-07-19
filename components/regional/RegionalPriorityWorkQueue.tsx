@@ -32,7 +32,7 @@ const SNAG_STATUSES = new Set(['snag', 'snag_assigned', 'snag_in_progress'])    
 const needsAssignment = (t: RegionalTicketRow) => !t.supplierAssigned && (t.status === 'open' || t.status === 'info_requested')
 const slaAtRisk = (t: RegionalTicketRow) => t.breached || t.overdue
 
-export function RegionalPriorityWorkQueue({ tickets, generatedAt, suppliers = [], motivSuppliers = [], motivAccess = 'none' }: { tickets: RegionalTicketRow[]; generatedAt: string; suppliers?: SupplierChoice[]; motivSuppliers?: SupplierChoice[]; motivAccess?: 'none' | 'pending' | 'approved' | 'rejected' }) {
+export function RegionalPriorityWorkQueue({ tickets, generatedAt, suppliers = [], motivSuppliers = [], motivAccess = 'none', chatUnread = {} }: { tickets: RegionalTicketRow[]; generatedAt: string; suppliers?: SupplierChoice[]; motivSuppliers?: SupplierChoice[]; motivAccess?: 'none' | 'pending' | 'approved' | 'rejected'; chatUnread?: Record<string, number> }) {
   const [filter, setFilter] = useState<QueueFilter>('all')
   const nowMs = new Date(generatedAt).getTime()
   // Click the active card again to clear the filter.
@@ -72,7 +72,7 @@ export function RegionalPriorityWorkQueue({ tickets, generatedAt, suppliers = []
       </section>
 
       <QueueCard compact viewAllHref="/regional/tickets">
-        {rows.length ? rows.map(t => <QueueRow key={t.id} ticket={t} nowMs={nowMs} suppliers={suppliers} motivSuppliers={motivSuppliers} motivAccess={motivAccess} />) : (
+        {rows.length ? rows.map(t => <QueueRow key={t.id} ticket={t} nowMs={nowMs} suppliers={suppliers} motivSuppliers={motivSuppliers} motivAccess={motivAccess} chatUnread={chatUnread[t.id] ?? 0} />) : (
           <div className="px-4 py-10"><EmptyQueue copy={emptyCopy(filter)} /></div>
         )}
       </QueueCard>
@@ -89,7 +89,7 @@ function emptyCopy(filter: QueueFilter): string {
     : 'No active tickets in your region.'
 }
 
-function QueueRow({ ticket, nowMs, suppliers, motivSuppliers, motivAccess }: { ticket: RegionalTicketRow; nowMs: number; suppliers: SupplierChoice[]; motivSuppliers: SupplierChoice[]; motivAccess: 'none' | 'pending' | 'approved' | 'rejected' }) {
+function QueueRow({ ticket, nowMs, suppliers, motivSuppliers, motivAccess, chatUnread }: { ticket: RegionalTicketRow; nowMs: number; suppliers: SupplierChoice[]; motivSuppliers: SupplierChoice[]; motivAccess: 'none' | 'pending' | 'approved' | 'rejected'; chatUnread: number }) {
   // The next SLA checkpoint (quote decision / sign-off / supplier action), falling
   // back to the final resolution deadline when there's no active blocker.
   const slaDeadline = ticket.slaDueAt ?? ticket.dueAt
@@ -120,7 +120,7 @@ function QueueRow({ ticket, nowMs, suppliers, motivSuppliers, motivAccess }: { t
       <QueueRowBadges priority={String(ticket.priority)}
         statusCls={ticket.disputed ? 'bg-violet-500/15 text-violet-700 dark:text-violet-400' : closeout ? closeoutBadge : meta.cls}
         statusLabel={ticket.disputed ? 'Dispute' : closeout ? 'Close-out' : meta.label}
-        disputeUnread={ticket.disputeUnread} note={ticket.supplierAssigned ? 'Supplier assigned' : 'No supplier assigned'} />
+        disputeUnread={ticket.disputeUnread} chatUnread={chatUnread} note={ticket.supplierAssigned ? 'Supplier assigned' : 'No supplier assigned'} />
 
       <QueueRowNextStep createdAt={ticket.createdAt} nextStep={nextStep(ticket)} breached={breached} slaMs={slaMs} slaDeadline={slaDeadline} deadlineHiddenOnMobile />
 

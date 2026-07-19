@@ -4,6 +4,7 @@ import { requireIndividual } from '@/lib/health/guard'
 import { createAdminClient } from '@/lib/supabase/server'
 import { IndividualPriorityWorkQueue, type IndividualJobRow } from '@/components/individual/IndividualPriorityWorkQueue'
 import { QuickLogBanner } from '@/components/tickets/QuickLogBanner'
+import { chatUnreadCounts } from '@/lib/chat-unread'
 
 export default async function IndividualOverviewPage() {
   const { userId, fullName } = await requireIndividual()
@@ -27,6 +28,9 @@ export default async function IndividualOverviewPage() {
       .in('ticket_id', snagIds).order('created_at', { ascending: false })
     for (const s of snagRows ?? []) if (!latestSnagSchedule.has(s.ticket_id)) latestSnagSchedule.set(s.ticket_id, s.schedule_status)
   }
+
+  // Unread supplier-chat counts — chat exists only once a supplier is awarded.
+  const chatUnread = await chatUnreadCounts(admin, userId, tickets.filter(t => t.supplier_id).map(t => t.id))
 
   const jobs: IndividualJobRow[] = tickets.map(t => ({
     id: t.id,
@@ -57,7 +61,7 @@ export default async function IndividualOverviewPage() {
         steps={['Describe the issue', 'Add photos', 'Review & send']}
       />
 
-      <IndividualPriorityWorkQueue jobs={jobs} generatedAt={new Date().toISOString()} />
+      <IndividualPriorityWorkQueue jobs={jobs} generatedAt={new Date().toISOString()} chatUnread={chatUnread} />
     </div>
   )
 }

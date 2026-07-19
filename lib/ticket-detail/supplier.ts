@@ -11,7 +11,7 @@ import 'server-only'
 import { createAdminClient } from '@/lib/supabase/server'
 import { signedUrl, signManyUrls } from '@/lib/storage'
 import { requireSupplierV3 } from '@/lib/health/guard'
-import { ticketChatUnread } from '@/lib/chat-unread'
+import { chatUnreadCounts } from '@/lib/chat-unread'
 import { loadSlaResolver } from '@/lib/health/data'
 import { deriveDueDates } from '@/lib/health/priority'
 import { computeTicketSla } from '@/lib/health/sla'
@@ -116,8 +116,10 @@ export async function loadSupplierTicketDetail(ticketId: string) {
   const technicians = technicianRows ?? []
   // Access: the awarded supplier OR a supplier invited to quote (competitive model).
   const awarded = !!t.supplier_id && supplierIds.includes(t.supplier_id)
-  // Per-ticket RM↔supplier chat is available to the awarded supplier's users.
-  const chatUnread = awarded ? await ticketChatUnread(admin, t.id, userId) : false
+  // Per-ticket RM↔supplier chat is available to the awarded supplier's users. The
+  // count feeds the floating chat button's badge; the boolean the header icon's dot.
+  const chatUnreadCount = awarded ? ((await chatUnreadCounts(admin, userId, [t.id]))[t.id] ?? 0) : 0
+  const chatUnread = chatUnreadCount > 0
   if (!awarded && !invite) return { kind: 'redirect' as const, to: '/supplier/tickets' }
   // Declined off the ticket (not re-invited) — show "Declined" to the supplier.
   const declinedForMe = !awarded && !!invite && ['declined', 'closed'].includes(invite.status)
@@ -346,7 +348,7 @@ export async function loadSupplierTicketDetail(ticketId: string) {
   const data = {
     t, store, storeName, disputeStore, companyName, supplierCompanyName, customer, editorName, quoteRequestedAt,
     latestSnag, snagFixApproved, snagScheduleActive, declinedSnag, scheduledTechName,
-    awarded, chatUnread, declinedForMe, dueAt, overdue, declineDetails, sla, breached, now,
+    awarded, chatUnread, chatUnreadCount, declinedForMe, dueAt, overdue, declineDetails, sla, breached, now,
     latestQuote, canSubmitQuote, declineReason, declinedBy, declinedByLabel, declineMessage, supplierStatus, reQuoteByRm,
     quoteStatusOf, requoteReason,
     pendingSignoffs, rejectedSignoffs, acceptedSignoff, submissionLabel, roundBySignoff, liveSnag, liveEvidence, archivedSuperseded,

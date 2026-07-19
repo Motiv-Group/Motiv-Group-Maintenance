@@ -11,7 +11,7 @@ import { MessageSquare, Paperclip, Send, X, FileText, Image as ImageIcon, Loader
 import { uploadOne } from '@/lib/upload'
 import { formatDateTime } from '@/lib/utils'
 
-export type ChatViewerRole = 'supplier' | 'regional_manager'
+export type ChatViewerRole = 'supplier' | 'regional_manager' | 'store_manager' | 'individual'
 
 interface ChatMessage {
   id: string
@@ -22,13 +22,20 @@ interface ChatMessage {
   attachment_urls: string[]
 }
 
-const OTHER_LABEL: Record<ChatViewerRole, string> = { supplier: 'regional manager', regional_manager: 'supplier' }
-const ROLE_LABEL: Record<string, string> = { supplier: 'Supplier', regional_manager: 'Regional Manager' }
+const OTHER_LABEL: Record<ChatViewerRole, string> = {
+  supplier: 'regional manager',
+  regional_manager: 'supplier',
+  store_manager: 'team',
+  individual: 'supplier',
+}
+const ROLE_LABEL: Record<string, string> = { supplier: 'Supplier', regional_manager: 'Regional Manager', store_manager: 'Store Manager', individual: 'Client' }
 const AVATAR_CLS: Record<string, string> = {
   supplier: 'bg-blue-500/20 text-blue-700 dark:text-blue-300',
   regional_manager: 'bg-teal-500/20 text-teal-700 dark:text-teal-300',
+  store_manager: 'bg-amber-500/20 text-amber-700 dark:text-amber-300',
+  individual: 'bg-teal-500/20 text-teal-700 dark:text-teal-300',
 }
-const roleInitial = (r: string) => (r === 'supplier' ? 'S' : r === 'regional_manager' ? 'M' : '?')
+const roleInitial = (r: string) => (r === 'supplier' ? 'S' : r === 'regional_manager' ? 'M' : r === 'store_manager' ? 'SM' : r === 'individual' ? 'C' : '?')
 const isImageUrl = (url: string) => /\.(jpe?g|png|webp|gif)(\?|$)/i.test(url)
 function attachmentName(url: string): string {
   try {
@@ -85,6 +92,8 @@ function ChatBody({ ticketId, viewerRole, onClose }: { ticketId: string; viewerR
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [loading, setLoading] = useState(true)
   const [available, setAvailable] = useState(true)
+  const [smAdded, setSmAdded] = useState(false)
+  const [canManageSm, setCanManageSm] = useState(false)
   const [err, setErr] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
   const atBottomRef = useRef(true)
@@ -97,6 +106,7 @@ function ChatBody({ ticketId, viewerRole, onClose }: { ticketId: string; viewerR
       const d = await r.json()
       if (d?.error) { setErr(d.error); return }
       setErr(''); setAvailable(d.available !== false); setMessages(d.messages ?? [])
+      setSmAdded(!!d.smAdded); setCanManageSm(!!d.canManageSm)
     } catch { setErr('Could not load the conversation.') }
     finally { setLoading(false) }
   }
@@ -125,7 +135,7 @@ function ChatBody({ ticketId, viewerRole, onClose }: { ticketId: string; viewerR
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3">
-        <h3 className="flex items-center gap-2 text-lg font-bold text-[var(--text)]"><MessageSquare size={19} className="text-blue-500" /> Chat with the {OTHER_LABEL[viewerRole]}</h3>
+        <h3 className="flex items-center gap-2 text-lg font-bold text-[var(--text)]"><MessageSquare size={19} className="text-blue-500" /> {viewerRole === 'store_manager' ? 'Ticket chat' : `Chat with the ${OTHER_LABEL[viewerRole]}`}</h3>
         <button type="button" onClick={onClose} aria-label="Close" className="-m-1 rounded-lg p-1.5 text-[var(--text-faint)] transition hover:bg-[var(--hover)] hover:text-[var(--text)]"><X size={18} /></button>
       </div>
 
@@ -134,6 +144,7 @@ function ChatBody({ ticketId, viewerRole, onClose }: { ticketId: string; viewerR
         : !available ? <p className="py-6 text-center text-sm text-[var(--text-faint)]">Chat opens once a supplier is assigned to this ticket.</p>
         : (
           <>
+            {canManageSm && <SmParticipantBar ticketId={ticketId} smAdded={smAdded} onChanged={load} />}
             <div ref={scrollRef} onScroll={onScroll} className="max-h-[440px] min-h-[160px] space-y-3 overflow-y-auto rounded-xl bg-[var(--app-bg)] p-3 ring-1 ring-[var(--border)]">
               {messages.length === 0 && <p className="py-8 text-center text-sm text-[var(--text-faint)]">No messages yet. Say hello 👋</p>}
               {messages.map(m => {
@@ -220,5 +231,66 @@ function ChatComposer({ ticketId, onSent }: { ticketId: string; onSent: () => vo
         </button>
       </div>
     </div>
+  )
+}
+
+// RM-only participants bar: pull the ticket's Store Manager(s) into the chat
+// (choosing whether they see the full history or only from now), or remove them.
+function SmParticipantBar({ ticketId, smAdded, onChanged }: { ticketId: string; smAdded: boolean; onChanged: () => void }) {
+  const [picking, setPicking] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+
+  async function act(payload: { action: 'add_sm'; history: 'full' | 'from_now' } | { action: 'remove_sm' }) {
+    setBusy(true); setErr('')
+    try {
+      const res = await fetch(`/api/tickets/${ticketId}/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed')
+      setPicking(false); onChanged()
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)) }
+    finally { setBusy(false) }
+  }
+
+  return (
+    <div className="rounded-xl bg-[var(--surface-2)] px-3 py-2 ring-1 ring-[var(--border)]">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="min-w-0 flex-1 text-xs text-[var(--text-muted)]">
+          {smAdded ? 'The store manager is in this conversation.' : 'The store manager is not in this conversation.'}
+        </span>
+        {busy ? <Loader2 size={14} className="shrink-0 animate-spin text-[var(--text-faint)]" />
+          : smAdded ? (
+            <button type="button" onClick={() => act({ action: 'remove_sm' })} className="shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-red-600 ring-1 ring-red-500/40 transition hover:bg-red-500/10 dark:text-red-400">Remove</button>
+          ) : (
+            <button type="button" onClick={() => setPicking(p => !p)} className="shrink-0 rounded-lg bg-blue-600 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-500">Add store manager</button>
+          )}
+      </div>
+      {picking && !smAdded && (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <span className="w-full text-[11px] text-[var(--text-faint)]">What should they see?</span>
+          <button type="button" disabled={busy} onClick={() => act({ action: 'add_sm', history: 'full' })} className="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-[var(--text)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)]">Full history</button>
+          <button type="button" disabled={busy} onClick={() => act({ action: 'add_sm', history: 'from_now' })} className="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-[var(--text)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)]">Only from now on</button>
+        </div>
+      )}
+      {err && <p className="mt-1.5 text-xs text-red-500">{err}</p>}
+    </div>
+  )
+}
+
+// Floating chat button for the ticket-detail pages: fixed bottom-right, above the
+// mobile bottom tab bar (sm: has no bottom nav → sits at the corner), with an
+// unread-count badge. A client wrapper so Server Components can drop it in.
+export function ChatFab({ ticketId, viewerRole, unreadCount = 0 }: { ticketId: string; viewerRole: ChatViewerRole; unreadCount?: number }) {
+  return (
+    <TicketChat ticketId={ticketId} viewerRole={viewerRole} trigger={open => (
+      <button type="button" onClick={open} aria-label="Open the ticket chat"
+        className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] right-4 z-40 grid h-[52px] w-[52px] place-items-center rounded-full bg-blue-600 text-white shadow-lg shadow-black/25 transition hover:bg-blue-500 sm:bottom-6 sm:right-6">
+        <MessageSquare size={22} />
+        {unreadCount > 0 && (
+          <span className="absolute -right-0.5 -top-0.5 grid h-5 min-w-5 place-items-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white ring-2 ring-[var(--app-bg)]">
+            {unreadCount > 9 ? '9+' : unreadCount}
+          </span>
+        )}
+      </button>
+    )} />
   )
 }

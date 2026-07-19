@@ -2754,6 +2754,30 @@ export interface Database {
         }
         Relationships: []
       }
+      ticket_chat_settings: {
+        Row: {
+          ticket_id: string | null
+          sm_added_at: string | null
+          sm_history_from: string | null
+          sm_added_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          ticket_id?: string | null
+          sm_added_at?: string | null
+          sm_history_from?: string | null
+          sm_added_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ticket_id?: string | null
+          sm_added_at?: string | null
+          sm_history_from?: string | null
+          sm_added_by?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       ticket_dispute_messages: {
         Row: {
           id: string

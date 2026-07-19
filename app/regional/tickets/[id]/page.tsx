@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic'
 import { redirect } from 'next/navigation'
 import { BackLink } from '@/components/ui/BackLink'
 import { CheckCircle2, FileText, Calendar, Clock, MessageSquare, Camera } from 'lucide-react'
-import { TicketChatIcon } from '@/components/chat/TicketChat'
+import { ChatFab, TicketChatIcon } from '@/components/chat/TicketChat'
 import { BreachReason } from '@/components/workflow/BreachReason'
 import { QuoteSummary } from '@/components/workflow/QuoteSummary'
 import { Card } from '@/components/exec/ui'
@@ -118,7 +118,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
   const result = await loadRegionalTicketDetail(params.id)
   if (result.kind === 'redirect') redirect(result.to)
   const {
-    t, storeName, editorName, dueAt, overdue, now, sla, breached, chatUnread, nextAction, COURTESY_NOTE,
+    t, storeName, editorName, dueAt, overdue, now, sla, breached, chatUnread, chatUnreadCount, nextAction, COURTESY_NOTE,
     disputes, openDispute, resolvedDisputes, disputeSubject, msgsByDispute,
     roundBySignoff, submissionLabel, submissionTone,
     acceptedSignoff, liveEvidence, liveSnagSubmission, isEvidenceResubmission,
@@ -448,11 +448,13 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
         {!isTerminal && !awarded && quotePanelRows.length > 0 && <RmQuotePanel ticketId={t.id} rows={quotePanelRows} canReQuote={canReQuote} />}
 
         {/* Primary action leads (Assign supplier); everything secondary/destructive —
-            add extra work, request more info, cancel — lives behind "More actions".
+            add extra work, request more info, chat with the supplier, cancel — lives
+            behind "More actions". Once a supplier is awarded the bar stays rendered
+            (menu-only) so the chat entry point remains reachable.
             It's a client component so its per-action trigger render-props are created
             client-side (a Server Component can't pass functions to Client Components). */}
-        {!isTerminal && (canAssign || canCancel) && (
-          <RmTicketActionBar ticketId={t.id} status={t.status} canAssign={canAssign} canAssignSupplier={canAssignSupplier} canCancel={canCancel} canEdit={canEdit} jobRef={t.job_ref}
+        {!isTerminal && (canAssign || canCancel || !!t.supplier_id) && (
+          <RmTicketActionBar ticketId={t.id} status={t.status} canAssign={canAssign} canAssignSupplier={canAssignSupplier} canCancel={canCancel} canEdit={canEdit} hasSupplier={!!t.supplier_id} jobRef={t.job_ref}
             suppliers={supplierList} motivSuppliers={motivSupplierList} motivAccess={motivAccess} declinedSupplierIds={declinedSupplierIds} awaitingById={engagedSupplierIds}
             description={t.description ?? ''} photoUrls={Array.isArray(t.photo_urls) ? t.photo_urls : []} title={t.title} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} priority={t.priority} />
         )}
@@ -622,6 +624,9 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
           : quotesContent && (t.status === 'quoted' || reviewQuotes.length > 0) ? 'quotes'
           : undefined
         } />
+      {/* Floating chat button — quick access to the RM↔supplier chat from anywhere
+          on the page. Only exists once a supplier is awarded. */}
+      {t.supplier_id && <ChatFab ticketId={t.id} viewerRole="regional_manager" unreadCount={chatUnreadCount} />}
     </div>
   );
 }

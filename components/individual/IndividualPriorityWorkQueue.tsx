@@ -10,7 +10,7 @@
 // "Assign supplier" CTA deep-links with ?assign=1, which auto-opens the picker.
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { AlertCircle, ArrowRight, CalendarClock, CheckCircle2, CircleAlert, ClipboardList, Info, Loader2, UserPlus } from 'lucide-react'
+import { AlertCircle, ArrowRight, CalendarClock, CheckCircle2, CircleAlert, ClipboardList, Info, Loader2, MessageSquare, UserPlus } from 'lucide-react'
 import { Card } from '@/components/exec/ui'
 import { CategoryIcon } from '@/components/client/ticketBadges'
 import { rmStatusMeta, formatDate, humanizeDuration, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
@@ -53,7 +53,9 @@ const isProgress = (t: IndividualJobRow) => PROGRESS_STATUSES.has(t.status)
 const isOverdue = (t: IndividualJobRow, nowMs: number) => !!t.dueAt && new Date(t.dueAt).getTime() < nowMs
 const isUrgent = (t: IndividualJobRow, nowMs: number) => isOverdue(t, nowMs) || ['P1', 'urgent'].includes(t.priority)
 
-export function IndividualPriorityWorkQueue({ jobs, generatedAt }: { jobs: IndividualJobRow[]; generatedAt: string }) {
+// chatUnread: unread supplier-chat message counts by ticket id (server-computed;
+// only awarded tickets have a chat) — rows with a count show a small blue chip.
+export function IndividualPriorityWorkQueue({ jobs, generatedAt, chatUnread }: { jobs: IndividualJobRow[]; generatedAt: string; chatUnread?: Record<string, number> }) {
   const [filter, setFilter] = useState<QueueFilter>('all')
   const nowMs = new Date(generatedAt).getTime()
   const pick = (k: QueueFilter) => setFilter(f => (f === k ? 'all' : k))
@@ -102,7 +104,7 @@ export function IndividualPriorityWorkQueue({ jobs, generatedAt }: { jobs: Indiv
 
         <div className="px-4 py-4 sm:px-5">
           <div className="overflow-hidden rounded-2xl border border-[var(--border)]">
-            {rows.length ? rows.map(t => <QueueRow key={t.id} job={t} nowMs={nowMs} />) : (
+            {rows.length ? rows.map(t => <QueueRow key={t.id} job={t} nowMs={nowMs} unread={chatUnread?.[t.id] ?? 0} />) : (
               <div className="px-4 py-10"><EmptyQueue filter={filter} /></div>
             )}
             <div className="border-t border-[var(--border)] px-4 py-4">
@@ -141,7 +143,7 @@ function MetricButton({ active, icon, label, value, sub, subActive, onClick }: {
   )
 }
 
-function QueueRow({ job, nowMs }: { job: IndividualJobRow; nowMs: number }) {
+function QueueRow({ job, nowMs, unread }: { job: IndividualJobRow; nowMs: number; unread: number }) {
   const overdue = isOverdue(job, nowMs)
   const dueMs = job.dueAt ? new Date(job.dueAt).getTime() - nowMs : null
   const ticketUrl = `/individual/tickets/${job.id}`
@@ -167,6 +169,9 @@ function QueueRow({ job, nowMs }: { job: IndividualJobRow; nowMs: number }) {
         <div className="flex flex-wrap items-center gap-1.5">
           <span className={`inline-flex w-[72px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${priorityBadgeClass(job.priority)}`}>{PRIORITY_LEVEL_LABELS[job.priority] ?? 'Medium'}</span>
           <span className={`inline-flex w-[120px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${meta.cls}`}>{meta.label}</span>
+          {unread > 0 && (
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-blue-500/15 px-1.5 py-0.5 text-[10px] font-bold text-blue-600 dark:text-blue-400"><MessageSquare size={11} /> {unread}</span>
+          )}
         </div>
         <p className="mt-1.5 truncate text-sm text-[var(--text-muted)]">{job.supplierAssigned ? 'Supplier assigned' : 'No supplier assigned'}</p>
       </div>

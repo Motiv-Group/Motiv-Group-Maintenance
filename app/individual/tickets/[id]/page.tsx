@@ -13,6 +13,8 @@ import { QuoteSummary, type QuoteSummaryStatus } from '@/components/workflow/Quo
 import { AssignSuppliersButton, SupplierStatusList, QuoteReviewCard, ApproveSignoffCard, RequestEvidenceButton, RaiseSnagButton, VariationReviewCard, CloseOutButton, CancelTicketCard, AcceptSnagScheduleCard, type ReviewQuote } from '@/components/regional/RmTicketActions'
 import { isTerminalStatus } from '@/lib/workflow'
 import { DisputeThread } from '@/components/dispute/DisputeBox'
+import { ChatFab } from '@/components/chat/TicketChat'
+import { chatUnreadCounts } from '@/lib/chat-unread'
 import { rmStatusMeta, formatDateTime, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
 
 const ASSIGNABLE = ['open', 'info_requested', 'assigned', 'assessment', 'quote_requested', 'quoted', 'quote_revision', 'suppliers_declined']
@@ -34,6 +36,9 @@ export default async function IndividualTicketDetailPage(props: { params: Promis
     admin.from('ticket_disputes').select('id, signoff_id, pending_outcome, pending_by').eq('ticket_id', params.id),
   ])
   if (!t || t.created_by !== userId) redirect('/individual/tickets')
+
+  // Chat exists only once a supplier is awarded — unread count for the floating chat button.
+  const chatUnread = t.supplier_id ? ((await chatUnreadCounts(admin, userId, [t.id]))[t.id] ?? 0) : 0
 
   // Disputes — the Individual owner is the resolver (the "client" side). Sign
   // message evidence for the private buckets. Newer per-dispute columns are
@@ -207,6 +212,9 @@ export default async function IndividualTicketDetailPage(props: { params: Promis
 
         {!isTerminal && <CancelTicketCard ticketId={t.id} />}
       </Card>
+
+      {/* Chat with the awarded supplier — floating button (fixed, above the bottom nav) */}
+      {t.supplier_id && <ChatFab ticketId={t.id} viewerRole="individual" unreadCount={chatUnread} />}
     </div>
   )
 }

@@ -10,6 +10,7 @@ import { getDailyBriefing } from '@/lib/briefing/generate'
 import { storeFacts } from '@/lib/briefing/facts'
 import { StorePriorityWorkQueue } from '@/components/client/StorePriorityWorkQueue'
 import { QuickLogBanner } from '@/components/tickets/QuickLogBanner'
+import { chatUnreadCounts } from '@/lib/chat-unread'
 
 type TodayVisit = {
   id: string
@@ -20,13 +21,15 @@ type TodayVisit = {
 }
 
 export default async function StoreOverviewPage() {
-  const { companyId, storeIds, fullName } = await requireStoreManagerV3()
+  const { companyId, storeIds, fullName, userId } = await requireStoreManagerV3()
   const d = await assembleStoreManagerDashboard(companyId, storeIds)
   const h = d.health
   const briefingScopeId = storeIds.slice().sort().join(',')
-  const [briefing, todayVisits] = await Promise.all([
+  const [briefing, todayVisits, chatUnread] = await Promise.all([
     getDailyBriefing({ companyId, scope: 'store', scopeId: briefingScopeId, role: 'store_manager', facts: storeFacts(d) }),
     loadTodayVisits(storeIds),
+    // Unread ticket-chat messages per ticket — only tickets the RM added the SM to count.
+    chatUnreadCounts(createAdminClient(), userId, d.tickets.map(t => t.id), { smViewer: true }),
   ])
   const greeting = (() => { const x = new Date().getHours(); return x < 12 ? 'Good morning' : x < 17 ? 'Good afternoon' : 'Good evening' })()
 
@@ -58,6 +61,7 @@ export default async function StoreOverviewPage() {
         todayVisits={todayVisits}
         storeName={d.branch || d.storeName}
         generatedAt={d.generatedAt}
+        chatUnread={chatUnread}
       />
     </div>
   )

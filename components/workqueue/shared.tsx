@@ -129,10 +129,10 @@ export function QueueRowTitle({ category, title, priority, jobId, subtitle }: {
   )
 }
 
-// Column 2: priority + status badges (with the "New message" dispute chip) over
-// a role-specific note line.
-export function QueueRowBadges({ priority, statusCls, statusLabel, disputeUnread, note }: {
-  priority: string; statusCls: string; statusLabel: string; disputeUnread: boolean; note: string
+// Column 2: priority + status badges (with the "New message" dispute chip and the
+// unread ticket-chat count chip) over a role-specific note line.
+export function QueueRowBadges({ priority, statusCls, statusLabel, disputeUnread, chatUnread = 0, note }: {
+  priority: string; statusCls: string; statusLabel: string; disputeUnread: boolean; chatUnread?: number; note: string
 }) {
   return (
     <div className="min-w-0">
@@ -140,6 +140,7 @@ export function QueueRowBadges({ priority, statusCls, statusLabel, disputeUnread
         <span className={`inline-flex w-[72px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${priorityBadgeClass(priority)}`}>{PRIORITY_LEVEL_LABELS[priority] ?? 'Medium'}</span>
         <span className={`inline-flex w-[120px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${statusCls}`}>{statusLabel}</span>
         {disputeUnread && <span className="relative z-20 inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-blue-500/15 px-1.5 py-1 text-[10px] font-bold text-blue-700 dark:text-blue-400"><MessageSquare size={10} /> New message</span>}
+        {chatUnread > 0 && <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-blue-500/15 px-1.5 py-0.5 text-[10px] font-bold text-blue-600 dark:text-blue-400"><MessageSquare size={11} /> {chatUnread}</span>}
       </div>
       <p className="mt-1.5 truncate text-sm text-[var(--text-muted)]">{note}</p>
     </div>

@@ -5,13 +5,14 @@ import { Clock, Settings } from 'lucide-react'
 import { requireRegionalUser } from '@/lib/health/guard'
 import { assembleRegionalDashboard } from '@/lib/health/data'
 import { createAdminClient } from '@/lib/supabase/server'
+import { chatUnreadCounts } from '@/lib/chat-unread'
 import { RegionalOverview } from '@/components/exec/RegionalOverview'
 import { Card } from '@/components/exec/ui'
 import { getDailyBriefing } from '@/lib/briefing/generate'
 import { regionFacts } from '@/lib/briefing/facts'
 
 export default async function RegionalOverviewPage() {
-  const { companyId, regionIds, fullName, requestedRegionCode } = await requireRegionalUser()
+  const { userId, companyId, regionIds, fullName, requestedRegionCode } = await requireRegionalUser()
 
   // Pending: signed up but not yet linked to a region by an executive.
   if (!companyId || regionIds.length === 0) {
@@ -51,7 +52,10 @@ export default async function RegionalOverviewPage() {
   const motivSuppliers = ((motivRaw ?? []) as { id: string; company_name: string; trade: string | null; trades: string[] | null }[])
     .filter(s => !companySupplierIds.has(s.id))
     .map(s => ({ id: s.id, name: s.company_name, category: Array.isArray(s.trades) && s.trades.filter(Boolean).length ? s.trades.filter(Boolean).join(', ') : (s.trade ?? null) }))
+  // Unread RM↔supplier chat counts for the Today queue's row chips — chat only
+  // exists on awarded tickets, so only those with a supplier assigned are counted.
+  const chatUnread = await chatUnreadCounts(admin, userId, data.tickets.filter(t => t.supplierAssigned).map(t => t.id))
   const briefingScopeId = regionIds.slice().sort().join(',')
   const briefing = await getDailyBriefing({ companyId, scope: 'region', scopeId: briefingScopeId, role: 'regional_manager', facts: regionFacts(data) })
-  return <RegionalOverview data={data} name={fullName} briefing={briefing} briefingScopeId={briefingScopeId} motivSuppliers={motivSuppliers} motivAccess={motivAccess} />
+  return <RegionalOverview data={data} name={fullName} briefing={briefing} briefingScopeId={briefingScopeId} motivSuppliers={motivSuppliers} motivAccess={motivAccess} chatUnread={chatUnread} />
 }
