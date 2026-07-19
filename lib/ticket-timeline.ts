@@ -29,6 +29,10 @@ export interface TimelineInput {
   editedByName?: string | null
   // Optional note on the edit (e.g. "added extra work") → "Ticket edited — <note>".
   editNote?: string | null
+  // Durable per-edit log (ticket_edits) → one event per edit. Overrides the
+  // single-slot editedAt/editNote above when non-empty (those remain the fallback
+  // for tickets predating the log). note 'added extra work' gets its own wording.
+  edits?: { at: string; note?: string | null; byName?: string | null; byRole?: string | null }[]
   cancellationReason?: string | null
   updatedAt?: string | null
   // RM↔Store-Manager "more information" exchange (only passed on the RM view).
@@ -154,7 +158,7 @@ export function buildTicketTimeline(t: TimelineInput): TimelineEvent[] {
   // Dispute lifecycle: the supplier raises it (snag / evidence request), the RM
   // resolves it as upheld (requirement stands) or withdrawn (dropped).
   for (const d of t.disputes ?? []) {
-    const what = d.origin === 'snag' ? 'snag' : d.origin === 'variation' ? 'variation order' : 'evidence request'
+    const what = d.origin === 'snag' ? 'snag' : d.origin === 'variation' ? 'variation order' : d.origin === 'quote_declined' ? 'quote decline' : 'evidence request'
     push(d.created_at, `Dispute raised — ${what}`, 'quote_declined', 'Supplier')
     if (d.status === 'resolved') {
       const reason = d.reason ? ` — ${d.reason}` : ''
@@ -186,7 +190,18 @@ export function buildTicketTimeline(t: TimelineInput): TimelineEvent[] {
   if (t.status === 'completed') push(t.completedAt ?? t.updatedAt, 'Ticket completed', 'completed')
   if (t.status === 'cancelled') push(t.updatedAt, `Ticket cancelled${t.cancellationReason ? ` — ${t.cancellationReason}` : ''}`, 'cancelled')
   push(t.supplierDeclinedAt, 'Declined — no further updates on this ticket', 'cancelled')
-  push(t.editedAt, `Ticket edited${t.editNote ? ` — ${t.editNote}` : ''}`, 'edited', t.editedByName)
+  // Every edit from the durable log; the single-slot columns only when no log rows
+  // exist (older tickets). "added extra work" reads as its own event kind.
+  const editRows = t.edits ?? []
+  if (editRows.length) {
+    for (const e of editRows) {
+      const isExtraWork = (e.note ?? '').toLowerCase() === 'added extra work'
+      const who = e.byName ?? (e.byRole ? ROLE_LABEL[e.byRole] ?? e.byRole : null)
+      push(e.at, isExtraWork ? 'Extra work added to the ticket' : `Ticket edited${e.note ? ` — ${e.note}` : ''}`, 'edited', who)
+    }
+  } else {
+    push(t.editedAt, `Ticket edited${t.editNote ? ` — ${t.editNote}` : ''}`, 'edited', t.editedByName)
+  }
 
   for (const u of t.updates ?? []) push(u.created_at, u.body, 'update', ROLE_LABEL[u.author_role ?? ''] ?? (u.author_role ?? 'System'))
   for (const v of t.views ?? []) push(v.first_viewed_at, `Viewed ${v.item_label || VIEW_LABEL[v.item_type] || 'an attachment'}`, 'viewed', ROLE_LABEL[v.viewer_role ?? ''] ?? (v.viewer_role ?? 'System'))
@@ -261,9 +276,36 @@ export function rmFriendlyLabel(e: TimelineEvent): string {
     case 'cancelled': return /Declined/.test(L) ? 'Declined — no further updates on this ticket' : `The ticket was cancelled${tail}`
     case 'edited':
       if (/proposal cancelled/.test(L)) return `${A ?? 'Someone'} cancelled their dispute proposal`
+      if (/Extra work added/.test(L)) return `${A ?? 'You'} added extra work to the ticket`
       return A ? `${A} edited the ticket${tail}` : `The ticket was edited${tail}`
     case 'update': return A ? `${A}: ${L}` : L
     case 'viewed': return `${A ?? 'Someone'} viewed ${L.replace(/^Viewed /, '')}`
     default: return L
   }
+}
+
+// ── Store-Manager view filter ────────────────────────────────────────────────
+// The SM sees the ticket's OPERATIONAL story, not the commercial internals:
+// edits + extra work, the quote APPROVAL (never submissions/declines/amounts —
+// supplier competition is RM-side), scheduling, snags, variation orders,
+// completion, cancellation and the info exchange. Everything quote-competitive,
+// dispute-related and view-tracking is dropped ('quote_declined' is also the
+// dispute tone, so excluding it removes both).
+const SM_TONES: ReadonlySet<TimelineTone> = new Set<TimelineTone>([
+  'logged', 'info_requested', 'info_added', 'edited',
+  'quote_approved', 'scheduled',
+  'variation', 'variation_approved', 'variation_declined',
+  'completion_submitted', 'completion_approved', 'completion_rejected',
+  'completed', 'cancelled',
+])
+
+/** The Store-Manager (and owner-adjacent) subset of a ticket's timeline. */
+export function filterTimelineForSm(events: TimelineEvent[]): TimelineEvent[] {
+  return events.filter(e => {
+    if (!SM_TONES.has(e.tone)) return false
+    // The variation-retraction event rides 'completion_approved' via the dispute
+    // flow — dispute mechanics stay off the SM view.
+    if (/retracted/i.test(e.label)) return false
+    return true
+  })
 }

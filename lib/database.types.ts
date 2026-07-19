@@ -2850,6 +2850,7 @@ export interface Database {
           pending_outcome: string | null
           pending_by: string | null
           pending_at: string | null
+          supplier_id: string | null
         }
         Insert: {
           id?: string
@@ -2867,6 +2868,7 @@ export interface Database {
           pending_outcome?: string | null
           pending_by?: string | null
           pending_at?: string | null
+          supplier_id?: string | null
         }
         Update: {
           id?: string
@@ -2884,6 +2886,7 @@ export interface Database {
           pending_outcome?: string | null
           pending_by?: string | null
           pending_at?: string | null
+          supplier_id?: string | null
         }
         Relationships: [
         {
@@ -2922,6 +2925,36 @@ export interface Database {
           referencedColumns: ["id"]
         }
       ]
+      }
+      ticket_edits: {
+        Row: {
+          id: string | null
+          ticket_id: string
+          company_id: string | null
+          editor_id: string | null
+          editor_role: string | null
+          note: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string | null
+          ticket_id?: string
+          company_id?: string | null
+          editor_id?: string | null
+          editor_role?: string | null
+          note?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string | null
+          ticket_id?: string
+          company_id?: string | null
+          editor_id?: string | null
+          editor_role?: string | null
+          note?: string | null
+          created_at?: string
+        }
+        Relationships: []
       }
       ticket_events: {
         Row: {

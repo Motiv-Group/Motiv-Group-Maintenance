@@ -609,8 +609,29 @@ create table if not exists public.ticket_disputes (
   signoff_id                   uuid,
   pending_outcome              text,
   pending_by                   text,
-  pending_at                   timestamptz
+  pending_at                   timestamptz,
+  -- The supplier org that raised the dispute (20260721): a quote-decline dispute
+  -- can't be derived from tickets.supplier_id (the decline nulls it), and several
+  -- declined suppliers on one ticket must not see each other's disputes.
+  supplier_id                  uuid
 );
+alter table public.ticket_disputes add column if not exists supplier_id uuid references public.suppliers(id) on delete set null;
+
+-- Durable per-edit log (20260721): tickets.edited_at/edit_note are a single slot
+-- (each PATCH overwrites), so the timeline could only show the latest edit. Every
+-- successful ticket PATCH appends a row here ('added extra work' rides note).
+-- Deny-all RLS — written/read via the API routes only.
+create table if not exists public.ticket_edits (
+  id                           uuid primary key default gen_random_uuid(),
+  ticket_id                    uuid not null references public.tickets(id) on delete cascade,
+  company_id                   uuid references public.companies(id) on delete set null,
+  editor_id                    uuid references public.user_profiles(id) on delete set null,
+  editor_role                  text,
+  note                         text,
+  created_at                   timestamptz not null default now()
+);
+create index if not exists ticket_edits_ticket_idx on public.ticket_edits (ticket_id, created_at);
+alter table public.ticket_edits enable row level security;
 
 create table if not exists public.ticket_evidence (
   id                           uuid not null default gen_random_uuid(),

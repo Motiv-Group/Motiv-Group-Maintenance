@@ -114,23 +114,35 @@ export function RmTicketActionBar({ ticketId, status, canAssign, canAssignSuppli
   // Once one or more suppliers have already been invited/quoted, assigning is
   // adding ANOTHER supplier — reflect that in the button label.
   const assignLabel = Object.keys(awaitingById).length > 0 ? 'Request another supplier' : 'Assign supplier'
+  // With no primary action a lone floating "More" chip looks broken — surface the
+  // remaining actions as outline buttons instead (chat also lives on the FAB).
+  const outlineCls = 'flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-sm font-semibold ring-1 ring-[var(--border)] text-[var(--text)] hover:bg-[var(--hover)] transition'
+  const outlineDangerCls = 'flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-sm font-semibold ring-1 ring-red-500/40 text-red-600 dark:text-red-400 hover:bg-red-500/10 transition'
   return (
     <>
-      <div className={`flex items-center gap-2 ${hasPrimary && hasMenu ? '' : 'flex-col'}`}>
-        {hasPrimary && (
+      {hasPrimary ? (
+        <div className="flex items-center gap-2">
           <AssignSuppliersButton ticketId={ticketId} suppliers={suppliers} motivSuppliers={motivSuppliers} motivAccess={motivAccess} declinedSupplierIds={declinedSupplierIds} awaitingById={awaitingById}
             trigger={open => <button onClick={open} className={primaryCls}>{assignLabel}</button>} />
-        )}
-        {hasMenu && (
-          <MoreMenu fullWidth={!hasPrimary}>
-            {canAssign && <MoreActionItem icon={<Plus size={16} />} label="Add extra work" onClick={() => setActive('addwork')} />}
-            {showRequestInfo && <MoreActionItem icon={<MessageSquare size={16} />} label="Request more info" onClick={() => setActive('info')} />}
-            {hasSupplier && <MoreActionItem icon={<MessageSquare size={16} />} label="Chat with supplier" onClick={() => setActive('chat')} />}
-            {canEdit && <MoreActionItem icon={<Pencil size={16} />} label="Edit ticket" onClick={() => setActive('edit')} />}
-            {canCancel && <MoreActionItem icon={<XCircle size={16} />} label="Cancel ticket" tone="danger" onClick={() => setActive('cancel')} />}
-          </MoreMenu>
-        )}
-      </div>
+          {hasMenu && (
+            <MoreMenu>
+              {canAssign && <MoreActionItem icon={<Plus size={16} />} label="Add extra work" onClick={() => setActive('addwork')} />}
+              {showRequestInfo && <MoreActionItem icon={<MessageSquare size={16} />} label="Request more info" onClick={() => setActive('info')} />}
+              {hasSupplier && <MoreActionItem icon={<MessageSquare size={16} />} label="Chat with supplier" onClick={() => setActive('chat')} />}
+              {canEdit && <MoreActionItem icon={<Pencil size={16} />} label="Edit ticket" onClick={() => setActive('edit')} />}
+              {canCancel && <MoreActionItem icon={<XCircle size={16} />} label="Cancel ticket" tone="danger" onClick={() => setActive('cancel')} />}
+            </MoreMenu>
+          )}
+        </div>
+      ) : hasMenu ? (
+        <div className="flex flex-wrap items-center gap-2">
+          {canAssign && <button onClick={() => setActive('addwork')} className={outlineCls}><Plus size={15} /> Add extra work</button>}
+          {showRequestInfo && <button onClick={() => setActive('info')} className={outlineCls}><MessageSquare size={15} /> Request more info</button>}
+          {hasSupplier && <button onClick={() => setActive('chat')} className={outlineCls}><MessageSquare size={15} /> Chat with supplier</button>}
+          {canEdit && <button onClick={() => setActive('edit')} className={outlineCls}><Pencil size={15} /> Edit ticket</button>}
+          {canCancel && <button onClick={() => setActive('cancel')} className={outlineDangerCls}><XCircle size={15} /> Cancel ticket</button>}
+        </div>
+      ) : null}
 
       {/* Action modals — mounted only while active, so they appear instantly. */}
       {active === 'addwork' && <RmAddWorkForm defaultOpen onClose={done} ticketId={ticketId} description={description} photoUrls={photoUrls} title={title} category={category} impact={impact} />}

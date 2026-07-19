@@ -23,7 +23,8 @@ import type { QuoteSummaryStatus } from '@/components/workflow/QuoteSummary'
 import type { Database } from '@/lib/database.types'
 
 // Newer per-dispute columns fetched by the second ticket_disputes query below.
-type DisputeExtra = Pick<Database['public']['Tables']['ticket_disputes']['Row'], 'id' | 'signoff_id' | 'pending_outcome' | 'pending_by'>
+// supplier_id = the org that raised the dispute (drives cross-supplier isolation).
+type DisputeExtra = Pick<Database['public']['Tables']['ticket_disputes']['Row'], 'id' | 'signoff_id' | 'pending_outcome' | 'pending_by' | 'supplier_id'>
 
 // Shown when the RM declined a quote without typing a reason.
 const DEFAULT_DECLINE_REASON = 'Thank you for your submission. Although your quotation was not selected for this request, we value your participation and look forward to inviting you to future opportunities.'
@@ -41,7 +42,7 @@ export async function loadSupplierTicketDetail(ticketId: string) {
   // Access is by ASSIGNMENT, not company (a Motiv/pool supplier works client tickets
   // they don't belong to). The awarded/invite check below is the real gate.
   if (!t) return { kind: 'redirect' as const, to: '/supplier/tickets' }
-  const [{ data: store }, { data: updates }, { data: invite }, { data: myQuotes }, { data: technicianRows }, { data: signoffRows }, { data: snagRows }, { data: companyRow }, { data: variationRows }, { data: viewRows }, { data: declineRows }, { data: requoteRows }, { data: roundRows }, { data: disputeRows }, { data: disputeMsgRows }, { data: snagEventRows }, { data: disputeExtra }] = await Promise.all([
+  const [{ data: store }, { data: updates }, { data: invite }, { data: myQuotes }, { data: technicianRows }, { data: signoffRows }, { data: snagRows }, { data: companyRow }, { data: variationRows }, { data: viewRows }, { data: declineRows }, { data: requoteRows }, { data: roundRows }, { data: disputeRows }, { data: disputeMsgRows }, { data: snagEventRows }, { data: disputeExtra }, { data: ticketEdits }] = await Promise.all([
     admin.from('stores').select('name, sub_store, branch_code').eq('id', t.store_id ?? '').single(),
     admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('ticket_suppliers').select('supplier_id, status, invited_at, decline_reason, responded_at, declined_by, requote_requested_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).maybeSingle(),
@@ -72,9 +73,13 @@ export async function loadSupplierTicketDetail(ticketId: string) {
     admin.from('ticket_dispute_messages').select('id, dispute_id, author_role, body, evidence_urls, created_at').eq('ticket_id', t.id).order('created_at', { ascending: true }),
     // Durable snag-fix schedule rounds → every proposal / approval / decline on the trail.
     admin.from('snag_schedule_events').select('kind, scheduled_for, reason, created_at').eq('ticket_id', t.id).order('created_at', { ascending: true }),
-    // Newer per-dispute columns (signoff link + pending proposal) fetched separately so
-    // the dispute block still works if those columns aren't migrated yet (query fails → null).
-    admin.from('ticket_disputes').select('id, signoff_id, pending_outcome, pending_by').eq('ticket_id', t.id),
+    // Newer per-dispute columns (signoff link + pending proposal + raising org)
+    // fetched separately so the dispute block still works if those columns aren't
+    // migrated yet (query fails → null).
+    admin.from('ticket_disputes').select('id, signoff_id, pending_outcome, pending_by, supplier_id').eq('ticket_id', t.id),
+    // Durable per-edit log → one "Ticket edited"/"Extra work added" timeline event
+    // per edit (the single-slot edited_at/edit_note columns remain the fallback).
+    admin.from('ticket_edits').select('editor_id, editor_role, note, created_at').eq('ticket_id', t.id).order('created_at', { ascending: true }),
   ])
   // Private-bucket signing: rewrite every stored ticket-photo / COC / attachment /
   // evidence URL to a short-lived signed URL in place, so all the render sites below
@@ -126,7 +131,15 @@ export async function loadSupplierTicketDetail(ticketId: string) {
   const storeName = storeLabel(store?.name, store?.sub_store)
   // "Store · Branch" label shown on the raise-dispute pop-up's subject card.
   const disputeStore = [storeName, store?.branch_code].filter(Boolean).join(' · ') || null
-  const editorName = t.edited_by ? ((await admin.from('user_profiles').select('full_name').eq('id', t.edited_by).single()).data?.full_name ?? null) : null
+  // Editor display names — one batched lookup covers the single-slot edited_by
+  // fallback and every distinct editor in the durable ticket_edits log.
+  const editorIds = [...new Set([t.edited_by, ...(ticketEdits ?? []).map(r => r.editor_id)].filter((x): x is string => !!x))]
+  const editorProfiles = editorIds.length ? ((await admin.from('user_profiles').select('id, full_name').in('id', editorIds)).data ?? []) : []
+  const editorNameById = new Map(editorProfiles.map(p => [p.id, p.full_name ?? null]))
+  const editorName = t.edited_by ? (editorNameById.get(t.edited_by) ?? null) : null
+  // Durable per-edit events for the timeline (note 'added extra work' gets its own
+  // wording there, so the supplier sees every scope change on the ticket).
+  const ticketEditEvents = (ticketEdits ?? []).map(r => ({ at: r.created_at, note: r.note, byName: r.editor_id ? (editorNameById.get(r.editor_id) ?? null) : null, byRole: r.editor_role }))
   // Standalone Individual (home) job — no company/store. Load the customer's name +
   // contact so the supplier can arrange the home visit.
   const customer = (!t.company_id && t.created_by)
@@ -252,8 +265,15 @@ export async function loadSupplierTicketDetail(ticketId: string) {
   // Snag / evidence disputes. While one is OPEN the snag/evidence step is paused;
   // resolved ones live in the Archive. Messages are grouped by their dispute.
   const disputeExtraById = new Map((disputeExtra ?? []).map((x): [string, DisputeExtra] => [x.id, x]))
-  const disputes = (disputeRows ?? []).map(d => ({ ...d, ...disputeExtraById.get(d.id) }))
-  const disputeMsgs = disputeMsgRows ?? []
+  // Cross-supplier isolation: only THIS org's disputes — theirs by supplier_id
+  // (e.g. a quote-decline dispute raised while declined off the ticket), or legacy
+  // null-supplier_id rows when they are the awarded org. Several competing orgs on
+  // one ticket must never see each other's disputes or threads.
+  const disputes = (disputeRows ?? [])
+    .map(d => ({ ...d, ...disputeExtraById.get(d.id) }))
+    .filter(d => d.supplier_id ? supplierIds.includes(d.supplier_id) : awarded)
+  const myDisputeIds = new Set(disputes.map(d => d.id))
+  const disputeMsgs = (disputeMsgRows ?? []).filter(m => myDisputeIds.has(m.dispute_id))
   // evidence_urls is a Json column that always stores a string[] of URLs.
   const msgsByDispute = (id: string) => disputeMsgs.filter(m => m.dispute_id === id).map(m => ({ ...m, evidence_urls: Array.isArray(m.evidence_urls) ? m.evidence_urls as string[] : [] }))
   const openDispute = disputes.find(d => d.status === 'open') ?? null
@@ -261,6 +281,7 @@ export async function loadSupplierTicketDetail(ticketId: string) {
   // What each dispute is about — the disputed "Submission #N" + snag / evidence request.
   const disputeSubject = (d: { origin: string; signoff_id?: string | null }) => {
     if (d.origin === 'variation') return 'Variation order · declined'
+    if (d.origin === 'quote_declined') return 'Quote declined'
     const n = d.signoff_id ? submissionNo.get(d.signoff_id) : null
     const what = d.origin === 'snag' ? 'snag' : 'evidence request'
     return n ? `Submission #${n} · ${what}` : what
@@ -315,7 +336,7 @@ export async function loadSupplierTicketDetail(ticketId: string) {
         quoteRequests: myQuoteRequests.map(at => ({ at })),
         requoteRequestedAt: invite?.requote_requested_at ?? null,
         quoteSubmittedAt: latestQuote?.created_at ?? null,
-        editedAt: t.edited_at, editedByName: editorName, editNote: t.edit_note,
+        editedAt: t.edited_at, editedByName: editorName, editNote: t.edit_note, edits: ticketEditEvents,
         infoRequestedAt: t.info_requested_at, infoAddedAt: t.info_added_at, infoRequestReason: t.info_request_reason,
         quotes: myQuotes ?? [], supplierDeclines: myDeclines, views: viewRows ?? [],
         supplierDeclinedAt: declinedForMe ? (invite?.responded_at ?? latestQuote?.updated_at ?? t.updated_at) : null,
@@ -328,7 +349,7 @@ export async function loadSupplierTicketDetail(ticketId: string) {
         quoteApprovedAt: t.quote_decision_status === 'approved' ? t.quote_decided_at : null,
         scheduledAt: t.scheduled_at, completedAt: t.completed_at,
         infoRequestedAt: t.info_requested_at, infoAddedAt: t.info_added_at, infoRequestReason: t.info_request_reason,
-        editedAt: t.edited_at, editedByName: editorName, editNote: t.edit_note, cancellationReason: t.cancellation_reason,
+        editedAt: t.edited_at, editedByName: editorName, editNote: t.edit_note, edits: ticketEditEvents, cancellationReason: t.cancellation_reason,
         snagScheduledAt, workStartedAt: t.attended_at ?? null,
         snagAcceptedAt: latestSnag?.assigned_at ?? null, snagProposedAt: latestSnag?.assigned_at ?? null, snagApprovedAt: latestSnag?.schedule_agreed_at ?? null,
         snagDeclinedAt: declinedSnag?.schedule_declined_at ?? null, snagDeclineReason: declinedSnag?.schedule_decline_reason ?? null,
