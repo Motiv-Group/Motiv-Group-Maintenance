@@ -84,9 +84,8 @@ async function buildRegionalTicketDetail(
     admin.from('signoff_rounds').select('signoff_id, round_no, kind, reason').eq('ticket_id', t.id),
   ])
   const storeName = store ? storeLabel(store.name, store.sub_store) : 'Store'
-  const editorName = t.edited_by ? ((await admin.from('user_profiles').select('full_name').eq('id', t.edited_by).single()).data?.full_name ?? null) : null
   // Motiv-curated supplier pool (assign pop-up) + who has viewed this ticket's items.
-  const [{ data: motivSuppliers }, { data: viewRows }, { data: declineRows }, { data: requestRows }, { data: readRow }, { data: disputeRows }, { data: disputeMsgRows }, { data: snagEventRows }, { data: disputeExtra }] = await Promise.all([
+  const [{ data: motivSuppliers }, { data: viewRows }, { data: declineRows }, { data: requestRows }, { data: readRow }, { data: disputeRows }, { data: disputeMsgRows }, { data: snagEventRows }, { data: disputeExtra }, { data: ticketEdits }] = await Promise.all([
     admin.from('suppliers').select('id, company_name, trade, trades').eq('is_motiv', true).eq('active', true).order('company_name'),
     admin.from('ticket_views').select('viewer_role, item_type, item_label, first_viewed_at').eq('ticket_id', t.id),
     // Durable supplier request-declines — kept even after the supplier is re-invited.
@@ -104,7 +103,16 @@ async function buildRegionalTicketDetail(
     // Newer per-dispute columns (signoff link + pending proposal) fetched separately so
     // the dispute block still works if those columns aren't migrated yet (query fails → null).
     admin.from('ticket_disputes').select('id, signoff_id, pending_outcome, pending_by').eq('ticket_id', t.id),
+    // Durable per-edit log → one "Ticket edited" timeline event per edit (the
+    // single-slot edited_at/edit_note columns remain the engine's fallback).
+    admin.from('ticket_edits').select('editor_id, editor_role, note, created_at').eq('ticket_id', t.id).order('created_at', { ascending: true }),
   ])
+  // Editor display names — one batched lookup covers the single-slot edited_by
+  // fallback and every distinct editor in the durable ticket_edits log.
+  const editorIds = [...new Set([t.edited_by, ...(ticketEdits ?? []).map(r => r.editor_id)].filter((x): x is string => !!x))]
+  const editorProfiles = editorIds.length ? ((await admin.from('user_profiles').select('id, full_name').in('id', editorIds)).data ?? []) : []
+  const editorNameById = new Map(editorProfiles.map(p => [p.id, p.full_name ?? null]))
+  const editorName = t.edited_by ? (editorNameById.get(t.edited_by) ?? null) : null
   // Private-bucket signing. The "new evidence" green-highlight compares URLs across
   // signoff rounds by equality, so each DISTINCT stored URL is signed exactly once
   // (shared map) → identical stored URLs still map to identical signed URLs. Every
@@ -415,6 +423,9 @@ async function buildRegionalTicketDetail(
     quoteApprovedAt: t.quote_decision_status === 'approved' ? t.quote_decided_at : null,
     scheduledAt: t.scheduled_at, completedAt: t.completed_at,
     editedAt: t.edited_at, editedByName: editorName, editNote: t.edit_note, cancellationReason: t.cancellation_reason,
+    // Durable per-edit log → one event per edit (engine falls back to the
+    // single-slot fields above when this is empty).
+    edits: (ticketEdits ?? []).map(r => ({ at: r.created_at, note: r.note, byName: r.editor_id ? (editorNameById.get(r.editor_id) ?? null) : null, byRole: r.editor_role })),
     infoRequestedAt: t.info_requested_at, infoAddedAt: t.info_added_at, infoRequestReason: t.info_request_reason,
     snagScheduledAt,
     snagAcceptedAt: latestSnag?.assigned_at ?? null,

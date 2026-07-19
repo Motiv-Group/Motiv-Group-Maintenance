@@ -9,6 +9,7 @@ import { uploadOne } from '@/lib/upload'
 import type { ReactNode } from 'react'
 import { MessageSquareWarning, Paperclip, X, Send, ShieldCheck, ShieldX, FileText, Image as ImageIcon, Loader2, ClipboardList, ChevronDown } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
+import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { formatDateTime } from '@/lib/utils'
 import { useScrollLock } from '@/lib/useScrollLock'
 
@@ -17,8 +18,9 @@ const DISPUTE_REASONS: Record<string, string[]> = {
   snag: ['Work was completed correctly', 'Snag is outside the agreed scope', 'Defect not caused by our work', 'Insufficient detail provided', 'Other'],
   evidence: ['Requested evidence already provided', 'Request is outside the agreed scope', 'Evidence not applicable to this job', 'Insufficient detail provided', 'Other'],
   variation: ['Variation was pre-approved', 'Work is within the agreed scope', 'The decline reason is incorrect', 'Insufficient detail provided', 'Other'],
+  quote_declined: ['The decline reason is incorrect', 'The quote met the requested scope', 'Pricing was competitive for the scope', 'Insufficient detail provided', 'Other'],
 }
-const ORIGIN_CARD_LABEL: Record<string, string> = { snag: 'SNAG', evidence: 'EVIDENCE REQUEST', variation: 'VARIATION' }
+const ORIGIN_CARD_LABEL: Record<string, string> = { snag: 'SNAG', evidence: 'EVIDENCE REQUEST', variation: 'VARIATION', quote_declined: 'QUOTE DECLINE' }
 
 // Narrow an unknown catch value to the message shown in the inline error banner.
 const errMsg = (e: unknown): string => (e instanceof Error ? e.message : String(e))
@@ -45,7 +47,7 @@ export interface DisputeMessage {
 }
 export interface DisputeRecord {
   id: string
-  origin: 'snag' | 'evidence_requested' | 'variation' | string
+  origin: 'snag' | 'evidence_requested' | 'variation' | 'quote_declined' | string
   status: 'open' | 'resolved' | string
   outcome: 'upheld' | 'withdrawn' | string | null
   resolution_note: string | null
@@ -58,7 +60,7 @@ export interface DisputeRecord {
 }
 
 // Origin → the word used for the disputed request across the UI.
-const originWord = (o: string) => o === 'snag' ? 'snag' : o === 'variation' ? 'variation order' : 'evidence request'
+const originWord = (o: string) => o === 'snag' ? 'snag' : o === 'variation' ? 'variation order' : o === 'quote_declined' ? 'quote decline' : 'evidence request'
 
 const ROLE_LABEL: Record<string, string> = { supplier: 'Supplier', regional_manager: 'Regional Manager', system: 'System' }
 
@@ -146,10 +148,12 @@ function Composer({ ticketId, action, submitLabel, placeholder, onDone }: { tick
 // (renders a custom opener); without it, the default full-width red button shows.
 const MAX_DISPUTE_CHARS = 1000
 const MAX_DISPUTE_FILES = 5
-export function RaiseDisputeButton({ ticketId, origin, subjectTitle, jobRef, store, trigger, defaultOpen = false, onClose }: {
-  ticketId: string; origin: 'snag' | 'evidence' | 'variation'
+export function RaiseDisputeButton({ ticketId, origin, subjectTitle, jobRef, store, trigger, label, defaultOpen = false, onClose }: {
+  ticketId: string; origin: 'snag' | 'evidence' | 'variation' | 'quote_declined'
   subjectTitle?: string | null; jobRef?: string | null; store?: string | null
   trigger?: (open: () => void) => ReactNode; defaultOpen?: boolean; onClose?: () => void
+  /** Text of the default opener button (Server Components can't pass a `trigger` fn). */
+  label?: string
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(defaultOpen)
@@ -159,7 +163,7 @@ export function RaiseDisputeButton({ ticketId, origin, subjectTitle, jobRef, sto
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   useScrollLock(open)
-  const what = origin === 'snag' ? 'snag' : origin === 'variation' ? 'variation-order decline' : 'evidence request'
+  const what = origin === 'snag' ? 'snag' : origin === 'variation' ? 'variation-order decline' : origin === 'quote_declined' ? 'quote decline' : 'evidence request'
   const reset = () => { setReason(''); setText(''); setFiles([]); setErr('') }
   const close = () => { setOpen(false); reset(); onClose?.() }
   // Snapshot the live FileList before the input is cleared (lazy reads inside the
@@ -185,7 +189,7 @@ export function RaiseDisputeButton({ ticketId, origin, subjectTitle, jobRef, sto
     <>
       {trigger ? trigger(() => setOpen(true)) : (!defaultOpen &&
         <button onClick={() => setOpen(true)} className="w-full py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-semibold transition flex items-center justify-center gap-1.5">
-          <MessageSquareWarning size={15} /> Raise dispute
+          <MessageSquareWarning size={15} /> {label ?? 'Raise dispute'}
         </button>
       )}
       {open && (
@@ -199,7 +203,10 @@ export function RaiseDisputeButton({ ticketId, origin, subjectTitle, jobRef, sto
             </div>
 
             <div className="space-y-5 p-4 sm:p-6">
-              <p className="text-sm text-[var(--text-muted)]">Raising a dispute pauses this {what} until it is resolved. Explain why you disagree and attach supporting evidence. Messages exchanged with the client will be recorded for audit purposes.</p>
+              {/* Quote-decline disputes are thread-only — nothing on the ticket pauses. */}
+              <p className="text-sm text-[var(--text-muted)]">{origin === 'quote_declined'
+                ? 'Raising a dispute opens a conversation with the client about this quote decline — the decision stands unless the client retracts it.'
+                : `Raising a dispute pauses this ${what} until it is resolved.`} Explain why you disagree and attach supporting evidence. Messages exchanged with the client will be recorded for audit purposes.</p>
 
               {/* Subject info card — stacks on phones (three side-by-side cells need
                   ~450px inside the modal); sm+ keeps the divided row. */}
@@ -415,14 +422,14 @@ export function DisputeThread({ ticketId, dispute, messages, viewerRole, readOnl
                       <p className={`text-[10px] font-semibold uppercase tracking-wide ${mine ? 'text-white/70' : 'text-[var(--text-faint)]'}`}>Attachment{urls.length === 1 ? '' : `s (${urls.length})`}</p>
                       <div className="flex flex-wrap gap-1.5">
                         {urls.map((u, j) => (
-                          <a key={j} href={u} target="_blank" rel="noopener noreferrer"
+                          <ViewTrackedLink key={j} ticketId={ticketId} itemType="attachment" itemLabel={attachmentName(u)} href={u}
                             className={`flex max-w-[200px] items-center gap-2 rounded-lg p-1.5 pr-2.5 transition ${mine ? 'bg-white/10 hover:bg-white/20' : 'bg-[var(--surface-2)] ring-1 ring-[var(--border)] hover:bg-[var(--hover)]'}`}>
                             {isImageUrl(u)
                               /* eslint-disable-next-line @next/next/no-img-element -- signed remote evidence thumbnail */
                               ? <img src={u} alt="" className="h-9 w-9 shrink-0 rounded object-cover" />
                               : <span className={`grid h-9 w-9 shrink-0 place-items-center rounded ${mine ? 'bg-white/15 text-white' : 'bg-blue-500/15 text-blue-600 dark:text-blue-400'}`}><FileText size={16} /></span>}
                             <span className={`min-w-0 truncate text-[11px] font-medium ${mine ? 'text-white' : 'text-[var(--text)]'}`}>{attachmentName(u)}</span>
-                          </a>
+                          </ViewTrackedLink>
                         ))}
                       </div>
                     </div>

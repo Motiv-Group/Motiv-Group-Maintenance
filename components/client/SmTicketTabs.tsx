@@ -4,11 +4,12 @@ import { useState } from 'react'
 import { FileText, Download } from 'lucide-react'
 import { Card } from '@/components/exec/ui'
 import { PhotoThumbs } from '@/components/ui/PhotoThumbs'
+import { TicketTimeline } from '@/components/ui/TicketTimeline'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { formatDateTime } from '@/lib/utils'
+import type { TimelineEvent } from '@/lib/ticket-timeline'
 
 type Update = { body: string; created_at: string }
-type TimelineEntry = { label: string; at: string }
 type Tab = 'photos' | 'activity' | 'timeline'
 
 function docName(url: string): string {
@@ -17,7 +18,8 @@ function docName(url: string): string {
 
 // Lower tabbed section of the SM ticket detail — only content a store manager
 // may see: attachments (photos + documents), the activity notes, and the
-// status-change Timeline (audit trail). No internal Documents/Comments/History.
+// Timeline (the shared engine's SM-safe subset — see filterTimelineForSm).
+// No internal Documents/Comments/History.
 export function SmTicketTabs({
   photoUrls, docUrls, ticketId, updates, timeline,
 }: {
@@ -25,7 +27,7 @@ export function SmTicketTabs({
   docUrls: string[]
   ticketId: string
   updates: Update[]
-  timeline: TimelineEntry[]
+  timeline: TimelineEvent[]
 }) {
   const [tab, setTab] = useState<Tab>(photoUrls.length || docUrls.length ? 'photos' : 'timeline')
   const tabs: { key: Tab; label: string }[] = [
@@ -86,24 +88,7 @@ export function SmTicketTabs({
         ) : <p className="text-sm text-[var(--text-faint)]">No updates yet.</p>
       )}
 
-      {tab === 'timeline' && (
-        timeline.length ? (
-          <ol className="space-y-4">
-            {timeline.map((e, i) => (
-              <li key={i} className="flex gap-3">
-                <div className="flex flex-col items-center">
-                  <span className={`mt-1 h-2.5 w-2.5 rounded-full ${i === timeline.length - 1 ? 'bg-blue-500' : 'bg-[var(--text-faint)]'}`} />
-                  {i < timeline.length - 1 && <span className="mt-1 w-px flex-1 bg-[var(--border)]" />}
-                </div>
-                <div className="min-w-0 pb-1">
-                  <p className="text-sm font-medium text-[var(--text)]">{e.label}</p>
-                  <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(e.at)}</p>
-                </div>
-              </li>
-            ))}
-          </ol>
-        ) : <p className="text-sm text-[var(--text-faint)]">No history yet.</p>
-      )}
+      {tab === 'timeline' && <TicketTimeline items={timeline} />}
     </Card>
   )
 }

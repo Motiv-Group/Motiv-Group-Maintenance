@@ -9,19 +9,18 @@ import { requireStoreManagerV3 } from '@/lib/health/guard'
 import { Card } from '@/components/exec/ui'
 import { ClientTicketProgress } from '@/components/client/ClientTicketProgress'
 import { clientStatusMeta } from '@/components/client/ClientTicketStatus'
-import { AddInfoModal } from '@/components/client/AddInfoModal'
 import { ClientTicketActions } from '@/components/client/ClientTicketActions'
 import { SmTicketTabs } from '@/components/client/SmTicketTabs'
 import { TicketBadges } from '@/components/client/ticketBadges'
 import { ChatFab } from '@/components/chat/TicketChat'
 import { chatUnreadCounts, smChatAdded } from '@/lib/chat-unread'
 import { EditedLine } from '@/components/ui/EditedLine'
+import { buildTicketTimeline, filterTimelineForSm } from '@/lib/ticket-timeline'
 import { formatDateTime, clientVisibleStatus, PRIORITY_LEVEL_LABELS, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
 import type { StoreManagerTicket } from '@/lib/health/data'
 import type { TicketStatus } from '@/lib/types'
 import type { Database } from '@/lib/database.types'
 
-type TicketRow = Database['public']['Tables']['tickets']['Row']
 type SnagSel = Pick<Database['public']['Tables']['snags']['Row'], 'scheduled_at' | 'schedule_status' | 'status'>
 
 function InfoRow({ label, value }: { label: string; value: string }) {
@@ -33,84 +32,34 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   )
 }
 
-type TimelineEntry = { label: string; at: string }
-type EventRow = { from_status: string | null; to_status: string; created_at: string }
-
-// SM-safe label for a status transition — the store manager sees only the
-// necessary milestones: the info-request loop, scheduling, work start, the
-// completion submission, and the terminal states. The competitive quoting and
-// every "viewed" event are intentionally hidden (award is added separately, from
-// the ticket row, so it fires even without a captured status event).
-function lifecycleLabel(from: string | null, to: string): string | null {
-  if (to === 'info_requested') return 'Your manager requested more information'
-  if (from === 'info_requested' && to === 'open') return 'You added the requested information'
-  switch (to) {
-    case 'scheduled': return 'A visit was scheduled'
-    case 'in_progress': return 'The supplier started work'
-    case 'submitted_for_signoff':
-    case 'pending_sign_off': return 'The supplier submitted the completion for review'
-    case 'completed': return 'Work was completed'
-    case 'cancelled': return 'The ticket was cancelled'
-    case 'declined': return 'The ticket was declined'
-    default: return null
-  }
-}
-
-// The SM audit trail: the necessary milestones only (no competitive-quoting
-// detail, no "viewed" events). Built from ticket_events (status changes, with a
-// fallback for tickets predating the trigger), the award (from the ticket row),
-// and the edit. De-duplicated by label so a reschedule doesn't repeat, oldest-first.
-function buildSmTimeline(t: TicketRow, events: EventRow[]): TimelineEntry[] {
-  const out: TimelineEntry[] = [{ label: 'You logged the ticket', at: t.created_at }]
-
-  // Supplier awarded — taken from the ticket row so it shows regardless of how the
-  // approval was recorded. The store manager never sees the quoting that led here.
-  if (t.quote_decision_status === 'approved' && t.quote_decided_at) {
-    out.push({ label: 'A supplier was assigned to the job', at: t.quote_decided_at })
-  }
-
-  for (const ev of events) {
-    if (ev.from_status == null) continue // "created" already added above
-    const label = lifecycleLabel(ev.from_status, ev.to_status)
-    if (label) out.push({ label, at: ev.created_at })
-  }
-  // Fallback: surface the current "info requested" even if it predates the
-  // ticket_events trigger (no captured event) — best-effort timestamp.
-  if (t.status === 'info_requested' && t.info_request_reason && !events.some(e => e.to_status === 'info_requested')) {
-    out.push({ label: 'Your manager requested more information', at: t.updated_at ?? t.created_at })
-  }
-  // The SM's (or their manager's) edit to the ticket details is recorded on the
-  // ticket row (edited_at), not as a status event, so add it explicitly.
-  if (t.edited_at && +new Date(t.edited_at) > +new Date(t.created_at)) {
-    const who = t.edited_by && t.edited_by !== t.created_by ? 'Your manager updated the ticket' : 'You edited the ticket'
-    const note = typeof t.edit_note === 'string' && t.edit_note.trim() ? ` — ${t.edit_note.trim()}` : ''
-    out.push({ label: `${who}${note}`, at: t.edited_at })
-  }
-
-  // Oldest-first, then keep the first occurrence of each milestone label.
-  const seen = new Set<string>()
-  return out
-    .sort((a, b) => +new Date(a.at) - +new Date(b.at))
-    .filter(e => (seen.has(e.label) ? false : (seen.add(e.label), true)))
-}
-
 export default async function StoreTicketDetailPage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params
   const admin = createAdminClient()
-  const [{ storeIds, userId }, { data: t }, { data: updates }, { data: snagRows }, { data: eventRows }] = await Promise.all([
+  // Timeline source rows (shared engine input). Quotes are status + timestamps
+  // ONLY — no amounts or supplier names ever reach the SM view.
+  const [{ storeIds, userId }, { data: t }, { data: updates }, { data: snagRows }, { data: quoteRows }, { data: signoffRows }, { data: variationRows }, { data: snagEventRows }, { data: editRows }] = await Promise.all([
     requireStoreManagerV3(),
     admin.from('tickets').select('*').eq('id', params.id).single(),
     admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', params.id).order('created_at', { ascending: false }),
     admin.from('snags').select('scheduled_at, schedule_status, status').eq('ticket_id', params.id).order('created_at', { ascending: false }),
-    admin.from('ticket_events').select('from_status, to_status, created_at').eq('ticket_id', params.id).order('created_at', { ascending: true }),
+    admin.from('quotes').select('status, created_at, updated_at').eq('ticket_id', params.id).order('created_at', { ascending: true }),
+    admin.from('signoffs').select('status, reject_reason, reviewed_at, created_at').eq('ticket_id', params.id).order('created_at', { ascending: true }),
+    admin.from('ticket_variations').select('status, reject_reason, reviewed_at, created_at').eq('ticket_id', params.id).order('created_at', { ascending: true }),
+    admin.from('snag_schedule_events').select('kind, scheduled_for, reason, created_at').eq('ticket_id', params.id).order('created_at', { ascending: true }),
+    admin.from('ticket_edits').select('note, editor_id, editor_role, created_at').eq('ticket_id', params.id).order('created_at', { ascending: true }),
   ])
   if (!t || !storeIds.includes(t.store_id ?? '')) redirect('/client/tickets')
 
   const showVisit = !!t.scheduled_at && !['completed', 'cancelled', 'declined'].includes(t.status)
   const photoUrlsRaw = Array.isArray(t.photo_urls) ? t.photo_urls : []
   const docUrlsRaw = Array.isArray(t.info_doc_urls) ? t.info_doc_urls : []
-  const [editorName, visitSupplier, visitTech, signedPhotoUrls, signedDocUrls, chatAddedSet, chatCounts] = await Promise.all([
-    t.edited_by ? admin.from('user_profiles').select('full_name').eq('id', t.edited_by).single().then(r => r.data?.full_name ?? null) : null,
+  // Editor names for the description "edited" line + the per-edit timeline events —
+  // one lookup covering the single-slot editor and every ticket_edits editor.
+  const editorIds = [...new Set([t.edited_by, ...(editRows ?? []).map(e => e.editor_id)])].filter((x): x is string => !!x)
+  const [editorNames, visitSupplier, visitTech, signedPhotoUrls, signedDocUrls, chatAddedSet, chatCounts] = await Promise.all([
+    editorIds.length
+      ? admin.from('user_profiles').select('id, full_name').in('id', editorIds).then(r => new Map<string, string | null>((r.data ?? []).map(p => [p.id, p.full_name])))
+      : new Map<string, string | null>(),
     showVisit && t.supplier_id ? admin.from('suppliers').select('company_name').eq('id', t.supplier_id).single().then(r => r.data?.company_name ?? null) : null,
     showVisit && t.technician_id ? admin.from('technicians').select('name').eq('id', t.technician_id).single().then(r => r.data?.name ?? null) : null,
     signManyUrls(photoUrlsRaw),
@@ -120,6 +69,7 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
     t.supplier_id ? chatUnreadCounts(admin, userId, [t.id], { smViewer: true }) : ({} as Record<string, number>),
   ])
   const chatAdded = !!t.supplier_id && chatAddedSet.has(t.id)
+  const editorName = t.edited_by ? (editorNames.get(t.edited_by) ?? null) : null
   // The guard already required scheduled_at — the predicate just surfaces that to the type.
   const followUp = (snagRows ?? []).find((s): s is SnagSel & { scheduled_at: string } => !!s.scheduled_at && s.schedule_status === 'agreed' && ['assigned', 'in_progress'].includes(s.status)) ?? null
   const showFollowUp = !!followUp && !['completed', 'cancelled', 'declined'].includes(t.status)
@@ -147,7 +97,25 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
   // today page / Tickets tab, so they match everywhere.
   const badgeTicket = { priority: t.priority, status: cv ?? t.status, infoAdded } as unknown as StoreManagerTicket
 
-  const timeline = buildSmTimeline(t, eventRows ?? [])
+  // Full lifecycle from the shared engine, then the SM-safe subset — the filter
+  // strips quote submissions/declines, disputes and view-tracking; the input
+  // carries no amounts, so nothing commercial can leak. Labels stay the engine's
+  // neutral wording (no RM voice).
+  const events = buildTicketTimeline({
+    createdAt: t.created_at, status: t.status, updatedAt: t.updated_at,
+    quoteApprovedAt: t.quote_decision_status === 'approved' ? t.quote_decided_at : null,
+    scheduledAt: t.scheduled_at, completedAt: t.completed_at,
+    editedAt: t.edited_at, editedByName: editorName, editNote: t.edit_note,
+    edits: (editRows ?? []).map(e => ({ at: e.created_at, note: e.note, byName: e.editor_id ? (editorNames.get(e.editor_id) ?? null) : null, byRole: e.editor_role })),
+    cancellationReason: t.cancellation_reason,
+    infoRequestedAt: t.info_requested_at, infoAddedAt: t.info_added_at, infoRequestReason: t.info_request_reason,
+    snagScheduleEvents: snagEventRows ?? [],
+    workStartedAt: t.attended_at ?? null,
+    quotes: quoteRows ?? [],
+    variations: variationRows ?? [],
+    signoffs: signoffRows ?? [],
+  })
+  const smTimeline = filterTimelineForSm(events)
 
   return (
     <div className="space-y-4">
@@ -184,7 +152,7 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
             </div>
           )}
           {t.status === 'info_requested' ? (
-            <AddInfoModal ticketId={t.id} title={t.title} description={t.description} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} photoUrls={photoUrlsRaw} docUrls={docUrlsRaw} requestReason={t.info_request_reason} />
+            <ClientTicketActions ticketId={t.id} title={t.title} description={t.description ?? ''} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} photoUrls={photoUrlsRaw} docUrls={docUrlsRaw} requestReason={t.info_request_reason} smAdded={chatAdded} mode="add_info" />
           ) : canEdit ? (
             <ClientTicketActions ticketId={t.id} title={t.title} description={t.description ?? ''} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} photoUrls={photoUrlsRaw} smAdded={chatAdded} />
           ) : (
@@ -219,7 +187,7 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
 
       {/* Photos + documents · Activity · Timeline (audit trail). */}
       {/* body is never null on a real update row — narrow cast so the tabs' Update props typecheck. */}
-      <SmTicketTabs photoUrls={signedPhotoUrls} docUrls={signedDocUrls} ticketId={t.id} updates={(updates ?? []) as { body: string; author_role: string | null; created_at: string }[]} timeline={timeline} />
+      <SmTicketTabs photoUrls={signedPhotoUrls} docUrls={signedDocUrls} ticketId={t.id} updates={(updates ?? []) as { body: string; author_role: string | null; created_at: string }[]} timeline={smTimeline} />
 
       {/* Floating chat entry — only once the RM has added the SM to this ticket's chat. */}
       {chatAdded && <ChatFab ticketId={t.id} viewerRole="store_manager" unreadCount={chatCounts[t.id] ?? 0} />}

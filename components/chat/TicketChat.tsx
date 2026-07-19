@@ -7,6 +7,7 @@
 // notification + push fired by the API on send). Mirrors the dispute thread's look.
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Modal } from '@/components/ui/Modal'
+import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { MessageSquare, Paperclip, Send, X, FileText, Image as ImageIcon, Loader2 } from 'lucide-react'
 import { uploadOne } from '@/lib/upload'
 import { formatDateTime } from '@/lib/utils'
@@ -162,14 +163,14 @@ function ChatBody({ ticketId, viewerRole, onClose }: { ticketId: string; viewerR
                       {urls.length > 0 && (
                         <div className="mt-2 flex flex-wrap gap-1.5">
                           {urls.map((u, j) => (
-                            <a key={j} href={u} target="_blank" rel="noopener noreferrer"
+                            <ViewTrackedLink key={j} ticketId={ticketId} itemType="attachment" itemLabel={attachmentName(u)} href={u}
                               className={`flex max-w-[200px] items-center gap-2 rounded-lg p-1.5 pr-2.5 transition ${mine ? 'bg-white/10 hover:bg-white/20' : 'bg-[var(--surface-2)] ring-1 ring-[var(--border)] hover:bg-[var(--hover)]'}`}>
                               {isImageUrl(u)
                                 /* eslint-disable-next-line @next/next/no-img-element -- short-lived signed remote thumbnail */
                                 ? <img src={u} alt="" className="h-9 w-9 shrink-0 rounded object-cover" />
                                 : <span className={`grid h-9 w-9 shrink-0 place-items-center rounded ${mine ? 'bg-white/15 text-white' : 'bg-blue-500/15 text-blue-600 dark:text-blue-400'}`}><FileText size={16} /></span>}
                               <span className={`min-w-0 truncate text-[11px] font-medium ${mine ? 'text-white' : 'text-[var(--text)]'}`}>{attachmentName(u)}</span>
-                            </a>
+                            </ViewTrackedLink>
                           ))}
                         </div>
                       )}
