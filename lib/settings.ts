@@ -89,9 +89,12 @@ export interface AppSettings {
   tagline: string
   supportEmail: string
   supportPhone: string
-  /** Android app download link (Play Store or APK) shown in invite emails. Empty
-   *  = only the "open in your browser" link is shown. */
+  /** Optional app-store / APK download link (in addition to the install steps). */
   appDownloadUrl: string
+  /** Editable "Add to Home Screen" install steps shown in invite emails + the
+   *  Customize preview. Newline-separated; empty = the built-in default steps. */
+  appInstallAndroid: string
+  appInstallIos: string
   /** What people see before choosing a theme themselves ('system' = device setting). */
   defaultTheme: 'light' | 'dark' | 'system'
   /** Hex overrides ('#rrggbb') of the brand palette; missing stop = factory colour. */
@@ -139,12 +142,19 @@ export function normaliseEmails(raw: unknown): EmailOverrides {
   return out
 }
 
+// Built-in "Add to Home Screen" steps (newline-separated). Used when the admin
+// leaves the Customize field blank. It's a PWA — installed via the browser.
+export const DEFAULT_INSTALL_ANDROID = 'Open this site in Chrome.\nTap the ⋮ menu (top-right).\nTap “Add to Home screen”, then “Install”.'
+export const DEFAULT_INSTALL_IOS = 'Open this site in Safari.\nTap the Share button.\nScroll down and tap “Add to Home Screen”, then “Add”.'
+
 export const DEFAULT_SETTINGS: AppSettings = {
   appName: 'Motiv',
   tagline: 'Maintenance ticketing & quoting platform',
   supportEmail: '',
   supportPhone: '',
   appDownloadUrl: '',
+  appInstallAndroid: '',
+  appInstallIos: '',
   defaultTheme: 'system',
   colors: {},
   authButtonColor: AUTH_BUTTON_DEFAULT,
@@ -209,6 +219,8 @@ export function normaliseSettings(raw: unknown): AppSettings {
     supportEmail: str(r.supportEmail, ''),
     supportPhone: str(r.supportPhone, '', 40),
     appDownloadUrl: str(r.appDownloadUrl, '', 300).trim(),
+    appInstallAndroid: str(r.appInstallAndroid, '', 1200),
+    appInstallIos: str(r.appInstallIos, '', 1200),
     defaultTheme: r.defaultTheme === 'light' || r.defaultTheme === 'dark' ? r.defaultTheme : 'system',
     colors,
     authButtonColor: isHex(r.authButtonColor) ? (r.authButtonColor as string).toLowerCase() : AUTH_BUTTON_DEFAULT,

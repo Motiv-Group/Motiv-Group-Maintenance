@@ -16,6 +16,8 @@ const BodySchema = z.object({
   supportEmail: z.string().max(200).refine(v => v === '' || z.string().email().safeParse(v).success, 'Invalid email').optional(),
   supportPhone: z.string().max(40).optional(),
   appDownloadUrl: z.string().max(300).refine(v => v === '' || z.string().url().safeParse(v).success, 'Invalid URL').optional(),
+  appInstallAndroid: z.string().max(1200).optional(),
+  appInstallIos: z.string().max(1200).optional(),
   defaultTheme: z.enum(['light', 'dark', 'system']).optional(),
   colors: z.record(z.string(), HEX).optional(),
   authButtonColor: HEX.optional(),
@@ -61,6 +63,8 @@ export async function POST(request: Request) {
   if (body.supportEmail !== undefined) patch.supportEmail = body.supportEmail
   if (body.supportPhone !== undefined) patch.supportPhone = body.supportPhone
   if (body.appDownloadUrl !== undefined) patch.appDownloadUrl = body.appDownloadUrl.trim()
+  if (body.appInstallAndroid !== undefined) patch.appInstallAndroid = body.appInstallAndroid
+  if (body.appInstallIos !== undefined) patch.appInstallIos = body.appInstallIos
   if (body.defaultTheme !== undefined) patch.defaultTheme = body.defaultTheme
   if (body.colors !== undefined) {
     // Only known stops survive; sending {} clears every override (factory reset).

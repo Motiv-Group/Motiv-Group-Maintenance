@@ -9,6 +9,7 @@ import 'server-only'
 // from app_settings automatically.
 
 import type { BrandingState, EmailCopy, EmailKey } from '@/lib/settings'
+import { DEFAULT_INSTALL_ANDROID, DEFAULT_INSTALL_IOS } from '@/lib/settings'
 import { getAppSettings } from '@/lib/settings-server'
 import { emailLogoHeader, resolveCopy, type EmailLogo } from '@/lib/emails/defaults'
 import { escapeHtml, renderBrandedEmail, renderStoreWelcome, renderSupplierAdded } from '@/lib/email'
@@ -23,7 +24,7 @@ export interface EmailVars {
 }
 
 export type BuiltEmail = { subject: string; html: string; text: string }
-type AppLinks = { downloadUrl: string | null; browserUrl: string }
+type AppLinks = { android: string; ios: string; downloadUrl: string | null; browserUrl: string }
 
 type Overrides = Partial<EmailCopy> | undefined
 type Handlers = { [K in EmailKey]: (vars: EmailVars[K], overrides: Overrides, logo: EmailLogo, app: AppLinks) => BuiltEmail }
@@ -96,6 +97,11 @@ export async function buildEmail<K extends EmailKey>(key: K, vars: EmailVars[K])
   const settings = await getAppSettings()
   const origin = originFrom(key, vars)
   const logo = emailLogoHeader(settings.branding as BrandingState, origin)
-  const app: AppLinks = { downloadUrl: settings.appDownloadUrl?.trim() || null, browserUrl: origin }
+  const app: AppLinks = {
+    android: settings.appInstallAndroid?.trim() || DEFAULT_INSTALL_ANDROID,
+    ios: settings.appInstallIos?.trim() || DEFAULT_INSTALL_IOS,
+    downloadUrl: settings.appDownloadUrl?.trim() || null,
+    browserUrl: origin,
+  }
   return HANDLERS[key](vars, settings.emails[key], logo, app)
 }

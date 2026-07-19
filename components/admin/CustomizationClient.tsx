@@ -8,6 +8,7 @@ import { useState, type ChangeEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check, Image as ImageIcon, LifeBuoy, Loader2, Monitor, Moon, Paintbrush, Plus, Smartphone, Sun, Type, X } from 'lucide-react'
 import type { AppSettings } from '@/lib/settings'
+import { DEFAULT_INSTALL_ANDROID, DEFAULT_INSTALL_IOS } from '@/lib/settings'
 import { DarkTile, Field, SaveRow, Section, inputCls, postForm, postJson, useAsyncSave, validateImage } from '@/components/admin/customization/shared'
 import { LogoSection } from '@/components/admin/customization/LogoSection'
 import { LogoLayoutSection } from '@/components/admin/customization/LogoLayoutSection'
@@ -39,7 +40,7 @@ export function CustomizationClient({ initial }: { initial: AppSettings }) {
       <ColoursSection initialColors={initial.colors} initialButtonColor={initial.authButtonColor} appName={initial.appName} symbolSrc={symbolSrc} />
       <LoginBackgroundsSection initialUrls={initial.authBgUrls} />
       <SupportSection initialEmail={initial.supportEmail} initialPhone={initial.supportPhone} />
-      <MobileAppSection initialUrl={initial.appDownloadUrl} />
+      <MobileAppSection initialAndroid={initial.appInstallAndroid} initialIos={initial.appInstallIos} initialUrl={initial.appDownloadUrl} />
       <EmailsSection initialEmails={initial.emails} branding={initial.branding} />
       <AppearanceSection initialTheme={initial.defaultTheme} />
     </div>
@@ -252,29 +253,86 @@ function SupportSection({ initialEmail, initialPhone }: { initialEmail: string; 
 
 /* ------------------------------ 5b. Mobile app ----------------------------- */
 
-function MobileAppSection({ initialUrl }: { initialUrl: string }) {
+function MobileAppSection({ initialAndroid, initialIos, initialUrl }: { initialAndroid: string; initialIos: string; initialUrl: string }) {
   const router = useRouter()
+  const [android, setAndroid] = useState(initialAndroid)
+  const [ios, setIos] = useState(initialIos)
   const [url, setUrl] = useState(initialUrl)
-  const [saved, setSaved] = useState(initialUrl)
+  const [saved, setSaved] = useState({ android: initialAndroid, ios: initialIos, url: initialUrl })
   const saver = useAsyncSave<SettingsResponse>()
-  const dirty = url.trim() !== saved
+  const dirty = android !== saved.android || ios !== saved.ios || url.trim() !== saved.url
 
   async function save() {
-    const data = await saver.run(() => postJson<SettingsResponse>('/api/admin/customization', { appDownloadUrl: url.trim() }))
-    if (data) { setUrl(data.settings.appDownloadUrl); setSaved(data.settings.appDownloadUrl); router.refresh() }
+    const data = await saver.run(() => postJson<SettingsResponse>('/api/admin/customization', {
+      appInstallAndroid: android,
+      appInstallIos: ios,
+      appDownloadUrl: url.trim(),
+    }))
+    if (data) {
+      setAndroid(data.settings.appInstallAndroid)
+      setIos(data.settings.appInstallIos)
+      setUrl(data.settings.appDownloadUrl)
+      setSaved({ android: data.settings.appInstallAndroid, ios: data.settings.appInstallIos, url: data.settings.appDownloadUrl })
+      router.refresh()
+    }
   }
+
+  // Empty field = fall back to the built-in default (mirrors the email at send time).
+  const toSteps = (v: string) => v.split('\n').map((s) => s.trim()).filter(Boolean)
+  const androidSteps = toSteps(android.trim() || DEFAULT_INSTALL_ANDROID)
+  const iosSteps = toSteps(ios.trim() || DEFAULT_INSTALL_IOS)
+  const dl = url.trim()
 
   return (
     <Section
       icon={<Smartphone size={15} className="text-blue-600 dark:text-blue-400" />}
       title="Mobile app"
-      blurb="Invite emails include a “Get the app” step. Paste the Android download link (Play Store or APK) to show it; the “open in your browser” link is always shown. Leave empty to show only the browser link."
+      blurb="Invite emails include a “Get the app” block. There’s no app store — people install it to their home screen straight from the browser. Edit the Android and iPhone steps below; the preview shows exactly how they’ll look in the email. Leave a field empty to use the sensible default."
     >
-      <Field label="Android app download link" hint="Optional — e.g. a Play Store URL or a direct APK link.">
-        <input type="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://play.google.com/store/apps/details?id=…" className={inputCls} />
-      </Field>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="space-y-3">
+          <Field label="Android install steps" hint="One step per line. Leave empty to use the default.">
+            <textarea value={android} onChange={(e) => setAndroid(e.target.value)} rows={4} maxLength={1200} placeholder={DEFAULT_INSTALL_ANDROID} className={`${inputCls} resize-y leading-relaxed`} />
+          </Field>
+          <Field label="iPhone / iPad install steps" hint="One step per line. Leave empty to use the default.">
+            <textarea value={ios} onChange={(e) => setIos(e.target.value)} rows={4} maxLength={1200} placeholder={DEFAULT_INSTALL_IOS} className={`${inputCls} resize-y leading-relaxed`} />
+          </Field>
+          <Field label="Optional app download link" hint="Optional — a Play Store or direct APK URL, shown in addition to the steps.">
+            <input type="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://play.google.com/store/apps/details?id=…" className={inputCls} />
+          </Field>
+        </div>
+
+        {/* Phone-mockup preview of the email's “Get the app” block. */}
+        <div>
+          <span className="mb-1.5 block text-xs font-semibold text-[var(--text)]">Preview</span>
+          <div className="mx-auto max-w-[15rem] rounded-[1.75rem] bg-[var(--surface-2)] p-2 ring-1 ring-[var(--border)] shadow-sm">
+            <div className="relative rounded-[1.25rem] bg-white p-4 text-left ring-1 ring-black/5">
+              <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-gray-200" />
+              <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Get the app</p>
+              <p className="mt-0.5 text-[11px] leading-snug text-gray-500">Install it to your home screen straight from your browser — no app store needed.</p>
+              <StepPreview title="On Android" steps={androidSteps} />
+              <StepPreview title="On iPhone / iPad" steps={iosSteps} />
+              {dl && <p className="mt-2 text-[11px] leading-snug text-gray-700">📥 Prefer a download? <span className="font-semibold text-blue-600">Get it here</span></p>}
+              <p className="mt-1.5 text-[11px] leading-snug text-gray-700">💻 Or use it in your browser: <span className="font-semibold text-blue-600">motiv.app</span></p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <SaveRow state={saver.state} error={saver.error} dirty={dirty} onSave={save} />
     </Section>
+  )
+}
+
+function StepPreview({ title, steps }: { title: string; steps: string[] }) {
+  if (!steps.length) return null
+  return (
+    <div className="mt-2">
+      <p className="text-[11px] font-bold text-gray-800">{title}</p>
+      <ol className="mt-0.5 list-decimal space-y-0.5 pl-4 text-[11px] leading-snug text-gray-600">
+        {steps.map((s, i) => <li key={i}>{s}</li>)}
+      </ol>
+    </div>
   )
 }
 
