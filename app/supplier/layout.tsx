@@ -9,7 +9,7 @@ import { SlaReacceptGate } from '@/components/supplier/SlaReacceptGate'
 export const dynamic = 'force-dynamic'
 
 export default async function SupplierLayout({ children }: { children: React.ReactNode }) {
-  const { userId, fullName, companyId, supplierIds } = await requireSupplierV3()
+  const { userId, fullName, companyId, supplierIds, avatarUrl } = await requireSupplierV3()
 
   // B12: gate all supplier work until they've accepted the CURRENT SLA version.
   // Fires on a SLA_VERSION bump and for pre-wizard invited suppliers who never
@@ -35,7 +35,7 @@ export default async function SupplierLayout({ children }: { children: React.Rea
 
   const unreadCount = await getUnreadCount()
   return (
-    <ExecChrome userName={fullName} variant="supplier" unreadCount={unreadCount} accountStatus={accountStatus}>
+    <ExecChrome userName={fullName} variant="supplier" unreadCount={unreadCount} accountStatus={accountStatus} avatarUrl={avatarUrl}>
       <RealtimeRefresh tables={['tickets', 'quotes', 'signoffs', 'snags', 'ticket_updates', 'ratings', 'notifications', 'ticket_disputes', 'ticket_dispute_messages']} />
       {needsSla ? <SlaReacceptGate signedNameDefault={fullName} /> : children}
     </ExecChrome>

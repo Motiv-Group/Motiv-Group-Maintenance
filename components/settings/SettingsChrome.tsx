@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { UserCircle2, Building2, Bell, Palette, ShieldCheck, LogOut, ArrowLeft, type LucideIcon } from 'lucide-react'
 import { MotivLogo } from '@/components/ui/MotivLogo'
+import { UserAvatar } from '@/components/ui/UserAvatar'
 
 type NavItem = { href: string; label: string; short: string; icon: LucideIcon }
 
@@ -15,17 +16,17 @@ type NavItem = { href: string; label: string; short: string; icon: LucideIcon }
  * bottom tab nav, mirroring the rest of the app.
  */
 export function SettingsChrome({
-  children, userName, roleLabel, roleHome, profileLabel,
+  children, userName, roleLabel, roleHome, profileLabel, avatarUrl = null,
 }: {
   children: ReactNode
   userName: string | null
   roleLabel: string
   roleHome: string
   profileLabel: string
+  avatarUrl?: string | null
 }) {
   const pathname = usePathname()
   const user = userName ?? roleLabel
-  const initial = user.trim().charAt(0).toUpperCase()
   const iconBtn = 'p-2 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 transition-colors'
 
   const NAV: NavItem[] = [
@@ -81,7 +82,7 @@ export function SettingsChrome({
 
         <div className="border-t border-white/10 p-4">
           <div className="flex items-center gap-3 rounded-2xl bg-white/[0.04] p-3">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-blue-600 text-sm font-bold text-white">{initial}</span>
+            <UserAvatar name={user} avatarUrl={avatarUrl} size={40} />
             <div className="min-w-0">
               <div className="truncate text-sm font-bold text-white">{user}</div>
               <div className="truncate text-xs text-gray-400">{roleLabel}</div>
@@ -101,7 +102,7 @@ export function SettingsChrome({
                 <button type="submit" className={iconBtn} title="Log out"><LogOut size={17} /></button>
               </form>
               <div className="flex items-center gap-2 pl-2 ml-1 border-l border-white/15">
-                <span className="w-8 h-8 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-sm">{initial}</span>
+                <UserAvatar name={user} avatarUrl={avatarUrl} size={32} />
               </div>
             </div>
           </div>
