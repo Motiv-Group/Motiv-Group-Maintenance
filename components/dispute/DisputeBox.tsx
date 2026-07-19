@@ -162,7 +162,9 @@ export function RaiseDisputeButton({ ticketId, origin, subjectTitle, jobRef, sto
   const what = origin === 'snag' ? 'snag' : origin === 'variation' ? 'variation-order decline' : 'evidence request'
   const reset = () => { setReason(''); setText(''); setFiles([]); setErr('') }
   const close = () => { setOpen(false); reset(); onClose?.() }
-  const addFiles = (list: FileList | null) => { setFiles(p => [...p, ...Array.from(list ?? [])].slice(0, MAX_DISPUTE_FILES)); setErr('') }
+  // Snapshot the live FileList before the input is cleared (lazy reads inside the
+  // state updater would find it already emptied).
+  const addFiles = (list: FileList | null) => { const picked = Array.from(list ?? []); setFiles(p => [...p, ...picked].slice(0, MAX_DISPUTE_FILES)); setErr('') }
 
   async function submit() {
     if (!reason) { setErr('Choose a reason for the dispute.'); return }

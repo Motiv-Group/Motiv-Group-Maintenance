@@ -324,7 +324,10 @@ function clientStatusLabel(ticket: StoreManagerTicket): string {
 }
 
 function clientStatusBadgeClass(ticket: StoreManagerTicket): string {
-  if (ticket.infoAdded || ticket.status === 'info_requested') return 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
+  // "Info added" reads blue (in-flight) — the SM already actioned the request;
+  // amber stays reserved for statuses that still need the SM's input.
+  if (ticket.infoAdded) return 'bg-blue-500/15 text-blue-600 dark:text-blue-400'
+  if (ticket.status === 'info_requested') return 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
   switch (ticket.status) {
     case 'in_progress': return 'bg-[#f59e0b]/15 text-amber-700 dark:text-[#f59e0b]'
     case 'completed':   return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'

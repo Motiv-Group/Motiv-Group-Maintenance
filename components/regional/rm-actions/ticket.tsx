@@ -396,7 +396,13 @@ export function RmAddWorkForm({ ticketId, description, photoUrls, title, categor
   // empty MIME type (Android WebView), so require-image would silently drop it —
   // the `accept="image/*"` picker already limits selection, and the upload route
   // accepts an empty type, so only reject a clearly non-image type here.
-  const addFiles = (list: FileList | null) => setFiles(p => [...p, ...Array.from(list ?? []).filter(f => !f.type || f.type.startsWith('image/'))].slice(0, MAX_WORK_PHOTOS))
+  // Snapshot the LIVE FileList synchronously: the input's value is cleared right
+  // after this call, and reading the list lazily inside the state updater (which
+  // runs after the handler) would find it already emptied — zero photos added.
+  const addFiles = (list: FileList | null) => {
+    const picked = Array.from(list ?? []).filter(f => !f.type || f.type.startsWith('image/'))
+    setFiles(p => [...p, ...picked].slice(0, MAX_WORK_PHOTOS))
+  }
 
   async function submit() {
     if (!text.trim()) { setErr('Describe the extra work needed.'); return }
