@@ -9,6 +9,7 @@ type Opt = { id: string; label: string }
 export type LinkerExec = { id: string; name: string }
 export type LinkerRM = { id: string; name: string; email: string; regionIds: string[]; execIds: string[] }
 export type LinkerSM = { id: string; name: string; email: string; storeIds: string[] }
+export type LinkerStoreRow = { id: string; label: string; regionId: string | null }
 
 // Chip multi-select that persists on every toggle. `action` + `key` (the payload
 // field for the id list) drive the POST to /api/admin/hierarchy.
@@ -58,11 +59,54 @@ function LinkChips({ companyId, userId, action, listKey, options, initial, empty
   )
 }
 
-export function HierarchyLinker({ companyId, executives, regions, stores, rms, sms }: {
+// One store row in the Stores card: current region + a move-to-region picker
+// (POSTs the existing move_store action, which also re-homes the store's tickets).
+function StoreRegionRow({ store, regions }: { store: LinkerStoreRow; regions: Opt[] }) {
+  const router = useRouter()
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+
+  async function move(regionId: string) {
+    if (!regionId || regionId === store.regionId) return
+    const target = regions.find(r => r.id === regionId)
+    if (!window.confirm(`Move ${store.label} to ${target?.label ?? 'that region'}? Its tickets move to that region's manager too.`)) return
+    setBusy(true); setErr('')
+    try {
+      const res = await fetch('/api/admin/accounts', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'move_store', storeId: store.id, regionId }),
+      })
+      if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error ?? 'Failed') }
+      router.refresh()
+    } catch (e) { setErr(e instanceof Error ? e.message : 'Failed') } finally { setBusy(false) }
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-xl bg-[var(--surface-2)] p-3 ring-1 ring-[var(--border)]">
+      <p className="min-w-0 flex-1 basis-full line-clamp-2 break-words text-sm font-semibold text-[var(--text)] sm:basis-auto sm:line-clamp-1">{store.label}</p>
+      {/* Natural-width select (a flex-shrunk native select clips its label). */}
+      <select
+        value={store.regionId ?? ''}
+        onChange={e => move(e.target.value)}
+        disabled={busy}
+        aria-label={`Region for ${store.label}`}
+        className="w-full shrink-0 rounded-lg bg-[var(--input-bg)] px-3 py-2.5 text-sm text-[var(--text)] ring-1 ring-[var(--border)] disabled:opacity-60 sm:w-auto sm:py-2"
+      >
+        {!store.regionId && <option value="">No region yet…</option>}
+        {regions.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
+      </select>
+      {busy && <Loader2 size={14} className="animate-spin text-[var(--text-faint)]" />}
+      {err && <p className="w-full text-xs text-red-500">{err}</p>}
+    </div>
+  )
+}
+
+export function HierarchyLinker({ companyId, executives, regions, stores, storeRows, rms, sms }: {
   companyId: string
   executives: LinkerExec[]
   regions: Opt[]
   stores: Opt[]
+  storeRows: LinkerStoreRow[]
   rms: LinkerRM[]
   sms: LinkerSM[]
 }) {
@@ -100,6 +144,18 @@ export function HierarchyLinker({ companyId, executives, regions, stores, rms, s
             ))}
           </div>
         ) : <p className="text-xs text-[var(--text-faint)]">No regional managers yet — invite one from Accounts.</p>}
+      </Card>
+
+      {/* Stores → regions. A store's region decides which RM oversees it (and its SM):
+          SM → store → region → RM. This is where that middle link is set/changed. */}
+      <Card className="p-4">
+        <h2 className="text-sm font-bold text-[var(--text)] flex items-center gap-2 mb-1"><MapPin size={15} className="text-[var(--text-muted)]" /> Stores ({storeRows.length})</h2>
+        <p className="mb-3 text-xs text-[var(--text-muted)]">A store&rsquo;s region decides which Regional Manager oversees it and its Store Manager. Moving a store re-homes its tickets to the new region&rsquo;s manager.</p>
+        {storeRows.length ? (
+          <div className="space-y-2.5">
+            {storeRows.map(s => <StoreRegionRow key={s.id} store={s} regions={regions} />)}
+          </div>
+        ) : <p className="text-xs text-[var(--text-faint)]">No stores yet — they&rsquo;re created when you invite a Store Manager.</p>}
       </Card>
 
       {/* Store managers */}
