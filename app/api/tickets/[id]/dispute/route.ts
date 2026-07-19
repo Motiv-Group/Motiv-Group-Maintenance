@@ -282,9 +282,20 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       ? (ticket.status === 'snag' ? 'snag' : ticket.status === 'vo_declined' ? 'variation' : 'evidence_requested')
       : 'quote_declined'
     const orgId = workflowRaise ? ticket.supplier_id : declinedOrg
-    const { data: disp, error } = await admin.from('ticket_disputes')
+    let { data: disp, error } = await admin.from('ticket_disputes')
       .insert({ company_id: ticket.company_id, ticket_id: ticketId, origin, status: 'open', raised_by: user.id, supplier_id: orgId, created_at: now })
       .select('id').single()
+    if (error) {
+      // Pre-migration fallback: supplier_id may not exist yet (20260721). A workflow
+      // dispute binds to the awarded org implicitly, so retry unbound; a quote-decline
+      // dispute NEEDS the binding (its visibility keys on it) — surface the migration.
+      if (origin === 'quote_declined') {
+        return NextResponse.json({ error: 'Quote-decline disputes are not available yet — the latest database migration needs to be applied.' }, { status: 503 })
+      }
+      ;({ data: disp, error } = await admin.from('ticket_disputes')
+        .insert({ company_id: ticket.company_id, ticket_id: ticketId, origin, status: 'open', raised_by: user.id, created_at: now })
+        .select('id').single())
+    }
     if (error || !disp) return NextResponse.json({ error: 'Could not raise the dispute.' }, { status: 500 })
     // Link a snag/evidence dispute to the submission it concerns (the latest signoff).
     // Best-effort, separate update so raising works before the signoff_id column exists.
