@@ -174,8 +174,10 @@ export function RegionalProjectDashboard({ project, summary, stores }: { project
           <div className="grid grid-cols-2 gap-2">
             {filtered.map((s) => (
               <Link key={s.id} href={`/regional/projects/${project.id}/stores/${s.id}`}>
-                <Card className="h-full space-y-2 p-3">
-                  <div className="min-w-0">
+                {/* flex-col + grow name: the status row and progress bar pin to the
+                    tile bottom, so they line up across tiles whose names wrap differently. */}
+                <Card className="flex h-full flex-col gap-2 p-3">
+                  <div className="min-w-0 grow">
                     {/* Primary name never ellipsizes on mobile — wrap to two lines instead. */}
                     <h3 className="line-clamp-2 break-words text-sm font-bold text-[var(--text)]">{s.store_name ?? s.branch_code}</h3>
                     <p className="truncate text-[10px] text-[var(--text-muted)]">{s.branch_code}</p>
@@ -199,8 +201,9 @@ export function RegionalProjectDashboard({ project, summary, stores }: { project
                   <p className="line-clamp-2 break-words text-sm font-medium text-[var(--text)]">{s.store_name ?? s.branch_code}</p>
                   <p className="truncate text-[11px] text-[var(--text-muted)]">{s.branch_code}{s.town && ` · ${s.town}`}</p>
                 </div>
-                <span className="shrink-0 text-[11px] font-semibold tabular-nums text-[var(--text-muted)]">{s.progress}%</span>
-                <span className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full ${s.overdue ? OVERDUE_PILL : STORE_STATUS_PILL[s.status]}`}>{s.overdue ? 'Overdue' : STORE_STATUS_LABEL[s.status]}</span>
+                {/* Fixed-width % and pill columns so every row lines up. */}
+                <span className="w-10 shrink-0 text-right text-[11px] font-semibold tabular-nums text-[var(--text-muted)]">{s.progress}%</span>
+                <span className={`inline-flex w-[108px] shrink-0 justify-center whitespace-nowrap text-[10px] font-semibold px-2 py-0.5 rounded-full ${s.overdue ? OVERDUE_PILL : STORE_STATUS_PILL[s.status]}`}>{s.overdue ? 'Overdue' : STORE_STATUS_LABEL[s.status]}</span>
               </Link>
             ))}
           </Card>

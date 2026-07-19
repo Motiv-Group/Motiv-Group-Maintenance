@@ -26,12 +26,15 @@ const PHASE_META: Record<Phase, { label: string; badge: string }> = {
 const prioTicket = (p: string) => ({ priority: p } as unknown as Parameters<typeof priorityBadgeClass>[0])
 
 function StatCard({ icon, tone, value, title, sub, active, onClick }: { icon: ReactNode; tone: string; value: number; title: string; sub: string; active: boolean; onClick: () => void }) {
+  // Phone: icon / number / label stack vertically — three side-by-side cards are
+  // only ~110px wide, so the horizontal layout crammed the label against the icon.
+  // sm: restores the original row layout pixel-identical.
   return (
-    <button type="button" onClick={onClick} aria-pressed={active} className={`flex items-center gap-2.5 rounded-xl bg-[var(--surface)] p-3 text-left ring-1 transition hover:bg-[var(--hover)] sm:gap-3 sm:p-4 ${active ? 'ring-2 ring-blue-500/50' : 'ring-[var(--border)]'}`}>
+    <button type="button" onClick={onClick} aria-pressed={active} className={`flex flex-col items-start gap-1.5 rounded-xl bg-[var(--surface)] p-3 text-left ring-1 transition hover:bg-[var(--hover)] sm:flex-row sm:items-center sm:gap-3 sm:p-4 ${active ? 'ring-2 ring-blue-500/50' : 'ring-[var(--border)]'}`}>
       <span className="shrink-0">{icon}</span>
       <span className="min-w-0">
         <span className="block text-xl font-bold leading-none text-[var(--text)] sm:text-2xl">{value}</span>
-        <span className="mt-1 block text-xs font-semibold text-[var(--text)] sm:text-sm">{title}</span>
+        <span className="mt-1 block text-xs font-semibold leading-tight text-[var(--text)] sm:text-sm">{title}</span>
         <span className="hidden text-[11px] text-[var(--text-muted)] sm:block">{sub}</span>
       </span>
     </button>

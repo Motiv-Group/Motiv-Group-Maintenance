@@ -186,8 +186,10 @@ export function RegionalStores({ stores, archived = [], companyName = '' }: { st
       )}
 
       {/* Status bucket tabs — always colour-coded (All blue · Critical red · Attention
-          amber · Controlled green); the active tab gets a thicker ring + bold. */}
-      <div className="flex flex-wrap gap-2">
+          amber · Controlled green); the active tab gets a thicker ring + bold.
+          Phone: a tidy 2×2 grid of equal-width chips (flex-wrap gave a ragged 3+1);
+          sm: restores the original inline row. */}
+      <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
         {([
           { key: 'all', label: 'All', n: counts.all, tint: 'bg-blue-500/15 text-blue-700 dark:text-blue-400', ring: 'ring-blue-500/40' },
           { key: 'critical', label: 'Critical', n: counts.critical, tint: 'bg-red-500/15 text-red-700 dark:text-red-400', ring: 'ring-red-500/40' },
@@ -197,7 +199,7 @@ export function RegionalStores({ stores, archived = [], companyName = '' }: { st
           const active = bucket === t.key
           return (
             <button key={t.key} onClick={() => setBucket(t.key)} aria-pressed={active}
-              className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm transition ${t.tint} ${t.ring} ${active ? 'font-bold ring-2' : 'font-semibold ring-1 opacity-80 hover:opacity-100'}`}>
+              className={`flex items-center justify-between gap-2 rounded-xl px-3.5 py-2 text-sm transition sm:justify-start ${t.tint} ${t.ring} ${active ? 'font-bold ring-2' : 'font-semibold ring-1 opacity-80 hover:opacity-100'}`}>
               {t.label} <span className="rounded-md bg-black/10 px-1.5 py-0.5 text-xs tabular-nums dark:bg-white/10">{t.n}</span>
             </button>
           )
