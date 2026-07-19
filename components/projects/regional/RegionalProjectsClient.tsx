@@ -146,7 +146,9 @@ function FeaturedCard({ f }: { f: Featured }) {
               <h2 className="text-xl font-bold line-clamp-2 sm:line-clamp-1">{project.name}</h2>
               <p className="text-xs text-white/70">{project.client_name ?? ''}</p>
             </div>
-            <span className={`shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-white/90 ${PROJECT_STATUS_PILL[s.status].replace(/bg-[^ ]+/, '')}`}>{PROJECT_STATUS_LABELS[s.status]}</span>
+            {/* White chip over the photo: strip the pill's bg AND its dark: text
+                variants — pale dark-mode text on a white chip was unreadable. */}
+            <span className={`shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-white/90 ${PROJECT_STATUS_PILL[s.status].replace(/bg-\S+/g, '').replace(/dark:\S+/g, '')}`}>{PROJECT_STATUS_LABELS[s.status]}</span>
           </div>
 
           <AnimatedBar pct={s.progress} label="Overall Project Completion" stage={stageLabel(s.progress)} />

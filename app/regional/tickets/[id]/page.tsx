@@ -406,10 +406,14 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
           {nextAction.sub && !breached && <p className="mt-0.5 text-sm text-[var(--text-muted)]">{nextAction.sub}</p>}
         </div>
 
-        {/* Open dispute — the resolve controls live here; the chat is in the Dispute tab. */}
+        {/* Open dispute — the resolve controls live here; the chat is in the Dispute tab.
+            A quote-decline dispute is thread-only (nothing pauses — the decline stands
+            unless retracted); workflow disputes pause the disputed step. */}
         {openDispute && (
           <div className="space-y-2.5">
-            <p className="text-sm text-[var(--text-muted)]">This step is paused while the dispute is reviewed. Resolve it here, or continue the conversation in the <span className="font-semibold text-[var(--text)]">Dispute</span> tab.</p>
+            <p className="text-sm text-[var(--text-muted)]">{openDispute.origin === 'quote_declined'
+              ? 'A supplier disputed your quote decline — the decision stands unless you retract it.'
+              : 'This step is paused while the dispute is reviewed.'} Resolve it here, or continue the conversation in the <span className="font-semibold text-[var(--text)]">Dispute</span> tab.</p>
             <DisputeControls ticketId={t.id} origin={openDispute.origin} viewerRole="regional_manager" pendingOutcome={openDispute.pending_outcome ?? null} pendingBy={openDispute.pending_by ?? null} />
           </div>
         )}

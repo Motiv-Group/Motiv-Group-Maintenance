@@ -100,9 +100,10 @@ async function buildRegionalTicketDetail(
     admin.from('ticket_dispute_messages').select('id, dispute_id, author_role, body, evidence_urls, created_at').eq('ticket_id', t.id).order('created_at', { ascending: true }),
     // Durable snag-fix schedule rounds → every proposal / approval / decline on the trail.
     admin.from('snag_schedule_events').select('kind, scheduled_for, reason, created_at').eq('ticket_id', t.id).order('created_at', { ascending: true }),
-    // Newer per-dispute columns (signoff link + pending proposal) fetched separately so
-    // the dispute block still works if those columns aren't migrated yet (query fails → null).
-    admin.from('ticket_disputes').select('id, signoff_id, pending_outcome, pending_by').eq('ticket_id', t.id),
+    // Newer per-dispute columns (signoff link + pending proposal + raising org)
+    // fetched separately so the dispute block still works if those columns aren't
+    // migrated yet (query fails → null).
+    admin.from('ticket_disputes').select('id, signoff_id, pending_outcome, pending_by, supplier_id').eq('ticket_id', t.id),
     // Durable per-edit log → one "Ticket edited" timeline event per edit (the
     // single-slot edited_at/edit_note columns remain the engine's fallback).
     admin.from('ticket_edits').select('editor_id, editor_role, note, created_at').eq('ticket_id', t.id).order('created_at', { ascending: true }),
@@ -165,7 +166,11 @@ async function buildRegionalTicketDetail(
   const disputeMsgs = disputeMsgRows ?? []
   // evidence_urls is a JSON column that stores an array of (now signed) URL strings.
   const msgsByDispute = (id: string) => disputeMsgs.filter(m => m.dispute_id === id).map(m => ({ ...m, evidence_urls: Array.isArray(m.evidence_urls) ? (m.evidence_urls as string[]) : [] }))
-  const openDispute = disputes.find(d => d.status === 'open') ?? null
+  // Mirror the dispute API's manager-side pick: the workflow dispute (snag /
+  // evidence / variation — it pauses a step) first, else the NEWEST quote-decline
+  // thread — so the thread shown is the same one replies + resolve controls act on.
+  const openDisputes = disputes.filter(d => d.status === 'open')
+  const openDispute = openDisputes.find(d => d.origin !== 'quote_declined') ?? openDisputes[openDisputes.length - 1] ?? null
   const resolvedDisputes = disputes.filter(d => d.status === 'resolved')
   // Stable "Submission #N" numbers across live + archived, ordered by when each
   // COC/POC was submitted (oldest = #1). Shown in the card titles.
@@ -189,9 +194,15 @@ async function buildRegionalTicketDetail(
   for (const r of roundRows ?? []) if (r.signoff_id) roundBySignoff.set(r.signoff_id, { round_no: r.round_no, kind: r.kind, reason: r.reason ?? null })
   const submissionLabel = (s: { id: string }) => `Submission #${roundBySignoff.get(s.id)?.round_no ?? submissionNo.get(s.id) ?? '?'}`
   const submissionTone = (s: { id: string; status: string }): 'snag' | 'evidence' => (roundBySignoff.get(s.id)?.kind ?? (s.status === 'rejected' ? 'snag' : 'evidence')) === 'snag' ? 'snag' : 'evidence'
-  // What each dispute is about — the disputed "Submission #N" + snag / evidence request.
-  const disputeSubject = (d: { origin: string; signoff_id?: string | null }) => {
+  // What each dispute is about — the disputed "Submission #N" + snag / evidence
+  // request, or the declined variation / quote. Called at render time (after this
+  // builder returns), so referencing the later-declared nameById is safe.
+  const disputeSubject = (d: { origin: string; signoff_id?: string | null; supplier_id?: string | null }) => {
     if (d.origin === 'variation') return 'Variation order · declined'
+    if (d.origin === 'quote_declined') {
+      const org = d.supplier_id ? nameById.get(d.supplier_id) : null
+      return org ? `Quote declined · ${org}` : 'Quote declined'
+    }
     const n = d.signoff_id ? submissionNo.get(d.signoff_id) : null
     const what = d.origin === 'snag' ? 'snag' : 'evidence request'
     return n ? `Submission #${n} · ${what}` : what
@@ -366,7 +377,10 @@ async function buildRegionalTicketDetail(
     // signpost line is blank so it isn't said twice.
     if (t.status === 'completed') return { mode: 'done', msg: '', sub: '' }
     if (t.status === 'cancelled' || t.status === 'declined') return { mode: 'closed', msg: `Ticket ${t.status}`, sub: t.cancellation_reason || 'No further action needed.' }
-    if (openDispute) return { mode: 'act', msg: 'Resolve the open dispute', sub: 'A dispute is paused on this ticket — review the thread and resolve it in the Dispute section.' }
+    // A quote-decline dispute is thread-only (nothing pauses); workflow disputes pause the step.
+    if (openDispute) return { mode: 'act', msg: 'Resolve the open dispute', sub: openDispute.origin === 'quote_declined'
+      ? 'A supplier has disputed your quote decline — review the thread and resolve it in the Dispute section.'
+      : 'A dispute is paused on this ticket — review the thread and resolve it in the Dispute section.' }
     if (snagAwaitingApproval) return { mode: 'act', msg: 'Approve the snag-fix date', sub: 'The supplier proposed a date to carry out the corrective work — approve it below.' }
     if (pendingSignoffs.length > 0) return { mode: 'act', msg: '', sub: 'The supplier submitted the COC & POC — approve it, request more evidence, or raise a snag.' }
     if (t.status === 'variation_review') return { mode: 'act', msg: 'Review the variation order', sub: 'A variation order for extra work is awaiting your approval below.' }

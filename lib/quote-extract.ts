@@ -79,7 +79,9 @@ const VAT_LABELS = [
   'total\\s+vat',
   'vat\\s+amount',
   'vat\\s*@',
-  '\\bvat\\b',
+  // Generic "VAT" — but never a VAT REGISTRATION number ("VAT no 4600243721"
+  // parsed as a 4.6-billion-rand VAT amount on a real quote).
+  '\\bvat\\b(?!\\s*(?:no|nr|number|reg|registration))',
 ]
 
 const INCL_LABELS = [
@@ -89,7 +91,10 @@ const INCL_LABELS = [
   'total\\s+due',
   'amount\\s+due',
   'balance\\s+due',
-  '\\btotal\\b',   // generic "Total R…" fallback (does NOT match "Subtotal")
+  // Generic "Total R…" fallback. The lookbehind skips the "Total" inside a
+  // two-word "Sub Total" (which otherwise reads the EXCL figure as the incl one
+  // and fails the whole document on the consistency check).
+  '(?<!sub)(?<!sub[ -])\\btotal\\b',
 ]
 
 /** Find the money value that appears immediately after any of the given labels. */
@@ -110,6 +115,39 @@ function hasVatMention(text: string): boolean {
   return /\bvat\b/i.test(text)
 }
 
+// Sanity limits for any extracted total: a Motiv quote is bounded far below a
+// billion rand, and a "total" of a few rand is a mis-hit on a qty/table cell.
+const MAX_PLAUSIBLE = 500_000_000
+const plausibleTotal = (n: number | null): n is number => n != null && n >= 10 && n < MAX_PLAUSIBLE
+// A believable VAT-to-excl ratio (SA VAT is 15%, but allow partial-VAT quotes).
+const plausibleVatRatio = (vat: number, excl: number) => excl > 0 && vat / excl >= 0.03 && vat / excl <= 0.3
+
+/**
+ * Layout-independent fallback for column-extracted PDFs where the amounts land
+ * BEFORE their labels ("198 809,60R 29 821,44R 228 631,03R … SUB TOTAL VAT 15% :
+ * Total Including VAT :"): scan the money tokens and find a consecutive triple
+ * a + b = c with a VAT-like ratio. Scanned from the END — totals sit at the
+ * bottom of a quote, line items above. Purely arithmetic on figures literally
+ * present, per this module's contract.
+ */
+function findTotalsTriple(text: string): { excl: number; incl: number } | null {
+  const tokens: number[] = []
+  const re = new RegExp(MONEY, 'gi')
+  let m: RegExpExecArray | null
+  while ((m = re.exec(text)) !== null) {
+    const v = parseZar(m[1])
+    if (v != null && v > 0) tokens.push(v)
+    if (tokens.length > 400) break
+  }
+  for (let i = tokens.length - 3; i >= 0; i--) {
+    const [a, b, c] = [tokens[i], tokens[i + 1], tokens[i + 2]]
+    if (!plausibleTotal(a) || !plausibleTotal(c)) continue
+    const tol = Math.max(1, c * 0.005)
+    if (Math.abs(a + b - c) <= tol && plausibleVatRatio(b, a)) return { excl: a, incl: c }
+  }
+  return null
+}
+
 /**
  * Extract excl/incl totals from extracted document text using only labelled
  * figures. All amounts returned are literally present on the document; a single
@@ -124,9 +162,16 @@ export function extractTotalsFromText(fullText: string): ExtractedTotals {
   const scopes = [tail, fullText]
 
   for (const scope of scopes) {
-    const vat  = findAmountAfter(scope, VAT_LABELS)
+    let vat    = findAmountAfter(scope, VAT_LABELS)
     let excl   = findAmountAfter(scope, EXCL_LABELS)
     let incl   = findAmountAfter(scope, INCL_LABELS)
+
+    // Plausibility gates: a "total" of a few rand is a table-header/qty mis-hit,
+    // a billions-scale figure is a registration number — drop them rather than
+    // letting arithmetic amplify garbage.
+    if (!plausibleTotal(excl)) excl = null
+    if (!plausibleTotal(incl)) incl = null
+    if (vat != null && (vat <= 0 || vat >= MAX_PLAUSIBLE)) vat = null
 
     // Both totals present
     if (excl != null && incl != null) {
@@ -137,12 +182,12 @@ export function extractTotalsFromText(fullText: string): ExtractedTotals {
     }
 
     // excl + vat → derive incl by exact arithmetic
-    if (excl != null && vat != null) {
+    if (excl != null && vat != null && plausibleVatRatio(vat, excl)) {
       return { amount: round2(excl), amount_incl_vat: round2(excl + vat), confident: true }
     }
 
     // incl + vat → derive excl by exact arithmetic
-    if (incl != null && vat != null) {
+    if (incl != null && vat != null && vat < incl && plausibleVatRatio(vat, incl - vat)) {
       return { amount: round2(incl - vat), amount_incl_vat: round2(incl), confident: true }
     }
 
@@ -154,6 +199,13 @@ export function extractTotalsFromText(fullText: string): ExtractedTotals {
       // labelled "total/amount due" but no VAT anywhere → treat as the sole amount
       return { amount: round2(incl), amount_incl_vat: null, confident: true }
     }
+  }
+
+  // Label matching found nothing usable — try the layout-independent triple scan
+  // (column-extracted PDFs put the amounts before their labels).
+  for (const scope of scopes) {
+    const triple = findTotalsTriple(scope)
+    if (triple) return { amount: round2(triple.excl), amount_incl_vat: round2(triple.incl), confident: true }
   }
 
   return none

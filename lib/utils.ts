@@ -281,8 +281,9 @@ export function supplierStatusMeta(status: string): { label: string; cls: string
   const amber = `bg-amber-500/15 ${amberT}`, blue = `bg-blue-500/15 ${blueT}`
   if (status === 'quote_requested' || status === 'assigned') return { label: 'Quote requested', cls: amber, text: amberT }
   if (status === 'quoted' || status === 'quote_revision') return { label: 'Quoted', cls: blue, text: blueT }
-  // A scheduled job is the SUPPLIER's next move (arrive + mark in progress) → amber.
-  if (status === 'scheduled') return { label: rmStatusMeta(status).label, cls: amber, text: amberT }
+  // A scheduled job is the SUPPLIER's next move (arrive + mark in progress) → amber,
+  // and while the work is IN PROGRESS the ball is still theirs → amber too.
+  if (status === 'scheduled' || status === 'in_progress') return { label: rmStatusMeta(status).label, cls: amber, text: amberT }
   // Action-aware from the SUPPLIER's side (mirror of the RM's): amber = the supplier
   // owes the next action, blue = it's done and waiting on the manager.
   if (status === 'submitted_for_signoff') return { label: 'Awaiting sign-off', cls: blue, text: blueT }        // COC/POC in → waiting on the RM

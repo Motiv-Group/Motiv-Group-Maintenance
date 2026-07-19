@@ -6,7 +6,9 @@
 // sign-off.
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { UploadCloud, ImagePlus, Camera, X, CheckCircle2, FileText } from 'lucide-react'
+import { UploadCloud, ImagePlus, Camera, X, CheckCircle2, FileText, MessageSquare } from 'lucide-react'
+import { MoreMenu, MoreActionItem } from '@/components/regional/RmTicketActions'
+import { TicketChat } from '@/components/chat/TicketChat'
 import { uploadOne } from '@/lib/upload'
 import { useScrollLock } from '@/lib/useScrollLock'
 import { errMsg } from '@/components/ui/errMsg'
@@ -21,9 +23,12 @@ async function addEvidence(ticketId: string, kind: string, url: string) {
   if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Upload failed')
 }
 
-export function SubmitCompletionForm({ ticketId, evidenceRequested = false, requireBoth = true, defaultOpen = false, onClose }: { ticketId: string; evidenceRequested?: boolean; requireBoth?: boolean; defaultOpen?: boolean; onClose?: () => void }) {
+export function SubmitCompletionForm({ ticketId, evidenceRequested = false, evidenceRequestReason = null, requireBoth = true, defaultOpen = false, onClose }: { ticketId: string; evidenceRequested?: boolean; evidenceRequestReason?: string | null; requireBoth?: boolean; defaultOpen?: boolean; onClose?: () => void }) {
   const router = useRouter()
   const [open, setOpen] = useState(defaultOpen)
+  // "Chat with manager" (under More on an evidence request) — the job is awarded
+  // by this stage, so the RM↔supplier chat exists.
+  const [chatOpen, setChatOpen] = useState(false)
   const [coc, setCoc] = useState<File | null>(null)
   const [photos, setPhotos] = useState<File[]>([])
   const [notes, setNotes] = useState('')
@@ -83,6 +88,13 @@ export function SubmitCompletionForm({ ticketId, evidenceRequested = false, requ
     <>
     <div className="rounded-2xl bg-[var(--surface)] ring-1 ring-[var(--border)] p-5 sm:p-6 space-y-5">
       <h2 className="flex items-center gap-2 text-lg font-bold text-[var(--text)]"><CheckCircle2 size={20} className="text-emerald-500" /> Submit COC &amp; POC for Sign-off</h2>
+      {/* Why the RM sent the completion back — mirrors the SM add-info modal. */}
+      {evidenceRequested && evidenceRequestReason && (
+        <div className="rounded-lg bg-amber-500/10 ring-1 ring-amber-500/30 p-3 space-y-0.5">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400">More evidence requested</p>
+          <p className="text-sm text-[var(--text)]">Your manager asked: &ldquo;{evidenceRequestReason}&rdquo;</p>
+        </div>
+      )}
       {!requireBoth && <p className="text-sm text-[var(--text-muted)]">Add the COC and/or completion photos — at least one is required.</p>}
 
       {/* COC */}
@@ -149,10 +161,22 @@ export function SubmitCompletionForm({ ticketId, evidenceRequested = false, requ
 
       {err && <p className="text-sm text-red-500">{err}</p>}
 
-      <div className="grid grid-cols-2 gap-3">
-        <button onClick={submit} disabled={busy} className="py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Submitting…' : 'Review & Submit'}</button>
-        <button onClick={() => { setOpen(false); setErr(''); onClose?.() }} disabled={busy} className="py-3 rounded-xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm font-semibold disabled:opacity-50 hover:bg-[var(--hover)]">Cancel</button>
-      </div>
+      {evidenceRequested ? (
+        // Evidence-request flavour: Cancel moves under "More" alongside a direct line
+        // to the manager who asked for the evidence.
+        <div className="flex items-center gap-3">
+          <button onClick={submit} disabled={busy} className="flex-1 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Submitting…' : 'Review & Submit'}</button>
+          <MoreMenu up>
+            <MoreActionItem icon={<X size={16} />} label="Cancel" onClick={() => { setOpen(false); setErr(''); onClose?.() }} />
+            <MoreActionItem icon={<MessageSquare size={16} />} label="Chat with manager" onClick={() => setChatOpen(true)} />
+          </MoreMenu>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-3">
+          <button onClick={submit} disabled={busy} className="py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Submitting…' : 'Review & Submit'}</button>
+          <button onClick={() => { setOpen(false); setErr(''); onClose?.() }} disabled={busy} className="py-3 rounded-xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm font-semibold disabled:opacity-50 hover:bg-[var(--hover)]">Cancel</button>
+        </div>
+      )}
     </div>
 
     {/* Tap-to-view lightbox */}
@@ -163,6 +187,9 @@ export function SubmitCompletionForm({ ticketId, evidenceRequested = false, requ
         <button type="button" onClick={() => setPreview(null)} className="absolute top-4 right-4 p-2 rounded-full bg-white/10 text-white hover:bg-white/20" title="Close"><X size={22} /></button>
       </div>
     )}
+
+    {/* RM↔supplier chat, opened from More → Chat with manager. */}
+    {chatOpen && <TicketChat ticketId={ticketId} viewerRole="supplier" defaultOpen onClose={() => setChatOpen(false)} />}
     </>
   )
 }

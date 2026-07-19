@@ -668,6 +668,8 @@ export interface SupplierTicketRow {
   disputeUnread: boolean
   // Why the manager raised the latest snag (newest rejected signoff's reason).
   snagReason: string | null
+  // The manager's "more evidence" request message (only while status = evidence_requested).
+  evidenceRequestReason: string | null
 }
 export interface SupplierQuoteRow { id: string; ticketId: string; ticketTitle: string; ticketStatus: string; storeName: string; branchCode: string | null; amount: number; amountInclVat: number | null; status: string; createdAt: string; category: string | null; priority: Priority; jobRef: string | null; description: string | null; validUntil: string | null; proposedScheduleAt: string | null; reQuoteRequested: boolean }
 export interface SupplierSignoffRow { id: string; ticketId: string; ticketTitle: string; ticketStatus: string; storeName: string; branchCode: string | null; status: string; createdAt: string; category: string | null; priority: Priority; description: string | null; jobRef: string | null; photoCount: number; certCount: number; decidedAt: string | null; decidedBy: string | null }
@@ -823,6 +825,7 @@ export async function assembleSupplierDashboard(companyId: string | null, suppli
       disputed: awardedToMe && disputedIds.has(t.id),
       disputeUnread: awardedToMe && disputedIds.has(t.id) && latestDisputeAuthor.get(t.id) === 'regional_manager',
       snagReason: snagReasonByTicket.get(t.id) ?? null,
+      evidenceRequestReason: t.status === 'evidence_requested' ? (raw.evidence_request_reason ?? null) : null,
     })
   }
   // Active first, then unacknowledged, then oldest — keeps the dashboard queues useful.
