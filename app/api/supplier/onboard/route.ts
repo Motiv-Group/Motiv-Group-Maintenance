@@ -49,7 +49,7 @@ const BodySchema = z.object({
 // the 'supplier' role can ONLY be granted by this trusted path — a browser cannot
 // self-provision it via auth.signUp().
 
-interface Invite { id: string; email: string; supplier_id: string; company_id: string; accepted_at: string | null; expires_at: string | null }
+interface Invite { id: string; email: string; supplier_id: string; company_id: string | null; accepted_at: string | null; expires_at: string | null }
 
 async function loadInvite(token: string | null): Promise<{ inv?: Invite; error?: string; status?: number }> {
   if (!token) return { error: 'Missing invite token.', status: 400 }
@@ -133,12 +133,29 @@ export async function POST(request: Request) {
     }
     await admin.from('suppliers').update(supUpd as Database['public']['Tables']['suppliers']['Update']).eq('id', inv.supplier_id)
 
+    // Motiv-pool invite (no client company): now that they've onboarded (SLA +
+    // details), they enter the verification queue and admins are notified. A
+    // company-scoped invite needs no review — the inviting company vouches.
+    if (inv.company_id === null) {
+      await admin.from('suppliers').update({ verification_status: 'pending_review' }).eq('id', inv.supplier_id)
+      const { data: admins } = await admin.from('user_profiles').select('id').eq('role', 'system_admin')
+      const adminIds = (admins ?? []).map(a => a.id)
+      if (adminIds.length) {
+        await admin.from('notifications').insert(adminIds.map(id => ({
+          company_id: null, user_id: id, type: 'supplier_review',
+          title: 'Motiv supplier ready for review',
+          message: `${b.company_name!.trim()} completed onboarding and is waiting for verification.`,
+          link: '/admin/suppliers',
+        })))
+      }
+    }
+
     await admin.from('supplier_sla_acceptances').insert({
       supplier_id: inv.supplier_id, user_id: uid, sla_version: SLA_VERSION, signed_name: signedName, ip,
     })
     await admin.from('supplier_invites').update({ accepted_at: new Date().toISOString() }).eq('id', inv.id)
 
-    await logAudit(admin, { actorId: uid, companyId: inv.company_id, action: 'supplier.onboard_invited', entityType: 'user', entityId: uid, metadata: { supplierId: inv.supplier_id, email } })
+    await logAudit(admin, { actorId: uid, companyId: inv.company_id ?? undefined, action: 'supplier.onboard_invited', entityType: 'user', entityId: uid, metadata: { supplierId: inv.supplier_id, email } })
     return NextResponse.json({ ok: true, email, pending: false })
   }
 

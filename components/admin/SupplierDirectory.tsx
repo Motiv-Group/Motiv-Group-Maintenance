@@ -2,9 +2,10 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ShieldCheck, Clock, Plus } from 'lucide-react'
+import { ShieldCheck, Clock, Plus, Sparkles } from 'lucide-react'
 import { Card } from '@/components/exec/ui'
 import { CompanyAvatar } from './CompanyAvatar'
+import { MotivSupplierInviteModal } from './MotivSupplierInviteModal'
 import { errMsg } from '@/components/ui/errMsg'
 
 export type DirectorySupplier = {
@@ -27,6 +28,7 @@ const input = 'w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[v
 export function SupplierDirectory({ suppliers, companies }: { suppliers: DirectorySupplier[]; companies: CompanyOpt[] }) {
   const [q, setQ] = useState('')
   const [filter, setFilter] = useState<Filter>('all')
+  const [motivOpen, setMotivOpen] = useState(false)
 
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase()
@@ -52,13 +54,19 @@ export function SupplierDirectory({ suppliers, companies }: { suppliers: Directo
         <div className="flex items-center gap-1.5">
           {chip('all', 'All')}{chip('motiv', 'Motiv')}{chip('company', 'Company')}
         </div>
-        <span className="ml-auto text-xs text-[var(--text-faint)]">{rows.length} supplier{rows.length === 1 ? '' : 's'}</span>
+        <button type="button" onClick={() => setMotivOpen(true)}
+          className="ml-auto inline-flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 px-3 py-2 text-sm font-semibold text-white transition">
+          <Sparkles size={15} /> Invite Motiv supplier
+        </button>
       </div>
+      <div className="text-xs text-[var(--text-faint)]">{rows.length} supplier{rows.length === 1 ? '' : 's'}</div>
 
       {rows.map(s => <SupplierRow key={s.id} s={s} companies={companies} />)}
       {!rows.length && (
         <Card className="p-8 text-center"><p className="text-sm text-[var(--text-muted)]">No suppliers match.</p></Card>
       )}
+
+      {motivOpen && <MotivSupplierInviteModal onClose={() => setMotivOpen(false)} />}
     </div>
   )
 }
