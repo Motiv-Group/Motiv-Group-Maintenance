@@ -10,7 +10,7 @@ import { PROJECT_STATUS_PILL } from '@/components/projects/statusStyles'
 import { ProjectFormModal } from './ProjectFormModal'
 import type { ProjectSummary } from '@/lib/projects/data'
 
-export function AdminProjectsClient({ projects, hasCompany }: { projects: ProjectSummary[]; hasCompany: boolean }) {
+export function AdminProjectsClient({ projects, hasCompany, selectedCompanyId, selector }: { projects: ProjectSummary[]; hasCompany: boolean; selectedCompanyId?: string | null; selector?: React.ReactNode }) {
   const [creating, setCreating] = useState(false)
 
   return (
@@ -31,6 +31,8 @@ export function AdminProjectsClient({ projects, hasCompany }: { projects: Projec
           </button>
         )}
       </div>
+
+      {selector}
 
       {!hasCompany && (
         <Card className="p-4 flex items-start gap-2 text-sm text-amber-600 dark:text-amber-400">
@@ -84,7 +86,7 @@ export function AdminProjectsClient({ projects, hasCompany }: { projects: Projec
         ))}
       </div>
 
-      {creating && <ProjectFormModal mode="create" onClose={() => setCreating(false)} />}
+      {creating && <ProjectFormModal mode="create" companyId={selectedCompanyId ?? null} onClose={() => setCreating(false)} />}
     </div>
   )
 }

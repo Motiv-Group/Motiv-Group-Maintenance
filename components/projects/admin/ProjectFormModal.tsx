@@ -22,10 +22,12 @@ export function ProjectFormModal({
   mode,
   project,
   onClose,
+  companyId,
 }: {
   mode: 'create' | 'edit'
   project?: ProjectFormValues
   onClose: () => void
+  companyId?: string | null
 }) {
   const router = useRouter()
   const [name, setName] = useState(project?.name ?? '')
@@ -54,6 +56,7 @@ export function ProjectFormModal({
       status,
     }
     if (mode === 'create' && note.trim()) payload.internal_note = note.trim()
+    if (mode === 'create' && companyId) payload.companyId = companyId
     const url = mode === 'create' ? '/api/projects' : `/api/projects/${project!.id}`
     const method = mode === 'create' ? 'POST' : 'PATCH'
     const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })

@@ -5,13 +5,10 @@ import { requireMasterAdmin } from '@/lib/health/guard'
 import { createAdminClient } from '@/lib/supabase/server'
 import { InfoTip } from '@/components/ui/InfoTip'
 import { HierarchyView, type CompanyNode, type RegionRef } from '@/components/admin/HierarchyView'
-import { AdminSelfCompany } from '@/components/admin/AdminSelfCompany'
 
 export default async function AdminHierarchyPage() {
-  const { userId } = await requireMasterAdmin()
+  await requireMasterAdmin()
   const db = createAdminClient()
-  const { data: mine } = await db.from('user_profiles').select('company_id').eq('id', userId).single()
-  const myCompanyId = mine?.company_id ?? null
   const [{ data: companies }, { data: regions }, { data: stores }, { data: users }, { data: ru }, { data: su }] = await Promise.all([
     db.from('companies').select('id, name').eq('active', true).order('name'),
     db.from('regions').select('id, name, region_code, company_id').eq('active', true).order('name'),
@@ -63,11 +60,6 @@ export default async function AdminHierarchyPage() {
         </h1>
         <p className="text-sm text-[var(--text-muted)] mt-0.5">Which store belongs to which company, and who manages what. Move stores or reassign managers to re-link the tree.</p>
       </div>
-      <AdminSelfCompany
-        currentCompanyId={myCompanyId}
-        currentCompanyName={(companies ?? []).find(c => c.id === myCompanyId)?.name ?? null}
-        companies={(companies ?? []).map(c => ({ id: c.id, name: c.name }))}
-      />
       <HierarchyView companies={tree} regionsByCompany={regionRefs} />
     </div>
   )
