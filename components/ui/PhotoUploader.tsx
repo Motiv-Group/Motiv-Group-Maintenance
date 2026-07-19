@@ -41,13 +41,16 @@ export function PhotoUploader({ photos, previews, onAdd, onRemove, max = 5, minH
   return (
     <div className="space-y-3">
 
-      {/* Previews — shown as links (open the image in a new tab) */}
+      {/* Previews — thumbnail grid (tap opens the full image; X removes) */}
       {previews.length > 0 && (
-        <div className="space-y-1">
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
           {previews.map((src, i) => (
-            <div key={i} className="flex items-center justify-between gap-2">
-              <a href={src} target="_blank" rel="noopener noreferrer" className="text-sm text-[#f59e0b] underline truncate min-w-0">Photo {i + 1}</a>
-              <button type="button" onClick={() => onRemove(i)} className="shrink-0 text-[var(--text-faint)] hover:text-red-500">
+            <div key={i} className="group relative aspect-square overflow-hidden rounded-xl ring-1 ring-[var(--border)]">
+              <a href={src} target="_blank" rel="noopener noreferrer" className="block h-full w-full">
+                {/* eslint-disable-next-line @next/next/no-img-element -- local object-URL preview, not a remote asset */}
+                <img src={src} alt={photos[i]?.name ?? `Photo ${i + 1}`} className="h-full w-full object-cover" />
+              </a>
+              <button type="button" onClick={() => onRemove(i)} aria-label={`Remove photo ${i + 1}`} className="absolute right-1 top-1 grid h-8 w-8 place-items-center rounded-full bg-black/60 text-white transition hover:bg-black/80">
                 <X size={14} />
               </button>
             </div>
