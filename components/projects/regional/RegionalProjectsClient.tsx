@@ -79,8 +79,9 @@ export function RegionalProjectsClient({ projects, featured }: { projects: Proje
               <div className="grid grid-cols-2 gap-2 sm:hidden">
                 {projects.map((p) => (
                   <Link key={p.id} href={`/regional/projects/${p.id}`}>
-                    <Card className="h-full space-y-2 p-3">
-                      <div className="min-w-0">
+                    {/* flex-col + grow name: status row + bar pin to the tile bottom so rows align. */}
+                    <Card className="flex h-full flex-col gap-2 p-3">
+                      <div className="min-w-0 grow">
                         {/* Primary name never ellipsizes on mobile — wrap to two lines instead. */}
                         <h3 className="line-clamp-2 break-words text-sm font-bold text-[var(--text)]">{p.name}</h3>
                         <p className="truncate text-[10px] text-[var(--text-muted)]">{p.client_name ?? '—'}</p>
@@ -112,9 +113,10 @@ export function RegionalProjectsClient({ projects, featured }: { projects: Proje
                     <div className="flex-1 h-1.5 rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden"><div className="h-full rounded-full bg-blue-500" style={{ width: `${p.progress}%` }} /></div>
                     <span className="text-[11px] tabular-nums text-[var(--text-muted)] w-8 text-right">{p.progress}%</span>
                   </div>
-                  {/* Phones lose the bar — keep the % so rows aren't just a name + pill. */}
-                  <span className="shrink-0 text-[11px] font-semibold tabular-nums text-[var(--text-muted)] sm:hidden">{p.progress}%</span>
-                  <span className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full ${PROJECT_STATUS_PILL[p.status]}`}>{PROJECT_STATUS_LABELS[p.status]}</span>
+                  {/* Phones lose the bar — keep the % so rows aren't just a name + pill.
+                      Fixed % + pill widths at base align the columns; sm: restores desktop. */}
+                  <span className="w-10 shrink-0 text-right text-[11px] font-semibold tabular-nums text-[var(--text-muted)] sm:hidden">{p.progress}%</span>
+                  <span className={`inline-flex w-[88px] shrink-0 justify-center whitespace-nowrap text-[10px] font-semibold px-2 py-0.5 rounded-full sm:w-auto ${PROJECT_STATUS_PILL[p.status]}`}>{PROJECT_STATUS_LABELS[p.status]}</span>
                   <ArrowRight size={15} className="text-[var(--text-faint)] group-hover:text-blue-500 transition-colors shrink-0" />
                 </Link>
               ))}

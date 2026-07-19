@@ -228,9 +228,10 @@ export function AdminProjectDetail({
                 <div
                   key={s.id}
                   onClick={() => router.push(`/admin/projects/${project.id}/stores/${s.id}`)}
-                  className="cursor-pointer space-y-2 rounded-xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] p-3"
+                  className="flex h-full cursor-pointer flex-col gap-2 rounded-xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] p-3"
                 >
-                  <div className="min-w-0">
+                  {/* grow pins the status row + bar to the tile bottom so rows align. */}
+                  <div className="min-w-0 grow">
                     {/* Primary name never ellipsizes on mobile — wrap to two lines instead. */}
                     <div className="line-clamp-2 break-words text-sm font-semibold text-[var(--text)]">{s.store_name ?? '—'}</div>
                     <div className="truncate text-[10px] text-[var(--text-muted)]">{s.branch_code}</div>
@@ -260,7 +261,8 @@ export function AdminProjectDetail({
                       <div className="font-semibold text-[var(--text)] line-clamp-2 break-words">{s.store_name ?? '—'}</div>
                       <div className="text-xs text-[var(--text-muted)] mt-0.5">{s.branch_code}{s.town ? ` · ${s.town}` : ''}</div>
                     </div>
-                    <span className={`shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full ${s.overdue ? OVERDUE_PILL : STORE_STATUS_PILL[s.status]}`}>
+                    {/* Uniform pill width so the badges line up down the list. */}
+                    <span className={`inline-flex w-[108px] shrink-0 justify-center whitespace-nowrap text-[11px] font-semibold px-2 py-0.5 rounded-full ${s.overdue ? OVERDUE_PILL : STORE_STATUS_PILL[s.status]}`}>
                       {s.overdue ? 'Overdue' : STORE_STATUS_LABEL[s.status]}
                     </span>
                   </div>

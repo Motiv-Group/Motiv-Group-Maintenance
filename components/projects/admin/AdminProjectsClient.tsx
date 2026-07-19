@@ -69,8 +69,9 @@ export function AdminProjectsClient({ projects, hasCompany, selectedCompanyId, s
               <div className="grid grid-cols-2 gap-2">
                 {projects.map((p) => (
                   <Link key={p.id} href={`/admin/projects/${p.id}`}>
-                    <Card className="h-full space-y-2 p-3">
-                      <div className="min-w-0">
+                    {/* flex-col + grow name: status row + bar pin to the tile bottom so rows align. */}
+                    <Card className="flex h-full flex-col gap-2 p-3">
+                      <div className="min-w-0 grow">
                         {/* Primary name never ellipsizes on mobile — wrap to two lines instead. */}
                         <h2 className="line-clamp-2 break-words text-sm font-bold text-[var(--text)]">{p.name}</h2>
                         <p className="truncate text-[10px] text-[var(--text-muted)]">{p.client_name ?? '—'}</p>
@@ -95,8 +96,9 @@ export function AdminProjectsClient({ projects, hasCompany, selectedCompanyId, s
                       <p className="line-clamp-2 break-words text-sm font-medium text-[var(--text)]">{p.name}</p>
                       <p className="truncate text-[11px] text-[var(--text-muted)]">{p.client_name ?? '—'} · {p.storeCount} stores{p.overdue > 0 ? ` · ${p.overdue} overdue` : ''}</p>
                     </div>
-                    <span className="shrink-0 text-[11px] font-semibold tabular-nums text-[var(--text-muted)]">{p.progress}%</span>
-                    <span className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full ${PROJECT_STATUS_PILL[p.status]}`}>{PROJECT_STATUS_LABELS[p.status]}</span>
+                    {/* Fixed-width % and pill columns so every row lines up. */}
+                    <span className="w-10 shrink-0 text-right text-[11px] font-semibold tabular-nums text-[var(--text-muted)]">{p.progress}%</span>
+                    <span className={`inline-flex w-[88px] shrink-0 justify-center whitespace-nowrap text-[10px] font-semibold px-2 py-0.5 rounded-full ${PROJECT_STATUS_PILL[p.status]}`}>{PROJECT_STATUS_LABELS[p.status]}</span>
                     <ChevronRight size={14} className="shrink-0 text-[var(--text-faint)]" />
                   </Link>
                 ))}
