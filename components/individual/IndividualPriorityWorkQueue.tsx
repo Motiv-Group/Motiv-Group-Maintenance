@@ -158,8 +158,8 @@ function QueueRow({ job, nowMs }: { job: IndividualJobRow; nowMs: number }) {
         <CategoryIcon category={job.category ?? job.title} priority={job.priority} />
         <div className="min-w-0">
           {job.jobRef && <p className="truncate font-mono text-[10px] text-[var(--text-faint)]">{job.jobRef}</p>}
-          <p className="truncate text-base font-bold text-[var(--text)]">{job.category || job.title}</p>
-          {job.category && <p className="truncate text-sm text-[var(--text-muted)]">{job.title}</p>}
+          <p className="line-clamp-2 text-base font-bold text-[var(--text)] sm:line-clamp-none sm:truncate">{job.category || job.title}</p>
+          {job.category && <p className="line-clamp-2 text-sm text-[var(--text-muted)] sm:line-clamp-none sm:truncate">{job.title}</p>}
         </div>
       </div>
 

@@ -107,7 +107,7 @@ export function CompanyAccountsCard({ group, regions, projects, defaultOpen = fa
                     <li key={m.id} className="flex items-center justify-between gap-3 rounded-lg bg-[var(--surface-2)] px-3 py-2 text-sm">
                       <div className="min-w-0">
                         <p className="text-[var(--text)] truncate">{m.name || '—'}</p>
-                        <p className="text-xs text-[var(--text-muted)] truncate">{m.email}{m.location !== '—' && <span className="text-[var(--text-faint)]"> · {m.location}</span>}</p>
+                        <p className="text-xs text-[var(--text-muted)] break-all sm:break-normal sm:truncate">{m.email}{m.location !== '—' && <span className="text-[var(--text-faint)]"> · {m.location}</span>}</p>
                       </div>
                       <span className="shrink-0 text-xs whitespace-nowrap"><LastSignIn iso={m.lastSignIn} /></span>
                     </li>

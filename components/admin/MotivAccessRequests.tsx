@@ -35,9 +35,9 @@ export function MotivAccessRequests({ requests }: { requests: MotivAccessRequest
       <p className="text-xs text-[var(--text-muted)] mb-3">These companies asked to use the Motiv supplier directory when requesting quotes. Approve to unlock it for their regional managers.</p>
       <ul className="space-y-2">
         {requests.map(r => (
-          <li key={r.companyId} className="flex items-center justify-between gap-3 rounded-lg bg-[var(--surface-2)] px-3 py-2">
+          <li key={r.companyId} className="flex flex-col gap-2 rounded-lg bg-[var(--surface-2)] px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-[var(--text)] truncate">{r.companyName}</p>
+              <p className="text-sm font-semibold text-[var(--text)] line-clamp-2 break-words sm:line-clamp-1">{r.companyName}</p>
               <p className="text-[11px] text-[var(--text-faint)]">Requested {formatDateTime(r.requestedAt)}</p>
             </div>
             <div className="flex shrink-0 items-center gap-2">

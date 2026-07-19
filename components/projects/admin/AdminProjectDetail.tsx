@@ -98,9 +98,10 @@ export function AdminProjectDetail({
       <Card className="p-5 space-y-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-bold text-[var(--text)] truncate">{project.name}</h1>
-              <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${PROJECT_STATUS_PILL[summary.status]}`}>{PROJECT_STATUS_LABELS[summary.status]}</span>
+            <div className="flex items-start gap-2 sm:items-center">
+              {/* Mobile: wrap the name (truncate loses half of it); desktop keeps one line. */}
+              <h1 className="text-lg font-bold text-[var(--text)] line-clamp-2 break-words sm:line-clamp-1">{project.name}</h1>
+              <span className={`shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full ${PROJECT_STATUS_PILL[summary.status]}`}>{PROJECT_STATUS_LABELS[summary.status]}</span>
             </div>
             <p className="text-xs text-[var(--text-muted)] mt-0.5">{project.client_name ?? '—'} · {formatDate(project.start_date) || 'no start'} → {formatDate(project.end_date) || 'no end'}{daysLeft != null && ` · ${daysLeft >= 0 ? `${daysLeft} days left` : `${-daysLeft} days overdue`}`}</p>
           </div>
@@ -127,18 +128,21 @@ export function AdminProjectDetail({
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 min-w-[200px]">
+        <div className="relative w-full sm:w-auto sm:flex-1 sm:min-w-[200px]">
           <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
           <input className={`${input} w-full pl-8`} placeholder="Search store, branch, town…" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
-        <select className={input} value={status} onChange={(e) => setStatus(e.target.value as StatusFilter)}>
+        {/* Mobile: one swipeable strip at natural widths (a shrunk native select clips
+            its label mid-word); sm:contents restores the flex-wrap desktop row. */}
+        <div className="flex w-full flex-nowrap items-center gap-2 overflow-x-auto pb-0.5 no-scrollbar sm:contents">
+        <select className={`shrink-0 ${input}`} value={status} onChange={(e) => setStatus(e.target.value as StatusFilter)}>
           <option value="all">All statuses</option>
           <option value="not_started">Not started</option>
           <option value="in_progress">In progress</option>
           <option value="complete">Complete</option>
           <option value="overdue">Overdue</option>
         </select>
-        <select className={input} value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
+        <select className={`shrink-0 ${input}`} value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
           <option value="branch">Sort: Branch</option>
           <option value="name">Sort: Name</option>
           <option value="progress">Sort: Completion</option>
@@ -152,6 +156,7 @@ export function AdminProjectDetail({
           onChange={setMobileView}
           options={[{ value: 'grid', icon: LayoutGrid, label: 'Tile view' }, { value: 'list', icon: List, label: 'List view' }]}
         />
+        </div>
       </div>
 
       {/* Store table */}
@@ -226,7 +231,8 @@ export function AdminProjectDetail({
                   className="cursor-pointer space-y-2 rounded-xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] p-3"
                 >
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold text-[var(--text)]">{s.store_name ?? '—'}</div>
+                    {/* Primary name never ellipsizes on mobile — wrap to two lines instead. */}
+                    <div className="line-clamp-2 break-words text-sm font-semibold text-[var(--text)]">{s.store_name ?? '—'}</div>
                     <div className="truncate text-[10px] text-[var(--text-muted)]">{s.branch_code}</div>
                   </div>
                   <div className="flex items-center justify-between gap-1">
@@ -251,7 +257,7 @@ export function AdminProjectDetail({
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <div className="font-semibold text-[var(--text)] truncate">{s.store_name ?? '—'}</div>
+                      <div className="font-semibold text-[var(--text)] line-clamp-2 break-words">{s.store_name ?? '—'}</div>
                       <div className="text-xs text-[var(--text-muted)] mt-0.5">{s.branch_code}{s.town ? ` · ${s.town}` : ''}</div>
                     </div>
                     <span className={`shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full ${s.overdue ? OVERDUE_PILL : STORE_STATUS_PILL[s.status]}`}>

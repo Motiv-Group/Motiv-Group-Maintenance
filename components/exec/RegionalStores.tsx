@@ -158,7 +158,7 @@ export function RegionalStores({ stores, archived = [], companyName = '' }: { st
   }
   const kebab = (t: ActionTarget) => (
     <button type="button" onClick={() => setActionTarget(t)} disabled={busy} aria-label={`Actions for ${t.name}`}
-      className="p-1.5 rounded-lg text-[var(--text-faint)] hover:text-[var(--text)] hover:bg-[var(--hover)] transition disabled:opacity-50">
+      className="p-3 sm:p-1.5 rounded-lg text-[var(--text-faint)] hover:text-[var(--text)] hover:bg-[var(--hover)] transition disabled:opacity-50">
       <MoreVertical size={16} />
     </button>
   )
@@ -262,7 +262,7 @@ export function RegionalStores({ stores, archived = [], companyName = '' }: { st
             const m = BUCKET_META[bucketOf(s.finalStatus)]
             return (
               <li key={s.storeId} className="relative">
-                <button onClick={() => { setSelId(s.storeId); setOpen(true) }} className="w-full p-3 pr-10 text-left transition hover:bg-[var(--hover)]">
+                <button onClick={() => { setSelId(s.storeId); setOpen(true) }} className="w-full p-3 pr-12 sm:pr-10 text-left transition hover:bg-[var(--hover)]">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       {/* Mobile-only card (ul is md:hidden) — let the name wrap. */}
@@ -282,7 +282,7 @@ export function RegionalStores({ stores, archived = [], companyName = '' }: { st
                     <span>Activity: <span className="text-[var(--text)]">{relativeTime(s.lastActivityAt, nowMs)}</span></span>
                   </div>
                 </button>
-                <div className="absolute right-2 top-2">{kebab({ id: s.storeId, name: s.storeName, archived: false })}</div>
+                <div className="absolute right-1 top-1 sm:right-2 sm:top-2">{kebab({ id: s.storeId, name: s.storeName, archived: false })}</div>
               </li>
             )
           })}

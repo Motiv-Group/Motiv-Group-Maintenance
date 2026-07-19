@@ -202,8 +202,8 @@ function MemberCard({ member: m, tint, editing, onEdit, onCancel, onSaved, onRem
       <div className="flex items-start gap-3">
         <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-full text-sm font-bold ${tint}`}>{initials(m.name)}</span>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <p className="min-w-0 truncate text-sm font-semibold text-[var(--text)]">{m.name}</p>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <p className="min-w-0 line-clamp-2 break-words text-sm font-semibold text-[var(--text)]">{m.name}</p>
             <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${onJob ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'}`}>{onJob ? 'On a job' : 'Available'}</span>
           </div>
           <a href={`tel:${m.phone}`} className="mt-0.5 inline-flex items-center gap-1 text-xs text-[var(--text-muted)] transition hover:text-blue-600 dark:hover:text-blue-400"><Phone size={11} /> {m.phone}</a>

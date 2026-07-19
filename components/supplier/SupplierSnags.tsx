@@ -46,7 +46,7 @@ function StatCard({ icon, tone, value, title, sub, active, onClick }: { icon: Re
 
 function Select<T extends string>({ label, value, onChange, options }: { label: string; value: T; onChange: (v: T) => void; options: { value: T; label: string }[] }) {
   return (
-    <label className="relative flex min-w-[150px] flex-1 items-center gap-1.5 rounded-xl bg-[var(--input-bg)] px-3 py-2.5 text-sm ring-1 ring-[var(--border)] transition focus-within:ring-blue-500/40 sm:flex-none">
+    <label className="relative flex w-full items-center gap-1.5 rounded-xl bg-[var(--input-bg)] px-3 py-2.5 text-sm ring-1 ring-[var(--border)] transition focus-within:ring-blue-500/40 sm:w-auto sm:min-w-[150px] sm:flex-none">
       <span className="whitespace-nowrap text-[11px] uppercase tracking-wide text-[var(--text-faint)]">{label}</span>
       <select value={value} onChange={e => onChange(e.target.value as T)} className="w-full cursor-pointer appearance-none bg-transparent pr-4 font-semibold text-[var(--text)] outline-none">
         {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -165,10 +165,10 @@ export function SupplierSnags({ snags, company, generatedAt }: { snags: Supplier
             <div role="button" tabIndex={0} aria-expanded={open} onClick={() => toggle(storeName)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(storeName) } }} className="flex cursor-pointer items-center gap-3 px-4 py-3 transition hover:bg-[var(--hover)]">
               <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[var(--surface-2)] text-[var(--text-muted)]"><Store size={17} /></span>
               <span className="min-w-0 flex-1">
-                <span className="flex items-center gap-2"><span className="truncate text-base font-bold text-[var(--text)]">{[company, storeName].filter(Boolean).join(' · ')}</span>{g.branchCode && <span className="shrink-0 text-sm text-[var(--text-muted)]">· {g.branchCode}</span>}</span>
+                <span className="flex items-center gap-2"><span className="line-clamp-2 break-words text-base font-bold text-[var(--text)] sm:line-clamp-1">{[company, storeName].filter(Boolean).join(' · ')}</span>{g.branchCode && <span className="shrink-0 text-sm text-[var(--text-muted)]">· {g.branchCode}</span>}</span>
                 <span className="text-[11px] text-[var(--text-muted)]">{g.rows.length} snag{g.rows.length === 1 ? '' : 's'} · <span className={`font-semibold ${meta.store}`}>{summary}</span></span>
               </span>
-              <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${meta.badge}`}>{g.rows.length} {phase === 'dispute' ? 'under dispute' : phase === 'resolved' ? 'resolved' : 'open'}</span>
+              <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${meta.badge}`}>{g.rows.length}<span className="hidden sm:inline"> {phase === 'dispute' ? 'under dispute' : phase === 'resolved' ? 'resolved' : 'open'}</span></span>
               <ChevronDown size={18} className={`shrink-0 text-[var(--text-muted)] transition-transform ${open ? 'rotate-180' : ''}`} />
             </div>
             {open && (

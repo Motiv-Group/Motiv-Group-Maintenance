@@ -197,7 +197,7 @@ export function LogTicketWizard({
                           <img src={previews[i]} alt={`Photo ${i + 1}`} className="h-full w-full object-cover" />
                         </button>
                         <button type="button" onClick={() => setFiles(files.filter((_, j) => j !== i))} title="Remove photo"
-                          className="absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-full bg-black/60 text-white transition hover:bg-red-500">
+                          className="absolute right-1 top-1 grid h-9 w-9 place-items-center rounded-full bg-black/60 text-white transition hover:bg-red-500 sm:h-6 sm:w-6">
                           <X size={13} />
                         </button>
                       </div>

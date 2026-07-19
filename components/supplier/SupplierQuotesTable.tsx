@@ -164,7 +164,7 @@ export function SupplierQuotesTable({ items }: { items: SupplierQuoteItem[] }) {
                   <CategoryIcon category={i.category ?? i.storeName} priority={i.priority} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-2">
-                      <p className="truncate text-sm font-semibold text-[var(--text)]">{i.storeName}</p>
+                      <p className="line-clamp-2 break-words text-sm font-semibold text-[var(--text)]">{i.storeName}</p>
                       <span className="flex w-fit shrink-0 flex-col items-stretch gap-1">
                         {PRIO[i.priority] && <span className={`${BADGE} ${PRIO[i.priority].cls}`}>{PRIO[i.priority].label}</span>}
                         <span className={`${BADGE} ${STATUS[i.kind].badge}`}>{i.declinedLabel ?? STATUS[i.kind].label}</span>

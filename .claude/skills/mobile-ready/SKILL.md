@@ -70,6 +70,21 @@ Target viewport **≈375px** (iPhone SE / small Android). For each changed surfa
 9. **CSS vars, not raw hex.** Surfaces/text via `var(--surface|--border|--text|
    --text-muted|--text-faint|--input-bg)` so light/dark both work. Interactive
    accent = blue; semantic attention = amber `#f59e0b`. Never hardcode gray-*/white.
+10. **Never flex-shrink a native control below its label.** `min-w-0 flex-1` on a
+   `<select>`/`<input type=button>` lets flexbox squeeze it narrower than its
+   text and the native control clips MID-WORD with no ellipsis ("Sort: Start dat"
+   — a live prod bug). In a crowded mobile row, controls keep natural width
+   (`shrink-0` at base) inside the swipeable `overflow-x-auto no-scrollbar` strip
+   (rule 6); `flex-1` on a select is allowed only where the longest option
+   provably fits (single control on its own row).
+11. **Primary identifying text never ellipsizes on mobile.** Store/project/ticket
+   names, branch codes, company names, amounts: in compact containers (2-up tile
+   grids, crowded rows) use `line-clamp-2 break-words` at base — single-line
+   `truncate` turns "VP GROOT PHESANTEKRAAL" into "VP GROOT PHESA…" (a live prod
+   bug) and makes same-prefix items indistinguishable ("VP MALL OF THE …" vs
+   "VP MALL OF MTH…"). Desktop may restore one line with `sm:truncate` /
+   `sm:line-clamp-1`. Plain `truncate` stays fine for secondary metadata
+   (client sub-line, town) where losing the tail costs nothing.
 
 ## Copy-paste patterns
 
@@ -148,6 +163,10 @@ The change is observable in the browser preview when the dev server renders it.
 2. For an auth'd page you can't reach, drop a **temporary** `app/uipreview/page.tsx`
    that renders the component(s) with mock props (see prior phases). DELETE it
    before committing (and `rm -rf .next/dev` if stale types linger).
+   **Mock with the longest REAL data, never short strings** — "VP GROOT
+   PHESANTEKRAAL", "VP MALL OF THE NORTH", long supplier company names,
+   "R1 234 567.89", a 40-char email. Short mock names are how the tile-name and
+   sort-select truncation bugs shipped: everything "fit" until real data arrived.
 3. Measure — no page-level horizontal overflow, controls render, strips scroll
    internally:
    ```js
@@ -155,6 +174,16 @@ The change is observable in the browser preview when the dev server renders it.
    ;({ horizScroll: de.scrollWidth > de.clientWidth, w: de.scrollWidth, client: de.clientWidth })
    ```
    `horizScroll` must be `false`. Check console/network for errors.
+   Also hunt CLIPPED text (no page overflow, still broken): mid-word cut-offs in
+   native controls and ellipsized primary names:
+   ```js
+   // any select rendering narrower than its longest label?
+   [...document.querySelectorAll('select')].filter(s => s.scrollWidth > s.clientWidth + 1)
+   // any ellipsized primary heading in a mobile tile/row?
+   [...document.querySelectorAll('h1,h2,h3,.font-bold,.font-semibold,.font-medium')]
+     .filter(el => el.scrollWidth > el.clientWidth + 1)
+   ```
+   Both must be empty for mobile-visible primary text/controls (rules 10–11).
 4. `resize_window` with `colorScheme: 'dark'` to confirm both themes (CSS vars).
 5. Open every new pop-up and confirm the background does NOT scroll behind it.
 

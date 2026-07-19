@@ -81,7 +81,8 @@ export function RegionalProjectsClient({ projects, featured }: { projects: Proje
                   <Link key={p.id} href={`/regional/projects/${p.id}`}>
                     <Card className="h-full space-y-2 p-3">
                       <div className="min-w-0">
-                        <h3 className="truncate text-sm font-bold text-[var(--text)]">{p.name}</h3>
+                        {/* Primary name never ellipsizes on mobile — wrap to two lines instead. */}
+                        <h3 className="line-clamp-2 break-words text-sm font-bold text-[var(--text)]">{p.name}</h3>
                         <p className="truncate text-[10px] text-[var(--text-muted)]">{p.client_name ?? '—'}</p>
                       </div>
                       <div className="flex items-center justify-between gap-1">
@@ -103,7 +104,8 @@ export function RegionalProjectsClient({ projects, featured }: { projects: Proje
                 <Link key={p.id} href={`/regional/projects/${p.id}`} className="flex items-center gap-3 py-2.5 group">
                   <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--surface-2)] text-[var(--text-muted)]"><FolderKanban size={16} /></span>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-[var(--text)] truncate">{p.name}</p>
+                    {/* Mobile: wrap the name to two lines rather than ellipsize; desktop keeps one line. */}
+                    <p className="text-sm font-medium text-[var(--text)] line-clamp-2 break-words sm:line-clamp-1">{p.name}</p>
                     <p className="text-[11px] text-[var(--text-muted)] truncate">{p.client_name ?? '—'}</p>
                   </div>
                   <div className="hidden sm:flex items-center gap-2 w-40">
