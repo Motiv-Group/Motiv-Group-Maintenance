@@ -40,12 +40,18 @@ export default async function RegionalOverviewPage() {
   // Motiv-curated suppliers the RM can also invite from the Today queue's in-place
   // assign picker (company suppliers come from the dashboard payload already).
   const admin = createAdminClient()
-  const { data: motivRaw } = await admin.from('suppliers').select('id, company_name, trade, trades').eq('is_motiv', true).eq('active', true).order('company_name')
+  // Motiv directory is gated: only surface the Motiv pool once the company's
+  // access is approved (an RM requests it, a system_admin approves).
+  const { data: accessRow } = await admin.from('company_motiv_access').select('status').eq('company_id', companyId).maybeSingle()
+  const motivAccess = (accessRow?.status ?? 'none') as 'none' | 'pending' | 'approved' | 'rejected'
   const companySupplierIds = new Set(data.suppliers.map(s => s.id))
+  const { data: motivRaw } = motivAccess === 'approved'
+    ? await admin.from('suppliers').select('id, company_name, trade, trades').eq('is_motiv', true).eq('active', true).order('company_name')
+    : { data: [] as { id: string; company_name: string; trade: string | null; trades: string[] | null }[] }
   const motivSuppliers = ((motivRaw ?? []) as { id: string; company_name: string; trade: string | null; trades: string[] | null }[])
     .filter(s => !companySupplierIds.has(s.id))
     .map(s => ({ id: s.id, name: s.company_name, category: Array.isArray(s.trades) && s.trades.filter(Boolean).length ? s.trades.filter(Boolean).join(', ') : (s.trade ?? null) }))
   const briefingScopeId = regionIds.slice().sort().join(',')
   const briefing = await getDailyBriefing({ companyId, scope: 'region', scopeId: briefingScopeId, role: 'regional_manager', facts: regionFacts(data) })
-  return <RegionalOverview data={data} name={fullName} briefing={briefing} briefingScopeId={briefingScopeId} motivSuppliers={motivSuppliers} />
+  return <RegionalOverview data={data} name={fullName} briefing={briefing} briefingScopeId={briefingScopeId} motivSuppliers={motivSuppliers} motivAccess={motivAccess} />
 }

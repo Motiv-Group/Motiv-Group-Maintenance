@@ -353,6 +353,33 @@ export interface Database {
         }
         Relationships: []
       }
+      company_motiv_access: {
+        Row: {
+          company_id: string | null
+          status: string
+          requested_by: string | null
+          requested_at: string
+          decided_by: string | null
+          decided_at: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          status?: string
+          requested_by?: string | null
+          requested_at?: string
+          decided_by?: string | null
+          decided_at?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          status?: string
+          requested_by?: string | null
+          requested_at?: string
+          decided_by?: string | null
+          decided_at?: string | null
+        }
+        Relationships: []
+      }
       company_suppliers: {
         Row: {
           company_id: string

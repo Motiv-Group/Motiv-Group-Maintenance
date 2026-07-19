@@ -124,7 +124,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
     acceptedSignoff, liveEvidence, liveSnagSubmission, isEvidenceResubmission,
     reviewSignoff, reviewQuotes,
     latestSnag, snagAwaitingApproval, snagFixApproved, snagScheduleActive,
-    supplierList, motivSupplierList, declinedSupplierIds, engagedSupplierIds, nameById,
+    supplierList, motivSupplierList, motivAccess, declinedSupplierIds, engagedSupplierIds, nameById,
     quotePanelRows,
     isTerminal, awarded, canReQuote, canAssign, canCancel, canEdit, canAssignSupplier, rmInfoAdded,
     supplierUpdates, newSupplierUpdates, photoGroups, timelineItems,
@@ -453,7 +453,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
             client-side (a Server Component can't pass functions to Client Components). */}
         {!isTerminal && (canAssign || canCancel) && (
           <RmTicketActionBar ticketId={t.id} status={t.status} canAssign={canAssign} canAssignSupplier={canAssignSupplier} canCancel={canCancel} canEdit={canEdit} jobRef={t.job_ref}
-            suppliers={supplierList} motivSuppliers={motivSupplierList} declinedSupplierIds={declinedSupplierIds} awaitingById={engagedSupplierIds}
+            suppliers={supplierList} motivSuppliers={motivSupplierList} motivAccess={motivAccess} declinedSupplierIds={declinedSupplierIds} awaitingById={engagedSupplierIds}
             description={t.description ?? ''} photoUrls={Array.isArray(t.photo_urls) ? t.photo_urls : []} title={t.title} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} priority={t.priority} />
         )}
 

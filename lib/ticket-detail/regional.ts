@@ -224,8 +224,14 @@ async function buildRegionalTicketDetail(
     return { id: s.id, name: s.company_name, category, avgRating: ra ? ra.sum / ra.n : 5, ratingCount: ra ? ra.n : 0 }
   }
   const supplierList = (suppliers ?? []).map(toSupplierCard)
-  // Motiv-curated suppliers the RM can also invite (shown under a toggle in the pop-up).
-  const motivSupplierList = (motivSuppliers ?? []).filter(s => !supplierList.some(m => m.id === s.id)).map(toSupplierCard)
+  // The Motiv directory is gated: a company sees the shared Motiv pool only after
+  // an RM requests access and a system_admin approves it. Until then, no Motiv
+  // suppliers are exposed and the assign pop-up shows a "request access" step.
+  const { data: motivAccessRow } = await admin.from('company_motiv_access').select('status').eq('company_id', companyId).maybeSingle()
+  const motivAccess = (motivAccessRow?.status ?? 'none') as 'none' | 'pending' | 'approved' | 'rejected'
+  const motivSupplierList = motivAccess === 'approved'
+    ? (motivSuppliers ?? []).filter(s => !supplierList.some(m => m.id === s.id)).map(toSupplierCard)
+    : []
   const nameById = new Map<string, string>([...supplierList, ...motivSupplierList].map(s => [s.id, s.name]))
   for (const inv of invites ?? []) if (inv.suppliers?.company_name) nameById.set(inv.supplier_id, inv.suppliers.company_name)
   const declineReasonBy = new Map<string, string>()
@@ -461,7 +467,7 @@ async function buildRegionalTicketDetail(
     // snagAwaitingApproval / `?.`) that imply the snag row exists; it can be null at runtime.
     latestSnag: latestSnag as SnagSel & { scheduled_at: string },
     snagScheduledAt, snagAwaitingApproval, snagFixApproved, snagScheduleActive, declinedSnag,
-    supplierList, motivSupplierList, declinedSupplierIds, engagedSupplierIds, nameById,
+    supplierList, motivSupplierList, motivAccess, declinedSupplierIds, engagedSupplierIds, nameById,
     quotePanelRows, requestedRows,
     isTerminal, awarded, canReQuote, canAssign, canCancel, canEdit, canAssignSupplier, rmInfoAdded,
     supplierUpdates, newSupplierUpdates, photoGroups, timelineItems,

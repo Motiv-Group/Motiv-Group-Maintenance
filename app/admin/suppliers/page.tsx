@@ -9,6 +9,7 @@ import { formatDateTime } from '@/lib/utils'
 import { SupplierReviewActions } from '@/components/admin/SupplierReviewActions'
 import { SupplierTabs } from '@/components/admin/SupplierTabs'
 import { SupplierDirectory, type DirectorySupplier } from '@/components/admin/SupplierDirectory'
+import { MotivAccessRequests, type MotivAccessRequest } from '@/components/admin/MotivAccessRequests'
 
 const DOC_LABEL: Record<string, string> = {
   cipc: 'CIPC registration', vat_cert: 'VAT certificate', insurance: 'Liability insurance',
@@ -34,6 +35,13 @@ export default async function AdminSuppliersPage() {
     admin.from('company_suppliers').select('supplier_id, company_id'),
     admin.from('companies').select('id, name').eq('active', true).order('name'),
   ])
+
+  // Companies requesting access to the Motiv directory (pending admin approval).
+  const { data: motivReqRows } = await admin.from('company_motiv_access').select('company_id, requested_at').eq('status', 'pending').order('requested_at')
+  const companyNameById = new Map((companies ?? []).map(c => [c.id, c.name]))
+  const motivRequests: MotivAccessRequest[] = (motivReqRows ?? [])
+    .filter((r): r is { company_id: string; requested_at: string } => !!r.company_id)
+    .map(r => ({ companyId: r.company_id, companyName: companyNameById.get(r.company_id) ?? 'Company', requestedAt: r.requested_at }))
 
   // ── Review queue ───────────────────────────────────────────────────────────
   const rows = pending ?? []
@@ -150,6 +158,7 @@ export default async function AdminSuppliersPage() {
         <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-2"><Truck size={22} className="text-blue-600 dark:text-blue-400" /> Suppliers</h1>
         <p className="text-sm text-[var(--text-muted)] mt-0.5">Every supplier across companies and the Motiv pool. Review self-signups before they receive work.</p>
       </div>
+      <MotivAccessRequests requests={motivRequests} />
       <SupplierTabs
         pendingCount={rows.length}
         defaultTab={rows.length ? 'review' : 'directory'}

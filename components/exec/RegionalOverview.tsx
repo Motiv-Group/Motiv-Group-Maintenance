@@ -10,7 +10,7 @@ import { Stars } from '@/components/ui/Stars'
 import type { Briefing } from '@/lib/briefing/facts'
 import { formatCurrency, humanizeDuration } from '@/lib/utils'
 
-export function RegionalOverview({ data, name, briefing, briefingScopeId, motivSuppliers = [] }: { data: RegionalDashboardData; name: string | null; briefing?: Briefing; briefingScopeId?: string; motivSuppliers?: { id: string; name: string; avgRating?: number; ratingCount?: number; category?: string | null }[] }) {
+export function RegionalOverview({ data, name, briefing, briefingScopeId, motivSuppliers = [], motivAccess = 'none' }: { data: RegionalDashboardData; name: string | null; briefing?: Briefing; briefingScopeId?: string; motivSuppliers?: { id: string; name: string; avgRating?: number; ratingCount?: number; category?: string | null }[]; motivAccess?: 'none' | 'pending' | 'approved' | 'rejected' }) {
   const p = data.portfolio
   const greeting = (() => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening' })()
 
@@ -39,7 +39,7 @@ export function RegionalOverview({ data, name, briefing, briefingScopeId, motivS
       />
 
       {/* KPI cards + priority work queue (same as the store-manager home). */}
-      <RegionalPriorityWorkQueue tickets={data.tickets} generatedAt={data.generatedAt} suppliers={assignSuppliers} motivSuppliers={motivSuppliers} />
+      <RegionalPriorityWorkQueue tickets={data.tickets} generatedAt={data.generatedAt} suppliers={assignSuppliers} motivSuppliers={motivSuppliers} motivAccess={motivAccess} />
 
       {/* Portfolio blocks side by side: distribution · focus · supplier perf · quote value */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">

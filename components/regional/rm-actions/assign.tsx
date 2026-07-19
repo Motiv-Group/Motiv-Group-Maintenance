@@ -4,7 +4,7 @@
 // "View & Assign" pop-up, and the per-supplier status list.
 import { useState, useMemo, useEffect, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, ChevronDown, ChevronLeft, ChevronRight, Send } from 'lucide-react'
+import { Search, ChevronDown, ChevronLeft, ChevronRight, Send, Lock } from 'lucide-react'
 import { Stars } from '@/components/ui/Stars'
 import { PhotoThumbs } from '@/components/ui/PhotoThumbs'
 import { formatCurrency, formatDateTime, rmStatusMeta, PRIORITY_LEVEL_LABELS, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
@@ -19,7 +19,7 @@ function supInitials(name: string): string {
   return parts.length ? parts.slice(0, 3).map(p => p[0]!.toUpperCase()).join('') : '?'
 }
 
-export function AssignSuppliersButton({ ticketId, suppliers, motivSuppliers = [], declinedSupplierIds = [], awaitingById = {}, trigger }: { ticketId: string; suppliers: SupplierChoice[]; motivSuppliers?: SupplierChoice[]; declinedSupplierIds?: string[]; awaitingById?: Record<string, 'invited' | 'quoted'>; trigger?: (open: () => void) => ReactNode }) {
+export function AssignSuppliersButton({ ticketId, suppliers, motivSuppliers = [], motivAccess = 'none', declinedSupplierIds = [], awaitingById = {}, trigger }: { ticketId: string; suppliers: SupplierChoice[]; motivSuppliers?: SupplierChoice[]; motivAccess?: 'none' | 'pending' | 'approved' | 'rejected'; declinedSupplierIds?: string[]; awaitingById?: Record<string, 'invited' | 'quoted'>; trigger?: (open: () => void) => ReactNode }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   // Auto-open when deep-linked from the Today queue's "Assign supplier" action
@@ -29,6 +29,20 @@ export function AssignSuppliersButton({ ticketId, suppliers, motivSuppliers = []
     if (new URLSearchParams(window.location.search).get('assign') === '1') setOpen(true)
   }, [])
   const [tab, setTab] = useState<'mine' | 'motiv'>('mine')
+  // Motiv directory is gated per company (RM requests → admin approves).
+  const [access, setAccess] = useState(motivAccess)
+  const [reqBusy, setReqBusy] = useState(false)
+  const [reqErr, setReqErr] = useState('')
+  const motivGated = tab === 'motiv' && access !== 'approved'
+  async function requestMotiv() {
+    setReqBusy(true); setReqErr('')
+    try {
+      const res = await fetch('/api/regional/motiv-access', { method: 'POST' })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(d.error ?? 'Failed')
+      setAccess(d.status ?? 'pending')
+    } catch (e) { setReqErr(errMsg(e)) } finally { setReqBusy(false) }
+  }
   const [q, setQ] = useState('')
   const [sort, setSort] = useState<'rating' | 'name'>('rating')
   const [page, setPage] = useState(1)
@@ -89,9 +103,33 @@ export function AssignSuppliersButton({ ticketId, suppliers, motivSuppliers = []
           {/* Directory tabs — selection carries across both. */}
           <div className="flex gap-2">
             <button onClick={() => setTab('mine')} className={tabCls(tab === 'mine')}>My suppliers ({suppliers.length})</button>
-            <button onClick={() => setTab('motiv')} className={tabCls(tab === 'motiv')}>MOTIV directory ({motivSuppliers.length})</button>
+            <button onClick={() => setTab('motiv')} className={tabCls(tab === 'motiv')}>MOTIV directory {access === 'approved' ? `(${motivSuppliers.length})` : <Lock size={12} className="inline align-middle" />}</button>
           </div>
 
+          {/* MOTIV directory is gated — request access, an admin approves. */}
+          {motivGated && (
+            <div className="rounded-xl ring-1 ring-[var(--border)] bg-[var(--surface-2)] p-6 text-center">
+              <span className="mx-auto mb-3 grid h-11 w-11 place-items-center rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400"><Lock size={20} /></span>
+              {access === 'pending' ? (
+                <>
+                  <p className="text-sm font-semibold text-[var(--text)]">Request pending</p>
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">A system admin needs to approve your company&apos;s access to the Motiv supplier directory. You&apos;ll be notified once it&apos;s approved.</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-semibold text-[var(--text)]">Motiv directory locked</p>
+                  <p className="mt-1 mb-3 text-xs text-[var(--text-muted)]">Your own suppliers are always available. To also request quotes from Motiv-verified suppliers, ask an admin to unlock the Motiv directory for your company.</p>
+                  <button type="button" onClick={requestMotiv} disabled={reqBusy}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 px-4 py-2 text-sm font-semibold text-white transition disabled:opacity-50">
+                    {reqBusy ? 'Requesting…' : 'Request access'}
+                  </button>
+                  {reqErr && <p className="mt-2 text-xs text-red-500">{reqErr}</p>}
+                </>
+              )}
+            </div>
+          )}
+
+          {!motivGated && (<>
           {/* Search */}
           <div className="relative">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
@@ -158,6 +196,7 @@ export function AssignSuppliersButton({ ticketId, suppliers, motivSuppliers = []
               </div>
             </div>
           )}
+          </>)}
 
           {confirmReinvite && (
             <div className="rounded-lg bg-amber-500/10 ring-1 ring-amber-500/40 p-3">
@@ -204,9 +243,9 @@ function vaPriorityBadge(p: string): string {
   return 'bg-slate-500/15 text-slate-600 dark:text-slate-300'
 }
 
-export function ViewAssignButton({ ticketId, summary, suppliers, motivSuppliers = [], awaitingById = {}, declinedSupplierIds = [], trigger }: {
+export function ViewAssignButton({ ticketId, summary, suppliers, motivSuppliers = [], motivAccess = 'none', awaitingById = {}, declinedSupplierIds = [], trigger }: {
   ticketId: string; summary: ViewAssignSummary
-  suppliers: SupplierChoice[]; motivSuppliers?: SupplierChoice[]
+  suppliers: SupplierChoice[]; motivSuppliers?: SupplierChoice[]; motivAccess?: 'none' | 'pending' | 'approved' | 'rejected'
   awaitingById?: Record<string, 'invited' | 'quoted'>; declinedSupplierIds?: string[]
   trigger: (open: () => void) => ReactNode
 }) {
@@ -281,7 +320,7 @@ export function ViewAssignButton({ ticketId, summary, suppliers, motivSuppliers 
 
             {/* Assign action — opens the existing searchable supplier picker on top. */}
             <div className="border-t border-[var(--border)] pt-3">
-              <AssignSuppliersButton ticketId={ticketId} suppliers={suppliers} motivSuppliers={motivSuppliers} awaitingById={awaitingById} declinedSupplierIds={declinedSupplierIds}
+              <AssignSuppliersButton ticketId={ticketId} suppliers={suppliers} motivSuppliers={motivSuppliers} motivAccess={motivAccess} awaitingById={awaitingById} declinedSupplierIds={declinedSupplierIds}
                 trigger={openPicker => <button onClick={openPicker} className="w-full rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500">Assign supplier</button>} />
             </div>
           </div>
