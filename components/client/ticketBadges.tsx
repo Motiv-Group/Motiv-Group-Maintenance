@@ -53,7 +53,9 @@ export function clientStatusLabel(ticket: StoreManagerTicket): string {
 export function clientStatusBadgeClass(ticket: StoreManagerTicket): string {
   // 4-tone status language (mirrors rmStatusMeta): amber = your input is needed,
   // blue = new / in-flight, green = completed, grey = cancelled/declined.
-  if (ticket.infoAdded || ticket.status === 'info_requested') return 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
+  // "Info added" is deliberately NOT amber here: the SM already actioned the
+  // request — the ball is with the RM, so it reads blue (in-flight).
+  if (ticket.status === 'info_requested' && !ticket.infoAdded) return 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
   switch (ticket.status) {
     case 'completed':   return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
     case 'cancelled':   return 'bg-gray-500/15 text-gray-600 dark:text-gray-400'

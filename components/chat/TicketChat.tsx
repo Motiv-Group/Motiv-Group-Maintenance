@@ -212,7 +212,8 @@ function ChatComposer({ ticketId, onSent }: { ticketId: string; onSent: () => vo
       <div className="flex items-center gap-2">
         <label className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-xl px-3 py-2 text-sm text-[var(--text)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)]">
           <Paperclip size={15} /> Attach
-          <input type="file" accept="image/*,.pdf,.doc,.docx" multiple className="hidden" onChange={e => { setFiles(p => [...p, ...Array.from(e.target.files ?? [])].slice(0, MAX_FILES)); setErr(''); e.currentTarget.value = '' }} />
+          {/* Snapshot the FileList before clearing the input — a lazy read inside the updater finds it emptied. */}
+          <input type="file" accept="image/*,.pdf,.doc,.docx" multiple className="hidden" onChange={e => { const picked = Array.from(e.target.files ?? []); setFiles(p => [...p, ...picked].slice(0, MAX_FILES)); setErr(''); e.currentTarget.value = '' }} />
         </label>
         <button onClick={submit} disabled={busy} className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-blue-600 py-2 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:opacity-50">
           {busy ? <><Loader2 size={14} className="animate-spin" /> Sending…</> : <><Send size={14} /> Send</>}
