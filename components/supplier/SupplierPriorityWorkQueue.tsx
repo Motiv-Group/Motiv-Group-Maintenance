@@ -216,7 +216,7 @@ function UploadEvidenceCta({ ticket, className }: { ticket: SupplierTicketRow; c
       <button type="button" onClick={() => setOpen(true)} className={className}>Upload Evidence</button>
       {open && (
         <Modal onClose={() => setOpen(false)} maxWidth="max-w-2xl">
-          {close => <SubmitCompletionForm defaultOpen ticketId={ticket.id} evidenceRequested={evidenceRequested} requireBoth={!evidenceRequested} onClose={close} />}
+          {close => <SubmitCompletionForm defaultOpen ticketId={ticket.id} evidenceRequested={evidenceRequested} evidenceRequestReason={ticket.evidenceRequestReason} requireBoth={!evidenceRequested} onClose={close} />}
         </Modal>
       )}
     </>
@@ -240,6 +240,13 @@ function ViewSnagCta({ ticket, className, company }: { ticket: SupplierTicketRow
                 <h3 className="text-base font-bold text-[var(--text)]">Completion snagged</h3>
                 <p className="mt-1 text-sm text-[var(--text-muted)]">The regional manager raised a snag on your completion. Accept the snag and schedule the corrective work, or raise a dispute if you disagree.</p>
               </div>
+              {/* What the manager snagged, and why — same callout as the ticket's Snag tab. */}
+              {ticket.snagReason && (
+                <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3 space-y-0.5">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Why it was sent back</p>
+                  <p className="text-sm text-[var(--text)]">{ticket.snagReason}</p>
+                </div>
+              )}
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
                 <div className="flex-1"><AcceptSnagCard ticketId={ticket.id} priority={String(ticket.priority)} createdAt={ticket.createdAt} /></div>
                 <RaiseDisputeMore ticketId={ticket.id} origin="snag" subjectTitle={ticket.category || ticket.title} jobRef={ticket.jobRef} store={store} />

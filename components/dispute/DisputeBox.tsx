@@ -3,7 +3,7 @@
 // Supplier↔RM dispute thread over a snag or a "more evidence" request. The supplier
 // raises it (pausing the snag/evidence step); both sides post messages + evidence in
 // a free-flowing numbered thread until the RM resolves it as upheld or withdrawn.
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { uploadOne } from '@/lib/upload'
 import type { ReactNode } from 'react'
@@ -100,6 +100,13 @@ function Composer({ ticketId, action, submitLabel, placeholder, onDone }: { tick
   const [files, setFiles] = useState<File[]>([])
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  // Object-URL previews for the picked IMAGE files (null slots for documents),
+  // revoked whenever the selection changes / on unmount.
+  const previews = useMemo(() => files.map(f => (f.type.startsWith('image/') ? URL.createObjectURL(f) : null)), [files])
+  useEffect(() => () => { previews.forEach(u => { if (u) URL.revokeObjectURL(u) }) }, [previews])
+  // Keep each file's index in `files` so remove works from either list.
+  const images = files.map((f, i) => ({ f, i })).filter(({ f }) => f.type.startsWith('image/'))
+  const docs = files.map((f, i) => ({ f, i })).filter(({ f }) => !f.type.startsWith('image/'))
 
   async function submit() {
     if (!text.trim() && !files.length) { setErr('Add a message or attach evidence.'); return }
@@ -120,11 +127,26 @@ function Composer({ ticketId, action, submitLabel, placeholder, onDone }: { tick
     <div className="space-y-2.5">
       <textarea value={text} onChange={e => setText(e.target.value)} placeholder={placeholder} rows={3}
         className="w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)] focus:ring-blue-500/40 outline-none" />
-      {files.length > 0 && (
+      {/* Picked images preview as thumbnails (like the photo uploaders); documents
+          keep the compact text rows. */}
+      {images.length > 0 && (
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+          {images.map(({ f, i }) => (
+            <div key={i} className="relative aspect-square overflow-hidden rounded-xl ring-1 ring-[var(--border)]">
+              {/* eslint-disable-next-line @next/next/no-img-element -- local object-URL preview, not a remote asset */}
+              <img src={previews[i]!} alt={f.name} className="h-full w-full object-cover" />
+              <button type="button" onClick={() => setFiles(p => p.filter((_, j) => j !== i))} aria-label={`Remove ${f.name}`} className="absolute right-1 top-1 grid h-8 w-8 place-items-center rounded-full bg-black/60 text-white transition hover:bg-red-500">
+                <X size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      {docs.length > 0 && (
         <div className="space-y-1">
-          {files.map((f, i) => (
+          {docs.map(({ f, i }) => (
             <div key={i} className="flex items-center justify-between gap-2 text-sm text-[var(--text-muted)]">
-              <span className="truncate min-w-0 flex items-center gap-1.5">{f.type.startsWith('image/') ? <ImageIcon size={13} /> : <FileText size={13} />}{f.name}</span>
+              <span className="truncate min-w-0 flex items-center gap-1.5"><FileText size={13} />{f.name}</span>
               <button type="button" onClick={() => setFiles(p => p.filter((_, j) => j !== i))} className="shrink-0 text-[var(--text-faint)] hover:text-red-500"><X size={14} /></button>
             </div>
           ))}
@@ -381,8 +403,12 @@ export function DisputeThread({ ticketId, dispute, messages, viewerRole, readOnl
         <div className={`rounded-lg p-3 ring-1 ${dispute.outcome === 'withdrawn' ? 'bg-emerald-500/10 ring-emerald-500/30' : 'bg-amber-500/10 ring-amber-500/30'}`}>
           <p className={`text-[11px] font-bold uppercase tracking-wide ${dispute.outcome === 'withdrawn' ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}`}>
             {dispute.outcome === 'withdrawn'
-              ? (dispute.origin === 'variation' ? 'Variation-order decline retracted — reopened for review' : `${What} retracted — dropped`)
-              : (dispute.origin === 'variation' ? 'Variation-order decline upheld — stays declined' : `${What} upheld — stands`)}
+              ? (dispute.origin === 'variation' ? 'Variation-order decline retracted — reopened for review'
+                : dispute.origin === 'quote_declined' ? 'Quote decline retracted — the manager will revisit the quote'
+                : `${What} retracted — dropped`)
+              : (dispute.origin === 'variation' ? 'Variation-order decline upheld — stays declined'
+                : dispute.origin === 'quote_declined' ? 'Quote decline upheld — the decision stands'
+                : `${What} upheld — stands`)}
           </p>
           {dispute.resolution_note && <p className="text-sm text-[var(--text)]">{dispute.resolution_note}</p>}
         </div>

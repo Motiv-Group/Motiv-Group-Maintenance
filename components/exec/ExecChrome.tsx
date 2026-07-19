@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { Globe2, Map as MapIcon, Store, Truck, Gavel, Bell, Settings, LogOut, FileBarChart, LayoutDashboard, Ticket, ClipboardCheck, AlertTriangle, ReceiptText, BarChart2, Users, CalendarClock, Network, ScrollText, Database, Triangle, Mail, Zap, ShieldAlert, FolderKanban, Paintbrush } from 'lucide-react'
+import { Globe2, Map as MapIcon, Store, Truck, Gavel, Bell, Settings, LogOut, FileBarChart, LayoutDashboard, Ticket, ClipboardCheck, AlertTriangle, ReceiptText, BarChart2, Users, CalendarClock, Network, ScrollText, Database, Triangle, Mail, Zap, ShieldAlert, FolderKanban, Paintbrush, Timer } from 'lucide-react'
 import { MotivLogo } from '@/components/ui/MotivLogo'
 import { ContextSwitcher } from '@/components/ui/ContextSwitcher'
 import { SwipeNav } from '@/components/ui/SwipeNav'
@@ -77,6 +77,7 @@ const ADMIN_TABS: ChromeTab[] = [
   { href: '/admin/hierarchy', label: 'Hierarchy', icon: Network },
   { href: '/admin/suppliers', label: 'Suppliers', icon: Truck },
   { href: '/admin/projects',  label: 'Projects',  icon: FolderKanban },
+  { href: '/admin/sla',       label: 'SLA',       icon: Timer },
   { href: '/admin/audit',     label: 'Audit',     icon: ScrollText },
 ]
 const ADMIN_DESKTOP_TABS: ChromeTab[] = [

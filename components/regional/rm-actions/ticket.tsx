@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation'
 import { Pencil, Plus, Camera, Info, X, ChevronDown, MessageSquare, XCircle, Send, AlertCircle, Trash2 } from 'lucide-react'
 import { uploadFiles } from '@/lib/upload'
 import { formatDateTime } from '@/lib/utils'
+import { StarInput } from '@/components/ui/Stars'
 import { TicketChat } from '@/components/chat/TicketChat'
 import { Modal } from './modal'
 import { post, errMsg, type SupplierChoice } from './shared'
@@ -583,20 +584,53 @@ export function CancelTicketCard({ ticketId, jobRef, defaultOpen = false, onClos
 }
 
 // ── Final close-out — greyed until the supplier confirms no more VOs ─
+// The confirm pop-up asks for the supplier rating (moved here from the sign-off
+// approval): a REQUIRED 1–5 star score + optional comment, posted to /api/ratings
+// before the close_out transition. Used by the RM ticket page AND the individual
+// (job-owner) ticket page — /api/ratings accepts both roles.
 export function CloseOutButton({ ticketId, voConfirmed }: { ticketId: string; voConfirmed: boolean }) {
   const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [score, setScore] = useState(0)
+  const [comment, setComment] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  const close = () => { if (!busy) { setOpen(false); setErr('') } }
+
   async function closeOut() {
+    if (!score) { setErr('Please give the supplier a star rating before closing out.'); return }
     setBusy(true); setErr('')
-    try { await post(`/api/tickets/${ticketId}/transition`, { action: 'close_out' }); router.refresh() }
-    catch (e) { setErr(errMsg(e)); setBusy(false) }
+    try {
+      await post(`/api/ratings`, { ticketId, score, comment })
+      await post(`/api/tickets/${ticketId}/transition`, { action: 'close_out' })
+      setOpen(false); router.refresh()
+    } catch (e) { setErr(errMsg(e)); setBusy(false) }
   }
+
   return (
     <div className="space-y-1.5">
       {!voConfirmed && <p className="text-xs text-[var(--text-muted)]">Waiting for the supplier to confirm there are no further variation orders before you can close out.</p>}
-      <button onClick={closeOut} disabled={busy || !voConfirmed} className="w-full py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed">{busy ? 'Closing out…' : 'Final close-out'}</button>
-      {err && <p className="text-xs text-red-500">{err}</p>}
+      <button onClick={() => setOpen(true)} disabled={!voConfirmed} className="w-full py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed">Final close-out</button>
+      {open && (
+        <Modal title="Final close-out" onClose={close}>
+          <p className="-mt-1 text-sm text-[var(--text-muted)]">Rate the supplier&apos;s work to complete the job — the ticket is closed once you confirm.</p>
+          <div className="space-y-2 rounded-xl p-4 ring-1 ring-[var(--border)]">
+            <p className="text-sm font-semibold text-[var(--text)]">Rate the supplier <span className="text-red-500">*</span></p>
+            <StarInput value={score} onChange={v => { setScore(v); setErr('') }} />
+            <p className="text-[11px] text-[var(--text-faint)]">Tap a star to rate</p>
+            <div className="relative">
+              <textarea maxLength={250} value={comment} onChange={e => setComment(e.target.value.slice(0, 250))} placeholder="Comment on the supplier's work (optional)"
+                className="min-h-[64px] w-full rounded-lg bg-[var(--input-bg)] px-3 py-2 pb-6 text-sm text-[var(--text)] ring-1 ring-[var(--border)]" />
+              <span className="pointer-events-none absolute bottom-2 right-3 text-[11px] tabular-nums text-[var(--text-faint)]">{comment.length}/250</span>
+            </div>
+          </div>
+          {err && <p className="text-xs text-red-500">{err}</p>}
+          <div className="flex gap-2">
+            <button onClick={close} disabled={busy} className="flex-1 py-2.5 rounded-xl ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm font-medium disabled:opacity-50">Cancel</button>
+            <button onClick={closeOut} disabled={busy} className="flex-1 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition disabled:opacity-50">{busy ? 'Closing out…' : 'Close out'}</button>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }

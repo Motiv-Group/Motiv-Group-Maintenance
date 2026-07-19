@@ -326,7 +326,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
               ) : (
                 <div className={t.status === 'evidence_requested' ? 'flex flex-col gap-2 sm:flex-row sm:items-start' : ''}>
                   <div className={t.status === 'evidence_requested' ? 'flex-1' : ''}>
-                    <PopupForm label={t.status === 'evidence_requested' ? 'Upload more evidence' : 'Upload COC & POC'} tone="primary"><SubmitCompletionForm defaultOpen ticketId={t.id} evidenceRequested={t.status === 'evidence_requested'} requireBoth={t.status !== 'evidence_requested'} /></PopupForm>
+                    <PopupForm label={t.status === 'evidence_requested' ? 'Upload more evidence' : 'Upload COC & POC'} tone="primary"><SubmitCompletionForm defaultOpen ticketId={t.id} evidenceRequested={t.status === 'evidence_requested'} evidenceRequestReason={t.evidence_request_reason ?? null} requireBoth={t.status !== 'evidence_requested'} /></PopupForm>
                   </div>
                   {t.status === 'evidence_requested' && <RaiseDisputeMore ticketId={t.id} origin="evidence" subjectTitle="More evidence requested" jobRef={t.job_ref} store={disputeStore} />}
                 </div>

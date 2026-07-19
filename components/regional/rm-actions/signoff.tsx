@@ -5,8 +5,8 @@
 import { useState, useEffect, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { FileText, ChevronRight, MessageSquare, ClipboardCheck, Image as ImageIcon, CheckCircle2, AlertTriangle } from 'lucide-react'
-import { StarInput } from '@/components/ui/Stars'
 import { PhotoThumbs } from '@/components/ui/PhotoThumbs'
+import { TicketChat } from '@/components/chat/TicketChat'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { formatDateTime } from '@/lib/utils'
 import { Modal } from './modal'
@@ -52,15 +52,15 @@ export function RmReviewPanel({ heading, items }: {
 
 // ── RM completion review (COC & POC submitted) — inline "Next action" block ──
 // A tap-to-review summary of the submission (photo/document/note counts) that
-// opens the full "Sign off completion" pop-up (photos · COC · notes + rating +
+// opens the full "Sign off completion" pop-up (photos · COC · notes +
 // approve/more), plus an "Approve completion" button (same pop-up) and a "More"
-// menu holding Raise snag / Request more evidence for quick access.
+// menu holding Raise snag / Request more evidence / Chat with supplier.
 export function RmCompletionReview({ ticketId, label, submittedAt, photoCount, docCount, noteCount, beforeUrls, afterUrls, cocUrl, invoiceUrl, notes }: {
   ticketId: string; label: string; submittedAt: string; photoCount: number; docCount: number; noteCount: number
   beforeUrls: string[]; afterUrls: string[]; cocUrl: string | null; invoiceUrl: string | null; notes: string | null
 }) {
   const [open, setOpen] = useState(false)
-  const [active, setActive] = useState<'evidence' | 'snag' | null>(null)
+  const [active, setActive] = useState<'evidence' | 'snag' | 'chat' | null>(null)
   const done = () => setActive(null)
   const submission: SignoffSubmission = { id: '', label, createdAt: submittedAt, beforeUrls, afterUrls, cocUrl, invoiceUrl, notes }
   return (
@@ -87,6 +87,7 @@ export function RmCompletionReview({ ticketId, label, submittedAt, photoCount, d
         <MoreMenu>
           <MoreActionItem icon={<AlertTriangle size={16} />} label="Raise snag" onClick={() => setActive('snag')} />
           <MoreActionItem icon={<MessageSquare size={16} />} label="Request more evidence" onClick={() => setActive('evidence')} />
+          <MoreActionItem icon={<MessageSquare size={16} />} label="Chat with supplier" onClick={() => setActive('chat')} />
         </MoreMenu>
       </div>
 
@@ -97,6 +98,8 @@ export function RmCompletionReview({ ticketId, label, submittedAt, photoCount, d
       )}
       {active === 'evidence' && <RequestEvidenceButton ticketId={ticketId} defaultOpen onClose={done} />}
       {active === 'snag' && <RaiseSnagButton ticketId={ticketId} defaultOpen onClose={done} />}
+      {/* A submitted sign-off means the supplier is already awarded, so chat is always available here. */}
+      {active === 'chat' && <TicketChat ticketId={ticketId} viewerRole="regional_manager" defaultOpen onClose={done} />}
     </div>
   )
 }
@@ -170,23 +173,20 @@ function DocRow({ ticketId, url, itemType, itemLabel, uploadedAt, viewLabel }: {
 
 // The rich "Sign off completion" review panel — used in BOTH the RM ticket's
 // Next-action pop-up and the Today-queue sign-off pop-up. Shows the full
-// submission (photos · COC · notes) + a star rating, with "Approve completion"
-// and a "More actions" menu (Request more evidence / Raise a snag).
+// submission (photos · COC · notes) with "Approve completion" and a "More
+// actions" menu (Chat with supplier / Request more evidence / Raise a snag).
+// The supplier rating moved to the final close-out (CloseOutButton).
 export function SignoffReviewPanel({ ticketId, s, onDone }: { ticketId: string; s: SignoffSubmission; onDone?: () => void }) {
   const router = useRouter()
-  const [score, setScore] = useState(0)
-  const [comment, setComment] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
-  const [sub, setSub] = useState<'evidence' | 'snag' | null>(null)
+  const [sub, setSub] = useState<'evidence' | 'snag' | 'chat' | null>(null)
   const photos = [...s.beforeUrls, ...s.afterUrls]
   const closeSub = () => setSub(null)
 
   async function approve() {
-    if (!score) { setErr('Please give the supplier a star rating before accepting.'); return }
     setBusy(true); setErr('')
     try {
-      await post(`/api/ratings`, { ticketId, score, comment })
       await post(`/api/tickets/${ticketId}/transition`, { action: 'approve' })
       onDone?.(); router.refresh()
     } catch (e) { setErr(errMsg(e)); setBusy(false) }
@@ -223,22 +223,11 @@ export function SignoffReviewPanel({ ticketId, s, onDone }: { ticketId: string; 
         </div>
       </div>
 
-      {/* Rate the supplier (required before accepting). */}
-      <div className="space-y-2 rounded-xl p-4 ring-1 ring-[var(--border)]">
-        <p className="text-sm font-semibold text-[var(--text)]">Rate the supplier, then accept the COC &amp; POC</p>
-        <StarInput value={score} onChange={setScore} />
-        <p className="text-[11px] text-[var(--text-faint)]">Tap a star to rate</p>
-        <div className="relative">
-          <textarea maxLength={250} value={comment} onChange={e => setComment(e.target.value.slice(0, 250))} placeholder="Comment on the supplier's work (optional)"
-            className="min-h-[64px] w-full rounded-lg bg-[var(--input-bg)] px-3 py-2 pb-6 text-sm text-[var(--text)] ring-1 ring-[var(--border)]" />
-          <span className="pointer-events-none absolute bottom-2 right-3 text-[11px] tabular-nums text-[var(--text-faint)]">{comment.length}/250</span>
-        </div>
-      </div>
-
       {err && <p className="text-xs text-red-500">{err}</p>}
 
       <div className="flex items-center gap-2">
         <MoreMenu label="More actions" up align="left">
+          <MoreActionItem icon={<MessageSquare size={16} />} label="Chat with supplier" onClick={() => setSub('chat')} />
           <MoreActionItem icon={<MessageSquare size={16} />} label="Request more evidence" onClick={() => setSub('evidence')} />
           <MoreActionItem icon={<AlertTriangle size={16} />} label="Raise a snag" tone="danger" onClick={() => setSub('snag')} />
         </MoreMenu>
@@ -247,6 +236,8 @@ export function SignoffReviewPanel({ ticketId, s, onDone }: { ticketId: string; 
 
       {sub === 'evidence' && <RequestEvidenceButton ticketId={ticketId} defaultOpen onClose={closeSub} />}
       {sub === 'snag' && <RaiseSnagButton ticketId={ticketId} defaultOpen onClose={closeSub} />}
+      {/* A submitted sign-off means the supplier is already awarded, so chat is always available here. */}
+      {sub === 'chat' && <TicketChat ticketId={ticketId} viewerRole="regional_manager" defaultOpen onClose={closeSub} />}
     </div>
   )
 }
@@ -314,19 +305,16 @@ export function VariationReviewCard({ ticketId }: { ticketId: string }) {
   )
 }
 
-// ── Approve sign-off (rate the supplier first) ──────────────────
+// ── Approve sign-off ────────────────────────────────────────────
+// The supplier rating moved to the final close-out (CloseOutButton).
 export function ApproveSignoffCard({ ticketId }: { ticketId: string }) {
   const router = useRouter()
-  const [score, setScore] = useState(0)
-  const [comment, setComment] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
 
   async function approve() {
-    if (!score) { setErr('Please give the supplier a star rating before accepting.'); return }
     setBusy(true); setErr('')
     try {
-      await post(`/api/ratings`, { ticketId, score, comment })
       await post(`/api/tickets/${ticketId}/transition`, { action: 'approve' })
       router.refresh()
     } catch (e) { setErr(errMsg(e)); setBusy(false) }
@@ -334,9 +322,7 @@ export function ApproveSignoffCard({ ticketId }: { ticketId: string }) {
 
   return (
     <div className="rounded-xl ring-1 ring-[var(--border)] p-4 space-y-3">
-      <p className="text-sm font-semibold text-[var(--text)]">Rate the supplier, then accept the COC &amp; POC</p>
-      <StarInput value={score} onChange={setScore} />
-      <textarea className="w-full px-3 py-2 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm min-h-[60px]" placeholder="Comment on the supplier's work (optional)" value={comment} onChange={e => setComment(e.target.value)} />
+      <p className="text-sm font-semibold text-[var(--text)]">Accept the COC &amp; POC to approve the completion</p>
       {err && <p className="text-xs text-red-500">{err}</p>}
       <button onClick={approve} disabled={busy} className="w-full py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Submitting…' : 'Accept COC/POC'}</button>
     </div>
