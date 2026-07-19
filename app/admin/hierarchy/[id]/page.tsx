@@ -7,7 +7,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { BackLink } from '@/components/ui/BackLink'
 import { CompanyAvatar } from '@/components/admin/CompanyAvatar'
 import { InfoTip } from '@/components/ui/InfoTip'
-import { HierarchyLinker, type LinkerExec, type LinkerRM, type LinkerSM } from '@/components/admin/HierarchyLinker'
+import { HierarchyLinker, type LinkerExec, type LinkerRM, type LinkerSM, type LinkerStoreRow } from '@/components/admin/HierarchyLinker'
 import { storeLabel } from '@/lib/utils'
 
 export default async function AdminHierarchyCompanyPage(props: { params: Promise<{ id: string }> }) {
@@ -21,14 +21,23 @@ export default async function AdminHierarchyCompanyPage(props: { params: Promise
   const [{ data: users }, { data: regions }, { data: stores }, { data: ru }, { data: su }, { data: rex }] = await Promise.all([
     db.from('user_profiles').select('id, full_name, email, role').eq('company_id', id).in('role', ['executive', 'regional_manager', 'store_manager']),
     db.from('regions').select('id, name, region_code').eq('company_id', id).eq('active', true).order('name'),
-    db.from('stores').select('id, name, sub_store, branch_code').eq('company_id', id).eq('active', true).order('branch_code'),
+    db.from('stores').select('id, name, sub_store, branch_code, region_id').eq('company_id', id).eq('active', true).order('branch_code'),
     db.from('regional_users').select('user_id, region_id'),
     db.from('store_users').select('user_id, store_id'),
     db.from('rm_executive_links').select('rm_user_id, executive_user_id').eq('company_id', id),
   ])
 
   const regionOpts = (regions ?? []).map(r => ({ id: r.id, label: `${r.name} (${r.region_code})` }))
-  const storeOpts = (stores ?? []).map(s => ({ id: s.id, label: `${s.branch_code ? s.branch_code + ' · ' : ''}${storeLabel(s.name, s.sub_store)}` }))
+  // SM chips carry the store's region code so the SM→store→region→RM chain is visible at a glance.
+  const regionCodeById = new Map((regions ?? []).map(r => [r.id, r.region_code]))
+  const baseStoreLabel = (s: { name: string | null; sub_store: string | null; branch_code: string | null }) =>
+    `${s.branch_code ? s.branch_code + ' · ' : ''}${storeLabel(s.name, s.sub_store)}`
+  const storeOpts = (stores ?? []).map(s => {
+    const code = s.region_id ? regionCodeById.get(s.region_id) : null
+    return { id: s.id, label: `${baseStoreLabel(s)}${code ? ` · ${code}` : ''}` }
+  })
+  // Stores card: each store's current region + the move-to-region control.
+  const storeRows: LinkerStoreRow[] = (stores ?? []).map(s => ({ id: s.id, label: baseStoreLabel(s), regionId: s.region_id ?? null }))
 
   const rmRegions = new Map<string, string[]>()
   for (const r of (ru ?? [])) { const a = rmRegions.get(r.user_id) ?? []; a.push(r.region_id); rmRegions.set(r.user_id, a) }
@@ -65,7 +74,7 @@ export default async function AdminHierarchyCompanyPage(props: { params: Promise
         </div>
       </div>
 
-      <HierarchyLinker companyId={company.id} executives={executives} regions={regionOpts} stores={storeOpts} rms={rms} sms={sms} />
+      <HierarchyLinker companyId={company.id} executives={executives} regions={regionOpts} stores={storeOpts} storeRows={storeRows} rms={rms} sms={sms} />
     </div>
   )
 }
