@@ -98,6 +98,33 @@ export async function POST(request: Request) {
       return done({ companyId: company.id, companyName: company.name, message: `Company “${company.name}” created.` })
     }
 
+    // Rename a company (logo is changed via /api/admin/companies/logo).
+    if (action === 'edit_company') {
+      const companyId = str(body.companyId), name = str(body.companyName)
+      if (!companyId || !name) return bad('Company and name are required.')
+      const { data: dup } = await admin.from('companies').select('id').ilike('name', name).neq('id', companyId).maybeSingle()
+      if (dup?.id) return bad('Another company already has that name.')
+      const { error } = await admin.from('companies').update({ name }).eq('id', companyId)
+      if (error) return bad(error.message)
+      await logAudit(admin, { actorId: user.id, companyId, action: 'admin.edit_company', entityType: 'company', entityId: companyId, metadata: { name } })
+      revalidatePath('/admin/accounts'); revalidatePath('/admin/hierarchy')
+      return NextResponse.json({ ok: true, message: 'Company updated.' })
+    }
+
+    // Deactivate a company: hide it AND block its users' logins (reversible). All
+    // its user_profiles are set inactive; reactivating restores them.
+    if (action === 'deactivate_company' || action === 'reactivate_company') {
+      const companyId = str(body.companyId)
+      if (!companyId) return bad('Company is required.')
+      const active = action === 'reactivate_company'
+      const { error: cErr } = await admin.from('companies').update({ active }).eq('id', companyId)
+      if (cErr) return bad(cErr.message)
+      await admin.from('user_profiles').update({ active }).eq('company_id', companyId)
+      await logAudit(admin, { actorId: user.id, companyId, action: `admin.${action}`, entityType: 'company', entityId: companyId })
+      revalidatePath('/admin/accounts'); revalidatePath('/admin/hierarchy')
+      return NextResponse.json({ ok: true, message: active ? 'Company reactivated.' : 'Company deactivated — its users can no longer sign in.' })
+    }
+
     // Invite an Executive attached to an EXISTING company (optional — companies
     // don't require one).
     if (action === 'invite_executive') {

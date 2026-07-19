@@ -13,9 +13,10 @@ const input = 'w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[v
 // "Create company" pop-up: company name + optional logo. Creates the company,
 // then (if a logo was chosen) uploads it and stores the URL. People are added
 // afterwards from the company's card on the Accounts page.
-export function CreateCompanyModal({ onClose }: { onClose: () => void }) {
+export function CreateCompanyModal({ onClose, company }: { onClose: () => void; company?: { id: string; name: string } }) {
   const router = useRouter()
-  const [name, setName] = useState('')
+  const editing = !!company
+  const [name, setName] = useState(company?.name ?? '')
   const [file, setFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -47,19 +48,22 @@ export function CreateCompanyModal({ onClose }: { onClose: () => void }) {
     try {
       const res = await fetch('/api/admin/accounts', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'create_company', companyName: clean }),
+        body: JSON.stringify(editing
+          ? { action: 'edit_company', companyId: company!.id, companyName: clean }
+          : { action: 'create_company', companyName: clean }),
       })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data.error ?? 'Could not create company.')
-      if (file && data.companyId) {
+      if (!res.ok) throw new Error(data.error ?? (editing ? 'Could not update company.' : 'Could not create company.'))
+      const companyId = editing ? company!.id : data.companyId
+      if (file && companyId) {
         const fd = new FormData()
-        fd.append('companyId', data.companyId)
+        fd.append('companyId', companyId)
         fd.append('file', file)
         const up = await fetch('/api/admin/companies/logo', { method: 'POST', body: fd })
         if (!up.ok) {
-          // Company was created; only the logo failed — don't lose the company.
+          // The name saved; only the logo failed — don't lose the change.
           const upData = await up.json().catch(() => ({}))
-          setErr(`Company created, but the logo failed: ${upData.error ?? 'upload error'}.`)
+          setErr(`Saved, but the logo failed: ${upData.error ?? 'upload error'}.`)
           router.refresh()
           return
         }
@@ -75,7 +79,7 @@ export function CreateCompanyModal({ onClose }: { onClose: () => void }) {
         <form onSubmit={e => submit(close, e)} className="space-y-4">
           <div className="flex items-center gap-2">
             <Building2 size={18} className="text-blue-600 dark:text-blue-400" />
-            <h2 className="text-base font-bold text-[var(--text)]">Create company</h2>
+            <h2 className="text-base font-bold text-[var(--text)]">{editing ? 'Edit company' : 'Create company'}</h2>
           </div>
 
           <div>
@@ -110,7 +114,7 @@ export function CreateCompanyModal({ onClose }: { onClose: () => void }) {
           <div className="flex gap-2 pt-1">
             <button type="button" onClick={close} className="flex-1 py-2.5 rounded-xl ring-1 ring-[var(--border)] text-sm font-semibold text-[var(--text)] hover:bg-[var(--hover)] transition">Cancel</button>
             <button type="submit" disabled={busy} className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition disabled:opacity-50">
-              {busy ? 'Creating…' : 'Create company'}
+              {busy ? 'Saving…' : editing ? 'Save changes' : 'Create company'}
             </button>
           </div>
         </form>

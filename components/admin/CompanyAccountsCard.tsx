@@ -64,8 +64,8 @@ function LastSignIn({ iso }: { iso: string | null }) {
   )
 }
 
-export function CompanyAccountsCard({ group, regions, projects }: { group: CompanyGroup; regions: RegionOpt[]; projects: ProjectOpt[] }) {
-  const [open, setOpen] = useState(false)
+export function CompanyAccountsCard({ group, regions, projects, defaultOpen = false }: { group: CompanyGroup; regions: RegionOpt[]; projects: ProjectOpt[]; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen)
   const [modal, setModal] = useState<null | 'invite' | 'bulk' | 'supplier' | 'supplierBulk'>(null)
 
   const byRole = (r: MemberRow['role']) => group.members.filter(m => m.role === r)
