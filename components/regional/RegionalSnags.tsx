@@ -154,7 +154,7 @@ export function RegionalSnags({ snags, generatedAt }: { snags: RegionalSnagRow[]
             <div role="button" tabIndex={0} aria-expanded={open} onClick={() => toggle(storeName)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(storeName) } }} className="flex cursor-pointer items-center gap-3 px-4 py-3 transition hover:bg-[var(--hover)]">
               <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[var(--surface-2)] text-[var(--text-muted)]"><Store size={17} /></span>
               <span className="min-w-0 flex-1">
-                <span className="flex items-center gap-2"><span className="truncate text-base font-bold text-[var(--text)]">{storeName}</span>{g.branchCode && <span className="shrink-0 text-sm text-[var(--text-muted)]">· {g.branchCode}</span>}</span>
+                <span className="flex items-center gap-2"><span className="line-clamp-2 break-words text-base font-bold text-[var(--text)] sm:line-clamp-none sm:truncate">{storeName}</span>{g.branchCode && <span className="hidden shrink-0 text-sm text-[var(--text-muted)] sm:inline">· {g.branchCode}</span>}</span>
                 <span className="text-[11px] text-[var(--text-muted)]">{g.rows.length} snag{g.rows.length === 1 ? '' : 's'} · <span className={`font-semibold ${meta.store}`}>{summary}</span></span>
               </span>
               {/* Phase pill is sm+ — the summary line above already carries it on phones. */}

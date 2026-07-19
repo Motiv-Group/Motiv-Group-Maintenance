@@ -142,7 +142,8 @@ export function RmQuotePanel({ ticketId, rows, canReQuote }: { ticketId: string;
                     ? <input type="radio" name={`rmq-${ticketId}`} checked={selectedId === r.supplierId} onChange={() => setSelectedId(r.supplierId)} onClick={() => { if (selectedId === r.supplierId) setSelectedId(null) }} className="h-4 w-4 shrink-0 accent-emerald-600" />
                     : <i className={`w-2.5 h-2.5 rounded-full shrink-0 ${m.dot}`} />}
                   <span className="min-w-0">
-                    <span className="block truncate text-sm text-[var(--text)]">{r.name}</span>
+                    {/* Wraps to two lines on phones so long supplier names keep their suffix. */}
+                    <span className="line-clamp-2 break-words text-sm text-[var(--text)] sm:line-clamp-none sm:block sm:truncate">{r.name}</span>
                     {r.requestedAt && <span className="text-[11px] text-[var(--text-faint)]">requested {formatDateTime(r.requestedAt)}</span>}
                   </span>
                 </label>
@@ -308,7 +309,8 @@ export function QuoteComparison({ ticketId, rows, onClose }: { ticketId: string;
                 <span className="flex min-w-0 items-start gap-3">
                   {/* Avatar chip is sm+ — phones give its width back to the supplier name. */}
                   <span className="hidden h-10 w-10 shrink-0 place-items-center rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 sm:grid"><Store size={18} /></span>
-                  <span className="min-w-0"><span className="block truncate text-sm font-bold text-[var(--text)]">{r.name}</span><span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">Quote received</span><span className="block text-[11px] text-[var(--text-faint)]">Received {formatDateTime(q.createdAt)}</span></span>
+                  {/* Name wraps to two lines on phones — long supplier orgs must stay distinguishable when awarding. */}
+                  <span className="min-w-0"><span className="line-clamp-2 break-words text-sm font-bold text-[var(--text)] sm:line-clamp-none sm:block sm:truncate">{r.name}</span><span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">Quote received</span><span className="block text-[11px] text-[var(--text-faint)]">Received {formatDateTime(q.createdAt)}</span></span>
                 </span>
                 <span className="flex shrink-0 items-start gap-3">
                   <span className="text-right"><span className="block text-lg font-bold tabular-nums text-[var(--text)]">{formatCurrency(q.amount)}</span><span className="block text-[11px] text-[var(--text-faint)]">excl VAT</span>{q.amountInclVat != null && <span className="hidden text-[11px] text-[var(--text-faint)] sm:block">{formatCurrency(q.amountInclVat)} incl VAT</span>}</span>

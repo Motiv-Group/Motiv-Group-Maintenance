@@ -50,7 +50,7 @@ function StatCard({ icon, tone, value, title, sub, active, onClick }: { icon: Re
 
 function Select<T extends string>({ label, value, onChange, options }: { label: string; value: T; onChange: (v: T) => void; options: { value: T; label: string }[] }) {
   return (
-    <label className="relative flex min-h-[44px] min-w-[150px] flex-1 items-center gap-1.5 rounded-xl bg-[var(--input-bg)] px-3 py-2.5 text-sm ring-1 ring-[var(--border)] transition focus-within:ring-blue-500/40 sm:min-h-0 sm:flex-none">
+    <label className="relative flex min-h-[44px] w-full items-center gap-1.5 rounded-xl bg-[var(--input-bg)] px-3 py-2.5 text-sm ring-1 ring-[var(--border)] transition focus-within:ring-blue-500/40 sm:min-h-0 sm:w-auto sm:min-w-[150px] sm:flex-none">
       <span className="whitespace-nowrap text-[11px] uppercase tracking-wide text-[var(--text-faint)]">{label}</span>
       <select value={value} onChange={e => onChange(e.target.value as T)} className="w-full cursor-pointer appearance-none bg-transparent pr-4 font-semibold text-[var(--text)] outline-none">
         {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -156,7 +156,7 @@ export function SupplierSignoff({ signoffs }: { signoffs: SupplierSignoffRow[] }
             <div role="button" tabIndex={0} aria-expanded={open} onClick={() => toggleStore(storeName)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleStore(storeName) } }} className="flex cursor-pointer items-center gap-3 px-4 py-3 transition hover:bg-[var(--hover)]">
             <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${priorityBadgeClass(prioTicket(topPriority(g.rows)))}`}><Store size={17} /></span>
             <span className="flex min-w-0 flex-1 items-center gap-2">
-              <span className="truncate text-base font-bold text-[var(--text)]">{storeName}</span>
+              <span className="line-clamp-2 break-words text-base font-bold text-[var(--text)] sm:line-clamp-1">{storeName}</span>
               {g.branchCode && <span className="shrink-0 text-sm text-[var(--text-muted)]">· {g.branchCode}</span>}
             </span>
             <span className="shrink-0 text-sm text-[var(--text-muted)]">{g.rows.length} job{g.rows.length === 1 ? '' : 's'}</span>

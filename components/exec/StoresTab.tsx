@@ -96,7 +96,26 @@ export function StoresTab({ data, initialStatus = 'all' }: { data: EstateDashboa
       <div className="space-y-5">
         <div className="space-y-5 min-w-0">
           <SectionCard title="Store Ranking">
-            <div className="overflow-x-auto -mx-1">
+            {/* Phone — stacked cards, tap to open detail (no horizontal scroll) */}
+            <ul className="sm:hidden divide-y divide-[var(--border)]">
+              {shown.map(s => (
+                <li key={s.storeId}>
+                  <button onClick={() => openRow(s.storeId)} className="w-full py-2.5 text-left transition hover:bg-[var(--hover)]">
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="min-w-0 line-clamp-2 break-words text-sm font-medium text-[var(--text)]">{s.storeName}</p>
+                      <span className={`shrink-0 font-semibold ${STATUS_TEXT[s.finalStatus]}`}>{s.finalHealthScore}%</span>
+                    </div>
+                    <div className="mt-1 flex items-center gap-2">
+                      <Pill status={s.finalStatus} />
+                      <span className="min-w-0 truncate text-[11px] text-[var(--text-muted)]">{s.regionName} · {s.openTickets} open · {s.overdueTickets} overdue · {fmtK(s.costExposure)}</span>
+                    </div>
+                  </button>
+                </li>
+              ))}
+              {!shown.length && <li className="py-6 text-center text-sm text-[var(--text-faint)]">No stores match this filter.</li>}
+            </ul>
+            {/* Desktop / tablet — full table */}
+            <div className="hidden sm:block overflow-x-auto -mx-1">
               <table className="w-full text-sm min-w-[820px]">
                 <thead><tr className="text-left text-[11px] text-[var(--text-faint)] border-b border-[var(--border)]">
                   <th className="py-2 px-2">#</th><th className="px-2">Store</th><th className="px-2">Region</th><th className="px-2">Health</th><th className="px-2">Trend</th><th className="px-2">Status</th>
@@ -161,9 +180,9 @@ function StoreDetail({ s, onClose }: { s: StoreCard; onClose?: () => void }) {
       <div><div className={`text-3xl font-bold ${STATUS_TEXT[s.finalStatus]}`}>{s.finalHealthScore}%</div><p className="text-xs text-[var(--text-muted)] mt-1">Region: {s.regionName} · Open work: {s.openTickets} · Pending approvals: {s.pendingDecisions}</p></div>
       <div>
         <div className="text-xs font-semibold text-[var(--text-muted)] mb-3">Health Breakdown</div>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col items-center gap-3 sm:flex-row sm:items-center sm:gap-4">
           <Donut value={s.finalHealthScore} status={s.finalStatus} size={104} />
-          <div className="flex-1"><BreakdownList rows={[
+          <div className="w-full flex-1 sm:w-auto"><BreakdownList rows={[
             { label: 'Operational Risk', value: s.breakdown.operationalRisk, max: 30 },
             { label: 'SLA Performance', value: s.breakdown.sla, max: 20 },
             { label: 'Ticket Load', value: s.breakdown.ticketLoad, max: 15 },

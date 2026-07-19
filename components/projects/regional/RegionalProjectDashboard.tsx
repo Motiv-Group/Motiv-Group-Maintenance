@@ -114,17 +114,18 @@ export function RegionalProjectDashboard({ project, summary, stores }: { project
           <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)]" />
           <input className="w-full rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] pl-8 pr-3 py-2 text-sm text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-blue-500/50" placeholder="Search store, branch, town…" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
-        {/* Mobile: controls share one row under the search; sm:contents restores
-            the flex-wrap desktop layout. */}
-        <div className="flex w-full items-center gap-2 sm:contents">
-        <select className="min-w-0 flex-1 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] px-3 py-2 text-sm text-[var(--text)] sm:flex-none" value={status} onChange={(e) => setStatus(e.target.value as StatusFilter)}>
+        {/* Mobile: controls form one swipeable strip under the search (natural widths —
+            flex-1 would shrink a native select below its label and clip the text);
+            sm:contents restores the flex-wrap desktop layout. */}
+        <div className="flex w-full flex-nowrap items-center gap-2 overflow-x-auto pb-0.5 no-scrollbar sm:contents">
+        <select className="shrink-0 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] px-3 py-2 text-sm text-[var(--text)] sm:flex-none" value={status} onChange={(e) => setStatus(e.target.value as StatusFilter)}>
           <option value="all">All statuses</option>
           <option value="not_started">Not started</option>
           <option value="in_progress">In progress</option>
           <option value="complete">Complete</option>
           <option value="overdue">Overdue</option>
         </select>
-        <select className="min-w-0 flex-1 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] px-3 py-2 text-sm text-[var(--text)] sm:flex-none" value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
+        <select className="shrink-0 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] px-3 py-2 text-sm text-[var(--text)] sm:flex-none" value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
           <option value="branch">Sort: Branch</option>
           <option value="name">Sort: Name</option>
           <option value="progress">Sort: Completion</option>
@@ -175,7 +176,8 @@ export function RegionalProjectDashboard({ project, summary, stores }: { project
               <Link key={s.id} href={`/regional/projects/${project.id}/stores/${s.id}`}>
                 <Card className="h-full space-y-2 p-3">
                   <div className="min-w-0">
-                    <h3 className="truncate text-sm font-bold text-[var(--text)]">{s.store_name ?? s.branch_code}</h3>
+                    {/* Primary name never ellipsizes on mobile — wrap to two lines instead. */}
+                    <h3 className="line-clamp-2 break-words text-sm font-bold text-[var(--text)]">{s.store_name ?? s.branch_code}</h3>
                     <p className="truncate text-[10px] text-[var(--text-muted)]">{s.branch_code}</p>
                   </div>
                   <div className="flex items-center justify-between gap-1">
@@ -194,7 +196,7 @@ export function RegionalProjectDashboard({ project, summary, stores }: { project
             {filtered.map((s) => (
               <Link key={s.id} href={`/regional/projects/${project.id}/stores/${s.id}`} className="flex items-center gap-3 px-3 py-2.5">
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-[var(--text)]">{s.store_name ?? s.branch_code}</p>
+                  <p className="line-clamp-2 break-words text-sm font-medium text-[var(--text)]">{s.store_name ?? s.branch_code}</p>
                   <p className="truncate text-[11px] text-[var(--text-muted)]">{s.branch_code}{s.town && ` · ${s.town}`}</p>
                 </div>
                 <span className="shrink-0 text-[11px] font-semibold tabular-nums text-[var(--text-muted)]">{s.progress}%</span>

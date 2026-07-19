@@ -67,7 +67,23 @@ export function DecisionsTab({ data }: { data: EstateDashboardData }) {
       <div className="space-y-5">
         <div className="space-y-5 min-w-0">
           <SectionCard title="Decision Queue — highest priority first">
-            <div className="overflow-x-auto -mx-1">
+            {/* Phone — stacked cards, tap to open detail (no horizontal scroll) */}
+            <ul className="sm:hidden divide-y divide-[var(--border)]">
+              {shown.map(d => (
+                <li key={d.title}>
+                  <button onClick={() => openRow(d.title)} className={`w-full py-2.5 text-left transition hover:bg-[var(--hover)] ${sel === d.title ? 'bg-[var(--hover)]' : ''}`}>
+                    <div className="flex items-start gap-2">
+                      <span className={`shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full ${BAND_PILL[d.band]}`}>{d.band}</span>
+                      <span className="min-w-0 text-sm text-[var(--text)] line-clamp-2">{d.title}</span>
+                    </div>
+                    <p className="mt-1 text-[11px] text-[var(--text-muted)]">{d.category} · {d.exposureValue ? fmtM(d.exposureValue) : 'R 0'} · {d.owner} · due {d.deadlineDays}d · {statusOf(d)}</p>
+                  </button>
+                </li>
+              ))}
+              {!shown.length && <li className="py-6 text-center text-sm text-[var(--text-faint)]">No decisions match this filter.</li>}
+            </ul>
+            {/* Desktop — full 10-column table, unchanged */}
+            <div className="hidden sm:block overflow-x-auto -mx-1">
               <table className="w-full text-sm min-w-[860px]">
                 <thead><tr className="text-left text-[11px] text-[var(--text-faint)] border-b border-[var(--border)]">
                   <th className="py-2 px-2">#</th><th className="px-2">Priority</th><th className="px-2">Type</th><th className="px-2">Decision Item</th>
@@ -145,9 +161,9 @@ function DecisionDetail({ d, data, onClose }: { d: DecisionItem; data: EstateDas
       <p className="text-xs text-[var(--text-muted)]">{d.context}. Main driver: {d.mainDriver}.</p>
       <div>
         <div className="text-xs font-semibold text-[var(--text-muted)] mb-3">Decision Summary</div>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col items-center gap-3 sm:flex-row sm:items-center sm:gap-4">
           <Donut value={avg} status={bandStatus(d.band)} size={104} label={d.band} />
-          <div className="flex-1"><BreakdownList rows={[
+          <div className="w-full flex-1 sm:w-auto"><BreakdownList rows={[
             { label: 'Business Impact', value: d.scores.businessImpact, max: 100 },
             { label: 'Urgency', value: d.scores.urgency, max: 100 },
             { label: 'Cost Efficiency', value: d.scores.costEfficiency, max: 100 },

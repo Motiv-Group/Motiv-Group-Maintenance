@@ -81,7 +81,7 @@ export function KpiCard({ kpi }: { kpi: Kpi }) {
   const body = (
     <Card className={`p-4 flex flex-col gap-1.5 min-w-0 ${ring}${kpi.href ? ' h-full transition hover:ring-blue-500/50 hover:-translate-y-0.5 cursor-pointer' : ''}`}>
       <div className={`flex items-center justify-between gap-2 text-[11px] font-semibold ${TONE[effTone]}`}>
-        <span className="flex items-center gap-1.5 truncate">{kpi.icon}{kpi.label}</span>
+        <span className="flex min-w-0 items-center gap-1.5"><span className="shrink-0">{kpi.icon}</span><span className="truncate">{kpi.label}</span></span>
         {kpi.trend && <TrendArrow t={kpi.trend} />}
       </div>
       <div className="text-xl sm:text-2xl font-bold leading-none text-[var(--text)] break-words tabular-nums">{kpi.value}</div>

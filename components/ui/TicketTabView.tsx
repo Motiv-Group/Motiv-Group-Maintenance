@@ -341,7 +341,7 @@ export function TicketTabView({ rows, grouped, newHref, subtitle, statusOptions,
                 <div role="button" tabIndex={0} aria-expanded={!isCollapsed} onClick={() => toggle(storeName)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(storeName) } }} className="flex cursor-pointer items-center gap-3 p-4 transition hover:bg-[var(--hover)]">
                   <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full sm:h-11 sm:w-11 ${accent.icon}`}><Store size={20} /></span>
                   <span className="min-w-0 flex-1">
-                    <span className="flex items-center gap-2"><span className="truncate text-base font-bold text-[var(--text)]">{storeName}</span>{g.branchCode && <span className="shrink-0 text-sm text-[var(--text-muted)]">· {g.branchCode}</span>}</span>
+                    <span className="flex items-center gap-2"><span className="min-w-0 line-clamp-2 break-words text-base font-bold text-[var(--text)] sm:line-clamp-none sm:truncate">{storeName}</span>{g.branchCode && <span className="shrink-0 text-sm text-[var(--text-muted)]">· {g.branchCode}</span>}</span>
                     {/* Mobile folds the next-SLA countdown into this sub-line (the right-hand block is sm+). */}
                     <span className="mt-0.5 block text-sm text-[var(--text-muted)]">{openN} open{critical > 0 && <> · <span className="font-semibold text-red-600 dark:text-red-400">{critical} critical</span></>}{overdue > 0 && <> · <span className="font-semibold text-amber-600 dark:text-amber-400">{overdue} overdue</span></>}{nextSla != null && <span className="sm:hidden"> · SLA {humanizeDuration(nextSla - nowMs)}</span>}</span>
                   </span>

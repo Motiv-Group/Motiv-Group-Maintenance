@@ -71,7 +71,8 @@ export function AdminProjectsClient({ projects, hasCompany, selectedCompanyId, s
                   <Link key={p.id} href={`/admin/projects/${p.id}`}>
                     <Card className="h-full space-y-2 p-3">
                       <div className="min-w-0">
-                        <h2 className="truncate text-sm font-bold text-[var(--text)]">{p.name}</h2>
+                        {/* Primary name never ellipsizes on mobile — wrap to two lines instead. */}
+                        <h2 className="line-clamp-2 break-words text-sm font-bold text-[var(--text)]">{p.name}</h2>
                         <p className="truncate text-[10px] text-[var(--text-muted)]">{p.client_name ?? '—'}</p>
                       </div>
                       <div className="flex items-center justify-between gap-1">
@@ -91,7 +92,7 @@ export function AdminProjectsClient({ projects, hasCompany, selectedCompanyId, s
                 {projects.map((p) => (
                   <Link key={p.id} href={`/admin/projects/${p.id}`} className="flex items-center gap-3 px-3 py-2.5">
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-[var(--text)]">{p.name}</p>
+                      <p className="line-clamp-2 break-words text-sm font-medium text-[var(--text)]">{p.name}</p>
                       <p className="truncate text-[11px] text-[var(--text-muted)]">{p.client_name ?? '—'} · {p.storeCount} stores{p.overdue > 0 ? ` · ${p.overdue} overdue` : ''}</p>
                     </div>
                     <span className="shrink-0 text-[11px] font-semibold tabular-nums text-[var(--text-muted)]">{p.progress}%</span>

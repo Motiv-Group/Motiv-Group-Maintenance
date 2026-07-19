@@ -75,7 +75,7 @@ export function SuppliersTab({ data }: { data: EstateDashboardData }) {
       <div className="space-y-5">
         <div className="space-y-5 min-w-0">
           <SectionCard title="Supplier Performance Ranking — highest risk first">
-            <div className="overflow-x-auto -mx-1">
+            <div className="hidden sm:block overflow-x-auto -mx-1">
               <table className="w-full text-sm min-w-[900px]">
                 <thead><tr className="text-left text-[11px] text-[var(--text-faint)] border-b border-[var(--border)]">
                   <th className="py-2 px-2">#</th><th className="px-2">Supplier</th><th className="px-2">SLA%</th><th className="px-2">Trend</th><th className="px-2">Status</th>
@@ -102,6 +102,24 @@ export function SuppliersTab({ data }: { data: EstateDashboardData }) {
                 </tbody>
               </table>
             </div>
+            {/* Phone — stacked cards, tap to open detail (no horizontal scroll) */}
+            <ul className="sm:hidden divide-y divide-[var(--border)]">
+              {shown.map(s => (
+                <li key={s.id}>
+                  <button onClick={() => openRow(s.id)} className="w-full p-3 text-left transition hover:bg-[var(--hover)]">
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="min-w-0 line-clamp-2 break-words text-sm font-medium text-[var(--text)]">{s.name}</p>
+                      <span className={`shrink-0 font-semibold ${STATUS_TEXT[s.perf.band]}`}>{s.perf.performanceScore}%</span>
+                    </div>
+                    <div className="mt-1.5 flex items-center gap-2">
+                      <Pill status={s.perf.band} />
+                      <span className="min-w-0 truncate text-[11px] text-[var(--text-muted)]">{s.open} open · {s.overdue} overdue · {fmtK(s.costExposure)}</span>
+                    </div>
+                  </button>
+                </li>
+              ))}
+              {!shown.length && <li className="py-6 text-center text-sm text-[var(--text-faint)]">No suppliers match this filter.</li>}
+            </ul>
           </SectionCard>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -208,9 +226,9 @@ function SupplierDetail({ s, onClose }: { s: Supplier; onClose?: () => void }) {
       </div>
       <div>
         <div className="text-xs font-semibold text-[var(--text-muted)] mb-3">SLA Breakdown</div>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col items-center gap-3 sm:flex-row sm:items-center sm:gap-4">
           <Donut value={s.perf.performanceScore} status={s.perf.band} size={104} label="SLA" />
-          <div className="flex-1"><BreakdownList rows={[
+          <div className="w-full flex-1 sm:w-auto"><BreakdownList rows={[
             { label: 'Response Time', value: a.response, max: 20 },
             { label: 'Completion Time', value: a.completion, max: 20 },
             { label: 'First Time Fix', value: a.firstFix, max: 20 },

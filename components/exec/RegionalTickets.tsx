@@ -356,7 +356,7 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
           {filtersOpen && (
             <>
               <button aria-hidden tabIndex={-1} onClick={() => setFiltersOpen(false)} className="fixed inset-0 z-10 cursor-default" />
-              <div className="absolute right-0 z-20 mt-2 w-64 rounded-xl bg-[var(--surface-2)] p-2 ring-1 ring-[var(--border)] shadow-lg shadow-black/20">
+              <div className="absolute left-0 z-20 mt-2 w-64 max-w-[calc(100vw-2rem)] rounded-xl bg-[var(--surface-2)] p-2 ring-1 ring-[var(--border)] shadow-lg shadow-black/20 sm:left-auto sm:right-0">
                 <p className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-faint)]">Refine</p>
                 {([['overdue', 'Overdue'], ['internal_breach', 'Internal breached'], ['supplier_breach', 'Supplier breached'], ['disputed', 'Disputed']] as const).map(([k, label]) => (
                   <label key={k} className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-2 text-sm text-[var(--text)] transition hover:bg-[var(--hover)]">
@@ -392,7 +392,7 @@ export function RegionalTickets({ tickets }: { tickets: RegionalTicketRow[] }) {
               <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full sm:h-11 sm:w-11 ${accent.icon}`}><Store size={20} /></span>
               <span className="min-w-0 flex-1">
                 <span className="flex items-center gap-2">
-                  <span className="truncate text-base font-bold text-[var(--text)]">{storeName}</span>
+                  <span className="min-w-0 line-clamp-2 break-words text-base font-bold text-[var(--text)] sm:line-clamp-none sm:truncate">{storeName}</span>
                   {g.branchCode && <span className="shrink-0 text-sm text-[var(--text-muted)]">· {g.branchCode}</span>}
                 </span>
                 <span className="mt-0.5 block text-sm text-[var(--text-muted)]">

@@ -109,7 +109,7 @@ export function AdminStoreEditor({
             <p className="text-xs text-[var(--text-muted)]">{store.branch_code} · {store.town ?? '—'}{store.rfid_m2_required != null && ` · ${store.rfid_m2_required} m² RFID`}</p>
             <p className="text-[11px] text-[var(--text-faint)] mt-0.5">{formatDate(store.start_date) || 'no start'} → {formatDate(store.end_date) || 'no end'}{store.overdue && <span className="text-red-500 font-semibold"> · Overdue</span>}</p>
           </div>
-          <button onClick={() => setEditing(true)} className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs ring-1 ring-[var(--border)] text-[var(--text)] hover:bg-[var(--hover)]"><Pencil size={13} /> Edit</button>
+          <button onClick={() => setEditing(true)} className="flex min-h-[40px] items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs ring-1 ring-[var(--border)] text-[var(--text)] hover:bg-[var(--hover)] sm:min-h-0"><Pencil size={13} /> Edit</button>
         </div>
         <div>
           <div className="flex justify-between text-xs mb-1.5"><span className="text-[var(--text-muted)]">Store completion</span><span className="font-bold text-[var(--text)]">{store.progress}%</span></div>
@@ -122,11 +122,11 @@ export function AdminStoreEditor({
       {/* On Site */}
       <MilestoneCard n={1} title="On Site" done={!!store.on_site_completed_at} date={store.on_site_completed_at}>
         {store.on_site_completed_at ? (
-          <button onClick={() => toggleMilestone('on_site', false)} disabled={busy === 'on_site'} className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-red-500">
+          <button onClick={() => toggleMilestone('on_site', false)} disabled={busy === 'on_site'} className="flex min-h-[40px] items-center gap-1.5 px-2 -mx-2 text-xs text-[var(--text-muted)] hover:text-red-500 sm:min-h-0 sm:px-0 sm:mx-0">
             <RotateCcw size={13} /> Reverse
           </button>
         ) : (
-          <button onClick={() => toggleMilestone('on_site', true)} disabled={busy === 'on_site'} className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60">
+          <button onClick={() => toggleMilestone('on_site', true)} disabled={busy === 'on_site'} className="flex min-h-[40px] items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 sm:min-h-0">
             <MapPin size={14} /> Mark as On Site
           </button>
         )}
@@ -258,12 +258,12 @@ function PhotoMilestone({
           </div>
         </div>
         {done ? (
-          <button onClick={() => onToggle(milestone, false)} className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-red-500"><RotateCcw size={13} /> Unmark</button>
+          <button onClick={() => onToggle(milestone, false)} className="flex min-h-[40px] items-center gap-1.5 px-2 -mx-2 text-xs text-[var(--text-muted)] hover:text-red-500 sm:min-h-0 sm:px-0 sm:mx-0"><RotateCcw size={13} /> Unmark</button>
         ) : (
           <button
             onClick={() => onToggle(milestone, true)}
             disabled={files.length === 0 || busy === milestone}
-            className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-40"
+            className="min-h-[40px] rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-40 sm:min-h-0"
             title={files.length === 0 ? 'Upload at least one file first' : ''}
           >
             Mark complete
@@ -307,7 +307,7 @@ function FileThumb({ file, onRemove, removing }: { file: ProjectFileView; onRemo
       <button
         onClick={onRemove}
         disabled={removing}
-        className="absolute top-1 right-1 rounded-full bg-black/60 p-1 text-white opacity-0 group-hover:opacity-100 transition hover:bg-red-600"
+        className="absolute top-1 right-1 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white transition hover:bg-red-600 sm:h-auto sm:w-auto sm:p-1 sm:opacity-0 sm:group-hover:opacity-100"
       >
         {removing ? <span className="block h-3 w-3 animate-spin rounded-full border border-white border-t-transparent" /> : <Trash2 size={12} />}
       </button>
