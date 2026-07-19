@@ -8,6 +8,7 @@ import { isValidPhone } from '@/lib/csv'
 import { Building2, CheckCircle2 } from 'lucide-react'
 import { Card } from '@/components/exec/ui'
 import { SettingsHeader } from '@/components/settings/SettingsHeader'
+import { AvatarUpload } from '@/components/settings/AvatarUpload'
 
 interface ProfileForm {
   full_name: string
@@ -25,6 +26,8 @@ export default function ProfileSettingsPage() {
   const [saved,    setSaved]    = useState(false)
   const [error,    setError]    = useState('')
   const [role,     setRole]     = useState('')
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [name,     setName]     = useState('')
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<ProfileForm>()
 
@@ -43,6 +46,8 @@ export default function ProfileSettingsPage() {
             requested_region_code: profile.requested_region_code ?? '',
           })
           setRole(profile.role ?? '')
+          setAvatarUrl(profile.avatar_url ?? null)
+          setName(profile.full_name ?? '')
         }
         setFetching(false)
       })
@@ -60,6 +65,7 @@ export default function ProfileSettingsPage() {
 
   const isStoreManager = role === 'store_manager' || role === 'client'
   const isRegionalManager = role === 'regional_manager'
+  const isIndividual = role === 'individual'
   const title = isStoreManager ? 'Store Information' : 'Profile Information'
   // Store managers may only edit their own name; the rest is managed for them.
   const lock = isStoreManager
@@ -67,16 +73,20 @@ export default function ProfileSettingsPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-5">
-      <SettingsHeader title={title} subtitle="Update your contact and company details." Icon={Building2} />
+      <SettingsHeader title={title} subtitle={isIndividual ? 'Update your contact details and photo.' : 'Update your contact and company details.'} Icon={Building2} />
       <Card className="p-5">
         {fetching ? (
           <div className="flex justify-center py-6"><div className="animate-spin rounded-full h-7 w-7 border-b-2 border-brand-600" /></div>
         ) : (
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <div className="pb-1"><AvatarUpload name={name} avatarUrl={avatarUrl} /></div>
             <Input id="full_name" label={isStoreManager ? 'Store manager full name' : 'Full Name'} placeholder="Jane Smith" error={errors.full_name?.message}
               {...register('full_name', { required: 'Full name is required' })} />
-            <Input id="company_name" label="Company Name" placeholder="Acme Corporation" error={errors.company_name?.message}
-              disabled={lock} className={lockCls} {...register('company_name')} />
+            {/* Individual home-owners have no company. */}
+            {!isIndividual && (
+              <Input id="company_name" label="Company Name" placeholder="Acme Corporation" error={errors.company_name?.message}
+                disabled={lock} className={lockCls} {...register('company_name')} />
+            )}
 
             {isRegionalManager && (
               <Input id="requested_region_code" label="Region Code" placeholder="e.g. GP — given by your executive"

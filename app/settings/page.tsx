@@ -49,7 +49,7 @@ export default function AccountSettingsPage() {
             </div>
             <div>
               <p className="text-xs text-[var(--text-faint)] mb-1">Role</p>
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-brand-100 text-brand-700 dark:bg-brand-900/30 dark:text-brand-400">
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-500/15 text-blue-600 dark:text-blue-400">
                 {ROLE_LABELS[role] ?? role ?? '—'}
               </span>
             </div>

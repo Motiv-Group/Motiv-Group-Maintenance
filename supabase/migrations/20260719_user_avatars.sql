@@ -1,0 +1,11 @@
+-- ---------------------------------------------------------------------------
+-- 20260719_user_avatars
+-- ---------------------------------------------------------------------------
+-- Profile pictures for every account. `user_profiles.avatar_url` holds a public
+-- URL in the existing `branding` bucket (path avatars/<uid>-…webp); the UI falls
+-- back to the initials monogram when null. Upload goes through
+-- POST /api/profile/avatar (service-role write, sharp re-encode). No new bucket —
+-- `branding` is already public and allows png/jpeg/webp.
+--
+-- Idempotent.
+alter table public.user_profiles add column if not exists avatar_url text;

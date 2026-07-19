@@ -7,7 +7,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 export const dynamic = 'force-dynamic'
 
 export default async function RegionalLayout({ children }: { children: React.ReactNode }) {
-  const { fullName, allRegionIds, activeRegionId } = await requireRegionalUser()
+  const { fullName, allRegionIds, activeRegionId, avatarUrl } = await requireRegionalUser()
   const unreadCount = await getUnreadCount()
   // All of the RM's regions → the sidebar switcher (chip when only one).
   let regionOptions: { id: string; label: string }[] = []
@@ -17,7 +17,7 @@ export default async function RegionalLayout({ children }: { children: React.Rea
     regionOptions = (data ?? []).map(r => ({ id: r.id, label: r.name ?? 'Region' })).sort((a, b) => a.label.localeCompare(b.label))
   }
   return (
-    <ExecChrome userName={fullName} variant="regional" unreadCount={unreadCount}
+    <ExecChrome userName={fullName} variant="regional" unreadCount={unreadCount} avatarUrl={avatarUrl}
       contextOptions={regionOptions} activeContextId={activeRegionId} contextCookie="motiv_region">
       <RealtimeRefresh tables={['tickets', 'quotes', 'signoffs', 'snags', 'notifications', 'ticket_updates', 'ticket_disputes', 'ticket_dispute_messages', 'projects', 'project_stores', 'project_files']} />
       {children}
