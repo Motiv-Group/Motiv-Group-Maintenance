@@ -10,6 +10,7 @@ import { parseJsonBody } from '@/lib/validate'
 const BodySchema = z.object({
   action: z.string().optional(),
   supplierId: z.string().optional(),
+  companyId: z.string().optional(),
 })
 
 // POST /api/admin/suppliers — system_admin reviews self-signup suppliers.
@@ -31,6 +32,33 @@ export async function POST(request: Request) {
   if (!parsed.ok) return parsed.error
   const body = parsed.data
   const action = String(body.action ?? '')
+
+  // Approve / reject a company's request to access the Motiv supplier directory.
+  if (action === 'motiv_access_approve' || action === 'motiv_access_reject') {
+    const companyId = String(body.companyId ?? '')
+    if (!companyId) return NextResponse.json({ error: 'Company required' }, { status: 400 })
+    const status = action === 'motiv_access_approve' ? 'approved' : 'rejected'
+    const { error } = await admin.from('company_motiv_access').upsert(
+      { company_id: companyId, status, decided_by: user.id, decided_at: new Date().toISOString() },
+      { onConflict: 'company_id' },
+    )
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    await logAudit(admin, { actorId: user.id, companyId, action: `motiv_access.${status}`, entityType: 'company', entityId: companyId })
+    // Tell the company's RMs the outcome.
+    const { data: rms } = await admin.from('user_profiles').select('id').eq('company_id', companyId).eq('role', 'regional_manager')
+    const rmIds = (rms ?? []).map(r => r.id)
+    if (rmIds.length) {
+      const title = status === 'approved' ? 'Motiv supplier access approved' : 'Motiv supplier access declined'
+      const message = status === 'approved'
+        ? 'You can now browse and assign Motiv suppliers from the MOTIV directory when requesting quotes.'
+        : 'Your request to access the Motiv supplier directory wasn’t approved.'
+      await admin.from('notifications').insert(rmIds.map(id => ({ company_id: companyId, user_id: id, type: 'motiv_access', title, message, link: '/regional/tickets' })))
+      void sendPushToMany(rmIds, { title, body: message, url: '/regional/tickets' })
+    }
+    revalidatePath('/admin/suppliers')
+    return NextResponse.json({ ok: true })
+  }
+
   const supplierId = String(body.supplierId ?? '')
   if (!supplierId) return NextResponse.json({ error: 'Supplier required' }, { status: 400 })
 

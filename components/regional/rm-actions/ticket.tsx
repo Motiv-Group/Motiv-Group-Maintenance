@@ -82,7 +82,7 @@ type ActionKey = 'addwork' | 'info' | 'edit' | 'cancel'
 // rendered as SIBLINGS (mounted only when active) so they open instantly — the
 // previous approach kept them inside the collapsing menu, which felt laggy/buggy.
 // Client component (a Server Component may not pass the click handlers).
-export function RmTicketActionBar({ ticketId, status, canAssign, canAssignSupplier, canCancel, canEdit, jobRef, suppliers, motivSuppliers, declinedSupplierIds, awaitingById, description, photoUrls, title, category, impact, priority }: {
+export function RmTicketActionBar({ ticketId, status, canAssign, canAssignSupplier, canCancel, canEdit, jobRef, suppliers, motivSuppliers, motivAccess = 'none', declinedSupplierIds, awaitingById, description, photoUrls, title, category, impact, priority }: {
   ticketId: string
   status: string
   canAssign: boolean
@@ -92,6 +92,7 @@ export function RmTicketActionBar({ ticketId, status, canAssign, canAssignSuppli
   jobRef?: string | null
   suppliers: SupplierChoice[]
   motivSuppliers: SupplierChoice[]
+  motivAccess?: 'none' | 'pending' | 'approved' | 'rejected'
   declinedSupplierIds: string[]
   awaitingById: Record<string, 'invited' | 'quoted'>
   description: string
@@ -114,7 +115,7 @@ export function RmTicketActionBar({ ticketId, status, canAssign, canAssignSuppli
     <>
       <div className={`flex items-center gap-2 ${hasPrimary && hasMenu ? '' : 'flex-col'}`}>
         {hasPrimary && (
-          <AssignSuppliersButton ticketId={ticketId} suppliers={suppliers} motivSuppliers={motivSuppliers} declinedSupplierIds={declinedSupplierIds} awaitingById={awaitingById}
+          <AssignSuppliersButton ticketId={ticketId} suppliers={suppliers} motivSuppliers={motivSuppliers} motivAccess={motivAccess} declinedSupplierIds={declinedSupplierIds} awaitingById={awaitingById}
             trigger={open => <button onClick={open} className={primaryCls}>{assignLabel}</button>} />
         )}
         {hasMenu && (

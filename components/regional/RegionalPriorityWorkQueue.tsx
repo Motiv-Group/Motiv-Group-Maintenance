@@ -32,7 +32,7 @@ const SNAG_STATUSES = new Set(['snag', 'snag_assigned', 'snag_in_progress'])    
 const needsAssignment = (t: RegionalTicketRow) => !t.supplierAssigned && (t.status === 'open' || t.status === 'info_requested')
 const slaAtRisk = (t: RegionalTicketRow) => t.breached || t.overdue
 
-export function RegionalPriorityWorkQueue({ tickets, generatedAt, suppliers = [], motivSuppliers = [] }: { tickets: RegionalTicketRow[]; generatedAt: string; suppliers?: SupplierChoice[]; motivSuppliers?: SupplierChoice[] }) {
+export function RegionalPriorityWorkQueue({ tickets, generatedAt, suppliers = [], motivSuppliers = [], motivAccess = 'none' }: { tickets: RegionalTicketRow[]; generatedAt: string; suppliers?: SupplierChoice[]; motivSuppliers?: SupplierChoice[]; motivAccess?: 'none' | 'pending' | 'approved' | 'rejected' }) {
   const [filter, setFilter] = useState<QueueFilter>('all')
   const nowMs = new Date(generatedAt).getTime()
   // Click the active card again to clear the filter.
@@ -72,7 +72,7 @@ export function RegionalPriorityWorkQueue({ tickets, generatedAt, suppliers = []
       </section>
 
       <QueueCard compact viewAllHref="/regional/tickets">
-        {rows.length ? rows.map(t => <QueueRow key={t.id} ticket={t} nowMs={nowMs} suppliers={suppliers} motivSuppliers={motivSuppliers} />) : (
+        {rows.length ? rows.map(t => <QueueRow key={t.id} ticket={t} nowMs={nowMs} suppliers={suppliers} motivSuppliers={motivSuppliers} motivAccess={motivAccess} />) : (
           <div className="px-4 py-10"><EmptyQueue copy={emptyCopy(filter)} /></div>
         )}
       </QueueCard>
@@ -89,7 +89,7 @@ function emptyCopy(filter: QueueFilter): string {
     : 'No active tickets in your region.'
 }
 
-function QueueRow({ ticket, nowMs, suppliers, motivSuppliers }: { ticket: RegionalTicketRow; nowMs: number; suppliers: SupplierChoice[]; motivSuppliers: SupplierChoice[] }) {
+function QueueRow({ ticket, nowMs, suppliers, motivSuppliers, motivAccess }: { ticket: RegionalTicketRow; nowMs: number; suppliers: SupplierChoice[]; motivSuppliers: SupplierChoice[]; motivAccess: 'none' | 'pending' | 'approved' | 'rejected' }) {
   // The next SLA checkpoint (quote decision / sign-off / supplier action), falling
   // back to the final resolution deadline when there's no active blocker.
   const slaDeadline = ticket.slaDueAt ?? ticket.dueAt
@@ -135,7 +135,7 @@ function QueueRow({ ticket, nowMs, suppliers, motivSuppliers }: { ticket: Region
           <SignoffReviewButton ticketId={ticket.id}
             trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}><ClipboardCheck size={15} /> Sign-Off</button>} />
         ) : assignable ? (
-          <ViewAssignButton ticketId={ticket.id} suppliers={suppliers} motivSuppliers={motivSuppliers}
+          <ViewAssignButton ticketId={ticket.id} suppliers={suppliers} motivSuppliers={motivSuppliers} motivAccess={motivAccess}
             awaitingById={ticket.engagedSupplierIds} declinedSupplierIds={ticket.declinedSupplierIds}
             summary={{ category: ticket.category, title: ticket.title, storeName: ticket.storeName, status: ticket.status, priority: String(ticket.priority), jobId }}
             trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}>View &amp; Assign</button>} />

@@ -2199,6 +2199,27 @@ where company_id is not null and supplier_id is not null
 on conflict (company_id, supplier_id) do nothing;
 
 -- ---------------------------------------------------------------------------
+-- COMPANY MOTIV-POOL ACCESS (migration 20260719_company_motiv_access)
+-- ---------------------------------------------------------------------------
+-- Gates the "MOTIV directory" in the supplier-assign flow. One row per company:
+-- an RM requests access, a system_admin approves. Writes via the service-role
+-- client; company members read their own row.
+create table if not exists public.company_motiv_access (
+  company_id   uuid primary key references public.companies(id) on delete cascade,
+  status       text not null default 'pending',   -- pending | approved | rejected
+  requested_by uuid references public.user_profiles(id) on delete set null,
+  requested_at timestamptz not null default now(),
+  decided_by   uuid references public.user_profiles(id) on delete set null,
+  decided_at   timestamptz
+);
+
+alter table public.company_motiv_access enable row level security;
+
+drop policy if exists "company_motiv_access read" on public.company_motiv_access;
+create policy "company_motiv_access read" on public.company_motiv_access for select
+  using (company_id = public.app_company_id());
+
+-- ---------------------------------------------------------------------------
 -- RM -> EXECUTIVE ASSIGNMENT (migration 20260719_rm_executive_links)
 -- ---------------------------------------------------------------------------
 -- Direct M2M recording which executive(s) oversee a given regional manager
