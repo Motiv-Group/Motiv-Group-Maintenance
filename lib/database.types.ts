@@ -1583,6 +1583,27 @@ export interface Database {
         }
       ]
       }
+      rm_executive_links: {
+        Row: {
+          rm_user_id: string
+          executive_user_id: string
+          company_id: string | null
+          created_at: string
+        }
+        Insert: {
+          rm_user_id?: string
+          executive_user_id?: string
+          company_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          rm_user_id?: string
+          executive_user_id?: string
+          company_id?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       roles: {
         Row: {
           key: string
