@@ -13,10 +13,10 @@ export const dynamic = 'force-dynamic'
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const { userId } = await requireMasterAdmin()
   const admin = createAdminClient()
-  const { data: prof } = await admin.from('user_profiles').select('full_name').eq('id', userId).single()
+  const { data: prof } = await admin.from('user_profiles').select('full_name, avatar_url').eq('id', userId).single()
   const unreadCount = await getUnreadCount()
   return (
-    <ExecChrome userName={prof?.full_name ?? 'Admin'} variant="admin" unreadCount={unreadCount}>
+    <ExecChrome userName={prof?.full_name ?? 'Admin'} variant="admin" unreadCount={unreadCount} avatarUrl={prof?.avatar_url ?? null}>
       <RealtimeRefresh tables={['notifications', 'suppliers', 'projects', 'project_stores', 'project_files']} />
       {children}
     </ExecChrome>

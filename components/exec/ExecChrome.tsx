@@ -7,6 +7,7 @@ import { Globe2, Map as MapIcon, Store, Truck, Gavel, Bell, Settings, LogOut, Fi
 import { MotivLogo } from '@/components/ui/MotivLogo'
 import { ContextSwitcher } from '@/components/ui/ContextSwitcher'
 import { SwipeNav } from '@/components/ui/SwipeNav'
+import { UserAvatar } from '@/components/ui/UserAvatar'
 
 interface ChromeTab { href: string; label: string; icon: React.ElementType }
 type SearchParamsLike = { get(name: string): string | null }
@@ -98,13 +99,12 @@ const VARIANTS = {
 
 export function ExecChrome({
   children, userName, variant = 'exec', unreadCount = 0, contextLabel,
-  contextOptions, activeContextId, contextCookie, accountStatus = null,
-}: { children: ReactNode; userName: string | null; variant?: keyof typeof VARIANTS; unreadCount?: number; contextLabel?: string | null; contextOptions?: { id: string; label: string }[]; activeContextId?: string | null; contextCookie?: string; accountStatus?: AccountStatus | null }) {
+  contextOptions, activeContextId, contextCookie, accountStatus = null, avatarUrl = null,
+}: { children: ReactNode; userName: string | null; variant?: keyof typeof VARIANTS; unreadCount?: number; contextLabel?: string | null; contextOptions?: { id: string; label: string }[]; activeContextId?: string | null; contextCookie?: string; accountStatus?: AccountStatus | null; avatarUrl?: string | null }) {
   const { tabs, roleLabel, base, reports } = VARIANTS[variant]
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const home = tabs[0]?.href ?? base
-  const initial = (userName ?? roleLabel).trim().charAt(0).toUpperCase()
   const isStore = variant === 'store'
   const isSupplier = variant === 'supplier'
   const isAdmin = variant === 'admin'
@@ -133,7 +133,7 @@ export function ExecChrome({
         contextCookie={contextCookie}
         ContextIcon={isStore ? Store : isSupplier ? Truck : isAdmin ? LayoutDashboard : MapIcon}
         unreadCount={unreadCount}
-        initial={initial}
+        avatarUrl={avatarUrl}
         accountStatus={accountStatus}
         tabs={isStore ? STORE_DESKTOP_TABS : isAdmin ? ADMIN_DESKTOP_TABS : isExec ? EXEC_DESKTOP_TABS : tabs}
         home={home}
@@ -163,7 +163,7 @@ export function ExecChrome({
               <button type="submit" className={iconBtn} title="Log out"><LogOut size={17} /></button>
             </form>
             <div className="flex items-center gap-2 pl-2 ml-1 border-l border-white/15">
-              <span className="w-8 h-8 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-sm">{initial}</span>
+              <UserAvatar name={userName ?? roleLabel} avatarUrl={avatarUrl} size={32} />
               <div className="hidden sm:block leading-tight">
                 <div className="text-sm font-medium text-white truncate">{userName ?? roleLabel}</div>
                 <div className="text-[11px] text-gray-300 truncate">{roleLabel}{accountStatus && statusSuffix(accountStatus)}</div>
@@ -221,7 +221,7 @@ function DesktopSidebar({
   contextCookie,
   ContextIcon,
   unreadCount,
-  initial,
+  avatarUrl,
   accountStatus,
   tabs,
   home,
@@ -236,7 +236,7 @@ function DesktopSidebar({
   contextCookie?: string
   ContextIcon: React.ElementType
   unreadCount: number
-  initial: string
+  avatarUrl?: string | null
   accountStatus?: AccountStatus | null
   tabs: ChromeTab[]
   home: string
@@ -303,7 +303,7 @@ function DesktopSidebar({
 
       <div className="border-t border-white/10 p-4">
         <div className="flex items-center gap-3 rounded-2xl bg-white/[0.04] p-3">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-blue-600 text-sm font-bold text-white">{initial}</span>
+          <UserAvatar name={user} avatarUrl={avatarUrl} size={40} />
           <div className="min-w-0">
             <div className="truncate text-sm font-bold text-white">{user}</div>
             <div className="truncate text-xs text-gray-400">{roleLabel}{accountStatus && statusSuffix(accountStatus)}</div>

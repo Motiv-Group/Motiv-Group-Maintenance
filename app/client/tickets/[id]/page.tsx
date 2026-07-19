@@ -9,9 +9,8 @@ import { requireStoreManagerV3 } from '@/lib/health/guard'
 import { Card } from '@/components/exec/ui'
 import { ClientTicketProgress } from '@/components/client/ClientTicketProgress'
 import { clientStatusMeta } from '@/components/client/ClientTicketStatus'
-import { EditTicketModal } from '@/components/client/EditTicketModal'
 import { AddInfoModal } from '@/components/client/AddInfoModal'
-import { DeleteTicketButton } from '@/components/client/DeleteTicketButton'
+import { ClientTicketActions } from '@/components/client/ClientTicketActions'
 import { SmTicketTabs } from '@/components/client/SmTicketTabs'
 import { TicketBadges } from '@/components/client/ticketBadges'
 import { EditedLine } from '@/components/ui/EditedLine'
@@ -181,10 +180,7 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
           {t.status === 'info_requested' ? (
             <AddInfoModal ticketId={t.id} title={t.title} description={t.description} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} photoUrls={photoUrlsRaw} docUrls={docUrlsRaw} requestReason={t.info_request_reason} />
           ) : canEdit ? (
-            <div className="mt-4 space-y-2">
-              <EditTicketModal ticketId={t.id} title={t.title} description={t.description ?? ''} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} photoUrls={photoUrlsRaw} />
-              <DeleteTicketButton ticketId={t.id} />
-            </div>
+            <ClientTicketActions ticketId={t.id} title={t.title} description={t.description ?? ''} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} photoUrls={photoUrlsRaw} />
           ) : (
             <div className="mt-4 flex items-center gap-2 rounded-lg bg-[var(--surface-2)] px-3 py-2.5 text-xs text-[var(--text-muted)]">
               <CheckCircle2 size={15} className="shrink-0 text-emerald-500" />

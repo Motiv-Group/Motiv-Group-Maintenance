@@ -1,10 +1,9 @@
 export const dynamic = 'force-dynamic'
 
-import Link from 'next/link'
-import { PlusCircle } from 'lucide-react'
 import { requireIndividual } from '@/lib/health/guard'
 import { createAdminClient } from '@/lib/supabase/server'
 import { IndividualPriorityWorkQueue, type IndividualJobRow } from '@/components/individual/IndividualPriorityWorkQueue'
+import { QuickLogBanner } from '@/components/tickets/QuickLogBanner'
 
 export default async function IndividualOverviewPage() {
   const { userId, fullName } = await requireIndividual()
@@ -46,15 +45,17 @@ export default async function IndividualOverviewPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-bold text-[var(--text)]">{greeting}, {fullName?.split(' ')[0] ?? 'there'} 👋</h1>
-          <p className="mt-0.5 text-sm text-[var(--text-muted)]">Your maintenance jobs — logged, quoted and signed off in one place.</p>
-        </div>
-        <Link href="/individual/tickets/new" className="flex shrink-0 items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500">
-          <PlusCircle size={16} /> Log a Job
-        </Link>
+      <div className="min-w-0">
+        <h1 className="text-2xl font-bold text-[var(--text)]">{greeting}, {fullName?.split(' ')[0] ?? 'there'} 👋</h1>
+        <p className="mt-0.5 text-sm text-[var(--text-muted)]">Your maintenance jobs — logged, quoted and signed off in one place.</p>
       </div>
+
+      <QuickLogBanner
+        href="/individual/tickets/new"
+        title="Report a problem in under 60 seconds"
+        subtitle="Tell us what’s wrong at home — we’ll take it from there."
+        steps={['Describe the issue', 'Add photos', 'Review & send']}
+      />
 
       <IndividualPriorityWorkQueue jobs={jobs} generatedAt={new Date().toISOString()} />
     </div>

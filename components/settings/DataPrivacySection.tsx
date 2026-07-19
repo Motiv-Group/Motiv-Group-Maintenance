@@ -67,9 +67,9 @@ export function DataPrivacySection() {
       <div className="space-y-4">
         <p className="text-xs text-gray-500 dark:text-gray-400">
           Read our{' '}
-          <Link href="/privacy" className="text-brand-600 dark:text-brand-400 underline">privacy policy</Link>
+          <Link href="/privacy" className="text-blue-600 dark:text-blue-400 underline">privacy policy</Link>
           {' '}and{' '}
-          <Link href="/terms" className="text-brand-600 dark:text-brand-400 underline">terms of service</Link>.
+          <Link href="/terms" className="text-blue-600 dark:text-blue-400 underline">terms of service</Link>.
         </p>
 
         <div className="flex items-center justify-between gap-3">

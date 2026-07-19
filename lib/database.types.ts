@@ -3788,6 +3788,7 @@ export interface Database {
           last_wa_inbound_at: string | null
           storage_bytes_used: number
           password_set_at: string | null
+          avatar_url: string | null
         }
         Insert: {
           id?: string
@@ -3807,6 +3808,7 @@ export interface Database {
           last_wa_inbound_at?: string | null
           storage_bytes_used?: number
           password_set_at?: string | null
+          avatar_url?: string | null
         }
         Update: {
           id?: string
@@ -3826,6 +3828,7 @@ export interface Database {
           last_wa_inbound_at?: string | null
           storage_bytes_used?: number
           password_set_at?: string | null
+          avatar_url?: string | null
         }
         Relationships: [
         {

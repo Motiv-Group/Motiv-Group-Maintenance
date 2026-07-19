@@ -14,9 +14,9 @@ async function pickActive(allIds: string[], cookieName: string): Promise<{ activ
   return { activeId, scopedIds: [activeId] }
 }
 
-export interface ExecContext { userId: string; companyId: string; fullName: string | null }
+export interface ExecContext { userId: string; companyId: string; fullName: string | null; avatarUrl: string | null }
 
-export interface SupplierContext { userId: string; companyId: string | null; supplierIds: string[]; fullName: string | null }
+export interface SupplierContext { userId: string; companyId: string | null; supplierIds: string[]; fullName: string | null; avatarUrl: string | null }
 
 /** Gate a v3 supplier page + return their supplier scope.
  *  companyId is NULL for standalone self-signup suppliers (Motiv-pool applicants,
@@ -28,14 +28,14 @@ export async function requireSupplierV3(): Promise<SupplierContext> {
   if (!user) redirect('/auth/login')
   // Profile + scope links both key on user.id only — fetch in parallel (one RTT, not two).
   const [{ data: profile }, { data: links }] = await Promise.all([
-    supabase.from('user_profiles').select('role, company_id, full_name').eq('id', user.id).single(),
+    supabase.from('user_profiles').select('role, company_id, full_name, avatar_url').eq('id', user.id).single(),
     supabase.from('supplier_users').select('supplier_id').eq('user_id', user.id),
   ])
   if (profile?.role !== 'supplier') redirect('/auth/login')
-  return { userId: user.id, companyId: profile.company_id ?? null, supplierIds: (links ?? []).map(l => l.supplier_id), fullName: profile.full_name ?? null }
+  return { userId: user.id, companyId: profile.company_id ?? null, supplierIds: (links ?? []).map(l => l.supplier_id), fullName: profile.full_name ?? null, avatarUrl: profile.avatar_url ?? null }
 }
 
-export interface StoreContext { userId: string; companyId: string; storeIds: string[]; allStoreIds: string[]; activeStoreId: string | null; fullName: string | null }
+export interface StoreContext { userId: string; companyId: string; storeIds: string[]; allStoreIds: string[]; activeStoreId: string | null; fullName: string | null; avatarUrl: string | null }
 
 /** Gate a v3 store-manager page + return their store scope (narrowed to the
  *  active store when they manage more than one — see the `motiv_store` cookie). */
@@ -44,17 +44,17 @@ export async function requireStoreManagerV3(): Promise<StoreContext> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
   const [{ data: profile }, { data: links }] = await Promise.all([
-    supabase.from('user_profiles').select('role, company_id, full_name').eq('id', user.id).single(),
+    supabase.from('user_profiles').select('role, company_id, full_name, avatar_url').eq('id', user.id).single(),
     supabase.from('store_users').select('store_id').eq('user_id', user.id),
   ])
   if (profile?.role !== 'store_manager') redirect('/auth/login')
   if (!profile?.company_id) redirect('/auth/login')
   const allStoreIds = (links ?? []).map(l => l.store_id)
   const { activeId, scopedIds } = await pickActive(allStoreIds, 'motiv_store')
-  return { userId: user.id, companyId: profile.company_id, storeIds: scopedIds, allStoreIds, activeStoreId: activeId, fullName: profile.full_name ?? null }
+  return { userId: user.id, companyId: profile.company_id, storeIds: scopedIds, allStoreIds, activeStoreId: activeId, fullName: profile.full_name ?? null, avatarUrl: profile.avatar_url ?? null }
 }
 
-export interface RegionalContext { userId: string; companyId: string; regionIds: string[]; allRegionIds: string[]; activeRegionId: string | null; fullName: string | null }
+export interface RegionalContext { userId: string; companyId: string; regionIds: string[]; allRegionIds: string[]; activeRegionId: string | null; fullName: string | null; avatarUrl: string | null }
 
 /** Gate a v3 regional-manager DATA page + return their region scope. A signed-up
  *  but not-yet-approved RM (no company) is sent to the /regional landing, which
@@ -65,7 +65,7 @@ export async function requireRegionalV3(): Promise<RegionalContext> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
   const [{ data: profile }, { data: links }] = await Promise.all([
-    supabase.from('user_profiles').select('role, company_id, full_name').eq('id', user.id).single(),
+    supabase.from('user_profiles').select('role, company_id, full_name, avatar_url').eq('id', user.id).single(),
     supabase.from('regional_users').select('region_id').eq('user_id', user.id),
   ])
   if (profile?.role !== 'regional_manager') redirect('/auth/login')
@@ -73,13 +73,13 @@ export async function requireRegionalV3(): Promise<RegionalContext> {
   if (!links?.length) redirect('/regional')
   const allRegionIds = links.map(l => l.region_id)
   const { activeId, scopedIds } = await pickActive(allRegionIds, 'motiv_region')
-  return { userId: user.id, companyId: profile.company_id, regionIds: scopedIds, allRegionIds, activeRegionId: activeId, fullName: profile.full_name ?? null }
+  return { userId: user.id, companyId: profile.company_id, regionIds: scopedIds, allRegionIds, activeRegionId: activeId, fullName: profile.full_name ?? null, avatarUrl: profile.avatar_url ?? null }
 }
 
 export interface RegionalUser {
   userId: string; role: string; companyId: string | null; regionIds: string[]
   allRegionIds: string[]; activeRegionId: string | null
-  fullName: string | null; requestedRegionCode: string | null
+  fullName: string | null; requestedRegionCode: string | null; avatarUrl: string | null
 }
 
 /** Tolerant gate for the regional LAYOUT + landing: requires an RM login but
@@ -90,7 +90,7 @@ export async function requireRegionalUser(): Promise<RegionalUser> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
   const [{ data: profile }, { data: links }] = await Promise.all([
-    supabase.from('user_profiles').select('role, company_id, full_name, requested_region_code').eq('id', user.id).single(),
+    supabase.from('user_profiles').select('role, company_id, full_name, requested_region_code, avatar_url').eq('id', user.id).single(),
     supabase.from('regional_users').select('region_id').eq('user_id', user.id),
   ])
   if (profile?.role !== 'regional_manager') redirect('/auth/login')
@@ -99,11 +99,11 @@ export async function requireRegionalUser(): Promise<RegionalUser> {
   return {
     userId: user.id, role: profile.role, companyId: profile.company_id ?? null,
     regionIds: scopedIds, allRegionIds, activeRegionId: activeId, fullName: profile.full_name ?? null,
-    requestedRegionCode: profile.requested_region_code ?? null,
+    requestedRegionCode: profile.requested_region_code ?? null, avatarUrl: profile.avatar_url ?? null,
   }
 }
 
-export interface IndividualContext { userId: string; fullName: string | null }
+export interface IndividualContext { userId: string; fullName: string | null; avatarUrl: string | null }
 
 /** Gate an Individual (general-public) page. Individuals are standalone — no company
  *  / store / region — so this only checks the role; their tickets scope by created_by. */
@@ -111,9 +111,9 @@ export async function requireIndividual(): Promise<IndividualContext> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
-  const { data: profile } = await supabase.from('user_profiles').select('role, full_name').eq('id', user.id).single()
+  const { data: profile } = await supabase.from('user_profiles').select('role, full_name, avatar_url').eq('id', user.id).single()
   if (profile?.role !== 'individual') redirect('/auth/login')
-  return { userId: user.id, fullName: profile.full_name ?? null }
+  return { userId: user.id, fullName: profile.full_name ?? null, avatarUrl: profile.avatar_url ?? null }
 }
 
 export interface MasterAdminContext { userId: string; email: string }
@@ -137,8 +137,8 @@ export async function requireExecutiveV3(): Promise<ExecContext> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
   const { data: profile } = await supabase
-    .from('user_profiles').select('role, company_id, full_name').eq('id', user.id).single()
+    .from('user_profiles').select('role, company_id, full_name, avatar_url').eq('id', user.id).single()
   if (profile?.role !== 'executive' && profile?.role !== 'system_admin') redirect('/auth/login')
   if (!profile?.company_id) redirect('/auth/login')
-  return { userId: user.id, companyId: profile.company_id, fullName: profile.full_name ?? null }
+  return { userId: user.id, companyId: profile.company_id, fullName: profile.full_name ?? null, avatarUrl: profile.avatar_url ?? null }
 }

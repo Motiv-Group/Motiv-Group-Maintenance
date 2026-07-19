@@ -28,7 +28,7 @@ export default async function SettingsLayout({ children }: { children: React.Rea
 
   const { data: profile } = await supabase
     .from('user_profiles')
-    .select('role, full_name')
+    .select('role, full_name, avatar_url')
     .eq('id', user.id)
     .single()
 
@@ -41,6 +41,7 @@ export default async function SettingsLayout({ children }: { children: React.Rea
       roleLabel={ROLE_LABEL[role] ?? 'Account'}
       roleHome={ROLE_HOME[role] ?? '/client'}
       profileLabel={isStore ? 'Store Info' : 'Profile'}
+      avatarUrl={profile?.avatar_url ?? null}
     >
       {children}
     </SettingsChrome>

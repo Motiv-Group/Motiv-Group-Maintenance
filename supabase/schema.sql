@@ -836,10 +836,12 @@ create table if not exists public.user_profiles (
   branch_code                  text,
   last_wa_inbound_at           timestamptz,
   storage_bytes_used           bigint not null default 0,
-  password_set_at              timestamptz   -- makes the confirm link one-time (20260719)
+  password_set_at              timestamptz,  -- makes the confirm link one-time (20260719)
+  avatar_url                   text          -- optional profile picture (public branding bucket, path avatars/); initials fallback
 );
--- Existing DBs: add the column if missing.
+-- Existing DBs: add the columns if missing.
 alter table public.user_profiles add column if not exists password_set_at timestamptz;
+alter table public.user_profiles add column if not exists avatar_url text;
 
 create table if not exists public.whatsapp_sessions (
   id                           uuid not null default gen_random_uuid(),
