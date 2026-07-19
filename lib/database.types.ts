@@ -3787,6 +3787,7 @@ export interface Database {
           branch_code: string | null
           last_wa_inbound_at: string | null
           storage_bytes_used: number
+          password_set_at: string | null
         }
         Insert: {
           id?: string
@@ -3805,6 +3806,7 @@ export interface Database {
           branch_code?: string | null
           last_wa_inbound_at?: string | null
           storage_bytes_used?: number
+          password_set_at?: string | null
         }
         Update: {
           id?: string
@@ -3823,6 +3825,7 @@ export interface Database {
           branch_code?: string | null
           last_wa_inbound_at?: string | null
           storage_bytes_used?: number
+          password_set_at?: string | null
         }
         Relationships: [
         {
