@@ -6,7 +6,7 @@
 // own; the heavy sections (logo, colours) live in ./customization/*.
 import { useState, type ChangeEvent } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, Image as ImageIcon, LifeBuoy, Loader2, Monitor, Moon, Paintbrush, Plus, Sun, Type, X } from 'lucide-react'
+import { Check, Image as ImageIcon, LifeBuoy, Loader2, Monitor, Moon, Paintbrush, Plus, Smartphone, Sun, Type, X } from 'lucide-react'
 import type { AppSettings } from '@/lib/settings'
 import { DarkTile, Field, SaveRow, Section, inputCls, postForm, postJson, useAsyncSave, validateImage } from '@/components/admin/customization/shared'
 import { LogoSection } from '@/components/admin/customization/LogoSection'
@@ -39,6 +39,7 @@ export function CustomizationClient({ initial }: { initial: AppSettings }) {
       <ColoursSection initialColors={initial.colors} initialButtonColor={initial.authButtonColor} appName={initial.appName} symbolSrc={symbolSrc} />
       <LoginBackgroundsSection initialUrls={initial.authBgUrls} />
       <SupportSection initialEmail={initial.supportEmail} initialPhone={initial.supportPhone} />
+      <MobileAppSection initialUrl={initial.appDownloadUrl} />
       <EmailsSection initialEmails={initial.emails} branding={initial.branding} />
       <AppearanceSection initialTheme={initial.defaultTheme} />
     </div>
@@ -244,6 +245,34 @@ function SupportSection({ initialEmail, initialPhone }: { initialEmail: string; 
           <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="082 000 0000" className={inputCls} />
         </Field>
       </div>
+      <SaveRow state={saver.state} error={saver.error} dirty={dirty} onSave={save} />
+    </Section>
+  )
+}
+
+/* ------------------------------ 5b. Mobile app ----------------------------- */
+
+function MobileAppSection({ initialUrl }: { initialUrl: string }) {
+  const router = useRouter()
+  const [url, setUrl] = useState(initialUrl)
+  const [saved, setSaved] = useState(initialUrl)
+  const saver = useAsyncSave<SettingsResponse>()
+  const dirty = url.trim() !== saved
+
+  async function save() {
+    const data = await saver.run(() => postJson<SettingsResponse>('/api/admin/customization', { appDownloadUrl: url.trim() }))
+    if (data) { setUrl(data.settings.appDownloadUrl); setSaved(data.settings.appDownloadUrl); router.refresh() }
+  }
+
+  return (
+    <Section
+      icon={<Smartphone size={15} className="text-blue-600 dark:text-blue-400" />}
+      title="Mobile app"
+      blurb="Invite emails include a “Get the app” step. Paste the Android download link (Play Store or APK) to show it; the “open in your browser” link is always shown. Leave empty to show only the browser link."
+    >
+      <Field label="Android app download link" hint="Optional — e.g. a Play Store URL or a direct APK link.">
+        <input type="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://play.google.com/store/apps/details?id=…" className={inputCls} />
+      </Field>
       <SaveRow state={saver.state} error={saver.error} dirty={dirty} onSave={save} />
     </Section>
   )

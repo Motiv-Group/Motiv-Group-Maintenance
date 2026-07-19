@@ -23,12 +23,13 @@ export interface EmailVars {
 }
 
 export type BuiltEmail = { subject: string; html: string; text: string }
+type AppLinks = { downloadUrl: string | null; browserUrl: string }
 
 type Overrides = Partial<EmailCopy> | undefined
-type Handlers = { [K in EmailKey]: (vars: EmailVars[K], overrides: Overrides, logo: EmailLogo) => BuiltEmail }
+type Handlers = { [K in EmailKey]: (vars: EmailVars[K], overrides: Overrides, logo: EmailLogo, app: AppLinks) => BuiltEmail }
 
 const HANDLERS: Handlers = {
-  role_invite: (v, overrides, logo) => {
+  role_invite: (v, overrides, logo, app) => {
     const invitedTo = (v.invitedTo ?? '').trim()
     const copy = resolveCopy('role_invite', overrides, { role: v.roleLabel, invitedTo })
     // Project invites (invitedTo set) reference the project rather than the role,
@@ -37,10 +38,10 @@ const HANDLERS: Handlers = {
       if (!(overrides?.subject && overrides.subject.trim())) copy.subject = `You've been invited to ${invitedTo} on MOTIV`
       if (!(overrides?.lead && overrides.lead.trim())) copy.lead = `You've been invited to ${escapeHtml(invitedTo)} on MOTIV.`
     }
-    return renderBrandedEmail(copy, { logo, link: v.link })
+    return renderBrandedEmail(copy, { logo, link: v.link, app })
   },
 
-  supplier_invite: (v, overrides, logo) => {
+  supplier_invite: (v, overrides, logo, app) => {
     const inviter = (v.inviterCompany ?? '').trim()
     const copy = resolveCopy('supplier_invite', overrides, { inviter })
     // The default lead leads with "{inviter} has invited you…". With no inviter
@@ -54,6 +55,7 @@ const HANDLERS: Handlers = {
       link: v.link,
       note: v.message ?? undefined,
       noteLabel: inviter ? `Message from ${inviter}` : 'Message',
+      app,
     })
   },
 
@@ -92,6 +94,8 @@ function originFrom<K extends EmailKey>(key: K, vars: EmailVars[K]): string {
  */
 export async function buildEmail<K extends EmailKey>(key: K, vars: EmailVars[K]): Promise<BuiltEmail> {
   const settings = await getAppSettings()
-  const logo = emailLogoHeader(settings.branding as BrandingState, originFrom(key, vars))
-  return HANDLERS[key](vars, settings.emails[key], logo)
+  const origin = originFrom(key, vars)
+  const logo = emailLogoHeader(settings.branding as BrandingState, origin)
+  const app: AppLinks = { downloadUrl: settings.appDownloadUrl?.trim() || null, browserUrl: origin }
+  return HANDLERS[key](vars, settings.emails[key], logo, app)
 }

@@ -89,6 +89,9 @@ export interface AppSettings {
   tagline: string
   supportEmail: string
   supportPhone: string
+  /** Android app download link (Play Store or APK) shown in invite emails. Empty
+   *  = only the "open in your browser" link is shown. */
+  appDownloadUrl: string
   /** What people see before choosing a theme themselves ('system' = device setting). */
   defaultTheme: 'light' | 'dark' | 'system'
   /** Hex overrides ('#rrggbb') of the brand palette; missing stop = factory colour. */
@@ -141,6 +144,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   tagline: 'Maintenance ticketing & quoting platform',
   supportEmail: '',
   supportPhone: '',
+  appDownloadUrl: '',
   defaultTheme: 'system',
   colors: {},
   authButtonColor: AUTH_BUTTON_DEFAULT,
@@ -204,6 +208,7 @@ export function normaliseSettings(raw: unknown): AppSettings {
     tagline: str(r.tagline, DEFAULT_SETTINGS.tagline, 120),
     supportEmail: str(r.supportEmail, ''),
     supportPhone: str(r.supportPhone, '', 40),
+    appDownloadUrl: str(r.appDownloadUrl, '', 300).trim(),
     defaultTheme: r.defaultTheme === 'light' || r.defaultTheme === 'dark' ? r.defaultTheme : 'system',
     colors,
     authButtonColor: isHex(r.authButtonColor) ? (r.authButtonColor as string).toLowerCase() : AUTH_BUTTON_DEFAULT,
