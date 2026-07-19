@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation'
 import { Pencil, Plus, Camera, Info, X, ChevronDown, MessageSquare, XCircle, Send, AlertCircle, Trash2 } from 'lucide-react'
 import { uploadFiles } from '@/lib/upload'
 import { formatDateTime } from '@/lib/utils'
+import { TicketChat } from '@/components/chat/TicketChat'
 import { Modal } from './modal'
 import { post, errMsg, type SupplierChoice } from './shared'
 import { AssignSuppliersButton } from './assign'
@@ -74,21 +75,23 @@ export function MoreMenu({ children, fullWidth = false, label = 'More', up = fal
   )
 }
 
-type ActionKey = 'addwork' | 'info' | 'edit' | 'cancel'
+type ActionKey = 'addwork' | 'info' | 'edit' | 'cancel' | 'chat'
 
 // The RM Next-action cluster: one primary button (Assign supplier) + a "More"
 // dropdown holding the secondary/destructive actions (add extra work, request info,
-// edit, cancel). The dropdown items just set which modal is active; the modals are
-// rendered as SIBLINGS (mounted only when active) so they open instantly — the
-// previous approach kept them inside the collapsing menu, which felt laggy/buggy.
+// chat with the supplier once one is awarded, edit, cancel). The dropdown items just
+// set which modal is active; the modals are rendered as SIBLINGS (mounted only when
+// active) so they open instantly — the previous approach kept them inside the
+// collapsing menu, which felt laggy/buggy.
 // Client component (a Server Component may not pass the click handlers).
-export function RmTicketActionBar({ ticketId, status, canAssign, canAssignSupplier, canCancel, canEdit, jobRef, suppliers, motivSuppliers, motivAccess = 'none', declinedSupplierIds, awaitingById, description, photoUrls, title, category, impact, priority }: {
+export function RmTicketActionBar({ ticketId, status, canAssign, canAssignSupplier, canCancel, canEdit, hasSupplier = false, jobRef, suppliers, motivSuppliers, motivAccess = 'none', declinedSupplierIds, awaitingById, description, photoUrls, title, category, impact, priority }: {
   ticketId: string
   status: string
   canAssign: boolean
   canAssignSupplier: boolean
   canCancel: boolean
   canEdit: boolean
+  hasSupplier?: boolean
   jobRef?: string | null
   suppliers: SupplierChoice[]
   motivSuppliers: SupplierChoice[]
@@ -106,7 +109,7 @@ export function RmTicketActionBar({ ticketId, status, canAssign, canAssignSuppli
   const done = () => setActive(null)
   const showRequestInfo = ['open', 'info_requested'].includes(status)
   const hasPrimary = canAssignSupplier
-  const hasMenu = canAssign || showRequestInfo || canEdit || canCancel
+  const hasMenu = canAssign || showRequestInfo || canEdit || canCancel || hasSupplier
   const primaryCls = `${hasMenu ? 'flex-1' : 'w-full'} py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition`
   // Once one or more suppliers have already been invited/quoted, assigning is
   // adding ANOTHER supplier — reflect that in the button label.
@@ -122,6 +125,7 @@ export function RmTicketActionBar({ ticketId, status, canAssign, canAssignSuppli
           <MoreMenu fullWidth={!hasPrimary}>
             {canAssign && <MoreActionItem icon={<Plus size={16} />} label="Add extra work" onClick={() => setActive('addwork')} />}
             {showRequestInfo && <MoreActionItem icon={<MessageSquare size={16} />} label="Request more info" onClick={() => setActive('info')} />}
+            {hasSupplier && <MoreActionItem icon={<MessageSquare size={16} />} label="Chat with supplier" onClick={() => setActive('chat')} />}
             {canEdit && <MoreActionItem icon={<Pencil size={16} />} label="Edit ticket" onClick={() => setActive('edit')} />}
             {canCancel && <MoreActionItem icon={<XCircle size={16} />} label="Cancel ticket" tone="danger" onClick={() => setActive('cancel')} />}
           </MoreMenu>
@@ -133,6 +137,7 @@ export function RmTicketActionBar({ ticketId, status, canAssign, canAssignSuppli
       {active === 'info' && <RequestInfoButton defaultOpen onClose={done} ticketId={ticketId} />}
       {active === 'edit' && <RmEditTicketForm defaultOpen onClose={done} ticketId={ticketId} initial={{ title, category, impact, priority, description }} />}
       {active === 'cancel' && <CancelTicketCard defaultOpen onClose={done} ticketId={ticketId} jobRef={jobRef} />}
+      {active === 'chat' && <TicketChat defaultOpen onClose={done} ticketId={ticketId} viewerRole="regional_manager" />}
     </>
   )
 }

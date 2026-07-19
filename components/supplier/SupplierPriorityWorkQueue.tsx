@@ -42,7 +42,7 @@ const SNAG_STATUSES = new Set(['snag', 'snag_assigned'])
 const isSnag = (t: SupplierTicketRow) => t.awardedToMe && SNAG_STATUSES.has(t.status)
 const slaAtRisk = (t: SupplierTicketRow) => t.breached || t.overdue
 
-export function SupplierPriorityWorkQueue({ tickets, generatedAt, company }: { tickets: SupplierTicketRow[]; generatedAt: string; company?: string }) {
+export function SupplierPriorityWorkQueue({ tickets, generatedAt, company, chatUnread }: { tickets: SupplierTicketRow[]; generatedAt: string; company?: string; chatUnread?: Record<string, number> }) {
   const [filter, setFilter] = useState<QueueFilter>('all')
   const nowMs = new Date(generatedAt).getTime()
   const pick = (k: QueueFilter) => setFilter(f => (f === k ? 'all' : k))
@@ -82,7 +82,7 @@ export function SupplierPriorityWorkQueue({ tickets, generatedAt, company }: { t
       </section>
 
       <QueueCard viewAllHref="/supplier/tickets">
-        {rows.length ? rows.map(t => <QueueRow key={t.id} ticket={t} nowMs={nowMs} company={company} />) : (
+        {rows.length ? rows.map(t => <QueueRow key={t.id} ticket={t} nowMs={nowMs} company={company} chatUnread={chatUnread?.[t.id] ?? 0} />) : (
           <div className="px-4 py-10"><EmptyQueue copy={emptyCopy(filter)} /></div>
         )}
       </QueueCard>
@@ -99,7 +99,7 @@ function emptyCopy(filter: QueueFilter): string {
     : 'No active jobs right now.'
 }
 
-function QueueRow({ ticket, nowMs, company }: { ticket: SupplierTicketRow; nowMs: number; company?: string }) {
+function QueueRow({ ticket, nowMs, company, chatUnread = 0 }: { ticket: SupplierTicketRow; nowMs: number; company?: string; chatUnread?: number }) {
   const slaDeadline = ticket.nextActionDueAt ?? ticket.dueAt
   const slaMs = new Date(slaDeadline).getTime() - nowMs
   const breached = ticket.overdue || ticket.breached || slaMs <= 0
@@ -128,7 +128,7 @@ function QueueRow({ ticket, nowMs, company }: { ticket: SupplierTicketRow; nowMs
       <QueueRowTitle category={ticket.category} title={ticket.title} priority={String(ticket.priority)} jobId={jobId} subtitle={who} />
 
       <QueueRowBadges priority={String(ticket.priority)} statusCls={statusCls} statusLabel={statusLabel}
-        disputeUnread={ticket.disputeUnread} note={ticket.awardedToMe ? 'Awarded to you' : 'Invited to quote'} />
+        disputeUnread={ticket.disputeUnread} chatUnread={chatUnread} note={ticket.awardedToMe ? 'Awarded to you' : 'Invited to quote'} />
 
       <QueueRowNextStep createdAt={ticket.createdAt} nextStep={nextStep(ticket)} breached={breached} slaMs={slaMs} slaDeadline={slaDeadline} />
 

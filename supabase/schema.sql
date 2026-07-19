@@ -1416,7 +1416,7 @@ create index if not exists technicians_company_idx on public.technicians (compan
 -- ---------------------------------------------------------------------------
 alter table public.ratings add constraint ratings_score_chk check (score between 1 and 5);
 alter table public.ticket_chat_messages add constraint ticket_chat_messages_author_role_chk
-  check (author_role in ('regional_manager', 'supplier'));
+  check (author_role in ('regional_manager', 'supplier', 'store_manager', 'individual'));
 
 -- ---------------------------------------------------------------------------
 -- TRIGGERS
@@ -2153,9 +2153,22 @@ create table if not exists public.ticket_chat_reads (
   primary key (ticket_id, user_id)
 );
 
+-- Per-ticket participant settings (migration 20260720_ticket_chat_participants).
+-- The RM may pull the ticket's Store Manager(s) into the chat; sm_history_from is
+-- the visibility cutoff chosen at add-time (NULL = SM sees the full history).
+-- Individual owners of standalone tickets join via tickets.created_by — no row here.
+create table if not exists public.ticket_chat_settings (
+  ticket_id       uuid primary key references public.tickets(id) on delete cascade,
+  sm_added_at     timestamptz,
+  sm_history_from timestamptz,
+  sm_added_by     uuid references public.user_profiles(id) on delete set null,
+  updated_at      timestamptz not null default now()
+);
+
 -- RLS: deny-all to end users (no policies). Mirrors ticket_disputes / ticket_dispute_messages.
 alter table public.ticket_chat_messages enable row level security;
 alter table public.ticket_chat_reads    enable row level security;
+alter table public.ticket_chat_settings enable row level security;
 
 -- ---------------------------------------------------------------------------
 -- COMPANY <-> SUPPLIER MEMBERSHIP (migration 20260719_admin_company_suppliers_logos)

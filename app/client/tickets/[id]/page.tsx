@@ -13,6 +13,8 @@ import { AddInfoModal } from '@/components/client/AddInfoModal'
 import { ClientTicketActions } from '@/components/client/ClientTicketActions'
 import { SmTicketTabs } from '@/components/client/SmTicketTabs'
 import { TicketBadges } from '@/components/client/ticketBadges'
+import { ChatFab } from '@/components/chat/TicketChat'
+import { chatUnreadCounts, smChatAdded } from '@/lib/chat-unread'
 import { EditedLine } from '@/components/ui/EditedLine'
 import { formatDateTime, clientVisibleStatus, PRIORITY_LEVEL_LABELS, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
 import type { StoreManagerTicket } from '@/lib/health/data'
@@ -95,7 +97,7 @@ function buildSmTimeline(t: TicketRow, events: EventRow[]): TimelineEntry[] {
 export default async function StoreTicketDetailPage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params
   const admin = createAdminClient()
-  const [{ storeIds }, { data: t }, { data: updates }, { data: snagRows }, { data: eventRows }] = await Promise.all([
+  const [{ storeIds, userId }, { data: t }, { data: updates }, { data: snagRows }, { data: eventRows }] = await Promise.all([
     requireStoreManagerV3(),
     admin.from('tickets').select('*').eq('id', params.id).single(),
     admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', params.id).order('created_at', { ascending: false }),
@@ -107,13 +109,17 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
   const showVisit = !!t.scheduled_at && !['completed', 'cancelled', 'declined'].includes(t.status)
   const photoUrlsRaw = Array.isArray(t.photo_urls) ? t.photo_urls : []
   const docUrlsRaw = Array.isArray(t.info_doc_urls) ? t.info_doc_urls : []
-  const [editorName, visitSupplier, visitTech, signedPhotoUrls, signedDocUrls] = await Promise.all([
+  const [editorName, visitSupplier, visitTech, signedPhotoUrls, signedDocUrls, chatAddedSet, chatCounts] = await Promise.all([
     t.edited_by ? admin.from('user_profiles').select('full_name').eq('id', t.edited_by).single().then(r => r.data?.full_name ?? null) : null,
     showVisit && t.supplier_id ? admin.from('suppliers').select('company_name').eq('id', t.supplier_id).single().then(r => r.data?.company_name ?? null) : null,
     showVisit && t.technician_id ? admin.from('technicians').select('name').eq('id', t.technician_id).single().then(r => r.data?.name ?? null) : null,
     signManyUrls(photoUrlsRaw),
     signManyUrls(docUrlsRaw),
+    // Ticket chat: entry points only once a supplier is awarded AND the RM added the SM.
+    t.supplier_id ? smChatAdded(admin, [t.id]) : new Set<string>(),
+    t.supplier_id ? chatUnreadCounts(admin, userId, [t.id], { smViewer: true }) : ({} as Record<string, number>),
   ])
+  const chatAdded = !!t.supplier_id && chatAddedSet.has(t.id)
   // The guard already required scheduled_at — the predicate just surfaces that to the type.
   const followUp = (snagRows ?? []).find((s): s is SnagSel & { scheduled_at: string } => !!s.scheduled_at && s.schedule_status === 'agreed' && ['assigned', 'in_progress'].includes(s.status)) ?? null
   const showFollowUp = !!followUp && !['completed', 'cancelled', 'declined'].includes(t.status)
@@ -180,7 +186,7 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
           {t.status === 'info_requested' ? (
             <AddInfoModal ticketId={t.id} title={t.title} description={t.description} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} photoUrls={photoUrlsRaw} docUrls={docUrlsRaw} requestReason={t.info_request_reason} />
           ) : canEdit ? (
-            <ClientTicketActions ticketId={t.id} title={t.title} description={t.description ?? ''} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} photoUrls={photoUrlsRaw} />
+            <ClientTicketActions ticketId={t.id} title={t.title} description={t.description ?? ''} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} photoUrls={photoUrlsRaw} smAdded={chatAdded} />
           ) : (
             <div className="mt-4 flex items-center gap-2 rounded-lg bg-[var(--surface-2)] px-3 py-2.5 text-xs text-[var(--text-muted)]">
               <CheckCircle2 size={15} className="shrink-0 text-emerald-500" />
@@ -214,6 +220,9 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
       {/* Photos + documents · Activity · Timeline (audit trail). */}
       {/* body is never null on a real update row — narrow cast so the tabs' Update props typecheck. */}
       <SmTicketTabs photoUrls={signedPhotoUrls} docUrls={signedDocUrls} ticketId={t.id} updates={(updates ?? []) as { body: string; author_role: string | null; created_at: string }[]} timeline={timeline} />
+
+      {/* Floating chat entry — only once the RM has added the SM to this ticket's chat. */}
+      {chatAdded && <ChatFab ticketId={t.id} viewerRole="store_manager" unreadCount={chatCounts[t.id] ?? 0} />}
     </div>
   )
 }

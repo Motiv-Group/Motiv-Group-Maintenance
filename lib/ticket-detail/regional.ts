@@ -11,7 +11,7 @@ import 'server-only'
 import { createAdminClient } from '@/lib/supabase/server'
 import { signedUrl } from '@/lib/storage'
 import { requireRegionalV3 } from '@/lib/health/guard'
-import { ticketChatUnread } from '@/lib/chat-unread'
+import { chatUnreadCounts } from '@/lib/chat-unread'
 import { loadSlaResolver } from '@/lib/health/data'
 import { deriveDueDates } from '@/lib/health/priority'
 import { computeTicketSla } from '@/lib/health/sla'
@@ -250,8 +250,10 @@ async function buildRegionalTicketDetail(
   const awaitingSupplierQuotes = ['assigned', 'assessment', 'quote_requested', 'quote_revision'].includes(t.status) && activeSupplierRows.some(r => r.status === 'invited')
   // A quote has been approved → the ticket is awarded and the round is over.
   const awarded = (quotes ?? []).some(q => q.status === 'accepted') || !!t.supplier_id
-  // Per-ticket RM↔supplier chat is available once a supplier is awarded.
-  const chatUnread = t.supplier_id ? await ticketChatUnread(admin, t.id, userId) : false
+  // Per-ticket RM↔supplier chat is available once a supplier is awarded. One
+  // count drives both the header icon's unread dot and the floating chat button.
+  const chatUnreadCount = t.supplier_id ? ((await chatUnreadCounts(admin, userId, [t.id]))[t.id] ?? 0) : 0
+  const chatUnread = chatUnreadCount > 0
   // Round boundary = the most recent quote-request round (assign / re-assign). A
   // decline (quote or request) is "live" only if it happened in this current round;
   // everything from earlier rounds moves to the Archive so nothing is ever dropped.
@@ -457,7 +459,7 @@ async function buildRegionalTicketDetail(
   const pendingVariation = (variations ?? []).find(v => v.status === 'pending') ?? null
 
   return {
-    t, storeName, editorName, dueAt, overdue, now, sla, breached, chatUnread, nextAction,
+    t, storeName, editorName, dueAt, overdue, now, sla, breached, chatUnread, chatUnreadCount, nextAction,
     COURTESY_NOTE,
     disputes, openDispute, resolvedDisputes, disputeSubject, msgsByDispute,
     roundBySignoff, submissionLabel, submissionTone,

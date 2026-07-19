@@ -173,7 +173,9 @@ export default function SupplierOnboardPage() {
             <span className={`text-xs ${s === step ? 'font-semibold text-gray-900 dark:text-white' : 'text-gray-400'} hidden sm:block`}>
               {s === 1 ? 'Account' : s === 2 ? 'Business details' : 'Agreement'}
             </span>
-            {s < 3 && <div className="h-px flex-1 bg-gray-200 dark:bg-gray-700" />}
+            {/* min-w keeps the connector visible — flex-1 alone collapses to 0px
+                when the step label ("Business details") eats the segment's width. */}
+            {s < 3 && <div className="h-px min-w-4 flex-1 bg-gray-200 dark:bg-gray-700" />}
           </div>
         ))}
       </div>

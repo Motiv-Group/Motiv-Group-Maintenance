@@ -11,6 +11,7 @@ import {
   ClipboardList,
   Info,
   Loader2,
+  MessageSquare,
 } from 'lucide-react'
 import type { StoreManagerTicket } from '@/lib/health/data'
 import { Card } from '@/components/exec/ui'
@@ -39,11 +40,13 @@ export function StorePriorityWorkQueue({
   todayVisits,
   storeName,
   generatedAt,
+  chatUnread,
 }: {
   tickets: StoreManagerTicket[]
   todayVisits: TodayVisit[]
   storeName: string
   generatedAt: string
+  chatUnread?: Record<string, number> // ticketId → unread chat messages (only chats the RM added the SM to)
 }) {
   const [filter, setFilter] = useState<QueueFilter>('all')
   const nowMs = new Date(generatedAt).getTime()
@@ -129,7 +132,7 @@ export function StorePriorityWorkQueue({
         <div className="px-4 py-4 sm:px-5">
           <div className="overflow-hidden rounded-2xl border border-[var(--border)]">
             {rows.length ? rows.map(t => (
-              <QueueRow key={t.id} ticket={t} storeName={storeName} nowMs={nowMs} />
+              <QueueRow key={t.id} ticket={t} storeName={storeName} nowMs={nowMs} chatUnread={chatUnread?.[t.id] ?? 0} />
             )) : (
               <div className="px-4 py-10">
                 <EmptyQueue filter={filter} />
@@ -193,7 +196,7 @@ function MetricButton({
   )
 }
 
-function QueueRow({ ticket, storeName, nowMs }: { ticket: StoreManagerTicket; storeName: string; nowMs: number }) {
+function QueueRow({ ticket, storeName, nowMs, chatUnread }: { ticket: StoreManagerTicket; storeName: string; nowMs: number; chatUnread: number }) {
   const dueMs = Math.max(0, new Date(ticket.dueAt).getTime() - nowMs)
   const ticketUrl = `/client/tickets/${ticket.id}`
   const needsInfo = ticket.status === 'info_requested'
@@ -222,6 +225,12 @@ function QueueRow({ ticket, storeName, nowMs }: { ticket: StoreManagerTicket; st
         <div className="flex items-center gap-1.5">
           <span className={`inline-flex w-[72px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${priorityBadgeClass(ticket)}`}>{priorityLabel(ticket)}</span>
           <span className={`inline-flex w-[120px] justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${clientStatusBadgeClass(ticket)}`}>{clientStatusLabel(ticket)}</span>
+          {/* Unread ticket-chat messages — only set when the RM added the SM to the chat. */}
+          {chatUnread > 0 && (
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-blue-500/15 px-1.5 py-0.5 text-[10px] font-bold text-blue-600 dark:text-blue-400">
+              <MessageSquare size={11} /> {chatUnread}
+            </span>
+          )}
         </div>
         <p className="mt-1.5 truncate text-sm text-[var(--text-muted)]">{ticket.supplierAssigned ? 'Supplier assigned' : 'No supplier assigned'}</p>
       </div>

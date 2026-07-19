@@ -6,7 +6,7 @@ import { SubmitCompletionForm } from '@/components/supplier/SubmitCompletionForm
 import { BackLink } from '@/components/ui/BackLink'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { PhotoThumbs } from '@/components/ui/PhotoThumbs'
-import { TicketChatIcon } from '@/components/chat/TicketChat'
+import { ChatFab, TicketChatIcon } from '@/components/chat/TicketChat'
 import { BreachReason } from '@/components/workflow/BreachReason'
 import { Card } from '@/components/exec/ui'
 import { WorkflowActions } from '@/components/workflow/WorkflowActions'
@@ -33,7 +33,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
   const {
     t, store, storeName, disputeStore, companyName, supplierCompanyName, customer, editorName, quoteRequestedAt,
     latestSnag, snagFixApproved, snagScheduleActive, declinedSnag, scheduledTechName,
-    awarded, chatUnread, declinedForMe, dueAt, overdue, declineDetails, sla, breached, now,
+    awarded, chatUnread, chatUnreadCount, declinedForMe, dueAt, overdue, declineDetails, sla, breached, now,
     latestQuote, canSubmitQuote, declineReason, declinedBy, declinedByLabel, declineMessage, supplierStatus, reQuoteByRm,
     quoteStatusOf, requoteReason,
     pendingSignoffs, rejectedSignoffs, acceptedSignoff, submissionLabel, roundBySignoff, liveSnag, liveEvidence, archivedSuperseded,
@@ -448,6 +448,8 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
           { key: 'timeline', label: 'Timeline', content: timelineTab },
         ]}
       />
+      {/* Floating chat button — the RM↔supplier chat opens once the job is awarded. */}
+      {awarded && <ChatFab ticketId={t.id} viewerRole="supplier" unreadCount={chatUnreadCount} />}
     </div>
   );
 }

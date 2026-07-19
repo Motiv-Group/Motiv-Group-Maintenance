@@ -7,11 +7,13 @@ import { assembleSupplierDashboard } from '@/lib/health/data'
 import { DashboardHealthHeader } from '@/components/exec/DashboardHealthHeader'
 import { SupplierPriorityWorkQueue } from '@/components/supplier/SupplierPriorityWorkQueue'
 import { createAdminClient } from '@/lib/supabase/server'
+import { chatUnreadCounts } from '@/lib/chat-unread'
 import { getDailyBriefing } from '@/lib/briefing/generate'
 import { supplierFacts } from '@/lib/briefing/facts'
 
 export default async function SupplierOverviewPage() {
-  const { companyId, supplierIds, fullName } = await requireSupplierV3()
+  const { userId, companyId, supplierIds, fullName } = await requireSupplierV3()
+  const admin = createAdminClient()
 
   // Standalone (self-signup) suppliers have no client company. PENDING ones can now
   // browse the whole dashboard while they wait — a gentle note points them to the
@@ -19,7 +21,6 @@ export default async function SupplierOverviewPage() {
   // the dashboard (assembleSupplierDashboard handles a null company).
   let pending = false
   if (!companyId) {
-    const admin = createAdminClient()
     const { data: supRow } = await admin.from('suppliers')
       .select('verification_status, is_motiv').in('id', supplierIds).limit(1).maybeSingle()
     pending = supRow?.verification_status !== 'verified' && !supRow?.is_motiv
@@ -27,6 +28,9 @@ export default async function SupplierOverviewPage() {
 
   const d = await assembleSupplierDashboard(companyId, supplierIds)
   const perf = d.perf
+  // Unread chat counts for the queue rows' chips — awarded jobs only (the chat opens
+  // on award), so this never reads beyond this supplier's own tickets.
+  const chatUnread = await chatUnreadCounts(admin, userId, d.tickets.filter(t => t.awardedToMe).map(t => t.id))
   const briefingScopeId = supplierIds.slice().sort().join(',')
   // Standalone (self-signup) suppliers have no client company, so key the daily
   // briefing cache on their own supplier id (a non-null UUID, no companies FK) — this
@@ -77,7 +81,7 @@ export default async function SupplierOverviewPage() {
       />
 
       {/* Filtering KPI cards + phase-aware priority queue (matches SM / RM). */}
-      <SupplierPriorityWorkQueue tickets={d.tickets} generatedAt={d.generatedAt} company={d.company} />
+      <SupplierPriorityWorkQueue tickets={d.tickets} generatedAt={d.generatedAt} company={d.company} chatUnread={chatUnread} />
     </div>
   )
 }
