@@ -10,7 +10,10 @@ import { signManyUrls } from '@/lib/storage'
 import { Card } from '@/components/exec/ui'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { QuoteSummary, type QuoteSummaryStatus } from '@/components/workflow/QuoteSummary'
-import { AssignSuppliersButton, SupplierStatusList, QuoteReviewCard, ApproveSignoffCard, RequestEvidenceButton, RaiseSnagButton, VariationReviewCard, CloseOutButton, CancelTicketCard, AcceptSnagScheduleCard, type ReviewQuote } from '@/components/regional/RmTicketActions'
+import { SupplierStatusList, QuoteReviewCard, ApproveSignoffCard, RequestEvidenceButton, RaiseSnagButton, VariationReviewCard, CloseOutButton, AcceptSnagScheduleCard, type ReviewQuote } from '@/components/regional/RmTicketActions'
+import { IndividualTicketActionBar } from '@/components/individual/IndividualTicketActionBar'
+import { TicketTimeline } from '@/components/ui/TicketTimeline'
+import { buildTicketTimeline } from '@/lib/ticket-timeline'
 import { isTerminalStatus } from '@/lib/workflow'
 import { DisputeThread } from '@/components/dispute/DisputeBox'
 import { ChatFab } from '@/components/chat/TicketChat'
@@ -23,17 +26,23 @@ export default async function IndividualTicketDetailPage(props: { params: Promis
   const params = await props.params;
   // One parallel wave: auth gate ∥ ticket ∥ child rows (all key on params.id).
   const admin = createAdminClient()
-  const [{ userId }, { data: t }, { data: quotes }, { data: signoffs }, { data: invites }, { data: motiv }, { data: snags }, { data: disputeRows }, { data: disputeMsgRows }, { data: disputeExtra }] = await Promise.all([
+  const [{ userId }, { data: t }, { data: quotes }, { data: signoffs }, { data: invites }, { data: motiv }, { data: snags }, { data: disputeRows }, { data: disputeMsgRows }, { data: disputeExtra }, { data: variations }, { data: snagEvents }, { data: requestRows }, { data: editRows }] = await Promise.all([
     requireIndividual(),
     admin.from('tickets').select('*').eq('id', params.id).single(),
     admin.from('quotes').select('id, supplier_id, amount, amount_incl_vat, description, file_url, status, valid_until, proposed_schedule_at, created_at, updated_at').eq('ticket_id', params.id).order('created_at', { ascending: false }),
-    admin.from('signoffs').select('id, before_urls, after_urls, coc_url, invoice_url, status, notes, created_at').eq('ticket_id', params.id).order('created_at', { ascending: false }),
+    admin.from('signoffs').select('id, before_urls, after_urls, coc_url, invoice_url, status, notes, reject_reason, reviewed_at, created_at').eq('ticket_id', params.id).order('created_at', { ascending: false }),
     admin.from('ticket_suppliers').select('supplier_id, status, invited_at, decline_reason').eq('ticket_id', params.id),
     admin.from('suppliers').select('id, company_name').eq('is_motiv', true).eq('active', true).order('company_name'),
-    admin.from('snags').select('scheduled_at, schedule_status, status, created_at').eq('ticket_id', params.id).order('created_at', { ascending: false }),
+    admin.from('snags').select('scheduled_at, schedule_status, status, assigned_at, schedule_agreed_at, schedule_declined_at, schedule_decline_reason, created_at').eq('ticket_id', params.id).order('created_at', { ascending: false }),
     admin.from('ticket_disputes').select('id, origin, status, outcome, resolution_note, created_at, resolved_at').eq('ticket_id', params.id).order('created_at', { ascending: true }),
     admin.from('ticket_dispute_messages').select('id, dispute_id, author_role, body, evidence_urls, created_at').eq('ticket_id', params.id).order('created_at', { ascending: true }),
     admin.from('ticket_disputes').select('id, signoff_id, pending_outcome, pending_by').eq('ticket_id', params.id),
+    // Timeline inputs — variation orders, durable snag-schedule rounds, quote-request
+    // rounds and the durable per-edit log (all chronological for the audit trail).
+    admin.from('ticket_variations').select('status, reject_reason, reviewed_at, created_at').eq('ticket_id', params.id).order('created_at', { ascending: true }),
+    admin.from('snag_schedule_events').select('kind, scheduled_for, reason, created_at').eq('ticket_id', params.id).order('created_at', { ascending: true }),
+    admin.from('ticket_quote_requests').select('supplier_id, requested_at').eq('ticket_id', params.id).order('requested_at', { ascending: true }),
+    admin.from('ticket_edits').select('editor_id, editor_role, note, created_at').eq('ticket_id', params.id).order('created_at', { ascending: true }),
   ])
   if (!t || t.created_by !== userId) redirect('/individual/tickets')
 
@@ -59,9 +68,15 @@ export default async function IndividualTicketDetailPage(props: { params: Promis
 
   const inviteRows = invites ?? []
   const quoteRows = quotes ?? []
-  const supplierIds = Array.from(new Set([...inviteRows.map(r => r.supplier_id), ...quoteRows.map(q => q.supplier_id)].filter((id): id is string => !!id)))
-  const { data: supRows } = supplierIds.length ? await admin.from('suppliers').select('id, company_name').in('id', supplierIds) : { data: [] as { id: string; company_name: string }[] }
-  const nameById = new Map((supRows ?? []).map(s => [s.id, s.company_name]))
+  const supplierIds = Array.from(new Set([...inviteRows.map(r => r.supplier_id), ...quoteRows.map(q => q.supplier_id), ...(requestRows ?? []).map(r => r.supplier_id)].filter((id): id is string => !!id)))
+  // Editor names for the timeline's edit events (durable log + the legacy single-slot fallback).
+  const editorIds = Array.from(new Set([...(editRows ?? []).map(e => e.editor_id), t.edited_by].filter((id): id is string => !!id)))
+  const [supRes, editorRes] = await Promise.all([
+    supplierIds.length ? admin.from('suppliers').select('id, company_name').in('id', supplierIds) : Promise.resolve({ data: [] as { id: string; company_name: string }[] }),
+    editorIds.length ? admin.from('user_profiles').select('id, full_name').in('id', editorIds) : Promise.resolve({ data: [] as { id: string; full_name: string | null }[] }),
+  ])
+  const nameById = new Map((supRes.data ?? []).map(s => [s.id, s.company_name]))
+  const editorNameById = new Map((editorRes.data ?? []).map(u => [u.id, u.full_name]))
 
   const sm = rmStatusMeta(t.status)
   // Buckets are private — stored URLs must be signed or they 403 (every other
@@ -83,6 +98,36 @@ export default async function IndividualTicketDetailPage(props: { params: Promis
     description: q.description ?? null, fileUrl: q.file_url ?? null, createdAt: q.created_at, proposedScheduleAt: q.proposed_schedule_at ?? null,
   }))
   const canAssign = ASSIGNABLE.includes(t.status)
+
+  // Full life-of-job audit trail (FULL view — the individual owner IS the manager,
+  // so nothing is filtered). Durable logs (quote-request rounds, snag-schedule
+  // rounds, per-edit log) override the single-slot ticket columns, which remain
+  // the fallback for older tickets. Actor "Regional Manager" reads as "You" here —
+  // on a standalone job the owner performs the manager-side actions themselves.
+  const declinedSnag = (snags ?? []).find(s => !!s.schedule_declined_at) ?? null
+  const snagScheduledAt = (snags ?? []).find(s => s.scheduled_at)?.scheduled_at ?? null
+  const timelineItems = buildTicketTimeline({
+    createdAt: t.created_at, status: t.status, updatedAt: t.updated_at,
+    quoteRequestedAt: t.first_quote_requested_at ?? t.quote_requested_at,
+    quoteRequests: (requestRows ?? []).map(r => ({ at: r.requested_at, supplierName: r.supplier_id ? (nameById.get(r.supplier_id) ?? null) : null })),
+    quoteSubmittedAt: t.quote_submitted_at,
+    quoteApprovedAt: t.quote_decision_status === 'approved' ? t.quote_decided_at : null,
+    scheduledAt: t.scheduled_at, completedAt: t.completed_at,
+    cancellationReason: t.cancellation_reason,
+    workStartedAt: t.attended_at ?? null,
+    snagScheduledAt,
+    snagAcceptedAt: latestSnag?.assigned_at ?? null,
+    snagProposedAt: latestSnag?.assigned_at ?? null, snagApprovedAt: latestSnag?.schedule_agreed_at ?? null,
+    snagDeclinedAt: declinedSnag?.schedule_declined_at ?? null, snagDeclineReason: declinedSnag?.schedule_decline_reason ?? null,
+    snagScheduleEvents: snagEvents ?? [],
+    edits: (editRows ?? []).map(e => ({ at: e.created_at, note: e.note, byName: e.editor_id ? (editorNameById.get(e.editor_id) ?? null) : null, byRole: e.editor_role })),
+    editedAt: t.edited_at, editNote: t.edit_note, editedByName: t.edited_by ? (editorNameById.get(t.edited_by) ?? null) : null,
+    quotes: quoteRows.map(q => ({ amount: q.amount, status: q.status, created_at: q.created_at, updated_at: q.updated_at, supplierName: (q.supplier_id ? nameById.get(q.supplier_id) : undefined) ?? 'Supplier' })),
+    variations: variations ?? [],
+    disputes: disputes.map(d => ({ origin: d.origin, status: d.status, outcome: d.outcome, created_at: d.created_at, resolved_at: d.resolved_at, reason: d.resolution_note })),
+    disputeMessages: (disputeMsgRows ?? []).map(m => ({ author_role: m.author_role, body: m.body, created_at: m.created_at })),
+    signoffs: (signoffs ?? []).map(s => ({ status: s.status, created_at: s.created_at, reviewed_at: s.reviewed_at, reject_reason: s.reject_reason })),
+  }).map(e => ({ ...e, who: e.who === 'Regional Manager' ? 'You' : e.who }))
 
   return (
     <div className="space-y-5">
@@ -165,7 +210,7 @@ export default async function IndividualTicketDetailPage(props: { params: Promis
       <Card className="p-5 space-y-4">
         <h2 className="text-sm font-bold text-[var(--text)]">Actions</h2>
 
-        {canAssign && <AssignSuppliersButton ticketId={t.id} suppliers={[]} motivSuppliers={motivSuppliers} declinedSupplierIds={declinedSupplierIds} awaitingById={awaitingById} />}
+        <IndividualTicketActionBar ticketId={t.id} canAssign={canAssign} hasSupplier={!!t.supplier_id} canCancel={!isTerminal} motivSuppliers={motivSuppliers} declinedSupplierIds={declinedSupplierIds} awaitingById={awaitingById} />
 
         {['accepted', 'scheduled'].includes(t.status) && (
           <div className="rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/30 p-3.5 flex items-start gap-2.5">
@@ -209,8 +254,12 @@ export default async function IndividualTicketDetailPage(props: { params: Promis
             <p className="text-sm text-[var(--text-muted)]">This job is completed and closed out.</p>
           </div>
         )}
+      </Card>
 
-        {!isTerminal && <CancelTicketCard ticketId={t.id} />}
+      {/* Timeline — full life-of-job audit trail (the owner sees everything) */}
+      <Card className="p-5 space-y-4">
+        <h2 className="text-sm font-bold text-[var(--text)]">Timeline</h2>
+        <TicketTimeline items={timelineItems} />
       </Card>
 
       {/* Chat with the awarded supplier — floating button (fixed, above the bottom nav) */}

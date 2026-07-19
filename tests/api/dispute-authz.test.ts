@@ -269,6 +269,50 @@ describe('POST dispute action=raise', () => {
     expect(res.status).toBe(400)
   })
 
+  // ── origin 'quote_declined' — raised by a DECLINED (non-awarded) org ────────
+  it('declined org disputing the RM quote decline → 200 (any ticket status)', async () => {
+    seed({
+      profile: { role: 'supplier', company_id: null },
+      // Ticket already awarded to sup-1; ME belongs to declined org sup-2.
+      ticket: { ...companyTicket, status: 'accepted' },
+      tables: {
+        supplier_users: { rows: [{ user_id: ME, supplier_id: 'sup-2' }] },
+        ticket_suppliers: { rows: [{ supplier_id: 'sup-2', status: 'declined', declined_by: 'regional_manager' }] },
+      },
+    })
+    const res = await POST(jsonRequest({ action: 'raise', body: 'The decline reason is incorrect.' }), params)
+    expect(res.status).toBe(200)
+  })
+
+  it("403 for a supplier org that was neither awarded nor declined", async () => {
+    seed({
+      profile: { role: 'supplier', company_id: null },
+      ticket: { ...companyTicket, status: 'accepted' },
+      tables: {
+        supplier_users: { rows: [{ user_id: ME, supplier_id: 'sup-3' }] },
+        // Their invite is still open — no decline to dispute.
+        ticket_suppliers: { rows: [{ supplier_id: 'sup-3', status: 'invited', declined_by: null }] },
+      },
+    })
+    const res = await POST(jsonRequest({ action: 'raise', body: 'x' }), params)
+    expect(res.status).toBe(403)
+  })
+
+  it("declined org cannot act on the AWARDED org's open dispute (invisible → 409 no-open-dispute)", async () => {
+    seed({
+      profile: { role: 'supplier', company_id: null },
+      ticket: { ...companyTicket, status: 'accepted' },
+      tables: {
+        supplier_users: { rows: [{ user_id: ME, supplier_id: 'sup-2' }] },
+        ticket_suppliers: { rows: [{ supplier_id: 'sup-2', status: 'declined', declined_by: 'regional_manager' }] },
+        // The awarded org's workflow dispute (bound to sup-1) — not ME's.
+        ticket_disputes: { rows: [{ ...openDispute, supplier_id: 'sup-1' }] },
+      },
+    })
+    const res = await POST(jsonRequest({ action: 'reply', body: 'let me in' }), params)
+    expect(res.status).toBe(409)
+  })
+
   it('supplier raising while a dispute is already open → 409', async () => {
     seed({
       profile: { role: 'supplier', company_id: null },

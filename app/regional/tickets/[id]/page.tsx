@@ -82,7 +82,7 @@ function RmDeclinedQuoteCard({ q, ticketId, canReQuote, open = false }: { q: Dec
         {(q.fileUrl || canReQuote) && (
           <div className="flex items-center justify-between gap-2 pt-1">
             {q.fileUrl
-              ? <a href={q.fileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-500 hover:underline"><FileText size={14} /> View attached quote</a>
+              ? <ViewTrackedLink ticketId={ticketId} itemType="quote" itemLabel={`the declined quote (${q.supplierName})`} href={q.fileUrl} className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-500 hover:underline"><FileText size={14} /> View attached quote</ViewTrackedLink>
               : <span />}
             {canReQuote && <ReQuoteButton ticketId={ticketId} quoteId={q.id} />}
           </div>
@@ -261,7 +261,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
                   {Array.isArray(v.file_urls) && v.file_urls.length > 0 && (
                     <div className="flex flex-wrap gap-x-3 gap-y-1 pt-1">
                       {v.file_urls.map((u: string, j: number) => (
-                        <a key={j} href={u} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"><FileText size={14} /> Attachment {j + 1}</a>
+                        <ViewTrackedLink key={j} ticketId={t.id} itemType="attachment" itemLabel={`Variation order ${i + 1} attachment ${j + 1}`} href={u} className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"><FileText size={14} /> Attachment {j + 1}</ViewTrackedLink>
                       ))}
                     </div>
                   )}
@@ -346,7 +346,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
           {Array.isArray(pendingVariation.file_urls) && pendingVariation.file_urls.length > 0 && (
             <div className="flex flex-wrap gap-x-3 gap-y-1 pt-1">
               {pendingVariation.file_urls.map((u: string, j: number) => (
-                <a key={j} href={u} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"><FileText size={14} /> Attachment {j + 1}</a>
+                <ViewTrackedLink key={j} ticketId={t.id} itemType="attachment" itemLabel={`Variation order attachment ${j + 1}`} href={u} className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"><FileText size={14} /> Attachment {j + 1}</ViewTrackedLink>
               ))}
             </div>
           )}

@@ -94,6 +94,13 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
   const { data, error } = await admin.from('tickets').update(update as Database['public']['Tables']['tickets']['Update']).eq('id', params.id).select().single()
   if (error) return serverError(error)
 
+  // Durable edit log — the single-slot edited_at/edit_note columns above are
+  // overwritten on every PATCH, so the timeline reads the full history from here.
+  await admin.from('ticket_edits').insert({
+    ticket_id: params.id, company_id: ticket.company_id ?? null,
+    editor_id: user.id, editor_role: role ?? null, note: editNote, created_at: now,
+  })
+
   revalidatePath('/client');revalidatePath('/client/tickets');revalidatePath(`/client/tickets/${params.id}`)
   revalidatePath('/regional');revalidatePath('/regional/tickets');revalidatePath(`/regional/tickets/${params.id}`)
   revalidatePath(`/supplier/tickets/${params.id}`)

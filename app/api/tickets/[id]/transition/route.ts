@@ -108,10 +108,11 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
 
   // An OPEN dispute pauses the disputed step — the supplier can't accept & schedule,
   // upload evidence or re-submit the VO, and the RM can't close out, until the dispute
-  // is resolved (see /dispute).
+  // is resolved (see /dispute). Quote-decline disputes are thread-only (raised by a
+  // NON-awarded org) and must never block the awarded supplier's workflow.
   if (['accept_snag', 'submit_completion', 'start_snag', 'submit_variation', 'close_out'].includes(action)) {
-    const { data: openDispute } = await admin.from('ticket_disputes').select('id').eq('ticket_id', ticketId).eq('status', 'open').maybeSingle()
-    if (openDispute) return NextResponse.json({ error: 'This ticket has an open dispute — resolve it before continuing.' }, { status: 409 })
+    const { data: openDisputes } = await admin.from('ticket_disputes').select('id, origin').eq('ticket_id', ticketId).eq('status', 'open')
+    if ((openDisputes ?? []).some(d => d.origin !== 'quote_declined')) return NextResponse.json({ error: 'This ticket has an open dispute — resolve it before continuing.' }, { status: 409 })
   }
 
   const now = new Date().toISOString()

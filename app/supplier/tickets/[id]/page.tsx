@@ -106,9 +106,13 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
         )
       })}</div>)
     : null
-  const disputeTab = (awarded && disputes.length > 0)
+  // Disputes are org-filtered in the loader, so a declined org sees ONLY its own
+  // quote-decline dispute here (no awarded gate). The awarded supplier's resolve
+  // controls surface in the Next-action block instead (hideControls); the declined
+  // org has no Next-action block, so the tab keeps the controls for them.
+  const disputeTab = disputes.length > 0
     ? (<div className="space-y-3">
-        {openDispute && <DisputeThread ticketId={t.id} dispute={openDispute} messages={msgsByDispute(openDispute.id)} viewerRole="supplier" subject={disputeSubject(openDispute)} hideControls />}
+        {openDispute && <DisputeThread ticketId={t.id} dispute={openDispute} messages={msgsByDispute(openDispute.id)} viewerRole="supplier" subject={disputeSubject(openDispute)} hideControls={awarded} />}
         {resolvedDisputes.map(d => (
           <details key={d.id} className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
             <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
@@ -236,6 +240,15 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
           {/* "Quote declined" once they'd submitted a quote; otherwise the request itself. */}
           <p className="text-sm font-bold text-red-700 dark:text-red-400">{latestQuote ? 'Quote declined' : 'Quote request declined'}{declinedByLabel}</p>
           <p className="text-sm text-[var(--text)]">{declineMessage}</p>
+          {/* The client declined this org — they may dispute it (thread-only, no workflow
+              pause; the conversation lives in the Dispute tab once raised). Hidden while
+              their own dispute is already open. */}
+          {declinedBy === 'regional_manager' && !openDispute && (
+            <div className="pt-2">
+              <RaiseDisputeButton ticketId={t.id} origin="quote_declined" label="Dispute the decline"
+                subjectTitle={latestQuote ? 'Quote declined' : 'Quote request declined'} jobRef={t.job_ref} store={disputeStore} />
+            </div>
+          )}
         </div>
       ) : (
         <div className="grid gap-4 lg:grid-cols-2 items-stretch">
