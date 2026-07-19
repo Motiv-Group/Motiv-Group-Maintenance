@@ -14,8 +14,16 @@ export function signAccountToken(userId: string, now: number, ttlMs = DEFAULT_TT
   return `${Buffer.from(payload).toString('base64url')}.${sig}`
 }
 
-/** Returns the user id if the token is authentic and unexpired, else null. */
-export function verifyAccountToken(token: string, now: number): string | null {
+export interface VerifiedToken {
+  userId: string
+  /** When the link was issued (= expiry − default TTL, since every issuer uses it).
+   *  Used to tell a spent link from a fresh one: a password set at/after this time
+   *  means this token (or a newer one) already activated the account. */
+  issuedAt: number
+}
+
+/** Returns the user id + issue time if the token is authentic and unexpired, else null. */
+export function verifyAccountToken(token: string, now: number): VerifiedToken | null {
   const [b64, sig] = (token || '').split('.')
   if (!b64 || !sig) return null
   let payload: string
@@ -25,5 +33,5 @@ export function verifyAccountToken(token: string, now: number): string | null {
   if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null
   const [userId, expStr] = payload.split('.')
   if (!userId || !expStr || now > Number(expStr)) return null
-  return userId
+  return { userId, issuedAt: Number(expStr) - DEFAULT_TTL_MS }
 }

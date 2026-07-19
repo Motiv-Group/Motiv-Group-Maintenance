@@ -835,8 +835,13 @@ create table if not exists public.user_profiles (
   sub_store                    text,
   branch_code                  text,
   last_wa_inbound_at           timestamptz,
-  storage_bytes_used           bigint not null default 0
+  storage_bytes_used           bigint not null default 0,
+  password_set_at              timestamptz,  -- makes the confirm link one-time (20260719)
+  avatar_url                   text          -- optional profile picture (public branding bucket, path avatars/); initials fallback
 );
+-- Existing DBs: add the columns if missing.
+alter table public.user_profiles add column if not exists password_set_at timestamptz;
+alter table public.user_profiles add column if not exists avatar_url text;
 
 create table if not exists public.whatsapp_sessions (
   id                           uuid not null default gen_random_uuid(),
@@ -2213,3 +2218,29 @@ alter table public.company_motiv_access enable row level security;
 drop policy if exists "company_motiv_access read" on public.company_motiv_access;
 create policy "company_motiv_access read" on public.company_motiv_access for select
   using (company_id = public.app_company_id());
+
+-- ---------------------------------------------------------------------------
+-- RM -> EXECUTIVE ASSIGNMENT (migration 20260719_rm_executive_links)
+-- ---------------------------------------------------------------------------
+-- Direct M2M recording which executive(s) oversee a given regional manager
+-- (executives remain company-wide by default; this is the explicit org chart the
+-- Hierarchy linking page manages). Writes via the service-role client only.
+create table if not exists public.rm_executive_links (
+  rm_user_id        uuid not null references public.user_profiles(id) on delete cascade,
+  executive_user_id uuid not null references public.user_profiles(id) on delete cascade,
+  company_id        uuid references public.companies(id) on delete cascade,
+  created_at        timestamptz not null default now(),
+  primary key (rm_user_id, executive_user_id)
+);
+create index if not exists rm_executive_links_exec_idx on public.rm_executive_links (executive_user_id);
+create index if not exists rm_executive_links_company_idx on public.rm_executive_links (company_id);
+
+alter table public.rm_executive_links enable row level security;
+
+drop policy if exists "rm_executive_links read" on public.rm_executive_links;
+create policy "rm_executive_links read" on public.rm_executive_links for select
+  using (
+    rm_user_id = auth.uid()
+    or executive_user_id = auth.uid()
+    or (company_id = public.app_company_id() and public.app_is_company_wide())
+  );
