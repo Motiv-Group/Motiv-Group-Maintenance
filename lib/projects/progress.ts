@@ -88,13 +88,20 @@ export function storeStatus(s: StoreMilestones): StoreStatus {
   }
 }
 
-/** A store is overdue when its end date has passed and it is not yet 100%. */
+/**
+ * A store is overdue when its end date has fully PASSED and it is not yet 100%.
+ * The end date is inclusive: a store due on the 19th is not overdue on the 19th,
+ * only from the 20th onwards. `end_date` is a date-only string (YYYY-MM-DD) which
+ * `new Date` parses to that day's UTC midnight (the START of the end date), so we
+ * add one day and require `now` to have reached the day after.
+ */
 export function isOverdue(store: ProjectStoreLike, now: Date): boolean {
   if (storeProgress(store) >= 100) return false
   if (!store.end_date) return false
   const end = new Date(store.end_date)
   if (Number.isNaN(end.getTime())) return false
-  return now.getTime() > end.getTime()
+  const dayAfterEnd = end.getTime() + 24 * 60 * 60 * 1000
+  return now.getTime() >= dayAfterEnd
 }
 
 /** Professional stage wording for a percentage (spec §5) — works for store or overall. */

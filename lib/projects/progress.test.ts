@@ -105,6 +105,14 @@ describe('isOverdue — end date passed AND below 100% (spec §9)', () => {
     expect(isOverdue(s, now)).toBe(true)
     expect(storeProgress(s)).toBe(50) // still 50%, per spec §9
   })
+  it('end date is inclusive — NOT overdue on the end date, only from the day after', () => {
+    const s = { ...store(2), end_date: '2026-07-19' }
+    // Any time on the 19th (the end date itself) is still on-time.
+    expect(isOverdue(s, new Date('2026-07-19T00:00:00.000Z'))).toBe(false)
+    expect(isOverdue(s, new Date('2026-07-19T23:59:59.000Z'))).toBe(false)
+    // From the 20th onwards it is overdue.
+    expect(isOverdue(s, new Date('2026-07-20T00:00:00.000Z'))).toBe(true)
+  })
 })
 
 describe('stageLabel — professional wording (spec §5)', () => {

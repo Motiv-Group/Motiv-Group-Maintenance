@@ -2,11 +2,12 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { LayoutGrid, Table2, Search, ArrowRight, CalendarClock, CheckCircle2, AlertTriangle, MapPin } from 'lucide-react'
+import { LayoutGrid, List, Table2, Search, ArrowRight, CalendarClock, CheckCircle2, AlertTriangle, MapPin } from 'lucide-react'
 import { Card } from '@/components/exec/ui'
 import { formatDate } from '@/lib/utils'
 import { AnimatedBar } from '@/components/projects/AnimatedBar'
 import { SegmentedProgressBar } from '@/components/projects/SegmentedProgressBar'
+import { ViewToggle } from '@/components/projects/ViewToggle'
 import { STORE_STATUS_LABEL, STORE_STATUS_PILL, OVERDUE_PILL } from '@/components/projects/statusStyles'
 import { milestoneSteps, milestoneCounts, stageLabel, MILESTONE_LABELS } from '@/lib/projects/progress'
 import type { ProjectRow, ProjectSummary, StoreRow } from '@/lib/projects/data'
@@ -15,6 +16,8 @@ type StatusFilter = 'all' | 'not_started' | 'in_progress' | 'complete' | 'overdu
 
 export function RegionalProjectDashboard({ project, summary, stores }: { project: ProjectRow; summary: ProjectSummary; stores: StoreRow[] }) {
   const [view, setView] = useState<'cards' | 'table'>('table')
+  // Phones get their own compact grid/list switch (the cards/table one above is sm+).
+  const [mobileView, setMobileView] = useState<'grid' | 'list'>('grid')
   const [q, setQ] = useState('')
   const [status, setStatus] = useState<StatusFilter>('all')
   const [sort, setSort] = useState<'branch' | 'name' | 'progress' | 'start' | 'end'>('start')
@@ -128,7 +131,14 @@ export function RegionalProjectDashboard({ project, summary, stores }: { project
           <option value="start">Sort: Start date</option>
           <option value="end">Sort: End date</option>
         </select>
-        {/* View toggle is sm+ — phones always see cards (the table needs ~470px). */}
+        {/* Mobile-only grid/list switch (the sm+ cards/table toggle can't fit the phone). */}
+        <ViewToggle
+          className="sm:hidden"
+          value={mobileView}
+          onChange={setMobileView}
+          options={[{ value: 'grid', icon: LayoutGrid, label: 'Tile view' }, { value: 'list', icon: List, label: 'List view' }]}
+        />
+        {/* View toggle is sm+ — phones use the mobile switch above (the table needs ~470px). */}
         <div className="hidden rounded-lg ring-1 ring-[var(--border)] overflow-hidden sm:flex">
           <button onClick={() => setView('cards')} className={`p-2 ${view === 'cards' ? 'bg-blue-600 text-white' : 'text-[var(--text-muted)] hover:bg-[var(--hover)]'}`}><LayoutGrid size={15} /></button>
           <button onClick={() => setView('table')} className={`p-2 ${view === 'table' ? 'bg-blue-600 text-white' : 'text-[var(--text-muted)] hover:bg-[var(--hover)]'}`}><Table2 size={15} /></button>
@@ -137,8 +147,8 @@ export function RegionalProjectDashboard({ project, summary, stores }: { project
       </div>
 
       {(() => {
-        // Shared card grid — the cards view, and the mobile fallback inside the table
-        // view (the table needs ~470px even with hidden columns, so phones get cards).
+        // Shared card grid — the cards view (sm+). The table needs ~470px even with
+        // hidden columns, so phones use the compact grid/list below instead.
         const cardsView = (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {filtered.map((s) => (
@@ -158,14 +168,49 @@ export function RegionalProjectDashboard({ project, summary, stores }: { project
             ))}
           </div>
         )
+        // Phone-only compact tile grid — 2-up, fits 375px with no sideways scroll.
+        const mobileGrid = (
+          <div className="grid grid-cols-2 gap-2">
+            {filtered.map((s) => (
+              <Link key={s.id} href={`/regional/projects/${project.id}/stores/${s.id}`}>
+                <Card className="h-full space-y-2 p-3">
+                  <div className="min-w-0">
+                    <h3 className="truncate text-sm font-bold text-[var(--text)]">{s.store_name ?? s.branch_code}</h3>
+                    <p className="truncate text-[10px] text-[var(--text-muted)]">{s.branch_code}</p>
+                  </div>
+                  <div className="flex items-center justify-between gap-1">
+                    <span className={`truncate text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${s.overdue ? OVERDUE_PILL : STORE_STATUS_PILL[s.status]}`}>{s.overdue ? 'Overdue' : STORE_STATUS_LABEL[s.status]}</span>
+                    <span className="shrink-0 text-base font-bold tabular-nums text-[var(--text)]">{s.progress}%</span>
+                  </div>
+                  <SegmentedProgressBar steps={milestoneSteps(s)} showLabels={false} height="h-1.5" />
+                </Card>
+              </Link>
+            ))}
+          </div>
+        )
+        // Phone-only compact list — one row per store, no horizontal scroll.
+        const mobileList = (
+          <Card className="divide-y divide-[var(--border)]">
+            {filtered.map((s) => (
+              <Link key={s.id} href={`/regional/projects/${project.id}/stores/${s.id}`} className="flex items-center gap-3 px-3 py-2.5">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-[var(--text)]">{s.store_name ?? s.branch_code}</p>
+                  <p className="truncate text-[11px] text-[var(--text-muted)]">{s.branch_code}{s.town && ` · ${s.town}`}</p>
+                </div>
+                <span className="shrink-0 text-[11px] font-semibold tabular-nums text-[var(--text-muted)]">{s.progress}%</span>
+                <span className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full ${s.overdue ? OVERDUE_PILL : STORE_STATUS_PILL[s.status]}`}>{s.overdue ? 'Overdue' : STORE_STATUS_LABEL[s.status]}</span>
+              </Link>
+            ))}
+          </Card>
+        )
         if (filtered.length === 0) return (
           <Card className="p-10 text-center text-sm text-[var(--text-muted)]">{stores.length === 0 ? 'No stores in this project yet.' : 'No stores match your filters.'}</Card>
         )
-        if (view === 'cards') return cardsView
         return (
         <>
-        <div className="sm:hidden">{cardsView}</div>
-        <Card className="hidden overflow-hidden sm:block">
+        <div className="sm:hidden">{mobileView === 'grid' ? mobileGrid : mobileList}</div>
+        {view === 'cards' && <div className="hidden sm:block">{cardsView}</div>}
+        <Card className={`hidden overflow-hidden ${view === 'table' ? 'sm:block' : ''}`}>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] border-b border-[var(--border)]">

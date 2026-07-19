@@ -3,10 +3,11 @@
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Pencil, FileSpreadsheet, Plus, Download, ChevronRight, Search, StickyNote, Trash2, AlertTriangle } from 'lucide-react'
+import { Pencil, FileSpreadsheet, Plus, Download, ChevronRight, Search, StickyNote, Trash2, AlertTriangle, LayoutGrid, List } from 'lucide-react'
 import { Card } from '@/components/exec/ui'
 import { Modal } from '@/components/ui/Modal'
 import { formatDate } from '@/lib/utils'
+import { ViewToggle } from '@/components/projects/ViewToggle'
 import { AnimatedBar } from '@/components/projects/AnimatedBar'
 import { STORE_STATUS_LABEL, STORE_STATUS_PILL, OVERDUE_PILL, PROJECT_STATUS_PILL } from '@/components/projects/statusStyles'
 import { stageLabel } from '@/lib/projects/progress'
@@ -45,6 +46,8 @@ export function AdminProjectDetail({
   const [q, setQ] = useState('')
   const [status, setStatus] = useState<StatusFilter>('all')
   const [sort, setSort] = useState<'branch' | 'name' | 'progress' | 'start' | 'end'>('branch')
+  // Phone-only tile/list switch for the store list (desktop always shows the table).
+  const [mobileView, setMobileView] = useState<'grid' | 'list'>('grid')
 
   const rfidTotal = useMemo(() => stores.reduce((s, r) => s + (r.rfid_m2_required ?? 0), 0), [stores])
   const daysLeft = daysUntil(project.end_date)
@@ -142,6 +145,13 @@ export function AdminProjectDetail({
           <option value="start">Sort: Start date</option>
           <option value="end">Sort: End date</option>
         </select>
+        {/* Phones pick tile vs list; desktop always uses the table below. */}
+        <ViewToggle
+          className="sm:hidden"
+          value={mobileView}
+          onChange={setMobileView}
+          options={[{ value: 'grid', icon: LayoutGrid, label: 'Tile view' }, { value: 'list', icon: List, label: 'List view' }]}
+        />
       </div>
 
       {/* Store table */}
@@ -201,34 +211,61 @@ export function AdminProjectDetail({
           </table>
         </div>
 
-        {/* Mobile stacked cards */}
-        <div className="sm:hidden space-y-2 p-2">
-          {filtered.map((s) => (
-            <div
-              key={s.id}
-              onClick={() => router.push(`/admin/projects/${project.id}/stores/${s.id}`)}
-              className="rounded-xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] p-3 cursor-pointer"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="font-semibold text-[var(--text)] truncate">{s.store_name ?? '—'}</div>
-                  <div className="text-xs text-[var(--text-muted)] mt-0.5">{s.branch_code}{s.town ? ` · ${s.town}` : ''}</div>
-                </div>
-                <span className={`shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full ${s.overdue ? OVERDUE_PILL : STORE_STATUS_PILL[s.status]}`}>
-                  {s.overdue ? 'Overdue' : STORE_STATUS_LABEL[s.status]}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 mt-2">
-                <div className="flex-1 h-1.5 rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden">
-                  <div className="h-full rounded-full bg-blue-500" style={{ width: `${s.progress}%` }} />
-                </div>
-                <span className="text-[11px] tabular-nums text-[var(--text-muted)] w-8 text-right">{s.progress}%</span>
-              </div>
-            </div>
-          ))}
-          {filtered.length === 0 && (
+        {/* Mobile: tile grid (2-up, compact) or stacked list, user-toggled. */}
+        <div className="sm:hidden p-2">
+          {filtered.length === 0 ? (
             <div className="px-3 py-10 text-center text-sm text-[var(--text-muted)]">
               {stores.length === 0 ? 'No stores yet — import a spreadsheet to get started.' : 'No stores match your filters.'}
+            </div>
+          ) : mobileView === 'grid' ? (
+            <div className="grid grid-cols-2 gap-2">
+              {filtered.map((s) => (
+                <div
+                  key={s.id}
+                  onClick={() => router.push(`/admin/projects/${project.id}/stores/${s.id}`)}
+                  className="cursor-pointer space-y-2 rounded-xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] p-3"
+                >
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold text-[var(--text)]">{s.store_name ?? '—'}</div>
+                    <div className="truncate text-[10px] text-[var(--text-muted)]">{s.branch_code}</div>
+                  </div>
+                  <div className="flex items-center justify-between gap-1">
+                    <span className={`truncate text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${s.overdue ? OVERDUE_PILL : STORE_STATUS_PILL[s.status]}`}>
+                      {s.overdue ? 'Overdue' : STORE_STATUS_LABEL[s.status]}
+                    </span>
+                    <span className="shrink-0 text-sm font-bold tabular-nums text-[var(--text)]">{s.progress}%</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden">
+                    <div className="h-full rounded-full bg-blue-500" style={{ width: `${s.progress}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {filtered.map((s) => (
+                <div
+                  key={s.id}
+                  onClick={() => router.push(`/admin/projects/${project.id}/stores/${s.id}`)}
+                  className="rounded-xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] p-3 cursor-pointer"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="font-semibold text-[var(--text)] truncate">{s.store_name ?? '—'}</div>
+                      <div className="text-xs text-[var(--text-muted)] mt-0.5">{s.branch_code}{s.town ? ` · ${s.town}` : ''}</div>
+                    </div>
+                    <span className={`shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full ${s.overdue ? OVERDUE_PILL : STORE_STATUS_PILL[s.status]}`}>
+                      {s.overdue ? 'Overdue' : STORE_STATUS_LABEL[s.status]}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <div className="flex-1 h-1.5 rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden">
+                      <div className="h-full rounded-full bg-blue-500" style={{ width: `${s.progress}%` }} />
+                    </div>
+                    <span className="text-[11px] tabular-nums text-[var(--text-muted)] w-8 text-right">{s.progress}%</span>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
