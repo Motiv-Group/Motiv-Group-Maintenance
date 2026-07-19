@@ -40,6 +40,13 @@ export async function inviteUser(opts: InviteOpts): Promise<{ userId: string; ac
     user_metadata: { role: opts.role, company_id: opts.companyId, full_name: p.fullName, phone: p.phone },
   })
   if (error || !data?.user) {
+    // GoTrue's admin API answers a bare 401/403 ("Forbidden") when the service
+    // key is stale/rotated/wrong-scope — surface an operator-actionable message
+    // instead (DB reads can still work while auth-admin rejects the same key).
+    const status = (error as { status?: number } | null)?.status
+    if (status === 401 || status === 403) {
+      throw new Error('Supabase rejected the server auth key — check SUPABASE_SERVICE_ROLE_KEY on this deployment (re-copy the service_role key after any rotation).')
+    }
     throw new Error(/already|registered|exists/i.test(error?.message ?? '') ? 'That email already has an account.' : (error?.message ?? 'Invite failed'))
   }
   const uid = data.user.id
