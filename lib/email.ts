@@ -64,7 +64,29 @@ export function motivBrandedEmailHtml(o: {
   note?: string; noteLabel?: string
   /** Optional login credentials box (store-manager welcome). */
   credentials?: { email: string; password: string }
+  /** Optional "get the app" block — per-OS install steps + optional download/browser links. */
+  app?: { android?: string | null; ios?: string | null; downloadUrl?: string | null; browserUrl?: string | null }
 }): string {
+  const android = (o.app?.android ?? '').trim()
+  const ios = (o.app?.ios ?? '').trim()
+  const dl = o.app?.downloadUrl?.trim() || ''
+  const br = o.app?.browserUrl?.trim() || ''
+  const stepsHtml = (label: string, text: string): string => {
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
+    if (!lines.length) return ''
+    return `<p style="margin:10px 0 3px;font-size:13px;font-weight:700;color:#0d1f2d;">${escapeHtml(label)}</p>`
+      + `<ol style="margin:0 0 4px;padding-left:18px;font-size:13px;line-height:1.6;color:#374151;">${lines.map(l => `<li>${escapeHtml(l)}</li>`).join('')}</ol>`
+  }
+  const appBlock = (android || ios || dl || br)
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0 0;border-top:1px solid #eef0f2;"><tr><td style="padding-top:18px;">
+            <p style="margin:0 0 2px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#94a3b8;">Get the app</p>
+            <p style="margin:0 0 4px;font-size:13px;line-height:1.6;color:#6b7280;">Install it to your home screen straight from your browser — no app store needed.</p>
+            ${stepsHtml('On Android', android)}
+            ${stepsHtml('On iPhone / iPad', ios)}
+            ${dl ? `<p style="margin:8px 0 0;font-size:13px;line-height:1.6;color:#374151;">📥 Prefer a download? <a href="${dl}" style="color:#2563eb;text-decoration:none;font-weight:600;">Get it here</a></p>` : ''}
+            ${br ? `<p style="margin:6px 0 0;font-size:13px;line-height:1.6;color:#374151;">💻 Or just use it in your browser: <a href="${br}" style="color:#2563eb;text-decoration:none;font-weight:600;">${br}</a></p>` : ''}
+          </td></tr></table>`
+    : ''
   const noteBlock = o.note && o.note.trim()
     ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;"><tr><td style="border-left:3px solid #2563eb;background:#f8fafc;border-radius:0 8px 8px 0;padding:12px 16px;">
             ${o.noteLabel ? `<p style="margin:0 0 4px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#94a3b8;">${escapeHtml(o.noteLabel)}</p>` : ''}
@@ -97,6 +119,7 @@ export function motivBrandedEmailHtml(o: {
           </td></tr></table>
           <p style="margin:26px 0 6px;font-size:12px;color:#6b7280;">Button not working? Copy and paste this link into your browser:</p>
           <p style="margin:0;font-size:12px;line-height:1.5;word-break:break-all;"><a href="${o.link}" style="color:#2563eb;text-decoration:none;">${o.link}</a></p>
+          ${appBlock}
         </td></tr>
         <tr><td style="padding:18px 32px;border-top:1px solid #eef0f2;background:#fafbfc;">
           <p style="margin:0;font-size:12px;line-height:1.5;color:#9ca3af;">${o.footerNote}</p>
@@ -119,8 +142,23 @@ export function motivBrandedEmailHtml(o: {
 function brandedText(
   copy: EmailCopy,
   link: string,
-  o?: { note?: string; credentials?: { email: string; password: string } },
+  o?: { note?: string; credentials?: { email: string; password: string }; app?: { android?: string | null; ios?: string | null; downloadUrl?: string | null; browserUrl?: string | null } },
 ): string {
+  const android = (o?.app?.android ?? '').trim()
+  const ios = (o?.app?.ios ?? '').trim()
+  const dl = o?.app?.downloadUrl?.trim() || ''
+  const br = o?.app?.browserUrl?.trim() || ''
+  const stepLines = (label: string, text: string): string[] => {
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
+    return lines.length ? [`  ${label}:`, ...lines.map((l, i) => `    ${i + 1}. ${l}`)] : []
+  }
+  const appLines = (android || ios || dl || br)
+    ? ['', 'Get the app — install it to your home screen from your browser:',
+        ...stepLines('On Android', android),
+        ...stepLines('On iPhone / iPad', ios),
+        ...(dl ? [`  Prefer a download? ${dl}`] : []),
+        ...(br ? [`  Or use it in your browser: ${br}`] : [])]
+    : []
   return [
     copy.heading,
     '',
@@ -130,6 +168,7 @@ function brandedText(
     ...(o?.note && o.note.trim() ? ['', o.note.trim()] : []),
     '',
     `${copy.ctaLabel}: ${link}`,
+    ...appLines,
     '',
     copy.footerNote,
   ].join('\n')
@@ -143,7 +182,7 @@ function brandedText(
  */
 export function renderBrandedEmail(
   copy: EmailCopy,
-  o: { logo: EmailLogo; link: string; note?: string; noteLabel?: string; credentials?: { email: string; password: string } },
+  o: { logo: EmailLogo; link: string; note?: string; noteLabel?: string; credentials?: { email: string; password: string }; app?: { android?: string | null; ios?: string | null; downloadUrl?: string | null; browserUrl?: string | null } },
 ): { subject: string; html: string; text: string } {
   const html = motivBrandedEmailHtml({
     logo: o.logo,
@@ -156,8 +195,9 @@ export function renderBrandedEmail(
     note: o.note,
     noteLabel: o.noteLabel,
     credentials: o.credentials,
+    app: o.app,
   })
-  return { subject: copy.subject, html, text: brandedText(copy, o.link, { note: o.note, credentials: o.credentials }) }
+  return { subject: copy.subject, html, text: brandedText(copy, o.link, { note: o.note, credentials: o.credentials, app: o.app }) }
 }
 
 /**

@@ -1583,6 +1583,27 @@ export interface Database {
         }
       ]
       }
+      rm_executive_links: {
+        Row: {
+          rm_user_id: string
+          executive_user_id: string
+          company_id: string | null
+          created_at: string
+        }
+        Insert: {
+          rm_user_id?: string
+          executive_user_id?: string
+          company_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          rm_user_id?: string
+          executive_user_id?: string
+          company_id?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       roles: {
         Row: {
           key: string
@@ -3766,6 +3787,7 @@ export interface Database {
           branch_code: string | null
           last_wa_inbound_at: string | null
           storage_bytes_used: number
+          password_set_at: string | null
           avatar_url: string | null
         }
         Insert: {
@@ -3785,6 +3807,7 @@ export interface Database {
           branch_code?: string | null
           last_wa_inbound_at?: string | null
           storage_bytes_used?: number
+          password_set_at?: string | null
           avatar_url?: string | null
         }
         Update: {
@@ -3804,6 +3827,7 @@ export interface Database {
           branch_code?: string | null
           last_wa_inbound_at?: string | null
           storage_bytes_used?: number
+          password_set_at?: string | null
           avatar_url?: string | null
         }
         Relationships: [

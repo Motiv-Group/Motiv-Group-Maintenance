@@ -1,11 +1,13 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
-import { FolderKanban, FolderOpen, CheckCircle2, AlertTriangle, ArrowRight, CalendarDays } from 'lucide-react'
+import { FolderKanban, FolderOpen, CheckCircle2, AlertTriangle, ArrowRight, CalendarDays, LayoutGrid, List } from 'lucide-react'
 import { Card } from '@/components/exec/ui'
 import { formatDate } from '@/lib/utils'
 import { PROJECT_STATUS_LABELS } from '@/lib/projects/types'
 import { PROJECT_STATUS_PILL } from '@/components/projects/statusStyles'
+import { ViewToggle } from '@/components/projects/ViewToggle'
 import { AnimatedBar } from '@/components/projects/AnimatedBar'
 import { milestoneCounts, stageLabel, MILESTONE_LABELS } from '@/lib/projects/progress'
 import type { ProjectRow, ProjectSummary, StoreRow } from '@/lib/projects/data'
@@ -17,6 +19,8 @@ interface Featured {
 }
 
 export function RegionalProjectsClient({ projects, featured }: { projects: ProjectSummary[]; featured: Featured | null }) {
+  // Phone-only tile/list switch for the recent-projects list (desktop keeps the list).
+  const [mobileView, setMobileView] = useState<'list' | 'grid'>('list')
   const totalProjects = projects.length
   const active = projects.filter((p) => p.status === 'active').length
   const completed = projects.filter((p) => p.status === 'complete').length
@@ -62,8 +66,39 @@ export function RegionalProjectsClient({ projects, featured }: { projects: Proje
           <Card className="p-4">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-bold text-[var(--text)]">Recent Projects</h2>
+              <ViewToggle
+                className="sm:hidden"
+                value={mobileView}
+                onChange={setMobileView}
+                options={[{ value: 'list', icon: List, label: 'List view' }, { value: 'grid', icon: LayoutGrid, label: 'Tile view' }]}
+              />
             </div>
-            <div className="divide-y divide-[var(--border)]">
+
+            {/* Phone-only compact 2-up tile grid. */}
+            {mobileView === 'grid' && (
+              <div className="grid grid-cols-2 gap-2 sm:hidden">
+                {projects.map((p) => (
+                  <Link key={p.id} href={`/regional/projects/${p.id}`}>
+                    <Card className="h-full space-y-2 p-3">
+                      <div className="min-w-0">
+                        <h3 className="truncate text-sm font-bold text-[var(--text)]">{p.name}</h3>
+                        <p className="truncate text-[10px] text-[var(--text-muted)]">{p.client_name ?? '—'}</p>
+                      </div>
+                      <div className="flex items-center justify-between gap-1">
+                        <span className={`truncate text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${PROJECT_STATUS_PILL[p.status]}`}>{PROJECT_STATUS_LABELS[p.status]}</span>
+                        <span className="shrink-0 text-sm font-bold tabular-nums text-[var(--text)]">{p.progress}%</span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden">
+                        <div className="h-full rounded-full bg-blue-500" style={{ width: `${p.progress}%` }} />
+                      </div>
+                    </Card>
+                  </Link>
+                ))}
+              </div>
+            )}
+
+            {/* List rows — always on desktop; on mobile only when list is selected. */}
+            <div className={`divide-y divide-[var(--border)] ${mobileView === 'grid' ? 'hidden sm:block' : ''}`}>
               {projects.map((p) => (
                 <Link key={p.id} href={`/regional/projects/${p.id}`} className="flex items-center gap-3 py-2.5 group">
                   <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--surface-2)] text-[var(--text-muted)]"><FolderKanban size={16} /></span>

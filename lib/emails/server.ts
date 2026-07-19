@@ -9,6 +9,7 @@ import 'server-only'
 // from app_settings automatically.
 
 import type { BrandingState, EmailCopy, EmailKey } from '@/lib/settings'
+import { DEFAULT_INSTALL_ANDROID, DEFAULT_INSTALL_IOS } from '@/lib/settings'
 import { getAppSettings } from '@/lib/settings-server'
 import { emailLogoHeader, resolveCopy, type EmailLogo } from '@/lib/emails/defaults'
 import { escapeHtml, renderBrandedEmail, renderStoreWelcome, renderSupplierAdded } from '@/lib/email'
@@ -23,12 +24,13 @@ export interface EmailVars {
 }
 
 export type BuiltEmail = { subject: string; html: string; text: string }
+type AppLinks = { android: string; ios: string; downloadUrl: string | null; browserUrl: string }
 
 type Overrides = Partial<EmailCopy> | undefined
-type Handlers = { [K in EmailKey]: (vars: EmailVars[K], overrides: Overrides, logo: EmailLogo) => BuiltEmail }
+type Handlers = { [K in EmailKey]: (vars: EmailVars[K], overrides: Overrides, logo: EmailLogo, app: AppLinks) => BuiltEmail }
 
 const HANDLERS: Handlers = {
-  role_invite: (v, overrides, logo) => {
+  role_invite: (v, overrides, logo, app) => {
     const invitedTo = (v.invitedTo ?? '').trim()
     const copy = resolveCopy('role_invite', overrides, { role: v.roleLabel, invitedTo })
     // Project invites (invitedTo set) reference the project rather than the role,
@@ -37,10 +39,10 @@ const HANDLERS: Handlers = {
       if (!(overrides?.subject && overrides.subject.trim())) copy.subject = `You've been invited to ${invitedTo} on MOTIV`
       if (!(overrides?.lead && overrides.lead.trim())) copy.lead = `You've been invited to ${escapeHtml(invitedTo)} on MOTIV.`
     }
-    return renderBrandedEmail(copy, { logo, link: v.link })
+    return renderBrandedEmail(copy, { logo, link: v.link, app })
   },
 
-  supplier_invite: (v, overrides, logo) => {
+  supplier_invite: (v, overrides, logo, app) => {
     const inviter = (v.inviterCompany ?? '').trim()
     const copy = resolveCopy('supplier_invite', overrides, { inviter })
     // The default lead leads with "{inviter} has invited you…". With no inviter
@@ -54,6 +56,7 @@ const HANDLERS: Handlers = {
       link: v.link,
       note: v.message ?? undefined,
       noteLabel: inviter ? `Message from ${inviter}` : 'Message',
+      app,
     })
   },
 
@@ -92,6 +95,13 @@ function originFrom<K extends EmailKey>(key: K, vars: EmailVars[K]): string {
  */
 export async function buildEmail<K extends EmailKey>(key: K, vars: EmailVars[K]): Promise<BuiltEmail> {
   const settings = await getAppSettings()
-  const logo = emailLogoHeader(settings.branding as BrandingState, originFrom(key, vars))
-  return HANDLERS[key](vars, settings.emails[key], logo)
+  const origin = originFrom(key, vars)
+  const logo = emailLogoHeader(settings.branding as BrandingState, origin)
+  const app: AppLinks = {
+    android: settings.appInstallAndroid?.trim() || DEFAULT_INSTALL_ANDROID,
+    ios: settings.appInstallIos?.trim() || DEFAULT_INSTALL_IOS,
+    downloadUrl: settings.appDownloadUrl?.trim() || null,
+    browserUrl: origin,
+  }
+  return HANDLERS[key](vars, settings.emails[key], logo, app)
 }

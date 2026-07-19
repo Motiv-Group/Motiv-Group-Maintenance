@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic'
 export async function POST(req: Request) {
   const auth = await projectAdminAuth()
   if ('fail' in auth) return NextResponse.json({ error: auth.message }, { status: auth.fail })
-  const { userId, companyId, admin } = auth
+  const { userId, companyId: linkedCompanyId, admin } = auth
 
   if (!(await rateLimit(`projects:${userId}`, 30, 60_000)))
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
@@ -20,6 +20,16 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => null)
   if (!body || typeof body.name !== 'string' || !body.name.trim())
     return NextResponse.json({ error: 'Project name is required' }, { status: 400 })
+
+  // system_admin may create a project for an explicitly-chosen company (the
+  // Projects tab company selector); otherwise fall back to their linked company.
+  let companyId = linkedCompanyId
+  if (typeof body.companyId === 'string' && body.companyId) {
+    const { data: c } = await admin.from('companies').select('id').eq('id', body.companyId).maybeSingle()
+    if (!c) return NextResponse.json({ error: 'Company not found' }, { status: 400 })
+    companyId = body.companyId
+  }
+  if (!companyId) return NextResponse.json({ error: 'Pick a company for this project' }, { status: 400 })
 
   const status: ProjectStatus = PROJECT_STATUSES.includes(body.status) ? body.status : 'draft'
 
