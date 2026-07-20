@@ -457,7 +457,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
             It's a client component so its per-action trigger render-props are created
             client-side (a Server Component can't pass functions to Client Components). */}
         {!isTerminal && (canAssign || canCancel) && (
-          <RmTicketActionBar ticketId={t.id} status={t.status} canAssign={canAssign} canAssignSupplier={canAssignSupplier} canCancel={canCancel} canEdit={canEdit} jobRef={t.job_ref}
+          <RmTicketActionBar ticketId={t.id} status={t.status} canAssign={canAssign} canAssignSupplier={canAssignSupplier} canCancel={canCancel} canEdit={canEdit} hasSupplier={!!t.supplier_id} jobRef={t.job_ref}
             suppliers={supplierList} motivSuppliers={motivSupplierList} motivAccess={motivAccess} declinedSupplierIds={declinedSupplierIds} awaitingById={engagedSupplierIds}
             description={t.description ?? ''} photoUrls={Array.isArray(t.photo_urls) ? t.photo_urls : []} title={t.title} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} priority={t.priority} />
         )}
@@ -513,9 +513,10 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
           exclude={['validate', 'reject', 'request_info', 'request_quote', 'require_assessment', 'approve_quote', 'reject_quote', 'request_revision', 'proceed_no_quote', 'schedule', 'approve', 'assign_snag', 'accept_schedule', 'approve_snag', 'decline_snag_schedule', 'approve_variation', 'reject_variation', 'request_evidence', 'raise_snag', 'close_out']}
         />
 
-        {/* Chat with the supplier — the single next-action chat entry, below every
-            informational callout (the header icon + the action-bar item were removed). */}
-        {t.supplier_id && !isTerminal && <TicketChatInline ticketId={t.id} viewerRole="regional_manager" unread={chatUnread} />}
+        {/* Chat with the supplier — only when this block has no "More" menu to fold it
+            into (no action bar and no completion review); otherwise chat lives inside
+            that menu. */}
+        {t.supplier_id && !isTerminal && !(canAssign || canCancel) && !reviewSignoff && <TicketChatInline ticketId={t.id} viewerRole="regional_manager" unread={chatUnread} />}
       </Card>
 
       {/* Ticket information — aligned label→value rows, then full-width description. */}

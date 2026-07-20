@@ -87,7 +87,16 @@ export function SubmitCompletionForm({ ticketId, evidenceRequested = false, evid
   return (
     <>
     <div className="rounded-2xl bg-[var(--surface)] ring-1 ring-[var(--border)] p-5 sm:p-6 space-y-5">
-      <h2 className="flex items-center gap-2 text-lg font-bold text-[var(--text)]"><CheckCircle2 size={20} className="text-emerald-500" /> Submit COC &amp; POC for Sign-off</h2>
+      {/* Heading + (on an evidence request) the secondary actions pinned top-right. */}
+      <div className="flex items-start justify-between gap-3">
+        <h2 className="flex items-center gap-2 text-lg font-bold text-[var(--text)]"><CheckCircle2 size={20} className="text-emerald-500" /> Submit COC &amp; POC for Sign-off</h2>
+        {evidenceRequested && (
+          <MoreMenu align="right">
+            <MoreActionItem icon={<X size={16} />} label="Cancel" onClick={() => { setOpen(false); setErr(''); onClose?.() }} />
+            <MoreActionItem icon={<MessageSquare size={16} />} label="Chat with manager" onClick={() => setChatOpen(true)} />
+          </MoreMenu>
+        )}
+      </div>
       {/* Why the RM sent the completion back — mirrors the SM add-info modal. */}
       {evidenceRequested && evidenceRequestReason && (
         <div className="rounded-lg bg-amber-500/10 ring-1 ring-amber-500/30 p-3 space-y-0.5">
@@ -162,15 +171,9 @@ export function SubmitCompletionForm({ ticketId, evidenceRequested = false, evid
       {err && <p className="text-sm text-red-500">{err}</p>}
 
       {evidenceRequested ? (
-        // Evidence-request flavour: Cancel moves under "More" alongside a direct line
-        // to the manager who asked for the evidence.
-        <div className="flex items-center gap-3">
-          <button onClick={submit} disabled={busy} className="flex-1 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Submitting…' : 'Review & Submit'}</button>
-          <MoreMenu up align="right">
-            <MoreActionItem icon={<X size={16} />} label="Cancel" onClick={() => { setOpen(false); setErr(''); onClose?.() }} />
-            <MoreActionItem icon={<MessageSquare size={16} />} label="Chat with manager" onClick={() => setChatOpen(true)} />
-          </MoreMenu>
-        </div>
+        // Evidence-request flavour: Cancel + Chat live in the top-right "More"; the
+        // bottom row is just the primary submit.
+        <button onClick={submit} disabled={busy} className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Submitting…' : 'Review & Submit'}</button>
       ) : (
         <div className="grid grid-cols-2 gap-3">
           <button onClick={submit} disabled={busy} className="py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Submitting…' : 'Review & Submit'}</button>

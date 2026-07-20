@@ -60,7 +60,7 @@ export function RmCompletionReview({ ticketId, label, submittedAt, photoCount, d
   beforeUrls: string[]; afterUrls: string[]; cocUrl: string | null; invoiceUrl: string | null; notes: string | null
 }) {
   const [open, setOpen] = useState(false)
-  const [active, setActive] = useState<'evidence' | 'snag' | null>(null)
+  const [active, setActive] = useState<'evidence' | 'snag' | 'chat' | null>(null)
   const done = () => setActive(null)
   const submission: SignoffSubmission = { id: '', label, createdAt: submittedAt, beforeUrls, afterUrls, cocUrl, invoiceUrl, notes }
   return (
@@ -85,6 +85,7 @@ export function RmCompletionReview({ ticketId, label, submittedAt, photoCount, d
       <div className="flex items-center gap-2">
         <button type="button" onClick={() => setOpen(true)} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500"><CheckCircle2 size={16} /> Approve completion</button>
         <MoreMenu align="left">
+          <MoreActionItem icon={<MessageSquare size={16} />} label="Chat with supplier" onClick={() => setActive('chat')} />
           <MoreActionItem icon={<AlertTriangle size={16} />} label="Raise snag" onClick={() => setActive('snag')} />
           <MoreActionItem icon={<MessageSquare size={16} />} label="Request more evidence" onClick={() => setActive('evidence')} />
         </MoreMenu>
@@ -97,6 +98,8 @@ export function RmCompletionReview({ ticketId, label, submittedAt, photoCount, d
       )}
       {active === 'evidence' && <RequestEvidenceButton ticketId={ticketId} defaultOpen onClose={done} />}
       {active === 'snag' && <RaiseSnagButton ticketId={ticketId} defaultOpen onClose={done} />}
+      {/* A submitted completion means the supplier is awarded, so chat is available. */}
+      {active === 'chat' && <TicketChat ticketId={ticketId} viewerRole="regional_manager" defaultOpen onClose={done} />}
     </div>
   )
 }
@@ -191,6 +194,16 @@ export function SignoffReviewPanel({ ticketId, s, onDone }: { ticketId: string; 
 
   return (
     <div className="space-y-4">
+      {/* Heading + secondary actions ("More") pinned to the top-right. */}
+      <div className="flex items-start justify-between gap-3">
+        <h3 className="text-sm font-bold text-[var(--text)]">Review submission</h3>
+        <MoreMenu label="More actions" align="right">
+          <MoreActionItem icon={<MessageSquare size={16} />} label="Chat with supplier" onClick={() => setSub('chat')} />
+          <MoreActionItem icon={<MessageSquare size={16} />} label="Request more evidence" onClick={() => setSub('evidence')} />
+          <MoreActionItem icon={<AlertTriangle size={16} />} label="Raise a snag" tone="danger" onClick={() => setSub('snag')} />
+        </MoreMenu>
+      </div>
+
       {/* Submission detail — photos / COC / notes, each under its own rule. */}
       <div className="overflow-hidden rounded-xl bg-[var(--surface)] ring-1 ring-[var(--border)]">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 border-b border-[var(--border)] px-4 py-3">
@@ -222,14 +235,7 @@ export function SignoffReviewPanel({ ticketId, s, onDone }: { ticketId: string; 
 
       {err && <p className="text-xs text-red-500">{err}</p>}
 
-      <div className="flex items-center gap-2">
-        <MoreMenu label="More actions" up align="right">
-          <MoreActionItem icon={<MessageSquare size={16} />} label="Chat with supplier" onClick={() => setSub('chat')} />
-          <MoreActionItem icon={<MessageSquare size={16} />} label="Request more evidence" onClick={() => setSub('evidence')} />
-          <MoreActionItem icon={<AlertTriangle size={16} />} label="Raise a snag" tone="danger" onClick={() => setSub('snag')} />
-        </MoreMenu>
-        <button onClick={approve} disabled={busy} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50"><CheckCircle2 size={16} /> {busy ? 'Approving…' : 'Approve completion'}</button>
-      </div>
+      <button onClick={approve} disabled={busy} className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50"><CheckCircle2 size={16} /> {busy ? 'Approving…' : 'Approve completion'}</button>
 
       {sub === 'evidence' && <RequestEvidenceButton ticketId={ticketId} defaultOpen onClose={closeSub} />}
       {sub === 'snag' && <RaiseSnagButton ticketId={ticketId} defaultOpen onClose={closeSub} />}

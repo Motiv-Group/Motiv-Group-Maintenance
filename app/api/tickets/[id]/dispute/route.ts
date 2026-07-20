@@ -64,13 +64,21 @@ async function callerSupplierOrgs(admin: Admin, userId: string): Promise<string[
 }
 // The org (if any) whose quote/invite the RM declined on this ticket, restricted
 // to the caller's orgs — the seat for a 'quote_declined' dispute. The decline
-// nulls tickets.supplier_id, so this is resolved from ticket_suppliers.
+// nulls tickets.supplier_id, so this is resolved from ticket_suppliers / quotes.
 async function declinedOrgFor(admin: Admin, ticketId: string, orgIds: string[]): Promise<string | null> {
   if (!orgIds.length) return null
+  // Fresh RM decline that was NOT asked to re-quote: the invite still reads 'declined'.
   const { data } = await admin.from('ticket_suppliers')
     .select('supplier_id, status, declined_by').eq('ticket_id', ticketId).in('supplier_id', orgIds)
-  const hit = (data ?? []).find(r => r.supplier_id && orgIds.includes(r.supplier_id) && r.status === 'declined' && r.declined_by === 'regional_manager')
-  return hit?.supplier_id ?? null
+  const invite = (data ?? []).find(r => r.supplier_id && orgIds.includes(r.supplier_id) && r.status === 'declined' && r.declined_by === 'regional_manager')
+  if (invite?.supplier_id) return invite.supplier_id
+  // Re-quote path: the RM decline resets ticket_suppliers.status back to 'invited',
+  // so the declined-invite evidence is gone — but the RM-declined QUOTE row survives.
+  // Fall back to it, still scoped to the caller's OWN orgs (cross-supplier isolation holds).
+  const { data: q } = await admin.from('quotes')
+    .select('supplier_id, status').eq('ticket_id', ticketId).eq('status', 'declined').in('supplier_id', orgIds)
+  const quote = (q ?? []).find(r => r.supplier_id && orgIds.includes(r.supplier_id))
+  return quote?.supplier_id ?? null
 }
 
 // Resolve a dispute. outcome 'withdrawn' = the RM's request is DROPPED/retracted;

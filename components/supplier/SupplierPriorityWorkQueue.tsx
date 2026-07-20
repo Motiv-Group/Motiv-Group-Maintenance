@@ -14,6 +14,7 @@ import { useRouter } from 'next/navigation'
 import type { SupplierTicketRow } from '@/lib/health/data'
 import { Modal } from '@/components/ui/Modal'
 import { PhotoThumbs } from '@/components/ui/PhotoThumbs'
+import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { errMsg } from '@/components/ui/errMsg'
 import { SendQuoteForm } from '@/components/admin/SendQuoteForm'
 import { SubmitCompletionForm } from '@/components/supplier/SubmitCompletionForm'
@@ -160,15 +161,17 @@ function QueueRow({ ticket, nowMs, company, chatUnread = 0 }: { ticket: Supplier
 // the supplier-scoped quote-context route (mirrors the RM's View & Assign
 // context). Kept lean: store · impact · description · photos.
 type QuoteContext = { title: string; category: string | null; description: string | null; impact: string | null; priority: string; jobRef: string | null; storeName: string | null; photoUrls: string[] }
-function TicketContextPanel({ ticketId }: { ticketId: string }) {
+type DeclinedQuote = { amount: number | null; amountInclVat: number | null; description: string | null; fileUrl: string | null; declineReason: string | null; validUntil: string | null; createdAt: string }
+function TicketContextPanel({ ticketId, showDeclined = false }: { ticketId: string; showDeclined?: boolean }) {
   const [ctx, setCtx] = useState<QuoteContext | null>(null)
+  const [declined, setDeclined] = useState<DeclinedQuote | null>(null)
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
   useEffect(() => {
     let live = true
     fetch(`/api/tickets/${ticketId}/quote-context`)
       .then(r => r.json())
-      .then(d => { if (!live) return; if (d?.error) setErr(d.error); else setCtx(d.ticket) })
+      .then(d => { if (!live) return; if (d?.error) setErr(d.error); else { setCtx(d.ticket); setDeclined(d.declinedQuote ?? null) } })
       .catch(() => { if (live) setErr('Could not load the job details.') })
       .finally(() => { if (live) setLoading(false) })
     return () => { live = false }
@@ -177,32 +180,54 @@ function TicketContextPanel({ ticketId }: { ticketId: string }) {
   if (loading) return <p className="py-3 text-center text-sm text-[var(--text-faint)]">Loading job details…</p>
   if (err || !ctx) return err ? <p className="text-sm text-red-500">{err}</p> : null
   return (
-    <div className="space-y-3 rounded-xl bg-[var(--surface-2)] p-4 ring-1 ring-[var(--border)]">
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs text-[var(--text-muted)]">
-        {ctx.storeName && <span><span className="text-[var(--text-faint)]">Store</span> <span className="font-semibold text-[var(--text)]">{ctx.storeName}</span></span>}
-        {ctx.category && <span><span className="text-[var(--text-faint)]">Category</span> <span className="font-semibold text-[var(--text)]">{ctx.category}</span></span>}
-        {ctx.impact && <span><span className="text-[var(--text-faint)]">Impact</span> <span className="font-semibold text-[var(--text)]">{OPERATIONAL_IMPACT_LABELS[ctx.impact] ?? ctx.impact}</span></span>}
+    <div className="space-y-3">
+      {/* Re-quote flow: the supplier's own declined quote — amount + attachment they
+          need to revise (the decline reason itself shows above, in the amber block). */}
+      {showDeclined && declined && (
+        <div className="space-y-2 rounded-xl bg-[var(--surface-2)] p-4 ring-1 ring-[var(--border)]">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-faint)]">Your declined quote</p>
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
+            {declined.amount != null && <span className="font-bold text-[var(--text)]">{formatCurrency(declined.amount)} <span className="text-xs font-normal text-[var(--text-faint)]">excl VAT</span></span>}
+            {declined.amountInclVat != null && <span className="text-[var(--text-muted)]">{formatCurrency(declined.amountInclVat)} <span className="text-xs text-[var(--text-faint)]">incl VAT</span></span>}
+          </div>
+          {declined.description && <p className="whitespace-pre-line break-words text-sm text-[var(--text-muted)]">{declined.description}</p>}
+          {declined.fileUrl && (
+            <ViewTrackedLink ticketId={ticketId} itemType="quote" itemLabel="Declined quote" href={declined.fileUrl}
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:underline">
+              <FileText size={15} /> View quote attachment
+            </ViewTrackedLink>
+          )}
+        </div>
+      )}
+      <div className="space-y-3 rounded-xl bg-[var(--surface-2)] p-4 ring-1 ring-[var(--border)]">
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs text-[var(--text-muted)]">
+          {ctx.storeName && <span><span className="text-[var(--text-faint)]">Store</span> <span className="font-semibold text-[var(--text)]">{ctx.storeName}</span></span>}
+          {ctx.category && <span><span className="text-[var(--text-faint)]">Category</span> <span className="font-semibold text-[var(--text)]">{ctx.category}</span></span>}
+          {ctx.impact && <span><span className="text-[var(--text-faint)]">Impact</span> <span className="font-semibold text-[var(--text)]">{OPERATIONAL_IMPACT_LABELS[ctx.impact] ?? ctx.impact}</span></span>}
+        </div>
+        {ctx.description && (
+          <div>
+            <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-[var(--text-faint)]">Description</p>
+            <p className="whitespace-pre-line break-words text-sm text-[var(--text)]">{ctx.description}</p>
+          </div>
+        )}
+        {ctx.photoUrls.length > 0 && (
+          <div>
+            <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-[var(--text-faint)]">Photos</p>
+            <PhotoThumbs urls={ctx.photoUrls} ticketId={ticketId} label="Job photo" limit={5} />
+          </div>
+        )}
       </div>
-      {ctx.description && (
-        <div>
-          <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-[var(--text-faint)]">Description</p>
-          <p className="whitespace-pre-line break-words text-sm text-[var(--text)]">{ctx.description}</p>
-        </div>
-      )}
-      {ctx.photoUrls.length > 0 && (
-        <div>
-          <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-[var(--text-faint)]">Photos</p>
-          <PhotoThumbs urls={ctx.photoUrls} ticketId={ticketId} label="Job photo" limit={5} />
-        </div>
-      )}
     </div>
   )
 }
 
-// "Submit quote" opens the job detail THEN the quote-upload form in one pop-up
-// (mirrors the RM assign flow), so the supplier reviews the job before quoting.
+// "Submit quote" is a TWO-STEP pop-up: first the job detail with a blue
+// "Submit quote" button (review the job neatly, like the RM View & Assign
+// context), which THEN opens the quote-upload form in a second pop-up.
 function SubmitQuoteCta({ ticket, className }: { ticket: SupplierTicketRow; className: string }) {
   const [open, setOpen] = useState(false)
+  const [quoting, setQuoting] = useState(false)
   return (
     <>
       <button type="button" onClick={() => setOpen(true)} className={className}>Submit Quote</button>
@@ -210,9 +235,22 @@ function SubmitQuoteCta({ ticket, className }: { ticket: SupplierTicketRow; clas
         <Modal onClose={() => setOpen(false)} maxWidth="max-w-3xl">
           {close => (
             <div className="space-y-4">
-              <h3 className="text-base font-bold text-[var(--text)]">Review the job &amp; submit your quote</h3>
+              <h3 className="text-base font-bold text-[var(--text)]">Review the job</h3>
               <TicketContextPanel ticketId={ticket.id} />
-              <SendQuoteForm defaultOpen competitive ticketId={ticket.id} priority={String(ticket.priority)} createdAt={ticket.createdAt} onClose={close} />
+              <button type="button" onClick={() => setQuoting(true)}
+                className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500">
+                <ReceiptText size={16} /> Submit quote
+              </button>
+              {quoting && (
+                <Modal onClose={() => setQuoting(false)} maxWidth="max-w-3xl">
+                  {closeQuote => (
+                    <div className="space-y-4">
+                      <h3 className="text-base font-bold text-[var(--text)]">Submit your quote</h3>
+                      <SendQuoteForm defaultOpen competitive ticketId={ticket.id} priority={String(ticket.priority)} createdAt={ticket.createdAt} onClose={() => { closeQuote(); close() }} />
+                    </div>
+                  )}
+                </Modal>
+              )}
             </div>
           )}
         </Modal>
@@ -237,7 +275,14 @@ function ReQuoteCta({ ticket, className, company }: { ticket: SupplierTicketRow;
         <Modal onClose={() => setOpen(false)} maxWidth="max-w-3xl">
           {close => (
             <div className="space-y-4">
-              <h3 className="text-base font-bold text-[var(--text)]">Quote declined — revise &amp; resubmit</h3>
+              {/* Pop-up convention (#8): More sits at the top-right, menu opens downward. */}
+              <div className="flex items-start justify-between gap-3">
+                <h3 className="text-base font-bold text-[var(--text)]">Quote declined — revise &amp; resubmit</h3>
+                <MoreMenu align="right">
+                  <MoreActionItem label="Cancel" onClick={close} />
+                  <MoreActionItem label="Raise dispute" tone="danger" onClick={() => setDisputing(true)} />
+                </MoreMenu>
+              </div>
               <div className="space-y-1 rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5">
                 <p className="text-sm text-[var(--text)]">The manager declined your quote and asked you to revise and resubmit it.</p>
                 {ticket.declineReason && (
@@ -245,18 +290,11 @@ function ReQuoteCta({ ticket, className, company }: { ticket: SupplierTicketRow;
                 )}
               </div>
 
-              <TicketContextPanel ticketId={ticket.id} />
+              <TicketContextPanel ticketId={ticket.id} showDeclined />
 
-              <div className="flex items-center gap-2">
-                <button type="button" onClick={() => setQuoting(true)} className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500">
-                  <ReceiptText size={16} /> Re-quote
-                </button>
-                {/* Pop-up convention: menu opens upward, right-aligned. */}
-                <MoreMenu up align="right">
-                  <MoreActionItem label="Cancel" onClick={close} />
-                  <MoreActionItem label="Raise dispute" tone="danger" onClick={() => setDisputing(true)} />
-                </MoreMenu>
-              </div>
+              <button type="button" onClick={() => setQuoting(true)} className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500">
+                <ReceiptText size={16} /> Re-quote
+              </button>
 
               {quoting && (
                 <Modal onClose={() => setQuoting(false)} maxWidth="max-w-3xl">

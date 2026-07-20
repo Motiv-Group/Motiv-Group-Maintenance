@@ -1,6 +1,6 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { signManyUrls } from '@/lib/storage'
+import { signManyUrls, signedUrl } from '@/lib/storage'
 
 // GET /api/tickets/[id]/quote-context — the ticket detail a supplier needs to
 // quote (description · photos · impact · store), for the Today-queue "Submit
@@ -43,11 +43,24 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   }
   const photoUrls = Array.isArray(t.photo_urls) ? await signManyUrls(t.photo_urls as string[]) : []
 
+  // The caller's own latest DECLINED quote on this ticket (for the re-quote flow —
+  // shows what was declined + why alongside the job). Restricted to their orgs.
+  const { data: declined } = await admin.from('quotes')
+    .select('amount, amount_incl_vat, description, file_url, decline_reason, created_at, valid_until')
+    .eq('ticket_id', id).eq('status', 'declined').in('supplier_id', [...myOrgs])
+    .order('created_at', { ascending: false }).limit(1).maybeSingle()
+  const declinedQuote = declined ? {
+    amount: declined.amount, amountInclVat: declined.amount_incl_vat ?? null,
+    description: declined.description ?? null, fileUrl: declined.file_url ? await signedUrl(declined.file_url) : null,
+    declineReason: declined.decline_reason ?? null, validUntil: declined.valid_until ?? null, createdAt: declined.created_at,
+  } : null
+
   return NextResponse.json({
     ticket: {
       title: t.title, category: t.category, description: t.description,
       impact: t.operational_impact, priority: t.priority, jobRef: t.job_ref,
       storeName, photoUrls,
     },
+    declinedQuote,
   })
 }

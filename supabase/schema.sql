@@ -729,6 +729,9 @@ create table if not exists public.ticket_views (
   first_viewed_at              timestamptz not null default now(),
   item_label                   text not null default ''::text
 );
+-- First-view-wins: the /view route upserts on these four columns (20260722).
+create unique index if not exists ticket_views_unique_view
+  on public.ticket_views (ticket_id, viewer_id, item_type, item_label);
 
 -- Ticket status-change audit trail (one row per status change; 20260710).
 create table if not exists public.ticket_events (
