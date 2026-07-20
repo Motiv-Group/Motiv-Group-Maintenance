@@ -2,6 +2,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { signedUrl, signManyUrls } from '@/lib/storage'
 import { rmOwnsTicket } from '@/lib/rm-ticket-access'
+import { loadSlaResolver } from '@/lib/health/data'
 import type { Database } from '@/lib/database.types'
 
 type PanelQuote = Pick<
@@ -80,12 +81,20 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     ? await admin.from('stores').select('name').eq('id', ticket.store_id).maybeSingle()
     : { data: null }
   const photoUrls = Array.isArray(ticket.photo_urls) && ticket.photo_urls.length ? await signManyUrls(ticket.photo_urls) : []
+  // "Due" = the resolution SLA target: the stamped columns when set (fresh tickets
+  // have neither yet), else created_at + the company's resolution rule — mirrors
+  // the health engine's fallback so the pop-up never shows a blank Due.
+  let dueAt: string | null = ticket.adjusted_resolution_due_at ?? ticket.resolution_due_at ?? null
+  if (!dueAt) {
+    const rules = await loadSlaResolver(admin, ticket.company_id)
+    const tgt = rules(ticket.priority as 'P1' | 'P2' | 'P3' | 'P4')
+    dueAt = new Date(new Date(ticket.created_at).getTime() + tgt.resolution_mins * 60_000).toISOString()
+  }
   const ticketDetail = {
     title: ticket.title, category: ticket.category ?? null, description: ticket.description ?? '',
     operationalImpact: ticket.operational_impact ?? null, priority: ticket.priority ?? null,
     jobRef: ticket.job_ref ?? null, storeName: store?.name ?? null, photoUrls,
-    // "Due" = the resolution SLA target (RM-adjusted when set).
-    createdAt: ticket.created_at, dueAt: ticket.adjusted_resolution_due_at ?? ticket.resolution_due_at ?? null,
+    createdAt: ticket.created_at, dueAt,
   }
 
   return NextResponse.json({ rows, canReQuote, ticket: ticketDetail })

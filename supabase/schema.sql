@@ -232,7 +232,8 @@ create table if not exists public.quotes (
   created_at                   timestamptz not null default now(),
   updated_at                   timestamptz not null default now(),
   proposed_schedule_at         timestamptz,
-  warranty                     text
+  warranty                     text,
+  quote_ref                    text -- human-readable "Q-YYYY-NNNNN" (assign_quote_ref trigger, 20260723)
 );
 
 create table if not exists public.ratings (
@@ -436,6 +437,12 @@ create table if not exists public.store_health_scores (
 create table if not exists public.store_ticket_counters (
   store_id                     uuid not null,
   year                         integer not null,
+  last_number                  integer not null default 0
+);
+
+-- Per-year counter behind quotes.quote_ref ("Q-YYYY-NNNNN", 20260723).
+create table if not exists public.quote_ref_counters (
+  year                         integer not null primary key,
   last_number                  integer not null default 0
 );
 
@@ -1309,6 +1316,33 @@ END;
 $function$
 ;
 
+-- Quote reference "Q-YYYY-NNNNN" — same locked-counter pattern as job refs (20260723).
+CREATE OR REPLACE FUNCTION public.assign_quote_ref()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_year integer := EXTRACT(year FROM COALESCE(NEW.created_at, now()))::integer;
+  v_seq  integer;
+BEGIN
+  IF NEW.quote_ref IS NOT NULL THEN
+    RETURN NEW;
+  END IF;
+
+  INSERT INTO public.quote_ref_counters (year, last_number)
+    VALUES (v_year, 1)
+    ON CONFLICT (year)
+    DO UPDATE SET last_number = public.quote_ref_counters.last_number + 1
+    RETURNING last_number INTO v_seq;
+
+  NEW.quote_ref := 'Q-' || v_year::text || '-' || lpad(v_seq::text, 5, '0');
+  RETURN NEW;
+END;
+$function$
+;
+
 -- SECURITY (20260721): the signup trigger may only ever produce the 'individual'
 -- role from client metadata — public signUp() data becomes raw_user_meta_data, so
 -- honouring its role was a self-service privilege escalation. Privileged roles are
@@ -1366,6 +1400,7 @@ begin new.updated_at = now(); return new; end; $function$
 revoke execute on function public.append_session_photo(uuid, text) from anon, authenticated;
 revoke execute on function public.handle_new_user()                 from anon, authenticated;
 revoke execute on function public.assign_store_job_ref()            from anon, authenticated;
+revoke execute on function public.assign_quote_ref()                from anon, authenticated;
 revoke execute on function public.log_ticket_event()                from anon, authenticated;  -- 20260717 / SEC-047
 revoke execute on function public.archive_ticket_notifications()    from anon, authenticated;  -- 20260717 / SEC-047
 
@@ -1448,6 +1483,8 @@ alter table public.ticket_chat_messages add constraint ticket_chat_messages_auth
 
 drop trigger if exists trg_assign_store_job_ref on public.tickets;
 create trigger trg_assign_store_job_ref BEFORE INSERT on public.tickets for each row EXECUTE FUNCTION assign_store_job_ref();
+drop trigger if exists trg_assign_quote_ref on public.quotes;
+create trigger trg_assign_quote_ref BEFORE INSERT on public.quotes for each row EXECUTE FUNCTION assign_quote_ref();
 
 -- Ticket audit trail + notification archive (20260710 / 20260711).
 drop trigger if exists trg_ticket_events_ins on public.tickets;
@@ -1471,6 +1508,7 @@ alter table public.asset_service_history enable row level security;
 alter table public.preventative_maintenance_plans enable row level security;
 alter table public.preventative_maintenance_tasks enable row level security;
 alter table public.store_ticket_counters enable row level security;  -- no policy: service-role/trigger only
+alter table public.quote_ref_counters enable row level security;     -- no policy: service-role/trigger only
 
 drop policy if exists "assets read" on public.assets;
 create policy "assets read" on public.assets for select using (company_id = public.app_company_id());

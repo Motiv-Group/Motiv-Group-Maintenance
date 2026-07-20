@@ -14,6 +14,8 @@ import { post, errMsg, PANEL_META } from './shared'
 // ── Quote review (approve / decline with reason) ────────────────
 export interface ReviewQuote { id: string; supplierName: string; amount: number; amountInclVat: number | null; description: string | null; fileUrl: string | null; createdAt: string; proposedScheduleAt?: string | null }
 const DECLINE_REASONS = ['Price too high', 'Scope unclear / incomplete', 'Choosing another supplier', 'Lead time too long', 'Other']
+// Choosing someone else ≠ asking this supplier to revise — this reason never offers the re-quote checkbox.
+const NO_REQUOTE_REASON = 'Choosing another supplier'
 
 export function QuoteReviewCard({ ticketId, quotes }: { ticketId: string; quotes: ReviewQuote[] }) {
   const router = useRouter()
@@ -187,12 +189,14 @@ export function RmQuotePanel({ ticketId, rows, canReQuote }: { ticketId: string;
           {active.kind === 'received' && (
             mode === 'decline' ? (
               <div className="space-y-2 pt-1">
-                <select className={input} value={reason} onChange={e => setReason(e.target.value)}>{DECLINE_REASONS.map(r => <option key={r} value={r}>{r}</option>)}</select>
+                <select className={input} value={reason} onChange={e => { setReason(e.target.value); if (e.target.value === NO_REQUOTE_REASON) setRequote(false) }}>{DECLINE_REASONS.map(r => <option key={r} value={r}>{r}</option>)}</select>
                 {reason === 'Other' && <textarea className={`${input} min-h-[60px]`} placeholder="Reason…" value={other} onChange={e => setOther(e.target.value)} />}
-                <label className="flex items-start gap-2 rounded-lg bg-[var(--input-bg)] px-3 py-2 text-sm text-[var(--text-muted)] ring-1 ring-[var(--border)]">
-                  <input type="checkbox" checked={requote} onChange={e => setRequote(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-blue-600" />
-                  Also ask this supplier to submit a revised quote
-                </label>
+                {reason !== NO_REQUOTE_REASON && (
+                  <label className="flex items-start gap-2 rounded-lg bg-[var(--input-bg)] px-3 py-2 text-sm text-[var(--text-muted)] ring-1 ring-[var(--border)]">
+                    <input type="checkbox" checked={requote} onChange={e => setRequote(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-blue-600" />
+                    Also ask this supplier to submit a revised quote
+                  </label>
+                )}
                 <div className="flex gap-2">
                   <button onClick={() => decide(active.quote!.id, 'decline')} disabled={busy} className="flex-1 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold disabled:opacity-50">Confirm decline</button>
                   <button onClick={() => setMode('view')} className="flex-1 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm">Back</button>
@@ -335,12 +339,14 @@ export function QuoteComparison({ ticketId, rows, onClose }: { ticketId: string;
       {declineMode && selected && (
         <div className="space-y-2 rounded-xl bg-[var(--input-bg)] p-3 ring-1 ring-[var(--border)]">
           <p className="text-sm text-[var(--text)]">Decline <span className="font-semibold">{selected.name}</span>&apos;s quote — choose a reason:</p>
-          <select className={input} value={reason} onChange={e => setReason(e.target.value)}>{DECLINE_REASONS.map(r => <option key={r} value={r}>{r}</option>)}</select>
+          <select className={input} value={reason} onChange={e => { setReason(e.target.value); if (e.target.value === NO_REQUOTE_REASON) setRequote(false) }}>{DECLINE_REASONS.map(r => <option key={r} value={r}>{r}</option>)}</select>
           {reason === 'Other' && <textarea className={`${input} min-h-[60px]`} placeholder="Reason…" value={other} onChange={e => setOther(e.target.value)} />}
-          <label className="flex items-start gap-2 text-sm text-[var(--text-muted)]">
-            <input type="checkbox" checked={requote} onChange={e => setRequote(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-blue-600" />
-            Also ask this supplier to submit a revised quote
-          </label>
+          {reason !== NO_REQUOTE_REASON && (
+            <label className="flex items-start gap-2 text-sm text-[var(--text-muted)]">
+              <input type="checkbox" checked={requote} onChange={e => setRequote(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-blue-600" />
+              Also ask this supplier to submit a revised quote
+            </label>
+          )}
         </div>
       )}
 

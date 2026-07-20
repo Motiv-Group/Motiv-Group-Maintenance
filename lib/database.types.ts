@@ -1124,6 +1124,21 @@ export interface Database {
         }
       ]
       }
+      quote_ref_counters: {
+        Row: {
+          year: number
+          last_number: number
+        }
+        Insert: {
+          year?: number
+          last_number?: number
+        }
+        Update: {
+          year?: number
+          last_number?: number
+        }
+        Relationships: []
+      }
       quotes: {
         Row: {
           id: string
@@ -1143,6 +1158,7 @@ export interface Database {
           updated_at: string
           proposed_schedule_at: string | null
           warranty: string | null
+          quote_ref: string | null
         }
         Insert: {
           id?: string
@@ -1162,6 +1178,7 @@ export interface Database {
           updated_at?: string
           proposed_schedule_at?: string | null
           warranty?: string | null
+          quote_ref?: string | null
         }
         Update: {
           id?: string
@@ -1181,6 +1198,7 @@ export interface Database {
           updated_at?: string
           proposed_schedule_at?: string | null
           warranty?: string | null
+          quote_ref?: string | null
         }
         Relationships: [
         {

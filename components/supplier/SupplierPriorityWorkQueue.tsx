@@ -7,9 +7,9 @@
 // phases (submit quote → mark in progress → upload evidence → sign-off). Uses
 // `myStatus` isolation so a supplier only ever sees their own quote state, never
 // another supplier's progress.
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { AlertOctagon, AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, ReceiptText, Camera, FileText, X } from 'lucide-react'
+import { AlertOctagon, AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, ChevronRight, Info, ReceiptText, Camera, FileText, ShieldCheck, SquarePen, Store as StoreIcon, Tag, X, XCircle } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import type { SupplierTicketRow } from '@/lib/health/data'
 import { Modal } from '@/components/ui/Modal'
@@ -169,70 +169,10 @@ function QueueRow({ ticket, nowMs, company, chatUnread = 0 }: { ticket: Supplier
   )
 }
 
-// Ticket detail a supplier reviews before quoting — fetched on pop-up open from
-// the supplier-scoped quote-context route (mirrors the RM's View & Assign
-// context). Kept lean: store · impact · description · photos.
-type QuoteContext = { title: string; category: string | null; description: string | null; impact: string | null; priority: string; jobRef: string | null; storeName: string | null; photoUrls: string[] }
-type DeclinedQuote = { amount: number | null; amountInclVat: number | null; description: string | null; fileUrl: string | null; declineReason: string | null; validUntil: string | null; createdAt: string }
-function TicketContextPanel({ ticketId, showDeclined = false }: { ticketId: string; showDeclined?: boolean }) {
-  const [ctx, setCtx] = useState<QuoteContext | null>(null)
-  const [declined, setDeclined] = useState<DeclinedQuote | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [err, setErr] = useState('')
-  useEffect(() => {
-    let live = true
-    fetch(`/api/tickets/${ticketId}/quote-context`)
-      .then(r => r.json())
-      .then(d => { if (!live) return; if (d?.error) setErr(d.error); else { setCtx(d.ticket); setDeclined(d.declinedQuote ?? null) } })
-      .catch(() => { if (live) setErr('Could not load the job details.') })
-      .finally(() => { if (live) setLoading(false) })
-    return () => { live = false }
-  }, [ticketId])
-
-  if (loading) return <p className="py-3 text-center text-sm text-[var(--text-faint)]">Loading job details…</p>
-  if (err || !ctx) return err ? <p className="text-sm text-red-500">{err}</p> : null
-  return (
-    <div className="space-y-3">
-      {/* Re-quote flow: the supplier's own declined quote — amount + attachment they
-          need to revise (the decline reason itself shows above, in the amber block). */}
-      {showDeclined && declined && (
-        <div className="space-y-2 rounded-xl bg-[var(--surface-2)] p-4 ring-1 ring-[var(--border)]">
-          <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-faint)]">Your declined quote</p>
-          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
-            {declined.amount != null && <span className="font-bold text-[var(--text)]">{formatCurrency(declined.amount)} <span className="text-xs font-normal text-[var(--text-faint)]">excl VAT</span></span>}
-            {declined.amountInclVat != null && <span className="text-[var(--text-muted)]">{formatCurrency(declined.amountInclVat)} <span className="text-xs text-[var(--text-faint)]">incl VAT</span></span>}
-          </div>
-          {declined.description && <p className="whitespace-pre-line break-words text-sm text-[var(--text-muted)]">{declined.description}</p>}
-          {declined.fileUrl && (
-            <ViewTrackedLink ticketId={ticketId} itemType="quote" itemLabel="Declined quote" href={declined.fileUrl}
-              className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:underline">
-              <FileText size={15} /> View quote attachment
-            </ViewTrackedLink>
-          )}
-        </div>
-      )}
-      <div className="space-y-3 rounded-xl bg-[var(--surface-2)] p-4 ring-1 ring-[var(--border)]">
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs text-[var(--text-muted)]">
-          {ctx.storeName && <span><span className="text-[var(--text-faint)]">Store</span> <span className="font-semibold text-[var(--text)]">{ctx.storeName}</span></span>}
-          {ctx.category && <span><span className="text-[var(--text-faint)]">Category</span> <span className="font-semibold text-[var(--text)]">{ctx.category}</span></span>}
-          {ctx.impact && <span><span className="text-[var(--text-faint)]">Impact</span> <span className="font-semibold text-[var(--text)]">{OPERATIONAL_IMPACT_LABELS[ctx.impact] ?? ctx.impact}</span></span>}
-        </div>
-        {ctx.description && (
-          <div>
-            <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-[var(--text-faint)]">Description</p>
-            <p className="whitespace-pre-line break-words text-sm text-[var(--text)]">{ctx.description}</p>
-          </div>
-        )}
-        {ctx.photoUrls.length > 0 && (
-          <div>
-            <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-[var(--text-faint)]">Photos</p>
-            <PhotoThumbs urls={ctx.photoUrls} ticketId={ticketId} label="Job photo" limit={5} />
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
+// Shapes returned by the supplier-scoped quote-context route (fetched on pop-up
+// open by the Submit-quote and Declined-quote sheets).
+type QuoteContext = { title: string; category: string | null; description: string | null; impact: string | null; priority: string; jobRef: string | null; storeName: string | null; photoUrls: string[]; quoteRequestedAt: string | null }
+type DeclinedQuote = { amount: number | null; amountInclVat: number | null; description: string | null; fileUrl: string | null; declineReason: string | null; validUntil: string | null; createdAt: string; declinedAt: string | null; warranty: string | null; quoteRef: string | null }
 
 // "Submit quote" is a TWO-STEP pop-up in the shared ticket-sheet layout ("Ticket"
 // heading, job ref + badges, TICKET INFORMATION rows, IMAGES) with a blue
@@ -291,6 +231,7 @@ function SubmitQuoteSheet({ ticket, company, onClose }: { ticket: SupplierTicket
                     { label: 'Operational impact', value: ctx.impact ? (OPERATIONAL_IMPACT_LABELS[ctx.impact] ?? ctx.impact) : null },
                     { label: 'Logged', value: formatDateTime(ticket.createdAt) },
                     { label: 'Due', value: ticket.dueAt ? formatDateTime(ticket.dueAt) : null },
+                    { label: 'Quote requested', value: ctx.quoteRequestedAt ? formatDateTime(ctx.quoteRequestedAt) : null },
                     { label: 'Description', value: ctx.description ? <span className="whitespace-pre-line font-normal">{ctx.description}</span> : null },
                   ]} />
                 </SheetSection>
@@ -325,55 +266,186 @@ function SubmitQuoteSheet({ ticket, company, onClose }: { ticket: SupplierTicket
   )
 }
 
-// "View & re-quote" from the Today queue — the RM declined this supplier's quote
-// and asked them to revise it. Shows the decline reason + the declined quote + job
-// detail, a Re-quote button (opens the upload form) and a small More beside it
-// (Cancel; quote declines are not disputable from here).
-function ReQuoteCta({ ticket, className }: { ticket: SupplierTicketRow; className: string; company?: string }) {
+// "View & re-quote" from the Today queue — full declined-quote review sheet
+// (reference layout): decline header, revision-requested banner (reason + when),
+// the previous quote card (amounts · description · attachment | submitted /
+// valid-until / warranty / reference), the ticket context (store · category ·
+// impact, description, photos), and a footer: Back to quotes · Revise quote ·
+// More (Chat with the manager).
+function ReQuoteCta({ ticket, className, company }: { ticket: SupplierTicketRow; className: string; company?: string }) {
   const [open, setOpen] = useState(false)
-  const [quoting, setQuoting] = useState(false)
   return (
     <>
       <button type="button" onClick={() => setOpen(true)} className={className}>View &amp; Re-Quote</button>
-      {open && (
-        <Modal onClose={() => setOpen(false)} maxWidth="max-w-3xl">
-          {close => (
-            <div className="space-y-4">
-              <h3 className="text-base font-bold text-[var(--text)]">Quote declined — revise &amp; resubmit</h3>
-              <div className="space-y-1 rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5">
-                <p className="text-sm text-[var(--text)]">The manager declined your quote and asked you to revise and resubmit it.</p>
-                {ticket.declineReason && (
-                  <p className="text-sm text-[var(--text-muted)]"><span className="font-semibold text-[var(--text)]">Reason:</span> {ticket.declineReason}</p>
-                )}
+      {open && <DeclinedQuoteSheet ticket={ticket} company={company} onClose={() => setOpen(false)} />}
+    </>
+  )
+}
+// Icon + label + value cell for the store/category/impact strip.
+function IconStat({ icon, tint, label, value }: { icon: ReactNode; tint: string; label: string; value: string }) {
+  return (
+    <div className="flex min-w-0 items-center gap-2.5">
+      <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${tint}`}>{icon}</span>
+      <div className="min-w-0">
+        <p className="text-xs text-[var(--text-muted)]">{label}</p>
+        <p className="truncate text-sm font-semibold text-[var(--text)]">{value}</p>
+      </div>
+    </div>
+  )
+}
+function DeclinedQuoteSheet({ ticket, company, onClose }: { ticket: SupplierTicketRow; company?: string; onClose: () => void }) {
+  const [quoting, setQuoting] = useState(false)
+  const [chatting, setChatting] = useState(false)
+  const [ctx, setCtx] = useState<QuoteContext | null>(null)
+  const [declined, setDeclined] = useState<DeclinedQuote | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [err, setErr] = useState('')
+  useEffect(() => {
+    let live = true
+    fetch(`/api/tickets/${ticket.id}/quote-context`)
+      .then(r => r.json())
+      .then(d => { if (!live) return; if (d?.error) setErr(d.error); else { setCtx(d.ticket); setDeclined(d.declinedQuote ?? null) } })
+      .catch(() => { if (live) setErr('Could not load the declined quote.') })
+      .finally(() => { if (live) setLoading(false) })
+    return () => { live = false }
+  }, [ticket.id])
+
+  const who = ticket.isIndividual ? 'Individual' : [company, ticket.storeName, ticket.branchCode].filter(Boolean).join(' · ')
+  const vat = declined && declined.amount != null && declined.amountInclVat != null ? declined.amountInclVat - declined.amount : null
+  return (
+    <Modal onClose={onClose} maxWidth="max-w-3xl">
+      {close => (
+        <div className="space-y-4">
+          {/* Header — decline badge + title/subtitle, boxed close. */}
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 items-start gap-3">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-red-500/15 text-red-500"><XCircle size={22} /></span>
+              <div className="min-w-0">
+                <h3 className="text-xl font-bold leading-snug text-[var(--text)]">Quote declined — revise &amp; resubmit</h3>
+                <p className="mt-0.5 text-sm text-[var(--text-muted)]">The manager declined your quote and asked you to revise and resubmit it.</p>
               </div>
+            </div>
+            <button type="button" onClick={close} aria-label="Close" className="shrink-0 rounded-lg p-2 ring-1 ring-[var(--border)] text-[var(--text-muted)] transition hover:bg-[var(--hover)]"><X size={16} /></button>
+          </div>
 
-              <TicketContextPanel ticketId={ticket.id} showDeclined />
-
-              {/* Pop-up convention: small More beside the primary button, menu opens up-right. */}
-              <div className="flex items-center gap-2">
-                <button type="button" onClick={() => setQuoting(true)} className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500">
-                  <ReceiptText size={16} /> Re-quote
-                </button>
-                <MoreMenu up align="right">
-                  <MoreActionItem label="Cancel" onClick={close} />
-                </MoreMenu>
-              </div>
-
-              {quoting && (
-                <Modal onClose={() => setQuoting(false)} maxWidth="max-w-3xl">
-                  {closeQuote => (
-                    <div className="space-y-4">
-                      <h3 className="text-base font-bold text-[var(--text)]">Submit your revised quote</h3>
-                      <SendQuoteForm defaultOpen competitive ticketId={ticket.id} priority={String(ticket.priority)} createdAt={ticket.createdAt} onClose={() => { closeQuote(); close() }} />
+          {loading ? <p className="py-6 text-center text-sm text-[var(--text-faint)]">Loading the declined quote…</p>
+            : err ? <p className="text-sm text-red-500">{err}</p>
+            : (
+              <>
+                {/* Revision-requested banner — reason left, decided-on right. */}
+                <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5">
+                  <div className="flex min-w-0 items-start gap-2.5">
+                    <Info size={17} className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-500" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-amber-700 dark:text-amber-400">Revision requested</p>
+                      <p className="text-sm text-[var(--text)]"><span className="font-semibold">Reason:</span> {declined?.declineReason ?? ticket.declineReason ?? 'No reason given'}</p>
+                    </div>
+                  </div>
+                  {declined?.declinedAt && (
+                    <div className="shrink-0 text-sm sm:text-right">
+                      <p className="flex items-center gap-1.5 text-[var(--text)]"><CalendarClock size={14} className="shrink-0 text-[var(--text-faint)]" /> Decided on <span className="font-semibold">{formatDateTime(declined.declinedAt)}</span></p>
+                      <p className="text-xs text-[var(--text-muted)]">by {ticket.isIndividual ? 'the client' : 'Regional Manager'}</p>
                     </div>
                   )}
-                </Modal>
+                </div>
+
+                {/* Previous quote (declined). */}
+                {declined ? (
+                  <div className="grid gap-4 rounded-xl bg-[var(--surface-2)] p-4 ring-1 ring-[var(--border)] sm:grid-cols-[1fr_14rem]">
+                    <div className="min-w-0 space-y-3">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-faint)]">Previous quote (declined)</p>
+                      <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
+                        {declined.amount != null && (
+                          <div><p className="text-2xl font-bold text-[var(--text)]">{formatCurrency(declined.amount)}</p><p className="text-xs text-[var(--text-muted)]">excl. VAT</p></div>
+                        )}
+                        {vat != null && vat > 0 && (
+                          <div><p className="text-lg font-semibold text-[var(--text)]">{formatCurrency(vat)}</p><p className="text-xs text-[var(--text-muted)]">VAT</p></div>
+                        )}
+                        {declined.amountInclVat != null && (
+                          <div><p className="text-lg font-semibold text-[var(--text)]">{formatCurrency(declined.amountInclVat)}</p><p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">incl. VAT</p></div>
+                        )}
+                      </div>
+                      {declined.description && <p className="whitespace-pre-line break-words text-sm text-[var(--text-muted)]">{declined.description}</p>}
+                      {declined.fileUrl && (
+                        <ViewTrackedLink ticketId={ticket.id} itemType="quote" itemLabel="Declined quote" href={declined.fileUrl}
+                          className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:underline">
+                          <FileText size={15} /> View quote attachment
+                        </ViewTrackedLink>
+                      )}
+                    </div>
+                    <div className="space-y-3 text-sm sm:border-l sm:border-[var(--border)] sm:pl-4">
+                      <div className="flex items-start gap-2"><CalendarClock size={15} className="mt-0.5 shrink-0 text-[var(--text-faint)]" /><div><p className="text-[var(--text-muted)]">Submitted on</p><p className="font-semibold text-[var(--text)]">{formatDateTime(declined.createdAt)}</p></div></div>
+                      {declined.validUntil && (
+                        <div className="flex items-start gap-2"><ShieldCheck size={15} className="mt-0.5 shrink-0 text-[var(--text-faint)]" /><div><p className="text-[var(--text-muted)]">Quote valid until</p><p className="font-semibold text-[var(--text)]">{formatDate(declined.validUntil)}</p></div></div>
+                      )}
+                      {declined.warranty && (
+                        <div className="flex items-start gap-2"><ShieldCheck size={15} className="mt-0.5 shrink-0 text-[var(--text-faint)]" /><div><p className="text-[var(--text-muted)]">Warranty</p><p className="break-words font-semibold text-[var(--text)]">{declined.warranty}</p></div></div>
+                      )}
+                      {declined.quoteRef && (
+                        <div className="flex items-start gap-2"><Tag size={15} className="mt-0.5 shrink-0 text-[var(--text-faint)]" /><div><p className="text-[var(--text-muted)]">Quote reference</p><p className="font-semibold text-[var(--text)]">{declined.quoteRef}</p></div></div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-[var(--text-faint)]">The declined quote is no longer available.</p>
+                )}
+
+                {/* Ticket context — store/category/impact strip, description, photos. */}
+                {ctx && (
+                  <div className="space-y-3 rounded-xl bg-[var(--surface-2)] p-4 ring-1 ring-[var(--border)]">
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <IconStat icon={<StoreIcon size={17} />} tint="bg-blue-500/15 text-blue-600 dark:text-blue-400" label="Store" value={ctx.storeName ?? who} />
+                      {ctx.category && <IconStat icon={<Tag size={17} />} tint="bg-violet-500/15 text-violet-600 dark:text-violet-400" label="Category" value={ctx.category} />}
+                      {ctx.impact && <IconStat icon={<AlertTriangle size={17} />} tint="bg-red-500/15 text-red-500" label="Impact" value={OPERATIONAL_IMPACT_LABELS[ctx.impact] ?? ctx.impact} />}
+                    </div>
+                    {ctx.description && (
+                      <div>
+                        <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-[var(--text-faint)]">Description</p>
+                        <p className="whitespace-pre-line break-words text-sm text-[var(--text)]">{ctx.description}</p>
+                      </div>
+                    )}
+                    {ctx.photoUrls.length > 0 && (
+                      <div>
+                        <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-[var(--text-faint)]">Photos ({ctx.photoUrls.length})</p>
+                        <PhotoThumbs urls={ctx.photoUrls} ticketId={ticket.id} label="Job photo" limit={5} />
+                        <p className="mt-1.5 flex items-center gap-1.5 text-xs text-[var(--text-faint)]"><Info size={12} className="shrink-0" /> Click any photo to view full size</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Footer — Back to quotes · Revise quote (primary) · More. */}
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+                  <button type="button" onClick={close} className="rounded-xl px-4 py-2.5 text-sm font-semibold text-[var(--text)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)]">Back to quotes</button>
+                  <button type="button" onClick={() => setQuoting(true)} className="flex flex-1 items-center justify-center gap-3 rounded-xl bg-blue-600 px-4 py-2 text-white transition hover:bg-blue-500">
+                    <SquarePen size={17} className="shrink-0" />
+                    <span className="min-w-0 text-left">
+                      <span className="block text-sm font-semibold leading-tight">Revise quote</span>
+                      <span className="block text-xs leading-tight text-white/75">Make changes and resubmit for review</span>
+                    </span>
+                    <ChevronRight size={16} className="shrink-0" />
+                  </button>
+                  <MoreMenu up align="right">
+                    <MoreActionItem label="Chat with the manager" onClick={() => setChatting(true)} />
+                  </MoreMenu>
+                </div>
+              </>
+            )}
+
+          {quoting && (
+            <Modal onClose={() => setQuoting(false)} maxWidth="max-w-3xl">
+              {closeQuote => (
+                <div className="space-y-4">
+                  <h3 className="text-base font-bold text-[var(--text)]">Submit your revised quote</h3>
+                  <SendQuoteForm defaultOpen competitive ticketId={ticket.id} priority={String(ticket.priority)} createdAt={ticket.createdAt} onClose={() => { closeQuote(); close() }} />
+                </div>
               )}
-            </div>
+            </Modal>
           )}
-        </Modal>
+          {chatting && <TicketChat ticketId={ticket.id} viewerRole="supplier" defaultOpen onClose={() => setChatting(false)} />}
+        </div>
       )}
-    </>
+    </Modal>
   )
 }
 

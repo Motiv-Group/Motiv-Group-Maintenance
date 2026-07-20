@@ -24,17 +24,17 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   if (!myOrgs.size) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { data: t } = await admin.from('tickets')
-    .select('id, title, category, description, operational_impact, priority, store_id, photo_urls, job_ref, supplier_id')
+    .select('id, title, category, description, operational_impact, priority, store_id, photo_urls, job_ref, supplier_id, quote_requested_at')
     .eq('id', id).single()
   if (!t) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   // Access: awarded to one of my orgs, or one of my orgs is invited on this ticket.
-  let ok = !!t.supplier_id && myOrgs.has(t.supplier_id)
-  if (!ok) {
-    const { data: invites } = await admin.from('ticket_suppliers').select('supplier_id').eq('ticket_id', id)
-    ok = (invites ?? []).some(i => i.supplier_id && myOrgs.has(i.supplier_id))
-  }
+  // The invites also carry when THIS org was asked to quote (shown on the sheet).
+  const { data: invites } = await admin.from('ticket_suppliers').select('supplier_id, invited_at').eq('ticket_id', id)
+  const myInvite = (invites ?? []).find(i => i.supplier_id && myOrgs.has(i.supplier_id))
+  const ok = (!!t.supplier_id && myOrgs.has(t.supplier_id)) || !!myInvite
   if (!ok) return NextResponse.json({ error: 'Not your ticket' }, { status: 403 })
+  const quoteRequestedAt = myInvite?.invited_at ?? t.quote_requested_at ?? null
 
   let storeName: string | null = null
   if (t.store_id) {
@@ -46,13 +46,15 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   // The caller's own latest DECLINED quote on this ticket (for the re-quote flow —
   // shows what was declined + why alongside the job). Restricted to their orgs.
   const { data: declined } = await admin.from('quotes')
-    .select('amount, amount_incl_vat, description, file_url, decline_reason, created_at, valid_until')
+    .select('amount, amount_incl_vat, description, file_url, decline_reason, created_at, updated_at, valid_until, warranty, quote_ref')
     .eq('ticket_id', id).eq('status', 'declined').in('supplier_id', [...myOrgs])
     .order('created_at', { ascending: false }).limit(1).maybeSingle()
   const declinedQuote = declined ? {
     amount: declined.amount, amountInclVat: declined.amount_incl_vat ?? null,
     description: declined.description ?? null, fileUrl: declined.file_url ? await signedUrl(declined.file_url) : null,
     declineReason: declined.decline_reason ?? null, validUntil: declined.valid_until ?? null, createdAt: declined.created_at,
+    // The decline stamps updated_at → "Decided on"; warranty + ref for the card.
+    declinedAt: declined.updated_at ?? null, warranty: declined.warranty ?? null, quoteRef: declined.quote_ref ?? null,
   } : null
 
   // Variation orders belong to the AWARDED org only — an invited-but-not-awarded
@@ -85,7 +87,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     ticket: {
       title: t.title, category: t.category, description: t.description,
       impact: t.operational_impact, priority: t.priority, jobRef: t.job_ref,
-      storeName, photoUrls,
+      storeName, photoUrls, quoteRequestedAt,
     },
     declinedQuote,
     declinedVariation,
