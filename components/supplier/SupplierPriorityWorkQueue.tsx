@@ -19,7 +19,8 @@ import { errMsg } from '@/components/ui/errMsg'
 import { SendQuoteForm } from '@/components/admin/SendQuoteForm'
 import { SubmitCompletionForm } from '@/components/supplier/SubmitCompletionForm'
 import { SupplierVariationGate, AcceptSnagCard, SnagRescheduleCta } from '@/components/supplier/SupplierJobActions'
-import { DisputeReviewButton, RaiseDisputeMore } from '@/components/dispute/DisputeBox'
+import { DisputeReviewButton, RaiseDisputeMore, RaiseDisputeButton } from '@/components/dispute/DisputeBox'
+import { TicketChat } from '@/components/chat/TicketChat'
 import { MoreMenu, MoreActionItem } from '@/components/regional/rm-actions/ticket'
 import { supplierStatusMeta, formatJobId, formatCurrency, formatDate, OPERATIONAL_IMPACT_LABELS, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
 import {
@@ -123,7 +124,9 @@ function QueueRow({ ticket, nowMs, company, chatUnread = 0 }: { ticket: Supplier
     : ['accepted', 'scheduled'].includes(ticket.status) && ticket.awardedToMe ? 'Mark in progress'
     : needsEvidence(ticket) ? 'Upload evidence'
     : ticket.status === 'snag' && ticket.snagScheduleStatus === 'declined' ? 'Re-schedule'
+    : ticket.status === 'snag_assigned' && ticket.snagScheduleStatus === 'agreed' ? 'Start snag'
     : isSnag(ticket) ? 'View snag'
+    : ticket.status === 'vo_declined' && ticket.awardedToMe ? 'View VO'
     : 'View Ticket'
   const ctaCls = queueCtaClass(isCriticalPriority(ticket.priority))
   const jobId = ticket.jobRef ?? formatJobId(ticket.jobNumber)
@@ -144,7 +147,9 @@ function QueueRow({ ticket, nowMs, company, chatUnread = 0 }: { ticket: Supplier
           ? <ReQuoteCta ticket={ticket} className={ctaCls} company={company} />
           : toQuote(ticket)
           ? <SubmitQuoteCta ticket={ticket} className={ctaCls} company={company} />
-          : closeout && !ticket.voNoneConfirmed
+          : cta === 'View VO'
+          ? <ViewVoCta ticket={ticket} className={ctaCls} company={company} />
+          : closeout && ticket.status !== 'vo_declined' && !ticket.voNoneConfirmed
           ? <CloseOutCta ticket={ticket} className={ctaCls} />
           : cta === 'Mark in progress'
           ? <MarkInProgressCta ticket={ticket} className={ctaCls} />
@@ -153,6 +158,8 @@ function QueueRow({ ticket, nowMs, company, chatUnread = 0 }: { ticket: Supplier
           : cta === 'Re-schedule'
           ? <SnagRescheduleCta ticketId={ticket.id} priority={String(ticket.priority)} createdAt={ticket.createdAt}
               declinedProposedAt={ticket.snagScheduledAt} declineReason={ticket.snagScheduleDeclineReason} className={ctaCls} />
+          : cta === 'Start snag'
+          ? <StartSnagCta ticket={ticket} className={ctaCls} />
           : cta === 'View snag'
           ? <ViewSnagCta ticket={ticket} className={ctaCls} company={company} />
           : <Link href={ticketUrl} className={ctaCls}>{cta} {cta === 'View Ticket' && <ArrowRight size={15} />}</Link>}
@@ -383,6 +390,144 @@ function MarkInProgressCta({ ticket, className }: { ticket: SupplierTicketRow; c
   )
 }
 
+// "Mark in progress" for an APPROVED snag schedule — confirm in a pop-up, fires
+// start_snag (the snag counterpart of MarkInProgressCta's start_work).
+function StartSnagCta({ ticket, className }: { ticket: SupplierTicketRow; className: string }) {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  async function go(close: () => void) {
+    setBusy(true); setErr('')
+    try {
+      const res = await fetch(`/api/tickets/${ticket.id}/transition`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'start_snag' }) })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Could not update the job')
+      close(); router.refresh()
+    } catch (e) { setErr(errMsg(e)); setBusy(false) }
+  }
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} className={className}>Mark In Progress</button>
+      {open && (
+        <Modal onClose={() => setOpen(false)} maxWidth="max-w-md">
+          {close => (
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-base font-bold text-[var(--text)]">Start the snag fix?</h3>
+                <p className="mt-1 text-sm text-[var(--text-muted)]">
+                  The manager approved your proposed time{ticket.snagScheduledAt ? <> (<span className="font-semibold text-[var(--text)]">{formatDate(ticket.snagScheduledAt)}</span>)</> : null}. Mark the snag fix in progress once you&apos;re on your way or on site.
+                </p>
+              </div>
+              {err && <p className="text-xs text-red-500">{err}</p>}
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setOpen(false)} disabled={busy} className="flex-1 rounded-xl py-2.5 text-sm font-medium text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-50">Cancel</button>
+                <button type="button" onClick={() => go(close)} disabled={busy} className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50">{busy ? 'Starting…' : 'Yes, mark in progress'}</button>
+              </div>
+            </div>
+          )}
+        </Modal>
+      )}
+    </>
+  )
+}
+
+// Variation-order context for the queue pop-ups — the caller's declined VO (for
+// the re-submit flow) + the approved VOs (shown at close-out). Fetched on open
+// from the supplier-scoped quote-context route (awarded-org gated server-side).
+type DeclinedVo = { amount: number | null; description: string | null; rejectReason: string | null; fileUrls: string[]; createdAt: string }
+type ApprovedVo = { amount: number | null; description: string | null; createdAt: string }
+function useVoContext(ticketId: string) {
+  const [declinedVo, setDeclinedVo] = useState<DeclinedVo | null>(null)
+  const [approvedVos, setApprovedVos] = useState<ApprovedVo[]>([])
+  const [loading, setLoading] = useState(true)
+  useEffect(() => {
+    let live = true
+    fetch(`/api/tickets/${ticketId}/quote-context`)
+      .then(r => r.json())
+      .then(d => { if (!live || d?.error) return; setDeclinedVo(d.declinedVariation ?? null); setApprovedVos(Array.isArray(d.approvedVariations) ? d.approvedVariations : []) })
+      .catch(() => {})
+      .finally(() => { if (live) setLoading(false) })
+    return () => { live = false }
+  }, [ticketId])
+  return { declinedVo, approvedVos, loading }
+}
+
+// "View VO" from the Today queue — the RM declined this supplier's variation
+// order. Shows the declined VO + reason, a Re-submit VO button (opens the VO
+// upload form) and a small More beside it (Raise dispute · Chat with the client).
+function ViewVoCta({ ticket, className, company }: { ticket: SupplierTicketRow; className: string; company?: string }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} className={className}>View VO</button>
+      {open && <ViewVoModal ticket={ticket} company={company} onClose={() => setOpen(false)} />}
+    </>
+  )
+}
+function ViewVoModal({ ticket, company, onClose }: { ticket: SupplierTicketRow; company?: string; onClose: () => void }) {
+  const [resubmitting, setResubmitting] = useState(false)
+  const [disputing, setDisputing] = useState(false)
+  const [chatting, setChatting] = useState(false)
+  const { declinedVo, loading } = useVoContext(ticket.id)
+  const store = ticket.isIndividual ? 'Individual' : [company, ticket.storeName, ticket.branchCode].filter(Boolean).join(' · ')
+  return (
+    <Modal onClose={onClose} maxWidth="max-w-2xl">
+      {close => (
+        <div className="space-y-4">
+          <h3 className="text-base font-bold text-[var(--text)]">Variation order declined</h3>
+          <div className="space-y-1 rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5">
+            <p className="text-sm text-[var(--text)]">The manager declined your variation order. Re-submit a revised one, or confirm there are no further variation orders from the ticket.</p>
+            {declinedVo?.rejectReason && (
+              <p className="text-sm text-[var(--text-muted)]"><span className="font-semibold text-[var(--text)]">Reason:</span> {declinedVo.rejectReason}</p>
+            )}
+          </div>
+
+          {loading ? (
+            <p className="py-2 text-center text-sm text-[var(--text-faint)]">Loading the variation order…</p>
+          ) : declinedVo ? (
+            <div className="space-y-2 rounded-xl bg-[var(--surface-2)] p-4 ring-1 ring-[var(--border)]">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-faint)]">Your declined variation order</p>
+              {declinedVo.amount != null && <p className="text-sm font-bold text-[var(--text)]">{formatCurrency(declinedVo.amount)} <span className="text-xs font-normal text-[var(--text-faint)]">excl VAT</span></p>}
+              {declinedVo.description && <p className="whitespace-pre-line break-words text-sm text-[var(--text-muted)]">{declinedVo.description}</p>}
+              {declinedVo.fileUrls.length > 0 && (
+                <div className="flex flex-wrap gap-x-3 gap-y-1 pt-0.5">
+                  {declinedVo.fileUrls.map((u, i) => (
+                    <ViewTrackedLink key={i} ticketId={ticket.id} itemType="attachment" itemLabel={`Declined VO attachment ${i + 1}`} href={u}
+                      className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:underline">
+                      <FileText size={15} /> Attachment {i + 1}
+                    </ViewTrackedLink>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-[var(--text-faint)]">The declined variation order is no longer available.</p>
+          )}
+
+          {/* Pop-up convention: small More beside the primary button, menu opens up-right. */}
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => setResubmitting(true)} className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500">
+              <ReceiptText size={16} /> Re-submit VO
+            </button>
+            <MoreMenu up align="right">
+              <MoreActionItem label="Raise dispute" tone="danger" onClick={() => setDisputing(true)} />
+              <MoreActionItem label="Chat with the client" onClick={() => setChatting(true)} />
+            </MoreMenu>
+          </div>
+
+          {resubmitting && (
+            <Modal onClose={() => setResubmitting(false)} maxWidth="max-w-2xl">
+              {closeVo => <div><SendQuoteForm ticketId={ticket.id} variant="variation" competitive priority={String(ticket.priority)} createdAt={ticket.createdAt} defaultOpen onClose={() => { closeVo(); close() }} /></div>}
+            </Modal>
+          )}
+          {disputing && <RaiseDisputeButton ticketId={ticket.id} origin="variation" subjectTitle={ticket.category || ticket.title} jobRef={ticket.jobRef} store={store} defaultOpen onClose={() => setDisputing(false)} />}
+          {chatting && <TicketChat ticketId={ticket.id} viewerRole="supplier" defaultOpen onClose={() => setChatting(false)} />}
+        </div>
+      )}
+    </Modal>
+  )
+}
+
 // "Upload evidence" from the Today queue — opens the COC/POC (or more-evidence)
 // uploader in a pop-up, no navigation into the ticket.
 function UploadEvidenceCta({ ticket, className }: { ticket: SupplierTicketRow; className: string }) {
@@ -476,26 +621,42 @@ function ViewSnagCta({ ticket, className, company }: { ticket: SupplierTicketRow
 }
 
 // "Close-out" opens the variation-order gate in place — the supplier raises a VO
-// (via More) or confirms there are none so the manager can close out.
+// (via More) or confirms there are none so the manager can close out. Any VOs the
+// manager has already APPROVED are listed so the supplier sees what's covered.
 function CloseOutCta({ ticket, className }: { ticket: SupplierTicketRow; className: string }) {
   const [open, setOpen] = useState(false)
   return (
     <>
       <button type="button" onClick={() => setOpen(true)} className={className}><CheckCircle2 size={15} /> Close-out</button>
-      {open && (
-        <Modal onClose={() => setOpen(false)} maxWidth="max-w-2xl">
-          {() => (
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-base font-bold text-[var(--text)]">Variation orders</h3>
-                <p className="mt-1 text-sm text-[var(--text-muted)]">Your COC &amp; POC were approved — raise a variation order for any extra work, or confirm there are none so the manager can close out.</p>
-              </div>
-              <SupplierVariationGate ticketId={ticket.id} priority={String(ticket.priority)} createdAt={ticket.createdAt} variationCount={0} status={ticket.status as 'approved_closeout' | 'vo_declined'} declineReason={null} noVosConfirmed={false} />
+      {open && <CloseOutModal ticket={ticket} onClose={() => setOpen(false)} />}
+    </>
+  )
+}
+function CloseOutModal({ ticket, onClose }: { ticket: SupplierTicketRow; onClose: () => void }) {
+  const { approvedVos } = useVoContext(ticket.id)
+  return (
+    <Modal onClose={onClose} maxWidth="max-w-2xl">
+      {() => (
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-base font-bold text-[var(--text)]">Variation orders</h3>
+            <p className="mt-1 text-sm text-[var(--text-muted)]">Your COC &amp; POC were approved — raise a variation order for any extra work, or confirm there are none so the manager can close out.</p>
+          </div>
+          {approvedVos.length > 0 && (
+            <div className="space-y-2 rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/30 p-3.5">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">Approved variation order{approvedVos.length > 1 ? 's' : ''}</p>
+              {approvedVos.map((v, i) => (
+                <div key={i} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-sm">
+                  {v.amount != null && <span className="font-bold text-[var(--text)]">{formatCurrency(v.amount)}</span>}
+                  {v.description && <span className="min-w-0 flex-1 break-words text-[var(--text-muted)]">{v.description}</span>}
+                </div>
+              ))}
             </div>
           )}
-        </Modal>
+          <SupplierVariationGate ticketId={ticket.id} priority={String(ticket.priority)} createdAt={ticket.createdAt} variationCount={0} status={ticket.status as 'approved_closeout' | 'vo_declined'} declineReason={null} noVosConfirmed={false} />
+        </div>
       )}
-    </>
+    </Modal>
   )
 }
 
@@ -520,9 +681,14 @@ function nextStep(t: SupplierTicketRow): string {
   if (t.status === 'evidence_requested') return 'Add the requested evidence'
   if (t.status === 'snag' && t.snagScheduleStatus === 'declined') return 'Schedule declined — propose a new time'
   if (t.status === 'snag_assigned' && t.snagScheduleStatus === 'proposed') return 'Awaiting schedule approval from the manager'
+  if (t.status === 'snag_assigned' && t.snagScheduleStatus === 'agreed') return 'Schedule approved — start the snag fix'
   if (['snag', 'snag_assigned'].includes(t.status)) return 'Accept and schedule the snag fix'
   if (['snag_in_progress', 'snag_resolved'].includes(t.status)) return 'Re-upload the COC & POC'
   if (t.status === 'submitted_for_signoff') return 'Awaiting the client sign-off'
-  if (['approved_closeout', 'vo_declined'].includes(t.status)) return t.voNoneConfirmed ? "Awaiting the manager's close-out" : 'Raise or confirm variation orders'
+  if (t.status === 'vo_declined') return 'Variation order declined — re-submit or confirm none'
+  if (t.status === 'approved_closeout') {
+    if (t.voNoneConfirmed) return "Awaiting the manager's close-out"
+    return t.hasApprovedVo ? 'VO approved — raise another or confirm none for close-out' : 'Raise or confirm variation orders'
+  }
   return 'Track progress on this job'
 }

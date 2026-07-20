@@ -7,14 +7,15 @@ import { TicketTimeline } from '@/components/ui/TicketTimeline'
 import type { TimelineEvent } from '@/lib/ticket-timeline'
 
 type PhotoGroup = { label: string; urls: string[] }
-type Tab = 'photos' | 'documents' | 'quotes' | 'completion' | 'dispute' | 'timeline' | 'history'
+type Tab = 'photos' | 'documents' | 'quotes' | 'completion' | 'variations' | 'dispute' | 'timeline' | 'history'
 
 /** Lower tabbed section of the RM ticket detail — Photos (every image on the
  *  ticket, grouped by source), Documents (COC/invoice/quote/VO attachments),
  *  Quotes (the approved quote + any under review), Completion (the approved COC
- *  & POC) and the full Timeline (supplier updates fold into it). */
+ *  & POC), Variation orders (once any exist) and the full Timeline (supplier
+ *  updates fold into it). */
 export function RmTicketTabs({
-  ticketId, photoGroups, timeline, history, documents, quotes, completion, dispute, defaultTab,
+  ticketId, photoGroups, timeline, history, documents, quotes, completion, variations, dispute, defaultTab,
 }: {
   ticketId: string
   photoGroups: PhotoGroup[]
@@ -23,6 +24,7 @@ export function RmTicketTabs({
   documents?: ReactNode
   quotes?: ReactNode
   completion?: ReactNode
+  variations?: ReactNode
   dispute?: ReactNode
   /** Tab selected on first render (e.g. 'completion' when a COC/POC is under review). */
   defaultTab?: Tab
@@ -34,6 +36,7 @@ export function RmTicketTabs({
     { key: 'documents', label: 'Documents' },
     { key: 'quotes', label: 'Quotes' },
     { key: 'completion', label: 'Completion' },
+    ...(variations ? [{ key: 'variations' as Tab, label: 'Variation orders' }] : []),
     ...(dispute ? [{ key: 'dispute' as Tab, label: 'Dispute' }] : []),
     { key: 'timeline', label: 'Timeline' },
     { key: 'history', label: 'History' },
@@ -106,6 +109,10 @@ export function RmTicketTabs({
 
       {tab === 'completion' && (
         completion ?? <p className="text-sm text-[var(--text-faint)]">Not completed yet.</p>
+      )}
+
+      {tab === 'variations' && (
+        variations ?? <p className="text-sm text-[var(--text-faint)]">No variation orders.</p>
       )}
 
       {tab === 'dispute' && (

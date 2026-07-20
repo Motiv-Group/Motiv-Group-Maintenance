@@ -675,6 +675,8 @@ export interface SupplierTicketRow {
   quotedByMe: boolean; awardedToMe: boolean
   // The supplier confirmed there are no further variation orders (ready for the RM's close-out).
   voNoneConfirmed: boolean
+  // The ticket has at least one APPROVED variation order (own awarded jobs only).
+  hasApprovedVo: boolean
   // An open dispute on their awarded job — the badge reads "Dispute".
   disputed: boolean
   // The open dispute's latest message is from the RM (awaiting the supplier's reply).
@@ -802,6 +804,11 @@ export async function assembleSupplierDashboard(companyId: string | null, suppli
   const ownedIdList = Array.from(ownedIds)
   const { data: openDisputeRows } = ownedIdList.length ? await db.from('ticket_disputes').select('ticket_id').eq('status', 'open').in('ticket_id', ownedIdList) : { data: null }
   const disputedIds = new Set<string>((openDisputeRows ?? []).map(d => d.ticket_id))
+  // Approved variation orders per ticket → hasApprovedVo. Ticket-id scoping
+  // suffices for isolation: ownedIdList is already this supplier's awarded work
+  // (VOs belong to the awarded org), so no supplier_id filter is needed.
+  const { data: approvedVoRows } = ownedIdList.length ? await db.from('ticket_variations').select('ticket_id').eq('status', 'approved').in('ticket_id', ownedIdList) : { data: null }
+  const approvedVoIds = new Set<string>((approvedVoRows ?? []).map(v => v.ticket_id))
   // Latest dispute-message author per open-dispute ticket → "new message" flag (a
   // message from the RM awaits the supplier's reply).
   const { data: dmsgS } = disputedIds.size ? await db.from('ticket_dispute_messages').select('ticket_id, author_role, created_at').in('ticket_id', [...disputedIds]).order('created_at', { ascending: false }) : { data: null }
@@ -857,6 +864,7 @@ export async function assembleSupplierDashboard(companyId: string | null, suppli
       declinedBy: declinedForMe ? (declinedByOf.get(t.id) ?? null) : null,
       quotedByMe, awardedToMe,
       voNoneConfirmed: !!raw.vo_none_confirmed_at,
+      hasApprovedVo: awardedToMe && approvedVoIds.has(t.id),
       disputed: awardedToMe && disputedIds.has(t.id),
       disputeUnread: awardedToMe && disputedIds.has(t.id) && latestDisputeAuthor.get(t.id) === 'regional_manager',
       snagReason: snagReasonByTicket.get(t.id) ?? null,

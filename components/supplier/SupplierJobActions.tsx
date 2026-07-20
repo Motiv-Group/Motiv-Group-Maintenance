@@ -5,12 +5,13 @@
 // hours). The Submit COC & POC flow lives on its own page (/complete).
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Calendar, Wrench, PlayCircle, XCircle, X, FileText, Ticket, MapPin, Info, ArrowRight, Plus, MessageSquare } from 'lucide-react'
+import { Calendar, Wrench, PlayCircle, XCircle, X, FileText, Ticket, MapPin, Info, ArrowRight, Plus, MessageSquare, MessageSquareWarning, CheckCircle2 } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { DrawerHeader } from '@/components/exec/Drawer'
 import { SchedulePicker } from '@/components/ui/SchedulePicker'
 import { SendQuoteForm } from '@/components/admin/SendQuoteForm'
 import { MoreMenu, MoreActionItem } from '@/components/regional/RmTicketActions'
+import { RaiseDisputeButton } from '@/components/dispute/DisputeBox'
 import { QuoteSummary, type QuoteSummaryData, type QuoteSchedule } from '@/components/workflow/QuoteSummary'
 import { TicketChat } from '@/components/chat/TicketChat'
 import { createClient } from '@/lib/supabase/client'
@@ -337,17 +338,22 @@ export function MarkInProgressButton({ ticketId }: { ticketId: string }) {
 // Variation-order gate for the close-out phase (approved_closeout / vo_declined):
 // AFTER the COC/POC is approved, the supplier can raise a variation order for extra
 // work — otherwise the RM does the final close-out. On vo_declined it leads with the
-// RM's decline reason and lets the supplier re-submit a revised VO.
-export function SupplierVariationGate({ ticketId, priority, createdAt, variationCount, status, declineReason, noVosConfirmed = false }: {
+// RM's decline reason and flips the layout: the revised VO becomes the primary
+// action, with Ready for Close-out + Raise dispute under "More".
+export function SupplierVariationGate({ ticketId, priority, createdAt, variationCount, status, declineReason, noVosConfirmed = false, dispute }: {
   ticketId: string; priority: string; createdAt: string; variationCount: number
   status: 'approved_closeout' | 'vo_declined'; declineReason?: string | null; noVosConfirmed?: boolean
+  /** Raise-dispute subject details (ticket ref + store label) for the vo_declined state. */
+  dispute?: { jobRef?: string | null; store?: string | null }
 }) {
   const router = useRouter()
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [voOpen, setVoOpen] = useState(false)
-  const hasVOs = variationCount > 0 || status === 'vo_declined'
-  const raiseLabel = status === 'vo_declined' ? 'Re-submit variation order' : hasVOs ? 'Raise another variation order' : 'Raise variation order'
+  const [disputeOpen, setDisputeOpen] = useState(false)
+  const declined = status === 'vo_declined'
+  const hasVOs = variationCount > 0 || declined
+  const raiseLabel = declined ? 'Re-submit variation order' : hasVOs ? 'Raise another variation order' : 'Raise variation order'
 
   async function confirmNoVos() {
     setBusy(true); setErr('')
@@ -367,27 +373,44 @@ export function SupplierVariationGate({ ticketId, priority, createdAt, variation
     <div className="space-y-3">
       {/* Only the vo_declined callout stays here; the "your COC & POC were approved…"
           line lives in the Next-action sub-heading, so it isn't said twice. */}
-      {status === 'vo_declined' && (
+      {declined && (
         <div className="rounded-xl bg-red-500/10 ring-1 ring-red-500/30 p-3.5 space-y-1">
           <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Variation order declined</p>
           <p className="text-sm text-[var(--text)]">{declineReason || 'The regional manager declined your variation order.'}</p>
           <p className="text-sm text-[var(--text-muted)]">Submit a revised variation order, or confirm there are none so the manager can close out.</p>
         </div>
       )}
-      {/* Primary = confirm no further VOs (ready for close-out); raising a VO lives
-          under "More" like the other action blocks. */}
-      <div className="flex items-center gap-2">
-        <button onClick={confirmNoVos} disabled={busy} className="flex-1 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition disabled:opacity-50">{busy ? 'Confirming…' : 'Ready for Close-out'}</button>
-        <MoreMenu align="left">
-          <MoreActionItem icon={<Plus size={16} />} label={raiseLabel} onClick={() => setVoOpen(true)} />
-        </MoreMenu>
-      </div>
-      <p className="text-[11px] text-[var(--text-faint)]">To raise a variation order, tap <span className="font-semibold text-[var(--text-muted)]">More → Raise VO</span>.</p>
+      {declined ? (
+        /* Declined → the revised VO is the primary action; Ready for Close-out and
+           Raise dispute live under "More". */
+        <div className="flex items-center gap-2">
+          <button onClick={() => setVoOpen(true)} className="flex-1 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition">{raiseLabel}</button>
+          <MoreMenu align="left">
+            <MoreActionItem icon={<CheckCircle2 size={16} />} label={busy ? 'Confirming…' : 'Ready for Close-out'} onClick={() => { if (!busy) confirmNoVos() }} />
+            <MoreActionItem icon={<MessageSquareWarning size={16} />} label="Raise dispute" tone="danger" onClick={() => setDisputeOpen(true)} />
+          </MoreMenu>
+        </div>
+      ) : (
+        /* Primary = confirm no further VOs (ready for close-out); raising a VO lives
+           under "More" like the other action blocks. */
+        <div className="flex items-center gap-2">
+          <button onClick={confirmNoVos} disabled={busy} className="flex-1 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition disabled:opacity-50">{busy ? 'Confirming…' : 'Ready for Close-out'}</button>
+          <MoreMenu align="left">
+            <MoreActionItem icon={<Plus size={16} />} label={raiseLabel} onClick={() => setVoOpen(true)} />
+          </MoreMenu>
+        </div>
+      )}
+      <p className="text-[11px] text-[var(--text-faint)]">{declined
+        ? <>To confirm there are no further variation orders, tap <span className="font-semibold text-[var(--text-muted)]">More → Ready for Close-out</span>.</>
+        : <>To raise a variation order, tap <span className="font-semibold text-[var(--text-muted)]">More → Raise VO</span>.</>}</p>
       {voOpen && (
         <Modal onClose={() => setVoOpen(false)} maxWidth="max-w-2xl">
           {close => <div><SendQuoteForm ticketId={ticketId} variant="variation" competitive priority={priority} createdAt={createdAt} defaultOpen onClose={close} /></div>}
         </Modal>
       )}
+      {/* Raise-dispute pop-up as a sibling driven by lifted state (mirrors the page's
+          RaiseDisputeMore pattern), so it opens instantly when the menu closes. */}
+      {disputeOpen && <RaiseDisputeButton ticketId={ticketId} origin="variation" defaultOpen subjectTitle="Variation order declined" jobRef={dispute?.jobRef} store={dispute?.store} onClose={() => setDisputeOpen(false)} />}
       {err && <p className="text-xs text-red-500">{err}</p>}
     </div>
   )

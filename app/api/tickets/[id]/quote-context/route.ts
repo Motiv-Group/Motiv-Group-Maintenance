@@ -55,6 +55,32 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     declineReason: declined.decline_reason ?? null, validUntil: declined.valid_until ?? null, createdAt: declined.created_at,
   } : null
 
+  // Variation orders belong to the AWARDED org only — an invited-but-not-awarded
+  // org must never see another supplier's VO trail (cross-supplier isolation), so
+  // both keys are gated on tickets.supplier_id being one of the caller's orgs.
+  const awarded = !!t.supplier_id && myOrgs.has(t.supplier_id)
+  let declinedVariation: { amount: number | null; description: string | null; rejectReason: string | null; fileUrls: string[]; createdAt: string } | null = null
+  let approvedVariations: Array<{ amount: number | null; description: string | null; createdAt: string }> = []
+  if (awarded) {
+    // The latest REJECTED VO (for the re-submit flow — what was rejected + why).
+    const { data: rejectedVo } = await admin.from('ticket_variations')
+      .select('amount, description, reject_reason, file_urls, created_at')
+      .eq('ticket_id', id).eq('status', 'rejected')
+      .order('created_at', { ascending: false }).limit(1).maybeSingle()
+    declinedVariation = rejectedVo ? {
+      amount: rejectedVo.amount ?? null, description: rejectedVo.description ?? null,
+      rejectReason: rejectedVo.reject_reason ?? null,
+      fileUrls: Array.isArray(rejectedVo.file_urls) ? await signManyUrls(rejectedVo.file_urls as string[]) : [],
+      createdAt: rejectedVo.created_at,
+    } : null
+    // All APPROVED VOs, oldest first (amounts already added to the job's value).
+    const { data: approvedVos } = await admin.from('ticket_variations')
+      .select('amount, description, created_at')
+      .eq('ticket_id', id).eq('status', 'approved')
+      .order('created_at', { ascending: true })
+    approvedVariations = (approvedVos ?? []).map(v => ({ amount: v.amount ?? null, description: v.description ?? null, createdAt: v.created_at }))
+  }
+
   return NextResponse.json({
     ticket: {
       title: t.title, category: t.category, description: t.description,
@@ -62,5 +88,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       storeName, photoUrls,
     },
     declinedQuote,
+    declinedVariation,
+    approvedVariations,
   })
 }

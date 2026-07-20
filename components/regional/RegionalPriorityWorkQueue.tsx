@@ -14,8 +14,8 @@ import { Modal } from '@/components/ui/Modal'
 import { ViewAssignButton, QuoteReviewButton, SignoffReviewButton, VariationReviewButton } from '@/components/regional/RmTicketActions'
 import { DisputeReviewButton } from '@/components/dispute/DisputeBox'
 import { TicketChat } from '@/components/chat/TicketChat'
-import { MoreMenu, MoreActionItem } from '@/components/regional/rm-actions/ticket'
-import { errMsg } from '@/components/regional/rm-actions/shared'
+import { MoreMenu, MoreActionItem, SupplierRatingCard } from '@/components/regional/rm-actions/ticket'
+import { post, errMsg } from '@/components/regional/rm-actions/shared'
 import { rmStatusMeta, formatJobId, formatDateTime } from '@/lib/utils'
 import {
   byUrgencyThenNewest, EmptyQueue, isActive, isCriticalPriority, MetricButton,
@@ -116,7 +116,6 @@ function QueueRow({ ticket, nowMs, suppliers, motivSuppliers, motivAccess, chatU
   // VOs" confirmation and amber once confirmed; the close-out button is disabled
   // until then (the RM can only finalise after the supplier confirms).
   const closeout = ticket.status === 'approved_closeout'
-  const closeoutCls = queueCtaClass(false)
   const closeoutBadge = ticket.voNoneConfirmed ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : 'bg-blue-500/15 text-blue-700 dark:text-blue-400'
   const jobId = ticket.jobRef ?? formatJobId(ticket.jobNumber)
   return (
@@ -152,8 +151,8 @@ function QueueRow({ ticket, nowMs, suppliers, motivSuppliers, motivAccess, chatU
             trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}>View &amp; Assign</button>} />
         ) : closeout ? (
           ticket.voNoneConfirmed
-            ? <CloseOutConfirm ticketId={ticket.id} storeName={ticket.storeName} category={ticket.category || ticket.title} className={closeoutCls} />
-            : <span className={`${closeoutCls} opacity-50 pointer-events-none`} aria-disabled="true">Close-Out</span>
+            ? <CloseOutConfirm ticketId={ticket.id} storeName={ticket.storeName} category={ticket.category || ticket.title} className={ctaCls} />
+            : <span className={`${ctaCls} opacity-50 pointer-events-none`} aria-disabled="true">Close-Out</span>
         ) : (
           <Link href={ticketUrl} className={ctaCls}>View Ticket <ArrowRight size={15} /></Link>
         )}
@@ -174,17 +173,22 @@ function matchesFilter(t: RegionalTicketRow, filter: QueueFilter): boolean {
 }
 
 // "Close-out" (once the supplier has confirmed no VOs) opens a confirmation
-// pop-up before completing the ticket — the close-out is final.
+// pop-up before completing the ticket — the close-out is final. Mirrors the
+// ticket page's CloseOutButton: a REQUIRED 1–5 star supplier rating + optional
+// comment, posted to /api/ratings before the close_out transition.
 function CloseOutConfirm({ ticketId, storeName, category, className }: { ticketId: string; storeName: string; category: string; className: string }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
+  const [score, setScore] = useState(0)
+  const [comment, setComment] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   async function confirm() {
+    if (!score) { setErr('Please give the supplier a star rating before closing out.'); return }
     setBusy(true); setErr('')
     try {
-      const res = await fetch(`/api/tickets/${ticketId}/transition`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'close_out' }) })
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to close out the ticket.')
+      await post(`/api/ratings`, { ticketId, score, comment })
+      await post(`/api/tickets/${ticketId}/transition`, { action: 'close_out' })
       setOpen(false); router.refresh()
     } catch (e) { setErr(errMsg(e)); setBusy(false) }
   }
@@ -192,7 +196,7 @@ function CloseOutConfirm({ ticketId, storeName, category, className }: { ticketI
     <>
       <button type="button" onClick={() => setOpen(true)} className={className}>Close-Out <ArrowRight size={15} /></button>
       {open && (
-        <Modal onClose={() => { if (!busy) setOpen(false) }} maxWidth="max-w-lg">
+        <Modal onClose={() => { if (!busy) { setOpen(false); setErr('') } }} maxWidth="max-w-lg">
           {close => (
             <div className="space-y-5">
               <div className="flex flex-col items-center text-center">
@@ -204,6 +208,7 @@ function CloseOutConfirm({ ticketId, storeName, category, className }: { ticketI
                 <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
                 <p className="text-sm text-[var(--text-muted)]">The supplier confirmed there are no further variation orders, so the job is ready to be closed out and completed.</p>
               </div>
+              <SupplierRatingCard score={score} comment={comment} onScore={v => { setScore(v); setErr('') }} onComment={setComment} />
               {err && <p className="text-sm text-red-500">{err}</p>}
               <div className="flex gap-2">
                 <button type="button" onClick={close} disabled={busy} className="flex-1 rounded-xl py-2.5 text-sm font-medium text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-50">Cancel</button>

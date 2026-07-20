@@ -50,4 +50,5 @@ export {
   AcceptScheduleCard,
   CancelTicketCard,
   CloseOutButton,
+  CloseOutBar,
 } from './rm-actions/ticket'

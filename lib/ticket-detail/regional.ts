@@ -377,10 +377,9 @@ async function buildRegionalTicketDetail(
     // signpost line is blank so it isn't said twice.
     if (t.status === 'completed') return { mode: 'done', msg: '', sub: '' }
     if (t.status === 'cancelled' || t.status === 'declined') return { mode: 'closed', msg: `Ticket ${t.status}`, sub: t.cancellation_reason || 'No further action needed.' }
-    // A quote-decline dispute is thread-only (nothing pauses); workflow disputes pause the step.
-    if (openDispute) return { mode: 'act', msg: 'Resolve the open dispute', sub: openDispute.origin === 'quote_declined'
-      ? 'A supplier has disputed your quote decline — review the thread and resolve it in the Dispute section.'
-      : 'A dispute is paused on this ticket — review the thread and resolve it in the Dispute section.' }
+    // Open dispute — the resolve panel in the Next-action block carries the detail;
+    // the signpost line is blank so it isn't said twice.
+    if (openDispute) return { mode: 'act', msg: 'Resolve the open dispute', sub: '' }
     if (snagAwaitingApproval) return { mode: 'act', msg: 'Approve the snag-fix date', sub: 'The supplier proposed a date to carry out the corrective work — approve it below.' }
     if (pendingSignoffs.length > 0) return { mode: 'act', msg: '', sub: 'The supplier submitted the COC & POC — approve it, request more evidence, or raise a snag.' }
     if (t.status === 'variation_review') return { mode: 'act', msg: 'Review the variation order', sub: 'A variation order for extra work is awaiting your approval below.' }
