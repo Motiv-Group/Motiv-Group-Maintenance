@@ -87,7 +87,7 @@ export const STATUS_COLORS: Record<TicketStatus, string> = {
   submitted_for_signoff: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
   evidence_requested:    'bg-blue-500/15 text-blue-700 dark:text-blue-400',
   snag:             'bg-red-500/15 text-red-700 dark:text-red-400',
-  snag_assigned:    'bg-red-500/15 text-red-700 dark:text-red-400',
+  snag_assigned:    'bg-blue-500/15 text-blue-700 dark:text-blue-400',
   snag_resolved:    'bg-amber-500/15 text-amber-700 dark:text-amber-400',
   approved_closeout:'bg-amber-500/15 text-amber-700 dark:text-amber-400',
   suppliers_declined: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',

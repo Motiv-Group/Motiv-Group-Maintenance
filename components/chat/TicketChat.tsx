@@ -53,6 +53,22 @@ const MAX_CHARS = 2000
 const MAX_FILES = 5
 const POLL_MS = 6000
 
+// Inline full-width outline button ("Chat with the supplier / manager") — the
+// next-action-block chat entry, sitting BELOW the informational callouts. A
+// client wrapper so a Server Component can drop it in without passing a function
+// `trigger` across the RSC boundary.
+export function TicketChatInline({ ticketId, viewerRole, unread = false }: { ticketId: string; viewerRole: ChatViewerRole; unread?: boolean }) {
+  return (
+    <TicketChat ticketId={ticketId} viewerRole={viewerRole} trigger={open => (
+      <button type="button" onClick={open}
+        className="flex w-full items-center justify-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-semibold text-[var(--text)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)]">
+        <MessageSquare size={16} /> Chat with the {OTHER_LABEL[viewerRole]}
+        {unread && <span className="h-2 w-2 rounded-full bg-blue-500" />}
+      </button>
+    )} />
+  )
+}
+
 // Header entry point: a compact message icon (with an unread dot) that opens the
 // chat. A client wrapper so a Server Component can drop it in without passing a
 // function `trigger` across the RSC boundary.

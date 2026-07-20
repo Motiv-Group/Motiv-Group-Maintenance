@@ -6,33 +6,29 @@ import { Card } from '@/components/exec/ui'
 import { PhotoThumbs } from '@/components/ui/PhotoThumbs'
 import { TicketTimeline } from '@/components/ui/TicketTimeline'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
-import { formatDateTime } from '@/lib/utils'
 import type { TimelineEvent } from '@/lib/ticket-timeline'
 
-type Update = { body: string; created_at: string }
-type Tab = 'photos' | 'activity' | 'timeline'
+type Tab = 'photos' | 'timeline'
 
 function docName(url: string): string {
   try { return decodeURIComponent(url.split('?')[0].split('/').pop() || 'Document') } catch { return 'Document' }
 }
 
 // Lower tabbed section of the SM ticket detail — only content a store manager
-// may see: attachments (photos + documents), the activity notes, and the
-// Timeline (the shared engine's SM-safe subset — see filterTimelineForSm).
-// No internal Documents/Comments/History.
+// may see: attachments (photos + documents) and the Timeline (the shared
+// engine's SM-safe subset — see filterTimelineForSm; supplier updates fold
+// into it). No internal Documents/Comments/History.
 export function SmTicketTabs({
-  photoUrls, docUrls, ticketId, updates, timeline,
+  photoUrls, docUrls, ticketId, timeline,
 }: {
   photoUrls: string[]
   docUrls: string[]
   ticketId: string
-  updates: Update[]
   timeline: TimelineEvent[]
 }) {
   const [tab, setTab] = useState<Tab>(photoUrls.length || docUrls.length ? 'photos' : 'timeline')
   const tabs: { key: Tab; label: string }[] = [
     { key: 'photos', label: `Photos${photoUrls.length ? ` (${photoUrls.length})` : ''}` },
-    { key: 'activity', label: `Activity${updates.length ? ` (${updates.length})` : ''}` },
     { key: 'timeline', label: 'Timeline' },
   ]
 
@@ -56,7 +52,7 @@ export function SmTicketTabs({
 
       {tab === 'photos' && (
         <div className="space-y-4">
-          {photoUrls.length ? <PhotoThumbs urls={photoUrls} ticketId={ticketId} /> : <p className="text-sm text-[var(--text-faint)]">No photos attached.</p>}
+          {photoUrls.length ? <PhotoThumbs urls={photoUrls} ticketId={ticketId} label="Job photo" /> : <p className="text-sm text-[var(--text-faint)]">No photos attached.</p>}
           {docUrls.length > 0 && (
             <div>
               <p className="mb-1.5 text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Documents</p>
@@ -73,19 +69,6 @@ export function SmTicketTabs({
             </div>
           )}
         </div>
-      )}
-
-      {tab === 'activity' && (
-        updates.length ? (
-          <div>
-            {updates.map((u, i) => (
-              <div key={i} className="border-b border-[var(--border)] py-2.5 last:border-0">
-                <p className="text-sm text-[var(--text)]">{u.body}</p>
-                <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(u.created_at)}</p>
-              </div>
-            ))}
-          </div>
-        ) : <p className="text-sm text-[var(--text-faint)]">No updates yet.</p>
       )}
 
       {tab === 'timeline' && <TicketTimeline items={timeline} />}

@@ -75,7 +75,7 @@ interface ParsedResult {
 }
 
 interface QuoteForm {
-  amount:          number
+  amount:          number | ''
   amount_incl_vat: number | ''
   description:     string
   valid_until:     string
@@ -445,7 +445,7 @@ export function SendQuoteForm({
                   setFilePreview(null); setFile(null)
                   setAutofilled(false); setNeedAmount(false); setParseError(false)
                   setValidNA(false); setWarrantyNA(false); setSchedule(''); setError('')
-                  reset({ amount: undefined, amount_incl_vat: '', description: '', valid_until: '', warranty: '' })
+                  reset({ amount: '', amount_incl_vat: '', description: '', valid_until: '', warranty: '' })
                 }}
                 className="p-1 text-[var(--text-faint)] hover:text-red-500 rounded transition-colors"
               >
@@ -678,7 +678,8 @@ export function SendQuoteForm({
           </div>
         )}
 
-        {confirmVals && (
+        {confirmVals ? (
+          // Competitive confirm replaces the Send/Cancel row in place (no separate row).
           <div className="rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] p-3 space-y-2">
             <p className="text-sm text-[var(--text)]">{isVariation ? 'Submit this variation order to the manager?' : 'Send this quote to the manager?'} Please double-check the amount and details first.</p>
             <div className="flex gap-2">
@@ -686,28 +687,28 @@ export function SendQuoteForm({
               <button type="button" onClick={() => setConfirmVals(null)} className="px-3 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm">Back</button>
             </div>
           </div>
+        ) : (
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              disabled={loading || uploading || parsing}
+              className="flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold text-white transition disabled:opacity-50 bg-green-700 hover:bg-green-600"
+            >
+              {uploading ? (
+                <><Loader2 size={14} className="animate-spin" /> Uploading…</>
+              ) : loading ? (
+                <><Loader2 size={14} className="animate-spin" /> {isVariation ? 'Submitting…' : 'Sending…'}</>
+              ) : isEdit ? 'Update Quote' : isVariation ? 'Submit Variation Order' : 'Send Quote'}
+            </button>
+            <button
+              type="button"
+              onClick={handleClose}
+              className="flex-1 py-2.5 rounded-xl ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm font-semibold transition hover:bg-[var(--hover)]"
+            >
+              Cancel
+            </button>
+          </div>
         )}
-
-        <div className="flex gap-2">
-          <button
-            type="submit"
-            disabled={loading || uploading || parsing}
-            className="flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold text-white transition disabled:opacity-50 bg-green-700 hover:bg-green-600"
-          >
-            {uploading ? (
-              <><Loader2 size={14} className="animate-spin" /> Uploading…</>
-            ) : loading ? (
-              <><Loader2 size={14} className="animate-spin" /> {isVariation ? 'Submitting…' : 'Sending…'}</>
-            ) : isEdit ? 'Update Quote' : isVariation ? 'Submit Variation Order' : 'Send Quote'}
-          </button>
-          <button
-            type="button"
-            onClick={handleClose}
-            className="flex-1 py-2.5 rounded-xl ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm font-semibold transition hover:bg-[var(--hover)]"
-          >
-            Cancel
-          </button>
-        </div>
 
         {!isVariation && (
           <p className="flex items-center justify-center gap-1.5 pt-1 text-[11px] text-[var(--text-faint)]">

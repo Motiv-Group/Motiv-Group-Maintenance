@@ -211,14 +211,19 @@ export async function loadProjectStore(
   storeId: string,
 ): Promise<{ store: StoreRow; project: ProjectRow; files: ProjectFileView[] } | null> {
   const admin = createAdminClient()
-  const { data: store } = await admin.from('project_stores').select('*').eq('id', storeId).eq('company_id', companyId).single()
-  if (!store) return null
-  const [{ data: project }, { data: files }] = await Promise.all([
-    admin.from('projects').select('*').eq('id', store.project_id).single(),
+  // The store and its files both key on storeId, so fetch them together instead of
+  // waiting for the store first — one round-trip saved on every store-detail open.
+  const [{ data: store }, { data: files }] = await Promise.all([
+    admin.from('project_stores').select('*').eq('id', storeId).eq('company_id', companyId).single(),
     admin.from('project_files').select('*').eq('project_store_id', storeId).order('sort_order', { ascending: true }),
   ])
+  if (!store) return null
+  // The project needs store.project_id, so it follows; its signing runs alongside.
+  const [{ data: project }, signed] = await Promise.all([
+    admin.from('projects').select('*').eq('id', store.project_id).single(),
+    signManyUrls((files ?? []).map((f) => f.storage_path)),
+  ])
   const fileRows: ProjectFileRow[] = files ?? []
-  const signed = await signManyUrls(fileRows.map((f) => f.storage_path))
   const fileViews: ProjectFileView[] = fileRows.map((f, i) => ({
     id: f.id,
     project_store_id: f.project_store_id,

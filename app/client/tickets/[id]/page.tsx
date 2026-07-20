@@ -114,6 +114,8 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
     quotes: quoteRows ?? [],
     variations: variationRows ?? [],
     signoffs: signoffRows ?? [],
+    // Supplier progress notes now surface in the Timeline (the Activity tab is gone).
+    updates: (updates ?? []) as { body: string; author_role: string | null; created_at: string }[],
   })
   const smTimeline = filterTimelineForSm(events)
 
@@ -185,9 +187,8 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
         </Card>
       </div>
 
-      {/* Photos + documents · Activity · Timeline (audit trail). */}
-      {/* body is never null on a real update row — narrow cast so the tabs' Update props typecheck. */}
-      <SmTicketTabs photoUrls={signedPhotoUrls} docUrls={signedDocUrls} ticketId={t.id} updates={(updates ?? []) as { body: string; author_role: string | null; created_at: string }[]} timeline={smTimeline} />
+      {/* Photos + documents · Timeline (audit trail; supplier updates fold into it). */}
+      <SmTicketTabs photoUrls={signedPhotoUrls} docUrls={signedDocUrls} ticketId={t.id} timeline={smTimeline} />
 
       {/* Floating chat entry — only once the RM has added the SM to this ticket's chat. */}
       {chatAdded && <ChatFab ticketId={t.id} viewerRole="store_manager" unreadCount={chatCounts[t.id] ?? 0} />}

@@ -300,8 +300,11 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       case 'decline_snag_schedule':
         // RM rejects the proposed snag-fix date → send it back so the supplier proposes
         // a new one. Reset the snag to 'open' (accept_snag re-proposes on 'open' snags)
-        // and clear the date.
-        await admin.from('snags').update({ status: 'open', schedule_status: null, scheduled_at: null }).eq('ticket_id', ticketId).in('status', ['assigned', 'in_progress'])
+        // but KEEP scheduled_at and mark the schedule 'declined' — the declined date +
+        // reason survive on the row so the supplier's reschedule prompt can show them.
+        // 'declined' still blocks start_snag (its gate requires 'agreed') and every
+        // "actively scheduled" consumer checks for 'proposed'/'agreed'.
+        await admin.from('snags').update({ status: 'open', schedule_status: 'declined' }).eq('ticket_id', ticketId).in('status', ['assigned', 'in_progress'])
         // Persist the reason + time (best-effort, separate update) so it shows on the
         // ticket + audit trail, not only in the notification — never blocks the reset.
         await admin.from('snags').update({ schedule_decline_reason: body.reason ?? null, schedule_declined_at: now }).eq('ticket_id', ticketId).eq('status', 'open')

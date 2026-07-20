@@ -25,6 +25,7 @@ export {
   SignoffReviewButton,
   SignoffReviewPanel,
   VariationReviewCard,
+  VariationReviewButton,
   ApproveSignoffCard,
   AcceptSnagScheduleCard,
 } from './rm-actions/signoff'
@@ -49,4 +50,5 @@ export {
   AcceptScheduleCard,
   CancelTicketCard,
   CloseOutButton,
+  CloseOutBar,
 } from './rm-actions/ticket'

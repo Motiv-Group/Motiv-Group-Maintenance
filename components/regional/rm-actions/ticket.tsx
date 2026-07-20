@@ -126,7 +126,7 @@ export function RmTicketActionBar({ ticketId, status, canAssign, canAssignSuppli
           <AssignSuppliersButton ticketId={ticketId} suppliers={suppliers} motivSuppliers={motivSuppliers} motivAccess={motivAccess} declinedSupplierIds={declinedSupplierIds} awaitingById={awaitingById}
             trigger={open => <button onClick={open} className={primaryCls}>{assignLabel}</button>} />
           {hasMenu && (
-            <MoreMenu>
+            <MoreMenu align="left">
               {canAssign && <MoreActionItem icon={<Plus size={16} />} label="Add extra work" onClick={() => setActive('addwork')} />}
               {showRequestInfo && <MoreActionItem icon={<MessageSquare size={16} />} label="Request more info" onClick={() => setActive('info')} />}
               {hasSupplier && <MoreActionItem icon={<MessageSquare size={16} />} label="Chat with supplier" onClick={() => setActive('chat')} />}
@@ -150,7 +150,8 @@ export function RmTicketActionBar({ ticketId, status, canAssign, canAssignSuppli
       {active === 'info' && <RequestInfoButton defaultOpen onClose={done} ticketId={ticketId} />}
       {active === 'edit' && <RmEditTicketForm defaultOpen onClose={done} ticketId={ticketId} initial={{ title, category, impact, priority, description }} />}
       {active === 'cancel' && <CancelTicketCard defaultOpen onClose={done} ticketId={ticketId} jobRef={jobRef} />}
-      {active === 'chat' && <TicketChat defaultOpen onClose={done} ticketId={ticketId} viewerRole="regional_manager" />}
+      {/* Chat opens as a sibling — the supplier is awarded once hasSupplier is set. */}
+      {active === 'chat' && <TicketChat ticketId={ticketId} viewerRole="regional_manager" defaultOpen onClose={done} />}
     </>
   )
 }
@@ -583,11 +584,30 @@ export function CancelTicketCard({ ticketId, jobRef, defaultOpen = false, onClos
   )
 }
 
+// ── Supplier rating block (shared by the close-out flows) ───────
+// The REQUIRED 1–5 star score + optional comment card used by CloseOutButton
+// below AND the RM Today queue's close-out pop-up (RegionalPriorityWorkQueue's
+// CloseOutConfirm) so both flows stay identical.
+export function SupplierRatingCard({ score, comment, onScore, onComment }: { score: number; comment: string; onScore: (v: number) => void; onComment: (v: string) => void }) {
+  return (
+    <div className="space-y-2 rounded-xl p-4 ring-1 ring-[var(--border)]">
+      <p className="text-sm font-semibold text-[var(--text)]">Rate the supplier <span className="text-red-500">*</span></p>
+      <StarInput value={score} onChange={onScore} />
+      <p className="text-[11px] text-[var(--text-faint)]">Tap a star to rate</p>
+      <div className="relative">
+        <textarea maxLength={250} value={comment} onChange={e => onComment(e.target.value.slice(0, 250))} placeholder="Comment on the supplier's work (optional)"
+          className="min-h-[64px] w-full rounded-lg bg-[var(--input-bg)] px-3 py-2 pb-6 text-sm text-[var(--text)] ring-1 ring-[var(--border)]" />
+        <span className="pointer-events-none absolute bottom-2 right-3 text-[11px] tabular-nums text-[var(--text-faint)]">{comment.length}/250</span>
+      </div>
+    </div>
+  )
+}
+
 // ── Final close-out — greyed until the supplier confirms no more VOs ─
 // The confirm pop-up asks for the supplier rating (moved here from the sign-off
 // approval): a REQUIRED 1–5 star score + optional comment, posted to /api/ratings
-// before the close_out transition. Used by the RM ticket page AND the individual
-// (job-owner) ticket page — /api/ratings accepts both roles.
+// before the close_out transition. Used by the RM ticket page (via CloseOutBar)
+// AND the individual (job-owner) ticket page — /api/ratings accepts both roles.
 export function CloseOutButton({ ticketId, voConfirmed }: { ticketId: string; voConfirmed: boolean }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -614,16 +634,7 @@ export function CloseOutButton({ ticketId, voConfirmed }: { ticketId: string; vo
       {open && (
         <Modal title="Final close-out" onClose={close}>
           <p className="-mt-1 text-sm text-[var(--text-muted)]">Rate the supplier&apos;s work to complete the job — the ticket is closed once you confirm.</p>
-          <div className="space-y-2 rounded-xl p-4 ring-1 ring-[var(--border)]">
-            <p className="text-sm font-semibold text-[var(--text)]">Rate the supplier <span className="text-red-500">*</span></p>
-            <StarInput value={score} onChange={v => { setScore(v); setErr('') }} />
-            <p className="text-[11px] text-[var(--text-faint)]">Tap a star to rate</p>
-            <div className="relative">
-              <textarea maxLength={250} value={comment} onChange={e => setComment(e.target.value.slice(0, 250))} placeholder="Comment on the supplier's work (optional)"
-                className="min-h-[64px] w-full rounded-lg bg-[var(--input-bg)] px-3 py-2 pb-6 text-sm text-[var(--text)] ring-1 ring-[var(--border)]" />
-              <span className="pointer-events-none absolute bottom-2 right-3 text-[11px] tabular-nums text-[var(--text-faint)]">{comment.length}/250</span>
-            </div>
-          </div>
+          <SupplierRatingCard score={score} comment={comment} onScore={v => { setScore(v); setErr('') }} onComment={setComment} />
           {err && <p className="text-xs text-red-500">{err}</p>}
           <div className="flex gap-2">
             <button onClick={close} disabled={busy} className="flex-1 py-2.5 rounded-xl ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm font-medium disabled:opacity-50">Cancel</button>
@@ -632,5 +643,25 @@ export function CloseOutButton({ ticketId, voConfirmed }: { ticketId: string; vo
         </Modal>
       )}
     </div>
+  )
+}
+
+// ── Close-out area (RM ticket page) — Final close-out + a small "More" beside it
+// holding the secondary chat entry. The chat modal is a sibling driven by lifted
+// state (same pattern as RmTicketActionBar); the menu opens up-right since the
+// button sits near the bottom of the Next-action card.
+// Client component (a Server Component may not pass the click handlers).
+export function CloseOutBar({ ticketId, voConfirmed }: { ticketId: string; voConfirmed: boolean }) {
+  const [chat, setChat] = useState(false)
+  return (
+    <>
+      <div className="flex items-end gap-2">
+        <div className="min-w-0 flex-1"><CloseOutButton ticketId={ticketId} voConfirmed={voConfirmed} /></div>
+        <MoreMenu up align="right">
+          <MoreActionItem icon={<MessageSquare size={16} />} label="Chat with the supplier" onClick={() => setChat(true)} />
+        </MoreMenu>
+      </div>
+      {chat && <TicketChat ticketId={ticketId} viewerRole="regional_manager" defaultOpen onClose={() => setChat(false)} />}
+    </>
   )
 }

@@ -294,7 +294,7 @@ export function ViewAssignButton({ ticketId, summary, suppliers, motivSuppliers 
                 <>
                   {ticket.description && <p className="whitespace-pre-line break-words text-sm text-[var(--text-muted)]">{ticket.description}</p>}
                   {ticket.operationalImpact && <p className="text-xs text-[var(--text-faint)]">Impact · {OPERATIONAL_IMPACT_LABELS[ticket.operationalImpact] ?? ticket.operationalImpact}</p>}
-                  {ticket.photoUrls.length > 0 && <PhotoThumbs urls={ticket.photoUrls} ticketId={ticketId} limit={5} />}
+                  {ticket.photoUrls.length > 0 && <PhotoThumbs urls={ticket.photoUrls} ticketId={ticketId} label="Job photo" limit={5} />}
 
                   {/* Suppliers & quotes gathered so far. */}
                   <div className="space-y-1 rounded-xl ring-1 ring-[var(--border)] p-3">

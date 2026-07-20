@@ -8,7 +8,7 @@ import { FileText, ChevronRight, MessageSquare, ClipboardCheck, Image as ImageIc
 import { PhotoThumbs } from '@/components/ui/PhotoThumbs'
 import { TicketChat } from '@/components/chat/TicketChat'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
-import { formatDateTime } from '@/lib/utils'
+import { formatDateTime, formatCurrency } from '@/lib/utils'
 import { Modal } from './modal'
 import { post, errMsg } from './shared'
 import { MoreMenu, MoreActionItem, RequestEvidenceButton, RaiseSnagButton } from './ticket'
@@ -84,10 +84,10 @@ export function RmCompletionReview({ ticketId, label, submittedAt, photoCount, d
 
       <div className="flex items-center gap-2">
         <button type="button" onClick={() => setOpen(true)} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500"><CheckCircle2 size={16} /> Approve completion</button>
-        <MoreMenu>
+        <MoreMenu align="left">
+          <MoreActionItem icon={<MessageSquare size={16} />} label="Chat with supplier" onClick={() => setActive('chat')} />
           <MoreActionItem icon={<AlertTriangle size={16} />} label="Raise snag" onClick={() => setActive('snag')} />
           <MoreActionItem icon={<MessageSquare size={16} />} label="Request more evidence" onClick={() => setActive('evidence')} />
-          <MoreActionItem icon={<MessageSquare size={16} />} label="Chat with supplier" onClick={() => setActive('chat')} />
         </MoreMenu>
       </div>
 
@@ -98,7 +98,7 @@ export function RmCompletionReview({ ticketId, label, submittedAt, photoCount, d
       )}
       {active === 'evidence' && <RequestEvidenceButton ticketId={ticketId} defaultOpen onClose={done} />}
       {active === 'snag' && <RaiseSnagButton ticketId={ticketId} defaultOpen onClose={done} />}
-      {/* A submitted sign-off means the supplier is already awarded, so chat is always available here. */}
+      {/* A submitted completion means the supplier is awarded, so chat is available. */}
       {active === 'chat' && <TicketChat ticketId={ticketId} viewerRole="regional_manager" defaultOpen onClose={done} />}
     </div>
   )
@@ -173,8 +173,8 @@ function DocRow({ ticketId, url, itemType, itemLabel, uploadedAt, viewLabel }: {
 
 // The rich "Sign off completion" review panel — used in BOTH the RM ticket's
 // Next-action pop-up and the Today-queue sign-off pop-up. Shows the full
-// submission (photos · COC · notes) with "Approve completion" and a "More
-// actions" menu (Chat with supplier / Request more evidence / Raise a snag).
+// submission (photos · COC · notes) with "Approve completion" and a "More"
+// menu (Chat with supplier / Request more evidence / Raise a snag).
 // The supplier rating moved to the final close-out (CloseOutButton).
 export function SignoffReviewPanel({ ticketId, s, onDone }: { ticketId: string; s: SignoffSubmission; onDone?: () => void }) {
   const router = useRouter()
@@ -226,12 +226,12 @@ export function SignoffReviewPanel({ ticketId, s, onDone }: { ticketId: string; 
       {err && <p className="text-xs text-red-500">{err}</p>}
 
       <div className="flex items-center gap-2">
-        <MoreMenu label="More actions" up align="left">
+        <button onClick={approve} disabled={busy} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50"><CheckCircle2 size={16} /> {busy ? 'Approving…' : 'Approve completion'}</button>
+        <MoreMenu up align="right">
           <MoreActionItem icon={<MessageSquare size={16} />} label="Chat with supplier" onClick={() => setSub('chat')} />
           <MoreActionItem icon={<MessageSquare size={16} />} label="Request more evidence" onClick={() => setSub('evidence')} />
           <MoreActionItem icon={<AlertTriangle size={16} />} label="Raise a snag" tone="danger" onClick={() => setSub('snag')} />
         </MoreMenu>
-        <button onClick={approve} disabled={busy} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50"><CheckCircle2 size={16} /> {busy ? 'Approving…' : 'Approve completion'}</button>
       </div>
 
       {sub === 'evidence' && <RequestEvidenceButton ticketId={ticketId} defaultOpen onClose={closeSub} />}
@@ -302,6 +302,65 @@ export function VariationReviewCard({ ticketId }: { ticketId: string }) {
         </Modal>
       )}
     </div>
+  )
+}
+
+// ── View & Approve a variation order (Today queue pop-up) ───────
+// Fetches the pending VO on open (description · amount · warranty · attachments)
+// and shows it above the approve/decline controls — the queue equivalent of the
+// RM detail page's variation block. RM-scoped GET (see /variation route).
+type PendingVo = { id: string; description: string; amount: number | null; warranty: string | null; file_urls: string[]; created_at: string }
+export function VariationReviewButton({ ticketId, trigger }: { ticketId: string; trigger: (open: () => void) => ReactNode }) {
+  const [open, setOpen] = useState(false)
+  const [vo, setVo] = useState<PendingVo | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [err, setErr] = useState('')
+  useEffect(() => {
+    if (!open) return
+    let live = true
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resets fetch state when the pop-up opens, before the async load
+    setLoading(true); setErr(''); setVo(null)
+    fetch(`/api/tickets/${ticketId}/variation`)
+      .then(r => r.json())
+      .then(d => { if (!live) return; if (d?.error) setErr(d.error); else setVo(d.variation) })
+      .catch(() => { if (live) setErr('Could not load the variation order.') })
+      .finally(() => { if (live) setLoading(false) })
+    return () => { live = false }
+  }, [open, ticketId])
+  return (
+    <>
+      {trigger(() => setOpen(true))}
+      {open && (
+        <Modal title="Variation order" maxWidth="max-w-2xl" onClose={() => setOpen(false)}>
+          {loading ? <p className="py-4 text-center text-sm text-[var(--text-faint)]">Loading…</p>
+            : err ? <p className="text-sm text-red-500">{err}</p>
+            : !vo ? <p className="py-4 text-center text-sm text-[var(--text-faint)]">No variation order awaiting review.</p>
+            : (
+              <div className="space-y-4">
+                <div className="space-y-2 rounded-xl bg-[var(--surface-2)] p-4 ring-1 ring-[var(--border)]">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-faint)]">Extra work requested</p>
+                    {vo.amount != null && <p className="shrink-0 text-lg font-bold tabular-nums text-[var(--text)]">{formatCurrency(vo.amount)}</p>}
+                  </div>
+                  <p className="whitespace-pre-line text-sm text-[var(--text)]">{vo.description}</p>
+                  {vo.warranty && <p className="text-[13px] text-[var(--text-muted)]"><span className="font-semibold text-[var(--text)]">Warranty:</span> {vo.warranty}</p>}
+                  {vo.file_urls.length > 0 && (
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {vo.file_urls.map((u, i) => (
+                        <ViewTrackedLink key={i} ticketId={ticketId} itemType="attachment" itemLabel={`Variation order attachment ${i + 1}`} href={u}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface)] px-2.5 py-1.5 text-[13px] font-medium text-blue-600 ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] dark:text-blue-400">
+                          <FileText size={14} /> Attachment {i + 1}
+                        </ViewTrackedLink>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <VariationReviewCard ticketId={ticketId} />
+              </div>
+            )}
+        </Modal>
+      )}
+    </>
   )
 }
 

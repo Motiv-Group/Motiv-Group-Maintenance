@@ -64,13 +64,21 @@ async function callerSupplierOrgs(admin: Admin, userId: string): Promise<string[
 }
 // The org (if any) whose quote/invite the RM declined on this ticket, restricted
 // to the caller's orgs — the seat for a 'quote_declined' dispute. The decline
-// nulls tickets.supplier_id, so this is resolved from ticket_suppliers.
+// nulls tickets.supplier_id, so this is resolved from ticket_suppliers / quotes.
 async function declinedOrgFor(admin: Admin, ticketId: string, orgIds: string[]): Promise<string | null> {
   if (!orgIds.length) return null
+  // Fresh RM decline that was NOT asked to re-quote: the invite still reads 'declined'.
   const { data } = await admin.from('ticket_suppliers')
     .select('supplier_id, status, declined_by').eq('ticket_id', ticketId).in('supplier_id', orgIds)
-  const hit = (data ?? []).find(r => r.supplier_id && orgIds.includes(r.supplier_id) && r.status === 'declined' && r.declined_by === 'regional_manager')
-  return hit?.supplier_id ?? null
+  const invite = (data ?? []).find(r => r.supplier_id && orgIds.includes(r.supplier_id) && r.status === 'declined' && r.declined_by === 'regional_manager')
+  if (invite?.supplier_id) return invite.supplier_id
+  // Re-quote path: the RM decline resets ticket_suppliers.status back to 'invited',
+  // so the declined-invite evidence is gone — but the RM-declined QUOTE row survives.
+  // Fall back to it, still scoped to the caller's OWN orgs (cross-supplier isolation holds).
+  const { data: q } = await admin.from('quotes')
+    .select('supplier_id, status').eq('ticket_id', ticketId).eq('status', 'declined').in('supplier_id', orgIds)
+  const quote = (q ?? []).find(r => r.supplier_id && orgIds.includes(r.supplier_id))
+  return quote?.supplier_id ?? null
 }
 
 // Resolve a dispute. outcome 'withdrawn' = the RM's request is DROPPED/retracted;
@@ -339,11 +347,11 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     const what = originWord(openDispute.origin)
     const { error: pErr } = await admin.from('ticket_disputes').update({ pending_outcome: proposed, pending_by: actingRole, pending_at: now }).eq('id', openDispute.id)
     if (pErr) return NextResponse.json({ error: 'Proposals are not available yet — the latest database migration needs to be applied.' }, { status: 503 })
-    const label = proposed === 'withdrawn' ? `proposed to resolve the dispute — drop the ${what}` : `proposed to uphold the ${what} — it stands`
+    const label = proposed === 'withdrawn' ? `proposed to resolve the dispute — drop the ${what}` : `proposed to keep the ${what} — it stands`
     await admin.from('ticket_dispute_messages').insert({ dispute_id: openDispute.id, ticket_id: ticketId, author_id: user.id, author_role: actingRole, body: `${roleName(actingRole)} ${label}. Awaiting the other party's agreement.${note ? ` — ${note}` : ''}`, evidence_urls: [], created_at: now })
     await admin.from('tickets').update({ updated_at: now, ...stampFreshness(actingRole, now) }).eq('id', ticketId)
     if (actingRole === 'supplier') await notifyResolver(admin, ticket, title, 'The supplier has proposed resolving the dispute. Confirm to drop the request.')
-    else await push(admin, await supplierIds(admin, openDispute.supplier_id ?? ticket.supplier_id), ticket.company_id ?? '', ticketId, title, 'The manager has proposed upholding the request. Confirm to agree.', `/supplier/tickets/${ticketId}`)
+    else await push(admin, await supplierIds(admin, openDispute.supplier_id ?? ticket.supplier_id), ticket.company_id ?? '', ticketId, title, 'The manager has proposed keeping the request. Confirm to agree.', `/supplier/tickets/${ticketId}`)
   } else if (action === 'confirm') {
     // The OTHER party agrees to the pending proposal → resolve with its outcome.
     if (!openDispute) return NextResponse.json({ error: 'No open dispute on this ticket.' }, { status: 409 })

@@ -3,7 +3,7 @@
 // Supplier↔RM dispute thread over a snag or a "more evidence" request. The supplier
 // raises it (pausing the snag/evidence step); both sides post messages + evidence in
 // a free-flowing numbered thread until the RM resolves it as upheld or withdrawn.
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { uploadOne } from '@/lib/upload'
 import type { ReactNode } from 'react'
@@ -380,6 +380,36 @@ export function DisputeReviewButton({ ticketId, viewerRole, trigger }: {
   )
 }
 
+// One server copy of the open dispute + its thread, as returned by the GET.
+type DisputeSnapshot = { dispute: DisputeRecord; messages: DisputeMessage[]; subject: string | null }
+
+// Poll the open-dispute GET while `live` (mirrors TicketChat — deny-all RLS means
+// no browser Realtime, so a plain interval keeps both sides' threads + proposal
+// state current). `snap` stays undefined until the first fetch lands, then holds
+// the latest server copy — or null once the server reports no open dispute
+// (resolved). `refresh` forces an immediate refetch (used right after a send /
+// propose / confirm so the UI flips without waiting out the interval).
+const POLL_MS = 6000
+function useDisputePoll(ticketId: string, live: boolean): { snap: DisputeSnapshot | null | undefined; refresh: () => void } {
+  const [snap, setSnap] = useState<DisputeSnapshot | null | undefined>(undefined)
+  const [tick, setTick] = useState(0)
+  useEffect(() => {
+    if (!live) return
+    let on = true
+    const load = async () => {
+      try {
+        const r = await fetch(`/api/tickets/${ticketId}/dispute`)
+        const d = await r.json()
+        if (on && !d?.error) setSnap(d?.dispute ? d : null)
+      } catch { /* transient failure — keep the last copy */ }
+    }
+    load()
+    const t = setInterval(() => { if (on) load() }, POLL_MS)
+    return () => { on = false; clearInterval(t) }
+  }, [ticketId, live, tick])
+  return { snap, refresh: () => setTick(n => n + 1) }
+}
+
 // The full thread: numbered messages, a reply composer while open, and the RM's
 // resolve controls. Read-only once resolved (also used for the Archive history).
 export function DisputeThread({ ticketId, dispute, messages, viewerRole, readOnly = false, subject, hideControls = false }: {
@@ -390,8 +420,30 @@ export function DisputeThread({ ticketId, dispute, messages, viewerRole, readOnl
   /** Hide the resolve/propose controls (the supplier surfaces them in the Next-action block instead). */
   hideControls?: boolean
 }) {
-  const isOpen = dispute.status === 'open' && !readOnly
-  const what = originWord(dispute.origin)
+  const router = useRouter()
+  // The server-rendered props are a point-in-time copy — while the dispute is open,
+  // poll the GET so the other side's replies + proposals appear without a manual
+  // refresh, and feed the live pending state down to the inline controls. Apply the
+  // polled copy only when it is THIS dispute (the GET returns the ticket's current
+  // open dispute, which can differ on a multi-dispute ticket).
+  const wantLive = dispute.status === 'open' && !readOnly
+  const { snap, refresh } = useDisputePoll(ticketId, wantLive)
+  const fresh = snap && snap.dispute.id === dispute.id ? snap : null
+  const d = fresh?.dispute ?? dispute
+  const msgs = fresh?.messages ?? messages
+  // The dispute left the open set (the other side confirmed/resolved it) — re-render
+  // the server page ONCE so the resolved banner + next-action block take over (the
+  // ref guard stops the every-poll snapshot objects from refresh-looping).
+  const bumped = useRef(false)
+  useEffect(() => {
+    if (!wantLive || snap === undefined) return
+    if (snap === null || snap.dispute.id !== dispute.id) {
+      if (!bumped.current) { bumped.current = true; router.refresh() }
+    } else bumped.current = false
+  }, [wantLive, snap, dispute.id, router])
+
+  const isOpen = d.status === 'open' && !readOnly
+  const what = originWord(d.origin)
   const What = `${what[0].toUpperCase()}${what.slice(1)}`
 
   return (
@@ -399,27 +451,27 @@ export function DisputeThread({ ticketId, dispute, messages, viewerRole, readOnl
       {subject && (
         <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-faint)]">Regarding {subject}</p>
       )}
-      {dispute.status === 'resolved' && (
-        <div className={`rounded-lg p-3 ring-1 ${dispute.outcome === 'withdrawn' ? 'bg-emerald-500/10 ring-emerald-500/30' : 'bg-amber-500/10 ring-amber-500/30'}`}>
-          <p className={`text-[11px] font-bold uppercase tracking-wide ${dispute.outcome === 'withdrawn' ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}`}>
-            {dispute.outcome === 'withdrawn'
-              ? (dispute.origin === 'variation' ? 'Variation-order decline retracted — reopened for review'
-                : dispute.origin === 'quote_declined' ? 'Quote decline retracted — the manager will revisit the quote'
+      {d.status === 'resolved' && (
+        <div className={`rounded-lg p-3 ring-1 ${d.outcome === 'withdrawn' ? 'bg-emerald-500/10 ring-emerald-500/30' : 'bg-amber-500/10 ring-amber-500/30'}`}>
+          <p className={`text-[11px] font-bold uppercase tracking-wide ${d.outcome === 'withdrawn' ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}`}>
+            {d.outcome === 'withdrawn'
+              ? (d.origin === 'variation' ? 'Variation-order decline retracted — reopened for review'
+                : d.origin === 'quote_declined' ? 'Quote decline retracted — the manager will revisit the quote'
                 : `${What} retracted — dropped`)
-              : (dispute.origin === 'variation' ? 'Variation-order decline upheld — stays declined'
-                : dispute.origin === 'quote_declined' ? 'Quote decline upheld — the decision stands'
+              : (d.origin === 'variation' ? 'Variation-order decline upheld — stays declined'
+                : d.origin === 'quote_declined' ? 'Quote decline upheld — the decision stands'
                 : `${What} upheld — stands`)}
           </p>
-          {dispute.resolution_note && <p className="text-sm text-[var(--text)]">{dispute.resolution_note}</p>}
+          {d.resolution_note && <p className="text-sm text-[var(--text)]">{d.resolution_note}</p>}
         </div>
       )}
 
       {/* Chat thread — the viewer's own messages sit right (blue), the other side's
           left (surface). Attachments keep a running count PER SIDE across the whole
           thread ("Evidence Supplier 1/2…", "Evidence RM 1/2…") for stable references. */}
-      {messages.length > 0 && (
+      {msgs.length > 0 && (
         <div className="max-h-[440px] space-y-3 overflow-y-auto rounded-xl bg-[var(--app-bg)] p-3 ring-1 ring-[var(--border)]">
-          {messages.map(m => {
+          {msgs.map(m => {
             // A system note (e.g. "Dispute created and SLA timer paused") sits centred.
             if (m.author_role === 'system') {
               return (
@@ -467,45 +519,71 @@ export function DisputeThread({ ticketId, dispute, messages, viewerRole, readOnl
         </div>
       )}
 
-      {/* Reply while open */}
-      {isOpen && <Composer ticketId={ticketId} action="reply" submitLabel="Send" placeholder="Write a reply or add evidence…" />}
+      {/* Reply while open — a successful send refetches the thread immediately so
+          the new message lands without waiting out the poll interval. */}
+      {isOpen && <Composer ticketId={ticketId} action="reply" submitLabel="Send" placeholder="Write a reply or add evidence…" onDone={refresh} />}
 
       {/* Negotiation controls: either side can concede unilaterally, or propose an
           outcome the other must confirm (propose → confirm). Hidden when the caller
-          renders them elsewhere (supplier → Next-action block). */}
-      {isOpen && !hideControls && <DisputeControls ticketId={ticketId} origin={dispute.origin} viewerRole={viewerRole} pendingOutcome={dispute.pending_outcome ?? null} pendingBy={dispute.pending_by ?? null} />}
+          renders them elsewhere (supplier → Next-action block). The thread already
+          polls, so the inline controls skip their own poll and ride its live state. */}
+      {isOpen && !hideControls && <DisputeControls ticketId={ticketId} origin={d.origin} viewerRole={viewerRole} pendingOutcome={d.pending_outcome ?? null} pendingBy={d.pending_by ?? null} poll={false} onAction={refresh} />}
     </div>
   )
 }
 
 // Dispute resolution. Each side can CONCEDE unilaterally (supplier withdraws → the
 // request stands; RM retracts → it's dropped), or PROPOSE an outcome the OTHER side
-// must confirm (supplier proposes to resolve/drop; RM proposes to uphold/keep).
-export function DisputeControls({ ticketId, origin, viewerRole, pendingOutcome, pendingBy }: {
+// must confirm (supplier proposes to resolve/drop; RM proposes to keep — 'upheld').
+export function DisputeControls({ ticketId, origin, viewerRole, pendingOutcome, pendingBy, poll = true, onAction }: {
   ticketId: string; origin: string; viewerRole: 'supplier' | 'regional_manager'
   pendingOutcome: string | null; pendingBy: string | null
+  /** Skip the internal poll when a parent (DisputeThread) already feeds live props. */
+  poll?: boolean
+  /** Extra refetch fired after a successful action (the parent thread's refresh). */
+  onAction?: () => void
 }) {
   const router = useRouter()
   const [busy, setBusy] = useState('')
   const [err, setErr] = useState('')
   const what = originWord(origin)
+  // Standalone usages (the next-action blocks) render from server props that go
+  // stale — poll the GET so the other side's proposal flips these buttons live.
+  // The polled copy applies only while it still matches this block's dispute
+  // (same origin); once it doesn't (resolved / superseded), the pending state
+  // clears and the server page re-renders ONCE (ref-guarded against loops).
+  const { snap, refresh } = useDisputePoll(ticketId, poll)
+  const polled = poll ? snap : undefined
+  const match = polled && polled.dispute.origin === origin ? polled.dispute : undefined
+  const gone = polled !== undefined && !match
+  const pOutcome = match ? (match.pending_outcome ?? null) : gone ? null : pendingOutcome
+  const pBy = match ? (match.pending_by ?? null) : gone ? null : pendingBy
+  const bumped = useRef(false)
+  useEffect(() => {
+    if (!poll || snap === undefined) return
+    if (snap === null || snap.dispute.origin !== origin) {
+      if (!bumped.current) { bumped.current = true; router.refresh() }
+    } else bumped.current = false
+  }, [poll, snap, origin, router])
 
   async function act(action: string) {
     setBusy(action); setErr('')
     try {
       const res = await fetch(`/api/tickets/${ticketId}/dispute`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed')
-      router.refresh()
+      // Refetch the dispute right away so propose/confirm/cancel feedback shows
+      // without waiting out the poll interval, then re-render the server page.
+      refresh(); onAction?.(); router.refresh()
     } catch (e) { setErr(errMsg(e)) }
     // Always clear busy — router.refresh() keeps this client component mounted, so
     // without this the buttons stay disabled after a successful action (e.g. cancel).
     finally { setBusy('') }
   }
 
-  const pending = !!pendingOutcome && !!pendingBy
-  const iAmProposer = pending && pendingBy === viewerRole
+  const pending = !!pOutcome && !!pBy
+  const iAmProposer = pending && pBy === viewerRole
   // 'withdrawn' = a proposal to DROP the request; 'upheld' = keep it (stands).
-  const proposalText = pendingOutcome === 'withdrawn' ? `drop the ${what}` : `keep the ${what} — it stands`
+  const proposalText = pOutcome === 'withdrawn' ? `drop the ${what}` : `keep the ${what} — it stands`
   const otherLabel = (r: string) => r === 'supplier' ? 'supplier' : 'client'
 
   // Role action set (propose + solo concede). Hidden for the proposer while waiting.
@@ -516,7 +594,7 @@ export function DisputeControls({ ticketId, origin, viewerRole, pendingOutcome, 
     </>
   ) : (
     <>
-      <button onClick={() => act('propose')} disabled={!!busy} className="w-full py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition disabled:opacity-50">{busy === 'propose' ? 'Proposing…' : `Propose to uphold the ${what}`}</button>
+      <button onClick={() => act('propose')} disabled={!!busy} className="w-full py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition disabled:opacity-50">{busy === 'propose' ? 'Proposing…' : `Propose to keep the ${what}`}</button>
       <button onClick={() => act('retract')} disabled={!!busy} className="w-full py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition disabled:opacity-50 flex items-center justify-center gap-1.5"><ShieldX size={14} /> {busy === 'retract' ? 'Retracting…' : `Retract the ${what}`}</button>
     </>
   )
@@ -531,7 +609,7 @@ export function DisputeControls({ ticketId, origin, viewerRole, pendingOutcome, 
       )}
       {pending && !iAmProposer && (
         <div className="rounded-lg ring-1 ring-[#f59e0b]/30 bg-[#f59e0b]/10 p-2.5 space-y-2">
-          <p className="text-sm text-[var(--text)]">The {otherLabel(pendingBy!)} proposed to <span className="font-semibold">{proposalText}</span>. Both sides must agree.</p>
+          <p className="text-sm text-[var(--text)]">The {otherLabel(pBy!)} proposed to <span className="font-semibold">{proposalText}</span>. Both sides must agree.</p>
           <button onClick={() => act('confirm')} disabled={!!busy} className="w-full py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold disabled:opacity-50">{busy === 'confirm' ? 'Agreeing…' : 'Agree'}</button>
         </div>
       )}
