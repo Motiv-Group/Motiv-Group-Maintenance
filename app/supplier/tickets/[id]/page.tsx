@@ -18,7 +18,7 @@ import { ArchiveGroup } from '@/components/ticket/ArchiveGroup'
 import { SignoffCard } from '@/components/ticket/SignoffCard'
 import { MarkInProgressButton, DeclineWorkButton, AcceptSnagCard, SnagRescheduleCta, StartSnagButton, SupplierVariationGate, SupplierQuoteBar, SupplierQuoteSubmittedActions } from '@/components/supplier/SupplierJobActions'
 import { PopupForm } from '@/components/supplier/PopupForm'
-import { RaiseDisputeButton, RaiseDisputeMore, DisputeThread, DisputeControls } from '@/components/dispute/DisputeBox'
+import { RaiseDisputeMore, DisputeThread, DisputeControls } from '@/components/dispute/DisputeBox'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { EditedLine } from '@/components/ui/EditedLine'
 import { TicketTimeline } from '@/components/ui/TicketTimeline'
@@ -34,7 +34,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
     t, store, storeName, disputeStore, companyName, supplierCompanyName, customer, editorName, quoteRequestedAt,
     latestSnag, snagFixApproved, snagScheduleActive, declinedSnag, scheduledTechName,
     awarded, chatUnread, chatUnreadCount, declinedForMe, dueAt, overdue, declineDetails, sla, breached, now,
-    latestQuote, canSubmitQuote, declineReason, declinedBy, declinedByLabel, declineMessage, politeDecline, supplierStatus, reQuoteByRm,
+    latestQuote, canSubmitQuote, declineReason, declinedBy, declinedByLabel, declineMessage, supplierStatus, reQuoteByRm,
     quoteStatusOf, requoteReason,
     pendingSignoffs, rejectedSignoffs, acceptedSignoff, submissionLabel, roundBySignoff, liveSnag, liveEvidence, archivedSuperseded,
     variations, variationCount, latestVoRejectReason, canDecline,
@@ -234,19 +234,11 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
       {/* Off the ticket → no "Next step", just why this quote request was declined. */}
       {declinedForMe ? (
         <div className="rounded-2xl bg-red-500/10 ring-1 ring-red-500/40 p-5 space-y-1">
-          {/* "Quote declined" once they'd submitted a quote; otherwise the request itself. */}
+          {/* "Quote declined" once they'd submitted a quote; otherwise the request itself.
+              A decline is final on this side — no dispute entry (any open dispute thread
+              still lives in the Dispute tab). */}
           <p className="text-sm font-bold text-red-700 dark:text-red-400">{latestQuote ? 'Quote declined' : 'Quote request declined'}{declinedByLabel}</p>
           <p className="text-sm text-[var(--text)]">{declineMessage}</p>
-          {/* The client declined this org — they may dispute it (thread-only, no workflow
-              pause; the conversation lives in the Dispute tab once raised). Hidden while
-              their own dispute is already open, and for a "choosing another supplier"
-              decline (a normal competitive outcome — nothing to dispute). */}
-          {declinedBy === 'regional_manager' && !openDispute && !politeDecline && (
-            <div className="pt-2">
-              <RaiseDisputeButton ticketId={t.id} origin="quote_declined" label="Dispute the decline"
-                subjectTitle={latestQuote ? 'Quote declined' : 'Quote request declined'} jobRef={t.job_ref} store={disputeStore} />
-            </div>
-          )}
         </div>
       ) : (
         <div className="grid gap-4 lg:grid-cols-2 items-stretch">

@@ -697,7 +697,7 @@ function SnagSheet({ ticket, company, onClose }: { ticket: SupplierTicketRow; co
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:divide-x sm:divide-[var(--border)]">
             <div className="flex min-w-0 items-start gap-2">
               <User size={15} className="mt-0.5 shrink-0 text-red-500" />
-              <div className="min-w-0"><p className="text-xs text-[var(--text-muted)]">Raised by</p><p className="truncate text-sm font-semibold text-[var(--text)]">{ticket.isIndividual ? 'Client' : 'Regional Manager'}</p>{ctx?.reviewedByName && <p className="truncate text-xs text-[var(--text-muted)]">{ctx.reviewedByName}</p>}</div>
+              <div className="min-w-0"><p className="text-xs text-[var(--text-muted)]">Raised by</p><p className="truncate text-sm font-semibold text-[var(--text)]">{ticket.isIndividual ? 'Client' : 'Regional Manager'}</p></div>
             </div>
             {ctx?.reviewedAt && (
               <div className="flex min-w-0 items-start gap-2 sm:pl-3">
@@ -719,7 +719,7 @@ function SnagSheet({ ticket, company, onClose }: { ticket: SupplierTicketRow; co
             )}
             <div className="flex min-w-0 items-start gap-2 sm:pl-3">
               <FileText size={15} className="mt-0.5 shrink-0 text-red-500" />
-              <div className="min-w-0"><p className="text-xs text-[var(--text-muted)]">Ticket</p><p className="truncate text-sm font-semibold text-[var(--text)]">{ticket.jobRef ?? formatJobId(ticket.jobNumber)}</p>{store && <p className="truncate text-xs text-[var(--text-muted)]">{store}{ticket.category ? ` · ${ticket.category}` : ''}</p>}</div>
+              <div className="min-w-0"><p className="text-xs text-[var(--text-muted)]">Ticket</p><p className="truncate text-sm font-semibold text-[var(--text)]">{ticket.jobRef ?? formatJobId(ticket.jobNumber)}</p></div>
             </div>
           </div>
 
@@ -784,12 +784,8 @@ function SnagSheet({ ticket, company, onClose }: { ticket: SupplierTicketRow; co
             <div className="min-w-0 flex-1">
               <AcceptSnagCard ticketId={ticket.id} priority={String(ticket.priority)} createdAt={ticket.createdAt}
                 trigger={openSched => (
-                  <button type="button" onClick={openSched} className="flex w-full items-center justify-center gap-3 rounded-xl bg-blue-600 px-4 py-2 text-white transition hover:bg-blue-500">
-                    <Calendar size={17} className="shrink-0" />
-                    <span className="min-w-0 text-left">
-                      <span className="block text-sm font-semibold leading-tight">Accept and schedule corrective work</span>
-                      <span className="block text-xs leading-tight text-white/75">Accept the snag and choose a date to complete the correction</span>
-                    </span>
+                  <button type="button" onClick={openSched} className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500">
+                    <Calendar size={16} /> Accept and schedule snag
                   </button>
                 )} />
             </div>
@@ -867,6 +863,7 @@ function matchesFilter(t: SupplierTicketRow, filter: QueueFilter): boolean {
 
 function nextStep(t: SupplierTicketRow): string {
   const s = myStatus(t)
+  if (t.disputed) return 'Dispute open — awaiting resolution'
   if (t.declinedForMe) return 'Your quote was not selected for this job'
   if (t.requoteRequested) return 'Quote declined — revise and resubmit'
   if (s === 'quote_requested') return 'Submit a quote'
