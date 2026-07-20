@@ -9,7 +9,7 @@
 // another supplier's progress.
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { AlertOctagon, AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, Info, ReceiptText, Camera, FileText, ShieldCheck, SquarePen, Store as StoreIcon, Tag, X, XCircle } from 'lucide-react'
+import { AlertCircle, AlertOctagon, AlertTriangle, ArrowRight, Calendar, CalendarClock, CheckCircle2, Clock, Eye, Info, ReceiptText, Camera, FileText, ShieldCheck, SquarePen, Store as StoreIcon, Tag, User, X, XCircle } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import type { SupplierTicketRow } from '@/lib/health/data'
 import { Modal } from '@/components/ui/Modal'
@@ -19,7 +19,7 @@ import { errMsg } from '@/components/ui/errMsg'
 import { SendQuoteForm } from '@/components/admin/SendQuoteForm'
 import { SubmitCompletionForm } from '@/components/supplier/SubmitCompletionForm'
 import { SupplierVariationGate, AcceptSnagCard, SnagRescheduleCta } from '@/components/supplier/SupplierJobActions'
-import { DisputeReviewButton, RaiseDisputeMore, RaiseDisputeButton } from '@/components/dispute/DisputeBox'
+import { DisputeReviewButton, RaiseDisputeButton } from '@/components/dispute/DisputeBox'
 import { TicketChat } from '@/components/chat/TicketChat'
 import { MoreMenu, MoreActionItem } from '@/components/regional/rm-actions/ticket'
 import { supplierStatusMeta, formatJobId, formatCurrency, formatDate, formatDateTime, OPERATIONAL_IMPACT_LABELS, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
@@ -633,78 +633,184 @@ function UploadEvidenceCta({ ticket, className }: { ticket: SupplierTicketRow; c
   )
 }
 
-// "View snag" from the Today queue — pops the snagged-completion context with the
-// relevant actions in place (Accept snag & schedule fix + More → Raise dispute),
-// plus a link to the full snagged submission on the ticket.
-type SnagContext = { beforeUrls: string[]; afterUrls: string[]; cocUrl: string | null; invoiceUrl: string | null; notes: string | null; rejectReason: string | null; submittedAt: string | null }
-// The snagged completion (before/after photos, COC & invoice, notes) — fetched on
-// open so the supplier sees exactly what was sent back before accepting the snag.
-function SnaggedCompletion({ ticketId }: { ticketId: string }) {
+// "View snag" from the Today queue — the "Completion requires correction" sheet
+// (reference layout): raised-by/date/due/ticket meta row, reason banner, the
+// snagged submission (photos + COC + notes), a big accept-and-schedule primary
+// with a small More (Raise dispute), and a link to the full snag on the ticket.
+type SnagContext = { beforeUrls: string[]; afterUrls: string[]; cocUrl: string | null; invoiceUrl: string | null; notes: string | null; rejectReason: string | null; submittedAt: string | null; reviewedAt: string | null; reviewedByName: string | null }
+// Derived display filename for a signed storage URL (path basename, query stripped).
+function docBasename(url: string, fallback: string): string {
+  try {
+    const path = new URL(url).pathname
+    const base = decodeURIComponent(path.split('/').pop() ?? '')
+    return base || fallback
+  } catch { return fallback }
+}
+// Whole days until `iso` (negative = past due).
+function daysUntilIso(iso: string): number {
+  return Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000)
+}
+function ViewSnagCta({ ticket, className, company }: { ticket: SupplierTicketRow; className: string; company?: string }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} className={className}>View Snag</button>
+      {open && <SnagSheet ticket={ticket} company={company} onClose={() => setOpen(false)} />}
+    </>
+  )
+}
+function SnagSheet({ ticket, company, onClose }: { ticket: SupplierTicketRow; company?: string; onClose: () => void }) {
+  const [disputing, setDisputing] = useState(false)
   const [ctx, setCtx] = useState<SnagContext | null>(null)
   const [loading, setLoading] = useState(true)
   useEffect(() => {
     let live = true
-    fetch(`/api/tickets/${ticketId}/snag-context`)
+    fetch(`/api/tickets/${ticket.id}/snag-context`)
       .then(r => r.json())
-      .then(d => { if (live) setCtx(d.signoff) })
+      .then(d => { if (live) setCtx(d.signoff ?? null) })
       .catch(() => {})
       .finally(() => { if (live) setLoading(false) })
     return () => { live = false }
-  }, [ticketId])
-  if (loading) return <p className="py-2 text-center text-sm text-[var(--text-faint)]">Loading the snagged completion…</p>
-  if (!ctx) return null
-  const docs = [ctx.cocUrl && { label: 'Certificate of Compliance', url: ctx.cocUrl }, ctx.invoiceUrl && { label: 'Invoice', url: ctx.invoiceUrl }].filter(Boolean) as { label: string; url: string }[]
+  }, [ticket.id])
+
+  const store = ticket.isIndividual ? 'Individual' : [company, ticket.storeName, ticket.branchCode].filter(Boolean).join(' · ')
+  const due = ticket.nextActionDueAt ?? ticket.dueAt
+  const daysLeft = due ? daysUntilIso(due) : null
+  const photos = ctx ? (ctx.afterUrls.length ? ctx.afterUrls : ctx.beforeUrls) : []
   return (
-    <div className="space-y-3 rounded-xl bg-[var(--surface-2)] p-4 ring-1 ring-[var(--border)]">
-      <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-faint)]">Your snagged submission</p>
-      {ctx.beforeUrls.length > 0 && <div><p className="mb-1 text-xs font-semibold text-[var(--text)]">Before</p><PhotoThumbs urls={ctx.beforeUrls} ticketId={ticketId} label="Before photo" limit={5} /></div>}
-      {ctx.afterUrls.length > 0 && <div><p className="mb-1 text-xs font-semibold text-[var(--text)]">After</p><PhotoThumbs urls={ctx.afterUrls} ticketId={ticketId} label="After photo" limit={5} /></div>}
-      {docs.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {docs.map((d, i) => (
-            <a key={i} href={d.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface)] px-2.5 py-1.5 text-[13px] font-medium text-blue-600 ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] dark:text-blue-400"><FileText size={14} /> {d.label}</a>
-          ))}
+    <Modal onClose={onClose} maxWidth="max-w-3xl">
+      {close => (
+        <div className="space-y-4">
+          {/* Header — red alert badge + title/subtitle, boxed close. */}
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 items-start gap-3">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-red-500/15 text-red-500"><AlertCircle size={22} /></span>
+              <div className="min-w-0">
+                <h3 className="text-xl font-bold leading-snug text-[var(--text)]">Completion requires correction</h3>
+                <p className="mt-0.5 text-sm text-[var(--text-muted)]">The regional manager raised a snag on your completion. Review the details below, then accept the snag and schedule corrective work — or raise a dispute if you disagree.</p>
+              </div>
+            </div>
+            <button type="button" onClick={close} aria-label="Close" className="shrink-0 rounded-lg p-2 ring-1 ring-[var(--border)] text-[var(--text-muted)] transition hover:bg-[var(--hover)]"><X size={16} /></button>
+          </div>
+
+          {/* Meta row — raised by · date raised · correction due · ticket. */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:divide-x sm:divide-[var(--border)]">
+            <div className="flex min-w-0 items-start gap-2">
+              <User size={15} className="mt-0.5 shrink-0 text-red-500" />
+              <div className="min-w-0"><p className="text-xs text-[var(--text-muted)]">Raised by</p><p className="truncate text-sm font-semibold text-[var(--text)]">{ticket.isIndividual ? 'Client' : 'Regional Manager'}</p>{ctx?.reviewedByName && <p className="truncate text-xs text-[var(--text-muted)]">{ctx.reviewedByName}</p>}</div>
+            </div>
+            {ctx?.reviewedAt && (
+              <div className="flex min-w-0 items-start gap-2 sm:pl-3">
+                <Calendar size={15} className="mt-0.5 shrink-0 text-red-500" />
+                <div className="min-w-0"><p className="text-xs text-[var(--text-muted)]">Date raised</p><p className="text-sm font-semibold text-[var(--text)]">{formatDateTime(ctx.reviewedAt)}</p></div>
+              </div>
+            )}
+            {due && (
+              <div className="flex min-w-0 items-start gap-2 sm:pl-3">
+                <Clock size={15} className="mt-0.5 shrink-0 text-red-500" />
+                <div className="min-w-0">
+                  <p className="text-xs text-[var(--text-muted)]">Correction due by</p>
+                  <p className="text-sm font-semibold text-[var(--text)]">{formatDateTime(due)}</p>
+                  {daysLeft != null && (daysLeft > 0
+                    ? <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">{daysLeft} day{daysLeft === 1 ? '' : 's'} remaining</p>
+                    : <p className="text-xs font-semibold text-red-500">Overdue</p>)}
+                </div>
+              </div>
+            )}
+            <div className="flex min-w-0 items-start gap-2 sm:pl-3">
+              <FileText size={15} className="mt-0.5 shrink-0 text-red-500" />
+              <div className="min-w-0"><p className="text-xs text-[var(--text-muted)]">Ticket</p><p className="truncate text-sm font-semibold text-[var(--text)]">{ticket.jobRef ?? formatJobId(ticket.jobNumber)}</p>{store && <p className="truncate text-xs text-[var(--text-muted)]">{store}{ticket.category ? ` · ${ticket.category}` : ''}</p>}</div>
+            </div>
+          </div>
+
+          {/* Reason banner. */}
+          <div className="flex items-start gap-3 rounded-xl bg-red-500/10 ring-1 ring-red-500/30 p-4">
+            <AlertCircle size={20} className="mt-0.5 shrink-0 text-red-500" />
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-red-700 dark:text-red-400">Reason for snag</p>
+              <p className="mt-0.5 break-words text-[15px] text-[var(--text)]">{ctx?.rejectReason ?? ticket.snagReason ?? 'No reason given'}</p>
+            </div>
+          </div>
+
+          {/* The snagged submission — photos left, COC + notes right. */}
+          <div className="space-y-3 rounded-xl bg-[var(--surface-2)] p-4 ring-1 ring-[var(--border)]">
+            <p className="text-base font-bold text-[var(--text)]">Your snagged submission</p>
+            {loading ? <p className="py-2 text-center text-sm text-[var(--text-faint)]">Loading the snagged completion…</p>
+              : ctx ? (
+                <div className="grid gap-4 sm:grid-cols-2 sm:divide-x sm:divide-[var(--border)]">
+                  <div className="min-w-0">
+                    {photos.length > 0 && (
+                      <>
+                        <p className="mb-1.5 text-sm text-[var(--text-muted)]">{ctx.afterUrls.length ? 'After photos submitted' : 'Photos submitted'}</p>
+                        <PhotoThumbs urls={photos} ticketId={ticket.id} label={ctx.afterUrls.length ? 'After photo' : 'Before photo'} limit={4} />
+                      </>
+                    )}
+                  </div>
+                  <div className="min-w-0 space-y-3 sm:pl-4">
+                    {ctx.cocUrl && (
+                      <div>
+                        <p className="mb-1.5 text-sm text-[var(--text-muted)]">Certificate of Compliance (COC)</p>
+                        <div className="space-y-2 rounded-xl bg-[var(--surface)] p-3 ring-1 ring-[var(--border)]">
+                          <div className="flex min-w-0 items-center gap-3">
+                            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-red-500/15 text-red-500"><FileText size={18} /></span>
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold text-[var(--text)]">{docBasename(ctx.cocUrl, 'COC.pdf')}</p>
+                              {ctx.submittedAt && <p className="text-xs text-[var(--text-muted)]">Uploaded {formatDateTime(ctx.submittedAt)}</p>}
+                            </div>
+                          </div>
+                          <ViewTrackedLink ticketId={ticket.id} itemType="coc" itemLabel="COC" href={ctx.cocUrl}
+                            className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-[var(--text)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)]">
+                            <Eye size={15} /> View certificate
+                          </ViewTrackedLink>
+                        </div>
+                      </div>
+                    )}
+                    {ctx.invoiceUrl && (
+                      <ViewTrackedLink ticketId={ticket.id} itemType="invoice" itemLabel="Invoice" href={ctx.invoiceUrl}
+                        className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:underline">
+                        <FileText size={15} /> View invoice
+                      </ViewTrackedLink>
+                    )}
+                    {ctx.notes && (
+                      <div><p className="mb-0.5 text-sm text-[var(--text-muted)]">Your notes</p><p className="break-words text-sm text-[var(--text)]">{ctx.notes}</p></div>
+                    )}
+                  </div>
+                </div>
+              ) : <p className="text-sm text-[var(--text-faint)]">The original submission is no longer available.</p>}
+          </div>
+
+          {/* Footer — big accept-and-schedule primary + small More (Raise dispute). */}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+            <div className="min-w-0 flex-1">
+              <AcceptSnagCard ticketId={ticket.id} priority={String(ticket.priority)} createdAt={ticket.createdAt}
+                trigger={openSched => (
+                  <button type="button" onClick={openSched} className="flex w-full items-center justify-center gap-3 rounded-xl bg-blue-600 px-4 py-2 text-white transition hover:bg-blue-500">
+                    <Calendar size={17} className="shrink-0" />
+                    <span className="min-w-0 text-left">
+                      <span className="block text-sm font-semibold leading-tight">Accept and schedule corrective work</span>
+                      <span className="block text-xs leading-tight text-white/75">Accept the snag and choose a date to complete the correction</span>
+                    </span>
+                  </button>
+                )} />
+            </div>
+            <MoreMenu up align="right">
+              <MoreActionItem label="Raise dispute" tone="danger" onClick={() => setDisputing(true)} />
+            </MoreMenu>
+          </div>
+
+          {/* Full detail on the ticket. */}
+          <Link href={`/supplier/tickets/${ticket.id}`} onClick={close} className="flex items-start gap-2">
+            <Info size={15} className="mt-0.5 shrink-0 text-blue-600 dark:text-blue-400" />
+            <span className="min-w-0">
+              <span className="inline-flex items-center gap-1 text-sm font-semibold text-blue-600 hover:underline dark:text-blue-400">View full snag details <ArrowRight size={14} /></span>
+              <span className="block text-xs text-[var(--text-muted)]">See full comments, history and evidence</span>
+            </span>
+          </Link>
+
+          {disputing && <RaiseDisputeButton ticketId={ticket.id} origin="snag" subjectTitle={ticket.category || ticket.title} jobRef={ticket.jobRef} store={store} defaultOpen onClose={() => setDisputing(false)} />}
         </div>
       )}
-      {ctx.notes && <p className="text-[13px] text-[var(--text-muted)]"><span className="font-semibold text-[var(--text)]">Your notes:</span> {ctx.notes}</p>}
-      {ctx.beforeUrls.length === 0 && ctx.afterUrls.length === 0 && docs.length === 0 && !ctx.notes && (
-        <p className="text-sm text-[var(--text-faint)]">The original submission is no longer available.</p>
-      )}
-    </div>
-  )
-}
-
-function ViewSnagCta({ ticket, className, company }: { ticket: SupplierTicketRow; className: string; company?: string }) {
-  const [open, setOpen] = useState(false)
-  const store = ticket.isIndividual ? 'Individual' : [company, ticket.storeName, ticket.branchCode].filter(Boolean).join(' · ')
-  return (
-    <>
-      <button type="button" onClick={() => setOpen(true)} className={className}>View Snag</button>
-      {open && (
-        <Modal onClose={() => setOpen(false)} maxWidth="max-w-3xl">
-          {close => (
-            <div className="space-y-4">
-              <h3 className="text-base font-bold text-[var(--text)]">Completion snagged</h3>
-              <p className="text-sm text-[var(--text-muted)]">The regional manager raised a snag on your completion. Review what was sent back below, then accept the snag and schedule the corrective work — or raise a dispute if you disagree.</p>
-              {/* Why it was sent back. */}
-              {ticket.snagReason && (
-                <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3 space-y-0.5">
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Why it was sent back</p>
-                  <p className="text-sm text-[var(--text)]">{ticket.snagReason}</p>
-                </div>
-              )}
-              {/* The snagged completion itself. */}
-              <SnaggedCompletion ticketId={ticket.id} />
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
-                <div className="flex-1"><AcceptSnagCard ticketId={ticket.id} priority={String(ticket.priority)} createdAt={ticket.createdAt} /></div>
-                <RaiseDisputeMore ticketId={ticket.id} origin="snag" subjectTitle={ticket.category || ticket.title} jobRef={ticket.jobRef} store={store} />
-              </div>
-              <Link href={`/supplier/tickets/${ticket.id}`} onClick={close} className="inline-flex items-center gap-1 text-sm font-semibold text-blue-600 hover:underline dark:text-blue-400">View full snag details <ArrowRight size={14} /></Link>
-            </div>
-          )}
-        </Modal>
-      )}
-    </>
+    </Modal>
   )
 }
 

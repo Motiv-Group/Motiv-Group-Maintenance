@@ -664,6 +664,9 @@ create table if not exists public.ticket_reads (
   user_id                      uuid not null,
   last_seen_at                 timestamptz not null default now()
 );
+-- One watermark per user+ticket: the /seen route upserts on these two columns (20260724).
+create unique index if not exists ticket_reads_unique_read
+  on public.ticket_reads (user_id, ticket_id);
 
 create table if not exists public.ticket_sla_events (
   id                           uuid not null default gen_random_uuid(),

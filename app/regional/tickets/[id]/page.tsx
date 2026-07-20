@@ -637,7 +637,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
       <RmTicketTabs ticketId={t.id} photoGroups={photoGroups} timeline={timelineItems} documents={documentsContent} quotes={quotesContent} completion={completionContent} variations={variationsContent} dispute={disputeContent} history={historyContent}
         defaultTab={
           openDispute ? 'dispute'
-          : completionContent && ['submitted_for_signoff', 'approved_closeout', 'completed'].includes(t.status) ? 'completion'
+          : completionContent && ['submitted_for_signoff', 'approved_closeout', 'completed', 'snag', 'snag_assigned', 'snag_in_progress', 'snag_resolved'].includes(t.status) ? 'completion'
           : quotesContent && (t.status === 'quoted' || reviewQuotes.length > 0) ? 'quotes'
           : undefined
         } />

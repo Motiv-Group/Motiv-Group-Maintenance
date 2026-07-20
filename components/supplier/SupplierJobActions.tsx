@@ -3,7 +3,7 @@
 // Supplier "Schedule job" action — a green button that opens a themed calendar
 // (date + 1-hour time slot, capped by the ticket priority window and operating
 // hours). The Submit COC & POC flow lives on its own page (/complete).
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { Calendar, Wrench, PlayCircle, XCircle, X, FileText, Ticket, MapPin, Info, ArrowRight, Plus, MessageSquare, MessageSquareWarning, CheckCircle2 } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
@@ -179,7 +179,9 @@ export function SupplierQuoteSubmittedActions({ ticketId, canDecline = false, de
 
 // Accept a raised snag and schedule when the corrective work will happen — opens
 // the same themed calendar as Schedule job (no technician step).
-export function AcceptSnagCard({ ticketId, priority, createdAt }: { ticketId: string; priority: string; createdAt: string }) {
+// `trigger` lets a caller supply its own opener (e.g. the View-snag sheet's big
+// primary button); default stays the full-width blue button.
+export function AcceptSnagCard({ ticketId, priority, createdAt, trigger }: { ticketId: string; priority: string; createdAt: string; trigger?: (open: () => void) => ReactNode }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -195,9 +197,11 @@ export function AcceptSnagCard({ ticketId, priority, createdAt }: { ticketId: st
 
   return (
     <>
-      <button onClick={() => setOpen(true)} className="w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition flex items-center justify-center gap-1.5">
-        <Calendar size={15} /> Accept snag &amp; schedule fix
-      </button>
+      {trigger ? trigger(() => setOpen(true)) : (
+        <button onClick={() => setOpen(true)} className="w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition flex items-center justify-center gap-1.5">
+          <Calendar size={15} /> Accept snag &amp; schedule fix
+        </button>
+      )}
       {open && (
         <Modal onClose={() => setOpen(false)} maxWidth="max-w-2xl">
           {close => (

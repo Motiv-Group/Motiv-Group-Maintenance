@@ -44,9 +44,12 @@ export async function POST(_request: Request, props: { params: Promise<{ id: str
   }
   if (!related) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  await admin.from('ticket_reads').upsert(
+  const { error } = await admin.from('ticket_reads').upsert(
     [{ company_id: ticket.company_id, ticket_id: ticket.id, user_id: user.id, last_seen_at: new Date().toISOString() }],
     { onConflict: 'user_id,ticket_id' },
   )
+  // Surface failures — a silently-dead watermark broke read markers for weeks
+  // (the unique index the upsert conflicts on ships in 20260724).
+  if (error) console.error('[seen] ticket_reads upsert failed:', ticket.id, error.message)
   return NextResponse.json({ ok: true })
 }
