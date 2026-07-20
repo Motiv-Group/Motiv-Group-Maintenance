@@ -7,18 +7,20 @@
 // phases (submit quote → mark in progress → upload evidence → sign-off). Uses
 // `myStatus` isolation so a supplier only ever sees their own quote state, never
 // another supplier's progress.
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { AlertOctagon, AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, ReceiptText, Camera } from 'lucide-react'
+import { AlertOctagon, AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, ReceiptText, Camera, FileText } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import type { SupplierTicketRow } from '@/lib/health/data'
 import { Modal } from '@/components/ui/Modal'
+import { PhotoThumbs } from '@/components/ui/PhotoThumbs'
 import { errMsg } from '@/components/ui/errMsg'
 import { SendQuoteForm } from '@/components/admin/SendQuoteForm'
 import { SubmitCompletionForm } from '@/components/supplier/SubmitCompletionForm'
 import { SupplierVariationGate, AcceptSnagCard } from '@/components/supplier/SupplierJobActions'
-import { DisputeReviewButton, RaiseDisputeMore } from '@/components/dispute/DisputeBox'
-import { supplierStatusMeta, formatJobId } from '@/lib/utils'
+import { DisputeReviewButton, RaiseDisputeMore, RaiseDisputeButton } from '@/components/dispute/DisputeBox'
+import { MoreMenu, MoreActionItem } from '@/components/regional/rm-actions/ticket'
+import { supplierStatusMeta, formatJobId, formatCurrency, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
 import {
   byUrgencyThenNewest, EmptyQueue, isActive, isCriticalPriority, MetricButton,
   QueueCard, queueCtaClass, QueueRowBadges, QueueRowNextStep, QueueRowShell, QueueRowTitle,
@@ -115,6 +117,7 @@ function QueueRow({ ticket, nowMs, company, chatUnread = 0 }: { ticket: Supplier
   // Phase CTA — labelled by what the supplier does next. Disputed → view the dispute
   // chat; snagged → view the snag; the rest open a pop-up or the ticket.
   const cta = ticket.disputed ? 'View dispute'
+    : ticket.requoteRequested ? 'View & re-quote'
     : toQuote(ticket) ? 'Submit quote'
     : ['accepted', 'scheduled'].includes(ticket.status) && ticket.awardedToMe ? 'Mark in progress'
     : needsEvidence(ticket) ? 'Upload evidence'
@@ -135,6 +138,8 @@ function QueueRow({ ticket, nowMs, company, chatUnread = 0 }: { ticket: Supplier
       <div className="flex lg:justify-end">
         {cta === 'View dispute'
           ? <DisputeReviewButton ticketId={ticket.id} viewerRole="supplier" trigger={open => <button type="button" onClick={open} className={ctaCls}>View Dispute</button>} />
+          : ticket.requoteRequested
+          ? <ReQuoteCta ticket={ticket} className={ctaCls} company={company} />
           : toQuote(ticket)
           ? <SubmitQuoteCta ticket={ticket} className={ctaCls} />
           : closeout && !ticket.voNoneConfirmed
@@ -151,8 +156,51 @@ function QueueRow({ ticket, nowMs, company, chatUnread = 0 }: { ticket: Supplier
   )
 }
 
-// "Submit quote" opens the full quote-upload pop-up in place (same SendQuoteForm as
-// the ticket detail), so the supplier can quote straight from the Today queue.
+// Ticket detail a supplier reviews before quoting — fetched on pop-up open from
+// the supplier-scoped quote-context route (mirrors the RM's View & Assign
+// context). Kept lean: store · impact · description · photos.
+type QuoteContext = { title: string; category: string | null; description: string | null; impact: string | null; priority: string; jobRef: string | null; storeName: string | null; photoUrls: string[] }
+function TicketContextPanel({ ticketId }: { ticketId: string }) {
+  const [ctx, setCtx] = useState<QuoteContext | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [err, setErr] = useState('')
+  useEffect(() => {
+    let live = true
+    fetch(`/api/tickets/${ticketId}/quote-context`)
+      .then(r => r.json())
+      .then(d => { if (!live) return; if (d?.error) setErr(d.error); else setCtx(d.ticket) })
+      .catch(() => { if (live) setErr('Could not load the job details.') })
+      .finally(() => { if (live) setLoading(false) })
+    return () => { live = false }
+  }, [ticketId])
+
+  if (loading) return <p className="py-3 text-center text-sm text-[var(--text-faint)]">Loading job details…</p>
+  if (err || !ctx) return err ? <p className="text-sm text-red-500">{err}</p> : null
+  return (
+    <div className="space-y-3 rounded-xl bg-[var(--surface-2)] p-4 ring-1 ring-[var(--border)]">
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs text-[var(--text-muted)]">
+        {ctx.storeName && <span><span className="text-[var(--text-faint)]">Store</span> <span className="font-semibold text-[var(--text)]">{ctx.storeName}</span></span>}
+        {ctx.category && <span><span className="text-[var(--text-faint)]">Category</span> <span className="font-semibold text-[var(--text)]">{ctx.category}</span></span>}
+        {ctx.impact && <span><span className="text-[var(--text-faint)]">Impact</span> <span className="font-semibold text-[var(--text)]">{OPERATIONAL_IMPACT_LABELS[ctx.impact] ?? ctx.impact}</span></span>}
+      </div>
+      {ctx.description && (
+        <div>
+          <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-[var(--text-faint)]">Description</p>
+          <p className="whitespace-pre-line break-words text-sm text-[var(--text)]">{ctx.description}</p>
+        </div>
+      )}
+      {ctx.photoUrls.length > 0 && (
+        <div>
+          <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-[var(--text-faint)]">Photos</p>
+          <PhotoThumbs urls={ctx.photoUrls} ticketId={ticketId} label="Job photo" limit={5} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+// "Submit quote" opens the job detail THEN the quote-upload form in one pop-up
+// (mirrors the RM assign flow), so the supplier reviews the job before quoting.
 function SubmitQuoteCta({ ticket, className }: { ticket: SupplierTicketRow; className: string }) {
   const [open, setOpen] = useState(false)
   return (
@@ -160,7 +208,69 @@ function SubmitQuoteCta({ ticket, className }: { ticket: SupplierTicketRow; clas
       <button type="button" onClick={() => setOpen(true)} className={className}>Submit Quote</button>
       {open && (
         <Modal onClose={() => setOpen(false)} maxWidth="max-w-3xl">
-          {close => <div><SendQuoteForm defaultOpen competitive ticketId={ticket.id} priority={String(ticket.priority)} createdAt={ticket.createdAt} onClose={close} /></div>}
+          {close => (
+            <div className="space-y-4">
+              <h3 className="text-base font-bold text-[var(--text)]">Review the job &amp; submit your quote</h3>
+              <TicketContextPanel ticketId={ticket.id} />
+              <SendQuoteForm defaultOpen competitive ticketId={ticket.id} priority={String(ticket.priority)} createdAt={ticket.createdAt} onClose={close} />
+            </div>
+          )}
+        </Modal>
+      )}
+    </>
+  )
+}
+
+// "View & re-quote" from the Today queue — the RM declined this supplier's quote
+// and asked them to revise it. Shows the decline reason + job detail, a Re-quote
+// button (opens the upload form) and a More menu (up/right, pop-up convention)
+// with Cancel + Raise dispute (dispute the decline, origin quote_declined).
+function ReQuoteCta({ ticket, className, company }: { ticket: SupplierTicketRow; className: string; company?: string }) {
+  const [open, setOpen] = useState(false)
+  const [quoting, setQuoting] = useState(false)
+  const [disputing, setDisputing] = useState(false)
+  const store = ticket.isIndividual ? 'Individual' : [company, ticket.storeName, ticket.branchCode].filter(Boolean).join(' · ')
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} className={className}>View &amp; Re-Quote</button>
+      {open && (
+        <Modal onClose={() => setOpen(false)} maxWidth="max-w-3xl">
+          {close => (
+            <div className="space-y-4">
+              <h3 className="text-base font-bold text-[var(--text)]">Quote declined — revise &amp; resubmit</h3>
+              <div className="space-y-1 rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5">
+                <p className="text-sm text-[var(--text)]">The manager declined your quote and asked you to revise and resubmit it.</p>
+                {ticket.declineReason && (
+                  <p className="text-sm text-[var(--text-muted)]"><span className="font-semibold text-[var(--text)]">Reason:</span> {ticket.declineReason}</p>
+                )}
+              </div>
+
+              <TicketContextPanel ticketId={ticket.id} />
+
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={() => setQuoting(true)} className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500">
+                  <ReceiptText size={16} /> Re-quote
+                </button>
+                {/* Pop-up convention: menu opens upward, right-aligned. */}
+                <MoreMenu up align="right">
+                  <MoreActionItem label="Cancel" onClick={close} />
+                  <MoreActionItem label="Raise dispute" tone="danger" onClick={() => setDisputing(true)} />
+                </MoreMenu>
+              </div>
+
+              {quoting && (
+                <Modal onClose={() => setQuoting(false)} maxWidth="max-w-3xl">
+                  {closeQuote => (
+                    <div className="space-y-4">
+                      <h3 className="text-base font-bold text-[var(--text)]">Submit your revised quote</h3>
+                      <SendQuoteForm defaultOpen competitive ticketId={ticket.id} priority={String(ticket.priority)} createdAt={ticket.createdAt} onClose={() => { closeQuote(); close() }} />
+                    </div>
+                  )}
+                </Modal>
+              )}
+              {disputing && <RaiseDisputeButton ticketId={ticket.id} origin="quote_declined" subjectTitle={ticket.category || ticket.title} jobRef={ticket.jobRef} store={store} defaultOpen onClose={() => setDisputing(false)} />}
+            </div>
+          )}
         </Modal>
       )}
     </>
@@ -226,6 +336,44 @@ function UploadEvidenceCta({ ticket, className }: { ticket: SupplierTicketRow; c
 // "View snag" from the Today queue — pops the snagged-completion context with the
 // relevant actions in place (Accept snag & schedule fix + More → Raise dispute),
 // plus a link to the full snagged submission on the ticket.
+type SnagContext = { beforeUrls: string[]; afterUrls: string[]; cocUrl: string | null; invoiceUrl: string | null; notes: string | null; rejectReason: string | null; submittedAt: string | null }
+// The snagged completion (before/after photos, COC & invoice, notes) — fetched on
+// open so the supplier sees exactly what was sent back before accepting the snag.
+function SnaggedCompletion({ ticketId }: { ticketId: string }) {
+  const [ctx, setCtx] = useState<SnagContext | null>(null)
+  const [loading, setLoading] = useState(true)
+  useEffect(() => {
+    let live = true
+    fetch(`/api/tickets/${ticketId}/snag-context`)
+      .then(r => r.json())
+      .then(d => { if (live) setCtx(d.signoff) })
+      .catch(() => {})
+      .finally(() => { if (live) setLoading(false) })
+    return () => { live = false }
+  }, [ticketId])
+  if (loading) return <p className="py-2 text-center text-sm text-[var(--text-faint)]">Loading the snagged completion…</p>
+  if (!ctx) return null
+  const docs = [ctx.cocUrl && { label: 'Certificate of Compliance', url: ctx.cocUrl }, ctx.invoiceUrl && { label: 'Invoice', url: ctx.invoiceUrl }].filter(Boolean) as { label: string; url: string }[]
+  return (
+    <div className="space-y-3 rounded-xl bg-[var(--surface-2)] p-4 ring-1 ring-[var(--border)]">
+      <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-faint)]">Your snagged submission</p>
+      {ctx.beforeUrls.length > 0 && <div><p className="mb-1 text-xs font-semibold text-[var(--text)]">Before</p><PhotoThumbs urls={ctx.beforeUrls} ticketId={ticketId} label="Before photo" limit={5} /></div>}
+      {ctx.afterUrls.length > 0 && <div><p className="mb-1 text-xs font-semibold text-[var(--text)]">After</p><PhotoThumbs urls={ctx.afterUrls} ticketId={ticketId} label="After photo" limit={5} /></div>}
+      {docs.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {docs.map((d, i) => (
+            <a key={i} href={d.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface)] px-2.5 py-1.5 text-[13px] font-medium text-blue-600 ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] dark:text-blue-400"><FileText size={14} /> {d.label}</a>
+          ))}
+        </div>
+      )}
+      {ctx.notes && <p className="text-[13px] text-[var(--text-muted)]"><span className="font-semibold text-[var(--text)]">Your notes:</span> {ctx.notes}</p>}
+      {ctx.beforeUrls.length === 0 && ctx.afterUrls.length === 0 && docs.length === 0 && !ctx.notes && (
+        <p className="text-sm text-[var(--text-faint)]">The original submission is no longer available.</p>
+      )}
+    </div>
+  )
+}
+
 function ViewSnagCta({ ticket, className, company }: { ticket: SupplierTicketRow; className: string; company?: string }) {
   const [open, setOpen] = useState(false)
   const store = ticket.isIndividual ? 'Individual' : [company, ticket.storeName, ticket.branchCode].filter(Boolean).join(' · ')
@@ -233,20 +381,20 @@ function ViewSnagCta({ ticket, className, company }: { ticket: SupplierTicketRow
     <>
       <button type="button" onClick={() => setOpen(true)} className={className}>View Snag</button>
       {open && (
-        <Modal onClose={() => setOpen(false)} maxWidth="max-w-2xl">
+        <Modal onClose={() => setOpen(false)} maxWidth="max-w-3xl">
           {close => (
             <div className="space-y-4">
-              <div>
-                <h3 className="text-base font-bold text-[var(--text)]">Completion snagged</h3>
-                <p className="mt-1 text-sm text-[var(--text-muted)]">The regional manager raised a snag on your completion. Accept the snag and schedule the corrective work, or raise a dispute if you disagree.</p>
-              </div>
-              {/* What the manager snagged, and why — same callout as the ticket's Snag tab. */}
+              <h3 className="text-base font-bold text-[var(--text)]">Completion snagged</h3>
+              <p className="text-sm text-[var(--text-muted)]">The regional manager raised a snag on your completion. Review what was sent back below, then accept the snag and schedule the corrective work — or raise a dispute if you disagree.</p>
+              {/* Why it was sent back. */}
               {ticket.snagReason && (
                 <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3 space-y-0.5">
                   <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Why it was sent back</p>
                   <p className="text-sm text-[var(--text)]">{ticket.snagReason}</p>
                 </div>
               )}
+              {/* The snagged completion itself. */}
+              <SnaggedCompletion ticketId={ticket.id} />
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
                 <div className="flex-1"><AcceptSnagCard ticketId={ticket.id} priority={String(ticket.priority)} createdAt={ticket.createdAt} /></div>
                 <RaiseDisputeMore ticketId={ticket.id} origin="snag" subjectTitle={ticket.category || ticket.title} jobRef={ticket.jobRef} store={store} />
@@ -297,6 +445,7 @@ function matchesFilter(t: SupplierTicketRow, filter: QueueFilter): boolean {
 
 function nextStep(t: SupplierTicketRow): string {
   const s = myStatus(t)
+  if (t.requoteRequested) return 'Quote declined — revise and resubmit'
   if (s === 'quote_requested') return 'Submit a quote'
   if (s === 'quoted') return "Awaiting the client's decision"
   if (['accepted', 'scheduled'].includes(t.status)) return 'Mark the job in progress when you start'

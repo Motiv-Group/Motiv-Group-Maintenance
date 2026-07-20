@@ -84,7 +84,9 @@ export interface TimelineInput {
 }
 
 // Fallback wording when a view has no specific label (older, section-level rows).
-const VIEW_LABEL: Record<string, string> = { quote: 'the quote', photos: 'the photos', photo: 'a photo', coc: 'the COC & POC', invoice: 'the invoice' }
+// Call sites now pass descriptive labels ("Job photo 2", "the invoice", "the
+// declined quote", "Variation order attachment 1"), so this only backs old rows.
+const VIEW_LABEL: Record<string, string> = { quote: 'the quote', photos: 'the photos', photo: 'a job photo', coc: 'the COC & POC', invoice: 'the invoice', attachment: 'an attachment', document: 'a document' }
 
 export function buildTicketTimeline(t: TimelineInput): TimelineEvent[] {
   const ev: (TimelineEvent & { seq: number })[] = []
@@ -297,6 +299,7 @@ const SM_TONES: ReadonlySet<TimelineTone> = new Set<TimelineTone>([
   'variation', 'variation_approved', 'variation_declined',
   'completion_submitted', 'completion_approved', 'completion_rejected',
   'completed', 'cancelled',
+  'update',   // supplier progress notes (operational — the Activity tab folded into the timeline)
 ])
 
 /** The Store-Manager (and owner-adjacent) subset of a ticket's timeline. */

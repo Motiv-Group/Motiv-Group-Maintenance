@@ -9,7 +9,6 @@ import { Pencil, Plus, Camera, Info, X, ChevronDown, MessageSquare, XCircle, Sen
 import { uploadFiles } from '@/lib/upload'
 import { formatDateTime } from '@/lib/utils'
 import { StarInput } from '@/components/ui/Stars'
-import { TicketChat } from '@/components/chat/TicketChat'
 import { Modal } from './modal'
 import { post, errMsg, type SupplierChoice } from './shared'
 import { AssignSuppliersButton } from './assign'
@@ -76,7 +75,7 @@ export function MoreMenu({ children, fullWidth = false, label = 'More', up = fal
   )
 }
 
-type ActionKey = 'addwork' | 'info' | 'edit' | 'cancel' | 'chat'
+type ActionKey = 'addwork' | 'info' | 'edit' | 'cancel'
 
 // The RM Next-action cluster: one primary button (Assign supplier) + a "More"
 // dropdown holding the secondary/destructive actions (add extra work, request info,
@@ -85,14 +84,13 @@ type ActionKey = 'addwork' | 'info' | 'edit' | 'cancel' | 'chat'
 // active) so they open instantly — the previous approach kept them inside the
 // collapsing menu, which felt laggy/buggy.
 // Client component (a Server Component may not pass the click handlers).
-export function RmTicketActionBar({ ticketId, status, canAssign, canAssignSupplier, canCancel, canEdit, hasSupplier = false, jobRef, suppliers, motivSuppliers, motivAccess = 'none', declinedSupplierIds, awaitingById, description, photoUrls, title, category, impact, priority }: {
+export function RmTicketActionBar({ ticketId, status, canAssign, canAssignSupplier, canCancel, canEdit, jobRef, suppliers, motivSuppliers, motivAccess = 'none', declinedSupplierIds, awaitingById, description, photoUrls, title, category, impact, priority }: {
   ticketId: string
   status: string
   canAssign: boolean
   canAssignSupplier: boolean
   canCancel: boolean
   canEdit: boolean
-  hasSupplier?: boolean
   jobRef?: string | null
   suppliers: SupplierChoice[]
   motivSuppliers: SupplierChoice[]
@@ -110,7 +108,7 @@ export function RmTicketActionBar({ ticketId, status, canAssign, canAssignSuppli
   const done = () => setActive(null)
   const showRequestInfo = ['open', 'info_requested'].includes(status)
   const hasPrimary = canAssignSupplier
-  const hasMenu = canAssign || showRequestInfo || canEdit || canCancel || hasSupplier
+  const hasMenu = canAssign || showRequestInfo || canEdit || canCancel
   const primaryCls = `${hasMenu ? 'flex-1' : 'w-full'} py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition`
   // Once one or more suppliers have already been invited/quoted, assigning is
   // adding ANOTHER supplier — reflect that in the button label.
@@ -126,10 +124,9 @@ export function RmTicketActionBar({ ticketId, status, canAssign, canAssignSuppli
           <AssignSuppliersButton ticketId={ticketId} suppliers={suppliers} motivSuppliers={motivSuppliers} motivAccess={motivAccess} declinedSupplierIds={declinedSupplierIds} awaitingById={awaitingById}
             trigger={open => <button onClick={open} className={primaryCls}>{assignLabel}</button>} />
           {hasMenu && (
-            <MoreMenu>
+            <MoreMenu align="left">
               {canAssign && <MoreActionItem icon={<Plus size={16} />} label="Add extra work" onClick={() => setActive('addwork')} />}
               {showRequestInfo && <MoreActionItem icon={<MessageSquare size={16} />} label="Request more info" onClick={() => setActive('info')} />}
-              {hasSupplier && <MoreActionItem icon={<MessageSquare size={16} />} label="Chat with supplier" onClick={() => setActive('chat')} />}
               {canEdit && <MoreActionItem icon={<Pencil size={16} />} label="Edit ticket" onClick={() => setActive('edit')} />}
               {canCancel && <MoreActionItem icon={<XCircle size={16} />} label="Cancel ticket" tone="danger" onClick={() => setActive('cancel')} />}
             </MoreMenu>
@@ -139,7 +136,6 @@ export function RmTicketActionBar({ ticketId, status, canAssign, canAssignSuppli
         <div className="flex flex-wrap items-center gap-2">
           {canAssign && <button onClick={() => setActive('addwork')} className={outlineCls}><Plus size={15} /> Add extra work</button>}
           {showRequestInfo && <button onClick={() => setActive('info')} className={outlineCls}><MessageSquare size={15} /> Request more info</button>}
-          {hasSupplier && <button onClick={() => setActive('chat')} className={outlineCls}><MessageSquare size={15} /> Chat with supplier</button>}
           {canEdit && <button onClick={() => setActive('edit')} className={outlineCls}><Pencil size={15} /> Edit ticket</button>}
           {canCancel && <button onClick={() => setActive('cancel')} className={outlineDangerCls}><XCircle size={15} /> Cancel ticket</button>}
         </div>
@@ -150,7 +146,6 @@ export function RmTicketActionBar({ ticketId, status, canAssign, canAssignSuppli
       {active === 'info' && <RequestInfoButton defaultOpen onClose={done} ticketId={ticketId} />}
       {active === 'edit' && <RmEditTicketForm defaultOpen onClose={done} ticketId={ticketId} initial={{ title, category, impact, priority, description }} />}
       {active === 'cancel' && <CancelTicketCard defaultOpen onClose={done} ticketId={ticketId} jobRef={jobRef} />}
-      {active === 'chat' && <TicketChat defaultOpen onClose={done} ticketId={ticketId} viewerRole="regional_manager" />}
     </>
   )
 }

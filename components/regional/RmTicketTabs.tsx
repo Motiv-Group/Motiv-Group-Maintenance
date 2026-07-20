@@ -1,28 +1,23 @@
 'use client'
 
 import { useState, useRef, useEffect, type ReactNode } from 'react'
-import { Camera } from 'lucide-react'
 import { Card } from '@/components/exec/ui'
 import { PhotoThumbs } from '@/components/ui/PhotoThumbs'
-import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
-import { formatDateTime } from '@/lib/utils'
 import { TicketTimeline } from '@/components/ui/TicketTimeline'
 import type { TimelineEvent } from '@/lib/ticket-timeline'
 
 type PhotoGroup = { label: string; urls: string[] }
-type Update = { body: string; created_at: string }
-type Tab = 'photos' | 'documents' | 'quotes' | 'completion' | 'dispute' | 'activity' | 'timeline' | 'history'
+type Tab = 'photos' | 'documents' | 'quotes' | 'completion' | 'dispute' | 'timeline' | 'history'
 
 /** Lower tabbed section of the RM ticket detail — Photos (every image on the
  *  ticket, grouped by source), Documents (COC/invoice/quote/VO attachments),
  *  Quotes (the approved quote + any under review), Completion (the approved COC
- *  & POC), Activity (supplier updates) and the full Timeline. */
+ *  & POC) and the full Timeline (supplier updates fold into it). */
 export function RmTicketTabs({
-  ticketId, photoGroups, updates, timeline, history, documents, quotes, completion, dispute, defaultTab,
+  ticketId, photoGroups, timeline, history, documents, quotes, completion, dispute, defaultTab,
 }: {
   ticketId: string
   photoGroups: PhotoGroup[]
-  updates: Update[]
   timeline: TimelineEvent[]
   history?: ReactNode
   documents?: ReactNode
@@ -40,7 +35,6 @@ export function RmTicketTabs({
     { key: 'quotes', label: 'Quotes' },
     { key: 'completion', label: 'Completion' },
     ...(dispute ? [{ key: 'dispute' as Tab, label: 'Dispute' }] : []),
-    { key: 'activity', label: `Activity${updates.length ? ` (${updates.length})` : ''}` },
     { key: 'timeline', label: 'Timeline' },
     { key: 'history', label: 'History' },
   ]
@@ -116,24 +110,6 @@ export function RmTicketTabs({
 
       {tab === 'dispute' && (
         dispute ?? <p className="text-sm text-[var(--text-faint)]">No dispute on this ticket.</p>
-      )}
-
-      {tab === 'activity' && (
-        updates.length ? (
-          <div>
-            {updates.map((u, i) => {
-              const photo = String(u.body).match(/^📷\s*Progress photo:\s*(\S+)/)
-              return (
-                <div key={i} className="border-b border-[var(--border)] py-2.5 last:border-0">
-                  {photo
-                    ? <ViewTrackedLink ticketId={ticketId} itemType="photo" itemLabel="Supplier progress photo" href={photo[1]} className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"><Camera size={14} /> View progress photo</ViewTrackedLink>
-                    : <p className="text-sm text-[var(--text)] whitespace-pre-line">{u.body}</p>}
-                  <p className="text-[11px] text-[var(--text-faint)]">Supplier · {formatDateTime(u.created_at)}</p>
-                </div>
-              )
-            })}
-          </div>
-        ) : <p className="text-sm text-[var(--text-faint)]">No updates from the supplier yet.</p>
       )}
 
       {tab === 'timeline' && <TicketTimeline items={timeline} />}

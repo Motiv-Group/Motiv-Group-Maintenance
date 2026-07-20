@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic'
 import { redirect } from 'next/navigation'
 import { BackLink } from '@/components/ui/BackLink'
 import { CheckCircle2, FileText, Calendar, Clock, MessageSquare, Camera } from 'lucide-react'
-import { ChatFab, TicketChatIcon } from '@/components/chat/TicketChat'
+import { ChatFab, TicketChatInline } from '@/components/chat/TicketChat'
 import { BreachReason } from '@/components/workflow/BreachReason'
 import { QuoteSummary } from '@/components/workflow/QuoteSummary'
 import { Card } from '@/components/exec/ui'
@@ -386,7 +386,6 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
                 return <span className={`inline-flex w-auto justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold sm:w-[120px] ${cls}`}>{label}</span>
               })()}
             </div>
-            {t.supplier_id && <TicketChatIcon ticketId={t.id} viewerRole="regional_manager" unread={chatUnread} />}
           </div>
         </div>
 
@@ -457,8 +456,8 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
             (menu-only) so the chat entry point remains reachable.
             It's a client component so its per-action trigger render-props are created
             client-side (a Server Component can't pass functions to Client Components). */}
-        {!isTerminal && (canAssign || canCancel || !!t.supplier_id) && (
-          <RmTicketActionBar ticketId={t.id} status={t.status} canAssign={canAssign} canAssignSupplier={canAssignSupplier} canCancel={canCancel} canEdit={canEdit} hasSupplier={!!t.supplier_id} jobRef={t.job_ref}
+        {!isTerminal && (canAssign || canCancel) && (
+          <RmTicketActionBar ticketId={t.id} status={t.status} canAssign={canAssign} canAssignSupplier={canAssignSupplier} canCancel={canCancel} canEdit={canEdit} jobRef={t.job_ref}
             suppliers={supplierList} motivSuppliers={motivSupplierList} motivAccess={motivAccess} declinedSupplierIds={declinedSupplierIds} awaitingById={engagedSupplierIds}
             description={t.description ?? ''} photoUrls={Array.isArray(t.photo_urls) ? t.photo_urls : []} title={t.title} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} priority={t.priority} />
         )}
@@ -513,6 +512,10 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
           suppliers={supplierList}
           exclude={['validate', 'reject', 'request_info', 'request_quote', 'require_assessment', 'approve_quote', 'reject_quote', 'request_revision', 'proceed_no_quote', 'schedule', 'approve', 'assign_snag', 'accept_schedule', 'approve_snag', 'decline_snag_schedule', 'approve_variation', 'reject_variation', 'request_evidence', 'raise_snag', 'close_out']}
         />
+
+        {/* Chat with the supplier — the single next-action chat entry, below every
+            informational callout (the header icon + the action-bar item were removed). */}
+        {t.supplier_id && !isTerminal && <TicketChatInline ticketId={t.id} viewerRole="regional_manager" unread={chatUnread} />}
       </Card>
 
       {/* Ticket information — aligned label→value rows, then full-width description. */}
@@ -621,7 +624,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
           row → full detail + actions); its files are also in the Documents/Photos tabs. */}
       {/* Photos · Activity (supplier updates) · Timeline (the full audit trail —
           status changes, edits, attachments/photos viewed, quotes, sign-offs …). */}
-      <RmTicketTabs ticketId={t.id} photoGroups={photoGroups} updates={supplierUpdates} timeline={timelineItems} documents={documentsContent} quotes={quotesContent} completion={completionContent} dispute={disputeContent} history={historyContent}
+      <RmTicketTabs ticketId={t.id} photoGroups={photoGroups} timeline={timelineItems} documents={documentsContent} quotes={quotesContent} completion={completionContent} dispute={disputeContent} history={historyContent}
         defaultTab={
           openDispute ? 'dispute'
           : completionContent && ['submitted_for_signoff', 'approved_closeout', 'completed'].includes(t.status) ? 'completion'

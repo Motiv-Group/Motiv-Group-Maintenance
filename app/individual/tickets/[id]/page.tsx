@@ -149,7 +149,7 @@ export default async function IndividualTicketDetailPage(props: { params: Promis
         {photos.length > 0 && (
           <div>
             <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5 flex items-center gap-1.5"><ImageIcon size={12} /> Photos</div>
-            <PhotoThumbs urls={photos} ticketId={t.id} />
+            <PhotoThumbs urls={photos} ticketId={t.id} label="Job photo" />
           </div>
         )}
       </Card>

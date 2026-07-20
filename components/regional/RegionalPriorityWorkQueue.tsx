@@ -11,7 +11,7 @@ import { useRouter } from 'next/navigation'
 import { AlertOctagon, AlertTriangle, ArrowRight, CheckCircle2, ClipboardCheck, ReceiptText, UserPlus } from 'lucide-react'
 import type { RegionalTicketRow } from '@/lib/health/data'
 import { Modal } from '@/components/ui/Modal'
-import { ViewAssignButton, QuoteReviewButton, SignoffReviewButton } from '@/components/regional/RmTicketActions'
+import { ViewAssignButton, QuoteReviewButton, SignoffReviewButton, VariationReviewButton } from '@/components/regional/RmTicketActions'
 import { DisputeReviewButton } from '@/components/dispute/DisputeBox'
 import { errMsg } from '@/components/regional/rm-actions/shared'
 import { rmStatusMeta, formatJobId } from '@/lib/utils'
@@ -103,6 +103,7 @@ function QueueRow({ ticket, nowMs, suppliers, motivSuppliers, motivAccess, chatU
   //  · still gathering / awaiting quotes → "Assign supplier" (assign / add more)
   //  · anything else                   → "View Ticket"
   const reviewQuote = ['quoted', 'quote_revision'].includes(ticket.status)
+  const reviewVo = ticket.status === 'variation_review'
   const reviewSignoff = ticket.status === 'submitted_for_signoff'
   const assignable = !reviewQuote && ['open', 'info_requested', 'suppliers_declined', 'assigned', 'quote_requested', 'assessment'].includes(ticket.status)
   const ctaCls = queueCtaClass(isCriticalPriority(ticket.priority))
@@ -131,6 +132,9 @@ function QueueRow({ ticket, nowMs, suppliers, motivSuppliers, motivAccess, chatU
         ) : reviewQuote ? (
           <QuoteReviewButton ticketId={ticket.id}
             trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}>Approve Quote</button>} />
+        ) : reviewVo ? (
+          <VariationReviewButton ticketId={ticket.id}
+            trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}>View &amp; Approve</button>} />
         ) : reviewSignoff ? (
           <SignoffReviewButton ticketId={ticket.id}
             trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}><ClipboardCheck size={15} /> Sign-Off</button>} />

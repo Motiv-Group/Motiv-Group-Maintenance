@@ -51,7 +51,7 @@ export function ClientTicketActions({ ticketId, title, description, category, im
           )}
         </div>
         {(smAdded || !addInfo) && (
-          <MoreMenu>
+          <MoreMenu align="left">
             {smAdded && <MoreActionItem icon={<MessageSquare size={16} />} label="Ticket chat" onClick={() => setChat(true)} />}
             {!addInfo && <MoreActionItem icon={<Trash2 size={16} />} label="Delete ticket" tone="danger" onClick={() => setDel(true)} />}
           </MoreMenu>

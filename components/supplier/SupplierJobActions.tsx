@@ -134,7 +134,7 @@ export function SupplierQuoteBar({ ticketId, priority, createdAt, canDecline = f
       <div className="flex items-center gap-2">
         <button type="button" onClick={() => setQuoteOpen(true)} className={`${canDecline ? 'flex-1' : 'w-full'} py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition`}>Upload Quote</button>
         {canDecline && (
-          <MoreMenu>
+          <MoreMenu align="left">
             <MoreActionItem icon={<XCircle size={16} />} label="Decline work" tone="danger" onClick={() => setDeclineOpen(true)} />
           </MoreMenu>
         )}
@@ -159,7 +159,7 @@ export function SupplierQuoteSubmittedActions({ ticketId, canDecline = false, de
       <div className="flex items-center gap-2">
         <button type="button" onClick={() => setQuoteOpen(true)} className={`${canDecline ? 'flex-1' : 'w-full'} inline-flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold text-blue-600 dark:text-blue-400 ring-1 ring-blue-500/50 transition hover:bg-blue-500/10`}>View my quote <ArrowRight size={15} /></button>
         {canDecline && (
-          <MoreMenu>
+          <MoreMenu align="left">
             <MoreActionItem icon={<XCircle size={16} />} label="Decline work" tone="danger" onClick={() => setDeclineOpen(true)} />
           </MoreMenu>
         )}
@@ -323,7 +323,7 @@ export function SupplierVariationGate({ ticketId, priority, createdAt, variation
           under "More" like the other action blocks. */}
       <div className="flex items-center gap-2">
         <button onClick={confirmNoVos} disabled={busy} className="flex-1 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition disabled:opacity-50">{busy ? 'Confirming…' : 'Ready for Close-out'}</button>
-        <MoreMenu up>
+        <MoreMenu align="left">
           <MoreActionItem icon={<Plus size={16} />} label={raiseLabel} onClick={() => setVoOpen(true)} />
         </MoreMenu>
       </div>

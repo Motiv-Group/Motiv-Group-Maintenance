@@ -25,6 +25,7 @@ export {
   SignoffReviewButton,
   SignoffReviewPanel,
   VariationReviewCard,
+  VariationReviewButton,
   ApproveSignoffCard,
   AcceptSnagScheduleCard,
 } from './rm-actions/signoff'

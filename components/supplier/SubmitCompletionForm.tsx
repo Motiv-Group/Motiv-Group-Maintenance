@@ -166,7 +166,7 @@ export function SubmitCompletionForm({ ticketId, evidenceRequested = false, evid
         // to the manager who asked for the evidence.
         <div className="flex items-center gap-3">
           <button onClick={submit} disabled={busy} className="flex-1 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Submitting…' : 'Review & Submit'}</button>
-          <MoreMenu up>
+          <MoreMenu up align="right">
             <MoreActionItem icon={<X size={16} />} label="Cancel" onClick={() => { setOpen(false); setErr(''); onClose?.() }} />
             <MoreActionItem icon={<MessageSquare size={16} />} label="Chat with manager" onClick={() => setChatOpen(true)} />
           </MoreMenu>

@@ -6,12 +6,11 @@ import { SubmitCompletionForm } from '@/components/supplier/SubmitCompletionForm
 import { BackLink } from '@/components/ui/BackLink'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { PhotoThumbs } from '@/components/ui/PhotoThumbs'
-import { ChatFab, TicketChatIcon } from '@/components/chat/TicketChat'
+import { ChatFab } from '@/components/chat/TicketChat'
 import { BreachReason } from '@/components/workflow/BreachReason'
 import { Card } from '@/components/exec/ui'
 import { WorkflowActions } from '@/components/workflow/WorkflowActions'
 import { RmPipeline } from '@/components/regional/RmPipeline'
-import { SupplierAttachments } from '@/components/workflow/SupplierAttachments'
 import { CompletionFooterNote } from '@/components/workflow/CompletionBody'
 import { QuoteSummary } from '@/components/workflow/QuoteSummary'
 import { ArchiveGroup } from '@/components/ticket/ArchiveGroup'
@@ -40,7 +39,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
     variations, variationCount, latestVoRejectReason, canDecline,
     disputes, msgsByDispute, openDispute, resolvedDisputes, disputeSubject,
     nextAction, timelineItems,
-    totalPhotos, quoteTabRows, historyDeclinedQuotes, updates, declineRows,
+    totalPhotos, quoteTabRows, historyDeclinedQuotes, declineRows,
   } = result.data
 
   // While a dispute is open the paused step's action area shows the resolve controls
@@ -55,7 +54,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
   // ── Lower tabbed section (mirrors the RM ticket detail). Each tab's content, or
   // null when it has nothing — DetailTabs drops the empty ones. ──────────────────
   const photosTab = totalPhotos > 0
-    ? <PhotoThumbs urls={t.photo_urls as string[]} ticketId={t.id} />
+    ? <PhotoThumbs urls={t.photo_urls as string[]} ticketId={t.id} label="Job photo" />
     : null
   const quotesTab = quoteTabRows.length > 0
     ? (<div className="space-y-2">{quoteTabRows.map((q, i, arr) => (
@@ -127,21 +126,6 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
             </div>
           </details>
         ))}
-      </div>)
-    : null
-  const activityTab = (awarded || updates.length > 0)
-    ? (<div className="space-y-4">
-        {awarded && <div><h3 className="text-sm font-bold text-[var(--text)] mb-3">Post an update</h3><SupplierAttachments ticketId={t.id} /></div>}
-        {updates.length > 0 && (
-          <div>
-            {updates.map((u, i) => (
-              <div key={i} className="border-b border-[var(--border)] py-2.5 last:border-0">
-                <p className="text-sm text-[var(--text)] whitespace-pre-line">{u.body}</p>
-                <p className="text-[11px] text-[var(--text-faint)]">{u.author_role === 'supplier' ? 'You' : 'Client'} · {formatDateTime(u.created_at)}</p>
-              </div>
-            ))}
-          </div>
-        )}
       </div>)
     : null
   const archiveTab = (historyDeclinedQuotes.length > 0 || declineRows.length > 0 || archivedSuperseded.length > 0 || !!declinedSnag)
@@ -229,7 +213,6 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
                 return <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${cls}`}>{label}</span>
               })()}
             </div>
-            {awarded && <TicketChatIcon ticketId={t.id} viewerRole="supplier" unread={chatUnread} />}
           </div>
         </div>
         {!declinedForMe && <RmPipeline status={supplierStatus} />}
@@ -456,7 +439,6 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
           { key: 'variations', label: 'Variation Orders', content: voTab },
           { key: 'snag', label: 'Snag', content: snagTab },
           { key: 'dispute', label: 'Dispute', content: disputeTab },
-          { key: 'activity', label: `Activity${updates.length ? ` (${updates.length})` : ''}`, content: activityTab },
           { key: 'archive', label: 'History', content: archiveTab },
           { key: 'timeline', label: 'Timeline', content: timelineTab },
         ]}

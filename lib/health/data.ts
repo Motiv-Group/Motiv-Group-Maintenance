@@ -670,6 +670,10 @@ export interface SupplierTicketRow {
   snagReason: string | null
   // The manager's "more evidence" request message (only while status = evidence_requested).
   evidenceRequestReason: string | null
+  // The RM declined this supplier's quote and asked them to re-quote (re-invited).
+  requoteRequested: boolean
+  // Why their quote was declined (shown in the re-quote flow).
+  declineReason: string | null
 }
 export interface SupplierQuoteRow { id: string; ticketId: string; ticketTitle: string; ticketStatus: string; storeName: string; branchCode: string | null; amount: number; amountInclVat: number | null; status: string; createdAt: string; category: string | null; priority: Priority; jobRef: string | null; description: string | null; validUntil: string | null; proposedScheduleAt: string | null; reQuoteRequested: boolean }
 export interface SupplierSignoffRow { id: string; ticketId: string; ticketTitle: string; ticketStatus: string; storeName: string; branchCode: string | null; status: string; createdAt: string; category: string | null; priority: Priority; description: string | null; jobRef: string | null; photoCount: number; certCount: number; decidedAt: string | null; decidedBy: string | null }
@@ -729,7 +733,7 @@ export async function assembleSupplierDashboard(companyId: string | null, suppli
   const titleOf = new Map(tickets.map(t => [t.id, t.title ?? 'Ticket']))
 
   const [{ data: quotesRaw }, { data: signoffsRaw }, { data: ratingRows }, { data: companyRow }] = await Promise.all([
-    db.from('quotes').select('id, ticket_id, amount, amount_incl_vat, status, created_at, updated_at, valid_until, proposed_schedule_at').in('supplier_id', supplierIds).order('created_at', { ascending: false }),
+    db.from('quotes').select('id, ticket_id, amount, amount_incl_vat, status, created_at, updated_at, valid_until, proposed_schedule_at, decline_reason').in('supplier_id', supplierIds).order('created_at', { ascending: false }),
     db.from('signoffs').select('id, ticket_id, status, created_at, before_urls, after_urls, coc_url, invoice_url, reviewed_at, reviewed_by, reject_reason').in('supplier_id', supplierIds).order('created_at', { ascending: false }),
     db.from('ratings').select('score').in('supplier_id', supplierIds),
     companyId ? db.from('companies').select('name').eq('id', companyId).maybeSingle() : Promise.resolve({ data: null as { name: string } | null }),
@@ -743,6 +747,12 @@ export async function assembleSupplierDashboard(companyId: string | null, suppli
   const snagReasonByTicket = new Map<string, string>()
   for (const s of (signoffsRaw ?? []).slice().sort((a, b) => +new Date(a.created_at) - +new Date(b.created_at))) {
     if (s.status === 'rejected' && s.reject_reason) snagReasonByTicket.set(s.ticket_id, s.reject_reason)
+  }
+  // Why THIS supplier's latest declined quote was declined — shown when the RM has
+  // asked them to re-quote (newest declined quote with a reason wins).
+  const declineReasonByTicket = new Map<string, string>()
+  for (const q of (quotesRaw ?? []).slice().sort((a, b) => +new Date(a.created_at) - +new Date(b.created_at))) {
+    if (q.status === 'declined' && q.decline_reason) declineReasonByTicket.set(q.ticket_id, q.decline_reason)
   }
   const ratingScores = (ratingRows ?? []).map(r => Number(r.score)).filter(n => Number.isFinite(n))
   // Suppliers start at a full 5★ and degrade as real ratings arrive.
@@ -826,6 +836,9 @@ export async function assembleSupplierDashboard(companyId: string | null, suppli
       disputeUnread: awardedToMe && disputedIds.has(t.id) && latestDisputeAuthor.get(t.id) === 'regional_manager',
       snagReason: snagReasonByTicket.get(t.id) ?? null,
       evidenceRequestReason: t.status === 'evidence_requested' ? (raw.evidence_request_reason ?? null) : null,
+      // Re-quote = re-invited (status 'invited') AND a prior re-quote request stamp.
+      requoteRequested: !awardedToMe && myInviteStatus.get(t.id) === 'invited' && !!requoteAt.get(t.id),
+      declineReason: declineReasonByTicket.get(t.id) ?? null,
     })
   }
   // Active first, then unacknowledged, then oldest — keeps the dashboard queues useful.
