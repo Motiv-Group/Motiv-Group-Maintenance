@@ -472,7 +472,8 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
             docCount={(reviewSignoff.coc_url ? 1 : 0) + (reviewSignoff.invoice_url ? 1 : 0)}
             noteCount={reviewSignoff.notes && String(reviewSignoff.notes).trim() ? 1 : 0}
             beforeUrls={reviewSignoff.before_urls ?? []} afterUrls={reviewSignoff.after_urls ?? []}
-            cocUrl={reviewSignoff.coc_url ?? null} invoiceUrl={reviewSignoff.invoice_url ?? null} notes={reviewSignoff.notes ?? null} />
+            cocUrl={reviewSignoff.coc_url ?? null} invoiceUrl={reviewSignoff.invoice_url ?? null} notes={reviewSignoff.notes ?? null}
+            supplierName={nameById.get(t.supplier_id ?? '') ?? 'Supplier'} jobRef={t.job_ref ?? null} storeName={storeName ?? null} category={t.category ?? null} />
         )}
 
         {t.status === 'scheduled' && t.schedule_status === 'proposed' && t.scheduled_at && <AcceptScheduleCard ticketId={t.id} scheduledAt={t.scheduled_at} />}

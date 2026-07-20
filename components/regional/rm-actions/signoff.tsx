@@ -4,7 +4,7 @@
 // review, approve-sign-off and snag-schedule cards.
 import { useState, useEffect, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { FileText, ChevronRight, MessageSquare, ClipboardCheck, Image as ImageIcon, CheckCircle2, AlertTriangle } from 'lucide-react'
+import { FileText, ChevronRight, MessageSquare, ClipboardCheck, Image as ImageIcon, CheckCircle2, AlertTriangle, User, Ticket, MapPin, Tag, Eye, Info } from 'lucide-react'
 import { PhotoThumbs } from '@/components/ui/PhotoThumbs'
 import { TicketChat } from '@/components/chat/TicketChat'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
@@ -55,14 +55,15 @@ export function RmReviewPanel({ heading, items }: {
 // opens the full "Sign off completion" pop-up (photos · COC · notes +
 // approve/more), plus an "Approve completion" button (same pop-up) and a "More"
 // menu holding Raise snag / Request more evidence / Chat with supplier.
-export function RmCompletionReview({ ticketId, label, submittedAt, photoCount, docCount, noteCount, beforeUrls, afterUrls, cocUrl, invoiceUrl, notes }: {
+export function RmCompletionReview({ ticketId, label, submittedAt, photoCount, docCount, noteCount, beforeUrls, afterUrls, cocUrl, invoiceUrl, notes, supplierName, jobRef, storeName, category }: {
   ticketId: string; label: string; submittedAt: string; photoCount: number; docCount: number; noteCount: number
   beforeUrls: string[]; afterUrls: string[]; cocUrl: string | null; invoiceUrl: string | null; notes: string | null
+  supplierName: string | null; jobRef: string | null; storeName: string | null; category: string | null
 }) {
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState<'evidence' | 'snag' | 'chat' | null>(null)
   const done = () => setActive(null)
-  const submission: SignoffSubmission = { id: '', label, createdAt: submittedAt, beforeUrls, afterUrls, cocUrl, invoiceUrl, notes }
+  const submission: SignoffSubmission = { id: '', label, createdAt: submittedAt, beforeUrls, afterUrls, cocUrl, invoiceUrl, notes, supplierName, jobRef, storeName, category }
   return (
     <div className="space-y-3">
       {/* Tap the summary to open the full submission for review + sign-off. */}
@@ -92,7 +93,7 @@ export function RmCompletionReview({ ticketId, label, submittedAt, photoCount, d
       </div>
 
       {open && (
-        <Modal title="Sign off completion" maxWidth="max-w-3xl" onClose={() => setOpen(false)}>
+        <Modal title={SIGNOFF_MODAL_TITLE} maxWidth="max-w-3xl" onClose={() => setOpen(false)}>
           <SignoffReviewPanel ticketId={ticketId} s={submission} onDone={() => setOpen(false)} />
         </Modal>
       )}
@@ -107,7 +108,19 @@ export function RmCompletionReview({ ticketId, label, submittedAt, photoCount, d
 // Today-queue "Sign off" pop-up: fetches the submission currently under review
 // and shows it + Accept COC/POC / Request evidence / Raise snag in place, so the
 // RM can sign off from the queue without navigating into the ticket.
-type SignoffSubmission = { id: string; label: string; createdAt: string; beforeUrls: string[]; afterUrls: string[]; cocUrl: string | null; invoiceUrl: string | null; notes: string | null }
+type SignoffSubmission = {
+  id: string; label: string; createdAt: string; beforeUrls: string[]; afterUrls: string[]; cocUrl: string | null; invoiceUrl: string | null; notes: string | null
+  // Header meta — nullable; a missing value just hides its cell in the pop-up.
+  supplierName: string | null; jobRef: string | null; storeName: string | null; category: string | null
+}
+
+// Shared pop-up title: green circled check + label (the Modal takes a ReactNode).
+const SIGNOFF_MODAL_TITLE = (
+  <span className="flex items-center gap-2.5">
+    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-emerald-500/15 text-emerald-500"><CheckCircle2 size={16} /></span>
+    Sign off completion
+  </span>
+)
 
 export function SignoffReviewButton({ ticketId, trigger }: { ticketId: string; trigger: (open: () => void) => ReactNode }) {
   const [open, setOpen] = useState(false)
@@ -130,7 +143,7 @@ export function SignoffReviewButton({ ticketId, trigger }: { ticketId: string; t
     <>
       {trigger(() => setOpen(true))}
       {open && (
-        <Modal title="Sign off completion" maxWidth="max-w-3xl" onClose={() => setOpen(false)}>
+        <Modal title={SIGNOFF_MODAL_TITLE} maxWidth="max-w-3xl" onClose={() => setOpen(false)}>
           {loading ? <p className="py-4 text-center text-sm text-[var(--text-faint)]">Loading…</p>
             : err ? <p className="text-sm text-red-500">{err}</p>
             : data?.submission ? <SignoffReviewPanel ticketId={ticketId} s={data.submission} onDone={() => setOpen(false)} />
@@ -151,22 +164,35 @@ function docName(url: string, fallback: string): string {
 
 const REVIEW_LABEL = 'text-[11px] font-semibold uppercase tracking-wide text-[var(--text-faint)]'
 
-// A document row (COC / invoice): PDF icon + filename + uploaded time, with a
-// "View …" link on the right.
-function DocRow({ ticketId, url, itemType, itemLabel, uploadedAt, viewLabel }: {
-  ticketId: string; url: string; itemType: 'coc' | 'invoice'; itemLabel: string; uploadedAt: string; viewLabel: string
+// A document row (COC / invoice): red PDF tile + filename + uploaded time, with
+// an outlined "View …" button on the right (same tracked link as before).
+function DocRow({ ticketId, url, itemType, itemLabel, fallbackName, uploadedAt, viewLabel }: {
+  ticketId: string; url: string; itemType: 'coc' | 'invoice'; itemLabel: string; fallbackName: string; uploadedAt: string; viewLabel: string
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg bg-[var(--surface-2)] p-3 ring-1 ring-[var(--border)]">
-      <span className="flex min-w-0 items-center gap-3">
+    // flex-wrap: on phones the button drops to its own line instead of squeezing the name.
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-[var(--surface)] p-3 ring-1 ring-[var(--border)]">
+      <span className="flex min-w-0 flex-1 items-center gap-3">
         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-red-500/15 text-red-600 dark:text-red-400"><FileText size={18} /></span>
         <span className="min-w-0">
           {/* Wraps to two lines on phones so the filename stays readable. */}
-          <span className="line-clamp-2 break-all text-sm font-semibold text-[var(--text)] sm:line-clamp-none sm:block sm:truncate">{docName(url, itemLabel)}</span>
+          <span className="line-clamp-2 break-all text-sm font-semibold text-[var(--text)] sm:line-clamp-none sm:block sm:truncate">{docName(url, fallbackName)}</span>
           <span className="block text-[11px] text-[var(--text-faint)]">Uploaded {formatDateTime(uploadedAt)}</span>
         </span>
       </span>
-      <ViewTrackedLink ticketId={ticketId} itemType={itemType} itemLabel={itemLabel} href={url} className="flex shrink-0 items-center gap-1 text-sm font-semibold text-blue-600 transition hover:underline dark:text-blue-400">{viewLabel} <ChevronRight size={15} /></ViewTrackedLink>
+      <ViewTrackedLink ticketId={ticketId} itemType={itemType} itemLabel={itemLabel} href={url} className="flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-[var(--text)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)]"><Eye size={15} /> {viewLabel} <ChevronRight size={15} /></ViewTrackedLink>
+    </div>
+  )
+}
+
+// One submission-meta cell (Submitted by / Ticket / Site / Trade): tinted icon +
+// tiny label over a semibold value. Hidden entirely when the value is missing.
+function MetaCell({ icon, label, value }: { icon: ReactNode; label: string; value: string | null }) {
+  if (!value) return null
+  return (
+    <div className="min-w-0 sm:px-4 sm:first:pl-0">
+      <span className="flex items-center gap-1.5 text-[11px] text-[var(--text-faint)]">{icon} {label}</span>
+      <span className="mt-0.5 block truncate text-sm font-semibold text-[var(--text)]">{value}</span>
     </div>
   )
 }
@@ -181,6 +207,7 @@ export function SignoffReviewPanel({ ticketId, s, onDone }: { ticketId: string; 
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [sub, setSub] = useState<'evidence' | 'snag' | 'chat' | null>(null)
+  const [allPhotos, setAllPhotos] = useState(false)   // "View all" tile expands the strip in place
   const photos = [...s.beforeUrls, ...s.afterUrls]
   const closeSub = () => setSub(null)
 
@@ -194,44 +221,69 @@ export function SignoffReviewPanel({ ticketId, s, onDone }: { ticketId: string; 
 
   return (
     <div className="space-y-4">
-      {/* Submission detail — photos / COC / notes, each under its own rule. */}
-      <div className="overflow-hidden rounded-xl bg-[var(--surface)] ring-1 ring-[var(--border)]">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 border-b border-[var(--border)] px-4 py-3">
+      {/* Submission summary card — which submission, when, by whom, for what. */}
+      <div className="rounded-xl bg-[var(--surface-2)] p-4 ring-1 ring-[var(--border)]">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
           <FileText size={16} className="shrink-0 text-blue-500" />
           <span className="text-sm font-bold text-[var(--text)]">{s.label}</span>
           <span className="text-[var(--text-faint)]">·</span>
           <span className="text-[13px] text-[var(--text-faint)]">{formatDateTime(s.createdAt)}</span>
         </div>
-        <div className="space-y-4 p-4">
-          <div>
-            <div className={REVIEW_LABEL}>Proof of completion</div>
-            <div className="mt-2">
-              {photos.length ? <PhotoThumbs urls={photos} ticketId={ticketId} label="Completion photo" limit={4} /> : <span className="text-sm text-[var(--text-faint)]">No photos</span>}
-            </div>
-          </div>
-          <div className="border-t border-[var(--border)] pt-4">
-            <div className={REVIEW_LABEL}>Certificate of completion</div>
-            <div className="mt-2 space-y-2">
-              {s.cocUrl ? <DocRow ticketId={ticketId} url={s.cocUrl} itemType="coc" itemLabel="COC" uploadedAt={s.createdAt} viewLabel="View COC" /> : <span className="text-sm text-[var(--text-faint)]">No certificate uploaded</span>}
-              {s.invoiceUrl && <DocRow ticketId={ticketId} url={s.invoiceUrl} itemType="invoice" itemLabel="Invoice" uploadedAt={s.createdAt} viewLabel="View invoice" />}
-            </div>
-          </div>
-          <div className="border-t border-[var(--border)] pt-4">
-            <div className={REVIEW_LABEL}>Notes</div>
-            {s.notes?.trim() ? <p className="mt-1 text-sm text-[var(--text-muted)] whitespace-pre-line">{s.notes}</p> : <span className="text-sm text-[var(--text-faint)]">No notes added</span>}
-          </div>
+        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-0 sm:divide-x sm:divide-[var(--border)]">
+          <MetaCell icon={<User size={13} className="text-blue-500" />} label="Submitted by" value={s.supplierName} />
+          <MetaCell icon={<Ticket size={13} className="text-violet-500" />} label="Ticket" value={s.jobRef} />
+          <MetaCell icon={<MapPin size={13} className="text-emerald-500" />} label="Site" value={s.storeName} />
+          <MetaCell icon={<Tag size={13} className="text-amber-500" />} label="Trade" value={s.category} />
         </div>
+      </div>
+
+      {/* Proof of completion — before + after in one numbered strip; the dashed
+          tile expands to every photo in place (lightbox + view-tracking kept). */}
+      <div>
+        <div className={REVIEW_LABEL}>Proof of completion ({photos.length} photo{photos.length === 1 ? '' : 's'})</div>
+        <div className="mt-2">
+          {photos.length
+            ? <PhotoThumbs urls={photos} ticketId={ticketId} label="Completion photo" limit={allPhotos ? undefined : 5} onMore={() => setAllPhotos(true)} />
+            : <span className="text-sm text-[var(--text-faint)]">No photos</span>}
+        </div>
+      </div>
+
+      <div>
+        <div className={REVIEW_LABEL}>Certificate of compliance (COC)</div>
+        <div className="mt-2">
+          {s.cocUrl ? <DocRow ticketId={ticketId} url={s.cocUrl} itemType="coc" itemLabel="COC" fallbackName="COC.pdf" uploadedAt={s.createdAt} viewLabel="View COC" /> : <span className="text-sm text-[var(--text-faint)]">No certificate uploaded</span>}
+        </div>
+      </div>
+
+      {s.invoiceUrl && (
+        <div>
+          <div className={REVIEW_LABEL}>Invoice</div>
+          <div className="mt-2"><DocRow ticketId={ticketId} url={s.invoiceUrl} itemType="invoice" itemLabel="Invoice" fallbackName="Invoice.pdf" uploadedAt={s.createdAt} viewLabel="View invoice" /></div>
+        </div>
+      )}
+
+      {s.notes?.trim() && (
+        <div>
+          <div className={REVIEW_LABEL}>Notes</div>
+          <p className="mt-1 text-sm text-[var(--text-muted)] whitespace-pre-line">{s.notes}</p>
+        </div>
+      )}
+
+      {/* What approving does — sits just above the buttons. */}
+      <div className="flex items-start gap-2.5 rounded-xl bg-blue-500/10 p-3.5 ring-1 ring-blue-500/30">
+        <Info size={16} className="mt-0.5 shrink-0 text-blue-500" />
+        <p className="text-sm text-[var(--text-muted)]">Approving this submission will sign off the work and move the ticket to the next close-out step.</p>
       </div>
 
       {err && <p className="text-xs text-red-500">{err}</p>}
 
       <div className="flex items-center gap-2">
-        <button onClick={approve} disabled={busy} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50"><CheckCircle2 size={16} /> {busy ? 'Approving…' : 'Approve completion'}</button>
-        <MoreMenu up align="right">
+        <MoreMenu up align="left">
           <MoreActionItem icon={<MessageSquare size={16} />} label="Chat with supplier" onClick={() => setSub('chat')} />
           <MoreActionItem icon={<MessageSquare size={16} />} label="Request more evidence" onClick={() => setSub('evidence')} />
           <MoreActionItem icon={<AlertTriangle size={16} />} label="Raise a snag" tone="danger" onClick={() => setSub('snag')} />
         </MoreMenu>
+        <button onClick={approve} disabled={busy} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50"><CheckCircle2 size={16} /> {busy ? 'Approving…' : 'Approve completion'}</button>
       </div>
 
       {sub === 'evidence' && <RequestEvidenceButton ticketId={ticketId} defaultOpen onClose={closeSub} />}
