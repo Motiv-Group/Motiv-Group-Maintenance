@@ -219,6 +219,12 @@ export async function loadSupplierTicketDetail(ticketId: string) {
   const myQuoteRequests = allRequestRows
     .filter(r => (r.supplier_id !== null && supplierIds.includes(r.supplier_id)) || (r.supplier_id === null && r.requested_at === earliestRequestAt))
     .map(r => r.requested_at).filter(Boolean)
+  // Belt-and-braces: union in this supplier's OWN invite stamps (invited_at +
+  // requote_requested_at) so their trail shows the request round even when the
+  // durable-log insert silently failed. Same-round stamps share the timestamp, so
+  // the engine's dedup collapses them. Cross-supplier isolation holds — the invite
+  // row is already scoped to the caller's org (`.in('supplier_id', supplierIds)`).
+  for (const at of [invite?.invited_at, invite?.requote_requested_at]) if (at && !myQuoteRequests.includes(at)) myQuoteRequests.push(at)
   // Trail starts at this supplier's EARLIEST involvement (first request / quote /
   // decline) — a re-invite resets invited_at to "now", so anchoring to it would hide
   // durable events from earlier rounds; the first quote request is the true start.

@@ -10,6 +10,7 @@ import { PhotoThumbs } from '@/components/ui/PhotoThumbs'
 import { formatCurrency, formatDateTime, rmStatusMeta, PRIORITY_LEVEL_LABELS, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
 import { Modal } from './modal'
 import { post, errMsg, PANEL_META, type SupplierChoice } from './shared'
+import { SheetHeader, SheetSection, InfoRows, SheetFooter } from '@/components/workflow/TicketInfoSheet'
 
 // ── Assign suppliers (button → modal: searchable, sortable, paginated table) ─
 
@@ -232,7 +233,7 @@ export function AssignSuppliersButton({ ticketId, suppliers, motivSuppliers = []
 // quotes. Ticket detail + quote rows are fetched on open from the RM-only /quotes
 // endpoint; the header renders instantly from the queue row's summary.
 interface ViewAssignSummary { category: string | null; title: string; storeName: string; status: string; priority: string; jobId: string | null }
-interface ViewAssignTicket { title: string; category: string | null; description: string; operationalImpact: string | null; priority: string | null; jobRef: string | null; storeName: string | null; photoUrls: string[] }
+interface ViewAssignTicket { title: string; category: string | null; description: string; operationalImpact: string | null; priority: string | null; jobRef: string | null; storeName: string | null; photoUrls: string[]; createdAt?: string | null; dueAt?: string | null }
 interface ViewAssignQuoteRow { supplierId: string; name: string; kind: 'waiting' | 'received' | 'accepted' | 'declined'; quote: { amount: number } | null }
 
 // Priority pill colours (mirrors the Today queue's priorityBadgeClass).
@@ -276,33 +277,42 @@ export function ViewAssignButton({ ticketId, summary, suppliers, motivSuppliers 
       {trigger(() => setOpen(true))}
       {open && (
         <Modal title="Ticket &amp; quotes" maxWidth="max-w-2xl" onClose={() => setOpen(false)}>
-          <div className="space-y-3">
-            {/* Ticket detail header (renders instantly from the queue row). */}
-            <div className="min-w-0">
-              {summary.jobId && <p className="font-mono text-[10px] text-[var(--text-faint)]">{summary.jobId}</p>}
-              <p className="text-base font-bold text-[var(--text)]">{summary.category || summary.title}</p>
-              <p className="text-sm text-[var(--text-muted)]">{summary.storeName}</p>
-            </div>
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className={`inline-flex justify-center rounded-md px-2 py-1 text-[10px] font-bold ${vaPriorityBadge(String(summary.priority))}`}>{priorityLabel}</span>
-              <span className={`inline-flex justify-center rounded-md px-2 py-1 text-[10px] font-bold ${meta.cls}`}>{meta.label}</span>
-            </div>
+          {/* Reference sheet layout: job ref + badges header, then TICKET
+              INFORMATION / IMAGES / SUPPLIERS & QUOTES sections, action bottom-right. */}
+          <div className="space-y-4">
+            <SheetHeader jobRef={summary.jobId} title={summary.category || summary.title}
+              badges={<>
+                <span className={`inline-flex justify-center rounded-md px-2 py-1 text-[10px] font-bold ${vaPriorityBadge(String(summary.priority))}`}>{priorityLabel}</span>
+                <span className={`inline-flex justify-center rounded-md px-2 py-1 text-[10px] font-bold ${meta.cls}`}>{meta.label}</span>
+              </>} />
 
             {loading ? <p className="py-4 text-center text-sm text-[var(--text-faint)]">Loading…</p>
               : err ? <p className="text-sm text-red-500">{err}</p>
               : ticket && (
                 <>
-                  {ticket.description && <p className="whitespace-pre-line break-words text-sm text-[var(--text-muted)]">{ticket.description}</p>}
-                  {ticket.operationalImpact && <p className="text-xs text-[var(--text-faint)]">Impact · {OPERATIONAL_IMPACT_LABELS[ticket.operationalImpact] ?? ticket.operationalImpact}</p>}
-                  {ticket.photoUrls.length > 0 && <PhotoThumbs urls={ticket.photoUrls} ticketId={ticketId} label="Job photo" limit={5} />}
+                  <SheetSection label="Ticket information">
+                    <InfoRows rows={[
+                      { label: 'Store', value: ticket.storeName ?? summary.storeName },
+                      { label: 'Category', value: ticket.category },
+                      { label: 'Operational impact', value: ticket.operationalImpact ? (OPERATIONAL_IMPACT_LABELS[ticket.operationalImpact] ?? ticket.operationalImpact) : null },
+                      { label: 'Logged', value: ticket.createdAt ? formatDateTime(ticket.createdAt) : null },
+                      { label: 'Due', value: ticket.dueAt ? formatDateTime(ticket.dueAt) : null },
+                      { label: 'Description', value: ticket.description ? <span className="whitespace-pre-line font-normal">{ticket.description}</span> : null },
+                    ]} />
+                  </SheetSection>
+
+                  {ticket.photoUrls.length > 0 && (
+                    <SheetSection label="Images">
+                      <PhotoThumbs urls={ticket.photoUrls} ticketId={ticketId} label="Job photo" limit={5} />
+                    </SheetSection>
+                  )}
 
                   {/* Suppliers & quotes gathered so far. */}
-                  <div className="space-y-1 rounded-xl ring-1 ring-[var(--border)] p-3">
-                    <p className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Suppliers &amp; quotes</p>
+                  <SheetSection label="Suppliers & quotes">
                     {rows.length ? rows.map(r => {
                       const m = PANEL_META[r.kind]
                       return (
-                        <div key={r.supplierId} className="flex items-center justify-between gap-2 py-1">
+                        <div key={r.supplierId} className="flex items-center justify-between gap-2 py-0.5">
                           <span className="flex min-w-0 items-center gap-2">
                             <i className={`h-2.5 w-2.5 shrink-0 rounded-full ${m.dot}`} />
                             <span className="truncate text-sm text-[var(--text)]">{r.name}</span>
@@ -313,16 +323,16 @@ export function ViewAssignButton({ ticketId, summary, suppliers, motivSuppliers 
                           </span>
                         </div>
                       )
-                    }) : <p className="py-2 text-center text-sm text-[var(--text-faint)]">No suppliers requested yet.</p>}
-                  </div>
+                    }) : <p className="text-sm text-[var(--text-muted)]">No suppliers requested yet.</p>}
+                  </SheetSection>
                 </>
               )}
 
-            {/* Assign action — opens the existing searchable supplier picker on top. */}
-            <div className="border-t border-[var(--border)] pt-3">
+            {/* Assign action — bottom-right, opens the searchable supplier picker on top. */}
+            <SheetFooter>
               <AssignSuppliersButton ticketId={ticketId} suppliers={suppliers} motivSuppliers={motivSuppliers} motivAccess={motivAccess} awaitingById={awaitingById} declinedSupplierIds={declinedSupplierIds}
-                trigger={openPicker => <button onClick={openPicker} className="w-full rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500">Assign supplier</button>} />
-            </div>
+                trigger={openPicker => <button onClick={openPicker} className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500">Assign supplier</button>} />
+            </SheetFooter>
           </div>
         </Modal>
       )}

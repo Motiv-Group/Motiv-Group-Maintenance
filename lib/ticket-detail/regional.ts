@@ -431,7 +431,15 @@ async function buildRegionalTicketDetail(
   const timelineItems = buildTicketTimeline({
     createdAt: t.created_at, status: t.status, updatedAt: t.updated_at,
     quoteRequestedAt: t.first_quote_requested_at ?? t.quote_requested_at,
-    quoteRequests: (requestRows ?? []).map(r => ({ at: r.requested_at, supplierName: r.supplier_id ? (nameById.get(r.supplier_id) ?? null) : null })),
+    // Union of the durable log AND the ticket_suppliers invites — belt-and-braces
+    // so an invite always yields a "Quote requested from X" event even when the
+    // durable-log insert silently failed (or was never written, e.g. suppliers
+    // invited at ticket-logging time). Same-round rows share the same timestamp +
+    // name, so the engine's `${at}|${name}` dedup collapses them to one event.
+    quoteRequests: [
+      ...(requestRows ?? []).map(r => ({ at: r.requested_at, supplierName: r.supplier_id ? (nameById.get(r.supplier_id) ?? null) : null })),
+      ...(invites ?? []).filter(inv => inv.invited_at).map(inv => ({ at: inv.invited_at, supplierName: inv.suppliers?.company_name ?? nameById.get(inv.supplier_id) ?? null })),
+    ],
     quoteSubmittedAt: t.quote_submitted_at,
     quoteApprovedAt: t.quote_decision_status === 'approved' ? t.quote_decided_at : null,
     scheduledAt: t.scheduled_at, completedAt: t.completed_at,

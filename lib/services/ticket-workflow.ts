@@ -10,8 +10,11 @@ type Admin = ReturnType<typeof createAdminClient>
 type TicketRow = Database['public']['Tables']['tickets']['Row']
 
 // Durable per-round log → a "Quote requested from <supplier>" audit event.
+// Non-blocking: a failed insert must never break the workflow move itself, but it
+// must be visible — a silently-missing row means a hole in the audit trail.
 export async function logQuoteRequest(admin: Admin, ticket: TicketRow, supplierId: string | null | undefined, now: string) {
-  await admin.from('ticket_quote_requests').insert({ company_id: ticket.company_id, ticket_id: ticket.id, supplier_id: supplierId ?? ticket.supplier_id ?? null, requested_at: now })
+  const { error } = await admin.from('ticket_quote_requests').insert({ company_id: ticket.company_id, ticket_id: ticket.id, supplier_id: supplierId ?? ticket.supplier_id ?? null, requested_at: now })
+  if (error) console.error('[ticket-workflow] quote-request log insert failed:', ticket.id, error.message)
 }
 
 // Targeted notifications for the moves that need someone else to act next.

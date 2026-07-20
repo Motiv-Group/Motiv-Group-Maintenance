@@ -7,6 +7,7 @@ import { sendPushToMany } from '@/lib/push'
 import { computePriority } from '@/lib/health/priority'
 import { loadSlaResolver } from '@/lib/health/data'
 import { composeTicketTitle } from '@/lib/utils'
+import { logQuoteRequest } from '@/lib/services/ticket-workflow'
 import { z } from 'zod'
 import { parseJsonBody } from '@/lib/validate'
 
@@ -84,6 +85,12 @@ export async function POST(request: Request) {
       status: 'assigned', quote_required: true, quote_requested_at: now, quote_due_at: new Date(Date.now() + tgt.quote_due_mins * 60_000).toISOString(),
       current_blocker: 'supplier_action', blocker_owner_type: 'supplier', blocker_started_at: now,
     }).eq('id', ticket.id)
+    // Durable per-supplier request-round log — without it the timeline loses this
+    // round's "Quote requested from X" events as soon as a later round writes one
+    // (the assign route logs the same way).
+    for (const supplier_id of supplierIds) {
+      await logQuoteRequest(admin, ticket, supplier_id, now)
+    }
     const { data: su } = await admin.from('supplier_users').select('user_id').in('supplier_id', supplierIds)
     const ids = Array.from(new Set((su ?? []).map(r => r.user_id)))
     if (ids.length) {

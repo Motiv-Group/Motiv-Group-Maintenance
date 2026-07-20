@@ -109,7 +109,14 @@ export default async function IndividualTicketDetailPage(props: { params: Promis
   const timelineItems = buildTicketTimeline({
     createdAt: t.created_at, status: t.status, updatedAt: t.updated_at,
     quoteRequestedAt: t.first_quote_requested_at ?? t.quote_requested_at,
-    quoteRequests: (requestRows ?? []).map(r => ({ at: r.requested_at, supplierName: r.supplier_id ? (nameById.get(r.supplier_id) ?? null) : null })),
+    // Union of the durable log AND the ticket_suppliers invites — belt-and-braces
+    // so an invite always yields a "Quote requested from X" event even when the
+    // durable-log insert silently failed. Same-round rows share the same timestamp
+    // + name, so the engine's `${at}|${name}` dedup collapses them to one event.
+    quoteRequests: [
+      ...(requestRows ?? []).map(r => ({ at: r.requested_at, supplierName: r.supplier_id ? (nameById.get(r.supplier_id) ?? null) : null })),
+      ...inviteRows.filter(r => r.invited_at).map(r => ({ at: r.invited_at, supplierName: nameById.get(r.supplier_id) ?? null })),
+    ],
     quoteSubmittedAt: t.quote_submitted_at,
     quoteApprovedAt: t.quote_decision_status === 'approved' ? t.quote_decided_at : null,
     scheduledAt: t.scheduled_at, completedAt: t.completed_at,

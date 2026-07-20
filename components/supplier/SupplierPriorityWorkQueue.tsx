@@ -9,7 +9,7 @@
 // another supplier's progress.
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { AlertOctagon, AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, ReceiptText, Camera, FileText } from 'lucide-react'
+import { AlertOctagon, AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, ReceiptText, Camera, FileText, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import type { SupplierTicketRow } from '@/lib/health/data'
 import { Modal } from '@/components/ui/Modal'
@@ -22,7 +22,8 @@ import { SupplierVariationGate, AcceptSnagCard, SnagRescheduleCta } from '@/comp
 import { DisputeReviewButton, RaiseDisputeMore, RaiseDisputeButton } from '@/components/dispute/DisputeBox'
 import { TicketChat } from '@/components/chat/TicketChat'
 import { MoreMenu, MoreActionItem } from '@/components/regional/rm-actions/ticket'
-import { supplierStatusMeta, formatJobId, formatCurrency, formatDate, OPERATIONAL_IMPACT_LABELS, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
+import { supplierStatusMeta, formatJobId, formatCurrency, formatDate, formatDateTime, OPERATIONAL_IMPACT_LABELS, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
+import { SheetHeader, SheetSection, InfoRows, SheetFooter } from '@/components/workflow/TicketInfoSheet'
 import {
   byUrgencyThenNewest, EmptyQueue, isActive, isCriticalPriority, MetricButton, priorityBadgeClass,
   QueueCard, queueCtaClass, QueueRowBadges, QueueRowNextStep, QueueRowShell, QueueRowTitle,
@@ -173,10 +174,7 @@ function QueueRow({ ticket, nowMs, company, chatUnread = 0 }: { ticket: Supplier
 // context). Kept lean: store · impact · description · photos.
 type QuoteContext = { title: string; category: string | null; description: string | null; impact: string | null; priority: string; jobRef: string | null; storeName: string | null; photoUrls: string[] }
 type DeclinedQuote = { amount: number | null; amountInclVat: number | null; description: string | null; fileUrl: string | null; declineReason: string | null; validUntil: string | null; createdAt: string }
-// `tile` renders the flat ticket-tile look (description → impact line → photos,
-// no inner card — the pop-up header above it already carries store/category), used
-// by the Submit-quote pop-up; the default card look serves the re-quote pop-up.
-function TicketContextPanel({ ticketId, showDeclined = false, tile = false }: { ticketId: string; showDeclined?: boolean; tile?: boolean }) {
+function TicketContextPanel({ ticketId, showDeclined = false }: { ticketId: string; showDeclined?: boolean }) {
   const [ctx, setCtx] = useState<QuoteContext | null>(null)
   const [declined, setDeclined] = useState<DeclinedQuote | null>(null)
   const [loading, setLoading] = useState(true)
@@ -193,15 +191,6 @@ function TicketContextPanel({ ticketId, showDeclined = false, tile = false }: { 
 
   if (loading) return <p className="py-3 text-center text-sm text-[var(--text-faint)]">Loading job details…</p>
   if (err || !ctx) return err ? <p className="text-sm text-red-500">{err}</p> : null
-  if (tile) {
-    return (
-      <div className="space-y-3">
-        {ctx.description && <p className="whitespace-pre-line break-words text-sm text-[var(--text)]">{ctx.description}</p>}
-        {ctx.impact && <p className="text-xs text-[var(--text-muted)]">Impact · <span className="font-semibold text-[var(--text)]">{OPERATIONAL_IMPACT_LABELS[ctx.impact] ?? ctx.impact}</span></p>}
-        {ctx.photoUrls.length > 0 && <PhotoThumbs urls={ctx.photoUrls} ticketId={ticketId} label="Job photo" limit={5} />}
-      </div>
-    )
-  }
   return (
     <div className="space-y-3">
       {/* Re-quote flow: the supplier's own declined quote — amount + attachment they
@@ -245,57 +234,94 @@ function TicketContextPanel({ ticketId, showDeclined = false, tile = false }: { 
   )
 }
 
-// "Submit quote" is a TWO-STEP pop-up: first the job detail rendered like the
-// ticket tile (job id + logged date · bold title · store · priority/status
-// badges · description · impact · photos), with a blue "Continue to quote"
-// button that THEN opens the quote-upload form in a second pop-up.
+// "Submit quote" is a TWO-STEP pop-up in the shared ticket-sheet layout ("Ticket"
+// heading, job ref + badges, TICKET INFORMATION rows, IMAGES) with a blue
+// "Continue to quote" button bottom-right that THEN opens the quote-upload form.
 function SubmitQuoteCta({ ticket, className, company }: { ticket: SupplierTicketRow; className: string; company?: string }) {
   const [open, setOpen] = useState(false)
-  const [quoting, setQuoting] = useState(false)
-  const status = myStatus(ticket)
-  const meta = supplierStatusMeta(status)
-  const jobId = ticket.jobRef ?? formatJobId(ticket.jobNumber)
-  const who = ticket.isIndividual ? 'Individual' : [company, ticket.storeName, ticket.branchCode].filter(Boolean).join(' · ')
   return (
     <>
       <button type="button" onClick={() => setOpen(true)} className={className}>Submit Quote</button>
-      {open && (
-        <Modal onClose={() => setOpen(false)} maxWidth="max-w-3xl">
-          {close => (
-            <div className="space-y-4">
-              {/* Tile-style header — mirrors the Today-queue row. */}
-              <div className="space-y-1">
-                <div className="flex items-baseline justify-between gap-3">
-                  {jobId && <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-faint)]">{jobId}</p>}
-                  <p className="ml-auto text-xs text-[var(--text-faint)]">{formatDate(ticket.createdAt)}</p>
-                </div>
-                <h3 className="text-lg font-bold leading-snug text-[var(--text)]">{ticket.category || ticket.title}</h3>
-                {who && <p className="text-sm text-[var(--text-muted)]">{who}</p>}
-                <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                  <span className={`inline-flex whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${priorityBadgeClass(String(ticket.priority))}`}>{PRIORITY_LEVEL_LABELS[String(ticket.priority)] ?? 'Medium'}</span>
-                  <span className={`inline-flex whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${meta.cls}`}>{meta.label}</span>
-                </div>
-              </div>
-              <TicketContextPanel ticketId={ticket.id} tile />
-              <button type="button" onClick={() => setQuoting(true)}
-                className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500">
-                <ReceiptText size={16} /> Continue to quote
-              </button>
-              {quoting && (
-                <Modal onClose={() => setQuoting(false)} maxWidth="max-w-3xl">
-                  {closeQuote => (
-                    <div className="space-y-4">
-                      <h3 className="text-base font-bold text-[var(--text)]">Submit your quote</h3>
-                      <SendQuoteForm defaultOpen competitive ticketId={ticket.id} priority={String(ticket.priority)} createdAt={ticket.createdAt} onClose={() => { closeQuote(); close() }} />
-                    </div>
-                  )}
-                </Modal>
-              )}
-            </div>
-          )}
-        </Modal>
-      )}
+      {open && <SubmitQuoteSheet ticket={ticket} company={company} onClose={() => setOpen(false)} />}
     </>
+  )
+}
+function SubmitQuoteSheet({ ticket, company, onClose }: { ticket: SupplierTicketRow; company?: string; onClose: () => void }) {
+  const [quoting, setQuoting] = useState(false)
+  const [ctx, setCtx] = useState<QuoteContext | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [err, setErr] = useState('')
+  useEffect(() => {
+    let live = true
+    fetch(`/api/tickets/${ticket.id}/quote-context`)
+      .then(r => r.json())
+      .then(d => { if (!live) return; if (d?.error) setErr(d.error); else setCtx(d.ticket) })
+      .catch(() => { if (live) setErr('Could not load the job details.') })
+      .finally(() => { if (live) setLoading(false) })
+    return () => { live = false }
+  }, [ticket.id])
+
+  const meta = supplierStatusMeta(myStatus(ticket))
+  const jobId = ticket.jobRef ?? formatJobId(ticket.jobNumber)
+  const who = ticket.isIndividual ? 'Individual' : [company, ticket.storeName, ticket.branchCode].filter(Boolean).join(' · ')
+  return (
+    <Modal onClose={onClose} maxWidth="max-w-2xl">
+      {close => (
+        <div className="space-y-4">
+          {/* Sheet heading + close (the shared Modal has no title bar of its own). */}
+          <div className="flex items-start justify-between gap-3">
+            <h2 className="text-lg font-bold text-[var(--text)]">Ticket</h2>
+            <button type="button" onClick={close} aria-label="Close" className="rounded-lg p-1.5 text-[var(--text-muted)] transition hover:bg-[var(--hover)]"><X size={18} /></button>
+          </div>
+
+          <SheetHeader jobRef={jobId} title={ticket.category || ticket.title}
+            badges={<>
+              <span className={`inline-flex justify-center rounded-md px-2 py-1 text-[10px] font-bold ${priorityBadgeClass(String(ticket.priority))}`}>{PRIORITY_LEVEL_LABELS[String(ticket.priority)] ?? 'Medium'}</span>
+              <span className={`inline-flex justify-center rounded-md px-2 py-1 text-[10px] font-bold ${meta.cls}`}>{meta.label}</span>
+            </>} />
+
+          {loading ? <p className="py-4 text-center text-sm text-[var(--text-faint)]">Loading…</p>
+            : err ? <p className="text-sm text-red-500">{err}</p>
+            : ctx && (
+              <>
+                <SheetSection label="Ticket information">
+                  <InfoRows rows={[
+                    { label: 'Store', value: ctx.storeName ?? who },
+                    { label: 'Category', value: ctx.category },
+                    { label: 'Operational impact', value: ctx.impact ? (OPERATIONAL_IMPACT_LABELS[ctx.impact] ?? ctx.impact) : null },
+                    { label: 'Logged', value: formatDateTime(ticket.createdAt) },
+                    { label: 'Due', value: ticket.dueAt ? formatDateTime(ticket.dueAt) : null },
+                    { label: 'Description', value: ctx.description ? <span className="whitespace-pre-line font-normal">{ctx.description}</span> : null },
+                  ]} />
+                </SheetSection>
+                {ctx.photoUrls.length > 0 && (
+                  <SheetSection label="Images">
+                    <PhotoThumbs urls={ctx.photoUrls} ticketId={ticket.id} label="Job photo" limit={5} />
+                  </SheetSection>
+                )}
+              </>
+            )}
+
+          <SheetFooter>
+            <button type="button" onClick={() => setQuoting(true)}
+              className="flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500">
+              <ReceiptText size={16} /> Continue to quote
+            </button>
+          </SheetFooter>
+
+          {quoting && (
+            <Modal onClose={() => setQuoting(false)} maxWidth="max-w-3xl">
+              {closeQuote => (
+                <div className="space-y-4">
+                  <h3 className="text-base font-bold text-[var(--text)]">Submit your quote</h3>
+                  <SendQuoteForm defaultOpen competitive ticketId={ticket.id} priority={String(ticket.priority)} createdAt={ticket.createdAt} onClose={() => { closeQuote(); close() }} />
+                </div>
+              )}
+            </Modal>
+          )}
+        </div>
+      )}
+    </Modal>
   )
 }
 
