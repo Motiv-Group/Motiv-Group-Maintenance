@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { LayoutGrid, List, Table2, Search, ArrowRight, CalendarClock, CheckCircle2, AlertTriangle, MapPin } from 'lucide-react'
 import { Card } from '@/components/exec/ui'
 import { formatDate } from '@/lib/utils'
@@ -15,6 +16,8 @@ import type { ProjectRow, ProjectSummary, StoreRow } from '@/lib/projects/data'
 type StatusFilter = 'all' | 'not_started' | 'in_progress' | 'complete' | 'overdue'
 
 export function RegionalProjectDashboard({ project, summary, stores }: { project: ProjectRow; summary: ProjectSummary; stores: StoreRow[] }) {
+  const router = useRouter()
+  const storeHref = (storeId: string) => `/regional/projects/${project.id}/stores/${storeId}`
   const [view, setView] = useState<'cards' | 'table'>('table')
   // Phones get their own compact grid/list switch (the cards/table one above is sm+).
   const [mobileView, setMobileView] = useState<'grid' | 'list'>('grid')
@@ -232,8 +235,12 @@ export function RegionalProjectDashboard({ project, summary, stores }: { project
               </thead>
               <tbody>
                 {filtered.map((s) => (
-                  <tr key={s.id} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)]">
-                    <td className="px-3 py-2"><Link href={`/regional/projects/${project.id}/stores/${s.id}`} className="text-[var(--text)] hover:text-blue-500">{s.store_name ?? '—'}</Link></td>
+                  // The whole row is clickable; prefetch the store detail (its skeleton)
+                  // on hover so the click lands instantly. The store-name link stays for
+                  // keyboard/screen-reader navigation.
+                  <tr key={s.id} onClick={() => router.push(storeHref(s.id))} onMouseEnter={() => router.prefetch(storeHref(s.id))}
+                    className="cursor-pointer border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)]">
+                    <td className="px-3 py-2"><Link href={storeHref(s.id)} onClick={e => e.stopPropagation()} className="text-[var(--text)] hover:text-blue-500">{s.store_name ?? '—'}</Link></td>
                     <td className="px-3 py-2 text-[var(--text-muted)]">{s.branch_code}</td>
                     <td className="px-3 py-2 text-[var(--text-muted)] hidden md:table-cell">{s.town ?? '—'}</td>
                     <td className="px-3 py-2 text-[var(--text-muted)] hidden lg:table-cell">{formatDate(s.start_date) || '—'}</td>
@@ -245,7 +252,7 @@ export function RegionalProjectDashboard({ project, summary, stores }: { project
                       </div>
                     </td>
                     <td className="px-3 py-2"><span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${s.overdue ? OVERDUE_PILL : STORE_STATUS_PILL[s.status]}`}>{s.overdue ? 'Overdue' : STORE_STATUS_LABEL[s.status]}</span></td>
-                    <td className="px-3 py-2 text-right"><Link href={`/regional/projects/${project.id}/stores/${s.id}`} className="text-blue-500"><ArrowRight size={15} className="inline" /></Link></td>
+                    <td className="px-3 py-2 text-right"><ArrowRight size={15} className="inline text-blue-500" /></td>
                   </tr>
                 ))}
               </tbody>
