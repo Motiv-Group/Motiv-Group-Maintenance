@@ -9,7 +9,7 @@
 // another supplier's progress.
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { AlertOctagon, AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, ChevronRight, Info, ReceiptText, Camera, FileText, ShieldCheck, SquarePen, Store as StoreIcon, Tag, X, XCircle } from 'lucide-react'
+import { AlertOctagon, AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, Info, ReceiptText, Camera, FileText, ShieldCheck, SquarePen, Store as StoreIcon, Tag, X, XCircle } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import type { SupplierTicketRow } from '@/lib/health/data'
 import { Modal } from '@/components/ui/Modal'
@@ -53,7 +53,9 @@ export function SupplierPriorityWorkQueue({ tickets, generatedAt, company, chatU
   const pick = (k: QueueFilter) => setFilter(f => (f === k ? 'all' : k))
 
   // A supplier that was declined (and not re-invited) is out of their active work.
-  const activeTickets = useMemo(() => tickets.filter(t => isActive(t.status) && !t.declinedForMe), [tickets])
+  // Plainly-declined rows (no re-quote asked) stay visible until the supplier has
+  // OPENED the ticket after the decline (declineSeen) — then they drop off Today.
+  const activeTickets = useMemo(() => tickets.filter(t => isActive(t.status) && (!t.declinedForMe || !t.declineSeen)), [tickets])
 
   const counts = useMemo(() => ({
     to_quote: activeTickets.filter(toQuote).length,
@@ -113,13 +115,14 @@ function QueueRow({ ticket, nowMs, company, chatUnread = 0 }: { ticket: Supplier
   // Close-out phase: the badge is amber while the supplier still owes a VO decision,
   // blue once they've confirmed there are none (awaiting the RM's close-out).
   const closeout = ['approved_closeout', 'vo_declined'].includes(ticket.status) && ticket.awardedToMe
-  const statusCls = ticket.disputed ? 'bg-violet-500/15 text-violet-700 dark:text-violet-400' : closeout ? (ticket.voNoneConfirmed ? 'bg-blue-500/15 text-blue-700 dark:text-blue-400' : 'bg-amber-500/15 text-amber-700 dark:text-amber-400') : meta.cls
-  const statusLabel = ticket.disputed ? 'Dispute' : closeout ? 'Close-out' : meta.label
+  const statusCls = ticket.disputed ? 'bg-violet-500/15 text-violet-700 dark:text-violet-400' : ticket.declinedForMe ? 'bg-red-500/15 text-red-700 dark:text-red-400' : closeout ? (ticket.voNoneConfirmed ? 'bg-blue-500/15 text-blue-700 dark:text-blue-400' : 'bg-amber-500/15 text-amber-700 dark:text-amber-400') : meta.cls
+  const statusLabel = ticket.disputed ? 'Dispute' : ticket.declinedForMe ? 'Declined' : closeout ? 'Close-out' : meta.label
   const ticketUrl = `/supplier/tickets/${ticket.id}`
   const who = ticket.isIndividual ? 'Individual' : [company, ticket.storeName].filter(Boolean).join(' · ')
   // Phase CTA — labelled by what the supplier does next. Disputed → view the dispute
   // chat; snagged → view the snag; the rest open a pop-up or the ticket.
   const cta = ticket.disputed ? 'View dispute'
+    : ticket.declinedForMe ? 'View Ticket'
     : ticket.requoteRequested ? 'View & re-quote'
     : toQuote(ticket) ? 'Submit quote'
     : ['accepted', 'scheduled'].includes(ticket.status) && ticket.awardedToMe ? 'Mark in progress'
@@ -295,7 +298,6 @@ function IconStat({ icon, tint, label, value }: { icon: ReactNode; tint: string;
 }
 function DeclinedQuoteSheet({ ticket, company, onClose }: { ticket: SupplierTicketRow; company?: string; onClose: () => void }) {
   const [quoting, setQuoting] = useState(false)
-  const [chatting, setChatting] = useState(false)
   const [ctx, setCtx] = useState<QuoteContext | null>(null)
   const [declined, setDeclined] = useState<DeclinedQuote | null>(null)
   const [loading, setLoading] = useState(true)
@@ -414,21 +416,10 @@ function DeclinedQuoteSheet({ ticket, company, onClose }: { ticket: SupplierTick
                   </div>
                 )}
 
-                {/* Footer — Back to quotes · Revise quote (primary) · More. */}
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
-                  <button type="button" onClick={close} className="rounded-xl px-4 py-2.5 text-sm font-semibold text-[var(--text)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)]">Back to quotes</button>
-                  <button type="button" onClick={() => setQuoting(true)} className="flex flex-1 items-center justify-center gap-3 rounded-xl bg-blue-600 px-4 py-2 text-white transition hover:bg-blue-500">
-                    <SquarePen size={17} className="shrink-0" />
-                    <span className="min-w-0 text-left">
-                      <span className="block text-sm font-semibold leading-tight">Revise quote</span>
-                      <span className="block text-xs leading-tight text-white/75">Make changes and resubmit for review</span>
-                    </span>
-                    <ChevronRight size={16} className="shrink-0" />
-                  </button>
-                  <MoreMenu up align="right">
-                    <MoreActionItem label="Chat with the manager" onClick={() => setChatting(true)} />
-                  </MoreMenu>
-                </div>
+                {/* Footer — a single standard primary button (the pop-up's X closes). */}
+                <button type="button" onClick={() => setQuoting(true)} className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500">
+                  <SquarePen size={16} /> Revise quote
+                </button>
               </>
             )}
 
@@ -442,7 +433,6 @@ function DeclinedQuoteSheet({ ticket, company, onClose }: { ticket: SupplierTick
               )}
             </Modal>
           )}
-          {chatting && <TicketChat ticketId={ticket.id} viewerRole="supplier" defaultOpen onClose={() => setChatting(false)} />}
         </div>
       )}
     </Modal>
@@ -771,6 +761,7 @@ function matchesFilter(t: SupplierTicketRow, filter: QueueFilter): boolean {
 
 function nextStep(t: SupplierTicketRow): string {
   const s = myStatus(t)
+  if (t.declinedForMe) return 'Your quote was not selected for this job'
   if (t.requoteRequested) return 'Quote declined — revise and resubmit'
   if (s === 'quote_requested') return 'Submit a quote'
   if (s === 'quoted') return "Awaiting the client's decision"

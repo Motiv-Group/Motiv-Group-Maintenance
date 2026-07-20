@@ -689,6 +689,9 @@ export interface SupplierTicketRow {
   requoteRequested: boolean
   // Why their quote was declined (shown in the re-quote flow).
   declineReason: string | null
+  // The viewer opened the ticket AFTER the decline (ticket_reads watermark) — a
+  // plainly-declined row drops off the Today queue once this is true.
+  declineSeen: boolean
   // Latest snag's schedule state — after the RM declines a proposed snag-fix date
   // the declined date + reason survive on the snag row and drive the reschedule CTA.
   snagScheduledAt: string | null
@@ -708,7 +711,9 @@ export interface SupplierDashboardData {
   generatedAt: string
 }
 
-export async function assembleSupplierDashboard(companyId: string | null, supplierIds: string[], now: Date = new Date()): Promise<SupplierDashboardData> {
+// `viewerId` (the signed-in supplier user) powers the declineSeen watermark —
+// optional so list/stats pages that don't need it skip the ticket_reads lookup.
+export async function assembleSupplierDashboard(companyId: string | null, supplierIds: string[], now: Date = new Date(), viewerId?: string): Promise<SupplierDashboardData> {
   const db = createAdminClient()
   const emptyPerf = calculateSupplierPerformance('none', [], (p) => FALLBACK_SLA[p], now)
   if (!supplierIds.length) return { perf: emptyPerf, company: '', kpis: { open: 0, overdue: 0, dueToday: 0, pendingQuotes: 0, awaitingSignoff: 0, evidenceMissing: 0, scheduled: 0 }, tickets: [], quotes: [], signoffs: [], rating: { avg: 5, count: 0 }, generatedAt: now.toISOString() }
@@ -752,7 +757,7 @@ export async function assembleSupplierDashboard(companyId: string | null, suppli
   const storeBranch = new Map((storesRaw ?? []).map(s => [s.id, s.branch_code ?? null]))
   const titleOf = new Map(tickets.map(t => [t.id, t.title ?? 'Ticket']))
 
-  const [{ data: quotesRaw }, { data: signoffsRaw }, { data: ratingRows }, { data: companyRow }, { data: snagRows }] = await Promise.all([
+  const [{ data: quotesRaw }, { data: signoffsRaw }, { data: ratingRows }, { data: companyRow }, { data: snagRows }, { data: readRows }] = await Promise.all([
     db.from('quotes').select('id, ticket_id, amount, amount_incl_vat, status, created_at, updated_at, valid_until, proposed_schedule_at, decline_reason').in('supplier_id', supplierIds).order('created_at', { ascending: false }),
     db.from('signoffs').select('id, ticket_id, status, created_at, before_urls, after_urls, coc_url, invoice_url, reviewed_at, reviewed_by, reject_reason').in('supplier_id', supplierIds).order('created_at', { ascending: false }),
     db.from('ratings').select('score').in('supplier_id', supplierIds),
@@ -760,7 +765,10 @@ export async function assembleSupplierDashboard(companyId: string | null, suppli
     // Own-org snags only (cross-supplier isolation) — the latest snag per ticket
     // carries the schedule state for the reschedule CTA after an RM decline.
     db.from('snags').select('ticket_id, scheduled_at, schedule_status, schedule_decline_reason, created_at').in('supplier_id', supplierIds).order('created_at', { ascending: false }),
+    // THIS viewer's "last seen" watermarks — drives declineSeen (own rows only).
+    viewerId && tickets.length ? db.from('ticket_reads').select('ticket_id, last_seen_at').eq('user_id', viewerId).in('ticket_id', tickets.map(t => t.id)) : Promise.resolve({ data: null as { ticket_id: string; last_seen_at: string }[] | null }),
   ])
+  const lastSeenByTicket = new Map((readRows ?? []).map(r => [r.ticket_id, r.last_seen_at]))
   // Manager names for the "decided by" line on each sign-off.
   const reviewerIds = [...new Set((signoffsRaw ?? []).map(s => s.reviewed_by).filter((id): id is string => !!id))]
   const { data: reviewerRows } = reviewerIds.length ? await db.from('user_profiles').select('id, full_name').in('id', reviewerIds) : { data: null }
@@ -872,6 +880,9 @@ export async function assembleSupplierDashboard(companyId: string | null, suppli
       // Re-quote = re-invited (status 'invited') AND a prior re-quote request stamp.
       requoteRequested: !awardedToMe && myInviteStatus.get(t.id) === 'invited' && !!requoteAt.get(t.id),
       declineReason: declineReasonByTicket.get(t.id) ?? null,
+      // Viewed after the decline → the plainly-declined row leaves the Today queue.
+      declineSeen: declinedForMe && !!declinedInviteAt.get(t.id) && !!lastSeenByTicket.get(t.id)
+        && new Date(lastSeenByTicket.get(t.id)!).getTime() > new Date(declinedInviteAt.get(t.id)!).getTime(),
       snagScheduledAt: latestSnagByTicket.get(t.id)?.scheduled_at ?? null,
       snagScheduleStatus: latestSnagByTicket.get(t.id)?.schedule_status ?? null,
       snagScheduleDeclineReason: latestSnagByTicket.get(t.id)?.schedule_decline_reason ?? null,

@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { ClipboardCheck, FileText, Calendar, ChevronDown, Clock, CheckCircle2, Info } from 'lucide-react'
 import { SubmitCompletionForm } from '@/components/supplier/SubmitCompletionForm'
 import { BackLink } from '@/components/ui/BackLink'
+import { MarkTicketSeen } from '@/components/ui/MarkTicketSeen'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { PhotoThumbs } from '@/components/ui/PhotoThumbs'
 import { ChatFab } from '@/components/chat/TicketChat'
@@ -201,6 +202,9 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
 
   return (
     <div className="space-y-5">
+      {/* Bump this supplier user's "last seen" watermark — a plainly-declined
+          ticket drops off their Today queue once they've opened it here. */}
+      <MarkTicketSeen ticketId={t.id} latestUpdateAt={t.updated_at} />
       <BackLink fallbackHref="/supplier/tickets" label="Back to tickets" />
 
       {/* Header — stepper + ref/title/badges (same layout as the RM ticket detail). */}

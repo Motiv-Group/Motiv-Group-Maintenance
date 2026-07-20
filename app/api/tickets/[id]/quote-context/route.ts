@@ -46,15 +46,22 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   // The caller's own latest DECLINED quote on this ticket (for the re-quote flow —
   // shows what was declined + why alongside the job). Restricted to their orgs.
   const { data: declined } = await admin.from('quotes')
-    .select('amount, amount_incl_vat, description, file_url, decline_reason, created_at, updated_at, valid_until, warranty, quote_ref')
+    .select('id, amount, amount_incl_vat, description, file_url, decline_reason, created_at, updated_at, valid_until, warranty')
     .eq('ticket_id', id).eq('status', 'declined').in('supplier_id', [...myOrgs])
     .order('created_at', { ascending: false }).limit(1).maybeSingle()
+  // quote_ref is fetched separately so the sheet still works if the 20260723
+  // migration isn't applied yet (query fails → null, the reference row hides).
+  let quoteRef: string | null = null
+  if (declined) {
+    const { data: refRow } = await admin.from('quotes').select('quote_ref').eq('id', declined.id).maybeSingle()
+    quoteRef = (refRow as { quote_ref?: string | null } | null)?.quote_ref ?? null
+  }
   const declinedQuote = declined ? {
     amount: declined.amount, amountInclVat: declined.amount_incl_vat ?? null,
     description: declined.description ?? null, fileUrl: declined.file_url ? await signedUrl(declined.file_url) : null,
     declineReason: declined.decline_reason ?? null, validUntil: declined.valid_until ?? null, createdAt: declined.created_at,
-    // The decline stamps updated_at → "Decided on"; warranty + ref for the card.
-    declinedAt: declined.updated_at ?? null, warranty: declined.warranty ?? null, quoteRef: declined.quote_ref ?? null,
+    // The decline stamps updated_at → "Decided on".
+    declinedAt: declined.updated_at ?? null, warranty: declined.warranty ?? null, quoteRef,
   } : null
 
   // Variation orders belong to the AWARDED org only — an invited-but-not-awarded
