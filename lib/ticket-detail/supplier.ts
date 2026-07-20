@@ -185,7 +185,10 @@ export async function loadSupplierTicketDetail(ticketId: string) {
   // Show the actual decline reason (the RM's reason for a declined quote, or the
   // supplier's own reason if they declined the request), falling back to the
   // courteous "not selected" message when no reason was captured.
-  const declineMessage = declineReason || DEFAULT_DECLINE_REASON
+  // "Choosing another supplier" is a normal competitive outcome — the supplier sees
+  // the courteous not-selected message instead of the raw reason, with no dispute.
+  const politeDecline = declinedBy === 'regional_manager' && declineReason === 'Choosing another supplier'
+  const declineMessage = politeDecline ? DEFAULT_DECLINE_REASON : (declineReason || DEFAULT_DECLINE_REASON)
   // This supplier's OWN view of the status — never leak another supplier's progress
   // (e.g. the ticket reading "Quoted" because a different supplier quoted). Awarded →
   // the real status; their own quote in → "Quoted"; nothing submitted → "Quote requested".
@@ -376,7 +379,7 @@ export async function loadSupplierTicketDetail(ticketId: string) {
     t, store, storeName, disputeStore, companyName, supplierCompanyName, customer, editorName, quoteRequestedAt,
     latestSnag, snagFixApproved, snagScheduleActive, declinedSnag, scheduledTechName,
     awarded, chatUnread, chatUnreadCount, declinedForMe, dueAt, overdue, declineDetails, sla, breached, now,
-    latestQuote, canSubmitQuote, declineReason, declinedBy, declinedByLabel, declineMessage, supplierStatus, reQuoteByRm,
+    latestQuote, canSubmitQuote, declineReason, declinedBy, declinedByLabel, declineMessage, politeDecline, supplierStatus, reQuoteByRm,
     quoteStatusOf, requoteReason,
     pendingSignoffs, rejectedSignoffs, acceptedSignoff, submissionLabel, roundBySignoff, liveSnag, liveEvidence, archivedSuperseded,
     variations, variationCount, latestVoRejectReason, canDecline,

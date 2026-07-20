@@ -19,6 +19,8 @@ export interface SupplierQuoteItem {
   declinedLabel?: string | null
   /** RM asked this supplier to re-submit after the decline (shown on the declined row). */
   reQuoteRequested?: boolean
+  /** Client-declined and not opened since — the row carries a "New" marker until then. */
+  declineUnseen?: boolean
 }
 
 const STATUS: Record<QuoteKind, { label: string; badge: string; tab: string; ring: string }> = {
@@ -143,7 +145,7 @@ export function SupplierQuotesTable({ items }: { items: SupplierQuoteItem[] }) {
                   <td className="px-3">
                     <div className="flex w-fit flex-col items-stretch gap-1">
                       {PRIO[i.priority] && <span className={`${BADGE} ${PRIO[i.priority].cls}`}>{PRIO[i.priority].label}</span>}
-                      <span className={`${BADGE} ${STATUS[i.kind].badge}`}>{i.declinedLabel ?? STATUS[i.kind].label}</span>
+                      <span className={`${BADGE} ${STATUS[i.kind].badge}`}>{i.declinedLabel ?? STATUS[i.kind].label}{i.declineUnseen && <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-red-500" aria-label="New" />}</span>
                       {i.kind === 'declined' && i.reQuoteRequested && <span className={`${BADGE} bg-amber-500/15 text-amber-700 dark:text-amber-400`}>Re-quote requested</span>}
                     </div>
                   </td>
@@ -167,7 +169,7 @@ export function SupplierQuotesTable({ items }: { items: SupplierQuoteItem[] }) {
                       <p className="line-clamp-2 break-words text-sm font-semibold text-[var(--text)]">{i.storeName}</p>
                       <span className="flex w-fit shrink-0 flex-col items-stretch gap-1">
                         {PRIO[i.priority] && <span className={`${BADGE} ${PRIO[i.priority].cls}`}>{PRIO[i.priority].label}</span>}
-                        <span className={`${BADGE} ${STATUS[i.kind].badge}`}>{i.declinedLabel ?? STATUS[i.kind].label}</span>
+                        <span className={`${BADGE} ${STATUS[i.kind].badge}`}>{i.declinedLabel ?? STATUS[i.kind].label}{i.declineUnseen && <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-red-500" aria-label="New" />}</span>
                         {i.kind === 'declined' && i.reQuoteRequested && <span className={`${BADGE} bg-amber-500/15 text-amber-700 dark:text-amber-400`}>Re-quote requested</span>}
                       </span>
                     </div>

@@ -100,8 +100,8 @@ const VARIANTS = {
 
 export function ExecChrome({
   children, userName, variant = 'exec', unreadCount = 0, contextLabel,
-  contextOptions, activeContextId, contextCookie, accountStatus = null, avatarUrl = null,
-}: { children: ReactNode; userName: string | null; variant?: keyof typeof VARIANTS; unreadCount?: number; contextLabel?: string | null; contextOptions?: { id: string; label: string }[]; activeContextId?: string | null; contextCookie?: string; accountStatus?: AccountStatus | null; avatarUrl?: string | null }) {
+  contextOptions, activeContextId, contextCookie, accountStatus = null, avatarUrl = null, tabBadges = {},
+}: { children: ReactNode; userName: string | null; variant?: keyof typeof VARIANTS; unreadCount?: number; contextLabel?: string | null; contextOptions?: { id: string; label: string }[]; activeContextId?: string | null; contextCookie?: string; accountStatus?: AccountStatus | null; avatarUrl?: string | null; tabBadges?: Record<string, number> }) {
   const { tabs, roleLabel, base, reports } = VARIANTS[variant]
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -137,6 +137,7 @@ export function ExecChrome({
         avatarUrl={avatarUrl}
         accountStatus={accountStatus}
         tabs={isStore ? STORE_DESKTOP_TABS : isAdmin ? ADMIN_DESKTOP_TABS : isExec ? EXEC_DESKTOP_TABS : tabs}
+        tabBadges={tabBadges}
         home={home}
         notificationsHref={`${base}/notifications`}
         isActive={(href) => isStore
@@ -183,10 +184,16 @@ export function ExecChrome({
         <div className={`${wrap} mx-auto flex items-stretch h-20 justify-around`}>
           {tabs.map(({ href, label, icon: Icon }) => {
             const active = isActiveHref(href, home, pathname, searchParams)
+            const badge = tabBadges[href] ?? 0
             return (
               <Link key={href} href={href}
                 className={`flex flex-col items-center justify-center gap-1 flex-1 text-[11px] font-medium transition-colors ${active ? 'text-blue-400' : 'text-gray-400 hover:text-gray-200'}`}>
-                <Icon size={22} strokeWidth={active ? 2.4 : 1.8} />
+                <span className="relative">
+                  <Icon size={22} strokeWidth={active ? 2.4 : 1.8} />
+                  {badge > 0 && (
+                    <span className="absolute -top-1 -right-2 min-w-[15px] h-[15px] px-0.5 bg-red-500 text-white text-[9px] font-semibold rounded-full flex items-center justify-center">{badge > 9 ? '9+' : badge}</span>
+                  )}
+                </span>
                 {label}
               </Link>
             )
@@ -225,6 +232,7 @@ function DesktopSidebar({
   avatarUrl,
   accountStatus,
   tabs,
+  tabBadges = {},
   home,
   notificationsHref,
   isActive,
@@ -240,6 +248,7 @@ function DesktopSidebar({
   avatarUrl?: string | null
   accountStatus?: AccountStatus | null
   tabs: ChromeTab[]
+  tabBadges?: Record<string, number>
   home: string
   notificationsHref: string
   isActive: (href: string) => boolean
@@ -269,6 +278,7 @@ function DesktopSidebar({
         <div className="space-y-1">
           {tabs.map(({ href, label, icon: Icon }) => {
             const active = isActive(href)
+            const badge = tabBadges[href] ?? 0
             return (
               <Link
                 key={href}
@@ -281,6 +291,7 @@ function DesktopSidebar({
               >
                 <Icon size={18} className={active ? 'text-blue-300' : 'text-gray-400'} />
                 <span>{label}</span>
+                {badge > 0 && <span className="ml-auto rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] text-white">{badge > 9 ? '9+' : badge}</span>}
               </Link>
             )
           })}

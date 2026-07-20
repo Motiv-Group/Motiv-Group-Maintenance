@@ -34,7 +34,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
     t, store, storeName, disputeStore, companyName, supplierCompanyName, customer, editorName, quoteRequestedAt,
     latestSnag, snagFixApproved, snagScheduleActive, declinedSnag, scheduledTechName,
     awarded, chatUnread, chatUnreadCount, declinedForMe, dueAt, overdue, declineDetails, sla, breached, now,
-    latestQuote, canSubmitQuote, declineReason, declinedBy, declinedByLabel, declineMessage, supplierStatus, reQuoteByRm,
+    latestQuote, canSubmitQuote, declineReason, declinedBy, declinedByLabel, declineMessage, politeDecline, supplierStatus, reQuoteByRm,
     quoteStatusOf, requoteReason,
     pendingSignoffs, rejectedSignoffs, acceptedSignoff, submissionLabel, roundBySignoff, liveSnag, liveEvidence, archivedSuperseded,
     variations, variationCount, latestVoRejectReason, canDecline,
@@ -239,8 +239,9 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
           <p className="text-sm text-[var(--text)]">{declineMessage}</p>
           {/* The client declined this org — they may dispute it (thread-only, no workflow
               pause; the conversation lives in the Dispute tab once raised). Hidden while
-              their own dispute is already open. */}
-          {declinedBy === 'regional_manager' && !openDispute && (
+              their own dispute is already open, and for a "choosing another supplier"
+              decline (a normal competitive outcome — nothing to dispute). */}
+          {declinedBy === 'regional_manager' && !openDispute && !politeDecline && (
             <div className="pt-2">
               <RaiseDisputeButton ticketId={t.id} origin="quote_declined" label="Dispute the decline"
                 subjectTitle={latestQuote ? 'Quote declined' : 'Quote request declined'} jobRef={t.job_ref} store={disputeStore} />

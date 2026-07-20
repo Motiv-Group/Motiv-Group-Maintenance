@@ -14,9 +14,11 @@ const kindOf = (s: string): QuoteKind => s === 'accepted' ? 'accepted' : s === '
 const declinedLabelOf = (by: string | null) => by === 'supplier' ? 'Declined (you)' : by === 'regional_manager' ? 'Declined (Client)' : 'Declined'
 
 export default async function SupplierQuotesPage() {
-  const { companyId, supplierIds } = await requireSupplierV3()
-  const d = await assembleSupplierDashboard(companyId, supplierIds)
+  const { companyId, supplierIds, userId } = await requireSupplierV3()
+  // viewerId powers declineSeen — the "declined, not yet opened" row marker.
+  const d = await assembleSupplierDashboard(companyId, supplierIds, new Date(), userId)
   const declinedByByTicket = new Map(d.tickets.map(t => [t.id, t.declinedBy]))
+  const declineSeenByTicket = new Map(d.tickets.map(t => [t.id, t.declineSeen]))
   const quotedTicketIds = new Set(d.quotes.map(q => q.ticketId))
   // Latest quote timestamp per ticket — a declined quote that's since been superseded
   // by a newer (re-)submitted quote drops off the tab entirely.
@@ -36,6 +38,8 @@ export default async function SupplierQuotesPage() {
         kind, at: q.createdAt, proposedVisit: q.proposedScheduleAt, validUntil: q.validUntil, amount: q.amount, amountInclVat: q.amountInclVat,
         declinedLabel: kind === 'declined' ? declinedLabelOf(declinedByByTicket.get(q.ticketId) ?? null) : null,
         reQuoteRequested: kind === 'declined' && q.reQuoteRequested,
+        // Client-declined and not yet opened since → "New" marker (clears on open).
+        declineUnseen: kind === 'declined' && declinedByByTicket.get(q.ticketId) === 'regional_manager' && !declineSeenByTicket.get(q.ticketId),
       }
     })
 
