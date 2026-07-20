@@ -103,6 +103,16 @@ const PRESETS = [
   { label: '1 month', days: 30 },
 ] as const
 
+// Warranty select presets (reference layout) — "Other" reveals a free-text input,
+// so the stored value stays a plain string either way.
+const WARRANTY_PRESETS = [
+  '3-month workmanship guarantee',
+  '6-month workmanship guarantee',
+  '12-month workmanship guarantee',
+  '12-month parts & workmanship guarantee',
+  '24-month parts warranty',
+] as const
+
 export function SendQuoteForm({
   ticketId,
   variant = 'quote',
@@ -147,7 +157,9 @@ export function SendQuoteForm({
   const [parseError,  setParseError]  = useState<'scanned' | 'generic' | false>(false)
   const [needAmount,  setNeedAmount]  = useState(false)   // parsed ok but amount couldn't be read confidently
   const [validNA,     setValidNA]     = useState(isEdit ? existingQuote!.valid_until === null : false)
-  const [warrantyNA,  setWarrantyNA]  = useState(false)   // quote warranty: manual text or explicit N/A
+  const [warrantyNA,  setWarrantyNA]  = useState(false)   // quote warranty: preset/typed text or explicit N/A
+  // "Other" chosen in the warranty select → show the free-text input.
+  const [warrantyOther, setWarrantyOther] = useState(false)
 
   const { register, handleSubmit, reset, watch, setValue, getValues, formState: { errors } } = useForm<QuoteForm>({
     defaultValues: existingQuote
@@ -317,7 +329,7 @@ export function SendQuoteForm({
       })
       if (!res.ok) { setError((await res.json().catch(() => ({}))).error || 'Failed to submit variation order'); setLoading(false); return }
       reset(); if (filePreview) URL.revokeObjectURL(filePreview)
-      setFilePreview(null); setFile(null); setOpen(false); setValidNA(false); setWarrantyNA(false); router.refresh(); setLoading(false)
+      setFilePreview(null); setFile(null); setOpen(false); setValidNA(false); setWarrantyNA(false); setWarrantyOther(false); router.refresh(); setLoading(false)
       onClose?.()   // in a pop-up, close it — don't collapse to the lone "Upload" button
       return
     }
@@ -354,7 +366,7 @@ export function SendQuoteForm({
     setOpen(false)
     setAutofilled(false)
     setNeedAmount(false)
-    setValidNA(false); setWarrantyNA(false)
+    setValidNA(false); setWarrantyNA(false); setWarrantyOther(false)
     router.refresh()
     setLoading(false)
     onClose?.()   // in a pop-up, close it — don't collapse to the lone "Upload" button
@@ -368,7 +380,7 @@ export function SendQuoteForm({
     setFile(null)
     setAutofilled(false)
     setNeedAmount(false)
-    setValidNA(false); setWarrantyNA(false)
+    setValidNA(false); setWarrantyNA(false); setWarrantyOther(false)
     reset()
     onClose?.()
   }
@@ -400,21 +412,18 @@ export function SendQuoteForm({
         </p>
       )}
 
-      {/* Supplier responsibility disclaimer */}
-      <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 flex items-start gap-2.5">
-        <AlertTriangle size={16} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
-        <p className="text-xs text-amber-700 dark:text-amber-400">
-          It is your responsibility to verify all amounts and details are correct before submitting — whether auto-filled from the document or entered manually.
-        </p>
+      {/* Supplier responsibility disclaimer — neutral card, amber icon (reference layout). */}
+      <div className="rounded-xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] p-3.5 flex items-start gap-2.5">
+        <AlertTriangle size={16} className="text-amber-500 shrink-0 mt-0.5" />
+        <p className="text-sm text-[var(--text)]">Verify all amounts and details are correct before submitting.</p>
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
 
         {/* File upload — first so PDF parse runs before user edits fields */}
         <div>
-          <label className="block text-sm font-medium text-[var(--text)] mb-1">
-            Attachment <span className="text-red-500">*</span>{' '}
-            <span className="text-[var(--text-faint)] font-normal">(PDF, Excel, image or Word, max 10 MB)</span>
+          <label className="block text-sm font-medium text-[var(--text)] mb-1.5">
+            Attachment <span className="text-red-500">*</span>
           </label>
           {file ? (
             <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600">
@@ -444,7 +453,7 @@ export function SendQuoteForm({
                   if (filePreview) URL.revokeObjectURL(filePreview)
                   setFilePreview(null); setFile(null)
                   setAutofilled(false); setNeedAmount(false); setParseError(false)
-                  setValidNA(false); setWarrantyNA(false); setSchedule(''); setError('')
+                  setValidNA(false); setWarrantyNA(false); setWarrantyOther(false); setSchedule(''); setError('')
                   reset({ amount: '', amount_incl_vat: '', description: '', valid_until: '', warranty: '' })
                 }}
                 className="p-1 text-[var(--text-faint)] hover:text-red-500 rounded transition-colors"
@@ -462,22 +471,28 @@ export function SendQuoteForm({
             )}
             <div
               {...getRootProps()}
-              className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${
+              className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ${
                 isDragActive
                   ? 'border-blue-500 bg-blue-500/10'
                   : 'border-[var(--border)] hover:border-emerald-500/60 hover:bg-[var(--hover)]'
               }`}
             >
               <input {...getInputProps()} />
-              <UploadCloud size={28} className={`mx-auto mb-2 ${isDragActive ? 'text-blue-500' : 'text-[var(--text-faint)]'}`} />
+              <UploadCloud size={30} className={`mx-auto mb-2.5 ${isDragActive ? 'text-blue-500' : 'text-[var(--text-faint)]'}`} />
               {isDragActive ? (
                 <p className="text-sm text-blue-600 dark:text-blue-400 font-medium">Drop it here…</p>
               ) : (
                 <>
-                  <p className="text-sm text-[var(--text-muted)]">
-                    Drag &amp; drop a file, or <span className="text-blue-600 dark:text-blue-400 font-medium">browse</span>
+                  <p className="text-[15px] text-[var(--text)]">
+                    Drag &amp; drop a file, or <span className="text-blue-600 dark:text-blue-400 font-semibold">browse</span>
                   </p>
-                  <p className="text-xs text-[var(--text-faint)] mt-1">PDF, Excel or photo auto-fills fields · Word also accepted · max 10 MB</p>
+                  <p className="mt-1 text-sm text-[var(--text-muted)]">PDF, Excel, Image or Word · Max 10 MB</p>
+                  {/* Accepted-type chips (decorative, reference layout). PDF/Excel/photo also auto-fill. */}
+                  <div className="mt-3 flex flex-wrap justify-center gap-1.5">
+                    {['PDF', 'Excel', 'Image', 'Word'].map(t => (
+                      <span key={t} className="rounded-md bg-[var(--surface-2)] ring-1 ring-[var(--border)] px-2.5 py-1 text-xs font-medium text-[var(--text-muted)]">{t}</span>
+                    ))}
+                  </div>
                 </>
               )}
             </div>
@@ -520,34 +535,40 @@ export function SendQuoteForm({
         <div>
           <div className="grid grid-cols-2 gap-3 items-start">
             <div>
-              <label htmlFor="amount" className="block text-sm font-medium text-[var(--text)] mb-1">Excl. VAT (R) *</label>
-              <input
-                id="amount"
-                type="number"
-                step="0.01"
-                placeholder="0.00"
-                className={field}
-                {...register('amount', { required: 'Required', min: { value: 1, message: 'Must be > 0' } })}
-              />
+              <label htmlFor="amount" className="block text-sm font-medium text-[var(--text)] mb-1">Excl. VAT (R) <span className="text-red-500">*</span></label>
+              <div className="flex">
+                <span className="grid w-10 shrink-0 place-items-center rounded-l-lg bg-[var(--surface-2)] ring-1 ring-[var(--border)] text-sm font-semibold text-[var(--text-muted)]">R</span>
+                <input
+                  id="amount"
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  className={`${field} rounded-l-none`}
+                  {...register('amount', { required: 'Required', min: { value: 1, message: 'Must be > 0' } })}
+                />
+              </div>
               {errors.amount && <p className="mt-1 text-xs text-red-500">{errors.amount.message}</p>}
             </div>
             <div>
               <label htmlFor="amount_incl_vat" className="block text-sm font-medium text-[var(--text)] mb-1">Incl. VAT (R)</label>
-              <input
-                id="amount_incl_vat"
-                type="number"
-                step="0.01"
-                placeholder="0.00"
-                className={field}
-                {...register('amount_incl_vat', {
-                  min: { value: 1, message: 'Must be > 0' },
-                  setValueAs: v => v === '' ? '' : Number(v),
-                })}
-              />
+              <div className="flex">
+                <span className="grid w-10 shrink-0 place-items-center rounded-l-lg bg-[var(--surface-2)] ring-1 ring-[var(--border)] text-sm font-semibold text-[var(--text-muted)]">R</span>
+                <input
+                  id="amount_incl_vat"
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  className={`${field} rounded-l-none`}
+                  {...register('amount_incl_vat', {
+                    min: { value: 1, message: 'Must be > 0' },
+                    setValueAs: v => v === '' ? '' : Number(v),
+                  })}
+                />
+              </div>
               {errors.amount_incl_vat && <p className="mt-1 text-xs text-red-500">{errors.amount_incl_vat.message}</p>}
             </div>
           </div>
-          <p className="mt-1 text-xs text-[var(--text-faint)]">Incl. VAT — leave blank if supplier not VAT-registered</p>
+          <p className="mt-1.5 text-xs text-[var(--text-faint)]">Leave blank if supplier not VAT-registered.</p>
         </div>
 
         <div>
@@ -565,26 +586,46 @@ export function SendQuoteForm({
           {errors.description && <p className="mt-1 text-xs text-red-500">{errors.description.message}</p>}
         </div>
 
-        {/* Warranty / Guarantee — on quotes AND variation orders, required (manual text or N/A) */}
+        {/* Warranty / Guarantee — on quotes AND variation orders, required. A preset
+            select (reference layout) with an "Other" free-text escape; the stored
+            value stays a plain string, N/A via the checkbox. */}
         <div>
           <label className="block text-sm font-medium text-[var(--text)] mb-1">
             Warranty / Guarantee <span className="text-red-500">*</span>
           </label>
-          <textarea
-            rows={2}
+          <input type="hidden" {...register('warranty')} />
+          <select
             disabled={warrantyNA}
-            placeholder="e.g. 12-month workmanship guarantee, 2-year parts warranty…"
-            className={`${field} resize-none disabled:opacity-50`}
-            {...register('warranty')}
-          />
+            value={warrantyNA ? '' : warrantyOther ? '__other' : ((WARRANTY_PRESETS as readonly string[]).includes(watch('warranty') ?? '') ? watch('warranty') : '')}
+            onChange={e => {
+              const v = e.target.value
+              if (v === '__other') { setWarrantyOther(true); setValue('warranty', '') }
+              else { setWarrantyOther(false); setValue('warranty', v) }
+              setError('')
+            }}
+            className={`${field} disabled:opacity-50`}
+          >
+            <option value="" disabled>Select warranty / guarantee</option>
+            {WARRANTY_PRESETS.map(p => <option key={p} value={p}>{p}</option>)}
+            <option value="__other">Other — type it in</option>
+          </select>
+          {warrantyOther && !warrantyNA && (
+            <input
+              type="text"
+              value={watch('warranty') ?? ''}
+              onChange={e => setValue('warranty', e.target.value)}
+              placeholder="e.g. 2-year parts warranty on the compressor"
+              className={`${field} mt-2`}
+            />
+          )}
           <label className="mt-2 flex cursor-pointer select-none items-center gap-2 text-sm text-[var(--text-muted)]">
             <input
               type="checkbox"
               checked={warrantyNA}
-              onChange={e => { setWarrantyNA(e.target.checked); if (e.target.checked) setValue('warranty', ''); setError('') }}
+              onChange={e => { setWarrantyNA(e.target.checked); if (e.target.checked) { setValue('warranty', ''); setWarrantyOther(false) } setError('') }}
               className="h-4 w-4 accent-blue-600"
             />
-            No warranty? Select this option
+            No warranty
           </label>
         </div>
 
@@ -637,7 +678,7 @@ export function SendQuoteForm({
               </span>
             </p>
           ) : (
-            <p className="text-xs text-red-500 mt-2">Required — select an expiry date or choose N/A.</p>
+            <p className="text-xs text-[var(--text-muted)] mt-2">Select an expiry date or choose N/A.</p>
           )}
 
           <input type="hidden" {...register('valid_until')} />
@@ -649,12 +690,12 @@ export function SendQuoteForm({
         {wantsSchedule && (
           <div>
             <label className="block text-sm font-medium text-[var(--text)] mb-1.5">Proposed start date &amp; time <span className="text-red-500">*</span></label>
-            <button type="button" onClick={() => setPickOpen(true)} className={`${field} flex items-center justify-between gap-2 text-left`}>
-              <span className="flex items-center gap-2">
-                <Calendar size={16} className="shrink-0 text-[var(--text-faint)]" />
+            <button type="button" onClick={() => setPickOpen(true)} className="flex w-full items-stretch text-left">
+              <span className="grid w-10 shrink-0 place-items-center rounded-l-lg bg-[var(--surface-2)] ring-1 ring-[var(--border)]"><Calendar size={16} className="text-[var(--text-faint)]" /></span>
+              <span className={`${field} rounded-l-none flex items-center justify-between gap-2`}>
                 <span className={schedule ? 'text-[var(--text)]' : 'text-[var(--text-faint)]'}>{schedule ? formatDateTime(schedule) : 'Select date & time'}</span>
+                <ChevronDown size={16} className="shrink-0 text-[var(--text-faint)]" />
               </span>
-              <ChevronDown size={16} className="shrink-0 text-[var(--text-faint)]" />
             </button>
             <p className="text-xs text-[var(--text-muted)] mt-1">The job schedules to this time once the quote is approved.</p>
             {pickOpen && (
