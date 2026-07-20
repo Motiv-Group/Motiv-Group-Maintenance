@@ -15,7 +15,7 @@ import { CompletionFooterNote } from '@/components/workflow/CompletionBody'
 import { QuoteSummary } from '@/components/workflow/QuoteSummary'
 import { ArchiveGroup } from '@/components/ticket/ArchiveGroup'
 import { SignoffCard } from '@/components/ticket/SignoffCard'
-import { MarkInProgressButton, DeclineWorkButton, AcceptSnagCard, StartSnagButton, SupplierVariationGate, SupplierQuoteBar, SupplierQuoteSubmittedActions } from '@/components/supplier/SupplierJobActions'
+import { MarkInProgressButton, DeclineWorkButton, AcceptSnagCard, SnagRescheduleCta, StartSnagButton, SupplierVariationGate, SupplierQuoteBar, SupplierQuoteSubmittedActions } from '@/components/supplier/SupplierJobActions'
 import { PopupForm } from '@/components/supplier/PopupForm'
 import { RaiseDisputeButton, RaiseDisputeMore, DisputeThread, DisputeControls } from '@/components/dispute/DisputeBox'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
@@ -283,6 +283,10 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
               )}
               {openDispute ? (
                 disputeAction
+              ) : latestSnag?.schedule_status === 'declined' ? (
+                /* RM declined the proposed time — Re-schedule replaces Accept (no
+                   Raise dispute here; the client chat lives under the CTA's More). */
+                <SnagRescheduleCta ticketId={t.id} priority={t.priority} createdAt={t.created_at} declinedProposedAt={latestSnag.scheduled_at ?? null} declineReason={latestSnag.schedule_decline_reason ?? null} />
               ) : (
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
                   <div className="flex-1"><AcceptSnagCard ticketId={t.id} priority={t.priority} createdAt={t.created_at} /></div>

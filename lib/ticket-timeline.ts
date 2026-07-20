@@ -176,7 +176,7 @@ export function buildTicketTimeline(t: TimelineInput): TimelineEvent[] {
   for (const m of t.disputeMessages ?? []) {
     const b = m.body ?? ''
     const who = ROLE_LABEL[m.author_role ?? ''] ?? (m.author_role ?? 'System')
-    if (/proposed to /.test(b)) push(m.created_at, /proposed to resolve/.test(b) ? 'Proposed to resolve the dispute — drop the request' : 'Proposed to uphold the request — it stands', 'info_requested', who)
+    if (/proposed to /.test(b)) push(m.created_at, /proposed to resolve/.test(b) ? 'Proposed to resolve the dispute — drop the request' : 'Proposed to keep the request — it stands', 'info_requested', who)
     else if (/cancelled their proposal/.test(b)) push(m.created_at, 'Dispute proposal cancelled', 'edited', who)
   }
 
@@ -245,7 +245,7 @@ export function rmFriendlyLabel(e: TimelineEvent): string {
       if (/on COC & POC/.test(L)) return `You requested more evidence on the completion${tail}`
       if (/stands/.test(L)) return 'The supplier withdrew the dispute — the request stands'
       if (/Proposed to resolve/.test(L)) return `${A ?? 'Someone'} proposed to drop the request`
-      if (/Proposed to uphold/.test(L)) return `${A ?? 'Someone'} proposed that the request stands`
+      if (/Proposed to keep/.test(L)) return `${A ?? 'Someone'} proposed that the request stands`
       return `You requested more information${tail}`
     case 'quote_requested': {
       if (/Revised/.test(L)) return 'You asked for a revised quote'

@@ -347,11 +347,11 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     const what = originWord(openDispute.origin)
     const { error: pErr } = await admin.from('ticket_disputes').update({ pending_outcome: proposed, pending_by: actingRole, pending_at: now }).eq('id', openDispute.id)
     if (pErr) return NextResponse.json({ error: 'Proposals are not available yet — the latest database migration needs to be applied.' }, { status: 503 })
-    const label = proposed === 'withdrawn' ? `proposed to resolve the dispute — drop the ${what}` : `proposed to uphold the ${what} — it stands`
+    const label = proposed === 'withdrawn' ? `proposed to resolve the dispute — drop the ${what}` : `proposed to keep the ${what} — it stands`
     await admin.from('ticket_dispute_messages').insert({ dispute_id: openDispute.id, ticket_id: ticketId, author_id: user.id, author_role: actingRole, body: `${roleName(actingRole)} ${label}. Awaiting the other party's agreement.${note ? ` — ${note}` : ''}`, evidence_urls: [], created_at: now })
     await admin.from('tickets').update({ updated_at: now, ...stampFreshness(actingRole, now) }).eq('id', ticketId)
     if (actingRole === 'supplier') await notifyResolver(admin, ticket, title, 'The supplier has proposed resolving the dispute. Confirm to drop the request.')
-    else await push(admin, await supplierIds(admin, openDispute.supplier_id ?? ticket.supplier_id), ticket.company_id ?? '', ticketId, title, 'The manager has proposed upholding the request. Confirm to agree.', `/supplier/tickets/${ticketId}`)
+    else await push(admin, await supplierIds(admin, openDispute.supplier_id ?? ticket.supplier_id), ticket.company_id ?? '', ticketId, title, 'The manager has proposed keeping the request. Confirm to agree.', `/supplier/tickets/${ticketId}`)
   } else if (action === 'confirm') {
     // The OTHER party agrees to the pending proposal → resolve with its outcome.
     if (!openDispute) return NextResponse.json({ error: 'No open dispute on this ticket.' }, { status: 409 })

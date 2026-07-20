@@ -515,8 +515,9 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
 
         {/* Chat with the supplier — only when this block has no "More" menu to fold it
             into (no action bar and no completion review); otherwise chat lives inside
-            that menu. */}
-        {t.supplier_id && !isTerminal && !(canAssign || canCancel) && !reviewSignoff && <TicketChatInline ticketId={t.id} viewerRole="regional_manager" unread={chatUnread} />}
+            that menu. Also hidden while a dispute is open — the dispute-resolution
+            panel above carries its own thread, so a second chat entry is clutter. */}
+        {t.supplier_id && !isTerminal && !(canAssign || canCancel) && !reviewSignoff && !openDispute && <TicketChatInline ticketId={t.id} viewerRole="regional_manager" unread={chatUnread} />}
       </Card>
 
       {/* Ticket information — aligned label→value rows, then full-width description. */}

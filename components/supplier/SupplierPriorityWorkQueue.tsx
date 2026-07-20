@@ -18,12 +18,12 @@ import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { errMsg } from '@/components/ui/errMsg'
 import { SendQuoteForm } from '@/components/admin/SendQuoteForm'
 import { SubmitCompletionForm } from '@/components/supplier/SubmitCompletionForm'
-import { SupplierVariationGate, AcceptSnagCard } from '@/components/supplier/SupplierJobActions'
-import { DisputeReviewButton, RaiseDisputeMore, RaiseDisputeButton } from '@/components/dispute/DisputeBox'
+import { SupplierVariationGate, AcceptSnagCard, SnagRescheduleCta } from '@/components/supplier/SupplierJobActions'
+import { DisputeReviewButton, RaiseDisputeMore } from '@/components/dispute/DisputeBox'
 import { MoreMenu, MoreActionItem } from '@/components/regional/rm-actions/ticket'
-import { supplierStatusMeta, formatJobId, formatCurrency, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
+import { supplierStatusMeta, formatJobId, formatCurrency, formatDate, OPERATIONAL_IMPACT_LABELS, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
 import {
-  byUrgencyThenNewest, EmptyQueue, isActive, isCriticalPriority, MetricButton,
+  byUrgencyThenNewest, EmptyQueue, isActive, isCriticalPriority, MetricButton, priorityBadgeClass,
   QueueCard, queueCtaClass, QueueRowBadges, QueueRowNextStep, QueueRowShell, QueueRowTitle,
 } from '@/components/workqueue/shared'
 
@@ -122,6 +122,7 @@ function QueueRow({ ticket, nowMs, company, chatUnread = 0 }: { ticket: Supplier
     : toQuote(ticket) ? 'Submit quote'
     : ['accepted', 'scheduled'].includes(ticket.status) && ticket.awardedToMe ? 'Mark in progress'
     : needsEvidence(ticket) ? 'Upload evidence'
+    : ticket.status === 'snag' && ticket.snagScheduleStatus === 'declined' ? 'Re-schedule'
     : isSnag(ticket) ? 'View snag'
     : 'View Ticket'
   const ctaCls = queueCtaClass(isCriticalPriority(ticket.priority))
@@ -142,13 +143,16 @@ function QueueRow({ ticket, nowMs, company, chatUnread = 0 }: { ticket: Supplier
           : ticket.requoteRequested
           ? <ReQuoteCta ticket={ticket} className={ctaCls} company={company} />
           : toQuote(ticket)
-          ? <SubmitQuoteCta ticket={ticket} className={ctaCls} />
+          ? <SubmitQuoteCta ticket={ticket} className={ctaCls} company={company} />
           : closeout && !ticket.voNoneConfirmed
           ? <CloseOutCta ticket={ticket} className={ctaCls} />
           : cta === 'Mark in progress'
           ? <MarkInProgressCta ticket={ticket} className={ctaCls} />
           : cta === 'Upload evidence'
           ? <UploadEvidenceCta ticket={ticket} className={ctaCls} />
+          : cta === 'Re-schedule'
+          ? <SnagRescheduleCta ticketId={ticket.id} priority={String(ticket.priority)} createdAt={ticket.createdAt}
+              declinedProposedAt={ticket.snagScheduledAt} declineReason={ticket.snagScheduleDeclineReason} className={ctaCls} />
           : cta === 'View snag'
           ? <ViewSnagCta ticket={ticket} className={ctaCls} company={company} />
           : <Link href={ticketUrl} className={ctaCls}>{cta} {cta === 'View Ticket' && <ArrowRight size={15} />}</Link>}
@@ -162,7 +166,10 @@ function QueueRow({ ticket, nowMs, company, chatUnread = 0 }: { ticket: Supplier
 // context). Kept lean: store · impact · description · photos.
 type QuoteContext = { title: string; category: string | null; description: string | null; impact: string | null; priority: string; jobRef: string | null; storeName: string | null; photoUrls: string[] }
 type DeclinedQuote = { amount: number | null; amountInclVat: number | null; description: string | null; fileUrl: string | null; declineReason: string | null; validUntil: string | null; createdAt: string }
-function TicketContextPanel({ ticketId, showDeclined = false }: { ticketId: string; showDeclined?: boolean }) {
+// `tile` renders the flat ticket-tile look (description → impact line → photos,
+// no inner card — the pop-up header above it already carries store/category), used
+// by the Submit-quote pop-up; the default card look serves the re-quote pop-up.
+function TicketContextPanel({ ticketId, showDeclined = false, tile = false }: { ticketId: string; showDeclined?: boolean; tile?: boolean }) {
   const [ctx, setCtx] = useState<QuoteContext | null>(null)
   const [declined, setDeclined] = useState<DeclinedQuote | null>(null)
   const [loading, setLoading] = useState(true)
@@ -179,6 +186,15 @@ function TicketContextPanel({ ticketId, showDeclined = false }: { ticketId: stri
 
   if (loading) return <p className="py-3 text-center text-sm text-[var(--text-faint)]">Loading job details…</p>
   if (err || !ctx) return err ? <p className="text-sm text-red-500">{err}</p> : null
+  if (tile) {
+    return (
+      <div className="space-y-3">
+        {ctx.description && <p className="whitespace-pre-line break-words text-sm text-[var(--text)]">{ctx.description}</p>}
+        {ctx.impact && <p className="text-xs text-[var(--text-muted)]">Impact · <span className="font-semibold text-[var(--text)]">{OPERATIONAL_IMPACT_LABELS[ctx.impact] ?? ctx.impact}</span></p>}
+        {ctx.photoUrls.length > 0 && <PhotoThumbs urls={ctx.photoUrls} ticketId={ticketId} label="Job photo" limit={5} />}
+      </div>
+    )
+  }
   return (
     <div className="space-y-3">
       {/* Re-quote flow: the supplier's own declined quote — amount + attachment they
@@ -222,12 +238,17 @@ function TicketContextPanel({ ticketId, showDeclined = false }: { ticketId: stri
   )
 }
 
-// "Submit quote" is a TWO-STEP pop-up: first the job detail with a blue
-// "Submit quote" button (review the job neatly, like the RM View & Assign
-// context), which THEN opens the quote-upload form in a second pop-up.
-function SubmitQuoteCta({ ticket, className }: { ticket: SupplierTicketRow; className: string }) {
+// "Submit quote" is a TWO-STEP pop-up: first the job detail rendered like the
+// ticket tile (job id + logged date · bold title · store · priority/status
+// badges · description · impact · photos), with a blue "Continue to quote"
+// button that THEN opens the quote-upload form in a second pop-up.
+function SubmitQuoteCta({ ticket, className, company }: { ticket: SupplierTicketRow; className: string; company?: string }) {
   const [open, setOpen] = useState(false)
   const [quoting, setQuoting] = useState(false)
+  const status = myStatus(ticket)
+  const meta = supplierStatusMeta(status)
+  const jobId = ticket.jobRef ?? formatJobId(ticket.jobNumber)
+  const who = ticket.isIndividual ? 'Individual' : [company, ticket.storeName, ticket.branchCode].filter(Boolean).join(' · ')
   return (
     <>
       <button type="button" onClick={() => setOpen(true)} className={className}>Submit Quote</button>
@@ -235,11 +256,23 @@ function SubmitQuoteCta({ ticket, className }: { ticket: SupplierTicketRow; clas
         <Modal onClose={() => setOpen(false)} maxWidth="max-w-3xl">
           {close => (
             <div className="space-y-4">
-              <h3 className="text-base font-bold text-[var(--text)]">Review the job</h3>
-              <TicketContextPanel ticketId={ticket.id} />
+              {/* Tile-style header — mirrors the Today-queue row. */}
+              <div className="space-y-1">
+                <div className="flex items-baseline justify-between gap-3">
+                  {jobId && <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-faint)]">{jobId}</p>}
+                  <p className="ml-auto text-xs text-[var(--text-faint)]">{formatDate(ticket.createdAt)}</p>
+                </div>
+                <h3 className="text-lg font-bold leading-snug text-[var(--text)]">{ticket.category || ticket.title}</h3>
+                {who && <p className="text-sm text-[var(--text-muted)]">{who}</p>}
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  <span className={`inline-flex whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${priorityBadgeClass(String(ticket.priority))}`}>{PRIORITY_LEVEL_LABELS[String(ticket.priority)] ?? 'Medium'}</span>
+                  <span className={`inline-flex whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold ${meta.cls}`}>{meta.label}</span>
+                </div>
+              </div>
+              <TicketContextPanel ticketId={ticket.id} tile />
               <button type="button" onClick={() => setQuoting(true)}
                 className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500">
-                <ReceiptText size={16} /> Submit quote
+                <ReceiptText size={16} /> Continue to quote
               </button>
               {quoting && (
                 <Modal onClose={() => setQuoting(false)} maxWidth="max-w-3xl">
@@ -260,14 +293,12 @@ function SubmitQuoteCta({ ticket, className }: { ticket: SupplierTicketRow; clas
 }
 
 // "View & re-quote" from the Today queue — the RM declined this supplier's quote
-// and asked them to revise it. Shows the decline reason + job detail, a Re-quote
-// button (opens the upload form) and a More menu (up/right, pop-up convention)
-// with Cancel + Raise dispute (dispute the decline, origin quote_declined).
-function ReQuoteCta({ ticket, className, company }: { ticket: SupplierTicketRow; className: string; company?: string }) {
+// and asked them to revise it. Shows the decline reason + the declined quote + job
+// detail, a Re-quote button (opens the upload form) and a small More beside it
+// (Cancel; quote declines are not disputable from here).
+function ReQuoteCta({ ticket, className }: { ticket: SupplierTicketRow; className: string; company?: string }) {
   const [open, setOpen] = useState(false)
   const [quoting, setQuoting] = useState(false)
-  const [disputing, setDisputing] = useState(false)
-  const store = ticket.isIndividual ? 'Individual' : [company, ticket.storeName, ticket.branchCode].filter(Boolean).join(' · ')
   return (
     <>
       <button type="button" onClick={() => setOpen(true)} className={className}>View &amp; Re-Quote</button>
@@ -275,14 +306,7 @@ function ReQuoteCta({ ticket, className, company }: { ticket: SupplierTicketRow;
         <Modal onClose={() => setOpen(false)} maxWidth="max-w-3xl">
           {close => (
             <div className="space-y-4">
-              {/* Pop-up convention (#8): More sits at the top-right, menu opens downward. */}
-              <div className="flex items-start justify-between gap-3">
-                <h3 className="text-base font-bold text-[var(--text)]">Quote declined — revise &amp; resubmit</h3>
-                <MoreMenu align="right">
-                  <MoreActionItem label="Cancel" onClick={close} />
-                  <MoreActionItem label="Raise dispute" tone="danger" onClick={() => setDisputing(true)} />
-                </MoreMenu>
-              </div>
+              <h3 className="text-base font-bold text-[var(--text)]">Quote declined — revise &amp; resubmit</h3>
               <div className="space-y-1 rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5">
                 <p className="text-sm text-[var(--text)]">The manager declined your quote and asked you to revise and resubmit it.</p>
                 {ticket.declineReason && (
@@ -292,9 +316,15 @@ function ReQuoteCta({ ticket, className, company }: { ticket: SupplierTicketRow;
 
               <TicketContextPanel ticketId={ticket.id} showDeclined />
 
-              <button type="button" onClick={() => setQuoting(true)} className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500">
-                <ReceiptText size={16} /> Re-quote
-              </button>
+              {/* Pop-up convention: small More beside the primary button, menu opens up-right. */}
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={() => setQuoting(true)} className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500">
+                  <ReceiptText size={16} /> Re-quote
+                </button>
+                <MoreMenu up align="right">
+                  <MoreActionItem label="Cancel" onClick={close} />
+                </MoreMenu>
+              </div>
 
               {quoting && (
                 <Modal onClose={() => setQuoting(false)} maxWidth="max-w-3xl">
@@ -306,7 +336,6 @@ function ReQuoteCta({ ticket, className, company }: { ticket: SupplierTicketRow;
                   )}
                 </Modal>
               )}
-              {disputing && <RaiseDisputeButton ticketId={ticket.id} origin="quote_declined" subjectTitle={ticket.category || ticket.title} jobRef={ticket.jobRef} store={store} defaultOpen onClose={() => setDisputing(false)} />}
             </div>
           )}
         </Modal>
@@ -489,6 +518,8 @@ function nextStep(t: SupplierTicketRow): string {
   if (['accepted', 'scheduled'].includes(t.status)) return 'Mark the job in progress when you start'
   if (t.status === 'in_progress') return 'Upload the COC & POC'
   if (t.status === 'evidence_requested') return 'Add the requested evidence'
+  if (t.status === 'snag' && t.snagScheduleStatus === 'declined') return 'Schedule declined — propose a new time'
+  if (t.status === 'snag_assigned' && t.snagScheduleStatus === 'proposed') return 'Awaiting schedule approval from the manager'
   if (['snag', 'snag_assigned'].includes(t.status)) return 'Accept and schedule the snag fix'
   if (['snag_in_progress', 'snag_resolved'].includes(t.status)) return 'Re-upload the COC & POC'
   if (t.status === 'submitted_for_signoff') return 'Awaiting the client sign-off'

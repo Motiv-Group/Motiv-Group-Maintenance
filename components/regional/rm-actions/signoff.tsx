@@ -173,8 +173,8 @@ function DocRow({ ticketId, url, itemType, itemLabel, uploadedAt, viewLabel }: {
 
 // The rich "Sign off completion" review panel — used in BOTH the RM ticket's
 // Next-action pop-up and the Today-queue sign-off pop-up. Shows the full
-// submission (photos · COC · notes) with "Approve completion" and a "More
-// actions" menu (Chat with supplier / Request more evidence / Raise a snag).
+// submission (photos · COC · notes) with "Approve completion" and a "More"
+// menu (Chat with supplier / Request more evidence / Raise a snag).
 // The supplier rating moved to the final close-out (CloseOutButton).
 export function SignoffReviewPanel({ ticketId, s, onDone }: { ticketId: string; s: SignoffSubmission; onDone?: () => void }) {
   const router = useRouter()
@@ -194,16 +194,6 @@ export function SignoffReviewPanel({ ticketId, s, onDone }: { ticketId: string; 
 
   return (
     <div className="space-y-4">
-      {/* Heading + secondary actions ("More") pinned to the top-right. */}
-      <div className="flex items-start justify-between gap-3">
-        <h3 className="text-sm font-bold text-[var(--text)]">Review submission</h3>
-        <MoreMenu label="More actions" align="right">
-          <MoreActionItem icon={<MessageSquare size={16} />} label="Chat with supplier" onClick={() => setSub('chat')} />
-          <MoreActionItem icon={<MessageSquare size={16} />} label="Request more evidence" onClick={() => setSub('evidence')} />
-          <MoreActionItem icon={<AlertTriangle size={16} />} label="Raise a snag" tone="danger" onClick={() => setSub('snag')} />
-        </MoreMenu>
-      </div>
-
       {/* Submission detail — photos / COC / notes, each under its own rule. */}
       <div className="overflow-hidden rounded-xl bg-[var(--surface)] ring-1 ring-[var(--border)]">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 border-b border-[var(--border)] px-4 py-3">
@@ -235,7 +225,14 @@ export function SignoffReviewPanel({ ticketId, s, onDone }: { ticketId: string; 
 
       {err && <p className="text-xs text-red-500">{err}</p>}
 
-      <button onClick={approve} disabled={busy} className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50"><CheckCircle2 size={16} /> {busy ? 'Approving…' : 'Approve completion'}</button>
+      <div className="flex items-center gap-2">
+        <button onClick={approve} disabled={busy} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50"><CheckCircle2 size={16} /> {busy ? 'Approving…' : 'Approve completion'}</button>
+        <MoreMenu up align="right">
+          <MoreActionItem icon={<MessageSquare size={16} />} label="Chat with supplier" onClick={() => setSub('chat')} />
+          <MoreActionItem icon={<MessageSquare size={16} />} label="Request more evidence" onClick={() => setSub('evidence')} />
+          <MoreActionItem icon={<AlertTriangle size={16} />} label="Raise a snag" tone="danger" onClick={() => setSub('snag')} />
+        </MoreMenu>
+      </div>
 
       {sub === 'evidence' && <RequestEvidenceButton ticketId={ticketId} defaultOpen onClose={closeSub} />}
       {sub === 'snag' && <RaiseSnagButton ticketId={ticketId} defaultOpen onClose={closeSub} />}

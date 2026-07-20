@@ -8,13 +8,15 @@
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { AlertOctagon, AlertTriangle, ArrowRight, CheckCircle2, ClipboardCheck, ReceiptText, UserPlus } from 'lucide-react'
+import { AlertOctagon, AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, ClipboardCheck, MessageSquare, ReceiptText, UserPlus, XCircle } from 'lucide-react'
 import type { RegionalTicketRow } from '@/lib/health/data'
 import { Modal } from '@/components/ui/Modal'
 import { ViewAssignButton, QuoteReviewButton, SignoffReviewButton, VariationReviewButton } from '@/components/regional/RmTicketActions'
 import { DisputeReviewButton } from '@/components/dispute/DisputeBox'
+import { TicketChat } from '@/components/chat/TicketChat'
+import { MoreMenu, MoreActionItem } from '@/components/regional/rm-actions/ticket'
 import { errMsg } from '@/components/regional/rm-actions/shared'
-import { rmStatusMeta, formatJobId } from '@/lib/utils'
+import { rmStatusMeta, formatJobId, formatDateTime } from '@/lib/utils'
 import {
   byUrgencyThenNewest, EmptyQueue, isActive, isCriticalPriority, MetricButton,
   QueueCard, queueCtaClass, QueueRowBadges, QueueRowNextStep, QueueRowShell, QueueRowTitle,
@@ -100,11 +102,14 @@ function QueueRow({ ticket, nowMs, suppliers, motivSuppliers, motivAccess, chatU
   // CTA per phase (all pop-ups open in place, like the SM "Add Info" button):
   //  · a quote is in to review        → "Approve quote"  (view + approve/decline)
   //  · a completion is in to sign off → "Sign off"       (view + approve/evidence/snag)
+  //  · a snag-fix time is proposed    → "View Schedule"  (approve / decline / chat)
   //  · still gathering / awaiting quotes → "Assign supplier" (assign / add more)
   //  · anything else                   → "View Ticket"
   const reviewQuote = ['quoted', 'quote_revision'].includes(ticket.status)
   const reviewVo = ticket.status === 'variation_review'
   const reviewSignoff = ticket.status === 'submitted_for_signoff'
+  // The supplier proposed a snag-fix time that the RM still needs to approve.
+  const proposedSnagAt = ticket.status === 'snag_assigned' && ticket.snagScheduleStatus === 'proposed' ? ticket.snagScheduledAt : null
   const assignable = !reviewQuote && ['open', 'info_requested', 'suppliers_declined', 'assigned', 'quote_requested', 'assessment'].includes(ticket.status)
   const ctaCls = queueCtaClass(isCriticalPriority(ticket.priority))
   // Close-out: the status badge is blue while awaiting the supplier's "no further
@@ -138,6 +143,8 @@ function QueueRow({ ticket, nowMs, suppliers, motivSuppliers, motivAccess, chatU
         ) : reviewSignoff ? (
           <SignoffReviewButton ticketId={ticket.id}
             trigger={open => <button type="button" onClick={open} className={`${ctaCls} whitespace-nowrap`}><ClipboardCheck size={15} /> Sign-Off</button>} />
+        ) : proposedSnagAt ? (
+          <SnagScheduleReview ticketId={ticket.id} scheduledAt={proposedSnagAt} snagDescription={ticket.snagDescription} className={`${ctaCls} whitespace-nowrap`} />
         ) : assignable ? (
           <ViewAssignButton ticketId={ticket.id} suppliers={suppliers} motivSuppliers={motivSuppliers} motivAccess={motivAccess}
             awaitingById={ticket.engagedSupplierIds} declinedSupplierIds={ticket.declinedSupplierIds}
@@ -210,6 +217,73 @@ function CloseOutConfirm({ ticketId, storeName, category, className }: { ticketI
   )
 }
 
+// "View Schedule" (snag assigned + a supplier-proposed fix time) opens the
+// proposed snag schedule for review: approve it, decline it with a reason (the
+// supplier is asked to propose a new time), or chat with the supplier. The
+// queue equivalent of the ticket page's AcceptSnagScheduleCard.
+function SnagScheduleReview({ ticketId, scheduledAt, snagDescription, className }: { ticketId: string; scheduledAt: string; snagDescription: string | null; className: string }) {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [declining, setDeclining] = useState(false)  // swaps the pop-up body to the decline step
+  const [chat, setChat] = useState(false)
+  const [reason, setReason] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+
+  async function act(body: { action: 'approve_snag' } | { action: 'decline_snag_schedule'; reason?: string }, fail: string) {
+    setBusy(true); setErr('')
+    try {
+      const res = await fetch(`/api/tickets/${ticketId}/transition`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? fail)
+      setOpen(false); router.refresh()
+    } catch (e) { setErr(errMsg(e)); setBusy(false) }
+  }
+
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} className={className}>View Schedule <ArrowRight size={15} /></button>
+      {open && (
+        <Modal onClose={() => { if (!busy) { setOpen(false); setDeclining(false); setErr('') } }} maxWidth="max-w-lg">
+          {() => declining ? (
+            <div className="space-y-4">
+              <h3 className="text-lg font-bold text-[var(--text)]">Decline the proposed time</h3>
+              <p className="text-sm text-[var(--text-muted)]">The supplier is notified and asked to propose a new time for the corrective work.</p>
+              <textarea autoFocus value={reason} onChange={e => setReason(e.target.value)} placeholder="Tell the supplier why the proposed time doesn't work…"
+                className="min-h-[100px] w-full rounded-xl bg-[var(--input-bg)] px-3 py-2.5 text-sm text-[var(--text)] ring-1 ring-[var(--border)] placeholder-[var(--text-faint)]" />
+              {err && <p className="text-sm text-red-500">{err}</p>}
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={() => { setDeclining(false); setErr('') }} disabled={busy} className="flex-1 rounded-xl py-2.5 text-sm font-medium text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] disabled:opacity-50">Back</button>
+                <button type="button" onClick={() => act({ action: 'decline_snag_schedule', reason: reason.trim() || undefined }, 'Failed to decline the proposed time.')} disabled={busy}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-red-600 py-2.5 text-sm font-semibold text-white transition hover:bg-red-500 disabled:opacity-50"><XCircle size={16} /> {busy ? 'Declining…' : 'Decline schedule'}</button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <h3 className="text-lg font-bold text-[var(--text)]">Proposed snag schedule</h3>
+              {snagDescription && <p className="text-sm text-[var(--text-muted)]">{snagDescription}</p>}
+              <div className="flex items-center gap-2.5 rounded-xl bg-indigo-500/5 px-3.5 py-3 ring-1 ring-indigo-500/40">
+                <CalendarClock size={16} className="shrink-0 text-indigo-500" />
+                <p className="text-sm text-[var(--text-muted)]">Proposed time: <span className="font-bold text-[var(--text)]">{formatDateTime(scheduledAt)}</span></p>
+              </div>
+              {err && <p className="text-sm text-red-500">{err}</p>}
+              <div className="flex flex-wrap items-center gap-2">
+                <button type="button" onClick={() => act({ action: 'approve_snag' }, 'Failed to approve the snag schedule.')} disabled={busy}
+                  className="flex min-w-0 flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50"><CheckCircle2 size={16} /> {busy ? 'Approving…' : 'Approve schedule'}</button>
+                <MoreMenu up align="left">
+                  <MoreActionItem icon={<XCircle size={16} />} label="Decline the proposed time" onClick={() => { setErr(''); setDeclining(true) }} />
+                  <MoreActionItem icon={<MessageSquare size={16} />} label="Chat with the supplier" onClick={() => setChat(true)} />
+                </MoreMenu>
+              </div>
+            </div>
+          )}
+        </Modal>
+      )}
+      {/* Chat stacks over the pop-up as a sibling — a snag means the supplier is already awarded. */}
+      {chat && <TicketChat ticketId={ticketId} viewerRole="regional_manager" defaultOpen onClose={() => setChat(false)} />}
+    </>
+  )
+}
+
 // The RM's next step per ticket status — short, professional, and covering every
 // state (no generic fallback for a real status). Mirrors the ticket-detail
 // "Next action" wording so the queue and the ticket page always agree.
@@ -232,8 +306,10 @@ function nextStep(t: RegionalTicketRow): string {
     case 'pending_sign_off':
     case 'snag_resolved': return 'Review & sign off the work'
     case 'evidence_requested': return 'Awaiting evidence from the supplier'
-    case 'snag':
-    case 'snag_assigned':
+    // Snags: a declined proposal waits on the supplier's new time; a 'proposed'
+    // one waits on the RM's approval; otherwise the corrective work is underway.
+    case 'snag': return t.snagScheduleStatus === 'declined' ? 'Awaiting a new proposed time from the supplier' : 'Snag in progress'
+    case 'snag_assigned': return t.snagScheduleStatus === 'proposed' ? 'Approve the snag schedule time' : 'Snag in progress'
     case 'snag_in_progress': return 'Snag in progress'
     case 'approved_closeout': return t.voNoneConfirmed ? 'Finalise the close-out' : 'Awaiting the supplier to confirm variation orders'
     case 'completed': return 'Completed'

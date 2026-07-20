@@ -5,13 +5,14 @@
 // hours). The Submit COC & POC flow lives on its own page (/complete).
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Calendar, Wrench, PlayCircle, XCircle, X, FileText, Ticket, MapPin, Info, ArrowRight, Plus } from 'lucide-react'
+import { Calendar, Wrench, PlayCircle, XCircle, X, FileText, Ticket, MapPin, Info, ArrowRight, Plus, MessageSquare } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { DrawerHeader } from '@/components/exec/Drawer'
 import { SchedulePicker } from '@/components/ui/SchedulePicker'
 import { SendQuoteForm } from '@/components/admin/SendQuoteForm'
 import { MoreMenu, MoreActionItem } from '@/components/regional/RmTicketActions'
 import { QuoteSummary, type QuoteSummaryData, type QuoteSchedule } from '@/components/workflow/QuoteSummary'
+import { TicketChat } from '@/components/chat/TicketChat'
 import { createClient } from '@/lib/supabase/client'
 import { errMsg } from '@/components/ui/errMsg'
 import { formatDateTime } from '@/lib/utils'
@@ -185,7 +186,9 @@ export function AcceptSnagCard({ ticketId, priority, createdAt }: { ticketId: st
 
   async function doAccept(iso: string) {
     setBusy(true); setErr('')
-    try { await transition(ticketId, { action: 'accept_snag', scheduledAt: iso }); router.refresh() }
+    // Close the pop-up on success — router.refresh() doesn't reset client state,
+    // so without this the modal sits on "Scheduling…" forever.
+    try { await transition(ticketId, { action: 'accept_snag', scheduledAt: iso }); setOpen(false); setBusy(false); router.refresh() }
     catch (e) { setErr(errMsg(e)); setBusy(false) }
   }
 
@@ -205,6 +208,58 @@ export function AcceptSnagCard({ ticketId, priority, createdAt }: { ticketId: st
           )}
         </Modal>
       )}
+    </>
+  )
+}
+
+// Re-propose the snag-fix time after the RM declined the proposal — shows the
+// declined date + reason, then the same themed calendar. Re-proposes via
+// accept_snag (the API re-proposes on 'open' snags). More → chat with the client.
+export function SnagRescheduleCta({ ticketId, priority, createdAt, declinedProposedAt, declineReason, className }: { ticketId: string; priority: string; createdAt: string; declinedProposedAt: string | null; declineReason: string | null; className?: string }) {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [chatOpen, setChatOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+
+  async function doPropose(iso: string) {
+    setBusy(true); setErr('')
+    // Close on success — router.refresh() alone leaves the modal on "Scheduling…".
+    try { await transition(ticketId, { action: 'accept_snag', scheduledAt: iso }); setOpen(false); setBusy(false); router.refresh() }
+    catch (e) { setErr(errMsg(e)); setBusy(false) }
+  }
+
+  return (
+    <>
+      <button onClick={() => setOpen(true)} className={className ?? 'w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition flex items-center justify-center gap-1.5'}>
+        <Calendar size={15} /> Re-schedule
+      </button>
+      {open && (
+        <Modal onClose={() => setOpen(false)} maxWidth="max-w-2xl">
+          {close => (
+            <>
+              <DrawerHeader onClose={close} title={<p className="font-semibold text-[var(--text)]">Schedule declined — pick a new time</p>} />
+              {/* What the RM turned down, so the supplier picks a better slot. */}
+              {(declinedProposedAt || declineReason) && (
+                <div className="rounded-lg bg-amber-500/10 ring-1 ring-amber-500/30 p-3 space-y-0.5">
+                  {declinedProposedAt && <p className="text-sm text-[var(--text-muted)]">Proposed: <span className="font-semibold text-[var(--text)]">{formatDateTime(declinedProposedAt)}</span></p>}
+                  {declineReason && <p className="text-sm text-[var(--text-muted)]">Reason: <span className="font-medium text-[var(--text)]">{declineReason}</span></p>}
+                </div>
+              )}
+              {err && <p className="text-xs text-red-500">{err}</p>}
+              <SchedulePicker priority={priority} createdAt={createdAt} busy={busy} onConfirm={doPropose} onCancel={close} />
+              {/* Sits under the picker's confirm row; `up` keeps the menu inside the sheet. */}
+              <div className="flex justify-end">
+                <MoreMenu up align="right">
+                  <MoreActionItem icon={<MessageSquare size={16} />} label="Chat with the client" onClick={() => setChatOpen(true)} />
+                </MoreMenu>
+              </div>
+            </>
+          )}
+        </Modal>
+      )}
+      {/* RM↔supplier chat, opened from More → Chat with the client (stacks over the picker). */}
+      {chatOpen && <TicketChat ticketId={ticketId} viewerRole="supplier" defaultOpen onClose={() => setChatOpen(false)} />}
     </>
   )
 }
@@ -367,7 +422,8 @@ export function ScheduleJobCard({ ticketId, priority, createdAt, technicians = [
 
   async function doSchedule(iso: string) {
     setBusy(true); setErr('')
-    try { await transition(ticketId, { action: 'schedule', scheduledAt: iso, technicianId: techId || null }); router.refresh() }
+    // Close on success (same stuck-"Scheduling…" trap as AcceptSnagCard).
+    try { await transition(ticketId, { action: 'schedule', scheduledAt: iso, technicianId: techId || null }); setOpen(false); setPendingIso(null); setBusy(false); router.refresh() }
     catch (e) { setErr(errMsg(e)); setBusy(false) }
   }
   function confirm(iso: string) {
