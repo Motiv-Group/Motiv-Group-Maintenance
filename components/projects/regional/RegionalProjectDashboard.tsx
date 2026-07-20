@@ -27,8 +27,10 @@ export function RegionalProjectDashboard({ project, summary, stores }: { project
 
   const counts = useMemo(() => milestoneCounts(stores), [stores])
   const daysLeft = daysUntil(project.end_date)
-  const endingSoon = useMemo(() => stores.filter((s) => withinDays(s.end_date, 7) && s.progress < 100).length, [stores])
-  const startingSoon = useMemo(() => stores.filter((s) => withinDays(s.start_date, 7)).length, [stores])
+  // "This week" counts use the SA calendar week (Mon–Sun), not a rolling 7 days.
+  const week = useMemo(() => saWeekBounds(), [])
+  const endingSoon = useMemo(() => stores.filter((s) => inThisWeek(s.end_date, week) && s.progress < 100).length, [stores, week])
+  const startingSoon = useMemo(() => stores.filter((s) => inThisWeek(s.start_date, week)).length, [stores, week])
   const recentlyDone = useMemo(() => stores.filter((s) => s.progress >= 100 && recentlyUpdated(s.updated_at, 7)).length, [stores])
 
   const filtered = useMemo(() => {
@@ -292,9 +294,22 @@ function daysUntil(date: string | null): number | null {
   if (Number.isNaN(d.getTime())) return null
   return Math.ceil((d.getTime() - Date.now()) / 86400000)
 }
-function withinDays(date: string | null, days: number): boolean {
-  const d = daysUntil(date)
-  return d != null && d >= 0 && d <= days
+// "This week" = the CURRENT CALENDAR WEEK, Monday 00:00 → Sunday 24:00 in SA time
+// (Africa/Johannesburg is UTC+2 year-round — no DST), returned as UTC ms bounds.
+// Date-only values (store start/end dates parse to UTC midnight) land correctly:
+// Monday 00:00 UTC ≥ the Sunday-22:00-UTC week start, Sunday 00:00 UTC < the end.
+const SA_OFFSET_MS = 2 * 3600000
+function saWeekBounds(nowMs: number = Date.now()): { start: number; end: number } {
+  const sa = new Date(nowMs + SA_OFFSET_MS)            // SA wall clock, read via UTC getters
+  const dow = (sa.getUTCDay() + 6) % 7                 // 0 = Monday … 6 = Sunday
+  const startSa = Date.UTC(sa.getUTCFullYear(), sa.getUTCMonth(), sa.getUTCDate() - dow)
+  const start = startSa - SA_OFFSET_MS
+  return { start, end: start + 7 * 86400000 }
+}
+function inThisWeek(date: string | null, week: { start: number; end: number }): boolean {
+  if (!date) return false
+  const t = new Date(date).getTime()
+  return !Number.isNaN(t) && t >= week.start && t < week.end
 }
 function recentlyUpdated(iso: string, days: number): boolean {
   const t = new Date(iso).getTime()
