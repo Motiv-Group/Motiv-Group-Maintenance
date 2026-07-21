@@ -5,7 +5,7 @@
 import { useState, useMemo, useEffect, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
-import { Pencil, Plus, Camera, Info, X, ChevronDown, MessageSquare, XCircle, Send, AlertCircle, Trash2 } from 'lucide-react'
+import { Pencil, Plus, Camera, Info, X, ChevronDown, MessageSquare, XCircle, Send, AlertCircle, Trash2, FileUp, FileText } from 'lucide-react'
 import { uploadFiles } from '@/lib/upload'
 import { formatDateTime } from '@/lib/utils'
 import { StarInput } from '@/components/ui/Stars'
@@ -85,7 +85,7 @@ type ActionKey = 'addwork' | 'info' | 'edit' | 'cancel' | 'chat'
 // active) so they open instantly — the previous approach kept them inside the
 // collapsing menu, which felt laggy/buggy.
 // Client component (a Server Component may not pass the click handlers).
-export function RmTicketActionBar({ ticketId, status, canAssign, canAssignSupplier, canCancel, canEdit, hasSupplier = false, jobRef, suppliers, motivSuppliers, motivAccess = 'none', declinedSupplierIds, awaitingById, description, photoUrls, title, category, impact, priority }: {
+export function RmTicketActionBar({ ticketId, status, canAssign, canAssignSupplier, canCancel, canEdit, hasSupplier = false, jobRef, suppliers, motivSuppliers, motivAccess = 'none', declinedSupplierIds, awaitingById, description, photoUrls, docUrls, title, category, impact, priority }: {
   ticketId: string
   status: string
   canAssign: boolean
@@ -101,6 +101,7 @@ export function RmTicketActionBar({ ticketId, status, canAssign, canAssignSuppli
   awaitingById: Record<string, 'invited' | 'quoted'>
   description: string
   photoUrls: string[]
+  docUrls: string[]
   title: string
   category: string
   impact: string
@@ -146,7 +147,7 @@ export function RmTicketActionBar({ ticketId, status, canAssign, canAssignSuppli
       ) : null}
 
       {/* Action modals — mounted only while active, so they appear instantly. */}
-      {active === 'addwork' && <RmAddWorkForm defaultOpen onClose={done} ticketId={ticketId} description={description} photoUrls={photoUrls} title={title} category={category} impact={impact} />}
+      {active === 'addwork' && <RmAddWorkForm defaultOpen onClose={done} ticketId={ticketId} description={description} photoUrls={photoUrls} docUrls={docUrls} title={title} category={category} impact={impact} />}
       {active === 'info' && <RequestInfoButton defaultOpen onClose={done} ticketId={ticketId} />}
       {active === 'edit' && <RmEditTicketForm defaultOpen onClose={done} ticketId={ticketId} initial={{ title, category, impact, priority, description }} />}
       {active === 'cancel' && <CancelTicketCard defaultOpen onClose={done} ticketId={ticketId} jobRef={jobRef} />}
@@ -396,13 +397,16 @@ export function RmEditTicketForm({ ticketId, initial, defaultOpen = false, onClo
 // ── RM adds extra work to the ticket (before a supplier is assigned) ─
 const MAX_WORK_CHARS = 1000
 const MAX_WORK_PHOTOS = 5
-export function RmAddWorkForm({ ticketId, description, photoUrls, title, category, impact, defaultOpen = false, onClose, trigger }: {
-  ticketId: string; description: string; photoUrls: string[]; title: string; category: string; impact: string; defaultOpen?: boolean; onClose?: () => void; trigger?: (open: () => void) => ReactNode
+const MAX_WORK_DOCS = 5
+const WORK_DOC_ACCEPT = '.pdf,.doc,.docx,application/pdf'
+export function RmAddWorkForm({ ticketId, description, photoUrls, docUrls, title, category, impact, defaultOpen = false, onClose, trigger }: {
+  ticketId: string; description: string; photoUrls: string[]; docUrls: string[]; title: string; category: string; impact: string; defaultOpen?: boolean; onClose?: () => void; trigger?: (open: () => void) => ReactNode
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(defaultOpen)
   const [text, setText] = useState('')
   const [files, setFiles] = useState<File[]>([])
+  const [docs, setDocs] = useState<File[]>([])
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const close = () => { setOpen(false); onClose?.() }
@@ -422,18 +426,30 @@ export function RmAddWorkForm({ ticketId, description, photoUrls, title, categor
     const picked = Array.from(list ?? []).filter(f => !f.type || f.type.startsWith('image/'))
     setFiles(p => [...p, ...picked].slice(0, MAX_WORK_PHOTOS))
   }
+  // Documents (PDF/Word) — same live-FileList snapshot rule as addFiles above;
+  // non-image only (the accept list already limits the picker), capped at 5.
+  const addDocs = (list: FileList | null) => {
+    const picked = Array.from(list ?? []).filter(f => !f.type.startsWith('image/'))
+    setDocs(p => [...p, ...picked].slice(0, MAX_WORK_DOCS))
+  }
 
   async function submit() {
     if (!text.trim()) { setErr('Describe the extra work needed.'); return }
     setBusy(true); setErr('')
     try {
-      const { urls: newUrls, failed } = await uploadFiles(files, 'ticket-photos')
-      if (failed.length) { setErr(`Couldn't upload ${failed.length} photo${failed.length > 1 ? 's' : ''}. Check the file type and try again.`); setBusy(false); return }
+      // Photos → ticket-photos, documents → ticket-docs (same buckets as the SM flows).
+      const [{ urls: newUrls, failed }, { urls: newDocUrls, failed: docFailed }] = await Promise.all([
+        uploadFiles(files, 'ticket-photos'),
+        uploadFiles(docs, 'ticket-docs'),
+      ])
+      const nFailed = failed.length + docFailed.length
+      if (nFailed) { setErr(`Couldn't upload ${nFailed} file${nFailed > 1 ? 's' : ''}. Check the file type and try again.`); setBusy(false); return }
       const newDescription = `${description}\n\n— Extra Work: ${text.trim()}`
       // The ticket endpoint is PATCH-only — POSTing here was the "something went wrong".
-      const res = await fetch(`/api/tickets/${ticketId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, description: newDescription, category, operational_impact: impact, photo_urls: [...photoUrls, ...newUrls], edit_note: 'added extra work' }) })
+      // Docs append to info_doc_urls exactly like the SM add-info flow (existing + new).
+      const res = await fetch(`/api/tickets/${ticketId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, description: newDescription, category, operational_impact: impact, photo_urls: [...photoUrls, ...newUrls], info_doc_urls: [...docUrls, ...newDocUrls], edit_note: 'added extra work' }) })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to add the extra work.')
-      setBusy(false); setText(''); setFiles([]); close(); router.refresh()
+      setBusy(false); setText(''); setFiles([]); setDocs([]); close(); router.refresh()
     } catch (e) { setErr(errMsg(e)); setBusy(false) }
   }
 
@@ -478,6 +494,29 @@ export function RmAddWorkForm({ ticketId, description, photoUrls, title, categor
               ))}
             </div>
             <p className="mt-2 text-xs text-[var(--text-faint)]">{files.length} of {MAX_WORK_PHOTOS} photos added</p>
+          </div>
+
+          {/* Documents — compact picker row + chosen-file list with remove. Uploaded
+              to ticket-docs and appended to info_doc_urls (SM add-info pattern). */}
+          <div>
+            <p className="mb-2 text-sm font-medium text-[var(--text)]">Attach documents <span className="font-normal text-[var(--text-faint)]">(optional)</span></p>
+            {docs.length < MAX_WORK_DOCS && (
+              <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-[var(--border)] px-3 py-3 text-sm font-medium text-[var(--text-muted)] transition hover:border-blue-500 hover:bg-[var(--hover)]">
+                <FileUp size={16} className="shrink-0 text-[var(--text-faint)]" /> Choose documents
+                <span className="text-[11px] font-normal text-[var(--text-faint)]">PDF or Word</span>
+                <input type="file" accept={WORK_DOC_ACCEPT} multiple className="hidden" onChange={e => { addDocs(e.target.files); e.currentTarget.value = '' }} />
+              </label>
+            )}
+            {docs.length > 0 && (
+              <ul className="mt-2 space-y-1">
+                {docs.map((d, i) => (
+                  <li key={i} className="flex items-center justify-between gap-2 rounded-lg bg-[var(--surface-2)] px-3 py-2">
+                    <span className="flex min-w-0 items-center gap-2 text-sm text-[var(--text)]"><FileText size={14} className="shrink-0 text-blue-500" /> <span className="truncate">{d.name}</span></span>
+                    <button type="button" onClick={() => setDocs(p => p.filter((_, j) => j !== i))} aria-label="Remove document" className="shrink-0 text-[var(--text-faint)] hover:text-red-500" title="Remove"><X size={14} /></button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           {/* Info callout */}

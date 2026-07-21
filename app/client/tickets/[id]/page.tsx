@@ -16,7 +16,7 @@ import { ChatFab } from '@/components/chat/TicketChat'
 import { chatUnreadCounts, smChatAdded } from '@/lib/chat-unread'
 import { EditedLine } from '@/components/ui/EditedLine'
 import { buildTicketTimeline, filterTimelineForSm } from '@/lib/ticket-timeline'
-import { formatDateTime, clientVisibleStatus, PRIORITY_LEVEL_LABELS, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
+import { formatDateTime, clientVisibleStatus, storeLabel, PRIORITY_LEVEL_LABELS, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
 import type { StoreManagerTicket } from '@/lib/health/data'
 import type { TicketStatus } from '@/lib/types'
 import type { Database } from '@/lib/database.types'
@@ -56,7 +56,7 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
   // Editor names for the description "edited" line + the per-edit timeline events —
   // one lookup covering the single-slot editor and every ticket_edits editor.
   const editorIds = [...new Set([t.edited_by, ...(editRows ?? []).map(e => e.editor_id)])].filter((x): x is string => !!x)
-  const [editorNames, visitSupplier, visitTech, signedPhotoUrls, signedDocUrls, chatAddedSet, chatCounts] = await Promise.all([
+  const [editorNames, visitSupplier, visitTech, signedPhotoUrls, signedDocUrls, chatAddedSet, chatCounts, smStoreName] = await Promise.all([
     editorIds.length
       ? admin.from('user_profiles').select('id, full_name').in('id', editorIds).then(r => new Map<string, string | null>((r.data ?? []).map(p => [p.id, p.full_name])))
       : new Map<string, string | null>(),
@@ -67,6 +67,8 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
     // Ticket chat: entry points only once a supplier is awarded AND the RM added the SM.
     t.supplier_id ? smChatAdded(admin, [t.id]) : new Set<string>(),
     t.supplier_id ? chatUnreadCounts(admin, userId, [t.id], { smViewer: true }) : ({} as Record<string, number>),
+    // Store label for the info-requested review sheet (store_id is non-null here — the guard above matched it).
+    admin.from('stores').select('name, sub_store').eq('id', t.store_id ?? '').maybeSingle().then(r => (r.data ? storeLabel(r.data.name, r.data.sub_store) : null)),
   ])
   const chatAdded = !!t.supplier_id && chatAddedSet.has(t.id)
   const editorName = t.edited_by ? (editorNames.get(t.edited_by) ?? null) : null
@@ -154,7 +156,7 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
             </div>
           )}
           {t.status === 'info_requested' ? (
-            <ClientTicketActions ticketId={t.id} title={t.title} description={t.description ?? ''} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} photoUrls={photoUrlsRaw} docUrls={docUrlsRaw} requestReason={t.info_request_reason} smAdded={chatAdded} mode="add_info" />
+            <ClientTicketActions ticketId={t.id} title={t.title} description={t.description ?? ''} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} photoUrls={photoUrlsRaw} docUrls={docUrlsRaw} requestReason={t.info_request_reason} smAdded={chatAdded} mode="add_info" jobRef={t.job_ref} priority={String(t.priority)} storeName={smStoreName} createdAt={t.created_at} signedPhotoUrls={signedPhotoUrls} />
           ) : canEdit ? (
             <ClientTicketActions ticketId={t.id} title={t.title} description={t.description ?? ''} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} photoUrls={photoUrlsRaw} smAdded={chatAdded} />
           ) : (
@@ -175,7 +177,6 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
             <div>
               <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Description</div>
               <p className="text-sm text-[var(--text)] mt-0.5 whitespace-pre-line break-words">{t.description}</p>
-              <EditedLine at={t.edited_at} by={editorName} />
             </div>
             {(showVisit || showFollowUp) && <InfoRow label="Assigned supplier" value={visitSupplier ?? 'Assigned supplier'} />}
             {showVisit && t.scheduled_at && !showFollowUp && (
@@ -183,6 +184,8 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
             )}
             {showFollowUp && followUp && <InfoRow label="Follow-up visit" value={formatDateTime(followUp.scheduled_at)} />}
             {!showVisit && !showFollowUp && active && <InfoRow label="Assigned supplier" value="Awaiting assignment" />}
+            {/* "Last edited" sits as the final row of the information block. */}
+            <EditedLine at={t.edited_at} by={editorName} />
           </div>
         </Card>
       </div>

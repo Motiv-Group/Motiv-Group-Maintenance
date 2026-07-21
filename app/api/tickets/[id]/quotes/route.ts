@@ -25,7 +25,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const { data: me } = await admin.from('user_profiles').select('role, company_id').eq('id', user.id).single()
   if (me?.role !== 'regional_manager') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { data: ticket } = await admin.from('tickets').select('id, company_id, region_id, store_id, status, title, category, description, operational_impact, priority, job_ref, photo_urls, created_at, resolution_due_at, adjusted_resolution_due_at').eq('id', id).single()
+  const { data: ticket } = await admin.from('tickets').select('id, company_id, region_id, store_id, status, title, category, description, operational_impact, priority, job_ref, photo_urls, info_doc_urls, created_at, resolution_due_at, adjusted_resolution_due_at').eq('id', id).single()
   if (!ticket || ticket.company_id !== me.company_id) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   if (!(await rmOwnsTicket(admin, user.id, ticket))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
@@ -95,6 +95,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     operationalImpact: ticket.operational_impact ?? null, priority: ticket.priority ?? null,
     jobRef: ticket.job_ref ?? null, storeName: store?.name ?? null, photoUrls,
     createdAt: ticket.created_at, dueAt,
+    // RAW stored doc urls — the add-work form round-trips them into its PATCH
+    // append, so they must not be signed here.
+    infoDocUrls: Array.isArray(ticket.info_doc_urls) ? ticket.info_doc_urls : [],
   }
 
   return NextResponse.json({ rows, canReQuote, ticket: ticketDetail })

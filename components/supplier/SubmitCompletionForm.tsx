@@ -76,7 +76,11 @@ export function SubmitCompletionForm({ ticketId, evidenceRequested = false, evid
       for (const f of photos) await addEvidence(ticketId, 'after_photo', await uploadOne(f, 'ticket-photos'))
       const res = await fetch(`/api/tickets/${ticketId}/transition`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'submit_completion', notes: notes || null }) })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Submit failed')
-      router.push(`/supplier/tickets/${ticketId}`); router.refresh()
+      // Mounted in a pop-up (onClose provided, e.g. the Today queue): close it and
+      // refresh in place — don't yank the supplier to the ticket page. Standalone
+      // uses (the /complete page) keep landing on the ticket.
+      if (onClose) { setOpen(false); onClose(); router.refresh() }
+      else { router.push(`/supplier/tickets/${ticketId}`); router.refresh() }
     } catch (e) { setErr(errMsg(e)); setBusy(false) }
   }
 

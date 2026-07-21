@@ -284,14 +284,16 @@ function ReQuoteCta({ ticket, className, company }: { ticket: SupplierTicketRow;
     </>
   )
 }
-// Icon + label + value cell for the store/category/impact strip.
+// Icon + label + value cell for the store/category/impact strip. The value
+// truncates with the full text on hover (the store label itself is de-duplicated
+// server-side, so truncation is the rare case, not the norm).
 function IconStat({ icon, tint, label, value }: { icon: ReactNode; tint: string; label: string; value: string }) {
   return (
     <div className="flex min-w-0 items-center gap-2.5">
       <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${tint}`}>{icon}</span>
       <div className="min-w-0">
         <p className="text-xs text-[var(--text-muted)]">{label}</p>
-        <p className="truncate text-sm font-semibold text-[var(--text)]">{value}</p>
+        <p title={value} className="truncate text-sm font-semibold text-[var(--text)]">{value}</p>
       </div>
     </div>
   )
@@ -392,10 +394,11 @@ function DeclinedQuoteSheet({ ticket, company, onClose }: { ticket: SupplierTick
                   <p className="text-sm text-[var(--text-faint)]">The declined quote is no longer available.</p>
                 )}
 
-                {/* Ticket context — store/category/impact strip, description, photos. */}
+                {/* Ticket context — store/category/impact strip, description, photos.
+                    The store column gets extra width — its label is the longest. */}
                 {ctx && (
                   <div className="space-y-3 rounded-xl bg-[var(--surface-2)] p-4 ring-1 ring-[var(--border)]">
-                    <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="grid gap-3 sm:grid-cols-[1.4fr_1fr_1fr]">
                       <IconStat icon={<StoreIcon size={17} />} tint="bg-blue-500/15 text-blue-600 dark:text-blue-400" label="Store" value={ctx.storeName ?? who} />
                       {ctx.category && <IconStat icon={<Tag size={17} />} tint="bg-violet-500/15 text-violet-600 dark:text-violet-400" label="Category" value={ctx.category} />}
                       {ctx.impact && <IconStat icon={<AlertTriangle size={17} />} tint="bg-red-500/15 text-red-500" label="Impact" value={OPERATIONAL_IMPACT_LABELS[ctx.impact] ?? ctx.impact} />}
@@ -592,15 +595,15 @@ function ViewVoModal({ ticket, company, onClose }: { ticket: SupplierTicketRow; 
             <p className="text-sm text-[var(--text-faint)]">The declined variation order is no longer available.</p>
           )}
 
-          {/* Pop-up convention: small More beside the primary button, menu opens up-right. */}
+          {/* Small More on the LEFT, the larger Re-submit primary on the RIGHT. */}
           <div className="flex items-center gap-2">
+            <MoreMenu up align="left">
+              <MoreActionItem label="Chat with the client" onClick={() => setChatting(true)} />
+              <MoreActionItem label="Raise dispute" tone="danger" onClick={() => setDisputing(true)} />
+            </MoreMenu>
             <button type="button" onClick={() => setResubmitting(true)} className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500">
               <ReceiptText size={16} /> Re-submit VO
             </button>
-            <MoreMenu up align="right">
-              <MoreActionItem label="Raise dispute" tone="danger" onClick={() => setDisputing(true)} />
-              <MoreActionItem label="Chat with the client" onClick={() => setChatting(true)} />
-            </MoreMenu>
           </div>
 
           {resubmitting && (
@@ -877,6 +880,7 @@ function nextStep(t: SupplierTicketRow): string {
   if (['snag', 'snag_assigned'].includes(t.status)) return 'Accept and schedule the snag fix'
   if (['snag_in_progress', 'snag_resolved'].includes(t.status)) return 'Re-upload the COC & POC'
   if (t.status === 'submitted_for_signoff') return 'Awaiting the client sign-off'
+  if (t.status === 'variation_review' && t.awardedToMe) return "Variation order submitted — awaiting the manager's decision"
   if (t.status === 'vo_declined') return 'Variation order declined — re-submit or confirm none'
   if (t.status === 'approved_closeout') {
     if (t.voNoneConfirmed) return "Awaiting the manager's close-out"

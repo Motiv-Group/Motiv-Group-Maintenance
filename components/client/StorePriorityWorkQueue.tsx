@@ -16,6 +16,7 @@ import {
 import type { StoreManagerTicket } from '@/lib/health/data'
 import { Card } from '@/components/exec/ui'
 import { AddInfoModal } from '@/components/client/AddInfoModal'
+import { InfoRequestSheet } from '@/components/client/InfoRequestSheet'
 import { formatDate, formatJobId, humanizeDuration, PRIORITY_LEVEL_LABELS } from '@/lib/utils'
 import { CategoryIcon } from '@/components/client/ticketBadges'
 
@@ -41,12 +42,14 @@ export function StorePriorityWorkQueue({
   storeName,
   generatedAt,
   chatUnread,
+  photoSigned,
 }: {
   tickets: StoreManagerTicket[]
   todayVisits: TodayVisit[]
   storeName: string
   generatedAt: string
   chatUnread?: Record<string, number> // ticketId → unread chat messages (only chats the RM added the SM to)
+  photoSigned?: Record<string, string[]> // ticketId → signed DISPLAY photo urls (info-requested tickets only, for the review sheet)
 }) {
   const [filter, setFilter] = useState<QueueFilter>('all')
   const nowMs = new Date(generatedAt).getTime()
@@ -132,7 +135,7 @@ export function StorePriorityWorkQueue({
         <div className="px-4 py-4 sm:px-5">
           <div className="overflow-hidden rounded-2xl border border-[var(--border)]">
             {rows.length ? rows.map(t => (
-              <QueueRow key={t.id} ticket={t} storeName={storeName} nowMs={nowMs} chatUnread={chatUnread?.[t.id] ?? 0} />
+              <QueueRow key={t.id} ticket={t} storeName={storeName} nowMs={nowMs} chatUnread={chatUnread?.[t.id] ?? 0} photoSigned={photoSigned?.[t.id] ?? []} />
             )) : (
               <div className="px-4 py-10">
                 <EmptyQueue filter={filter} />
@@ -196,7 +199,9 @@ function MetricButton({
   )
 }
 
-function QueueRow({ ticket, storeName, nowMs, chatUnread }: { ticket: StoreManagerTicket; storeName: string; nowMs: number; chatUnread: number }) {
+function QueueRow({ ticket, storeName, nowMs, chatUnread, photoSigned }: { ticket: StoreManagerTicket; storeName: string; nowMs: number; chatUnread: number; photoSigned: string[] }) {
+  // Info-requested review sheet — shown BEFORE the Add-Info form (sheet → button → AddInfoModal).
+  const [review, setReview] = useState(false)
   const dueMs = Math.max(0, new Date(ticket.dueAt).getTime() - nowMs)
   const ticketUrl = `/client/tickets/${ticket.id}`
   const needsInfo = ticket.status === 'info_requested'
@@ -260,7 +265,30 @@ function QueueRow({ ticket, storeName, nowMs, chatUnread }: { ticket: StoreManag
             photoUrls={ticket.photoUrls}
             docUrls={ticket.infoDocUrls}
             requestReason={ticket.infoRequestReason}
-            trigger={open => <button type="button" onClick={open} className={ctaCls}>Add Info <ArrowRight size={15} /></button>}
+            trigger={open => (
+              <>
+                {/* The CTA now opens the REVIEW sheet first; its footer button opens the form. */}
+                <button type="button" onClick={() => setReview(true)} className={ctaCls}>Add Info <ArrowRight size={15} /></button>
+                {review && (
+                  <InfoRequestSheet
+                    ticketId={ticket.id}
+                    jobRef={jobId}
+                    title={ticket.category || ticket.title}
+                    priority={String(ticket.priority)}
+                    storeName={storeName}
+                    category={ticket.category}
+                    operationalImpact={ticket.operationalImpact}
+                    createdAt={ticket.createdAt}
+                    dueAt={ticket.dueAt}
+                    description={ticket.description}
+                    requestReason={ticket.infoRequestReason}
+                    photoUrls={photoSigned}
+                    onClose={() => setReview(false)}
+                    onAddInfo={open}
+                  />
+                )}
+              </>
+            )}
           />
         ) : (
           <Link href={ticketUrl} className={ctaCls}>View Ticket <ArrowRight size={15} /></Link>

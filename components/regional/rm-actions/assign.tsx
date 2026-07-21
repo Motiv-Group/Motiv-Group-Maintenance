@@ -4,12 +4,15 @@
 // "View & Assign" pop-up, and the per-supplier status list.
 import { useState, useMemo, useEffect, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, ChevronDown, ChevronLeft, ChevronRight, Send, Lock } from 'lucide-react'
+import { Search, ChevronDown, ChevronLeft, ChevronRight, Send, Lock, Plus, MessageSquare, Pencil, XCircle } from 'lucide-react'
 import { Stars } from '@/components/ui/Stars'
 import { PhotoThumbs } from '@/components/ui/PhotoThumbs'
 import { formatCurrency, formatDateTime, rmStatusMeta, PRIORITY_LEVEL_LABELS, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
 import { Modal } from './modal'
 import { post, errMsg, PANEL_META, type SupplierChoice } from './shared'
+// Circular with ./ticket (it imports AssignSuppliersButton) — safe: all hoisted
+// function declarations, only referenced at render time.
+import { MoreMenu, MoreActionItem, RmAddWorkForm, RequestInfoButton, RmEditTicketForm, CancelTicketCard } from './ticket'
 import { SheetHeader, SheetSection, InfoRows, SheetFooter } from '@/components/workflow/TicketInfoSheet'
 
 // ── Assign suppliers (button → modal: searchable, sortable, paginated table) ─
@@ -233,7 +236,7 @@ export function AssignSuppliersButton({ ticketId, suppliers, motivSuppliers = []
 // quotes. Ticket detail + quote rows are fetched on open from the RM-only /quotes
 // endpoint; the header renders instantly from the queue row's summary.
 interface ViewAssignSummary { category: string | null; title: string; storeName: string; status: string; priority: string; jobId: string | null }
-interface ViewAssignTicket { title: string; category: string | null; description: string; operationalImpact: string | null; priority: string | null; jobRef: string | null; storeName: string | null; photoUrls: string[]; createdAt?: string | null; dueAt?: string | null }
+interface ViewAssignTicket { title: string; category: string | null; description: string; operationalImpact: string | null; priority: string | null; jobRef: string | null; storeName: string | null; photoUrls: string[]; createdAt?: string | null; dueAt?: string | null; infoDocUrls?: string[] }
 interface ViewAssignQuoteRow { supplierId: string; name: string; kind: 'waiting' | 'received' | 'accepted' | 'declined'; quote: { amount: number } | null }
 
 // Priority pill colours (mirrors the Today queue's priorityBadgeClass).
@@ -255,6 +258,12 @@ export function ViewAssignButton({ ticketId, summary, suppliers, motivSuppliers 
   const [err, setErr] = useState('')
   const [ticket, setTicket] = useState<ViewAssignTicket | null>(null)
   const [rows, setRows] = useState<ViewAssignQuoteRow[]>([])
+  // Secondary ticket actions (behind the footer "More") — same siblings-with-
+  // lifted-state pattern as RmTicketActionBar; `bump` refetches the sheet after
+  // an action modal closes so an edit / extra work shows immediately.
+  const [active, setActive] = useState<'addwork' | 'info' | 'edit' | 'cancel' | null>(null)
+  const [bump, setBump] = useState(0)
+  const done = () => { setActive(null); setBump(b => b + 1) }
 
   useEffect(() => {
     if (!open) return
@@ -267,10 +276,11 @@ export function ViewAssignButton({ ticketId, summary, suppliers, motivSuppliers 
       .catch(() => { if (live) setErr('Could not load the ticket.') })
       .finally(() => { if (live) setLoading(false) })
     return () => { live = false }
-  }, [open, ticketId])
+  }, [open, ticketId, bump])
 
   const meta = rmStatusMeta(summary.status)
   const priorityLabel = PRIORITY_LEVEL_LABELS[String(summary.priority)] ?? 'Medium'
+  const showRequestInfo = ['open', 'info_requested'].includes(summary.status)
 
   return (
     <>
@@ -328,14 +338,35 @@ export function ViewAssignButton({ ticketId, summary, suppliers, motivSuppliers 
                 </>
               )}
 
-            {/* Assign action — bottom-right, opens the searchable supplier picker on top. */}
+            {/* Footer — primary Assign (opens the searchable supplier picker on top)
+                + a small "More" chip with the secondary ticket actions (same modals
+                as the RM next-action bar). Menu opens up-right — bottom-of-pop-up
+                convention. The chip appears once the ticket detail is loaded, since
+                the actions need the fetched fields. */}
             <SheetFooter>
-              <AssignSuppliersButton ticketId={ticketId} suppliers={suppliers} motivSuppliers={motivSuppliers} motivAccess={motivAccess} awaitingById={awaitingById} declinedSupplierIds={declinedSupplierIds}
-                trigger={openPicker => <button onClick={openPicker} className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500">Assign supplier</button>} />
+              <div className="flex w-full items-center gap-2">
+                <AssignSuppliersButton ticketId={ticketId} suppliers={suppliers} motivSuppliers={motivSuppliers} motivAccess={motivAccess} awaitingById={awaitingById} declinedSupplierIds={declinedSupplierIds}
+                  trigger={openPicker => <button onClick={openPicker} className="flex-1 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500">Assign supplier</button>} />
+                {ticket && (
+                  <MoreMenu up align="right">
+                    <MoreActionItem icon={<Plus size={16} />} label="Add extra work" onClick={() => setActive('addwork')} />
+                    {showRequestInfo && <MoreActionItem icon={<MessageSquare size={16} />} label="Request more info" onClick={() => setActive('info')} />}
+                    <MoreActionItem icon={<Pencil size={16} />} label="Edit ticket" onClick={() => setActive('edit')} />
+                    <MoreActionItem icon={<XCircle size={16} />} label="Cancel ticket" tone="danger" onClick={() => setActive('cancel')} />
+                  </MoreMenu>
+                )}
+              </div>
             </SheetFooter>
           </div>
         </Modal>
       )}
+
+      {/* Action modals — mounted only while active (siblings of the sheet, so the
+          outer Modal's space-y can't offset their fixed overlays). */}
+      {active === 'addwork' && ticket && <RmAddWorkForm defaultOpen onClose={done} ticketId={ticketId} description={ticket.description} photoUrls={ticket.photoUrls} docUrls={ticket.infoDocUrls ?? []} title={ticket.title} category={ticket.category ?? 'General'} impact={ticket.operationalImpact ?? 'none'} />}
+      {active === 'info' && <RequestInfoButton defaultOpen onClose={done} ticketId={ticketId} />}
+      {active === 'edit' && ticket && <RmEditTicketForm defaultOpen onClose={done} ticketId={ticketId} initial={{ title: ticket.title, category: ticket.category ?? 'General', impact: ticket.operationalImpact ?? 'none', priority: ticket.priority ?? String(summary.priority), description: ticket.description }} />}
+      {active === 'cancel' && <CancelTicketCard defaultOpen onClose={done} ticketId={ticketId} jobRef={ticket?.jobRef ?? summary.jobId} />}
     </>
   )
 }

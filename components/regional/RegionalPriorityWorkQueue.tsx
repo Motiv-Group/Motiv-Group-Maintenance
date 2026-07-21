@@ -26,7 +26,7 @@ type QueueFilter = 'all' | 'assign' | 'quotes' | 'signoff' | 'sla' | 'snags'
 type SupplierChoice = { id: string; name: string; avgRating?: number; ratingCount?: number; category?: string | null }
 
 // Each KPI card counts (and filters the queue to) one slice of the RM's work.
-const QUOTE_STATUSES = new Set(['quoted', 'quote_revision'])                              // waiting on the RM to approve
+const QUOTE_STATUSES = new Set(['quoted', 'quote_revision', 'variation_review'])          // waiting on the RM to approve (incl. VOs)
 // COC submitted & still in the sign-off pipeline (not completed) — every such
 // ticket lands here EXCEPT active snags, which have their own KPI below.
 const SIGNOFF_STATUSES = new Set(['submitted_for_signoff', 'evidence_requested', 'snag_resolved', 'approved_closeout', 'pending_sign_off'])

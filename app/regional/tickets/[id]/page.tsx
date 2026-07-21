@@ -279,9 +279,10 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
     </div>
   ) : null
 
-  // "Documents" tab — every document (PDF) on the ticket in one place: the approved
-  // quote, the COC & invoice, and any variation-order attachments. Photos have their
-  // own tab; a few docs also stay in their in-context cards (same pattern as photos).
+  // "Documents" tab — every document (PDF) on the ticket in one place: the ticket's
+  // own attachments, the approved quote, the COC & invoice, and any variation-order
+  // attachments. Photos have their own tab; a few docs also stay in their in-context
+  // cards (same pattern as photos).
   const documentsContent = documentLinks.length > 0 ? (
     <ul className="space-y-2">
       {documentLinks.map((d, i) => (
@@ -460,7 +461,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
         {!isTerminal && (canAssign || canCancel) && (
           <RmTicketActionBar ticketId={t.id} status={t.status} canAssign={canAssign} canAssignSupplier={canAssignSupplier} canCancel={canCancel} canEdit={canEdit} hasSupplier={!!t.supplier_id} jobRef={t.job_ref}
             suppliers={supplierList} motivSuppliers={motivSupplierList} motivAccess={motivAccess} declinedSupplierIds={declinedSupplierIds} awaitingById={engagedSupplierIds}
-            description={t.description ?? ''} photoUrls={Array.isArray(t.photo_urls) ? t.photo_urls : []} title={t.title} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} priority={t.priority} />
+            description={t.description ?? ''} photoUrls={Array.isArray(t.photo_urls) ? t.photo_urls : []} docUrls={Array.isArray(t.info_doc_urls) ? t.info_doc_urls : []} title={t.title} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} priority={t.priority} />
         )}
 
         {/* Completion (COC & POC) submitted → inline summary + Approve completion,

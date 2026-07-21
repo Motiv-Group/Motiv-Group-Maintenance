@@ -467,10 +467,15 @@ async function buildRegionalTicketDetail(
   // requests, sent-back submissions, a declined snag-fix date, variation orders).
   const archivedGroups = { archivedDeclinedQuotes, archivedRequestDeclines, closedWaitingRows, supersededSubmissions, declinedSnag, variations: variations ?? [] }
 
-  // "Documents" tab — every document (PDF) on the ticket in one place: the approved
-  // quote, the COC & invoice, and any variation-order attachments.
+  // "Documents" tab — every document (PDF) on the ticket in one place: the ticket's
+  // own attachments (SM added-info docs + RM extra-work docs), the approved quote,
+  // the COC & invoice, and any variation-order attachments.
   type DocLink = { label: string; href: string; itemType: 'quote' | 'coc' | 'invoice' | 'attachment' }
   const documentLinks: DocLink[] = []
+  // Signed into a SEPARATE list — t.info_doc_urls must stay the raw stored values
+  // because the page round-trips it through the add-work PATCH (append).
+  const infoDocLinks = Array.isArray(t.info_doc_urls) ? ((await signList(t.info_doc_urls)) ?? []) : []
+  infoDocLinks.forEach((u, i) => documentLinks.push({ label: `Ticket document ${i + 1}`, href: u, itemType: 'attachment' }))
   for (const q of acceptedQuotes) if (q.fileUrl) documentLinks.push({ label: `${q.supplierName}'s quote`, href: q.fileUrl, itemType: 'quote' })
   for (const s of [acceptedSignoff, ...pendingSignoffs].filter(s => s !== null)) {
     if (s.coc_url) documentLinks.push({ label: 'Certificate of Completion (COC)', href: s.coc_url, itemType: 'coc' })

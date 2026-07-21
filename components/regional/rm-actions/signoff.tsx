@@ -54,7 +54,7 @@ export function RmReviewPanel({ heading, items }: {
 // A tap-to-review summary of the submission (photo/document/note counts) that
 // opens the full "Sign off completion" pop-up (photos · COC · notes +
 // approve/more), plus an "Approve completion" button (same pop-up) and a "More"
-// menu holding Raise snag / Request more evidence / Chat with supplier.
+// menu holding Request more evidence / Chat with supplier / Raise snag.
 export function RmCompletionReview({ ticketId, label, submittedAt, photoCount, docCount, noteCount, beforeUrls, afterUrls, cocUrl, invoiceUrl, notes, supplierName, jobRef, storeName, category }: {
   ticketId: string; label: string; submittedAt: string; photoCount: number; docCount: number; noteCount: number
   beforeUrls: string[]; afterUrls: string[]; cocUrl: string | null; invoiceUrl: string | null; notes: string | null
@@ -86,9 +86,9 @@ export function RmCompletionReview({ ticketId, label, submittedAt, photoCount, d
       <div className="flex items-center gap-2">
         <button type="button" onClick={() => setOpen(true)} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500"><CheckCircle2 size={16} /> Approve completion</button>
         <MoreMenu align="left">
-          <MoreActionItem icon={<MessageSquare size={16} />} label="Chat with supplier" onClick={() => setActive('chat')} />
-          <MoreActionItem icon={<AlertTriangle size={16} />} label="Raise snag" onClick={() => setActive('snag')} />
           <MoreActionItem icon={<MessageSquare size={16} />} label="Request more evidence" onClick={() => setActive('evidence')} />
+          <MoreActionItem icon={<MessageSquare size={16} />} label="Chat with supplier" onClick={() => setActive('chat')} />
+          <MoreActionItem icon={<AlertTriangle size={16} />} label="Raise snag" tone="danger" onClick={() => setActive('snag')} />
         </MoreMenu>
       </div>
 
@@ -200,7 +200,7 @@ function MetaCell({ icon, label, value }: { icon: ReactNode; label: string; valu
 // The rich "Sign off completion" review panel — used in BOTH the RM ticket's
 // Next-action pop-up and the Today-queue sign-off pop-up. Shows the full
 // submission (photos · COC · notes) with "Approve completion" and a "More"
-// menu (Chat with supplier / Request more evidence / Raise a snag).
+// menu (Request more evidence / Chat with supplier / Raise snag).
 // The supplier rating moved to the final close-out (CloseOutButton).
 export function SignoffReviewPanel({ ticketId, s, onDone }: { ticketId: string; s: SignoffSubmission; onDone?: () => void }) {
   const router = useRouter()
@@ -279,9 +279,9 @@ export function SignoffReviewPanel({ ticketId, s, onDone }: { ticketId: string; 
 
       <div className="flex items-center gap-2">
         <MoreMenu up align="left">
-          <MoreActionItem icon={<MessageSquare size={16} />} label="Chat with supplier" onClick={() => setSub('chat')} />
           <MoreActionItem icon={<MessageSquare size={16} />} label="Request more evidence" onClick={() => setSub('evidence')} />
-          <MoreActionItem icon={<AlertTriangle size={16} />} label="Raise a snag" tone="danger" onClick={() => setSub('snag')} />
+          <MoreActionItem icon={<MessageSquare size={16} />} label="Chat with supplier" onClick={() => setSub('chat')} />
+          <MoreActionItem icon={<AlertTriangle size={16} />} label="Raise snag" tone="danger" onClick={() => setSub('snag')} />
         </MoreMenu>
         <button onClick={approve} disabled={busy} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50"><CheckCircle2 size={16} /> {busy ? 'Approving…' : 'Approve completion'}</button>
       </div>

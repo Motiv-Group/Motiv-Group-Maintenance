@@ -39,7 +39,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   let storeName: string | null = null
   if (t.store_id) {
     const { data: store } = await admin.from('stores').select('name, sub_store, branch_code').eq('id', t.store_id).maybeSingle()
-    storeName = store ? [store.branch_code, store.name, store.sub_store].filter(Boolean).join(' · ') || null : null
+    // Skip a sub_store that just repeats the name ("Test Store · Test Store").
+    const sub = store?.sub_store && store.sub_store !== store.name ? store.sub_store : null
+    storeName = store ? [store.branch_code, store.name, sub].filter(Boolean).join(' · ') || null : null
   }
   const photoUrls = Array.isArray(t.photo_urls) ? await signManyUrls(t.photo_urls as string[]) : []
 

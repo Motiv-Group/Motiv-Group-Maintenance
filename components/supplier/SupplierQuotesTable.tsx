@@ -39,8 +39,9 @@ const PRIO: Record<string, { label: string; cls: string; rank: number }> = {
   P4: { label: 'Low',    cls: 'bg-slate-500/15 text-slate-600 dark:text-slate-300',    rank: 3 },
 }
 const rankOf = (p: string) => PRIO[p]?.rank ?? 9
-// Shared badge geometry so the priority + status pills are exactly the same size.
-const BADGE = 'inline-flex items-center justify-center rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide min-w-[96px]'
+// Shared badge geometry — fixed width (fits the longest label, "Re-quote requested")
+// so every stacked chip in the table lines up exactly, desktop and mobile.
+const BADGE = 'inline-flex items-center justify-center rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide w-40 text-center whitespace-nowrap'
 
 const SEL = 'appearance-none rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm pl-9 pr-8 py-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/40'
 
@@ -121,9 +122,9 @@ export function SupplierQuotesTable({ items }: { items: SupplierQuoteItem[] }) {
 
         {/* Desktop table */}
         <div className="hidden overflow-x-auto lg:block">
-          <table className="w-full min-w-[980px] text-sm">
+          <table className="w-full min-w-[1100px] text-sm">
             <thead><tr className="border-b border-[var(--border)] text-left text-[11px] uppercase tracking-wide text-[var(--text-faint)]">
-              <th className="px-4 py-2.5 font-medium">Store / Ticket</th><th className="px-3 font-medium">Request / Submitted</th><th className="px-3 font-medium">Proposed visit</th><th className="px-3 font-medium">Valid until</th><th className="px-3 font-medium">Amount (excl. VAT)</th><th className="px-3 font-medium">Status</th><th className="px-3"></th>
+              <th className="px-4 py-2.5 font-medium">Store / Ticket</th><th className="px-3 font-medium">Category</th><th className="px-3 font-medium">Request / Submitted</th><th className="px-3 font-medium">Proposed visit</th><th className="px-3 font-medium">Valid until</th><th className="px-3 font-medium">Amount (excl. VAT)</th><th className="px-3 font-medium">Status</th><th className="px-3"></th>
             </tr></thead>
             <tbody>
               {pageRows.map(i => (
@@ -133,11 +134,12 @@ export function SupplierQuotesTable({ items }: { items: SupplierQuoteItem[] }) {
                       <CategoryIcon category={i.category ?? i.storeName} priority={i.priority} />
                       <span className="min-w-0">
                         <span className="block truncate font-semibold text-[var(--text)]">{i.storeName}</span>
-                        <span className="block truncate text-[11px] text-[var(--text-faint)]">{[i.jobRef, i.category].filter(Boolean).join(' · ')}</span>
+                        <span className="block truncate text-[11px] text-[var(--text-faint)]">{i.jobRef}</span>
                         {i.description && <span className="block max-w-[280px] truncate text-[11px] text-[var(--text-muted)]">{i.description}</span>}
                       </span>
                     </Link>
                   </td>
+                  <td className="px-3 text-[var(--text)]">{i.category ?? <span className="text-[var(--text-faint)]">–</span>}</td>
                   <td className="px-3"><p className="text-[11px] text-[var(--text-faint)]">{i.kind === 'requested' ? 'Requested' : 'Submitted'}</p><p className="flex items-center gap-1.5 text-[var(--text)]"><Calendar size={13} className="text-[var(--text-faint)]" /> {formatDateTime(i.at)}</p></td>
                   <td className="px-3 text-[var(--text)]">{i.proposedVisit ? <span className="flex items-center gap-1.5"><Calendar size={13} className="text-[var(--text-faint)]" /> {formatDateTime(i.proposedVisit)}</span> : <span className="text-[var(--text-faint)]">–</span>}</td>
                   <td className="px-3 text-[var(--text)]">{i.validUntil ? <span className="flex items-center gap-1.5"><Calendar size={13} className="text-[var(--text-faint)]" /> {formatDate(i.validUntil)}</span> : <span className="text-[var(--text-faint)]">–</span>}</td>
@@ -152,7 +154,7 @@ export function SupplierQuotesTable({ items }: { items: SupplierQuoteItem[] }) {
                   <td className="px-3 text-right"><Link href={`/supplier/tickets/${i.ticketId}`} aria-label="Open ticket" className="inline-flex rounded-lg p-1.5 text-[var(--text-faint)] transition group-hover:text-[var(--text)]"><Chev size={16} /></Link></td>
                 </tr>
               ))}
-              {!pageRows.length && <tr><td colSpan={7} className="py-10 text-center text-[var(--text-faint)]">{items.length ? 'No quotes match your filters.' : 'No quotes yet.'}</td></tr>}
+              {!pageRows.length && <tr><td colSpan={8} className="py-10 text-center text-[var(--text-faint)]">{items.length ? 'No quotes match your filters.' : 'No quotes yet.'}</td></tr>}
             </tbody>
           </table>
         </div>
