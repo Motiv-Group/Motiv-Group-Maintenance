@@ -8,7 +8,7 @@ import { TicketTimeline } from '@/components/ui/TicketTimeline'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import type { TimelineEvent } from '@/lib/ticket-timeline'
 
-type Tab = 'photos' | 'timeline'
+type Tab = 'photos' | 'documents' | 'timeline'
 
 function docName(url: string): string {
   try { return decodeURIComponent(url.split('?')[0].split('/').pop() || 'Document') } catch { return 'Document' }
@@ -26,9 +26,10 @@ export function SmTicketTabs({
   ticketId: string
   timeline: TimelineEvent[]
 }) {
-  const [tab, setTab] = useState<Tab>(photoUrls.length || docUrls.length ? 'photos' : 'timeline')
+  const [tab, setTab] = useState<Tab>(photoUrls.length ? 'photos' : docUrls.length ? 'documents' : 'timeline')
   const tabs: { key: Tab; label: string }[] = [
     { key: 'photos', label: `Photos${photoUrls.length ? ` (${photoUrls.length})` : ''}` },
+    ...(docUrls.length > 0 ? [{ key: 'documents' as Tab, label: `Documents${docUrls.length ? ` (${docUrls.length})` : ''}` }] : []),
     { key: 'timeline', label: 'Timeline' },
   ]
 
@@ -53,22 +54,20 @@ export function SmTicketTabs({
       {tab === 'photos' && (
         <div className="space-y-4">
           {photoUrls.length ? <PhotoThumbs urls={photoUrls} ticketId={ticketId} label="Job photo" /> : <p className="text-sm text-[var(--text-faint)]">No photos attached.</p>}
-          {docUrls.length > 0 && (
-            <div>
-              <p className="mb-1.5 text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Documents</p>
-              <ul className="space-y-1">
-                {docUrls.map((u, i) => (
-                  <li key={i}>
-                    <ViewTrackedLink ticketId={ticketId} itemType="attachment" itemLabel={docName(u)} href={u} className="flex items-center justify-between gap-2 rounded-lg bg-[var(--surface-2)] px-3 py-2 transition hover:bg-[var(--hover)]">
-                      <span className="flex min-w-0 items-center gap-2 text-sm text-[var(--text)]"><FileText size={14} className="shrink-0 text-blue-500" /> <span className="truncate">{docName(u)}</span></span>
-                      <Download size={14} className="shrink-0 text-[var(--text-faint)]" />
-                    </ViewTrackedLink>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
         </div>
+      )}
+
+      {tab === 'documents' && (
+        <ul className="space-y-1">
+          {docUrls.map((u, i) => (
+            <li key={i}>
+              <ViewTrackedLink ticketId={ticketId} itemType="attachment" itemLabel={docName(u)} href={u} className="flex items-center justify-between gap-2 rounded-lg bg-[var(--surface-2)] px-3 py-2 transition hover:bg-[var(--hover)]">
+                <span className="flex min-w-0 items-center gap-2 text-sm text-[var(--text)]"><FileText size={14} className="shrink-0 text-blue-500" /> <span className="truncate">{docName(u)}</span></span>
+                <Download size={14} className="shrink-0 text-[var(--text-faint)]" />
+              </ViewTrackedLink>
+            </li>
+          ))}
+        </ul>
       )}
 
       {tab === 'timeline' && <TicketTimeline items={timeline} />}

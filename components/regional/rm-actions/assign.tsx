@@ -4,9 +4,10 @@
 // "View & Assign" pop-up, and the per-supplier status list.
 import { useState, useMemo, useEffect, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, ChevronDown, ChevronLeft, ChevronRight, Send, Lock, Plus, MessageSquare, Pencil, XCircle } from 'lucide-react'
+import { Search, ChevronDown, ChevronLeft, ChevronRight, Send, Lock, Plus, MessageSquare, Pencil, XCircle, FileText } from 'lucide-react'
 import { Stars } from '@/components/ui/Stars'
 import { PhotoThumbs } from '@/components/ui/PhotoThumbs'
+import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { formatCurrency, formatDateTime, rmStatusMeta, PRIORITY_LEVEL_LABELS, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
 import { Modal } from './modal'
 import { post, errMsg, PANEL_META, type SupplierChoice } from './shared'
@@ -237,8 +238,17 @@ export function AssignSuppliersButton({ ticketId, suppliers, motivSuppliers = []
 // quotes. Ticket detail + quote rows are fetched on open from the RM-only /quotes
 // endpoint; the header renders instantly from the queue row's summary.
 interface ViewAssignSummary { category: string | null; title: string; storeName: string; status: string; priority: string; jobId: string | null }
-interface ViewAssignTicket { title: string; category: string | null; description: string; operationalImpact: string | null; priority: string | null; jobRef: string | null; storeName: string | null; photoUrls: string[]; createdAt?: string | null; dueAt?: string | null; infoDocUrls?: string[] }
+interface ViewAssignTicket { title: string; category: string | null; description: string; operationalImpact: string | null; priority: string | null; jobRef: string | null; storeName: string | null; photoUrls: string[]; createdAt?: string | null; dueAt?: string | null; infoDocUrls?: string[]; infoDocs?: string[] }
 interface ViewAssignQuoteRow { supplierId: string; name: string; kind: 'waiting' | 'received' | 'accepted' | 'declined'; quote: { amount: number } | null }
+
+// Display name for a ticket document — basename of the (signed) URL path with the
+// query stripped; falls back to "Document N" when there's no usable segment.
+function docName(url: string, i: number): string {
+  try {
+    const path = url.split('?')[0]
+    return decodeURIComponent(path.slice(path.lastIndexOf('/') + 1)) || `Document ${i + 1}`
+  } catch { return `Document ${i + 1}` }
+}
 
 // Priority pill colours (mirrors the Today queue's priorityBadgeClass).
 function vaPriorityBadge(p: string): string {
@@ -321,6 +331,23 @@ export function ViewAssignButton({ ticketId, summary, suppliers, motivSuppliers 
                   {ticket.photoUrls.length > 0 && (
                     <SheetSection label="Images">
                       <PhotoThumbs urls={ticket.photoUrls} ticketId={ticketId} label="Job photo" limit={5} />
+                    </SheetSection>
+                  )}
+
+                  {/* Ticket documents (SM info-request response PDFs + RM extra-work
+                      docs) — signed for display; matches the RM Documents-tab rows. */}
+                  {(ticket.infoDocs?.length ?? 0) > 0 && (
+                    <SheetSection label="Documents">
+                      <ul className="space-y-2">
+                        {ticket.infoDocs!.map((u, i) => (
+                          <li key={i}>
+                            <ViewTrackedLink ticketId={ticketId} itemType="attachment" itemLabel={`Ticket document ${i + 1}`} href={u} className="flex items-center gap-2.5 rounded-xl ring-1 ring-[var(--border)] bg-[var(--surface)] px-3.5 py-3 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--hover)]">
+                              <FileText size={16} className="text-blue-600 dark:text-blue-400 shrink-0" />
+                              <span className="truncate">{docName(u, i)}</span>
+                            </ViewTrackedLink>
+                          </li>
+                        ))}
+                      </ul>
                     </SheetSection>
                   )}
 

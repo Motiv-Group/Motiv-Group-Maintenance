@@ -18,18 +18,24 @@ import { AssignSuppliersButton } from './assign'
 // drops a floating menu of secondary/destructive actions. It ONLY renders the menu
 // buttons; the actual modals live as siblings in RmTicketActionBar driven by lifted
 // state, so opening one is instant and doesn't depend on the menu staying mounted.
-export function MoreMenu({ children, fullWidth = false, label = 'More', up = false, align = 'right' }: { children: ReactNode; fullWidth?: boolean; label?: string; up?: boolean; align?: 'left' | 'right' }) {
+// `inline` (opt-in) renders the dropdown as an absolutely-positioned element
+// INSIDE this trigger's relative wrapper instead of portalling to <body> — so it
+// stays within the parent block (e.g. the SM Next-action card) and can't escape
+// into the card below. Every existing caller leaves it false (portalled).
+export function MoreMenu({ children, fullWidth = false, label = 'More', up = false, align = 'right', inline = false }: { children: ReactNode; fullWidth?: boolean; label?: string; up?: boolean; align?: 'left' | 'right'; inline?: boolean }) {
   const [open, setOpen] = useState(false)
   const btnRef = useRef<HTMLButtonElement>(null)
+  const wrapRef = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null)
 
   // The menu is PORTALLED to <body> and fixed-positioned against the trigger, so
   // it's never clipped by a pop-up's `overflow-y-auto` body (which also clips
   // overflow-x, cutting the old absolute menu off to the side). Left is clamped
   // into the viewport so a 256px menu can't run off a phone edge. Scroll/resize
-  // just closes it — simpler and correct vs. live repositioning.
+  // just closes it — simpler and correct vs. live repositioning. Skipped in
+  // `inline` mode, which positions against the wrapper and needs no portal.
   useEffect(() => {
-    if (!open) return
+    if (!open || inline) return
     const place = () => {
       const b = btnRef.current?.getBoundingClientRect()
       if (!b) return
@@ -43,10 +49,20 @@ export function MoreMenu({ children, fullWidth = false, label = 'More', up = fal
     window.addEventListener('scroll', onMove, true)
     window.addEventListener('resize', onMove)
     return () => { window.removeEventListener('scroll', onMove, true); window.removeEventListener('resize', onMove) }
-  }, [open, align, up])
+  }, [open, align, up, inline])
+
+  // Inline mode has no portal + click-catcher, so close on any outside click via
+  // a document listener scoped to while it's open. Clicks on the trigger/panel
+  // are inside the wrapper, so they don't self-close (the panel handles its own).
+  useEffect(() => {
+    if (!open || !inline) return
+    const onDown = (e: MouseEvent) => { if (!wrapRef.current?.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [open, inline])
 
   return (
-    <div className={`relative ${fullWidth ? '' : 'shrink-0'}`}>
+    <div ref={wrapRef} className={`relative ${fullWidth ? '' : 'shrink-0'}`}>
       <button
         ref={btnRef}
         type="button"
@@ -57,7 +73,19 @@ export function MoreMenu({ children, fullWidth = false, label = 'More', up = fal
       >
         {label} <ChevronDown size={15} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
-      {open && pos && createPortal(
+      {/* Inline: absolutely-positioned panel INSIDE the relative wrapper (right/left
+          per `align`, below/above per `up`). Right-aligned + capped width keep it
+          off the 375px viewport edge. Same panel styling as the portalled menu. */}
+      {open && inline && (
+        <div
+          role="menu"
+          onClick={() => setOpen(false)}
+          className={`absolute z-10 ${up ? 'bottom-full mb-2' : 'top-full mt-2'} ${align === 'left' ? 'left-0' : 'right-0'} w-56 max-w-[calc(100vw-2rem)] rounded-xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] shadow-lg shadow-black/20 p-1.5 space-y-0.5`}
+        >
+          {children}
+        </div>
+      )}
+      {open && !inline && pos && createPortal(
         <>
           {/* Outside-click catcher (below the menu, above everything else). */}
           <button aria-hidden tabIndex={-1} onClick={() => setOpen(false)} className="fixed inset-0 z-[110] cursor-default" />
