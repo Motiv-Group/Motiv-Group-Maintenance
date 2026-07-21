@@ -574,6 +574,27 @@ export function VariationReviewButton({ ticketId, trigger }: { ticketId: string;
   )
 }
 
+// ── VO review area (RM ticket page) — "View VO & approve" + a small "More"
+// beside it holding the secondary chat entry. Mirrors CloseOutBar: the chat
+// modal is a sibling driven by lifted state; the primary reuses
+// VariationReviewButton so the pop-up is the SAME one as the Today queue.
+// Client component (a Server Component may not pass the click handlers).
+export function VoReviewBar({ ticketId }: { ticketId: string }) {
+  const [chat, setChat] = useState(false)
+  return (
+    <>
+      <div className="flex items-center gap-2">
+        <MoreMenu up align="left">
+          <MoreActionItem icon={<MessageSquare size={16} />} label="Chat with supplier" onClick={() => setChat(true)} />
+        </MoreMenu>
+        <VariationReviewButton ticketId={ticketId}
+          trigger={open => <button type="button" onClick={open} className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition">View VO &amp; approve</button>} />
+      </div>
+      {chat && <TicketChat ticketId={ticketId} viewerRole="regional_manager" defaultOpen onClose={() => setChat(false)} />}
+    </>
+  )
+}
+
 // ── Approve sign-off ────────────────────────────────────────────
 // The supplier rating moved to the final close-out (CloseOutButton).
 export function ApproveSignoffCard({ ticketId }: { ticketId: string }) {

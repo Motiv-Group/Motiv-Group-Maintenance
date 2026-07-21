@@ -69,7 +69,7 @@ export function DeclineWorkButton({ ticketId, jobRef, title, storeName, dueAt, d
                 <button type="button" onClick={dismiss} aria-label="Close" className="shrink-0 -m-1 rounded-lg p-1.5 text-[var(--text-faint)] transition hover:bg-[var(--hover)] hover:text-[var(--text)]"><X size={20} /></button>
               </div>
               <div className="space-y-0.5 text-sm text-[var(--text-muted)]">
-                <p>The regional manager will be notified and this request may be sent to other suppliers.</p>
+                <p>The client will be notified and this request may be sent to other suppliers.</p>
                 <p>You will no longer be able to submit a quote unless you are invited again.</p>
               </div>
 
@@ -370,7 +370,7 @@ export function SupplierVariationGate({ ticketId, priority, createdAt, variation
 
   // Once confirmed, the VO options are locked and the RM can close out.
   if (noVosConfirmed) {
-    return <div className="rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/30 p-3.5 text-sm text-[var(--text-muted)]">You confirmed there are no further variation orders. Awaiting the manager&apos;s final close-out.</div>
+    return <div className="rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/30 p-3.5 text-sm text-[var(--text-muted)]">You confirmed there are no further variation orders. Awaiting the client&apos;s final close-out.</div>
   }
 
   return (
@@ -380,8 +380,8 @@ export function SupplierVariationGate({ ticketId, priority, createdAt, variation
       {declined && (
         <div className="rounded-xl bg-red-500/10 ring-1 ring-red-500/30 p-3.5 space-y-1">
           <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Variation order declined</p>
-          <p className="text-sm text-[var(--text)]">{declineReason || 'The regional manager declined your variation order.'}</p>
-          <p className="text-sm text-[var(--text-muted)]">Submit a revised variation order, or confirm there are none so the manager can close out.</p>
+          <p className="text-sm text-[var(--text)]">{declineReason || 'The client declined your variation order.'}</p>
+          <p className="text-sm text-[var(--text-muted)]">Submit a revised variation order, or confirm there are none so the client can close out.</p>
         </div>
       )}
       {declined ? (

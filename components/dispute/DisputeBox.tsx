@@ -63,6 +63,10 @@ export interface DisputeRecord {
 const originWord = (o: string) => o === 'snag' ? 'snag' : o === 'variation' ? 'variation order' : o === 'quote_declined' ? 'quote decline' : 'evidence request'
 
 const ROLE_LABEL: Record<string, string> = { supplier: 'Supplier', regional_manager: 'Regional Manager', system: 'System' }
+// The supplier's counterparty is presented as "the client" — RM-authored bubbles
+// read "Client" on the supplier's side only; the RM view keeps the real labels.
+const roleLabelFor = (authorRole: string, viewerRole: string) =>
+  viewerRole === 'supplier' && authorRole === 'regional_manager' ? 'Client' : (ROLE_LABEL[authorRole] ?? authorRole)
 
 // Chat avatar tint + initial per author role.
 const AVATAR_CLS: Record<string, string> = {
@@ -530,7 +534,7 @@ function MessageBubble({ ticketId, m, viewerRole }: { ticketId: string; m: Dispu
       <span className={`mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full text-[11px] font-bold ${AVATAR_CLS[m.author_role] ?? AVATAR_CLS.system}`}>{roleInitial(m.author_role)}</span>
       <div className={`min-w-0 max-w-[82%] rounded-2xl px-3.5 py-2.5 ${mine ? 'rounded-tr-sm bg-blue-600 text-white' : 'rounded-tl-sm bg-[var(--surface)] text-[var(--text)] ring-1 ring-[var(--border)]'}`}>
         <div className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-          <span className={`text-[11px] font-bold ${mine ? 'text-white' : 'text-[var(--text)]'}`}>{mine ? 'You' : (ROLE_LABEL[m.author_role] ?? m.author_role)}{mine ? ` · ${ROLE_LABEL[m.author_role] ?? ''}` : ''}</span>
+          <span className={`text-[11px] font-bold ${mine ? 'text-white' : 'text-[var(--text)]'}`}>{mine ? 'You' : roleLabelFor(m.author_role, viewerRole)}{mine ? ` · ${ROLE_LABEL[m.author_role] ?? ''}` : ''}</span>
           <span className={`text-[10px] ${mine ? 'text-white/60' : 'text-[var(--text-faint)]'}`}>{formatDateTime(m.created_at)}</span>
         </div>
         {reason && (
@@ -604,7 +608,7 @@ export function DisputeThread({ ticketId, dispute, messages, viewerRole, readOnl
           <p className={`text-[11px] font-bold uppercase tracking-wide ${d.outcome === 'withdrawn' ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}`}>
             {d.outcome === 'withdrawn'
               ? (d.origin === 'variation' ? 'Variation-order decline retracted — reopened for review'
-                : d.origin === 'quote_declined' ? 'Quote decline retracted — the manager will revisit the quote'
+                : d.origin === 'quote_declined' ? `Quote decline retracted — ${viewerRole === 'supplier' ? 'the client' : 'the manager'} will revisit the quote`
                 : `${What} retracted — dropped`)
               : (d.origin === 'variation' ? 'Variation-order decline upheld — stays declined'
                 : d.origin === 'quote_declined' ? 'Quote decline upheld — the decision stands'
@@ -638,17 +642,19 @@ export function DisputeThread({ ticketId, dispute, messages, viewerRole, readOnl
 // Pop-up resolve-card copy — the SAME actions as the inline buttons mapped onto
 // two option cards (destructive red = the request stays; constructive emerald =
 // it's dropped/reopened). RM: propose-keep / retract; supplier: propose-drop /
-// withdraw. No new actions — origin only changes the nouns.
+// withdraw. No new actions — origin only changes the nouns. PROPOSE cards end
+// with an agreement note (the other side must confirm); retract/withdraw resolve
+// immediately, so they carry none.
 type ResolveCard = { tone: 'red' | 'emerald'; title: string; body: string; action: string; busyLabel: string }
 function resolveCards(viewerRole: 'supplier' | 'regional_manager', origin: string): ResolveCard[] {
   const what = originWord(origin)
   if (viewerRole === 'regional_manager') {
     const keep: ResolveCard = {
       tone: 'red', action: 'propose', busyLabel: 'Proposing…',
-      ...(origin === 'variation' ? { title: 'Keep variation order declined', body: 'Uphold the original decision. The variation order will remain declined and the dispute will be closed.' }
-        : origin === 'quote_declined' ? { title: 'Keep quote declined', body: 'Uphold the original decision. The quote will remain declined and the dispute will be closed.' }
-        : origin === 'snag' ? { title: 'Keep the snag', body: 'Uphold the snag — the supplier must still correct the work, and the dispute will be closed.' }
-        : { title: 'Keep the evidence request', body: 'Uphold the request — the supplier must still provide the evidence, and the dispute will be closed.' }),
+      ...(origin === 'variation' ? { title: 'Keep variation order declined', body: 'Uphold the original decision. The variation order will remain declined and the dispute will be closed. Both parties must agree.' }
+        : origin === 'quote_declined' ? { title: 'Keep quote declined', body: 'Uphold the original decision. The quote will remain declined and the dispute will be closed. Both parties must agree.' }
+        : origin === 'snag' ? { title: 'Keep the snag', body: 'Uphold the snag — the supplier must still correct the work, and the dispute will be closed. Both parties must agree.' }
+        : { title: 'Keep the evidence request', body: 'Uphold the request — the supplier must still provide the evidence, and the dispute will be closed. Both parties must agree.' }),
     }
     const drop: ResolveCard = {
       tone: 'emerald', action: 'retract', busyLabel: 'Retracting…',
@@ -662,7 +668,7 @@ function resolveCards(viewerRole: 'supplier' | 'regional_manager', origin: strin
   // Supplier: propose-to-resolve first (mirrors the inline button order), then the
   // unilateral concede.
   return [
-    { tone: 'emerald', action: 'propose', busyLabel: 'Proposing…', title: 'Propose to resolve', body: `Propose dropping the ${what}. The client must agree before the dispute closes.` },
+    { tone: 'emerald', action: 'propose', busyLabel: 'Proposing…', title: 'Propose to resolve', body: `Propose dropping the ${what}. Both parties must agree before the dispute closes.` },
     { tone: 'red', action: 'withdraw', busyLabel: 'Withdrawing…', title: 'Withdraw dispute', body: `Accept the ${what} and close the dispute — it stands.` },
   ]
 }

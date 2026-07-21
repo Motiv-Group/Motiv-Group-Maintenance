@@ -29,7 +29,7 @@ async function addEvidence(ticketId: string, kind: string, url: string) {
 export function SubmitCompletionForm({ ticketId, evidenceRequested = false, evidenceRequestReason = null, requireBoth = true, defaultOpen = false, onClose }: { ticketId: string; evidenceRequested?: boolean; evidenceRequestReason?: string | null; requireBoth?: boolean; defaultOpen?: boolean; onClose?: () => void }) {
   const router = useRouter()
   const [open, setOpen] = useState(defaultOpen)
-  // "Chat with manager" (under More on an evidence request) — the job is awarded
+  // "Chat with the client" (under More on an evidence request) — the job is awarded
   // by this stage, so the RM↔supplier chat exists.
   const [chatOpen, setChatOpen] = useState(false)
   const [coc, setCoc] = useState<File | null>(null)
@@ -201,7 +201,7 @@ export function SubmitCompletionForm({ ticketId, evidenceRequested = false, evid
 
       {/* Notes */}
       <div>
-        <label className="block text-sm font-bold text-[var(--text)] mb-1.5">Notes for Regional Manager <span className="font-normal text-[var(--text-muted)]">(optional)</span></label>
+        <label className="block text-sm font-bold text-[var(--text)] mb-1.5">Notes for the client <span className="font-normal text-[var(--text-muted)]">(optional)</span></label>
         <div className="relative">
           <textarea maxLength={NOTES_MAX} className="w-full px-3 py-2.5 pb-7 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)] min-h-[80px] resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500/40" placeholder="Add any additional notes or comments…" value={notes} onChange={e => setNotes(e.target.value)} />
           <span className="pointer-events-none absolute bottom-2.5 right-3 text-[11px] tabular-nums text-[var(--text-faint)]">{notes.length} / {NOTES_MAX}</span>
@@ -211,19 +211,19 @@ export function SubmitCompletionForm({ ticketId, evidenceRequested = false, evid
       {/* What happens next */}
       <div className="flex gap-2 rounded-lg bg-blue-500/10 ring-1 ring-blue-500/30 p-3">
         <Info size={16} className="mt-0.5 shrink-0 text-blue-600 dark:text-blue-400" />
-        <p className="text-sm text-[var(--text)]">The Regional Manager will review this submission and the ticket will be signed off once approved.</p>
+        <p className="text-sm text-[var(--text)]">The client will review this submission and the ticket will be signed off once approved.</p>
       </div>
 
       {err && <p className="text-sm text-red-500">{err}</p>}
 
       {evidenceRequested ? (
         // Evidence-request flavour: Cancel moves under "More" alongside a direct line
-        // to the manager who asked for the evidence.
+        // to the client who asked for the evidence.
         <div className="flex items-center gap-3">
           <button onClick={submit} disabled={busy} className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Submitting…' : <>Review submission <ArrowRight size={16} /></>}</button>
           <MoreMenu up align="right">
             <MoreActionItem icon={<X size={16} />} label="Cancel" onClick={() => { setOpen(false); setErr(''); onClose?.() }} />
-            <MoreActionItem icon={<MessageSquare size={16} />} label="Chat with manager" onClick={() => setChatOpen(true)} />
+            <MoreActionItem icon={<MessageSquare size={16} />} label="Chat with the client" onClick={() => setChatOpen(true)} />
           </MoreMenu>
         </div>
       ) : (
@@ -243,7 +243,7 @@ export function SubmitCompletionForm({ ticketId, evidenceRequested = false, evid
       </div>
     )}
 
-    {/* RM↔supplier chat, opened from More → Chat with manager. */}
+    {/* RM↔supplier chat, opened from More → Chat with the client. */}
     {chatOpen && <TicketChat ticketId={ticketId} viewerRole="supplier" defaultOpen onClose={() => setChatOpen(false)} />}
     </>
   )

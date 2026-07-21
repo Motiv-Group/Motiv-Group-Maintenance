@@ -335,6 +335,10 @@ async function loadRegionPrevHealth(db: DB, companyId: string, now: Date): Promi
   return m
 }
 
+// Narrow a ticket_disputes.outcome (plain text in the DB) to the row-shape union.
+const disputeOutcome = (o: string | null | undefined): 'upheld' | 'withdrawn' | null =>
+  o === 'upheld' || o === 'withdrawn' ? o : null
+
 // ============================================================
 // REGIONAL DASHBOARD (scoped to a regional manager's regions)
 // ============================================================
@@ -357,6 +361,11 @@ export interface RegionalTicketRow {
   disputed: boolean
   // The open dispute's latest message is from the supplier (awaiting the RM's reply).
   disputeUnread: boolean
+  // Most recently RESOLVED dispute's outcome + origin — phrases the post-resolution
+  // next step. Null when none, or while an OPEN dispute exists (open wins — the
+  // disputed flag above covers that).
+  lastDisputeOutcome: 'upheld' | 'withdrawn' | null
+  lastDisputeOrigin: string | null
   // Suppliers already on this ticket (invited/quoted) and those who declined it —
   // so the "Assign supplier" picker (from the Today queue) can grey out the ones
   // already engaged and flag the ones who declined before.
@@ -420,6 +429,11 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
   // Tickets with an OPEN dispute → the badge reads "Dispute" everywhere.
   const { data: openDisputeRows } = ticketIds.length ? await db.from('ticket_disputes').select('ticket_id').eq('status', 'open').in('ticket_id', ticketIds) : { data: null }
   const disputedIds = new Set<string>((openDisputeRows ?? []).map(d => d.ticket_id))
+  // Latest RESOLVED dispute per ticket (newest resolved_at wins) → the queues'
+  // post-resolution next-step copy. Suppressed on rows with an open dispute.
+  const { data: resolvedDisputeRows } = ticketIds.length ? await db.from('ticket_disputes').select('ticket_id, outcome, origin, resolved_at').eq('status', 'resolved').in('ticket_id', ticketIds).order('resolved_at', { ascending: false, nullsFirst: false }) : { data: null }
+  const lastResolvedDispute = new Map<string, { outcome: string | null; origin: string | null }>()
+  for (const d of resolvedDisputeRows ?? []) if (!lastResolvedDispute.has(d.ticket_id)) lastResolvedDispute.set(d.ticket_id, d)
   // Latest dispute-message author per open-dispute ticket → "new message" flag (a
   // message from the supplier awaits the RM's reply).
   const { data: dmsgR } = disputedIds.size ? await db.from('ticket_dispute_messages').select('ticket_id, author_role, created_at').in('ticket_id', [...disputedIds]).order('created_at', { ascending: false }) : { data: null }
@@ -482,6 +496,8 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
       voNoneConfirmed: !!t.vo_none_confirmed_at,
       disputed: disputedIds.has(t.id),
       disputeUnread: disputedIds.has(t.id) && latestDisputeAuthor.get(t.id) === 'supplier',
+      lastDisputeOutcome: disputedIds.has(t.id) ? null : disputeOutcome(lastResolvedDispute.get(t.id)?.outcome),
+      lastDisputeOrigin: disputedIds.has(t.id) ? null : (lastResolvedDispute.get(t.id)?.origin ?? null),
       engagedSupplierIds: engagedByTicket.get(t.id) ?? {},
       declinedSupplierIds: declinedByTicket.get(t.id) ?? [],
       snagScheduledAt: latestSnagByTicket.get(t.id)?.scheduled_at ?? null,
@@ -681,6 +697,11 @@ export interface SupplierTicketRow {
   disputed: boolean
   // The open dispute's latest message is from the RM (awaiting the supplier's reply).
   disputeUnread: boolean
+  // Most recently RESOLVED dispute's outcome + origin — phrases the post-resolution
+  // next step. Null when none, or while an OPEN dispute exists (open wins — the
+  // disputed flag above covers that).
+  lastDisputeOutcome: 'upheld' | 'withdrawn' | null
+  lastDisputeOrigin: string | null
   // Why the manager raised the latest snag (newest rejected signoff's reason).
   snagReason: string | null
   // The manager's "more evidence" request message (only while status = evidence_requested).
@@ -812,6 +833,12 @@ export async function assembleSupplierDashboard(companyId: string | null, suppli
   const ownedIdList = Array.from(ownedIds)
   const { data: openDisputeRows } = ownedIdList.length ? await db.from('ticket_disputes').select('ticket_id').eq('status', 'open').in('ticket_id', ownedIdList) : { data: null }
   const disputedIds = new Set<string>((openDisputeRows ?? []).map(d => d.ticket_id))
+  // Latest RESOLVED dispute per awarded job (newest resolved_at wins; ownedIdList
+  // scoping = cross-supplier isolation) → the queue's post-resolution next-step
+  // copy. Suppressed on rows with an open dispute.
+  const { data: resolvedDisputeRows } = ownedIdList.length ? await db.from('ticket_disputes').select('ticket_id, outcome, origin, resolved_at').eq('status', 'resolved').in('ticket_id', ownedIdList).order('resolved_at', { ascending: false, nullsFirst: false }) : { data: null }
+  const lastResolvedDispute = new Map<string, { outcome: string | null; origin: string | null }>()
+  for (const d of resolvedDisputeRows ?? []) if (!lastResolvedDispute.has(d.ticket_id)) lastResolvedDispute.set(d.ticket_id, d)
   // Approved variation orders per ticket → hasApprovedVo. Ticket-id scoping
   // suffices for isolation: ownedIdList is already this supplier's awarded work
   // (VOs belong to the awarded org), so no supplier_id filter is needed.
@@ -875,6 +902,8 @@ export async function assembleSupplierDashboard(companyId: string | null, suppli
       hasApprovedVo: awardedToMe && approvedVoIds.has(t.id),
       disputed: awardedToMe && disputedIds.has(t.id),
       disputeUnread: awardedToMe && disputedIds.has(t.id) && latestDisputeAuthor.get(t.id) === 'regional_manager',
+      lastDisputeOutcome: awardedToMe && !disputedIds.has(t.id) ? disputeOutcome(lastResolvedDispute.get(t.id)?.outcome) : null,
+      lastDisputeOrigin: awardedToMe && !disputedIds.has(t.id) ? (lastResolvedDispute.get(t.id)?.origin ?? null) : null,
       snagReason: snagReasonByTicket.get(t.id) ?? null,
       evidenceRequestReason: t.status === 'evidence_requested' ? (raw.evidence_request_reason ?? null) : null,
       // Re-quote = re-invited (status 'invited') AND a prior re-quote request stamp.

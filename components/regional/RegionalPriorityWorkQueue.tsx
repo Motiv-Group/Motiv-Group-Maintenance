@@ -307,13 +307,16 @@ function nextStep(t: RegionalTicketRow): string {
     case 'accepted': return 'Approved — awaiting scheduling'
     case 'scheduled': return 'Supplier visit scheduled'
     case 'in_progress': return 'Supplier is working on this ticket'
-    case 'submitted_for_signoff':
+    // A withdrawn dispute drops the snag — the submission is back under review.
+    case 'submitted_for_signoff': return t.lastDisputeOutcome === 'withdrawn' ? 'Snag dropped — review & sign off the work' : 'Review & sign off the work'
     case 'pending_sign_off':
     case 'snag_resolved': return 'Review & sign off the work'
     case 'evidence_requested': return 'Awaiting evidence from the supplier'
-    // Snags: a declined proposal waits on the supplier's new time; a 'proposed'
-    // one waits on the RM's approval; otherwise the corrective work is underway.
-    case 'snag': return t.snagScheduleStatus === 'declined' ? 'Awaiting a new proposed time from the supplier' : 'Snag in progress'
+    // Snags: an upheld dispute waits on the supplier's schedule; a declined
+    // proposal waits on the supplier's new time; a 'proposed' one waits on the
+    // RM's approval; otherwise the corrective work is underway.
+    case 'snag': return t.lastDisputeOutcome === 'upheld' ? "Snag upheld — awaiting the supplier's schedule"
+      : t.snagScheduleStatus === 'declined' ? 'Awaiting a new proposed time from the supplier' : 'Snag in progress'
     case 'snag_assigned': return t.snagScheduleStatus === 'proposed' ? 'Approve the snag schedule time' : 'Snag in progress'
     case 'snag_in_progress': return 'Snag in progress'
     case 'approved_closeout': return t.voNoneConfirmed ? 'Finalise the close-out' : 'Awaiting the supplier to confirm variation orders'

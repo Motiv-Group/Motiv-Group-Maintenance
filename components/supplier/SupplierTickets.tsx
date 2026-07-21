@@ -64,7 +64,7 @@ function supplierNext(t: SupplierTicketRow): string {
   if (['snag', 'snag_assigned'].includes(t.status)) return 'Accept & schedule the snag fix'
   if (['snag_in_progress', 'snag_resolved'].includes(t.status)) return 'Re-upload the COC & POC'
   if (t.status === 'submitted_for_signoff') return 'Awaiting sign-off'
-  if (['approved_closeout', 'vo_declined'].includes(t.status)) return t.voNoneConfirmed ? "Awaiting the manager's close-out" : 'Raise or confirm variation orders'
+  if (['approved_closeout', 'vo_declined'].includes(t.status)) return t.voNoneConfirmed ? "Awaiting the client's close-out" : 'Raise or confirm variation orders'
   if (t.status === 'completed') return 'Completed'
   if (t.declinedForMe) return 'Declined'
   if (t.status === 'cancelled') return 'Cancelled'

@@ -706,10 +706,6 @@ function docBasename(url: string, fallback: string): string {
     return base || fallback
   } catch { return fallback }
 }
-// Whole days until `iso` (negative = past due).
-function daysUntilIso(iso: string): number {
-  return Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000)
-}
 function ViewSnagCta({ ticket, className, company }: { ticket: SupplierTicketRow; className: string; company?: string }) {
   const [open, setOpen] = useState(false)
   return (
@@ -734,8 +730,6 @@ function SnagSheet({ ticket, company, onClose }: { ticket: SupplierTicketRow; co
   }, [ticket.id])
 
   const store = ticket.isIndividual ? 'Individual' : [company, ticket.storeName, ticket.branchCode].filter(Boolean).join(' · ')
-  const due = ticket.nextActionDueAt ?? ticket.dueAt
-  const daysLeft = due ? daysUntilIso(due) : null
   const photos = ctx ? (ctx.afterUrls.length ? ctx.afterUrls : ctx.beforeUrls) : []
   return (
     <Modal onClose={onClose} maxWidth="max-w-3xl">
@@ -747,34 +741,22 @@ function SnagSheet({ ticket, company, onClose }: { ticket: SupplierTicketRow; co
               <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-red-500/15 text-red-500"><AlertCircle size={22} /></span>
               <div className="min-w-0">
                 <h3 className="text-xl font-bold leading-snug text-[var(--text)]">Completion requires correction</h3>
-                <p className="mt-0.5 text-sm text-[var(--text-muted)]">The regional manager raised a snag on your completion. Review the details below, then accept the snag and schedule corrective work — or raise a dispute if you disagree.</p>
+                <p className="mt-0.5 text-sm text-[var(--text-muted)]">The client raised a snag on your completion. Review the details below, then accept the snag and schedule corrective work — or raise a dispute if you disagree.</p>
               </div>
             </div>
             <button type="button" onClick={close} aria-label="Close" className="shrink-0 rounded-lg p-2 ring-1 ring-[var(--border)] text-[var(--text-muted)] transition hover:bg-[var(--hover)]"><X size={16} /></button>
           </div>
 
-          {/* Meta row — raised by · date raised · correction due · ticket. */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:divide-x sm:divide-[var(--border)]">
+          {/* Meta row — raised by · date raised · ticket. */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:divide-x sm:divide-[var(--border)]">
             <div className="flex min-w-0 items-start gap-2">
               <User size={15} className="mt-0.5 shrink-0 text-red-500" />
-              <div className="min-w-0"><p className="text-xs text-[var(--text-muted)]">Raised by</p><p className="truncate text-sm font-semibold text-[var(--text)]">{ticket.isIndividual ? 'Client' : 'Regional Manager'}</p></div>
+              <div className="min-w-0"><p className="text-xs text-[var(--text-muted)]">Raised by</p><p className="truncate text-sm font-semibold text-[var(--text)]">Client</p></div>
             </div>
             {ctx?.reviewedAt && (
               <div className="flex min-w-0 items-start gap-2 sm:pl-3">
                 <Calendar size={15} className="mt-0.5 shrink-0 text-red-500" />
                 <div className="min-w-0"><p className="text-xs text-[var(--text-muted)]">Date raised</p><p className="text-sm font-semibold text-[var(--text)]">{formatDateTime(ctx.reviewedAt)}</p></div>
-              </div>
-            )}
-            {due && (
-              <div className="flex min-w-0 items-start gap-2 sm:pl-3">
-                <Clock size={15} className="mt-0.5 shrink-0 text-red-500" />
-                <div className="min-w-0">
-                  <p className="text-xs text-[var(--text-muted)]">Correction due by</p>
-                  <p className="text-sm font-semibold text-[var(--text)]">{formatDateTime(due)}</p>
-                  {daysLeft != null && (daysLeft > 0
-                    ? <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">{daysLeft} day{daysLeft === 1 ? '' : 's'} remaining</p>
-                    : <p className="text-xs font-semibold text-red-500">Overdue</p>)}
-                </div>
               </div>
             )}
             <div className="flex min-w-0 items-start gap-2 sm:pl-3">
@@ -839,8 +821,11 @@ function SnagSheet({ ticket, company, onClose }: { ticket: SupplierTicketRow; co
               ) : <p className="text-sm text-[var(--text-faint)]">The original submission is no longer available.</p>}
           </div>
 
-          {/* Footer — big accept-and-schedule primary + small More (Raise dispute). */}
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+          {/* Footer — small More on the LEFT, the accept-and-schedule primary on the RIGHT. */}
+          <div className="flex items-center gap-2">
+            <MoreMenu up align="left">
+              <MoreActionItem label="Raise dispute" tone="danger" onClick={() => setDisputing(true)} />
+            </MoreMenu>
             <div className="min-w-0 flex-1">
               <AcceptSnagCard ticketId={ticket.id} priority={String(ticket.priority)} createdAt={ticket.createdAt}
                 trigger={openSched => (
@@ -849,9 +834,6 @@ function SnagSheet({ ticket, company, onClose }: { ticket: SupplierTicketRow; co
                   </button>
                 )} />
             </div>
-            <MoreMenu up align="right">
-              <MoreActionItem label="Raise dispute" tone="danger" onClick={() => setDisputing(true)} />
-            </MoreMenu>
           </div>
 
           {/* Full detail on the ticket. */}
@@ -986,6 +968,10 @@ function nextStep(t: SupplierTicketRow): string {
   if (['accepted', 'scheduled'].includes(t.status)) return 'Mark the job in progress when you start'
   if (t.status === 'in_progress') return 'Upload the COC & POC'
   if (t.status === 'evidence_requested') return 'Add the requested evidence'
+  // Post-dispute phrasing: an upheld snag dispute lands the supplier back on the
+  // snag; a withdrawn one puts the submission back under the client's review.
+  if (t.status === 'snag' && t.lastDisputeOutcome === 'upheld' && t.lastDisputeOrigin === 'snag') return 'Snag upheld — accept and schedule the fix'
+  if (t.status === 'submitted_for_signoff' && t.lastDisputeOutcome === 'withdrawn') return "Dispute resolved in your favour — awaiting the client's review"
   if (t.status === 'snag' && t.snagScheduleStatus === 'declined') return 'Schedule declined — propose a new time'
   if (t.status === 'snag_assigned' && t.snagScheduleStatus === 'proposed') return 'Awaiting schedule approval from the manager'
   if (t.status === 'snag_assigned' && t.snagScheduleStatus === 'agreed') return 'Schedule approved — start the snag fix'

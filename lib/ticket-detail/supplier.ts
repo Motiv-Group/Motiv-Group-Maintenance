@@ -323,7 +323,7 @@ export async function loadSupplierTicketDetail(ticketId: string) {
     if (awarded && ['in_progress', 'snag_in_progress', 'snag_resolved'].includes(t.status)) return { mode: 'act', msg: 'Upload the COC & POC', sub: 'Once the work is done, upload the certificate of completion and proof-of-completion photos below.' }
     if (awarded && t.status === 'submitted_for_signoff') return { mode: 'wait', msg: '', sub: '' }
     if (awarded && t.status === 'variation_review') return { mode: 'wait', msg: '', sub: '' }
-    if (awarded && (t.status === 'approved_closeout' || t.status === 'vo_declined')) return { mode: 'act', msg: 'Raise any variation orders', sub: 'Your COC & POC were approved — raise a variation order for any extra work, or confirm there are none so the manager can close out.' }
+    if (awarded && (t.status === 'approved_closeout' || t.status === 'vo_declined')) return { mode: 'act', msg: 'Raise any variation orders', sub: 'Your COC & POC were approved — raise a variation order for any extra work, or confirm there are none so the client can close out.' }
     return { mode: 'wait', msg: supplierStatusMeta(supplierStatus).label, sub: 'No action needed from you right now.' }
   })()
 

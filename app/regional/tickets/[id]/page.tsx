@@ -9,7 +9,7 @@ import { QuoteSummary } from '@/components/workflow/QuoteSummary'
 import { Card } from '@/components/exec/ui'
 import { WorkflowActions } from '@/components/workflow/WorkflowActions'
 import { RmPipeline } from '@/components/regional/RmPipeline'
-import { RmQuotePanel, RmReviewPanel, ReQuoteButton, AcceptScheduleCard, AcceptSnagScheduleCard, VariationReviewPanel, VoReviewTitle, CloseOutBar, RmTicketActionBar, RmCompletionReview } from '@/components/regional/RmTicketActions'
+import { RmQuotePanel, RmReviewPanel, ReQuoteButton, AcceptScheduleCard, AcceptSnagScheduleCard, VoReviewBar, CloseOutBar, RmTicketActionBar, RmCompletionReview } from '@/components/regional/RmTicketActions'
 import { CompletionFooterNote } from '@/components/workflow/CompletionBody'
 import { ArchiveGroup } from '@/components/ticket/ArchiveGroup'
 import { SignoffCard } from '@/components/ticket/SignoffCard'
@@ -340,28 +340,9 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
   // statuses — the standalone chat entry below then stays hidden.
   const showCloseOut = t.status === 'approved_closeout' || t.status === 'vo_declined'
 
-  // The submitting supplier org (falls back to the awarded supplier on old VOs
-  // that predate ticket_variations.supplier_id).
-  const voSupplierId = pendingVariation?.supplier_id ?? t.supplier_id ?? null
-  const voReviewItems = (t.status === 'variation_review' && pendingVariation) ? [{
-    id: 'vo-review',
-    dot: 'bg-amber-500',
-    title: 'Variation order',
-    subtitle: pendingVariation.amount != null ? formatCurrency(pendingVariation.amount) : 'Extra work',
-    statusLabel: 'Awaiting your approval',
-    statusCls: 'text-amber-700 dark:text-amber-400',
-    modalTitle: <VoReviewTitle />,
-    body: (
-      <VariationReviewPanel ticketId={t.id} vo={{
-        id: pendingVariation.id, description: pendingVariation.description,
-        amount: pendingVariation.amount, amount_incl_vat: pendingVariation.amount_incl_vat,
-        file_urls: Array.isArray(pendingVariation.file_urls) ? pendingVariation.file_urls : [],
-        created_at: pendingVariation.created_at,
-        supplierName: voSupplierId ? (nameById.get(voSupplierId) ?? 'Supplier') : null,
-        jobRef: t.job_ref ?? null, storeName, category: t.category ?? null,
-      }} />
-    ),
-  }] : []
+  // VO review area ("View VO & approve" + its "More" menu) shows while a pending
+  // VO awaits the RM — the standalone chat entry below then stays hidden.
+  const showVoReview = t.status === 'variation_review' && !!pendingVariation
 
   return (
     <div className="space-y-5">
@@ -477,8 +458,10 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
 
         {t.status === 'scheduled' && t.schedule_status === 'proposed' && t.scheduled_at && <AcceptScheduleCard ticketId={t.id} scheduledAt={t.scheduled_at} />}
 
-        {/* Variation order awaiting approval — compact row → pop-up (approve/decline). */}
-        <RmReviewPanel heading="Variation order" items={voReviewItems} />
+        {/* Variation order awaiting approval — "View VO & approve" opens the SAME
+            review pop-up as the Today queue (it fetches the pending VO itself);
+            the chat entry lives in the bar's "More" menu. */}
+        {showVoReview && <VoReviewBar ticketId={t.id} />}
 
         {/* Quote approved / job awarded — a positive callout while we wait for the
             supplier to start (not shown while a proposed visit time needs accepting). */}
@@ -520,11 +503,11 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
         />
 
         {/* Chat with the supplier — only when this block has no "More" menu to fold it
-            into (no action bar, completion review or close-out area); otherwise chat
-            lives inside that menu. Also hidden while a dispute is open — the dispute-
-            resolution panel above carries its own thread, so a second chat entry is
-            clutter. */}
-        {t.supplier_id && !isTerminal && !(canAssign || canCancel) && !reviewSignoff && !showCloseOut && !openDispute && <TicketChatInline ticketId={t.id} viewerRole="regional_manager" unread={chatUnread} />}
+            into (no action bar, completion review, VO review or close-out area);
+            otherwise chat lives inside that menu. Also hidden while a dispute is
+            open — the dispute-resolution panel above carries its own thread, so a
+            second chat entry is clutter. */}
+        {t.supplier_id && !isTerminal && !(canAssign || canCancel) && !reviewSignoff && !showVoReview && !showCloseOut && !openDispute && <TicketChatInline ticketId={t.id} viewerRole="regional_manager" unread={chatUnread} />}
       </Card>
 
       {/* Ticket information — aligned label→value rows, then full-width description. */}

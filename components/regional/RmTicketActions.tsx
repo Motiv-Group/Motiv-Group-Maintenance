@@ -27,6 +27,7 @@ export {
   VariationReviewCard,
   VariationReviewPanel,
   VariationReviewButton,
+  VoReviewBar,
   VoReviewTitle,
   ApproveSignoffCard,
   AcceptSnagScheduleCard,

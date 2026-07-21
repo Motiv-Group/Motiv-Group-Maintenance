@@ -71,7 +71,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
   const completionTab = (liveEvidence || pendingSignoffs.length > 0 || acceptedSignoff)
     ? (<div className="space-y-3">
         {liveEvidence && <SignoffCard s={liveEvidence} ticketId={t.id} icon={ClipboardCheck} chevron title={submissionLabel(liveEvidence)} reason={roundBySignoff.get(liveEvidence.id)?.reason ?? liveEvidence.reject_reason} collapsible defaultOpen />}
-        {pendingSignoffs.map(s => <SignoffCard key={s.id} s={s} ticketId={t.id} icon={ClipboardCheck} chevron title={submissionLabel(s)} collapsible defaultOpen footer={<CompletionFooterNote>You will be notified once the Regional Manager has reviewed and signed off.</CompletionFooterNote>} />)}
+        {pendingSignoffs.map(s => <SignoffCard key={s.id} s={s} ticketId={t.id} icon={ClipboardCheck} chevron title={submissionLabel(s)} collapsible defaultOpen footer={<CompletionFooterNote>You will be notified once the client has reviewed and signed off.</CompletionFooterNote>} />)}
         {acceptedSignoff && <SignoffCard s={acceptedSignoff} ticketId={t.id} icon={ClipboardCheck} chevron title="Completion" collapsible />}
       </div>)
     : null
@@ -267,7 +267,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
             <div className="rounded-lg bg-amber-500/10 ring-1 ring-amber-500/30 p-3 flex items-start gap-2.5">
               <Clock size={16} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
               <div className="space-y-0.5">
-                <p className="text-sm font-bold text-amber-700 dark:text-amber-400">The regional manager requested a re-quote</p>
+                <p className="text-sm font-bold text-amber-700 dark:text-amber-400">The client requested a re-quote</p>
                 {requoteReason && <p className="text-sm font-medium text-red-600 dark:text-red-400"><span className="font-semibold">Reason declined:</span> {requoteReason}</p>}
                 <p className="text-sm text-[var(--text-muted)]">Your previous quote request for this ticket was declined. Please submit a new quote below.</p>
               </div>
@@ -305,7 +305,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
           {awarded && t.status === 'snag_assigned' && (
             latestSnag?.schedule_status === 'agreed'
               ? <StartSnagButton ticketId={t.id} />
-              : <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 flex items-start gap-2.5"><Clock size={16} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" /><p className="text-sm text-[var(--text-muted)]">Snag fix proposed{latestSnag?.scheduled_at ? ` for ${formatDateTime(latestSnag.scheduled_at)}` : ''} — awaiting the manager&apos;s approval before you can start.</p></div>
+              : <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 flex items-start gap-2.5"><Clock size={16} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" /><p className="text-sm text-[var(--text-muted)]">Snag fix proposed{latestSnag?.scheduled_at ? ` for ${formatDateTime(latestSnag.scheduled_at)}` : ''} — awaiting the client&apos;s approval before you can start.</p></div>
           )}
           {awarded && ['in_progress', 'snag_resolved', 'snag_in_progress', 'evidence_requested'].includes(t.status) && (
             <div className="space-y-3">
@@ -330,7 +330,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
           {awarded && t.status === 'variation_review' && (
             <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 flex items-start gap-2.5">
               <Clock size={16} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
-              <p className="text-sm text-[var(--text-muted)]">Variation order submitted — awaiting approval from the regional manager.</p>
+              <p className="text-sm text-[var(--text-muted)]">Variation order submitted — awaiting approval from the client.</p>
             </div>
           )}
           {awarded && t.status === 'submitted_for_signoff' && (
@@ -340,7 +340,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
                 <div className="min-w-0">
                   <p className="text-sm font-bold text-[var(--text)]">Certificate and proof of completion submitted</p>
                   {pendingSignoffs[0]?.created_at && <p className="mt-0.5 text-[13px] text-[var(--text-faint)]">{formatDateTime(pendingSignoffs[0].created_at)}</p>}
-                  <p className="mt-2 text-sm text-[var(--text-muted)]">Awaiting Regional Manager approval.</p>
+                  <p className="mt-2 text-sm text-[var(--text-muted)]">Awaiting the client&apos;s approval.</p>
                   <p className="text-sm text-[var(--text-muted)]">You will be notified when a decision is made.</p>
                 </div>
               </div>
@@ -380,7 +380,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
             <div className="space-y-4">
               <div>
                 <p className="flex items-center gap-2 text-base font-bold text-[var(--text)]"><CheckCircle2 size={18} className="shrink-0 text-emerald-500" /> Quote submitted</p>
-                <p className="mt-1 text-sm text-[var(--text-muted)]">Thank you! Your quote has been submitted to the regional manager for review.</p>
+                <p className="mt-1 text-sm text-[var(--text-muted)]">Thank you! Your quote has been submitted to the client for review.</p>
               </div>
               <div className="flex items-start gap-2.5 rounded-xl bg-blue-500/10 ring-1 ring-blue-500/25 px-3.5 py-3">
                 <Info size={16} className="mt-0.5 shrink-0 text-blue-600 dark:text-blue-400" />
@@ -425,7 +425,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
               <div className="min-w-0">
                 <p className="text-[11px] uppercase tracking-wide font-semibold text-indigo-700 dark:text-indigo-400">Scheduled{t.schedule_status === 'proposed' ? ' · proposed' : ''}</p>
                 <p className="text-sm font-bold text-[var(--text)]">{formatDateTime(t.scheduled_at)}{scheduledTechName ? ` · ${scheduledTechName}` : ''}</p>
-                {t.schedule_status === 'proposed' && <p className="text-[11px] text-amber-600 dark:text-amber-400">Past the SLA window — awaiting the manager&apos;s acceptance.</p>}
+                {t.schedule_status === 'proposed' && <p className="text-[11px] text-amber-600 dark:text-amber-400">Past the SLA window — awaiting the client&apos;s acceptance.</p>}
               </div>
             </div>
           )}
