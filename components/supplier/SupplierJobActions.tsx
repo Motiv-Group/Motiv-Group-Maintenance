@@ -3,7 +3,7 @@
 // Supplier "Schedule job" action — a green button that opens a themed calendar
 // (date + 1-hour time slot, capped by the ticket priority window and operating
 // hours). The Submit COC & POC flow lives on its own page (/complete).
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { Calendar, Wrench, PlayCircle, XCircle, X, FileText, Ticket, MapPin, Info, ArrowRight, Plus, MessageSquare, MessageSquareWarning, CheckCircle2 } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
@@ -69,7 +69,7 @@ export function DeclineWorkButton({ ticketId, jobRef, title, storeName, dueAt, d
                 <button type="button" onClick={dismiss} aria-label="Close" className="shrink-0 -m-1 rounded-lg p-1.5 text-[var(--text-faint)] transition hover:bg-[var(--hover)] hover:text-[var(--text)]"><X size={20} /></button>
               </div>
               <div className="space-y-0.5 text-sm text-[var(--text-muted)]">
-                <p>The regional manager will be notified and this request may be sent to other suppliers.</p>
+                <p>The client will be notified and this request may be sent to other suppliers.</p>
                 <p>You will no longer be able to submit a quote unless you are invited again.</p>
               </div>
 
@@ -179,7 +179,9 @@ export function SupplierQuoteSubmittedActions({ ticketId, canDecline = false, de
 
 // Accept a raised snag and schedule when the corrective work will happen — opens
 // the same themed calendar as Schedule job (no technician step).
-export function AcceptSnagCard({ ticketId, priority, createdAt }: { ticketId: string; priority: string; createdAt: string }) {
+// `trigger` lets a caller supply its own opener (e.g. the View-snag sheet's big
+// primary button); default stays the full-width blue button.
+export function AcceptSnagCard({ ticketId, priority, createdAt, trigger }: { ticketId: string; priority: string; createdAt: string; trigger?: (open: () => void) => ReactNode }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -195,9 +197,11 @@ export function AcceptSnagCard({ ticketId, priority, createdAt }: { ticketId: st
 
   return (
     <>
-      <button onClick={() => setOpen(true)} className="w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition flex items-center justify-center gap-1.5">
-        <Calendar size={15} /> Accept snag &amp; schedule fix
-      </button>
+      {trigger ? trigger(() => setOpen(true)) : (
+        <button onClick={() => setOpen(true)} className="w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition flex items-center justify-center gap-1.5">
+          <Calendar size={15} /> Accept snag &amp; schedule fix
+        </button>
+      )}
       {open && (
         <Modal onClose={() => setOpen(false)} maxWidth="max-w-2xl">
           {close => (
@@ -366,7 +370,7 @@ export function SupplierVariationGate({ ticketId, priority, createdAt, variation
 
   // Once confirmed, the VO options are locked and the RM can close out.
   if (noVosConfirmed) {
-    return <div className="rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/30 p-3.5 text-sm text-[var(--text-muted)]">You confirmed there are no further variation orders. Awaiting the manager&apos;s final close-out.</div>
+    return <div className="rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/30 p-3.5 text-sm text-[var(--text-muted)]">You confirmed there are no further variation orders. Awaiting the client&apos;s final close-out.</div>
   }
 
   return (
@@ -376,8 +380,8 @@ export function SupplierVariationGate({ ticketId, priority, createdAt, variation
       {declined && (
         <div className="rounded-xl bg-red-500/10 ring-1 ring-red-500/30 p-3.5 space-y-1">
           <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Variation order declined</p>
-          <p className="text-sm text-[var(--text)]">{declineReason || 'The regional manager declined your variation order.'}</p>
-          <p className="text-sm text-[var(--text-muted)]">Submit a revised variation order, or confirm there are none so the manager can close out.</p>
+          <p className="text-sm text-[var(--text)]">{declineReason || 'The client declined your variation order.'}</p>
+          <p className="text-sm text-[var(--text-muted)]">Submit a revised variation order, or confirm there are none so the client can close out.</p>
         </div>
       )}
       {declined ? (

@@ -26,7 +26,7 @@ import type { Database } from '@/lib/database.types'
 type Tables = Database['public']['Tables']
 type TicketRow = Tables['tickets']['Row']
 type StoreSel = Pick<Tables['stores']['Row'], 'name' | 'sub_store' | 'region_id' | 'company_id'>
-type QuoteSel = Pick<Tables['quotes']['Row'], 'id' | 'supplier_id' | 'amount' | 'amount_incl_vat' | 'description' | 'file_url' | 'status' | 'valid_until' | 'proposed_schedule_at' | 'decline_reason' | 'created_at' | 'updated_at'>
+type QuoteSel = Pick<Tables['quotes']['Row'], 'id' | 'supplier_id' | 'amount' | 'amount_incl_vat' | 'description' | 'file_url' | 'status' | 'valid_until' | 'proposed_schedule_at' | 'decline_reason' | 'created_at' | 'updated_at' | 'quote_ref'>
 type SupplierSel = Pick<Tables['suppliers']['Row'], 'id' | 'company_name' | 'trade' | 'trades'>
 type SnagSel = Pick<Tables['snags']['Row'], 'description' | 'status' | 'scheduled_at' | 'schedule_status' | 'assigned_at' | 'schedule_agreed_at' | 'schedule_declined_at' | 'schedule_decline_reason' | 'created_at'>
 
@@ -70,11 +70,11 @@ async function buildRegionalTicketDetail(
   userId: string,
 ) {
   const [{ data: quotes }, { data: updates }, { data: signoffs }, { data: suppliers }, { data: variations }, { data: snags }, { data: invites }, { data: ratingRows }, { data: roundRows }] = await Promise.all([
-    admin.from('quotes').select('id, supplier_id, amount, amount_incl_vat, description, file_url, status, valid_until, proposed_schedule_at, decline_reason, created_at, updated_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
+    admin.from('quotes').select('id, supplier_id, amount, amount_incl_vat, description, file_url, status, valid_until, proposed_schedule_at, decline_reason, created_at, updated_at, quote_ref').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('signoffs').select('id, status, before_urls, after_urls, coc_url, invoice_url, notes, reject_reason, reviewed_at, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('suppliers').select('id, company_name, trade, trades').eq('company_id', companyId).eq('active', true).order('company_name'),
-    admin.from('ticket_variations').select('description, amount, warranty, status, reject_reason, reviewed_at, created_at, file_urls').eq('ticket_id', t.id).order('created_at', { ascending: false }),
+    admin.from('ticket_variations').select('id, supplier_id, description, amount, amount_incl_vat, warranty, status, reject_reason, reviewed_at, created_at, file_urls').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('snags').select('description, status, scheduled_at, schedule_status, assigned_at, schedule_agreed_at, schedule_declined_at, schedule_decline_reason, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('ticket_suppliers').select('supplier_id, status, invited_at, responded_at, decline_reason, declined_by, suppliers(company_name)').eq('ticket_id', t.id),
     admin.from('ratings').select('supplier_id, score').eq('company_id', companyId),
@@ -304,6 +304,7 @@ async function buildRegionalTicketDetail(
     // then to the courteous "not selected" note for quotes auto-declined on award.
     validUntil: q.valid_until ?? null, createdAt: q.created_at, declineReason: q.decline_reason ?? declineReasonBy.get(q.supplier_id ?? '') ?? (awarded ? COURTESY_NOTE : null),
     proposedScheduleAt: q.proposed_schedule_at ?? null, declinedAt: q.updated_at ?? null,
+    quoteRef: q.quote_ref ?? null,
   })
   const reviewQuotes = (quotes ?? []).filter(q => q.status === 'pending').map(mapQuote)
   const acceptedQuotes = (quotes ?? []).filter(q => q.status === 'accepted').map(mapQuote)
@@ -342,7 +343,7 @@ async function buildRegionalTicketDetail(
   for (const q of acceptedQuotes) quoteBySupplier.set(q.supplierId, { kind: 'accepted', q })
   for (const q of reviewQuotes) if (!quoteBySupplier.has(q.supplierId)) quoteBySupplier.set(q.supplierId, { kind: 'received', q })
   for (const q of liveDeclinedQuotes) if (!quoteBySupplier.has(q.supplierId)) quoteBySupplier.set(q.supplierId, { kind: 'declined', q })
-  const toPanelQuote = (q: ReturnType<typeof mapQuote>) => ({ id: q.id, amount: q.amount, amountInclVat: q.amountInclVat ?? null, description: q.description ?? null, fileUrl: q.fileUrl ?? null, createdAt: q.createdAt, validUntil: q.validUntil ?? null, proposedScheduleAt: q.proposedScheduleAt ?? null })
+  const toPanelQuote = (q: ReturnType<typeof mapQuote>) => ({ id: q.id, amount: q.amount, amountInclVat: q.amountInclVat ?? null, description: q.description ?? null, fileUrl: q.fileUrl ?? null, createdAt: q.createdAt, validUntil: q.validUntil ?? null, proposedScheduleAt: q.proposedScheduleAt ?? null, quoteRef: q.quoteRef ?? null })
   const quotePanelSeen = new Set<string>()
   const quotePanelRows: { supplierId: string; name: string; requestedAt: string | null; kind: 'waiting' | 'received' | 'accepted' | 'declined'; declineReason: string | null; quote: ReturnType<typeof toPanelQuote> | null }[] = []
   for (const r of requestedRows) {
@@ -431,7 +432,15 @@ async function buildRegionalTicketDetail(
   const timelineItems = buildTicketTimeline({
     createdAt: t.created_at, status: t.status, updatedAt: t.updated_at,
     quoteRequestedAt: t.first_quote_requested_at ?? t.quote_requested_at,
-    quoteRequests: (requestRows ?? []).map(r => ({ at: r.requested_at, supplierName: r.supplier_id ? (nameById.get(r.supplier_id) ?? null) : null })),
+    // Union of the durable log AND the ticket_suppliers invites — belt-and-braces
+    // so an invite always yields a "Quote requested from X" event even when the
+    // durable-log insert silently failed (or was never written, e.g. suppliers
+    // invited at ticket-logging time). Same-round rows share the same timestamp +
+    // name, so the engine's `${at}|${name}` dedup collapses them to one event.
+    quoteRequests: [
+      ...(requestRows ?? []).map(r => ({ at: r.requested_at, supplierName: r.supplier_id ? (nameById.get(r.supplier_id) ?? null) : null })),
+      ...(invites ?? []).filter(inv => inv.invited_at).map(inv => ({ at: inv.invited_at, supplierName: inv.suppliers?.company_name ?? nameById.get(inv.supplier_id) ?? null })),
+    ],
     quoteSubmittedAt: t.quote_submitted_at,
     quoteApprovedAt: t.quote_decision_status === 'approved' ? t.quote_decided_at : null,
     scheduledAt: t.scheduled_at, completedAt: t.completed_at,
@@ -459,10 +468,15 @@ async function buildRegionalTicketDetail(
   // requests, sent-back submissions, a declined snag-fix date, variation orders).
   const archivedGroups = { archivedDeclinedQuotes, archivedRequestDeclines, closedWaitingRows, supersededSubmissions, declinedSnag, variations: variations ?? [] }
 
-  // "Documents" tab — every document (PDF) on the ticket in one place: the approved
-  // quote, the COC & invoice, and any variation-order attachments.
+  // "Documents" tab — every document (PDF) on the ticket in one place: the ticket's
+  // own attachments (SM added-info docs + RM extra-work docs), the approved quote,
+  // the COC & invoice, and any variation-order attachments.
   type DocLink = { label: string; href: string; itemType: 'quote' | 'coc' | 'invoice' | 'attachment' }
   const documentLinks: DocLink[] = []
+  // Signed into a SEPARATE list — t.info_doc_urls must stay the raw stored values
+  // because the page round-trips it through the add-work PATCH (append).
+  const infoDocLinks = Array.isArray(t.info_doc_urls) ? ((await signList(t.info_doc_urls)) ?? []) : []
+  infoDocLinks.forEach((u, i) => documentLinks.push({ label: `Ticket document ${i + 1}`, href: u, itemType: 'attachment' }))
   for (const q of acceptedQuotes) if (q.fileUrl) documentLinks.push({ label: `${q.supplierName}'s quote`, href: q.fileUrl, itemType: 'quote' })
   for (const s of [acceptedSignoff, ...pendingSignoffs].filter(s => s !== null)) {
     if (s.coc_url) documentLinks.push({ label: 'Certificate of Completion (COC)', href: s.coc_url, itemType: 'coc' })

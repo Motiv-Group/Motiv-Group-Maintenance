@@ -17,12 +17,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const { data: me } = await admin.from('user_profiles').select('role, company_id').eq('id', user.id).single()
   if (me?.role !== 'regional_manager') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { data: ticket } = await admin.from('tickets').select('id, company_id, region_id, store_id, status').eq('id', id).single()
+  const { data: ticket } = await admin.from('tickets').select('id, company_id, region_id, store_id, status, job_ref, category, supplier_id').eq('id', id).single()
   if (!ticket || ticket.company_id !== me.company_id) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   if (!(await rmOwnsTicket(admin, user.id, ticket))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { data: signoffs } = await admin.from('signoffs')
-    .select('id, status, before_urls, after_urls, coc_url, invoice_url, notes, created_at')
+    .select('id, status, supplier_id, before_urls, after_urls, coc_url, invoice_url, notes, created_at')
     .eq('ticket_id', id).order('created_at', { ascending: true })
 
   const all = signoffs ?? []
@@ -37,14 +37,22 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const cache = new Map<string, Promise<string | null>>()
   const signOne = (u: string | null | undefined): Promise<string | null> => { if (!u) return Promise.resolve(null); let p = cache.get(u); if (!p) { p = signedUrl(u); cache.set(u, p) } return p }
   const signList = async (list: string[] | null): Promise<string[]> => Array.isArray(list) ? (await Promise.all(list.map(signOne))).filter((x): x is string => !!x) : []
-  const [beforeUrls, afterUrls, cocUrl, invoiceUrl] = await Promise.all([
+  // Pop-up header meta: the submitting supplier org's name + the site name.
+  const supplierOrgId = s.supplier_id ?? ticket.supplier_id ?? null
+  const [beforeUrls, afterUrls, cocUrl, invoiceUrl, supplierRes, storeRes] = await Promise.all([
     signList(s.before_urls), signList(s.after_urls), signOne(s.coc_url), signOne(s.invoice_url),
+    supplierOrgId ? admin.from('suppliers').select('company_name').eq('id', supplierOrgId).maybeSingle() : Promise.resolve({ data: null as { company_name: string } | null }),
+    ticket.store_id ? admin.from('stores').select('name').eq('id', ticket.store_id).maybeSingle() : Promise.resolve({ data: null as { name: string } | null }),
   ])
 
   return NextResponse.json({
     submission: {
       id: s.id, label: `Submission #${noById.get(s.id) ?? '?'}`, createdAt: s.created_at,
       beforeUrls, afterUrls, cocUrl, invoiceUrl, notes: s.notes ?? null,
+      supplierName: supplierRes.data?.company_name ?? 'Supplier',
+      jobRef: ticket.job_ref ?? null,
+      storeName: storeRes.data?.name ?? null,
+      category: ticket.category ?? null,
     },
   })
 }

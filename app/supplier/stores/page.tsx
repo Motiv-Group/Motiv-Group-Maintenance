@@ -155,7 +155,7 @@ export default async function AdminStoresPage() {
                         <span className="truncate min-w-0">{store.rm.full_name ?? store.rm.company_name}</span>
                       </span>
                     ) : (
-                      <span className="text-xs text-[var(--text-faint)] italic">No RM assigned</span>
+                      <span className="text-xs text-[var(--text-faint)] italic">No contact assigned</span>
                     )}
                   </div>
                 </div>

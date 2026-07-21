@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { ClipboardCheck, FileText, Calendar, ChevronDown, Clock, CheckCircle2, Info } from 'lucide-react'
 import { SubmitCompletionForm } from '@/components/supplier/SubmitCompletionForm'
 import { BackLink } from '@/components/ui/BackLink'
+import { MarkTicketSeen } from '@/components/ui/MarkTicketSeen'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { PhotoThumbs } from '@/components/ui/PhotoThumbs'
 import { ChatFab } from '@/components/chat/TicketChat'
@@ -17,7 +18,7 @@ import { ArchiveGroup } from '@/components/ticket/ArchiveGroup'
 import { SignoffCard } from '@/components/ticket/SignoffCard'
 import { MarkInProgressButton, DeclineWorkButton, AcceptSnagCard, SnagRescheduleCta, StartSnagButton, SupplierVariationGate, SupplierQuoteBar, SupplierQuoteSubmittedActions } from '@/components/supplier/SupplierJobActions'
 import { PopupForm } from '@/components/supplier/PopupForm'
-import { RaiseDisputeButton, RaiseDisputeMore, DisputeThread, DisputeControls } from '@/components/dispute/DisputeBox'
+import { RaiseDisputeMore, DisputeThread, DisputeControls } from '@/components/dispute/DisputeBox'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { EditedLine } from '@/components/ui/EditedLine'
 import { TicketTimeline } from '@/components/ui/TicketTimeline'
@@ -63,14 +64,14 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
   const quotesTab = quoteTabRows.length > 0
     ? (<div className="space-y-2">{quoteTabRows.map((q, i, arr) => (
         <QuoteSummary key={q.id} title={arr.length > 1 ? `Quote #${arr.length - i}` : 'Your submitted quote'} status={quoteStatusOf(q.status)} ticketId={t.id} collapsible declineReason={q.decline_reason ?? declineReason}
-          quote={{ id: q.id, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, description: q.description ?? null, fileUrl: q.file_url ?? null, validUntil: q.valid_until ?? null, createdAt: q.created_at }}
+          quote={{ id: q.id, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, description: q.description ?? null, fileUrl: q.file_url ?? null, validUntil: q.valid_until ?? null, createdAt: q.created_at, quoteRef: q.quote_ref ?? null }}
           schedule={q.status === 'accepted' && t.scheduled_at ? { at: t.scheduled_at, proposed: t.schedule_status === 'proposed', technician: scheduledTechName, audience: 'supplier' } : q.proposed_schedule_at ? { at: q.proposed_schedule_at, proposed: true, audience: 'supplier' } : null} />
       ))}</div>)
     : null
   const completionTab = (liveEvidence || pendingSignoffs.length > 0 || acceptedSignoff)
     ? (<div className="space-y-3">
         {liveEvidence && <SignoffCard s={liveEvidence} ticketId={t.id} icon={ClipboardCheck} chevron title={submissionLabel(liveEvidence)} reason={roundBySignoff.get(liveEvidence.id)?.reason ?? liveEvidence.reject_reason} collapsible defaultOpen />}
-        {pendingSignoffs.map(s => <SignoffCard key={s.id} s={s} ticketId={t.id} icon={ClipboardCheck} chevron title={submissionLabel(s)} collapsible defaultOpen footer={<CompletionFooterNote>You will be notified once the Regional Manager has reviewed and signed off.</CompletionFooterNote>} />)}
+        {pendingSignoffs.map(s => <SignoffCard key={s.id} s={s} ticketId={t.id} icon={ClipboardCheck} chevron title={submissionLabel(s)} collapsible defaultOpen footer={<CompletionFooterNote>You will be notified once the client has reviewed and signed off.</CompletionFooterNote>} />)}
         {acceptedSignoff && <SignoffCard s={acceptedSignoff} ticketId={t.id} icon={ClipboardCheck} chevron title="Completion" collapsible />}
       </div>)
     : null
@@ -140,7 +141,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
           <ArchiveGroup label="Quotes">
             {historyDeclinedQuotes.map((q, i, arr) => (
               <QuoteSummary key={q.id} title={arr.length > 1 ? `Quote #${arr.length - i}` : 'Your submitted quote'} status={quoteStatusOf(q.status)} ticketId={t.id} collapsible declineReason={q.decline_reason ?? declineReason}
-                quote={{ id: q.id, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, description: q.description ?? null, fileUrl: q.file_url ?? null, validUntil: q.valid_until ?? null, createdAt: q.created_at, declinedAt: q.updated_at ?? null }} />
+                quote={{ id: q.id, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, description: q.description ?? null, fileUrl: q.file_url ?? null, validUntil: q.valid_until ?? null, createdAt: q.created_at, declinedAt: q.updated_at ?? null, quoteRef: q.quote_ref ?? null }} />
             ))}
           </ArchiveGroup>
         )}
@@ -201,6 +202,9 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
 
   return (
     <div className="space-y-5">
+      {/* Bump this supplier user's "last seen" watermark — a plainly-declined
+          ticket drops off their Today queue once they've opened it here. */}
+      <MarkTicketSeen ticketId={t.id} latestUpdateAt={t.updated_at} />
       <BackLink fallbackHref="/supplier/tickets" label="Back to tickets" />
 
       {/* Header — stepper + ref/title/badges (same layout as the RM ticket detail). */}
@@ -230,18 +234,11 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
       {/* Off the ticket → no "Next step", just why this quote request was declined. */}
       {declinedForMe ? (
         <div className="rounded-2xl bg-red-500/10 ring-1 ring-red-500/40 p-5 space-y-1">
-          {/* "Quote declined" once they'd submitted a quote; otherwise the request itself. */}
+          {/* "Quote declined" once they'd submitted a quote; otherwise the request itself.
+              A decline is final on this side — no dispute entry (any open dispute thread
+              still lives in the Dispute tab). */}
           <p className="text-sm font-bold text-red-700 dark:text-red-400">{latestQuote ? 'Quote declined' : 'Quote request declined'}{declinedByLabel}</p>
           <p className="text-sm text-[var(--text)]">{declineMessage}</p>
-          {/* The client declined this org — they may dispute it (thread-only, no workflow
-              pause; the conversation lives in the Dispute tab once raised). Hidden while
-              their own dispute is already open. */}
-          {declinedBy === 'regional_manager' && !openDispute && (
-            <div className="pt-2">
-              <RaiseDisputeButton ticketId={t.id} origin="quote_declined" label="Dispute the decline"
-                subjectTitle={latestQuote ? 'Quote declined' : 'Quote request declined'} jobRef={t.job_ref} store={disputeStore} />
-            </div>
-          )}
         </div>
       ) : (
         <div className="grid gap-4 lg:grid-cols-2 items-stretch">
@@ -270,7 +267,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
             <div className="rounded-lg bg-amber-500/10 ring-1 ring-amber-500/30 p-3 flex items-start gap-2.5">
               <Clock size={16} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
               <div className="space-y-0.5">
-                <p className="text-sm font-bold text-amber-700 dark:text-amber-400">The regional manager requested a re-quote</p>
+                <p className="text-sm font-bold text-amber-700 dark:text-amber-400">The client requested a re-quote</p>
                 {requoteReason && <p className="text-sm font-medium text-red-600 dark:text-red-400"><span className="font-semibold">Reason declined:</span> {requoteReason}</p>}
                 <p className="text-sm text-[var(--text-muted)]">Your previous quote request for this ticket was declined. Please submit a new quote below.</p>
               </div>
@@ -308,7 +305,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
           {awarded && t.status === 'snag_assigned' && (
             latestSnag?.schedule_status === 'agreed'
               ? <StartSnagButton ticketId={t.id} />
-              : <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 flex items-start gap-2.5"><Clock size={16} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" /><p className="text-sm text-[var(--text-muted)]">Snag fix proposed{latestSnag?.scheduled_at ? ` for ${formatDateTime(latestSnag.scheduled_at)}` : ''} — awaiting the manager&apos;s approval before you can start.</p></div>
+              : <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 flex items-start gap-2.5"><Clock size={16} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" /><p className="text-sm text-[var(--text-muted)]">Snag fix proposed{latestSnag?.scheduled_at ? ` for ${formatDateTime(latestSnag.scheduled_at)}` : ''} — awaiting the client&apos;s approval before you can start.</p></div>
           )}
           {awarded && ['in_progress', 'snag_resolved', 'snag_in_progress', 'evidence_requested'].includes(t.status) && (
             <div className="space-y-3">
@@ -333,7 +330,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
           {awarded && t.status === 'variation_review' && (
             <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 flex items-start gap-2.5">
               <Clock size={16} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
-              <p className="text-sm text-[var(--text-muted)]">Variation order submitted — awaiting approval from the regional manager.</p>
+              <p className="text-sm text-[var(--text-muted)]">Variation order submitted — awaiting approval from the client.</p>
             </div>
           )}
           {awarded && t.status === 'submitted_for_signoff' && (
@@ -343,7 +340,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
                 <div className="min-w-0">
                   <p className="text-sm font-bold text-[var(--text)]">Certificate and proof of completion submitted</p>
                   {pendingSignoffs[0]?.created_at && <p className="mt-0.5 text-[13px] text-[var(--text-faint)]">{formatDateTime(pendingSignoffs[0].created_at)}</p>}
-                  <p className="mt-2 text-sm text-[var(--text-muted)]">Awaiting Regional Manager approval.</p>
+                  <p className="mt-2 text-sm text-[var(--text-muted)]">Awaiting the client&apos;s approval.</p>
                   <p className="text-sm text-[var(--text-muted)]">You will be notified when a decision is made.</p>
                 </div>
               </div>
@@ -383,14 +380,14 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
             <div className="space-y-4">
               <div>
                 <p className="flex items-center gap-2 text-base font-bold text-[var(--text)]"><CheckCircle2 size={18} className="shrink-0 text-emerald-500" /> Quote submitted</p>
-                <p className="mt-1 text-sm text-[var(--text-muted)]">Thank you! Your quote has been submitted to the regional manager for review.</p>
+                <p className="mt-1 text-sm text-[var(--text-muted)]">Thank you! Your quote has been submitted to the client for review.</p>
               </div>
               <div className="flex items-start gap-2.5 rounded-xl bg-blue-500/10 ring-1 ring-blue-500/25 px-3.5 py-3">
                 <Info size={16} className="mt-0.5 shrink-0 text-blue-600 dark:text-blue-400" />
                 <p className="text-sm text-[var(--text-muted)]">You will be notified of any updates on this ticket.</p>
               </div>
               <SupplierQuoteSubmittedActions ticketId={t.id} canDecline={canDecline} decline={declineDetails}
-                quote={latestQuote ? { id: latestQuote.id, amount: latestQuote.amount, amountInclVat: latestQuote.amount_incl_vat ?? null, description: latestQuote.description ?? null, fileUrl: latestQuote.file_url ?? null, validUntil: latestQuote.valid_until ?? null, createdAt: latestQuote.created_at } : null}
+                quote={latestQuote ? { id: latestQuote.id, amount: latestQuote.amount, amountInclVat: latestQuote.amount_incl_vat ?? null, description: latestQuote.description ?? null, fileUrl: latestQuote.file_url ?? null, validUntil: latestQuote.valid_until ?? null, createdAt: latestQuote.created_at, quoteRef: latestQuote.quote_ref ?? null } : null}
                 schedule={latestQuote?.proposed_schedule_at ? { at: latestQuote.proposed_schedule_at, proposed: true, audience: 'supplier' } : null} />
             </div>
           )}
@@ -428,7 +425,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
               <div className="min-w-0">
                 <p className="text-[11px] uppercase tracking-wide font-semibold text-indigo-700 dark:text-indigo-400">Scheduled{t.schedule_status === 'proposed' ? ' · proposed' : ''}</p>
                 <p className="text-sm font-bold text-[var(--text)]">{formatDateTime(t.scheduled_at)}{scheduledTechName ? ` · ${scheduledTechName}` : ''}</p>
-                {t.schedule_status === 'proposed' && <p className="text-[11px] text-amber-600 dark:text-amber-400">Past the SLA window — awaiting the manager&apos;s acceptance.</p>}
+                {t.schedule_status === 'proposed' && <p className="text-[11px] text-amber-600 dark:text-amber-400">Past the SLA window — awaiting the client&apos;s acceptance.</p>}
               </div>
             </div>
           )}

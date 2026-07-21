@@ -26,7 +26,7 @@ export default async function SupplierOverviewPage() {
     pending = supRow?.verification_status !== 'verified' && !supRow?.is_motiv
   }
 
-  const d = await assembleSupplierDashboard(companyId, supplierIds)
+  const d = await assembleSupplierDashboard(companyId, supplierIds, new Date(), userId)
   const perf = d.perf
   // Unread chat counts for the queue rows' chips — awarded jobs only (the chat opens
   // on award), so this never reads beyond this supplier's own tickets.

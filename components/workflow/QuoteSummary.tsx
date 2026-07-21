@@ -18,6 +18,8 @@ export interface QuoteSummaryData {
   createdAt: string
   /** When the quote was declined — shown on a declined card. */
   declinedAt?: string | null
+  /** Human quote reference ("Q-YYYY-NNNNN") — null on pre-migration quotes. */
+  quoteRef?: string | null
 }
 
 const BADGE: Record<QuoteSummaryStatus, { label: string; cls: string }> = {
@@ -114,7 +116,7 @@ export function QuoteSummary({ quote, status, title, schedule, collapsible = fal
 
         {/* Submitted + proposed visit */}
         <div className="space-y-3 sm:border-l sm:border-[var(--border)] sm:pl-5 lg:pr-5">
-          <DateItem label="Submitted" value={formatDateTime(quote.createdAt)} />
+          <DateItem label="Submitted" value={formatDateTime(quote.createdAt)} suffix={quote.quoteRef} />
           {schedule && <DateItem label="Proposed visit" value={formatDateTime(schedule.at)} suffix={schedule.technician} proposed={schedule.proposed} />}
         </div>
 

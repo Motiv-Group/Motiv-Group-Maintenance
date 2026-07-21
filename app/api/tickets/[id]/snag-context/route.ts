@@ -26,17 +26,21 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   // The snagged submission = the latest rejected sign-off.
   const { data: s } = await admin.from('signoffs')
-    .select('id, before_urls, after_urls, coc_url, invoice_url, notes, reject_reason, created_at, reviewed_at')
+    .select('id, before_urls, after_urls, coc_url, invoice_url, notes, reject_reason, created_at, reviewed_at, reviewed_by')
     .eq('ticket_id', id).eq('status', 'rejected').order('reviewed_at', { ascending: false, nullsFirst: false }).limit(1).maybeSingle()
   if (!s) return NextResponse.json({ signoff: null })
 
-  const [beforeUrls, afterUrls, cocUrl, invoiceUrl] = await Promise.all([
+  const [beforeUrls, afterUrls, cocUrl, invoiceUrl, reviewer] = await Promise.all([
     Array.isArray(s.before_urls) ? signManyUrls(s.before_urls as string[]) : Promise.resolve([]),
     Array.isArray(s.after_urls) ? signManyUrls(s.after_urls as string[]) : Promise.resolve([]),
     s.coc_url ? signedUrl(s.coc_url) : Promise.resolve(null),
     s.invoice_url ? signedUrl(s.invoice_url) : Promise.resolve(null),
+    s.reviewed_by ? admin.from('user_profiles').select('full_name').eq('id', s.reviewed_by).maybeSingle().then(r => r.data?.full_name ?? null) : Promise.resolve(null),
   ])
   return NextResponse.json({
-    signoff: { beforeUrls, afterUrls, cocUrl, invoiceUrl, notes: s.notes, rejectReason: s.reject_reason, submittedAt: s.created_at, reviewedAt: s.reviewed_at },
+    signoff: {
+      beforeUrls, afterUrls, cocUrl, invoiceUrl, notes: s.notes, rejectReason: s.reject_reason,
+      submittedAt: s.created_at, reviewedAt: s.reviewed_at, reviewedByName: reviewer,
+    },
   })
 }

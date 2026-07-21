@@ -24,12 +24,16 @@ interface ChatMessage {
 }
 
 const OTHER_LABEL: Record<ChatViewerRole, string> = {
-  supplier: 'regional manager',
+  supplier: 'client',
   regional_manager: 'supplier',
   store_manager: 'team',
   individual: 'supplier',
 }
 const ROLE_LABEL: Record<string, string> = { supplier: 'Supplier', regional_manager: 'Regional Manager', store_manager: 'Store Manager', individual: 'Client' }
+// The supplier's counterparty is presented as "the client" — RM-authored bubbles
+// read "Client" on the supplier's side only; other viewers keep the real labels.
+const roleLabelFor = (authorRole: string, viewerRole: ChatViewerRole) =>
+  viewerRole === 'supplier' && authorRole === 'regional_manager' ? 'Client' : (ROLE_LABEL[authorRole] ?? authorRole)
 const AVATAR_CLS: Record<string, string> = {
   supplier: 'bg-blue-500/20 text-blue-700 dark:text-blue-300',
   regional_manager: 'bg-teal-500/20 text-teal-700 dark:text-teal-300',
@@ -53,7 +57,7 @@ const MAX_CHARS = 2000
 const MAX_FILES = 5
 const POLL_MS = 6000
 
-// Inline full-width outline button ("Chat with the supplier / manager") — the
+// Inline full-width outline button ("Chat with the supplier / client") — the
 // next-action-block chat entry, sitting BELOW the informational callouts. A
 // client wrapper so a Server Component can drop it in without passing a function
 // `trigger` across the RSC boundary.
@@ -172,7 +176,7 @@ function ChatBody({ ticketId, viewerRole, onClose }: { ticketId: string; viewerR
                     <span className={`mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full text-[11px] font-bold ${AVATAR_CLS[m.author_role] ?? AVATAR_CLS.supplier}`}>{roleInitial(m.author_role)}</span>
                     <div className={`min-w-0 max-w-[82%] rounded-2xl px-3.5 py-2.5 ${mine ? 'rounded-tr-sm bg-blue-600 text-white' : 'rounded-tl-sm bg-[var(--surface)] text-[var(--text)] ring-1 ring-[var(--border)]'}`}>
                       <div className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                        <span className={`text-[11px] font-bold ${mine ? 'text-white' : 'text-[var(--text)]'}`}>{mine ? 'You' : (ROLE_LABEL[m.author_role] ?? m.author_role)}</span>
+                        <span className={`text-[11px] font-bold ${mine ? 'text-white' : 'text-[var(--text)]'}`}>{mine ? 'You' : roleLabelFor(m.author_role, viewerRole)}</span>
                         <span className={`text-[10px] ${mine ? 'text-white/60' : 'text-[var(--text-faint)]'}`}>{formatDateTime(m.created_at)}</span>
                       </div>
                       {m.body && <p className="whitespace-pre-line break-words text-sm">{m.body}</p>}

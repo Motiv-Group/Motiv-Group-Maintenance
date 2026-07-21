@@ -5,7 +5,7 @@ import { requireSupplierV3 } from '@/lib/health/guard'
 import { SupplierReviews, type SupplierReview } from '@/components/supplier/SupplierReviews'
 
 const ROLE_LABEL: Record<string, string> = {
-  regional_manager: 'Regional Manager', store_manager: 'Store Manager', client: 'Store Manager',
+  regional_manager: 'Client', store_manager: 'Store Manager', client: 'Store Manager',
   executive: 'Executive', system_admin: 'Admin', individual: 'Customer', supplier: 'Supplier',
 }
 

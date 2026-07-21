@@ -9,7 +9,7 @@ import { QuoteSummary } from '@/components/workflow/QuoteSummary'
 import { Card } from '@/components/exec/ui'
 import { WorkflowActions } from '@/components/workflow/WorkflowActions'
 import { RmPipeline } from '@/components/regional/RmPipeline'
-import { RmQuotePanel, RmReviewPanel, ReQuoteButton, AcceptScheduleCard, AcceptSnagScheduleCard, VariationReviewCard, CloseOutBar, RmTicketActionBar, RmCompletionReview } from '@/components/regional/RmTicketActions'
+import { RmQuotePanel, RmReviewPanel, ReQuoteButton, AcceptScheduleCard, AcceptSnagScheduleCard, VoReviewBar, CloseOutBar, RmTicketActionBar, RmCompletionReview } from '@/components/regional/RmTicketActions'
 import { CompletionFooterNote } from '@/components/workflow/CompletionBody'
 import { ArchiveGroup } from '@/components/ticket/ArchiveGroup'
 import { SignoffCard } from '@/components/ticket/SignoffCard'
@@ -45,6 +45,7 @@ type DeclinedQuote = {
   createdAt: string
   declinedAt: string | null
   declineReason: string | null
+  quoteRef: string | null
 }
 function RmDeclinedQuoteCard({ q, ticketId, canReQuote, open = false }: { q: DeclinedQuote; ticketId: string; canReQuote: boolean; open?: boolean }) {
   return (
@@ -70,6 +71,7 @@ function RmDeclinedQuoteCard({ q, ticketId, canReQuote, open = false }: { q: Dec
           <DetailItem label="Incl. VAT" value={q.amountInclVat ? formatCurrency(q.amountInclVat) : '—'} />
           <DetailItem label="Received" value={formatDateTime(q.createdAt)} />
           <DetailItem label="Declined" value={q.declinedAt ? formatDateTime(q.declinedAt) : '—'} />
+          {q.quoteRef && <DetailItem label="Reference" value={q.quoteRef} />}
         </div>
         {q.description && (
           <div>
@@ -279,9 +281,10 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
     </div>
   ) : null
 
-  // "Documents" tab — every document (PDF) on the ticket in one place: the approved
-  // quote, the COC & invoice, and any variation-order attachments. Photos have their
-  // own tab; a few docs also stay in their in-context cards (same pattern as photos).
+  // "Documents" tab — every document (PDF) on the ticket in one place: the ticket's
+  // own attachments, the approved quote, the COC & invoice, and any variation-order
+  // attachments. Photos have their own tab; a few docs also stay in their in-context
+  // cards (same pattern as photos).
   const documentsContent = documentLinks.length > 0 ? (
     <ul className="space-y-2">
       {documentLinks.map((d, i) => (
@@ -304,7 +307,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
         const isApproved = acceptedQuoteIds.has(q.id)
         return (
           <QuoteSummary key={q.id} title={q.supplierName ?? 'Supplier'} status={isApproved ? 'accepted' : 'pending'} collapsible ticketId={t.id}
-            quote={{ id: q.id, supplierName: q.supplierName, amount: q.amount, amountInclVat: q.amountInclVat ?? null, description: q.description ?? null, fileUrl: q.fileUrl ?? null, validUntil: q.validUntil ?? null, createdAt: q.createdAt }}
+            quote={{ id: q.id, supplierName: q.supplierName, amount: q.amount, amountInclVat: q.amountInclVat ?? null, description: q.description ?? null, fileUrl: q.fileUrl ?? null, validUntil: q.validUntil ?? null, createdAt: q.createdAt, quoteRef: q.quoteRef ?? null }}
             schedule={q.proposedScheduleAt ? { at: q.proposedScheduleAt, proposed: true, audience: 'rm' } : null} />
         )
       })}
@@ -337,32 +340,9 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
   // statuses — the standalone chat entry below then stays hidden.
   const showCloseOut = t.status === 'approved_closeout' || t.status === 'vo_declined'
 
-  const voReviewItems = (t.status === 'variation_review' && pendingVariation) ? [{
-    id: 'vo-review',
-    dot: 'bg-amber-500',
-    title: 'Variation order',
-    subtitle: pendingVariation.amount != null ? formatCurrency(pendingVariation.amount) : 'Extra work',
-    statusLabel: 'Awaiting your approval',
-    statusCls: 'text-amber-700 dark:text-amber-400',
-    modalTitle: 'Variation order — review',
-    body: (
-      <div className="space-y-4">
-        <div className="rounded-xl ring-1 ring-[var(--border)] p-4 space-y-2">
-          <p className="text-sm text-[var(--text)] whitespace-pre-line">{pendingVariation.description}</p>
-          {pendingVariation.warranty && <p className="text-[13px] text-[var(--text-muted)]"><span className="font-medium text-[var(--text)]">Warranty:</span> {pendingVariation.warranty}</p>}
-          {pendingVariation.amount != null && <p className="text-[13px] text-[var(--text-muted)]"><span className="font-medium text-[var(--text)]">Amount:</span> {formatCurrency(pendingVariation.amount)}</p>}
-          {Array.isArray(pendingVariation.file_urls) && pendingVariation.file_urls.length > 0 && (
-            <div className="flex flex-wrap gap-x-3 gap-y-1 pt-1">
-              {pendingVariation.file_urls.map((u: string, j: number) => (
-                <ViewTrackedLink key={j} ticketId={t.id} itemType="attachment" itemLabel={`Variation order attachment ${j + 1}`} href={u} className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"><FileText size={14} /> Attachment {j + 1}</ViewTrackedLink>
-              ))}
-            </div>
-          )}
-        </div>
-        <VariationReviewCard ticketId={t.id} />
-      </div>
-    ),
-  }] : []
+  // VO review area ("View VO & approve" + its "More" menu) shows while a pending
+  // VO awaits the RM — the standalone chat entry below then stays hidden.
+  const showVoReview = t.status === 'variation_review' && !!pendingVariation
 
   return (
     <div className="space-y-5">
@@ -460,7 +440,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
         {!isTerminal && (canAssign || canCancel) && (
           <RmTicketActionBar ticketId={t.id} status={t.status} canAssign={canAssign} canAssignSupplier={canAssignSupplier} canCancel={canCancel} canEdit={canEdit} hasSupplier={!!t.supplier_id} jobRef={t.job_ref}
             suppliers={supplierList} motivSuppliers={motivSupplierList} motivAccess={motivAccess} declinedSupplierIds={declinedSupplierIds} awaitingById={engagedSupplierIds}
-            description={t.description ?? ''} photoUrls={Array.isArray(t.photo_urls) ? t.photo_urls : []} title={t.title} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} priority={t.priority} />
+            description={t.description ?? ''} photoUrls={Array.isArray(t.photo_urls) ? t.photo_urls : []} docUrls={Array.isArray(t.info_doc_urls) ? t.info_doc_urls : []} title={t.title} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} priority={t.priority} />
         )}
 
         {/* Completion (COC & POC) submitted → inline summary + Approve completion,
@@ -472,13 +452,16 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
             docCount={(reviewSignoff.coc_url ? 1 : 0) + (reviewSignoff.invoice_url ? 1 : 0)}
             noteCount={reviewSignoff.notes && String(reviewSignoff.notes).trim() ? 1 : 0}
             beforeUrls={reviewSignoff.before_urls ?? []} afterUrls={reviewSignoff.after_urls ?? []}
-            cocUrl={reviewSignoff.coc_url ?? null} invoiceUrl={reviewSignoff.invoice_url ?? null} notes={reviewSignoff.notes ?? null} />
+            cocUrl={reviewSignoff.coc_url ?? null} invoiceUrl={reviewSignoff.invoice_url ?? null} notes={reviewSignoff.notes ?? null}
+            supplierName={nameById.get(t.supplier_id ?? '') ?? 'Supplier'} jobRef={t.job_ref ?? null} storeName={storeName ?? null} category={t.category ?? null} />
         )}
 
         {t.status === 'scheduled' && t.schedule_status === 'proposed' && t.scheduled_at && <AcceptScheduleCard ticketId={t.id} scheduledAt={t.scheduled_at} />}
 
-        {/* Variation order awaiting approval — compact row → pop-up (approve/decline). */}
-        <RmReviewPanel heading="Variation order" items={voReviewItems} />
+        {/* Variation order awaiting approval — "View VO & approve" opens the SAME
+            review pop-up as the Today queue (it fetches the pending VO itself);
+            the chat entry lives in the bar's "More" menu. */}
+        {showVoReview && <VoReviewBar ticketId={t.id} />}
 
         {/* Quote approved / job awarded — a positive callout while we wait for the
             supplier to start (not shown while a proposed visit time needs accepting). */}
@@ -520,11 +503,11 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
         />
 
         {/* Chat with the supplier — only when this block has no "More" menu to fold it
-            into (no action bar, completion review or close-out area); otherwise chat
-            lives inside that menu. Also hidden while a dispute is open — the dispute-
-            resolution panel above carries its own thread, so a second chat entry is
-            clutter. */}
-        {t.supplier_id && !isTerminal && !(canAssign || canCancel) && !reviewSignoff && !showCloseOut && !openDispute && <TicketChatInline ticketId={t.id} viewerRole="regional_manager" unread={chatUnread} />}
+            into (no action bar, completion review, VO review or close-out area);
+            otherwise chat lives inside that menu. Also hidden while a dispute is
+            open — the dispute-resolution panel above carries its own thread, so a
+            second chat entry is clutter. */}
+        {t.supplier_id && !isTerminal && !(canAssign || canCancel) && !reviewSignoff && !showVoReview && !showCloseOut && !openDispute && <TicketChatInline ticketId={t.id} viewerRole="regional_manager" unread={chatUnread} />}
       </Card>
 
       {/* Ticket information — aligned label→value rows, then full-width description. */}
@@ -636,7 +619,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
       <RmTicketTabs ticketId={t.id} photoGroups={photoGroups} timeline={timelineItems} documents={documentsContent} quotes={quotesContent} completion={completionContent} variations={variationsContent} dispute={disputeContent} history={historyContent}
         defaultTab={
           openDispute ? 'dispute'
-          : completionContent && ['submitted_for_signoff', 'approved_closeout', 'completed'].includes(t.status) ? 'completion'
+          : completionContent && ['submitted_for_signoff', 'approved_closeout', 'completed', 'snag', 'snag_assigned', 'snag_in_progress', 'snag_resolved'].includes(t.status) ? 'completion'
           : quotesContent && (t.status === 'quoted' || reviewQuotes.length > 0) ? 'quotes'
           : undefined
         } />

@@ -260,7 +260,7 @@ export function SchedulePicker({ priority, createdAt, onConfirm, onCancel, busy 
 
           <div className="flex items-start gap-2.5 rounded-lg bg-blue-500/10 ring-1 ring-blue-500/25 px-3.5 py-2.5">
             <Info size={15} className="mt-0.5 shrink-0 text-blue-600 dark:text-blue-400" />
-            <p className="text-sm text-[var(--text-muted)]">A time past the deadline will be sent to the manager to accept.</p>
+            <p className="text-sm text-[var(--text-muted)]">A time past the deadline will be sent to the client to accept.</p>
           </div>
 
           <button type="button" onClick={() => setUseCustom(false)} className="flex items-center gap-1.5 text-sm text-[var(--text-muted)] transition hover:text-[var(--text)]"><ArrowLeft size={15} /> Back to suggested slots</button>

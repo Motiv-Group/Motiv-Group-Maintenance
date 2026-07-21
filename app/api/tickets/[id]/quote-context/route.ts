@@ -24,68 +24,80 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   if (!myOrgs.size) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { data: t } = await admin.from('tickets')
-    .select('id, title, category, description, operational_impact, priority, store_id, photo_urls, job_ref, supplier_id')
+    .select('id, title, category, description, operational_impact, priority, store_id, photo_urls, job_ref, supplier_id, quote_requested_at')
     .eq('id', id).single()
   if (!t) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   // Access: awarded to one of my orgs, or one of my orgs is invited on this ticket.
-  let ok = !!t.supplier_id && myOrgs.has(t.supplier_id)
-  if (!ok) {
-    const { data: invites } = await admin.from('ticket_suppliers').select('supplier_id').eq('ticket_id', id)
-    ok = (invites ?? []).some(i => i.supplier_id && myOrgs.has(i.supplier_id))
-  }
+  // The invites also carry when THIS org was asked to quote (shown on the sheet).
+  const { data: invites } = await admin.from('ticket_suppliers').select('supplier_id, invited_at').eq('ticket_id', id)
+  const myInvite = (invites ?? []).find(i => i.supplier_id && myOrgs.has(i.supplier_id))
+  const ok = (!!t.supplier_id && myOrgs.has(t.supplier_id)) || !!myInvite
   if (!ok) return NextResponse.json({ error: 'Not your ticket' }, { status: 403 })
+  const quoteRequestedAt = myInvite?.invited_at ?? t.quote_requested_at ?? null
 
   let storeName: string | null = null
   if (t.store_id) {
     const { data: store } = await admin.from('stores').select('name, sub_store, branch_code').eq('id', t.store_id).maybeSingle()
-    storeName = store ? [store.branch_code, store.name, store.sub_store].filter(Boolean).join(' · ') || null : null
+    // Skip a sub_store that just repeats the name ("Test Store · Test Store").
+    const sub = store?.sub_store && store.sub_store !== store.name ? store.sub_store : null
+    storeName = store ? [store.branch_code, store.name, sub].filter(Boolean).join(' · ') || null : null
   }
   const photoUrls = Array.isArray(t.photo_urls) ? await signManyUrls(t.photo_urls as string[]) : []
 
   // The caller's own latest DECLINED quote on this ticket (for the re-quote flow —
   // shows what was declined + why alongside the job). Restricted to their orgs.
   const { data: declined } = await admin.from('quotes')
-    .select('amount, amount_incl_vat, description, file_url, decline_reason, created_at, valid_until')
+    .select('id, amount, amount_incl_vat, description, file_url, decline_reason, created_at, updated_at, valid_until, warranty')
     .eq('ticket_id', id).eq('status', 'declined').in('supplier_id', [...myOrgs])
     .order('created_at', { ascending: false }).limit(1).maybeSingle()
+  // quote_ref is fetched separately so the sheet still works if the 20260723
+  // migration isn't applied yet (query fails → null, the reference row hides).
+  let quoteRef: string | null = null
+  if (declined) {
+    const { data: refRow } = await admin.from('quotes').select('quote_ref').eq('id', declined.id).maybeSingle()
+    quoteRef = (refRow as { quote_ref?: string | null } | null)?.quote_ref ?? null
+  }
   const declinedQuote = declined ? {
     amount: declined.amount, amountInclVat: declined.amount_incl_vat ?? null,
     description: declined.description ?? null, fileUrl: declined.file_url ? await signedUrl(declined.file_url) : null,
     declineReason: declined.decline_reason ?? null, validUntil: declined.valid_until ?? null, createdAt: declined.created_at,
+    // The decline stamps updated_at → "Decided on".
+    declinedAt: declined.updated_at ?? null, warranty: declined.warranty ?? null, quoteRef,
   } : null
 
   // Variation orders belong to the AWARDED org only — an invited-but-not-awarded
   // org must never see another supplier's VO trail (cross-supplier isolation), so
   // both keys are gated on tickets.supplier_id being one of the caller's orgs.
   const awarded = !!t.supplier_id && myOrgs.has(t.supplier_id)
-  let declinedVariation: { amount: number | null; description: string | null; rejectReason: string | null; fileUrls: string[]; createdAt: string } | null = null
-  let approvedVariations: Array<{ amount: number | null; description: string | null; createdAt: string }> = []
+  let declinedVariation: { amount: number | null; amountInclVat: number | null; description: string | null; rejectReason: string | null; fileUrls: string[]; createdAt: string; reviewedAt: string | null } | null = null
+  let approvedVariations: Array<{ amount: number | null; amountInclVat: number | null; description: string | null; createdAt: string }> = []
   if (awarded) {
     // The latest REJECTED VO (for the re-submit flow — what was rejected + why).
     const { data: rejectedVo } = await admin.from('ticket_variations')
-      .select('amount, description, reject_reason, file_urls, created_at')
+      .select('amount, amount_incl_vat, description, reject_reason, file_urls, created_at, reviewed_at')
       .eq('ticket_id', id).eq('status', 'rejected')
       .order('created_at', { ascending: false }).limit(1).maybeSingle()
     declinedVariation = rejectedVo ? {
-      amount: rejectedVo.amount ?? null, description: rejectedVo.description ?? null,
+      amount: rejectedVo.amount ?? null, amountInclVat: rejectedVo.amount_incl_vat ?? null,
+      description: rejectedVo.description ?? null,
       rejectReason: rejectedVo.reject_reason ?? null,
       fileUrls: Array.isArray(rejectedVo.file_urls) ? await signManyUrls(rejectedVo.file_urls as string[]) : [],
-      createdAt: rejectedVo.created_at,
+      createdAt: rejectedVo.created_at, reviewedAt: rejectedVo.reviewed_at ?? null,
     } : null
     // All APPROVED VOs, oldest first (amounts already added to the job's value).
     const { data: approvedVos } = await admin.from('ticket_variations')
-      .select('amount, description, created_at')
+      .select('amount, amount_incl_vat, description, created_at')
       .eq('ticket_id', id).eq('status', 'approved')
       .order('created_at', { ascending: true })
-    approvedVariations = (approvedVos ?? []).map(v => ({ amount: v.amount ?? null, description: v.description ?? null, createdAt: v.created_at }))
+    approvedVariations = (approvedVos ?? []).map(v => ({ amount: v.amount ?? null, amountInclVat: v.amount_incl_vat ?? null, description: v.description ?? null, createdAt: v.created_at }))
   }
 
   return NextResponse.json({
     ticket: {
       title: t.title, category: t.category, description: t.description,
       impact: t.operational_impact, priority: t.priority, jobRef: t.job_ref,
-      storeName, photoUrls,
+      storeName, photoUrls, quoteRequestedAt,
     },
     declinedQuote,
     declinedVariation,

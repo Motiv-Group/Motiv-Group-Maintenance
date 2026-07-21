@@ -160,7 +160,7 @@ export async function GET(_req: Request, props: { params: Promise<{ id: string }
   const { data: prof } = await admin.from('user_profiles').select('role, company_id').eq('id', user.id).single()
   const role = prof?.role
   const isIndividual = role === 'individual'
-  const { data: ticket } = await admin.from('tickets').select('id, company_id, region_id, store_id, supplier_id, created_by').eq('id', id).single()
+  const { data: ticket } = await admin.from('tickets').select('id, company_id, region_id, store_id, supplier_id, created_by, job_ref').eq('id', id).single()
   if (!ticket) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   let ok = false
@@ -201,8 +201,27 @@ export async function GET(_req: Request, props: { params: Promise<{ id: string }
     ...m, evidence_urls: Array.isArray(m.evidence_urls) ? await signManyUrls(m.evidence_urls as string[]) : [],
   })))
 
+  // Header context for the conversation pop-up — the disputing org's name, the
+  // job ref + store, and (variation disputes) the disputed VO's amount. Null-safe:
+  // legacy disputes carry no supplier_id (→ the awarded org), standalone tickets
+  // have no store, and old VOs have no amount_incl_vat. The org is the DISPUTE's
+  // own org, so a supplier only ever sees their own name (cross-supplier isolation
+  // holds — the dispute itself was already scoped above).
+  const orgId = dispute.supplier_id ?? ticket.supplier_id
+  const { data: org } = orgId ? await admin.from('suppliers').select('company_name').eq('id', orgId).maybeSingle() : { data: null }
+  const { data: storeRow } = ticket.store_id ? await admin.from('stores').select('name').eq('id', ticket.store_id).maybeSingle() : { data: null }
+  let voAmount: number | null = null
+  let voAmountInclVat: number | null = null
+  if (dispute.origin === 'variation') {
+    // The disputed VO is the latest DECLINED one (mirrors the resolve/reopen logic).
+    const { data: vo } = await admin.from('ticket_variations').select('amount, amount_incl_vat').eq('ticket_id', id).eq('status', 'rejected').order('created_at', { ascending: false }).limit(1).maybeSingle()
+    voAmount = vo?.amount ?? null
+    voAmountInclVat = vo?.amount_incl_vat ?? null
+  }
+  const context = { supplierName: org?.company_name ?? null, jobRef: ticket.job_ref ?? null, store: storeRow?.name ?? null, amount: voAmount, amountInclVat: voAmountInclVat }
+
   const what = originWord(dispute.origin)
-  return NextResponse.json({ dispute, messages, viewerRole, subject: `${what[0].toUpperCase()}${what.slice(1)}` })
+  return NextResponse.json({ dispute, messages, viewerRole, subject: `${what[0].toUpperCase()}${what.slice(1)}`, context })
 }
 
 export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
