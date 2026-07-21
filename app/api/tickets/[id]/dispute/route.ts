@@ -10,11 +10,13 @@ import { signManyUrls } from '@/lib/storage'
 import { stampFreshness } from '@/lib/workflow'
 import type { Database } from '@/lib/database.types'
 
+// Message/note text is capped server-side (the composer already caps at 1000
+// client-side) so an oversized body can't be posted straight to the API.
 const BodySchema = z.object({
-  action: z.string().optional(),
-  body: z.any().optional(),
+  action: z.string().max(40).optional(),
+  body: z.string().max(1000).nullable().optional(),
   evidenceUrls: z.array(z.any()).optional(),
-  note: z.any().optional(),
+  note: z.string().max(1000).nullable().optional(),
 })
 
 type Admin = ReturnType<typeof createAdminClient>
