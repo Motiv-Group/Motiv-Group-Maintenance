@@ -18,7 +18,7 @@ import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { errMsg } from '@/components/ui/errMsg'
 import { SendQuoteForm } from '@/components/admin/SendQuoteForm'
 import { SubmitCompletionForm } from '@/components/supplier/SubmitCompletionForm'
-import { SupplierVariationGate, AcceptSnagCard, SnagRescheduleCta } from '@/components/supplier/SupplierJobActions'
+import { AcceptSnagCard, SnagRescheduleCta } from '@/components/supplier/SupplierJobActions'
 import { DisputeReviewButton, RaiseDisputeButton } from '@/components/dispute/DisputeBox'
 import { TicketChat } from '@/components/chat/TicketChat'
 import { MoreMenu, MoreActionItem } from '@/components/regional/rm-actions/ticket'
@@ -525,8 +525,8 @@ function StartSnagCta({ ticket, className }: { ticket: SupplierTicketRow; classN
 // Variation-order context for the queue pop-ups — the caller's declined VO (for
 // the re-submit flow) + the approved VOs (shown at close-out). Fetched on open
 // from the supplier-scoped quote-context route (awarded-org gated server-side).
-type DeclinedVo = { amount: number | null; description: string | null; rejectReason: string | null; fileUrls: string[]; createdAt: string }
-type ApprovedVo = { amount: number | null; description: string | null; createdAt: string }
+type DeclinedVo = { amount: number | null; amountInclVat: number | null; description: string | null; rejectReason: string | null; fileUrls: string[]; createdAt: string; reviewedAt: string | null }
+type ApprovedVo = { amount: number | null; amountInclVat: number | null; description: string | null; createdAt: string }
 function useVoContext(ticketId: string) {
   const [declinedVo, setDeclinedVo] = useState<DeclinedVo | null>(null)
   const [approvedVos, setApprovedVos] = useState<ApprovedVo[]>([])
@@ -562,47 +562,104 @@ function ViewVoModal({ ticket, company, onClose }: { ticket: SupplierTicketRow; 
   const { declinedVo, loading } = useVoContext(ticket.id)
   const store = ticket.isIndividual ? 'Individual' : [company, ticket.storeName, ticket.branchCode].filter(Boolean).join(' · ')
   return (
-    <Modal onClose={onClose} maxWidth="max-w-2xl">
+    <Modal onClose={onClose} maxWidth="max-w-3xl">
       {close => (
         <div className="space-y-4">
-          <h3 className="text-base font-bold text-[var(--text)]">Variation order declined</h3>
-          <div className="space-y-1 rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5">
-            <p className="text-sm text-[var(--text)]">The manager declined your variation order. Re-submit a revised one, or confirm there are no further variation orders from the ticket.</p>
-            {declinedVo?.rejectReason && (
-              <p className="text-sm text-[var(--text-muted)]"><span className="font-semibold text-[var(--text)]">Reason:</span> {declinedVo.rejectReason}</p>
-            )}
+          {/* Header — amber alert + title, boxed close. */}
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-amber-500/15 text-amber-500"><AlertTriangle size={20} /></span>
+              <h3 className="text-xl font-bold leading-snug text-[var(--text)]">Variation order declined</h3>
+            </div>
+            <button type="button" onClick={close} aria-label="Close" className="shrink-0 rounded-lg p-2 ring-1 ring-[var(--border)] text-[var(--text-muted)] transition hover:bg-[var(--hover)]"><X size={16} /></button>
+          </div>
+
+          {/* Decline notice + reason. */}
+          <div className="flex items-start gap-2.5 rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5">
+            <Info size={17} className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-500" />
+            <div className="min-w-0 space-y-0.5">
+              <p className="text-sm text-[var(--text)]">The manager declined your variation order. Revise and resubmit the variation order, or confirm that no additional work is required for this ticket.</p>
+              {declinedVo?.rejectReason && (
+                <p className="text-sm"><span className="font-bold text-[var(--text)]">Reason:</span> <span className="font-semibold text-amber-700 dark:text-amber-400">{declinedVo.rejectReason}</span></p>
+              )}
+            </div>
           </div>
 
           {loading ? (
             <p className="py-2 text-center text-sm text-[var(--text-faint)]">Loading the variation order…</p>
           ) : declinedVo ? (
-            <div className="space-y-2 rounded-xl bg-[var(--surface-2)] p-4 ring-1 ring-[var(--border)]">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-faint)]">Your declined variation order</p>
-              {declinedVo.amount != null && <p className="text-sm font-bold text-[var(--text)]">{formatCurrency(declinedVo.amount)} <span className="text-xs font-normal text-[var(--text-faint)]">excl VAT</span></p>}
-              {declinedVo.description && <p className="whitespace-pre-line break-words text-sm text-[var(--text-muted)]">{declinedVo.description}</p>}
-              {declinedVo.fileUrls.length > 0 && (
-                <div className="flex flex-wrap gap-x-3 gap-y-1 pt-0.5">
-                  {declinedVo.fileUrls.map((u, i) => (
-                    <ViewTrackedLink key={i} ticketId={ticket.id} itemType="attachment" itemLabel={`Declined VO attachment ${i + 1}`} href={u}
-                      className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:underline">
-                      <FileText size={15} /> Attachment {i + 1}
-                    </ViewTrackedLink>
-                  ))}
+            <>
+              {/* Meta row — ticket · declined by (no personal names). */}
+              <div className="grid grid-cols-2 gap-3 sm:divide-x sm:divide-[var(--border)]">
+                <div className="flex min-w-0 items-start gap-2">
+                  <FileText size={15} className="mt-0.5 shrink-0 text-blue-600 dark:text-blue-400" />
+                  <div className="min-w-0"><p className="text-xs text-[var(--text-muted)]">Ticket</p><p className="truncate text-sm font-semibold text-[var(--text)]">{ticket.jobRef ?? formatJobId(ticket.jobNumber)}</p>{store && <p className="truncate text-xs text-[var(--text-muted)]">{store}{ticket.category ? ` · ${ticket.category}` : ''}</p>}</div>
                 </div>
-              )}
-            </div>
+                <div className="flex min-w-0 items-start gap-2 sm:pl-3">
+                  <User size={15} className="mt-0.5 shrink-0 text-blue-600 dark:text-blue-400" />
+                  <div className="min-w-0"><p className="text-xs text-[var(--text-muted)]">Declined by</p><p className="text-sm font-semibold text-[var(--text)]">Client</p></div>
+                </div>
+              </div>
+
+              {/* Declined VO — scope + document | amounts + declined time. */}
+              <div className="grid gap-4 rounded-xl bg-[var(--surface-2)] p-4 ring-1 ring-[var(--border)] sm:grid-cols-[1fr_16rem]">
+                <div className="min-w-0 space-y-3">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-faint)]">Declined variation order</p>
+                  {declinedVo.description && (
+                    <div>
+                      <p className="mb-0.5 text-sm text-[var(--text-muted)]">Additional scope</p>
+                      <p className="whitespace-pre-line break-words text-sm text-[var(--text)]">{declinedVo.description}</p>
+                    </div>
+                  )}
+                  {declinedVo.fileUrls.length > 0 && (
+                    <div>
+                      <p className="mb-1.5 text-sm text-[var(--text-muted)]">Supporting document{declinedVo.fileUrls.length > 1 ? 's' : ''}</p>
+                      <div className="space-y-2">
+                        {declinedVo.fileUrls.map((u, i) => (
+                          <div key={i} className="flex min-w-0 items-center gap-3 rounded-xl bg-[var(--surface)] p-3 ring-1 ring-[var(--border)]">
+                            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-red-500/15 text-red-500"><FileText size={16} /></span>
+                            <p className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--text)]">{docBasename(u, `Attachment ${i + 1}`)}</p>
+                            <ViewTrackedLink ticketId={ticket.id} itemType="attachment" itemLabel={`Declined VO attachment ${i + 1}`} href={u}
+                              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold text-[var(--text)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)]">
+                              <Eye size={14} /> Preview
+                            </ViewTrackedLink>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-3 text-sm sm:border-l sm:border-[var(--border)] sm:pl-4">
+                  {declinedVo.amount != null && (
+                    <div className="flex items-baseline justify-between gap-2 border-b border-[var(--border)] pb-2"><span className="text-[var(--text-muted)]">Amount (excl. VAT)</span><span className="font-semibold text-[var(--text)]">{formatCurrency(declinedVo.amount)}</span></div>
+                  )}
+                  {declinedVo.amountInclVat != null && (
+                    <div className="flex items-baseline justify-between gap-2 border-b border-[var(--border)] pb-2"><span className="text-[var(--text-muted)]">Incl. VAT</span><span className="font-bold text-[var(--text)]">{formatCurrency(declinedVo.amountInclVat)}</span></div>
+                  )}
+                  {declinedVo.reviewedAt && (
+                    <div className="flex items-baseline justify-between gap-2"><span className="text-[var(--text-muted)]">Declined on</span><span className="font-semibold text-[var(--text)]">{formatDateTime(declinedVo.reviewedAt)}</span></div>
+                  )}
+                </div>
+              </div>
+
+              {/* Next-step hint. */}
+              <div className="flex items-start gap-2.5 rounded-xl bg-blue-500/10 ring-1 ring-blue-500/30 p-3.5">
+                <Info size={16} className="mt-0.5 shrink-0 text-blue-600 dark:text-blue-400" />
+                <p className="text-sm text-[var(--text-muted)]">You can revise and resubmit the variation order, or confirm that no additional work is required.</p>
+              </div>
+            </>
           ) : (
             <p className="text-sm text-[var(--text-faint)]">The declined variation order is no longer available.</p>
           )}
 
-          {/* Small More on the LEFT, the larger Re-submit primary on the RIGHT. */}
+          {/* Small More on the LEFT, the larger Revise primary on the RIGHT. */}
           <div className="flex items-center gap-2">
             <MoreMenu up align="left">
               <MoreActionItem label="Chat with the client" onClick={() => setChatting(true)} />
               <MoreActionItem label="Raise dispute" tone="danger" onClick={() => setDisputing(true)} />
             </MoreMenu>
             <button type="button" onClick={() => setResubmitting(true)} className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500">
-              <ReceiptText size={16} /> Re-submit VO
+              <SquarePen size={16} /> Revise VO
             </button>
           </div>
 
@@ -813,9 +870,11 @@ function SnagSheet({ ticket, company, onClose }: { ticket: SupplierTicketRow; co
   )
 }
 
-// "Close-out" opens the variation-order gate in place — the supplier raises a VO
-// (via More) or confirms there are none so the manager can close out. Any VOs the
-// manager has already APPROVED are listed so the supplier sees what's covered.
+// "Close-out" — the "Additional work required?" sheet (reference layout): the
+// approved-completion copy, a blue Confirm-no-additional-work primary + More
+// (Chat with the client · Raise variation order), and a Variation-orders row
+// that opens the VO form. Approved VOs stay listed so the supplier sees what's
+// already covered.
 function CloseOutCta({ ticket, className }: { ticket: SupplierTicketRow; className: string }) {
   const [open, setOpen] = useState(false)
   return (
@@ -826,15 +885,37 @@ function CloseOutCta({ ticket, className }: { ticket: SupplierTicketRow; classNa
   )
 }
 function CloseOutModal({ ticket, onClose }: { ticket: SupplierTicketRow; onClose: () => void }) {
+  const router = useRouter()
   const { approvedVos } = useVoContext(ticket.id)
+  const [voOpen, setVoOpen] = useState(false)
+  const [chatting, setChatting] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  async function confirmNoVos(close: () => void) {
+    setBusy(true); setErr('')
+    try {
+      const res = await fetch('/api/supplier/ticket-action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticketId: ticket.id, action: 'confirm_no_vos' }) })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed')
+      close(); router.refresh()
+    } catch (e) { setErr(errMsg(e)); setBusy(false) }
+  }
   return (
     <Modal onClose={onClose} maxWidth="max-w-2xl">
-      {() => (
+      {close => (
         <div className="space-y-4">
-          <div>
-            <h3 className="text-base font-bold text-[var(--text)]">Variation orders</h3>
-            <p className="mt-1 text-sm text-[var(--text-muted)]">Your COC &amp; POC were approved — raise a variation order for any extra work, or confirm there are none so the manager can close out.</p>
+          {/* Header — green check + title, boxed close. */}
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-emerald-500/15 text-emerald-500"><CheckCircle2 size={22} /></span>
+              <h3 className="text-xl font-bold leading-snug text-[var(--text)]">Additional work required?</h3>
+            </div>
+            <button type="button" onClick={close} aria-label="Close" className="shrink-0 rounded-lg p-2 ring-1 ring-[var(--border)] text-[var(--text-muted)] transition hover:bg-[var(--hover)]"><X size={16} /></button>
           </div>
+          <div className="space-y-1.5">
+            <p className="text-sm text-[var(--text)]">Your Certificate of Compliance (COC) and proof of completion were approved.</p>
+            <p className="text-sm text-[var(--text-muted)]">Raise a variation order for additional work, or confirm that no further work is required.</p>
+          </div>
+
           {approvedVos.length > 0 && (
             <div className="space-y-2 rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/30 p-3.5">
               <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">Approved variation order{approvedVos.length > 1 ? 's' : ''}</p>
@@ -846,7 +927,38 @@ function CloseOutModal({ ticket, onClose }: { ticket: SupplierTicketRow; onClose
               ))}
             </div>
           )}
-          <SupplierVariationGate ticketId={ticket.id} priority={String(ticket.priority)} createdAt={ticket.createdAt} variationCount={0} status={ticket.status as 'approved_closeout' | 'vo_declined'} declineReason={null} noVosConfirmed={false} />
+
+          {err && <p className="text-sm text-red-500">{err}</p>}
+
+          {/* Primary + More row. */}
+          <div className="flex items-center gap-2 border-t border-[var(--border)] pt-4">
+            <button type="button" onClick={() => confirmNoVos(close)} disabled={busy}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:opacity-50">
+              <CheckCircle2 size={16} /> {busy ? 'Confirming…' : 'Confirm no additional work'}
+            </button>
+            <MoreMenu up align="right">
+              <MoreActionItem label="Chat with the client" onClick={() => setChatting(true)} />
+              <MoreActionItem label="Raise variation order" onClick={() => setVoOpen(true)} />
+            </MoreMenu>
+          </div>
+
+          {/* Variation-orders row — opens the VO form. */}
+          <button type="button" onClick={() => setVoOpen(true)}
+            className="flex w-full items-center gap-3 rounded-xl p-3.5 text-left ring-1 ring-blue-500/30 transition hover:bg-[var(--hover)]">
+            <Info size={18} className="shrink-0 text-blue-600 dark:text-blue-400" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold text-[var(--text)]">Variation orders</span>
+              <span className="block text-xs text-[var(--text-muted)]">Use a variation order for any extra work, changes in scope or cost.</span>
+            </span>
+            <ArrowRight size={16} className="shrink-0 text-blue-600 dark:text-blue-400" />
+          </button>
+
+          {voOpen && (
+            <Modal onClose={() => setVoOpen(false)} maxWidth="max-w-2xl">
+              {closeVo => <div><SendQuoteForm ticketId={ticket.id} variant="variation" competitive priority={String(ticket.priority)} createdAt={ticket.createdAt} defaultOpen onClose={() => { closeVo(); close() }} /></div>}
+            </Modal>
+          )}
+          {chatting && <TicketChat ticketId={ticket.id} viewerRole="supplier" defaultOpen onClose={() => setChatting(false)} />}
         </div>
       )}
     </Modal>

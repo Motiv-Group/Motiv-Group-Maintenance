@@ -3373,6 +3373,7 @@ export interface Database {
           created_at: string
           file_urls: string[]
           warranty: string | null
+          amount_incl_vat: number | null
         }
         Insert: {
           id?: string
@@ -3389,6 +3390,7 @@ export interface Database {
           created_at?: string
           file_urls?: string[]
           warranty?: string | null
+          amount_incl_vat?: number | null
         }
         Update: {
           id?: string
@@ -3405,6 +3407,7 @@ export interface Database {
           created_at?: string
           file_urls?: string[]
           warranty?: string | null
+          amount_incl_vat?: number | null
         }
         Relationships: [
         {

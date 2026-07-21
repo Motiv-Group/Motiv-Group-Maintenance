@@ -726,7 +726,8 @@ create table if not exists public.ticket_variations (
   reject_reason                text,
   created_at                   timestamptz not null default now(),
   file_urls                    text[] not null default '{}'::text[],
-  warranty                     text
+  warranty                     text,
+  amount_incl_vat              numeric -- nullable; pre-20260725 VOs have none
 );
 
 create table if not exists public.ticket_views (

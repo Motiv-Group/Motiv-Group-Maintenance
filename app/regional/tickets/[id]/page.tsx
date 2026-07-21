@@ -9,7 +9,7 @@ import { QuoteSummary } from '@/components/workflow/QuoteSummary'
 import { Card } from '@/components/exec/ui'
 import { WorkflowActions } from '@/components/workflow/WorkflowActions'
 import { RmPipeline } from '@/components/regional/RmPipeline'
-import { RmQuotePanel, RmReviewPanel, ReQuoteButton, AcceptScheduleCard, AcceptSnagScheduleCard, VariationReviewCard, CloseOutBar, RmTicketActionBar, RmCompletionReview } from '@/components/regional/RmTicketActions'
+import { RmQuotePanel, RmReviewPanel, ReQuoteButton, AcceptScheduleCard, AcceptSnagScheduleCard, VariationReviewPanel, VoReviewTitle, CloseOutBar, RmTicketActionBar, RmCompletionReview } from '@/components/regional/RmTicketActions'
 import { CompletionFooterNote } from '@/components/workflow/CompletionBody'
 import { ArchiveGroup } from '@/components/ticket/ArchiveGroup'
 import { SignoffCard } from '@/components/ticket/SignoffCard'
@@ -338,6 +338,9 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
   // statuses — the standalone chat entry below then stays hidden.
   const showCloseOut = t.status === 'approved_closeout' || t.status === 'vo_declined'
 
+  // The submitting supplier org (falls back to the awarded supplier on old VOs
+  // that predate ticket_variations.supplier_id).
+  const voSupplierId = pendingVariation?.supplier_id ?? t.supplier_id ?? null
   const voReviewItems = (t.status === 'variation_review' && pendingVariation) ? [{
     id: 'vo-review',
     dot: 'bg-amber-500',
@@ -345,23 +348,16 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
     subtitle: pendingVariation.amount != null ? formatCurrency(pendingVariation.amount) : 'Extra work',
     statusLabel: 'Awaiting your approval',
     statusCls: 'text-amber-700 dark:text-amber-400',
-    modalTitle: 'Variation order — review',
+    modalTitle: <VoReviewTitle />,
     body: (
-      <div className="space-y-4">
-        <div className="rounded-xl ring-1 ring-[var(--border)] p-4 space-y-2">
-          <p className="text-sm text-[var(--text)] whitespace-pre-line">{pendingVariation.description}</p>
-          {pendingVariation.warranty && <p className="text-[13px] text-[var(--text-muted)]"><span className="font-medium text-[var(--text)]">Warranty:</span> {pendingVariation.warranty}</p>}
-          {pendingVariation.amount != null && <p className="text-[13px] text-[var(--text-muted)]"><span className="font-medium text-[var(--text)]">Amount:</span> {formatCurrency(pendingVariation.amount)}</p>}
-          {Array.isArray(pendingVariation.file_urls) && pendingVariation.file_urls.length > 0 && (
-            <div className="flex flex-wrap gap-x-3 gap-y-1 pt-1">
-              {pendingVariation.file_urls.map((u: string, j: number) => (
-                <ViewTrackedLink key={j} ticketId={t.id} itemType="attachment" itemLabel={`Variation order attachment ${j + 1}`} href={u} className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"><FileText size={14} /> Attachment {j + 1}</ViewTrackedLink>
-              ))}
-            </div>
-          )}
-        </div>
-        <VariationReviewCard ticketId={t.id} />
-      </div>
+      <VariationReviewPanel ticketId={t.id} vo={{
+        id: pendingVariation.id, description: pendingVariation.description,
+        amount: pendingVariation.amount, amount_incl_vat: pendingVariation.amount_incl_vat,
+        file_urls: Array.isArray(pendingVariation.file_urls) ? pendingVariation.file_urls : [],
+        created_at: pendingVariation.created_at,
+        supplierName: voSupplierId ? (nameById.get(voSupplierId) ?? 'Supplier') : null,
+        jobRef: t.job_ref ?? null, storeName, category: t.category ?? null,
+      }} />
     ),
   }] : []
 

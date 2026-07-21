@@ -4,7 +4,7 @@
 // review, approve-sign-off and snag-schedule cards.
 import { useState, useEffect, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { FileText, ChevronRight, MessageSquare, ClipboardCheck, Image as ImageIcon, CheckCircle2, AlertTriangle, User, Ticket, MapPin, Tag, Eye, Info } from 'lucide-react'
+import { FileText, ChevronRight, MessageSquare, ClipboardCheck, Image as ImageIcon, CheckCircle2, AlertTriangle, User, Ticket, MapPin, Tag, Eye, Info, Store, CalendarClock, Wrench, XCircle, FilePlus2 } from 'lucide-react'
 import { PhotoThumbs } from '@/components/ui/PhotoThumbs'
 import { TicketChat } from '@/components/chat/TicketChat'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
@@ -19,7 +19,7 @@ import { MoreMenu, MoreActionItem, RequestEvidenceButton, RaiseSnagButton } from
 // `body`). Same look as RmQuotePanel so every pending decision reads the same.
 export function RmReviewPanel({ heading, items }: {
   heading?: string
-  items: { id: string; dot: string; title: string; subtitle?: string | null; statusLabel: string; statusCls: string; modalTitle?: string; body: ReactNode }[]
+  items: { id: string; dot: string; title: string; subtitle?: string | null; statusLabel: string; statusCls: string; modalTitle?: ReactNode; body: ReactNode }[]
 }) {
   const [openId, setOpenId] = useState<string | null>(null)
   const active = items.find(i => i.id === openId) ?? null
@@ -186,13 +186,15 @@ function DocRow({ ticketId, url, itemType, itemLabel, fallbackName, uploadedAt, 
 }
 
 // One submission-meta cell (Submitted by / Ticket / Site / Trade): tinted icon +
-// tiny label over a semibold value. Hidden entirely when the value is missing.
-function MetaCell({ icon, label, value }: { icon: ReactNode; label: string; value: string | null }) {
+// tiny label over a semibold value (+ optional faint sub-line, e.g. "store ·
+// trade" under a job ref). Hidden entirely when the value is missing.
+function MetaCell({ icon, label, value, sub }: { icon: ReactNode; label: string; value: string | null; sub?: string | null }) {
   if (!value) return null
   return (
     <div className="min-w-0 sm:px-4 sm:first:pl-0">
       <span className="flex items-center gap-1.5 text-[11px] text-[var(--text-faint)]">{icon} {label}</span>
       <span className="mt-0.5 block truncate text-sm font-semibold text-[var(--text)]">{value}</span>
+      {sub && <span className="block truncate text-[11px] text-[var(--text-faint)]">{sub}</span>}
     </div>
   )
 }
@@ -295,6 +297,8 @@ export function SignoffReviewPanel({ ticketId, s, onDone }: { ticketId: string; 
 }
 
 // ── Variation order review (approve / decline) ──────────────────
+// VariationReviewCard is the compact inline approve/decline pair still used by
+// the individual ticket page; the RM surfaces use VariationReviewPanel below.
 const VO_DECLINE_REASONS = ['Cost too high', 'Not budgeted', 'Outside agreed scope', 'Needs more detail / justification', 'Obtain another quote', 'Other']
 export function VariationReviewCard({ ticketId }: { ticketId: string }) {
   const router = useRouter()
@@ -357,11 +361,187 @@ export function VariationReviewCard({ ticketId }: { ticketId: string }) {
   )
 }
 
+// ── RM "Review variation order" pop-up (ticket page + Today queue) ───────────
+// The rich review panel shared by BOTH RM entry points: submission meta
+// (supplier · ticket · submitted), the additional-scope card (description +
+// amount + attachments), an info banner and Approve VO / More (Decline · Chat).
+// Decline opens its own pop-up (reason select + comments) and fires the same
+// reject_variation transition as before. The ticket page feeds the panel from
+// the detail loader; the Today queue fetches /api/tickets/[id]/variation.
+type PendingVo = {
+  id: string; description: string; amount: number | null; amount_incl_vat: number | null; file_urls: string[]; created_at: string
+  // Header meta — nullable; a missing value just hides its cell in the pop-up.
+  supplierName: string | null; jobRef: string | null; storeName: string | null; category: string | null
+}
+
+// Pop-up titles: tinted circled icon + label (the Modal takes a ReactNode). The
+// review title is a COMPONENT (not a const) so the RSC ticket page can import
+// it — a plain const from a 'use client' file reads undefined in a Server Component.
+export function VoReviewTitle() {
+  return (
+    <span className="flex items-center gap-2.5">
+      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400"><FilePlus2 size={16} /></span>
+      Review variation order
+    </span>
+  )
+}
+const VO_DECLINE_MODAL_TITLE = (
+  <span className="flex items-center gap-2.5">
+    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-red-500/15 text-red-500"><XCircle size={16} /></span>
+    Decline variation order
+  </span>
+)
+
+const MAX_VO_DECLINE_COMMENT = 500
+const VO_IMAGE_RE = /\.(jpe?g|png|webp|heic)$/i
+
+export function VariationReviewPanel({ ticketId, vo, onDone }: { ticketId: string; vo: PendingVo; onDone?: () => void }) {
+  const router = useRouter()
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const [chatOpen, setChatOpen] = useState(false)
+  const [declineOpen, setDeclineOpen] = useState(false)
+  const [reason, setReason] = useState('')
+  const [comment, setComment] = useState('')
+  const input = 'w-full px-3 py-2 rounded-lg bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm'
+
+  async function act(action: 'approve_variation' | 'reject_variation', reasonText?: string) {
+    setBusy(true); setErr('')
+    try { await post(`/api/tickets/${ticketId}/transition`, { action, reason: reasonText }); onDone?.(); router.refresh() }
+    catch (e) { setErr(errMsg(e)); setBusy(false) }
+  }
+  function submitDecline() {
+    if (!reason) { setErr('Choose a reason.'); return }
+    const c = comment.trim()
+    if (reason === 'Other' && !c) { setErr('Add a comment explaining the reason.'); return }
+    // "Other" sends the comment itself; a preset + comment composes "Preset — comment".
+    act('reject_variation', reason === 'Other' ? c : c ? `${reason} — ${c}` : reason)
+  }
+
+  // Description: bold the first line when the text naturally splits into more.
+  const [voFirstLine, ...voRest] = vo.description.split('\n')
+  const voRestText = voRest.join('\n').trim()
+  // Attachments: image files render as small thumbnails, the rest as document
+  // rows. Labels keep the original file order so the view trail stays stable.
+  const files = vo.file_urls.map((url, i) => ({ url, n: i + 1, isImage: VO_IMAGE_RE.test(url.split('?')[0] ?? '') }))
+  const imageFiles = files.filter(f => f.isImage)
+  const docFiles = files.filter(f => !f.isImage)
+  const voTotal = vo.amount_incl_vat ?? vo.amount
+
+  return (
+    <div className="space-y-4">
+      <p className="-mt-1 text-sm text-[var(--text-muted)]">Review the supplier&apos;s request for additional work and either approve or decline.</p>
+
+      {/* Submission meta — who requested it, on which job, and when. */}
+      <div className="rounded-xl bg-[var(--surface-2)] p-4 ring-1 ring-[var(--border)]">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-0 sm:divide-x sm:divide-[var(--border)]">
+          <MetaCell icon={<Store size={13} className="text-blue-500" />} label="Supplier" value={vo.supplierName} />
+          <MetaCell icon={<Ticket size={13} className="text-violet-500" />} label="Ticket" value={vo.jobRef} sub={[vo.storeName, vo.category].filter(Boolean).join(' · ') || null} />
+          <MetaCell icon={<CalendarClock size={13} className="text-amber-500" />} label="Submitted" value={formatDateTime(vo.created_at)} />
+        </div>
+      </div>
+
+      {/* The requested extra work — description + attachments, amount on the right. */}
+      <div className="rounded-xl bg-[var(--surface-2)] p-4 ring-1 ring-[var(--border)]">
+        <div className={REVIEW_LABEL}>Additional scope</div>
+        <div className="mt-3 flex flex-col gap-4 sm:flex-row">
+          <div className="flex min-w-0 flex-1 items-start gap-3">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-blue-500/15 text-blue-600 dark:text-blue-400"><Wrench size={18} /></span>
+            <div className="min-w-0 flex-1">
+              {voRestText ? (
+                <>
+                  <p className="text-sm font-semibold text-[var(--text)]">{voFirstLine}</p>
+                  <p className="mt-1 whitespace-pre-line text-sm text-[var(--text)]">{voRestText}</p>
+                </>
+              ) : (
+                <p className="whitespace-pre-line text-sm text-[var(--text)]">{vo.description}</p>
+              )}
+              {imageFiles.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {imageFiles.map(f => (
+                    <ViewTrackedLink key={f.n} ticketId={ticketId} itemType="attachment" itemLabel={`Variation order attachment ${f.n}`} href={f.url} className="block h-16 w-16 overflow-hidden rounded-lg ring-1 ring-[var(--border)]">
+                      {/* eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL; next/image can't optimize it */}
+                      <img src={f.url} alt={`Variation order attachment ${f.n}`} loading="lazy" className="h-full w-full object-cover" />
+                    </ViewTrackedLink>
+                  ))}
+                </div>
+              )}
+              {docFiles.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  {docFiles.map(f => (
+                    <ViewTrackedLink key={f.n} ticketId={ticketId} itemType="attachment" itemLabel={`Variation order attachment ${f.n}`} href={f.url} className="flex items-center gap-2 rounded-lg bg-[var(--surface)] px-3 py-2 ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)]">
+                      <FileText size={15} className="shrink-0 text-[var(--text-faint)]" />
+                      <span className="min-w-0 truncate text-[13px] font-medium text-blue-600 dark:text-blue-400">{docName(f.url, `Attachment ${f.n}`)}</span>
+                    </ViewTrackedLink>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          {/* Amount — own row under the description on phones, right column from sm. */}
+          <div className="shrink-0 border-t border-[var(--border)] pt-3 sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0">
+            <span className="block text-[11px] text-[var(--text-faint)]">Amount requested</span>
+            <span className="mt-0.5 block text-xl font-bold tabular-nums text-[var(--text)]">{vo.amount != null ? formatCurrency(vo.amount) : '—'} <span className="text-[11px] font-medium text-[var(--text-faint)]">excl. VAT</span></span>
+            {/* Old VOs predate amount_incl_vat — omit the line rather than compute VAT. */}
+            {vo.amount_incl_vat != null && <span className="block text-sm font-semibold tabular-nums text-[var(--text-muted)]">{formatCurrency(vo.amount_incl_vat)} <span className="text-[11px] font-medium text-[var(--text-faint)]">incl. VAT</span></span>}
+          </div>
+        </div>
+      </div>
+
+      {/* What approving does — sits just above the buttons. */}
+      <div className="flex items-start gap-2.5 rounded-xl bg-blue-500/10 p-3.5 ring-1 ring-blue-500/30">
+        <Info size={16} className="mt-0.5 shrink-0 text-blue-500" />
+        <p className="text-sm text-[var(--text-muted)]">Approving this variation order will add {voTotal != null ? formatCurrency(voTotal) : 'the requested amount'} to the job total and authorise the supplier to proceed with this additional work.</p>
+      </div>
+
+      {err && !declineOpen && <p className="text-xs text-red-500">{err}</p>}
+
+      <div className="flex items-center gap-2">
+        <MoreMenu up align="left">
+          <MoreActionItem icon={<XCircle size={16} />} label="Decline variation order" tone="danger" onClick={() => { setReason(''); setComment(''); setErr(''); setDeclineOpen(true) }} />
+          <MoreActionItem icon={<MessageSquare size={16} />} label="Chat with supplier" onClick={() => setChatOpen(true)} />
+        </MoreMenu>
+        <button onClick={() => act('approve_variation')} disabled={busy} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50"><CheckCircle2 size={16} /> {busy && !declineOpen ? 'Approving…' : 'Approve VO'}</button>
+      </div>
+
+      {declineOpen && (
+        <Modal title={VO_DECLINE_MODAL_TITLE} onClose={() => { if (!busy) { setDeclineOpen(false); setErr('') } }}>
+          <p className="-mt-1 text-sm text-[var(--text-muted)]">The supplier will be notified that this variation order has been declined. Please select a reason for declining.</p>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-[var(--text)]">Reason for declining <span className="text-red-500">*</span></label>
+            <select autoFocus className={input} value={reason} onChange={e => { setReason(e.target.value); setErr('') }}>
+              <option value="">— Choose a reason —</option>
+              {VO_DECLINE_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-[var(--text)]">Comments <span className="font-normal text-[var(--text-faint)]">(required if &quot;Other&quot; is selected)</span></label>
+            <div className="relative">
+              <textarea maxLength={MAX_VO_DECLINE_COMMENT} className={`${input} min-h-[90px] pb-7`} placeholder="Add context for the supplier…" value={comment} onChange={e => { setComment(e.target.value.slice(0, MAX_VO_DECLINE_COMMENT)); setErr('') }} />
+              <span className="pointer-events-none absolute bottom-2.5 right-3 text-[11px] tabular-nums text-[var(--text-faint)]">{comment.length} / {MAX_VO_DECLINE_COMMENT}</span>
+            </div>
+          </div>
+          <div className="flex items-start gap-2.5 rounded-xl bg-blue-500/10 p-3.5 ring-1 ring-blue-500/30">
+            <Info size={16} className="mt-0.5 shrink-0 text-blue-500" />
+            <p className="text-sm text-[var(--text-muted)]">The supplier will be notified and may submit a revised variation order.</p>
+          </div>
+          {err && <p className="text-xs text-red-500">{err}</p>}
+          <div className="flex gap-2">
+            <button onClick={() => { setDeclineOpen(false); setErr('') }} disabled={busy} className="px-4 py-2.5 rounded-xl ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm font-medium disabled:opacity-50">Cancel</button>
+            <button onClick={submitDecline} disabled={busy} className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-semibold disabled:opacity-50">{busy ? 'Declining…' : 'Decline and notify supplier'}</button>
+          </div>
+        </Modal>
+      )}
+      {/* A VO means the supplier is already awarded, so chat is always available here. */}
+      {chatOpen && <TicketChat ticketId={ticketId} viewerRole="regional_manager" defaultOpen onClose={() => setChatOpen(false)} />}
+    </div>
+  )
+}
+
 // ── View & Approve a variation order (Today queue pop-up) ───────
-// Fetches the pending VO on open (description · amount · warranty · attachments)
-// and shows it above the approve/decline controls — the queue equivalent of the
-// RM detail page's variation block. RM-scoped GET (see /variation route).
-type PendingVo = { id: string; description: string; amount: number | null; warranty: string | null; file_urls: string[]; created_at: string }
+// Fetches the pending VO on open (meta · description · amounts · attachments)
+// and shows the shared VariationReviewPanel — the queue equivalent of the RM
+// detail page's variation pop-up. RM-scoped GET (see /variation route).
 export function VariationReviewButton({ ticketId, trigger }: { ticketId: string; trigger: (open: () => void) => ReactNode }) {
   const [open, setOpen] = useState(false)
   const [vo, setVo] = useState<PendingVo | null>(null)
@@ -383,33 +563,11 @@ export function VariationReviewButton({ ticketId, trigger }: { ticketId: string;
     <>
       {trigger(() => setOpen(true))}
       {open && (
-        <Modal title="Variation order" maxWidth="max-w-2xl" onClose={() => setOpen(false)}>
+        <Modal title={<VoReviewTitle />} maxWidth="max-w-2xl" onClose={() => setOpen(false)}>
           {loading ? <p className="py-4 text-center text-sm text-[var(--text-faint)]">Loading…</p>
             : err ? <p className="text-sm text-red-500">{err}</p>
             : !vo ? <p className="py-4 text-center text-sm text-[var(--text-faint)]">No variation order awaiting review.</p>
-            : (
-              <div className="space-y-4">
-                <div className="space-y-2 rounded-xl bg-[var(--surface-2)] p-4 ring-1 ring-[var(--border)]">
-                  <div className="flex items-baseline justify-between gap-3">
-                    <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-faint)]">Extra work requested</p>
-                    {vo.amount != null && <p className="shrink-0 text-lg font-bold tabular-nums text-[var(--text)]">{formatCurrency(vo.amount)}</p>}
-                  </div>
-                  <p className="whitespace-pre-line text-sm text-[var(--text)]">{vo.description}</p>
-                  {vo.warranty && <p className="text-[13px] text-[var(--text-muted)]"><span className="font-semibold text-[var(--text)]">Warranty:</span> {vo.warranty}</p>}
-                  {vo.file_urls.length > 0 && (
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      {vo.file_urls.map((u, i) => (
-                        <ViewTrackedLink key={i} ticketId={ticketId} itemType="attachment" itemLabel={`Variation order attachment ${i + 1}`} href={u}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface)] px-2.5 py-1.5 text-[13px] font-medium text-blue-600 ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] dark:text-blue-400">
-                          <FileText size={14} /> Attachment {i + 1}
-                        </ViewTrackedLink>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <VariationReviewCard ticketId={ticketId} />
-              </div>
-            )}
+            : <VariationReviewPanel ticketId={ticketId} vo={vo} onDone={() => setOpen(false)} />}
         </Modal>
       )}
     </>

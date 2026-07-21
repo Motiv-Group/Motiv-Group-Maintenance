@@ -229,7 +229,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
         if (!desc) return NextResponse.json({ error: 'Variation description required' }, { status: 400 })
         const fileUrls = Array.isArray(body.fileUrls) ? body.fileUrls.filter((u: unknown): u is string => typeof u === 'string') : []
         const warranty = typeof body.warranty === 'string' && body.warranty.trim() ? body.warranty.trim() : null
-        await admin.from('ticket_variations').insert({ company_id: ticket.company_id, ticket_id: ticketId, supplier_id: ticket.supplier_id, description: desc, amount: body.amount ? Number(body.amount) : null, warranty, status: 'pending', submitted_by: user.id, file_urls: fileUrls })
+        await admin.from('ticket_variations').insert({ company_id: ticket.company_id, ticket_id: ticketId, supplier_id: ticket.supplier_id, description: desc, amount: body.amount ? Number(body.amount) : null, amount_incl_vat: body.amount_incl_vat ? Number(body.amount_incl_vat) : null, warranty, status: 'pending', submitted_by: user.id, file_urls: fileUrls })
         break
       }
       case 'approve_variation':

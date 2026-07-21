@@ -325,7 +325,7 @@ export function SendQuoteForm({
     if (competitive && isVariation) {
       const res = await fetch(`/api/tickets/${ticketId}/transition`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'submit_variation', description: values.description, amount: values.amount ? Number(values.amount) : undefined, warranty: warrantyNA ? 'N/A' : (values.warranty?.trim() || null), fileUrls: fileUrl ? [fileUrl] : [] }),
+        body: JSON.stringify({ action: 'submit_variation', description: values.description, amount: values.amount ? Number(values.amount) : undefined, amount_incl_vat: values.amount_incl_vat !== '' ? Number(values.amount_incl_vat) : undefined, warranty: warrantyNA ? 'N/A' : (values.warranty?.trim() || null), fileUrls: fileUrl ? [fileUrl] : [] }),
       })
       if (!res.ok) { setError((await res.json().catch(() => ({}))).error || 'Failed to submit variation order'); setLoading(false); return }
       reset(); if (filePreview) URL.revokeObjectURL(filePreview)
