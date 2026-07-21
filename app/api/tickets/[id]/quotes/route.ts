@@ -90,14 +90,19 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     const tgt = rules(ticket.priority as 'P1' | 'P2' | 'P3' | 'P4')
     dueAt = new Date(new Date(ticket.created_at).getTime() + tgt.resolution_mins * 60_000).toISOString()
   }
+  // Signed copies of the ticket docs for DISPLAY (the pop-up's Documents section)
+  // — separate from the RAW infoDocUrls below, which stay unsigned for the add-work
+  // PATCH round-trip. Mirrors how photoUrls is signed.
+  const infoDocs = Array.isArray(ticket.info_doc_urls) && ticket.info_doc_urls.length ? await signManyUrls(ticket.info_doc_urls) : []
   const ticketDetail = {
     title: ticket.title, category: ticket.category ?? null, description: ticket.description ?? '',
     operationalImpact: ticket.operational_impact ?? null, priority: ticket.priority ?? null,
     jobRef: ticket.job_ref ?? null, storeName: store?.name ?? null, photoUrls,
     createdAt: ticket.created_at, dueAt,
     // RAW stored doc urls — the add-work form round-trips them into its PATCH
-    // append, so they must not be signed here.
+    // append, so they must not be signed here. `infoDocs` is the signed display list.
     infoDocUrls: Array.isArray(ticket.info_doc_urls) ? ticket.info_doc_urls : [],
+    infoDocs,
   }
 
   return NextResponse.json({ rows, canReQuote, ticket: ticketDetail })
