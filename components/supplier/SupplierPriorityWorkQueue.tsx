@@ -174,7 +174,7 @@ function QueueRow({ ticket, nowMs, company, chatUnread = 0 }: { ticket: Supplier
 
 // Shapes returned by the supplier-scoped quote-context route (fetched on pop-up
 // open by the Submit-quote and Declined-quote sheets).
-type QuoteContext = { title: string; category: string | null; description: string | null; impact: string | null; priority: string; jobRef: string | null; storeName: string | null; photoUrls: string[]; quoteRequestedAt: string | null }
+type QuoteContext = { title: string; category: string | null; description: string | null; impact: string | null; priority: string; jobRef: string | null; storeName: string | null; photoUrls: string[]; infoDocs: string[]; quoteRequestedAt: string | null }
 type DeclinedQuote = { amount: number | null; amountInclVat: number | null; description: string | null; fileUrl: string | null; declineReason: string | null; validUntil: string | null; createdAt: string; declinedAt: string | null; warranty: string | null; quoteRef: string | null }
 
 // "Submit quote" is a TWO-STEP pop-up in the shared ticket-sheet layout ("Ticket"
@@ -241,6 +241,19 @@ function SubmitQuoteSheet({ ticket, company, onClose }: { ticket: SupplierTicket
                 {ctx.photoUrls.length > 0 && (
                   <SheetSection label="Images">
                     <PhotoThumbs urls={ctx.photoUrls} ticketId={ticket.id} label="Job photo" limit={5} />
+                  </SheetSection>
+                )}
+                {ctx.infoDocs.length > 0 && (
+                  <SheetSection label="Documents">
+                    <div className="space-y-2">
+                      {ctx.infoDocs.map((u, i) => (
+                        <ViewTrackedLink key={i} ticketId={ticket.id} itemType="attachment" itemLabel={`Ticket document ${i + 1}`} href={u}
+                          className="flex items-center gap-2.5 rounded-xl bg-[var(--surface)] px-3.5 py-3 text-sm font-medium text-[var(--text)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)]">
+                          <FileText size={16} className="shrink-0 text-blue-600 dark:text-blue-400" />
+                          <span className="truncate">{docBasename(u, `Document ${i + 1}`)}</span>
+                        </ViewTrackedLink>
+                      ))}
+                    </div>
                   </SheetSection>
                 )}
               </>

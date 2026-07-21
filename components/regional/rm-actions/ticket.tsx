@@ -155,7 +155,7 @@ export function RmTicketActionBar({ ticketId, status, canAssign, canAssignSuppli
           <AssignSuppliersButton ticketId={ticketId} suppliers={suppliers} motivSuppliers={motivSuppliers} motivAccess={motivAccess} declinedSupplierIds={declinedSupplierIds} awaitingById={awaitingById}
             trigger={open => <button onClick={open} className={primaryCls}>{assignLabel}</button>} />
           {hasMenu && (
-            <MoreMenu align="left">
+            <MoreMenu inline align="right">
               {canAssign && <MoreActionItem icon={<Plus size={16} />} label="Add extra work" onClick={() => setActive('addwork')} />}
               {showRequestInfo && <MoreActionItem icon={<MessageSquare size={16} />} label="Request more info" onClick={() => setActive('info')} />}
               {hasSupplier && <MoreActionItem icon={<MessageSquare size={16} />} label="Chat with supplier" onClick={() => setActive('chat')} />}
@@ -724,7 +724,7 @@ export function CloseOutBar({ ticketId, voConfirmed }: { ticketId: string; voCon
     <>
       <div className="flex items-end gap-2">
         <div className="min-w-0 flex-1"><CloseOutButton ticketId={ticketId} voConfirmed={voConfirmed} /></div>
-        <MoreMenu up align="right">
+        <MoreMenu inline up align="right">
           <MoreActionItem icon={<MessageSquare size={16} />} label="Chat with the supplier" onClick={() => setChat(true)} />
         </MoreMenu>
       </div>

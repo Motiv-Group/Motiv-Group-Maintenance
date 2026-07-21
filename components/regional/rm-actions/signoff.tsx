@@ -85,7 +85,7 @@ export function RmCompletionReview({ ticketId, label, submittedAt, photoCount, d
 
       <div className="flex items-center gap-2">
         <button type="button" onClick={() => setOpen(true)} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500"><CheckCircle2 size={16} /> Approve completion</button>
-        <MoreMenu align="left">
+        <MoreMenu inline align="right">
           <MoreActionItem icon={<MessageSquare size={16} />} label="Request more evidence" onClick={() => setActive('evidence')} />
           <MoreActionItem icon={<MessageSquare size={16} />} label="Chat with supplier" onClick={() => setActive('chat')} />
           <MoreActionItem icon={<AlertTriangle size={16} />} label="Raise snag" tone="danger" onClick={() => setActive('snag')} />
@@ -584,7 +584,7 @@ export function VoReviewBar({ ticketId }: { ticketId: string }) {
   return (
     <>
       <div className="flex items-center gap-2">
-        <MoreMenu up align="left">
+        <MoreMenu inline up align="left">
           <MoreActionItem icon={<MessageSquare size={16} />} label="Chat with supplier" onClick={() => setChat(true)} />
         </MoreMenu>
         <VariationReviewButton ticketId={ticketId}
