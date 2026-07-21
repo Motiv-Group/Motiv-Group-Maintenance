@@ -85,7 +85,11 @@ export async function loadSupplierTicketDetail(ticketId: string) {
   // evidence URL to a short-lived signed URL in place, so all the render sites below
   // (ticket photos, signoff cards, quotes, variations, disputes) get readable links.
   if (Array.isArray(t.photo_urls)) t.photo_urls = await signManyUrls(t.photo_urls)
+  // Signed into a SEPARATE list (RM-loader pattern) — t.info_doc_urls keeps the
+  // raw stored values.
+  let infoDocUrls: string[] = []
   await Promise.all([
+    (async () => { infoDocUrls = Array.isArray(t.info_doc_urls) ? await signManyUrls(t.info_doc_urls) : [] })(),
     ...(signoffRows ?? []).map(async s => {
       if (Array.isArray(s.before_urls)) s.before_urls = await signManyUrls(s.before_urls)
       if (Array.isArray(s.after_urls)) s.after_urls = await signManyUrls(s.after_urls)
@@ -329,6 +333,23 @@ export async function loadSupplierTicketDetail(ticketId: string) {
 
   // ── Lower tabbed section (mirrors the RM ticket detail). Data the tab JSX consumes. ──
   const totalPhotos = Array.isArray(t.photo_urls) ? t.photo_urls.length : 0
+  // "Documents" tab — every document this supplier may see, in one place (mirrors
+  // the RM Documents tab): the ticket's own attachments (SM added-info docs + RM
+  // extra-work docs), their own quote files, their COC & invoice, and VO
+  // attachments. Quote/signoff rows are already scoped to this org above, so no
+  // other supplier's files can appear here.
+  type DocLink = { label: string; href: string; itemType: 'quote' | 'coc' | 'invoice' | 'attachment' }
+  const documentLinks: DocLink[] = []
+  infoDocUrls.forEach((u, i) => documentLinks.push({ label: `Ticket document ${i + 1}`, href: u, itemType: 'attachment' }))
+  myQuoteRows.forEach((q, i, arr) => { if (q.file_url) documentLinks.push({ label: arr.length > 1 ? `Your quote #${arr.length - i}` : 'Your quote', href: q.file_url, itemType: 'quote' }) })
+  for (const s of [acceptedSignoff, ...pendingSignoffs].filter(s => s !== null)) {
+    if (s.coc_url) documentLinks.push({ label: 'Certificate of Completion (COC)', href: s.coc_url, itemType: 'coc' })
+    if (s.invoice_url) documentLinks.push({ label: 'Invoice', href: s.invoice_url, itemType: 'invoice' })
+  }
+  // variations load newest-first, so number them chronologically (arr.length - i).
+  variations.forEach((v, i, arr) => {
+    if (Array.isArray(v.file_urls)) v.file_urls.forEach((u, j) => documentLinks.push({ label: `${arr.length > 1 ? `Variation order ${arr.length - i}` : 'Variation order'} · Attachment ${j + 1}`, href: u, itemType: 'attachment' }))
+  })
   // Quotes tab: active quotes (pending / approved). While the supplier is still
   // (re-)quoting, also show the declined quote(s) with the reason; once a quote is
   // approved or the request closes, declined quotes move to History instead.
@@ -385,7 +406,7 @@ export async function loadSupplierTicketDetail(ticketId: string) {
     variations, variationCount, latestVoRejectReason, canDecline,
     disputes, msgsByDispute, openDispute, resolvedDisputes, disputeSubject,
     nextAction, timelineItems,
-    totalPhotos, quoteTabRows, historyDeclinedQuotes, updates: updates ?? [], declineRows: declineRows ?? [],
+    totalPhotos, documentLinks, quoteTabRows, historyDeclinedQuotes, updates: updates ?? [], declineRows: declineRows ?? [],
   }
   return { kind: 'ok' as const, data }
 }

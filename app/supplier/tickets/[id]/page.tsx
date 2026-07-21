@@ -40,7 +40,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
     variations, variationCount, latestVoRejectReason, canDecline,
     disputes, msgsByDispute, openDispute, resolvedDisputes, disputeSubject,
     nextAction, timelineItems,
-    totalPhotos, quoteTabRows, historyDeclinedQuotes, declineRows,
+    totalPhotos, documentLinks, quoteTabRows, historyDeclinedQuotes, declineRows,
   } = result.data
 
   // While a dispute is open the paused step's action area shows the resolve controls
@@ -60,6 +60,19 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
   // null when it has nothing — DetailTabs drops the empty ones. ──────────────────
   const photosTab = totalPhotos > 0
     ? <PhotoThumbs urls={t.photo_urls as string[]} ticketId={t.id} label="Job photo" />
+    : null
+  // Same row layout as the RM Documents tab — one tracked link per document.
+  const documentsTab = documentLinks.length > 0
+    ? (<ul className="space-y-2">
+        {documentLinks.map((d, i) => (
+          <li key={i}>
+            <ViewTrackedLink ticketId={t.id} itemType={d.itemType} itemLabel={d.label} href={d.href} className="flex items-center gap-2.5 rounded-xl ring-1 ring-[var(--border)] bg-[var(--surface)] px-3.5 py-3 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--hover)]">
+              <FileText size={16} className="text-blue-600 dark:text-blue-400 shrink-0" />
+              <span className="truncate">{d.label}</span>
+            </ViewTrackedLink>
+          </li>
+        ))}
+      </ul>)
     : null
   const quotesTab = quoteTabRows.length > 0
     ? (<div className="space-y-2">{quoteTabRows.map((q, i, arr) => (
@@ -457,6 +470,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
         }
         tabs={[
           { key: 'photos', label: `Photos${totalPhotos ? ` (${totalPhotos})` : ''}`, content: photosTab },
+          { key: 'documents', label: 'Documents', content: documentsTab },
           { key: 'quotes', label: 'Quotes', content: quotesTab },
           { key: 'completion', label: 'Completion', content: completionTab },
           { key: 'variations', label: 'Variation Orders', content: voTab },

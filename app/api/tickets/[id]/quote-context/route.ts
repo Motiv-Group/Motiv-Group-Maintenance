@@ -24,7 +24,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   if (!myOrgs.size) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { data: t } = await admin.from('tickets')
-    .select('id, title, category, description, operational_impact, priority, store_id, photo_urls, job_ref, supplier_id, quote_requested_at')
+    .select('id, title, category, description, operational_impact, priority, store_id, photo_urls, info_doc_urls, job_ref, supplier_id, quote_requested_at')
     .eq('id', id).single()
   if (!t) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
@@ -44,6 +44,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     storeName = store ? [store.branch_code, store.name, sub].filter(Boolean).join(' · ') || null : null
   }
   const photoUrls = Array.isArray(t.photo_urls) ? await signManyUrls(t.photo_urls as string[]) : []
+  // Documents attached to the ticket itself (SM added-info docs + RM extra-work
+  // docs) — a quoting supplier needs these alongside the photos.
+  const infoDocUrls = Array.isArray(t.info_doc_urls) ? await signManyUrls(t.info_doc_urls as string[]) : []
 
   // The caller's own latest DECLINED quote on this ticket (for the re-quote flow —
   // shows what was declined + why alongside the job). Restricted to their orgs.
@@ -97,7 +100,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     ticket: {
       title: t.title, category: t.category, description: t.description,
       impact: t.operational_impact, priority: t.priority, jobRef: t.job_ref,
-      storeName, photoUrls, quoteRequestedAt,
+      storeName, photoUrls, infoDocUrls, quoteRequestedAt,
     },
     declinedQuote,
     declinedVariation,

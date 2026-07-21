@@ -174,7 +174,22 @@ function QueueRow({ ticket, nowMs, company, chatUnread = 0 }: { ticket: Supplier
 
 // Shapes returned by the supplier-scoped quote-context route (fetched on pop-up
 // open by the Submit-quote and Declined-quote sheets).
-type QuoteContext = { title: string; category: string | null; description: string | null; impact: string | null; priority: string; jobRef: string | null; storeName: string | null; photoUrls: string[]; quoteRequestedAt: string | null }
+type QuoteContext = { title: string; category: string | null; description: string | null; impact: string | null; priority: string; jobRef: string | null; storeName: string | null; photoUrls: string[]; infoDocUrls?: string[]; quoteRequestedAt: string | null }
+
+// Ticket documents (SM added-info docs + RM extra-work docs) as tracked links —
+// shared by the Submit-quote and Declined-quote sheets.
+function TicketDocLinks({ ticketId, urls }: { ticketId: string; urls: string[] }) {
+  return (
+    <div className="space-y-2">
+      {urls.map((u, i) => (
+        <ViewTrackedLink key={i} ticketId={ticketId} itemType="attachment" itemLabel={`Ticket document ${i + 1}`} href={u} className="flex items-center gap-2.5 rounded-xl ring-1 ring-[var(--border)] bg-[var(--surface)] px-3.5 py-3 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--hover)]">
+          <FileText size={16} className="text-blue-600 dark:text-blue-400 shrink-0" />
+          <span className="truncate">Ticket document {i + 1}</span>
+        </ViewTrackedLink>
+      ))}
+    </div>
+  )
+}
 type DeclinedQuote = { amount: number | null; amountInclVat: number | null; description: string | null; fileUrl: string | null; declineReason: string | null; validUntil: string | null; createdAt: string; declinedAt: string | null; warranty: string | null; quoteRef: string | null }
 
 // "Submit quote" is a TWO-STEP pop-up in the shared ticket-sheet layout ("Ticket"
@@ -241,6 +256,11 @@ function SubmitQuoteSheet({ ticket, company, onClose }: { ticket: SupplierTicket
                 {ctx.photoUrls.length > 0 && (
                   <SheetSection label="Images">
                     <PhotoThumbs urls={ctx.photoUrls} ticketId={ticket.id} label="Job photo" limit={5} />
+                  </SheetSection>
+                )}
+                {(ctx.infoDocUrls ?? []).length > 0 && (
+                  <SheetSection label="Documents">
+                    <TicketDocLinks ticketId={ticket.id} urls={ctx.infoDocUrls ?? []} />
                   </SheetSection>
                 )}
               </>
@@ -414,6 +434,12 @@ function DeclinedQuoteSheet({ ticket, company, onClose }: { ticket: SupplierTick
                         <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-[var(--text-faint)]">Photos ({ctx.photoUrls.length})</p>
                         <PhotoThumbs urls={ctx.photoUrls} ticketId={ticket.id} label="Job photo" limit={5} />
                         <p className="mt-1.5 flex items-center gap-1.5 text-xs text-[var(--text-faint)]"><Info size={12} className="shrink-0" /> Click any photo to view full size</p>
+                      </div>
+                    )}
+                    {(ctx.infoDocUrls ?? []).length > 0 && (
+                      <div>
+                        <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-[var(--text-faint)]">Documents ({(ctx.infoDocUrls ?? []).length})</p>
+                        <TicketDocLinks ticketId={ticket.id} urls={ctx.infoDocUrls ?? []} />
                       </div>
                     )}
                   </div>
