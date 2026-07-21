@@ -46,7 +46,7 @@ export async function loadSupplierTicketDetail(ticketId: string) {
     admin.from('stores').select('name, sub_store, branch_code').eq('id', t.store_id ?? '').single(),
     admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('ticket_suppliers').select('supplier_id, status, invited_at, decline_reason, responded_at, declined_by, requote_requested_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).maybeSingle(),
-    admin.from('quotes').select('id, amount, amount_incl_vat, description, file_url, status, valid_until, proposed_schedule_at, decline_reason, created_at, updated_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).order('created_at', { ascending: false }),
+    admin.from('quotes').select('id, amount, amount_incl_vat, description, file_url, status, valid_until, proposed_schedule_at, decline_reason, created_at, updated_at, quote_ref').eq('ticket_id', t.id).in('supplier_id', supplierIds).order('created_at', { ascending: false }),
     admin.from('technicians').select('id, name').in('supplier_id', supplierIds).eq('active', true).order('name'),
     admin.from('signoffs').select('id, before_urls, after_urls, coc_url, invoice_url, status, notes, reject_reason, reviewed_at, created_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).order('created_at', { ascending: false }),
     admin.from('snags').select('description, required_correction, severity, status, scheduled_at, schedule_status, assigned_at, schedule_agreed_at, schedule_declined_at, schedule_decline_reason, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),

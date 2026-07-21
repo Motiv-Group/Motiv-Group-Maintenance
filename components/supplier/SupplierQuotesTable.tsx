@@ -15,6 +15,8 @@ export type QuoteKind = 'requested' | 'pending' | 'accepted' | 'declined'
 export interface SupplierQuoteItem {
   key: string; ticketId: string; storeName: string; jobRef: string | null; category: string | null; priority: string; description: string | null
   kind: QuoteKind; at: string
+  /** Human quote reference ("Q-YYYY-NNNNN") — submitted quotes only, null pre-migration. */
+  quoteRef?: string | null
   proposedVisit: string | null; validUntil: string | null; amount: number | null; amountInclVat: number | null
   declinedLabel?: string | null
   /** RM asked this supplier to re-submit after the decline (shown on the declined row). */
@@ -59,7 +61,7 @@ export function SupplierQuotesTable({ items }: { items: SupplierQuoteItem[] }) {
     const term = q.trim().toLowerCase()
     const rows = items.filter(i => {
       if (tab !== 'all' && i.kind !== tab) return false
-      if (term && !`${i.storeName} ${i.jobRef ?? ''} ${i.category ?? ''} ${i.description ?? ''}`.toLowerCase().includes(term)) return false
+      if (term && !`${i.storeName} ${i.jobRef ?? ''} ${i.quoteRef ?? ''} ${i.category ?? ''} ${i.description ?? ''}`.toLowerCase().includes(term)) return false
       return true
     })
     const cmp: Record<string, (a: SupplierQuoteItem, b: SupplierQuoteItem) => number> = {
@@ -134,7 +136,7 @@ export function SupplierQuotesTable({ items }: { items: SupplierQuoteItem[] }) {
                       <CategoryIcon category={i.category ?? i.storeName} priority={i.priority} />
                       <span className="min-w-0">
                         <span className="block truncate font-semibold text-[var(--text)]">{i.storeName}</span>
-                        <span className="block truncate text-[11px] text-[var(--text-faint)]">{i.jobRef}</span>
+                        <span className="block truncate text-[11px] text-[var(--text-faint)]">{[i.jobRef, i.quoteRef].filter(Boolean).join(' · ')}</span>
                         {i.description && <span className="block max-w-[280px] truncate text-[11px] text-[var(--text-muted)]">{i.description}</span>}
                       </span>
                     </Link>
@@ -147,8 +149,10 @@ export function SupplierQuotesTable({ items }: { items: SupplierQuoteItem[] }) {
                   <td className="px-3">
                     <div className="flex w-fit flex-col items-stretch gap-1">
                       {PRIO[i.priority] && <span className={`${BADGE} ${PRIO[i.priority].cls}`}>{PRIO[i.priority].label}</span>}
-                      <span className={`${BADGE} ${STATUS[i.kind].badge}`}>{i.declinedLabel ?? STATUS[i.kind].label}{i.declineUnseen && <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-red-500" aria-label="New" />}</span>
-                      {i.kind === 'declined' && i.reQuoteRequested && <span className={`${BADGE} bg-amber-500/15 text-amber-700 dark:text-amber-400`}>Re-quote requested</span>}
+                      {/* Re-quote pending → the Declined chip is suppressed; the amber chip (carrying any unseen dot) is the status. */}
+                      {i.kind === 'declined' && i.reQuoteRequested
+                        ? <span className={`${BADGE} bg-amber-500/15 text-amber-700 dark:text-amber-400`}>Re-quote requested{i.declineUnseen && <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-red-500" aria-label="New" />}</span>
+                        : <span className={`${BADGE} ${STATUS[i.kind].badge}`}>{i.declinedLabel ?? STATUS[i.kind].label}{i.declineUnseen && <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-red-500" aria-label="New" />}</span>}
                     </div>
                   </td>
                   <td className="px-3 text-right"><Link href={`/supplier/tickets/${i.ticketId}`} aria-label="Open ticket" className="inline-flex rounded-lg p-1.5 text-[var(--text-faint)] transition group-hover:text-[var(--text)]"><Chev size={16} /></Link></td>
@@ -171,11 +175,13 @@ export function SupplierQuotesTable({ items }: { items: SupplierQuoteItem[] }) {
                       <p className="line-clamp-2 break-words text-sm font-semibold text-[var(--text)]">{i.storeName}</p>
                       <span className="flex w-fit shrink-0 flex-col items-stretch gap-1">
                         {PRIO[i.priority] && <span className={`${BADGE} ${PRIO[i.priority].cls}`}>{PRIO[i.priority].label}</span>}
-                        <span className={`${BADGE} ${STATUS[i.kind].badge}`}>{i.declinedLabel ?? STATUS[i.kind].label}{i.declineUnseen && <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-red-500" aria-label="New" />}</span>
-                        {i.kind === 'declined' && i.reQuoteRequested && <span className={`${BADGE} bg-amber-500/15 text-amber-700 dark:text-amber-400`}>Re-quote requested</span>}
+                        {/* Re-quote pending → the Declined chip is suppressed; the amber chip (carrying any unseen dot) is the status. */}
+                        {i.kind === 'declined' && i.reQuoteRequested
+                          ? <span className={`${BADGE} bg-amber-500/15 text-amber-700 dark:text-amber-400`}>Re-quote requested{i.declineUnseen && <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-red-500" aria-label="New" />}</span>
+                          : <span className={`${BADGE} ${STATUS[i.kind].badge}`}>{i.declinedLabel ?? STATUS[i.kind].label}{i.declineUnseen && <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-red-500" aria-label="New" />}</span>}
                       </span>
                     </div>
-                    <p className="truncate text-[11px] text-[var(--text-faint)]">{[i.jobRef, i.category].filter(Boolean).join(' · ')}</p>
+                    <p className="truncate text-[11px] text-[var(--text-faint)]">{[i.jobRef, i.quoteRef, i.category].filter(Boolean).join(' · ')}</p>
                     <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px] text-[var(--text-muted)]">
                       <span>{i.kind === 'requested' ? 'Requested' : 'Submitted'} {formatDateTime(i.at)}</span>
                       {i.amount != null && <span className="font-semibold text-[var(--text)]">{formatCurrency(i.amount)}</span>}

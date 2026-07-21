@@ -64,7 +64,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
   const quotesTab = quoteTabRows.length > 0
     ? (<div className="space-y-2">{quoteTabRows.map((q, i, arr) => (
         <QuoteSummary key={q.id} title={arr.length > 1 ? `Quote #${arr.length - i}` : 'Your submitted quote'} status={quoteStatusOf(q.status)} ticketId={t.id} collapsible declineReason={q.decline_reason ?? declineReason}
-          quote={{ id: q.id, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, description: q.description ?? null, fileUrl: q.file_url ?? null, validUntil: q.valid_until ?? null, createdAt: q.created_at }}
+          quote={{ id: q.id, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, description: q.description ?? null, fileUrl: q.file_url ?? null, validUntil: q.valid_until ?? null, createdAt: q.created_at, quoteRef: q.quote_ref ?? null }}
           schedule={q.status === 'accepted' && t.scheduled_at ? { at: t.scheduled_at, proposed: t.schedule_status === 'proposed', technician: scheduledTechName, audience: 'supplier' } : q.proposed_schedule_at ? { at: q.proposed_schedule_at, proposed: true, audience: 'supplier' } : null} />
       ))}</div>)
     : null
@@ -141,7 +141,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
           <ArchiveGroup label="Quotes">
             {historyDeclinedQuotes.map((q, i, arr) => (
               <QuoteSummary key={q.id} title={arr.length > 1 ? `Quote #${arr.length - i}` : 'Your submitted quote'} status={quoteStatusOf(q.status)} ticketId={t.id} collapsible declineReason={q.decline_reason ?? declineReason}
-                quote={{ id: q.id, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, description: q.description ?? null, fileUrl: q.file_url ?? null, validUntil: q.valid_until ?? null, createdAt: q.created_at, declinedAt: q.updated_at ?? null }} />
+                quote={{ id: q.id, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, description: q.description ?? null, fileUrl: q.file_url ?? null, validUntil: q.valid_until ?? null, createdAt: q.created_at, declinedAt: q.updated_at ?? null, quoteRef: q.quote_ref ?? null }} />
             ))}
           </ArchiveGroup>
         )}
@@ -387,7 +387,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
                 <p className="text-sm text-[var(--text-muted)]">You will be notified of any updates on this ticket.</p>
               </div>
               <SupplierQuoteSubmittedActions ticketId={t.id} canDecline={canDecline} decline={declineDetails}
-                quote={latestQuote ? { id: latestQuote.id, amount: latestQuote.amount, amountInclVat: latestQuote.amount_incl_vat ?? null, description: latestQuote.description ?? null, fileUrl: latestQuote.file_url ?? null, validUntil: latestQuote.valid_until ?? null, createdAt: latestQuote.created_at } : null}
+                quote={latestQuote ? { id: latestQuote.id, amount: latestQuote.amount, amountInclVat: latestQuote.amount_incl_vat ?? null, description: latestQuote.description ?? null, fileUrl: latestQuote.file_url ?? null, validUntil: latestQuote.valid_until ?? null, createdAt: latestQuote.created_at, quoteRef: latestQuote.quote_ref ?? null } : null}
                 schedule={latestQuote?.proposed_schedule_at ? { at: latestQuote.proposed_schedule_at, proposed: true, audience: 'supplier' } : null} />
             </div>
           )}

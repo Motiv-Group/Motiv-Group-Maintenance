@@ -11,7 +11,9 @@ const HIDE_FROM_QUOTES = new Set(['submitted_for_signoff', 'approved_closeout', 
 const AWAITING_QUOTE = new Set(['assigned', 'assessment', 'quote_requested', 'quote_revision'])
 
 const kindOf = (s: string): QuoteKind => s === 'accepted' ? 'accepted' : s === 'declined' ? 'declined' : s === 'revision_requested' ? 'requested' : 'pending'
-const declinedLabelOf = (by: string | null) => by === 'supplier' ? 'Declined (you)' : by === 'regional_manager' ? 'Declined (Client)' : 'Declined'
+// Any decline the supplier didn't make themselves is the client's side — covers the
+// auto-decline when the RM awards another supplier (invite 'closed', declined_by null).
+const declinedLabelOf = (by: string | null) => by === 'supplier' ? 'Declined (you)' : 'Declined (Client)'
 
 export default async function SupplierQuotesPage() {
   const { companyId, supplierIds, userId } = await requireSupplierV3()
@@ -35,7 +37,7 @@ export default async function SupplierQuotesPage() {
       const kind = kindOf(q.status)
       return {
         key: `q-${q.id}`, ticketId: q.ticketId, storeName: q.storeName, jobRef: q.jobRef, category: q.category, priority: String(q.priority ?? ''), description: q.description,
-        kind, at: q.createdAt, proposedVisit: q.proposedScheduleAt, validUntil: q.validUntil, amount: q.amount, amountInclVat: q.amountInclVat,
+        kind, at: q.createdAt, proposedVisit: q.proposedScheduleAt, validUntil: q.validUntil, amount: q.amount, amountInclVat: q.amountInclVat, quoteRef: q.quoteRef,
         declinedLabel: kind === 'declined' ? declinedLabelOf(declinedByByTicket.get(q.ticketId) ?? null) : null,
         reQuoteRequested: kind === 'declined' && q.reQuoteRequested,
         // Client-declined and not yet opened since → "New" marker (clears on open).

@@ -26,7 +26,7 @@ import type { Database } from '@/lib/database.types'
 type Tables = Database['public']['Tables']
 type TicketRow = Tables['tickets']['Row']
 type StoreSel = Pick<Tables['stores']['Row'], 'name' | 'sub_store' | 'region_id' | 'company_id'>
-type QuoteSel = Pick<Tables['quotes']['Row'], 'id' | 'supplier_id' | 'amount' | 'amount_incl_vat' | 'description' | 'file_url' | 'status' | 'valid_until' | 'proposed_schedule_at' | 'decline_reason' | 'created_at' | 'updated_at'>
+type QuoteSel = Pick<Tables['quotes']['Row'], 'id' | 'supplier_id' | 'amount' | 'amount_incl_vat' | 'description' | 'file_url' | 'status' | 'valid_until' | 'proposed_schedule_at' | 'decline_reason' | 'created_at' | 'updated_at' | 'quote_ref'>
 type SupplierSel = Pick<Tables['suppliers']['Row'], 'id' | 'company_name' | 'trade' | 'trades'>
 type SnagSel = Pick<Tables['snags']['Row'], 'description' | 'status' | 'scheduled_at' | 'schedule_status' | 'assigned_at' | 'schedule_agreed_at' | 'schedule_declined_at' | 'schedule_decline_reason' | 'created_at'>
 
@@ -70,7 +70,7 @@ async function buildRegionalTicketDetail(
   userId: string,
 ) {
   const [{ data: quotes }, { data: updates }, { data: signoffs }, { data: suppliers }, { data: variations }, { data: snags }, { data: invites }, { data: ratingRows }, { data: roundRows }] = await Promise.all([
-    admin.from('quotes').select('id, supplier_id, amount, amount_incl_vat, description, file_url, status, valid_until, proposed_schedule_at, decline_reason, created_at, updated_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
+    admin.from('quotes').select('id, supplier_id, amount, amount_incl_vat, description, file_url, status, valid_until, proposed_schedule_at, decline_reason, created_at, updated_at, quote_ref').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('signoffs').select('id, status, before_urls, after_urls, coc_url, invoice_url, notes, reject_reason, reviewed_at, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('suppliers').select('id, company_name, trade, trades').eq('company_id', companyId).eq('active', true).order('company_name'),
@@ -304,6 +304,7 @@ async function buildRegionalTicketDetail(
     // then to the courteous "not selected" note for quotes auto-declined on award.
     validUntil: q.valid_until ?? null, createdAt: q.created_at, declineReason: q.decline_reason ?? declineReasonBy.get(q.supplier_id ?? '') ?? (awarded ? COURTESY_NOTE : null),
     proposedScheduleAt: q.proposed_schedule_at ?? null, declinedAt: q.updated_at ?? null,
+    quoteRef: q.quote_ref ?? null,
   })
   const reviewQuotes = (quotes ?? []).filter(q => q.status === 'pending').map(mapQuote)
   const acceptedQuotes = (quotes ?? []).filter(q => q.status === 'accepted').map(mapQuote)
@@ -342,7 +343,7 @@ async function buildRegionalTicketDetail(
   for (const q of acceptedQuotes) quoteBySupplier.set(q.supplierId, { kind: 'accepted', q })
   for (const q of reviewQuotes) if (!quoteBySupplier.has(q.supplierId)) quoteBySupplier.set(q.supplierId, { kind: 'received', q })
   for (const q of liveDeclinedQuotes) if (!quoteBySupplier.has(q.supplierId)) quoteBySupplier.set(q.supplierId, { kind: 'declined', q })
-  const toPanelQuote = (q: ReturnType<typeof mapQuote>) => ({ id: q.id, amount: q.amount, amountInclVat: q.amountInclVat ?? null, description: q.description ?? null, fileUrl: q.fileUrl ?? null, createdAt: q.createdAt, validUntil: q.validUntil ?? null, proposedScheduleAt: q.proposedScheduleAt ?? null })
+  const toPanelQuote = (q: ReturnType<typeof mapQuote>) => ({ id: q.id, amount: q.amount, amountInclVat: q.amountInclVat ?? null, description: q.description ?? null, fileUrl: q.fileUrl ?? null, createdAt: q.createdAt, validUntil: q.validUntil ?? null, proposedScheduleAt: q.proposedScheduleAt ?? null, quoteRef: q.quoteRef ?? null })
   const quotePanelSeen = new Set<string>()
   const quotePanelRows: { supplierId: string; name: string; requestedAt: string | null; kind: 'waiting' | 'received' | 'accepted' | 'declined'; declineReason: string | null; quote: ReturnType<typeof toPanelQuote> | null }[] = []
   for (const r of requestedRows) {

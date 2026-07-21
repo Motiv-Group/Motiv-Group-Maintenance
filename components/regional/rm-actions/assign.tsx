@@ -23,7 +23,7 @@ function supInitials(name: string): string {
   return parts.length ? parts.slice(0, 3).map(p => p[0]!.toUpperCase()).join('') : '?'
 }
 
-export function AssignSuppliersButton({ ticketId, suppliers, motivSuppliers = [], motivAccess = 'none', declinedSupplierIds = [], awaitingById = {}, trigger }: { ticketId: string; suppliers: SupplierChoice[]; motivSuppliers?: SupplierChoice[]; motivAccess?: 'none' | 'pending' | 'approved' | 'rejected'; declinedSupplierIds?: string[]; awaitingById?: Record<string, 'invited' | 'quoted'>; trigger?: (open: () => void) => ReactNode }) {
+export function AssignSuppliersButton({ ticketId, suppliers, motivSuppliers = [], motivAccess = 'none', declinedSupplierIds = [], awaitingById = {}, trigger, onAssigned }: { ticketId: string; suppliers: SupplierChoice[]; motivSuppliers?: SupplierChoice[]; motivAccess?: 'none' | 'pending' | 'approved' | 'rejected'; declinedSupplierIds?: string[]; awaitingById?: Record<string, 'invited' | 'quoted'>; trigger?: (open: () => void) => ReactNode; onAssigned?: () => void }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   // Auto-open when deep-linked from the Today queue's "Assign supplier" action
@@ -84,7 +84,8 @@ export function AssignSuppliersButton({ ticketId, suppliers, motivSuppliers = []
 
   async function doAssign() {
     setBusy(true); setErr('')
-    try { await post(`/api/tickets/${ticketId}/assign`, { supplierIds: [...sel] }); setOpen(false); setBusy(false); setConfirmReinvite(false); router.refresh() }
+    // onAssigned lets a hosting pop-up (e.g. View & Assign) close itself too.
+    try { await post(`/api/tickets/${ticketId}/assign`, { supplierIds: [...sel] }); setOpen(false); setBusy(false); setConfirmReinvite(false); onAssigned?.(); router.refresh() }
     catch (e) { setErr(errMsg(e)); setBusy(false) }
   }
   function assign() {
@@ -281,6 +282,12 @@ export function ViewAssignButton({ ticketId, summary, suppliers, motivSuppliers 
   const meta = rmStatusMeta(summary.status)
   const priorityLabel = PRIORITY_LEVEL_LABELS[String(summary.priority)] ?? 'Medium'
   const showRequestInfo = ['open', 'info_requested'].includes(summary.status)
+  // Info requested from the store → hold off assigning (the More menu, where
+  // Request more info lives, stays usable).
+  const infoRequested = summary.status === 'info_requested'
+  // Once one or more suppliers have already been invited/quoted, assigning is
+  // adding ANOTHER supplier — reflect that in the button label.
+  const assignLabel = Object.keys(awaitingById).length > 0 ? 'Request another supplier' : 'Assign supplier'
 
   return (
     <>
@@ -338,25 +345,27 @@ export function ViewAssignButton({ ticketId, summary, suppliers, motivSuppliers 
                 </>
               )}
 
-            {/* Footer — primary Assign (opens the searchable supplier picker on top)
-                + a small "More" chip with the secondary ticket actions (same modals
-                as the RM next-action bar). Menu opens up-right — bottom-of-pop-up
-                convention. The chip appears once the ticket detail is loaded, since
-                the actions need the fetched fields. */}
+            {/* Footer — a small "More" chip with the secondary ticket actions (same
+                modals as the RM next-action bar) on the left + primary Assign (opens
+                the searchable supplier picker on top) on the right. Menu opens
+                up-left — bottom-of-pop-up convention. The chip appears once the
+                ticket detail is loaded, since the actions need the fetched fields.
+                Assigning is held while the store's info is outstanding. */}
             <SheetFooter>
               <div className="flex w-full items-center gap-2">
-                <AssignSuppliersButton ticketId={ticketId} suppliers={suppliers} motivSuppliers={motivSuppliers} motivAccess={motivAccess} awaitingById={awaitingById} declinedSupplierIds={declinedSupplierIds}
-                  trigger={openPicker => <button onClick={openPicker} className="flex-1 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500">Assign supplier</button>} />
                 {ticket && (
-                  <MoreMenu up align="right">
+                  <MoreMenu up align="left">
                     <MoreActionItem icon={<Plus size={16} />} label="Add extra work" onClick={() => setActive('addwork')} />
                     {showRequestInfo && <MoreActionItem icon={<MessageSquare size={16} />} label="Request more info" onClick={() => setActive('info')} />}
                     <MoreActionItem icon={<Pencil size={16} />} label="Edit ticket" onClick={() => setActive('edit')} />
                     <MoreActionItem icon={<XCircle size={16} />} label="Cancel ticket" tone="danger" onClick={() => setActive('cancel')} />
                   </MoreMenu>
                 )}
+                <AssignSuppliersButton ticketId={ticketId} suppliers={suppliers} motivSuppliers={motivSuppliers} motivAccess={motivAccess} awaitingById={awaitingById} declinedSupplierIds={declinedSupplierIds} onAssigned={() => setOpen(false)}
+                  trigger={openPicker => <button disabled={infoRequested} onClick={infoRequested ? undefined : openPicker} className="flex-1 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed">{assignLabel}</button>} />
               </div>
             </SheetFooter>
+            {infoRequested && <p className="-mt-2 text-xs text-[var(--text-muted)]">Waiting for the store&apos;s information before assigning.</p>}
           </div>
         </Modal>
       )}

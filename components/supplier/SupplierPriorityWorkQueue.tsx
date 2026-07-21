@@ -348,7 +348,7 @@ function DeclinedQuoteSheet({ ticket, company, onClose }: { ticket: SupplierTick
                   {declined?.declinedAt && (
                     <div className="shrink-0 text-sm sm:text-right">
                       <p className="flex items-center gap-1.5 text-[var(--text)]"><CalendarClock size={14} className="shrink-0 text-[var(--text-faint)]" /> Decided on <span className="font-semibold">{formatDateTime(declined.declinedAt)}</span></p>
-                      <p className="text-xs text-[var(--text-muted)]">by {ticket.isIndividual ? 'the client' : 'Regional Manager'}</p>
+                      <p className="text-xs text-[var(--text-muted)]">by Client</p>
                     </div>
                   )}
                 </div>

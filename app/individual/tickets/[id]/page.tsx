@@ -29,7 +29,7 @@ export default async function IndividualTicketDetailPage(props: { params: Promis
   const [{ userId }, { data: t }, { data: quotes }, { data: signoffs }, { data: invites }, { data: motiv }, { data: snags }, { data: disputeRows }, { data: disputeMsgRows }, { data: disputeExtra }, { data: variations }, { data: snagEvents }, { data: requestRows }, { data: editRows }] = await Promise.all([
     requireIndividual(),
     admin.from('tickets').select('*').eq('id', params.id).single(),
-    admin.from('quotes').select('id, supplier_id, amount, amount_incl_vat, description, file_url, status, valid_until, proposed_schedule_at, created_at, updated_at').eq('ticket_id', params.id).order('created_at', { ascending: false }),
+    admin.from('quotes').select('id, supplier_id, amount, amount_incl_vat, description, file_url, status, valid_until, proposed_schedule_at, created_at, updated_at, quote_ref').eq('ticket_id', params.id).order('created_at', { ascending: false }),
     admin.from('signoffs').select('id, before_urls, after_urls, coc_url, invoice_url, status, notes, reject_reason, reviewed_at, created_at').eq('ticket_id', params.id).order('created_at', { ascending: false }),
     admin.from('ticket_suppliers').select('supplier_id, status, invited_at, decline_reason').eq('ticket_id', params.id),
     admin.from('suppliers').select('id, company_name').eq('is_motiv', true).eq('active', true).order('company_name'),
@@ -95,7 +95,7 @@ export default async function IndividualTicketDetailPage(props: { params: Promis
   const supplierStatusRows = inviteRows.map(r => ({ name: nameById.get(r.supplier_id) ?? 'Supplier', status: r.status, invitedAt: r.invited_at, declineReason: r.decline_reason }))
   const reviewQuotes: ReviewQuote[] = quoteRows.filter(q => q.status === 'pending').map(q => ({
     id: q.id, supplierName: (q.supplier_id ? nameById.get(q.supplier_id) : undefined) ?? 'Supplier', amount: q.amount, amountInclVat: q.amount_incl_vat ?? null,
-    description: q.description ?? null, fileUrl: q.file_url ?? null, createdAt: q.created_at, proposedScheduleAt: q.proposed_schedule_at ?? null,
+    description: q.description ?? null, fileUrl: q.file_url ?? null, createdAt: q.created_at, proposedScheduleAt: q.proposed_schedule_at ?? null, quoteRef: q.quote_ref ?? null,
   }))
   const canAssign = ASSIGNABLE.includes(t.status)
 
@@ -169,7 +169,7 @@ export default async function IndividualTicketDetailPage(props: { params: Promis
           {reviewQuotes.length > 0 && <QuoteReviewCard ticketId={t.id} quotes={reviewQuotes} />}
           {acceptedQuote && (
             <QuoteSummary title={`Approved · ${(acceptedQuote.supplier_id ? nameById.get(acceptedQuote.supplier_id) : undefined) ?? 'Supplier'}`} status="accepted"
-              quote={{ id: acceptedQuote.id, amount: acceptedQuote.amount, amountInclVat: acceptedQuote.amount_incl_vat ?? null, description: acceptedQuote.description ?? null, fileUrl: acceptedQuote.file_url ?? null, validUntil: acceptedQuote.valid_until ?? null, createdAt: acceptedQuote.created_at }} />
+              quote={{ id: acceptedQuote.id, amount: acceptedQuote.amount, amountInclVat: acceptedQuote.amount_incl_vat ?? null, description: acceptedQuote.description ?? null, fileUrl: acceptedQuote.file_url ?? null, validUntil: acceptedQuote.valid_until ?? null, createdAt: acceptedQuote.created_at, quoteRef: acceptedQuote.quote_ref ?? null }} />
           )}
         </Card>
       )}

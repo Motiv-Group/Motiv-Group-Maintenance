@@ -45,6 +45,7 @@ type DeclinedQuote = {
   createdAt: string
   declinedAt: string | null
   declineReason: string | null
+  quoteRef: string | null
 }
 function RmDeclinedQuoteCard({ q, ticketId, canReQuote, open = false }: { q: DeclinedQuote; ticketId: string; canReQuote: boolean; open?: boolean }) {
   return (
@@ -70,6 +71,7 @@ function RmDeclinedQuoteCard({ q, ticketId, canReQuote, open = false }: { q: Dec
           <DetailItem label="Incl. VAT" value={q.amountInclVat ? formatCurrency(q.amountInclVat) : '—'} />
           <DetailItem label="Received" value={formatDateTime(q.createdAt)} />
           <DetailItem label="Declined" value={q.declinedAt ? formatDateTime(q.declinedAt) : '—'} />
+          {q.quoteRef && <DetailItem label="Reference" value={q.quoteRef} />}
         </div>
         {q.description && (
           <div>
@@ -305,7 +307,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
         const isApproved = acceptedQuoteIds.has(q.id)
         return (
           <QuoteSummary key={q.id} title={q.supplierName ?? 'Supplier'} status={isApproved ? 'accepted' : 'pending'} collapsible ticketId={t.id}
-            quote={{ id: q.id, supplierName: q.supplierName, amount: q.amount, amountInclVat: q.amountInclVat ?? null, description: q.description ?? null, fileUrl: q.fileUrl ?? null, validUntil: q.validUntil ?? null, createdAt: q.createdAt }}
+            quote={{ id: q.id, supplierName: q.supplierName, amount: q.amount, amountInclVat: q.amountInclVat ?? null, description: q.description ?? null, fileUrl: q.fileUrl ?? null, validUntil: q.validUntil ?? null, createdAt: q.createdAt, quoteRef: q.quoteRef ?? null }}
             schedule={q.proposedScheduleAt ? { at: q.proposedScheduleAt, proposed: true, audience: 'rm' } : null} />
         )
       })}

@@ -7,7 +7,7 @@ import type { Database } from '@/lib/database.types'
 
 type PanelQuote = Pick<
   Database['public']['Tables']['quotes']['Row'],
-  'id' | 'supplier_id' | 'amount' | 'amount_incl_vat' | 'description' | 'file_url' | 'status' | 'valid_until' | 'proposed_schedule_at' | 'created_at' | 'decline_reason'
+  'id' | 'supplier_id' | 'amount' | 'amount_incl_vat' | 'description' | 'file_url' | 'status' | 'valid_until' | 'proposed_schedule_at' | 'created_at' | 'decline_reason' | 'quote_ref'
 >
 
 // GET /api/tickets/[id]/quotes — the RM's quote-panel rows for a ticket (requested
@@ -30,7 +30,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   if (!(await rmOwnsTicket(admin, user.id, ticket))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const [{ data: quotes }, { data: invites }] = await Promise.all([
-    admin.from('quotes').select('id, supplier_id, amount, amount_incl_vat, description, file_url, status, valid_until, proposed_schedule_at, created_at, decline_reason').eq('ticket_id', id).order('created_at', { ascending: false }),
+    admin.from('quotes').select('id, supplier_id, amount, amount_incl_vat, description, file_url, status, valid_until, proposed_schedule_at, created_at, decline_reason, quote_ref').eq('ticket_id', id).order('created_at', { ascending: false }),
     admin.from('ticket_suppliers').select('supplier_id, status, invited_at, decline_reason, suppliers(company_name)').eq('ticket_id', id),
   ])
 
@@ -46,7 +46,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const missing = quoteRows.map(q => q.supplier_id).filter((sid): sid is string => !!sid && !nameById.has(sid))
   if (missing.length) { const { data: sups } = await admin.from('suppliers').select('id, company_name').in('id', missing); for (const s of sups ?? []) nameById.set(s.id, s.company_name) }
 
-  const toPanelQuote = (q: PanelQuote) => ({ id: q.id, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, description: q.description ?? null, fileUrl: q.file_url ?? null, createdAt: q.created_at, validUntil: q.valid_until ?? null, proposedScheduleAt: q.proposed_schedule_at ?? null })
+  const toPanelQuote = (q: PanelQuote) => ({ id: q.id, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, description: q.description ?? null, fileUrl: q.file_url ?? null, createdAt: q.created_at, validUntil: q.valid_until ?? null, proposedScheduleAt: q.proposed_schedule_at ?? null, quoteRef: q.quote_ref ?? null })
   const quoteBySupplier = new Map<string | null, { kind: 'received' | 'accepted' | 'declined'; q: PanelQuote }>()
   for (const q of quoteRows) {
     if (q.status === 'accepted') quoteBySupplier.set(q.supplier_id, { kind: 'accepted', q })
