@@ -156,9 +156,11 @@ export default function LoginPage() {
           label="Email address"
           placeholder="you@example.com"
           autoComplete="email"
+          maxLength={200}
           error={errors.email?.message}
           {...register('email', {
             required: 'Email is required',
+            maxLength: { value: 200, message: 'Email must be 200 characters or fewer' },
             validate: v => isValidEmail(v) || 'Enter a valid email address',
           })}
         />
@@ -168,8 +170,12 @@ export default function LoginPage() {
           label="Password"
           placeholder="Your password"
           autoComplete="current-password"
+          maxLength={200}
           error={errors.password?.message}
-          {...register('password', { required: 'Password is required' })}
+          {...register('password', {
+            required: 'Password is required',
+            maxLength: { value: 200, message: 'Password must be 200 characters or fewer' },
+          })}
         />
 
         <div className="flex items-center justify-between pt-0.5">
