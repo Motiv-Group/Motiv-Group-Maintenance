@@ -5,6 +5,7 @@ import { GeistMono } from 'geist/font/mono'
 import { ThemeProvider } from '@/components/providers/ThemeProvider'
 import { BrandingProvider, type BrandingValue } from '@/components/providers/BrandingProvider'
 import { ServiceWorkerSetup } from '@/components/ui/ServiceWorkerSetup'
+import { SpeedInsights } from '@vercel/speed-insights/next'
 import { getAppSettings } from '@/lib/settings-server'
 import { BRAND_DEFAULT_HEX, BRAND_STOPS, DEFAULT_BRAND_ASSETS, effectiveBrandHex, hexToChannels } from '@/lib/settings'
 import './globals.css'
@@ -124,6 +125,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             {children}
           </ThemeProvider>
         </BrandingProvider>
+        {/* Real-user Core Web Vitals. Injects its script client-side via the trusted
+            React bundle → allowed by the strict-dynamic CSP; beacons same-origin
+            (/_vercel/speed-insights/*), covered by connect-src 'self'. */}
+        <SpeedInsights />
       </body>
     </html>
   )
