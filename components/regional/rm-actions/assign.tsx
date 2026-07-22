@@ -295,9 +295,11 @@ export function ViewAssignButton({ ticketId, summary, suppliers, motivSuppliers 
   // Info requested from the store → hold off assigning (the More menu, where
   // Request more info lives, stays usable).
   const infoRequested = summary.status === 'info_requested'
-  // Once one or more suppliers have already been invited/quoted, assigning is
-  // adding ANOTHER supplier — reflect that in the button label.
-  const assignLabel = Object.keys(awaitingById).length > 0 ? 'Request another supplier' : 'Assign supplier'
+  // Once one or more suppliers are engaged (invited/quoted), assigning is adding
+  // ANOTHER supplier — reflect that in the button label, and lock scope-changing
+  // actions (Add extra work / Edit ticket) out of the More menu below.
+  const suppliersEngaged = Object.keys(awaitingById).length > 0
+  const assignLabel = suppliersEngaged ? 'Request another supplier' : 'Assign supplier'
 
   return (
     <>
@@ -312,6 +314,16 @@ export function ViewAssignButton({ ticketId, summary, suppliers, motivSuppliers 
                 <span className={`inline-flex justify-center rounded-md px-2 py-1 text-[10px] font-bold ${vaPriorityBadge(String(summary.priority))}`}>{priorityLabel}</span>
                 <span className={`inline-flex justify-center rounded-md px-2 py-1 text-[10px] font-bold ${meta.cls}`}>{meta.label}</span>
               </>} />
+
+            {/* Extra info was requested from the store — surface it up top so the RM
+                knows to hold off assigning; any response lands in the description /
+                documents sections below. */}
+            {infoRequested && (
+              <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/40 px-3.5 py-3">
+                <p className="text-sm font-semibold text-[var(--text)]">More information requested from the store</p>
+                <p className="mt-0.5 text-xs text-[var(--text-muted)]">Any response appears in the description or documents below.</p>
+              </div>
+            )}
 
             {loading ? <p className="py-4 text-center text-sm text-[var(--text-faint)]">Loading…</p>
               : err ? <p className="text-sm text-red-500">{err}</p>
@@ -382,9 +394,11 @@ export function ViewAssignButton({ ticketId, summary, suppliers, motivSuppliers 
               <div className="flex w-full items-center gap-2">
                 {ticket && (
                   <MoreMenu up align="left">
-                    <MoreActionItem icon={<Plus size={16} />} label="Add extra work" onClick={() => setActive('addwork')} />
+                    {/* Editing scope is disallowed once suppliers are quoting, so
+                        Add extra work / Edit ticket drop out once engaged. */}
+                    {!suppliersEngaged && <MoreActionItem icon={<Plus size={16} />} label="Add extra work" onClick={() => setActive('addwork')} />}
                     {showRequestInfo && <MoreActionItem icon={<MessageSquare size={16} />} label="Request more info" onClick={() => setActive('info')} />}
-                    <MoreActionItem icon={<Pencil size={16} />} label="Edit ticket" onClick={() => setActive('edit')} />
+                    {!suppliersEngaged && <MoreActionItem icon={<Pencil size={16} />} label="Edit ticket" onClick={() => setActive('edit')} />}
                     <MoreActionItem icon={<XCircle size={16} />} label="Cancel ticket" tone="danger" onClick={() => setActive('cancel')} />
                   </MoreMenu>
                 )}

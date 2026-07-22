@@ -840,7 +840,7 @@ function SnagSheet({ ticket, company, onClose }: { ticket: SupplierTicketRow; co
               <MoreActionItem label="Raise dispute" tone="danger" onClick={() => setDisputing(true)} />
             </MoreMenu>
             <div className="min-w-0 flex-1">
-              <AcceptSnagCard ticketId={ticket.id} priority={String(ticket.priority)} createdAt={ticket.createdAt}
+              <AcceptSnagCard ticketId={ticket.id} priority={String(ticket.priority)} createdAt={ticket.createdAt} onScheduled={close}
                 trigger={openSched => (
                   <button type="button" onClick={openSched} className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500">
                     <Calendar size={16} /> Accept and schedule snag
@@ -974,7 +974,7 @@ function matchesFilter(t: SupplierTicketRow, filter: QueueFilter): boolean {
 function nextStep(t: SupplierTicketRow): string {
   const s = myStatus(t)
   if (t.disputed) return 'Dispute open — awaiting resolution'
-  if (t.declinedForMe) return 'Your quote was not selected for this job'
+  if (t.declinedForMe) return t.declinedBy === 'supplier' ? 'You declined this quote request' : 'Your quote was not selected for this job'
   if (t.requoteRequested) return 'Quote declined — revise and resubmit'
   if (s === 'quote_requested') return 'Submit a quote'
   if (s === 'quoted') return "Awaiting the client's decision"
@@ -988,7 +988,7 @@ function nextStep(t: SupplierTicketRow): string {
   if (t.status === 'snag' && t.snagScheduleStatus === 'declined') return 'Schedule declined — propose a new time'
   if (t.status === 'snag_assigned' && t.snagScheduleStatus === 'proposed') return 'Awaiting schedule approval from the manager'
   if (t.status === 'snag_assigned' && t.snagScheduleStatus === 'agreed') return 'Schedule approved — start the snag fix'
-  if (['snag', 'snag_assigned'].includes(t.status)) return 'Accept and schedule the snag fix'
+  if (['snag', 'snag_assigned'].includes(t.status)) return 'Review the snag and schedule the corrective work'
   if (['snag_in_progress', 'snag_resolved'].includes(t.status)) return 'Re-upload the COC & POC'
   if (t.status === 'submitted_for_signoff') return 'Awaiting the client sign-off'
   if (t.status === 'variation_review' && t.awardedToMe) return "Variation order submitted — awaiting the manager's decision"

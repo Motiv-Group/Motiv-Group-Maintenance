@@ -161,6 +161,9 @@ export const TRANSITIONS: Record<TicketStatus, Transition[]> = {
   snag_assigned: [
     { action: 'approve_snag',          label: 'Approve snag schedule', to: 'snag_assigned',    roles: ['regional_manager', 'individual'] },
     { action: 'decline_snag_schedule', label: 'Decline snag schedule', to: 'snag',             roles: ['regional_manager', 'individual'] },
+    // Supplier may revise the proposed fix date while it's still awaiting the RM's
+    // approval (the handler blocks it once the schedule is agreed) — stays snag_assigned.
+    { action: 'update_snag_schedule',  label: 'Update snag schedule',  to: 'snag_assigned',    roles: ['supplier'] },
     { action: 'start_snag',            label: 'Snag in progress',      to: 'snag_in_progress', roles: ['supplier'] },
   ],
   snag_in_progress: [

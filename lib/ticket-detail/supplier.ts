@@ -85,6 +85,9 @@ export async function loadSupplierTicketDetail(ticketId: string) {
   // evidence URL to a short-lived signed URL in place, so all the render sites below
   // (ticket photos, signoff cards, quotes, variations, disputes) get readable links.
   if (Array.isArray(t.photo_urls)) t.photo_urls = await signManyUrls(t.photo_urls)
+  // Ticket documents logged with the ticket → signed for the Documents tab (supplier-
+  // scoped: the page already gates access). Kept in its own list; t stays untouched.
+  const infoDocUrls = Array.isArray(t.info_doc_urls) ? await signManyUrls(t.info_doc_urls) : []
   await Promise.all([
     ...(signoffRows ?? []).map(async s => {
       if (Array.isArray(s.before_urls)) s.before_urls = await signManyUrls(s.before_urls)
@@ -385,7 +388,7 @@ export async function loadSupplierTicketDetail(ticketId: string) {
     variations, variationCount, latestVoRejectReason, canDecline,
     disputes, msgsByDispute, openDispute, resolvedDisputes, disputeSubject,
     nextAction, timelineItems,
-    totalPhotos, quoteTabRows, historyDeclinedQuotes, updates: updates ?? [], declineRows: declineRows ?? [],
+    totalPhotos, infoDocUrls, quoteTabRows, historyDeclinedQuotes, updates: updates ?? [], declineRows: declineRows ?? [],
   }
   return { kind: 'ok' as const, data }
 }

@@ -32,7 +32,7 @@ type SnagSel = Pick<Tables['snags']['Row'], 'description' | 'status' | 'schedule
 
 // Professional "what we're waiting on" copy while a snag works its way through.
 export const SNAG_WAIT_MSG: Record<string, string> = {
-  snag: 'This completion has been snagged. Awaiting the supplier to accept the snag and propose a date to carry out the corrective work.',
+  snag: 'Snagged — awaiting the supplier to accept the snag and propose a date for the corrective work.',
   snag_assigned: 'The snag schedule is approved. The supplier will carry out the corrective work on the agreed date and resubmit the completion for sign-off.',
   snag_in_progress: 'The supplier is carrying out the corrective work and will resubmit the completion for sign-off.',
   snag_resolved: 'The snag has been resolved. Awaiting the resubmitted completion for sign-off.',

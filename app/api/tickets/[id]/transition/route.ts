@@ -110,7 +110,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   // upload evidence or re-submit the VO, and the RM can't close out, until the dispute
   // is resolved (see /dispute). Quote-decline disputes are thread-only (raised by a
   // NON-awarded org) and must never block the awarded supplier's workflow.
-  if (['accept_snag', 'submit_completion', 'start_snag', 'submit_variation', 'close_out'].includes(action)) {
+  if (['accept_snag', 'update_snag_schedule', 'submit_completion', 'start_snag', 'submit_variation', 'close_out'].includes(action)) {
     const { data: openDisputes } = await admin.from('ticket_disputes').select('id, origin').eq('ticket_id', ticketId).eq('status', 'open')
     if ((openDisputes ?? []).some(d => d.origin !== 'quote_declined')) return NextResponse.json({ error: 'This ticket has an open dispute — resolve it before continuing.' }, { status: 409 })
   }
@@ -286,6 +286,24 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
         if (when.getTime() < Date.now() - 5 * 60_000) return NextResponse.json({ error: 'Cannot schedule in the past.' }, { status: 400 })
         snagFixAt = when.toISOString()
         await admin.from('snags').update({ status: 'assigned', assigned_at: now, supplier_id: ticket.supplier_id, scheduled_at: snagFixAt, schedule_status: 'proposed' }).eq('ticket_id', ticketId).in('status', ['open'])
+        // Durable "proposed" event (keeps every round for the audit trail).
+        await logSnagScheduleEvent(admin, ticket, 'proposed', 'supplier', { scheduledFor: snagFixAt })
+        break
+      }
+      case 'update_snag_schedule': {
+        // Supplier revises the proposed snag-fix date while it's still awaiting the
+        // RM (same date validation as accept_snag), but re-stamps the SAME 'assigned'
+        // snag rather than accepting a fresh 'open' one — the schedule stays 'proposed'
+        // and the ticket stays snag_assigned (to === 'snag_assigned', no status change).
+        const when = body.scheduledAt ? new Date(body.scheduledAt) : null
+        if (!when || isNaN(when.getTime())) return NextResponse.json({ error: 'Pick when the snag will be fixed.' }, { status: 400 })
+        if (when.getTime() < Date.now() - 5 * 60_000) return NextResponse.json({ error: 'Cannot schedule in the past.' }, { status: 400 })
+        // Only a still-proposed schedule can be edited — once the RM has approved
+        // (agreed) or declined it, the supplier must act on that decision instead.
+        const { data: snag } = await admin.from('snags').select('schedule_status').eq('ticket_id', ticketId).eq('status', 'assigned').order('created_at', { ascending: false }).limit(1).maybeSingle()
+        if (!snag || snag.schedule_status !== 'proposed') return NextResponse.json({ error: 'The schedule can no longer be updated.' }, { status: 400 })
+        snagFixAt = when.toISOString()
+        await admin.from('snags').update({ scheduled_at: snagFixAt, schedule_status: 'proposed' }).eq('ticket_id', ticketId).eq('status', 'assigned').eq('schedule_status', 'proposed')
         // Durable "proposed" event (keeps every round for the audit trail).
         await logSnagScheduleEvent(admin, ticket, 'proposed', 'supplier', { scheduledFor: snagFixAt })
         break

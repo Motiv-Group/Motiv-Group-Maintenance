@@ -181,7 +181,9 @@ export function SupplierQuoteSubmittedActions({ ticketId, canDecline = false, de
 // the same themed calendar as Schedule job (no technician step).
 // `trigger` lets a caller supply its own opener (e.g. the View-snag sheet's big
 // primary button); default stays the full-width blue button.
-export function AcceptSnagCard({ ticketId, priority, createdAt, trigger }: { ticketId: string; priority: string; createdAt: string; trigger?: (open: () => void) => ReactNode }) {
+// `onScheduled` fires after a successful accept so an outer sheet (e.g. the
+// View-snag pop-up that renders this via `trigger`) can close itself too.
+export function AcceptSnagCard({ ticketId, priority, createdAt, trigger, onScheduled }: { ticketId: string; priority: string; createdAt: string; trigger?: (open: () => void) => ReactNode; onScheduled?: () => void }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -191,7 +193,7 @@ export function AcceptSnagCard({ ticketId, priority, createdAt, trigger }: { tic
     setBusy(true); setErr('')
     // Close the pop-up on success — router.refresh() doesn't reset client state,
     // so without this the modal sits on "Scheduling…" forever.
-    try { await transition(ticketId, { action: 'accept_snag', scheduledAt: iso }); setOpen(false); setBusy(false); router.refresh() }
+    try { await transition(ticketId, { action: 'accept_snag', scheduledAt: iso }); setOpen(false); setBusy(false); router.refresh(); onScheduled?.() }
     catch (e) { setErr(errMsg(e)); setBusy(false) }
   }
 
@@ -209,6 +211,49 @@ export function AcceptSnagCard({ ticketId, priority, createdAt, trigger }: { tic
               <DrawerHeader onClose={close} title={<p className="font-semibold text-[var(--text)]">Schedule the snag fix</p>} />
               {err && <p className="text-xs text-red-500">{err}</p>}
               <SchedulePicker priority={priority} createdAt={createdAt} busy={busy} onConfirm={doAccept} onCancel={close} />
+            </>
+          )}
+        </Modal>
+      )}
+    </>
+  )
+}
+
+// Move a still-pending snag schedule — the supplier proposed a time the RM
+// hasn't agreed to yet (schedule_status === 'proposed') and wants to change it.
+// Opens the same themed calendar, pre-noting the currently-proposed slot, and
+// re-proposes via update_snag_schedule (keeps the snag on 'proposed').
+export function UpdateSnagScheduleCta({ ticketId, priority, createdAt, currentScheduledAt }: { ticketId: string; priority: string; createdAt: string; currentScheduledAt: string | null }) {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+
+  async function doUpdate(iso: string) {
+    setBusy(true); setErr('')
+    // Close on success — router.refresh() alone leaves the modal on "Scheduling…".
+    try { await transition(ticketId, { action: 'update_snag_schedule', scheduledAt: iso }); setOpen(false); setBusy(false); router.refresh() }
+    catch (e) { setErr(errMsg(e)); setBusy(false) }
+  }
+
+  return (
+    <>
+      <button onClick={() => setOpen(true)} className="w-full py-2.5 rounded-lg ring-1 ring-[var(--border)] text-[var(--text)] text-sm font-semibold hover:bg-[var(--hover)] transition flex items-center justify-center gap-1.5">
+        <Calendar size={15} /> Update snag schedule
+      </button>
+      {open && (
+        <Modal onClose={() => setOpen(false)} maxWidth="max-w-2xl">
+          {close => (
+            <>
+              <DrawerHeader onClose={close} title={<p className="font-semibold text-[var(--text)]">Update the snag schedule</p>} />
+              {/* The time already proposed to the manager (still awaiting approval). */}
+              {currentScheduledAt && (
+                <div className="rounded-lg bg-amber-500/10 ring-1 ring-amber-500/30 p-3">
+                  <p className="text-sm text-[var(--text-muted)]">Currently proposed: <span className="font-semibold text-[var(--text)]">{formatDateTime(currentScheduledAt)}</span></p>
+                </div>
+              )}
+              {err && <p className="text-xs text-red-500">{err}</p>}
+              <SchedulePicker priority={priority} createdAt={createdAt} busy={busy} onConfirm={doUpdate} onCancel={close} />
             </>
           )}
         </Modal>
