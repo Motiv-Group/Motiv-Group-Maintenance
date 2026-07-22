@@ -7,6 +7,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Send, Camera, Check } from 'lucide-react'
 import { uploadOne } from '@/lib/upload'
+import { useFileDrop } from '@/components/ui/useFileDrop'
 
 const PRESETS = ['On my way', 'On site', 'Parts ordered', 'Delayed']
 
@@ -41,6 +42,13 @@ export function SupplierAttachments({ ticketId }: { ticketId: string }) {
     } catch (e) { setErr(errMsg(e)); setBusy(null) }
   }
 
+  // Route both the file picker and drag-and-drop through the same single-file path.
+  function addPhotoFiles(files: File[]) {
+    const f = files[0]
+    if (f) uploadPhoto(f)
+  }
+  const { isDragging, dropProps } = useFileDrop({ onFiles: addPhotoFiles, accept: 'image/*', multiple: false, disabled: busy === 'photo' })
+
   return (
     <div className="space-y-3">
       {err && <div className="text-sm text-red-400 bg-red-500/10 rounded-lg px-3 py-2">{err}</div>}
@@ -69,8 +77,9 @@ export function SupplierAttachments({ ticketId }: { ticketId: string }) {
       <div className="flex gap-2">
         <button onClick={() => addUpdate(note, 'note').then(() => setNote(''))} disabled={!!busy || !note.trim()}
           className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold disabled:opacity-50"><Send size={15} /> Send update</button>
-        <label className="flex items-center gap-2 px-3 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text)] text-sm cursor-pointer hover:bg-[var(--hover)] transition">
-          <Camera size={15} /> {busy === 'photo' ? 'Uploading…' : 'Add photo'}
+        <label {...dropProps}
+          className={`flex items-center gap-2 px-3 py-2 rounded-lg ring-1 text-[var(--text)] text-sm cursor-pointer transition ${isDragging ? 'ring-2 ring-blue-500 bg-blue-500/5' : 'ring-[var(--border)] hover:bg-[var(--hover)]'}`}>
+          <Camera size={15} /> {busy === 'photo' ? 'Uploading…' : isDragging ? 'Drop photo here' : 'Add photo'}
           <input type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) uploadPhoto(f) }} />
         </label>
       </div>

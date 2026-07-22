@@ -4,7 +4,7 @@
 // owner control the app's look for everyone: name, logo/icons, colours, login
 // backgrounds, support contact and default theme. Each section saves on its
 // own; the heavy sections (logo, colours) live in ./customization/*.
-import { useState, type ChangeEvent } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check, CheckCircle2, Download, ExternalLink, Image as ImageIcon, LayoutGrid, LifeBuoy, Loader2, LogIn, Monitor, Moon, Palette, Paintbrush, Plus, Rocket, Smartphone, Sun, Type, X } from 'lucide-react'
 import type { AppSettings } from '@/lib/settings'
@@ -12,6 +12,7 @@ import { DEFAULT_INSTALL_ANDROID, DEFAULT_INSTALL_IOS } from '@/lib/settings'
 import { formatDate } from '@/lib/utils'
 import { Card } from '@/components/exec/ui'
 import { DarkTile, Field, SaveRow, Section, inputCls, postForm, postJson, useAsyncSave, validateImage } from '@/components/admin/customization/shared'
+import { useFileDrop } from '@/components/ui/useFileDrop'
 import { LogoSection } from '@/components/admin/customization/LogoSection'
 import { LogoLayoutSection } from '@/components/admin/customization/LogoLayoutSection'
 import { ColoursSection } from '@/components/admin/customization/ColoursSection'
@@ -307,9 +308,8 @@ function LoginBackgroundsSection({ initialUrls }: { initialUrls: string[] }) {
     }
   }
 
-  async function add(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    e.target.value = ''
+  async function addFiles(files: File[]) {
+    const file = files[0]
     if (!file) return
     const err = validateImage(file, ['image/png', 'image/jpeg', 'image/webp'])
     if (err) {
@@ -330,6 +330,14 @@ function LoginBackgroundsSection({ initialUrls }: { initialUrls: string[] }) {
       router.refresh()
     }
   }
+
+  const atCapacity = urls.length >= 4
+  const { isDragging, dropProps } = useFileDrop({
+    onFiles: addFiles,
+    accept: 'image/png,image/jpeg,image/webp',
+    multiple: false,
+    disabled: busy || atCapacity,
+  })
 
   return (
     <Section
@@ -353,11 +361,23 @@ function LoginBackgroundsSection({ initialUrls }: { initialUrls: string[] }) {
             </button>
           </div>
         ))}
-        {urls.length < 4 && (
-          <label className={`flex aspect-[3/4] cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-[var(--border)] text-xs font-semibold text-blue-600 transition hover:bg-[var(--hover)] dark:text-blue-400 ${busy ? 'pointer-events-none opacity-50' : ''}`}>
-            <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" disabled={busy} onChange={add} />
+        {!atCapacity && (
+          <label
+            {...dropProps}
+            className={`flex aspect-[3/4] cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed text-xs font-semibold text-blue-600 transition hover:bg-[var(--hover)] dark:text-blue-400 ${busy ? 'pointer-events-none opacity-50' : ''} ${isDragging ? 'border-blue-500 bg-blue-500/5 ring-2 ring-blue-500' : 'border-[var(--border)]'}`}
+          >
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="sr-only"
+              disabled={busy}
+              onChange={(e) => {
+                addFiles(Array.from(e.target.files ?? []))
+                e.target.value = ''
+              }}
+            />
             {busy ? <Loader2 size={18} className="animate-spin" /> : <Plus size={18} />}
-            Add photo
+            {isDragging ? 'Drop photo here' : 'Add photo'}
           </label>
         )}
       </div>

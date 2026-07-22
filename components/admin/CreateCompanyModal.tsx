@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Building2, ImagePlus, X } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { errMsg } from '@/components/ui/errMsg'
+import { useFileDrop } from '@/components/ui/useFileDrop'
 
 function revoke(url: string | null) { if (url) URL.revokeObjectURL(url) }
 
@@ -38,7 +39,11 @@ export function CreateCompanyModal({ onClose, company }: { onClose: () => void; 
     setErr(''); setFile(f); setPreviewUrl(URL.createObjectURL(f))
   }
 
+  function addFiles(files: File[]) { pickFile(files[0]) }
+
   function clearFile() { setFile(null); setPreviewUrl(null) }
+
+  const { isDragging, dropProps } = useFileDrop({ onFiles: addFiles, accept: 'image/*', multiple: false, disabled: busy })
 
   async function submit(close: () => void, e: React.FormEvent) {
     e.preventDefault()
@@ -89,7 +94,8 @@ export function CreateCompanyModal({ onClose, company }: { onClose: () => void; 
 
           <div>
             <label className="block text-xs font-medium text-[var(--text-muted)] mb-1">Logo (optional)</label>
-            <div className="flex items-center gap-3">
+            <div {...dropProps} className={`relative flex items-center gap-3 rounded-xl p-2 -m-2 transition ${isDragging ? 'ring-2 ring-blue-500 bg-blue-500/5' : 'ring-1 ring-transparent'}`}>
+              {isDragging && <span className="pointer-events-none absolute right-4 text-[11px] font-medium text-blue-600 dark:text-blue-400">Drop logo here</span>}
               {preview ? (
                 // eslint-disable-next-line @next/next/no-img-element -- local object URL preview, not a remote asset
                 <img src={preview} alt="Logo preview" className="h-14 w-14 rounded-xl object-cover ring-1 ring-[var(--border)] bg-white" />

@@ -11,6 +11,7 @@ import { MoreMenu, MoreActionItem } from '@/components/regional/RmTicketActions'
 import { TicketChat } from '@/components/chat/TicketChat'
 import { uploadOne } from '@/lib/upload'
 import { useScrollLock } from '@/lib/useScrollLock'
+import { useFileDrop } from '@/components/ui/useFileDrop'
 import { errMsg } from '@/components/ui/errMsg'
 
 const MAX_PHOTOS = 10
@@ -37,8 +38,6 @@ export function SubmitCompletionForm({ ticketId, evidenceRequested = false, evid
   const [notes, setNotes] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
-  const [dragPoc, setDragPoc] = useState(false)
-  const [dragCoc, setDragCoc] = useState(false)
   const [preview, setPreview] = useState<string | null>(null)
 
   const previews = useMemo(() => photos.map(f => URL.createObjectURL(f)), [photos])
@@ -61,6 +60,10 @@ export function SubmitCompletionForm({ ticketId, evidenceRequested = false, evid
     if (f.size > COC_MAX_MB * 1024 * 1024) { setErr(`COC must be ${COC_MAX_MB} MB or less.`); return }
     setCoc(f)
   }
+
+  // Drag-and-drop, routed through the same handlers as the file inputs.
+  const cocDrop = useFileDrop({ onFiles: files => pickCoc(files[0]), accept: COC_ACCEPT, multiple: false })
+  const pocDrop = useFileDrop({ onFiles: addPhotos, accept: 'image/*', multiple: true, disabled: !remaining })
 
   async function submit() {
     if (requireBoth) {
@@ -137,10 +140,10 @@ export function SubmitCompletionForm({ ticketId, evidenceRequested = false, evid
             <p className="mt-2 flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400"><CheckCircle2 size={14} /> File uploaded successfully</p>
           </div>
         ) : (
-          <label onDragOver={e => { e.preventDefault(); setDragCoc(true) }} onDragLeave={() => setDragCoc(false)} onDrop={e => { e.preventDefault(); setDragCoc(false); pickCoc(e.dataTransfer.files?.[0]) }}
-            className={`flex flex-col items-center justify-center gap-1.5 py-8 rounded-xl border-2 border-dashed cursor-pointer transition ${dragCoc ? 'border-emerald-500 bg-emerald-500/10' : 'border-[var(--border)] hover:border-emerald-500/60'}`}>
+          <label {...cocDrop.dropProps}
+            className={`flex flex-col items-center justify-center gap-1.5 py-8 rounded-xl border-2 border-dashed cursor-pointer transition ${cocDrop.isDragging ? 'border-blue-500 ring-2 ring-blue-500 bg-blue-500/5' : 'border-[var(--border)] hover:border-emerald-500/60'}`}>
             <UploadCloud size={26} className="text-[var(--text-faint)]" />
-            <span className="text-sm text-[var(--text-muted)]">Tap to browse or drag &amp; drop</span>
+            <span className="text-sm text-[var(--text-muted)]">{cocDrop.isDragging ? 'Drop file here' : 'Tap to browse or drag & drop'}</span>
             <input type="file" accept={COC_ACCEPT} className="hidden" onChange={e => pickCoc(e.target.files?.[0])} />
           </label>
         )}
@@ -150,8 +153,8 @@ export function SubmitCompletionForm({ ticketId, evidenceRequested = false, evid
       <div>
         <label className="block text-sm font-bold text-[var(--text)]">Proof of Completion Photos {requireBoth && <span className="text-red-500">*</span>}</label>
         <p className="text-xs text-[var(--text-muted)] mb-1.5">{requireBoth ? `Minimum ${MIN_PHOTOS} photos required, up to ${MAX_PHOTOS}.` : `Up to ${MAX_PHOTOS} photos.`}</p>
-        <div onDragOver={e => { e.preventDefault(); setDragPoc(true) }} onDragLeave={() => setDragPoc(false)} onDrop={e => { e.preventDefault(); setDragPoc(false); addPhotos(Array.from(e.dataTransfer.files ?? [])) }}
-          className={`space-y-2 rounded-xl transition ${dragPoc ? 'outline-dashed outline-2 outline-offset-4 outline-emerald-500 bg-emerald-500/5' : ''}`}>
+        <div {...pocDrop.dropProps}
+          className={`space-y-2 rounded-xl transition ${pocDrop.isDragging ? 'outline-dashed outline-2 outline-offset-4 outline-blue-500 bg-blue-500/5' : ''}`}>
           <div className="grid grid-cols-2 gap-2">
             <label className={`flex items-center justify-center gap-2 py-4 rounded-xl border-2 border-dashed border-[var(--border)] text-sm font-medium text-[var(--text)] transition ${remaining ? 'cursor-pointer hover:border-emerald-500/60 hover:bg-[var(--hover)]' : 'opacity-50 cursor-not-allowed'}`}>
               <Upload size={16} /> Browse files
