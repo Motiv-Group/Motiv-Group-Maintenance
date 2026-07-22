@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import { redirect } from 'next/navigation'
-import { ClipboardCheck, FileText, Calendar, ChevronDown, Clock, CheckCircle2, Info } from 'lucide-react'
+import { ClipboardCheck, FileText, Calendar, ChevronDown, Clock, CheckCircle2, Info, Download } from 'lucide-react'
 import { SubmitCompletionForm } from '@/components/supplier/SubmitCompletionForm'
 import { BackLink } from '@/components/ui/BackLink'
 import { MarkTicketSeen } from '@/components/ui/MarkTicketSeen'
@@ -16,7 +16,7 @@ import { CompletionFooterNote } from '@/components/workflow/CompletionBody'
 import { QuoteSummary } from '@/components/workflow/QuoteSummary'
 import { ArchiveGroup } from '@/components/ticket/ArchiveGroup'
 import { SignoffCard } from '@/components/ticket/SignoffCard'
-import { MarkInProgressButton, DeclineWorkButton, AcceptSnagCard, SnagRescheduleCta, StartSnagButton, SupplierVariationGate, SupplierQuoteBar, SupplierQuoteSubmittedActions } from '@/components/supplier/SupplierJobActions'
+import { MarkInProgressButton, DeclineWorkButton, AcceptSnagCard, SnagRescheduleCta, StartSnagButton, SupplierVariationGate, SupplierQuoteBar, SupplierQuoteSubmittedActions, UpdateSnagScheduleCta } from '@/components/supplier/SupplierJobActions'
 import { PopupForm } from '@/components/supplier/PopupForm'
 import { RaiseDisputeMore, DisputeThread, DisputeControls } from '@/components/dispute/DisputeBox'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
@@ -25,6 +25,11 @@ import { TicketTimeline } from '@/components/ui/TicketTimeline'
 import { DetailTabs } from '@/components/ui/DetailTabs'
 import { formatCurrency, formatDateTime, supplierStatusMeta, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
 import { loadSupplierTicketDetail } from '@/lib/ticket-detail/supplier'
+
+// Derive a readable filename from a signed document URL (mirrors the SM Documents tab).
+function docName(url: string): string {
+  try { return decodeURIComponent(url.split('?')[0].split('/').pop() || 'Document') } catch { return 'Document' }
+}
 
 export default async function SupplierTicketDetailPage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params
@@ -40,7 +45,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
     variations, variationCount, latestVoRejectReason, canDecline,
     disputes, msgsByDispute, openDispute, resolvedDisputes, disputeSubject,
     nextAction, timelineItems,
-    totalPhotos, quoteTabRows, historyDeclinedQuotes, declineRows,
+    totalPhotos, infoDocUrls, quoteTabRows, historyDeclinedQuotes, declineRows,
   } = result.data
 
   // While a dispute is open the paused step's action area shows the resolve controls
@@ -56,10 +61,28 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
   // in the close-out gate so the supplier sees what extra work was agreed.
   const approvedVos = variations.filter(v => v.status === 'approved').reverse()
 
+  // Once the COC is approved (close-out stage onward) the scheduled-visit / snag-fix
+  // callouts are history — hide them from the Ticket-information card.
+  const closedOut = ['approved_closeout', 'vo_declined', 'completed'].includes(t.status)
+
   // ── Lower tabbed section (mirrors the RM ticket detail). Each tab's content, or
   // null when it has nothing — DetailTabs drops the empty ones. ──────────────────
   const photosTab = totalPhotos > 0
     ? <PhotoThumbs urls={t.photo_urls as string[]} ticketId={t.id} label="Job photo" />
+    : null
+  // Documents tab — the ticket's logged documents (signed). Mirrors the SM Documents
+  // tab row styling; DetailTabs drops the tab when there are none.
+  const documentsTab = infoDocUrls.length > 0
+    ? (<ul className="space-y-1">
+        {infoDocUrls.map((u, i) => (
+          <li key={i}>
+            <ViewTrackedLink ticketId={t.id} itemType="attachment" itemLabel={docName(u)} href={u} className="flex items-center justify-between gap-2 rounded-lg bg-[var(--surface-2)] px-3 py-2 transition hover:bg-[var(--hover)]">
+              <span className="flex min-w-0 items-center gap-2 text-sm text-[var(--text)]"><FileText size={14} className="shrink-0 text-blue-500" /> <span className="truncate">{docName(u)}</span></span>
+              <Download size={14} className="shrink-0 text-[var(--text-faint)]" />
+            </ViewTrackedLink>
+          </li>
+        ))}
+      </ul>)
     : null
   const quotesTab = quoteTabRows.length > 0
     ? (<div className="space-y-2">{quoteTabRows.map((q, i, arr) => (
@@ -305,7 +328,13 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
           {awarded && t.status === 'snag_assigned' && (
             latestSnag?.schedule_status === 'agreed'
               ? <StartSnagButton ticketId={t.id} />
-              : <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 flex items-start gap-2.5"><Clock size={16} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" /><p className="text-sm text-[var(--text-muted)]">Snag fix proposed{latestSnag?.scheduled_at ? ` for ${formatDateTime(latestSnag.scheduled_at)}` : ''} — awaiting the client&apos;s approval before you can start.</p></div>
+              : (
+                <div className="space-y-3">
+                  <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 flex items-start gap-2.5"><Clock size={16} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" /><p className="text-sm text-[var(--text-muted)]">Snag fix proposed{latestSnag?.scheduled_at ? ` for ${formatDateTime(latestSnag.scheduled_at)}` : ''} — awaiting the client&apos;s approval before you can start.</p></div>
+                  {/* Still proposed (not yet approved/declined) → let the supplier change the date/time. */}
+                  {latestSnag?.schedule_status === 'proposed' && <UpdateSnagScheduleCta ticketId={t.id} priority={t.priority} createdAt={t.created_at} currentScheduledAt={latestSnag?.scheduled_at ?? null} />}
+                </div>
+              )
           )}
           {awarded && ['in_progress', 'snag_resolved', 'snag_in_progress', 'evidence_requested'].includes(t.status) && (
             <div className="space-y-3">
@@ -418,8 +447,9 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
             <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Description</div>
             <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{t.description}</p>
           </div>
-          {/* Scheduled visit — hidden once a snag fix is in play (that callout replaces it). */}
-          {t.scheduled_at && !snagScheduleActive && (
+          {/* Scheduled visit — hidden once a snag fix is in play (that callout replaces it)
+              and once the COC is approved (close-out onward, so it's no longer live). */}
+          {t.scheduled_at && !snagScheduleActive && !closedOut && (
             <div className="flex items-center gap-2.5 rounded-xl bg-indigo-500/10 ring-1 ring-indigo-500/30 px-3.5 py-3">
               <Calendar size={18} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
               <div className="min-w-0">
@@ -429,7 +459,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
               </div>
             </div>
           )}
-          {snagFixApproved && (
+          {snagFixApproved && !closedOut && (
             <div className="flex items-center gap-2.5 rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 px-3.5 py-3">
               <Calendar size={18} className="text-amber-600 dark:text-amber-400 shrink-0" />
               <div className="min-w-0">
@@ -457,6 +487,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
         }
         tabs={[
           { key: 'photos', label: `Photos${totalPhotos ? ` (${totalPhotos})` : ''}`, content: photosTab },
+          { key: 'documents', label: `Documents${infoDocUrls.length ? ` (${infoDocUrls.length})` : ''}`, content: documentsTab },
           { key: 'quotes', label: 'Quotes', content: quotesTab },
           { key: 'completion', label: 'Completion', content: completionTab },
           { key: 'variations', label: 'Variation Orders', content: voTab },

@@ -344,6 +344,12 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
   // VO awaits the RM — the standalone chat entry below then stays hidden.
   const showVoReview = t.status === 'variation_review' && !!pendingVariation
 
+  // Scheduled-visit + snag-fix dates are execution-phase info. Once the COC is
+  // approved (approved_closeout and everything past it — VO review, vo_declined,
+  // completed) the work is done and signed off, so those dates are stale history and
+  // drop out of the Ticket-information card.
+  const scheduleInfoRelevant = !['approved_closeout', 'variation_review', 'vo_declined', 'completed'].includes(t.status)
+
   return (
     <div className="space-y-5">
       <BackLink fallbackHref="/regional/tickets" label="Back to tickets" />
@@ -557,8 +563,9 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
           {t.edited_at && <div className="pt-1"><EditedLine at={t.edited_at} by={editorName} /></div>}
 
           {t.info_request_reason && <p className="text-xs text-amber-600 dark:text-amber-400">Info requested: {t.info_request_reason}</p>}
-          {/* Scheduled visit — hidden once a snag fix is in play (that callout replaces it). */}
-          {t.scheduled_at && !snagScheduleActive && (
+          {/* Scheduled visit — hidden once a snag fix is in play (that callout replaces
+              it), and once the COC is approved (approved_closeout+) so the stale date drops. */}
+          {t.scheduled_at && !snagScheduleActive && scheduleInfoRelevant && (
             <div className="flex items-center gap-2.5 rounded-xl bg-indigo-500/10 ring-1 ring-indigo-500/30 px-3.5 py-3">
               <Calendar size={18} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
               <div className="min-w-0">
@@ -569,8 +576,9 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
             </div>
           )}
           {/* Snag fix schedule — only shown once the RM has approved the date (replaces
-              the original Scheduled callout above). */}
-          {snagFixApproved && (
+              the original Scheduled callout above); also drops once the COC is approved
+              (approved_closeout+), when the snag date is stale history. */}
+          {snagFixApproved && scheduleInfoRelevant && (
             <div className="flex items-center gap-2.5 rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 px-3.5 py-3">
               <Calendar size={18} className="text-amber-600 dark:text-amber-400 shrink-0" />
               <div className="min-w-0">

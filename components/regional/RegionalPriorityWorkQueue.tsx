@@ -271,13 +271,17 @@ function SnagScheduleReview({ ticketId, scheduledAt, snagDescription, className 
                 <p className="text-sm text-[var(--text-muted)]">Proposed time: <span className="font-bold text-[var(--text)]">{formatDateTime(scheduledAt)}</span></p>
               </div>
               {err && <p className="text-sm text-red-500">{err}</p>}
-              <div className="flex flex-wrap items-center gap-2">
+              {/* More on the LEFT, Approve primary on the RIGHT. `inline up align="left"`
+                  keeps the dropdown INSIDE the pop-up: left-aligned + w-56 clears the
+                  375px modal width, and opening up (footer is the modal's last row)
+                  keeps the panel over the content above rather than past the bottom. */}
+              <div className="flex items-center gap-2">
+                <MoreMenu inline up align="left">
+                  <MoreActionItem icon={<MessageSquare size={16} />} label="Chat with the supplier" onClick={() => setChat(true)} />
+                  <MoreActionItem icon={<XCircle size={16} />} label="Decline the proposed time" tone="danger" onClick={() => { setErr(''); setDeclining(true) }} />
+                </MoreMenu>
                 <button type="button" onClick={() => act({ action: 'approve_snag' }, 'Failed to approve the snag schedule.')} disabled={busy}
                   className="flex min-w-0 flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50"><CheckCircle2 size={16} /> {busy ? 'Approving…' : 'Approve schedule'}</button>
-                <MoreMenu up align="left">
-                  <MoreActionItem icon={<XCircle size={16} />} label="Decline the proposed time" onClick={() => { setErr(''); setDeclining(true) }} />
-                  <MoreActionItem icon={<MessageSquare size={16} />} label="Chat with the supplier" onClick={() => setChat(true)} />
-                </MoreMenu>
               </div>
             </div>
           )}
@@ -316,9 +320,9 @@ function nextStep(t: RegionalTicketRow): string {
     // proposal waits on the supplier's new time; a 'proposed' one waits on the
     // RM's approval; otherwise the corrective work is underway.
     case 'snag': return t.lastDisputeOutcome === 'upheld' ? "Snag upheld — awaiting the supplier's schedule"
-      : t.snagScheduleStatus === 'declined' ? 'Awaiting a new proposed time from the supplier' : 'Snag in progress'
-    case 'snag_assigned': return t.snagScheduleStatus === 'proposed' ? 'Approve the snag schedule time' : 'Snag in progress'
-    case 'snag_in_progress': return 'Snag in progress'
+      : t.snagScheduleStatus === 'declined' ? 'Awaiting a new proposed time from the supplier' : "Snagged — awaiting the supplier's response"
+    case 'snag_assigned': return t.snagScheduleStatus === 'proposed' ? 'Approve the snag schedule time' : 'Snag scheduled — awaiting the corrective work'
+    case 'snag_in_progress': return 'Corrective work in progress'
     case 'approved_closeout': return t.voNoneConfirmed ? 'Finalise the close-out' : 'Awaiting the supplier to confirm variation orders'
     case 'completed': return 'Completed'
     case 'cancelled':
