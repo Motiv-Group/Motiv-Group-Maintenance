@@ -9,6 +9,11 @@ const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   outputFileTracingRoot: projectRoot,
+  // @react-pdf/renderer ships wasm (yoga-layout) + font/trie assets that Next's
+  // bundler drops when it inlines the package — which breaks PDF generation in the
+  // serverless function (works locally where node_modules resolves normally). Keep
+  // it external so it loads from node_modules at runtime. (sharp is auto-external.)
+  serverExternalPackages: ['@react-pdf/renderer'],
   turbopack: {
     root: projectRoot,
   },

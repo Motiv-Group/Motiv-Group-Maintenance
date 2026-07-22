@@ -1,5 +1,6 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import * as Sentry from '@sentry/nextjs'
 import { readFile } from 'fs/promises'
 import path from 'path'
 import { rateLimit } from '@/lib/rate-limit'
@@ -52,6 +53,18 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   }
   if (!companyId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
+  try {
+    return await generate(admin, companyId, projectId, user.id)
+  } catch (e) {
+    // Surface the real failure (react-pdf / sharp / data) instead of a blank 500,
+    // so a broken deploy is diagnosable from Sentry + the client message.
+    Sentry.captureException(e, { tags: { route: 'project-report' }, extra: { projectId, companyId } })
+    console.error('[project-report] generation failed:', e)
+    return NextResponse.json({ error: 'Report generation failed. This has been logged — try again shortly.' }, { status: 500 })
+  }
+}
+
+async function generate(admin: ReturnType<typeof createAdminClient>, companyId: string, projectId: string, actorId: string): Promise<NextResponse> {
   const data = await loadProjectReportData(companyId, projectId) // access already enforced above
   if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
@@ -98,7 +111,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   }
 
   const pdf = await renderProjectReport(report)
-  await logAudit(admin, { actorId: user.id, companyId, action: 'project.report_generated', entityType: 'project', entityId: projectId, metadata: { stores: stores.length } })
+  await logAudit(admin, { actorId, companyId, action: 'project.report_generated', entityType: 'project', entityId: projectId, metadata: { stores: stores.length } })
 
   return new NextResponse(new Uint8Array(pdf), {
     status: 200,
