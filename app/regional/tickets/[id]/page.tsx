@@ -22,6 +22,7 @@ import { MarkTicketSeen } from '@/components/ui/MarkTicketSeen'
 import { DisputeThread, DisputeControls } from '@/components/dispute/DisputeBox'
 import { formatCurrency, formatDateTime, rmStatusMeta, OPERATIONAL_IMPACT_LABELS, humanizeDuration } from '@/lib/utils'
 import { loadRegionalTicketDetail, SNAG_WAIT_MSG } from '@/lib/ticket-detail/regional'
+import { quoteLabel, progressPhotoLabel, variationAttachmentLabel } from '@/lib/attachment-labels'
 
 function DetailItem({ label, value }: { label: string; value: string }) {
   return (
@@ -84,7 +85,7 @@ function RmDeclinedQuoteCard({ q, ticketId, canReQuote, open = false }: { q: Dec
         {(q.fileUrl || canReQuote) && (
           <div className="flex items-center justify-between gap-2 pt-1">
             {q.fileUrl
-              ? <ViewTrackedLink ticketId={ticketId} itemType="quote" itemLabel={`the declined quote (${q.supplierName})`} href={q.fileUrl} className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-500 hover:underline"><FileText size={14} /> View attached quote</ViewTrackedLink>
+              ? <ViewTrackedLink ticketId={ticketId} itemType="quote" itemLabel={quoteLabel(q.supplierName, q.quoteRef)} href={q.fileUrl} className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-500 hover:underline"><FileText size={14} /> View attached quote</ViewTrackedLink>
               : <span />}
             {canReQuote && <ReQuoteButton ticketId={ticketId} quoteId={q.id} />}
           </div>
@@ -109,7 +110,7 @@ function SupplierUpdateItem({ u, ticketId, isNew = false }: { u: { body: string;
         <span className="text-[11px] text-[var(--text-faint)]">{formatDateTime(u.created_at)}</span>
       </div>
       {photo
-        ? <ViewTrackedLink ticketId={ticketId} itemType="photo" itemLabel="Supplier progress photo" href={photo[1]} className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-500 hover:underline"><Camera size={14} /> View progress photo</ViewTrackedLink>
+        ? <ViewTrackedLink ticketId={ticketId} itemType="photo" itemLabel={progressPhotoLabel(1)} href={photo[1]} className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-500 hover:underline"><Camera size={14} /> View progress photo</ViewTrackedLink>
         : <p className="text-sm text-[var(--text)] whitespace-pre-line">{u.body}</p>}
     </li>
   )
@@ -269,7 +270,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
               {Array.isArray(v.file_urls) && v.file_urls.length > 0 && (
                 <div className="flex flex-wrap gap-x-3 gap-y-1 pt-1">
                   {v.file_urls.map((u: string, j: number) => (
-                    <ViewTrackedLink key={j} ticketId={t.id} itemType="attachment" itemLabel={`Variation order ${i + 1} attachment ${j + 1}`} href={u} className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"><FileText size={14} /> Attachment {j + 1}</ViewTrackedLink>
+                    <ViewTrackedLink key={j} ticketId={t.id} itemType="attachment" itemLabel={variationAttachmentLabel(j + 1, nameById.get(t.supplier_id ?? '') ?? undefined, (variations ?? []).length > 1 ? i + 1 : undefined)} href={u} className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"><FileText size={14} /> Attachment {j + 1}</ViewTrackedLink>
                   ))}
                 </div>
               )}

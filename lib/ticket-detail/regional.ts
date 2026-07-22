@@ -18,6 +18,7 @@ import { computeTicketSla } from '@/lib/health/sla'
 import { isActive } from '@/lib/health/types'
 import type { HealthTicket, Priority } from '@/lib/health/types'
 import { buildTicketTimeline, rmFriendlyLabel } from '@/lib/ticket-timeline'
+import { quoteLabel, cocLabel, invoiceLabel, variationAttachmentLabel, ticketDocLabel } from '@/lib/attachment-labels'
 import { rmStatusMeta, storeLabel } from '@/lib/utils'
 import type { Database } from '@/lib/database.types'
 
@@ -253,6 +254,9 @@ async function buildRegionalTicketDetail(
     : []
   const nameById = new Map<string, string>([...supplierList, ...motivSupplierList].map(s => [s.id, s.name]))
   for (const inv of invites ?? []) if (inv.suppliers?.company_name) nameById.set(inv.supplier_id, inv.suppliers.company_name)
+  // The awarded supplier's trade-company name — names the supplier on the timeline
+  // and on the completion attachments (COC / invoice / VO / photos).
+  const awardedSupplierName = t.supplier_id ? (nameById.get(t.supplier_id) ?? null) : null
   const declineReasonBy = new Map<string, string>()
   for (const inv of invites ?? []) if (inv.decline_reason) declineReasonBy.set(inv.supplier_id, inv.decline_reason)
   const supplierRows = (invites ?? []).map(inv => ({ id: inv.supplier_id, name: inv.suppliers?.company_name ?? nameById.get(inv.supplier_id) ?? 'Supplier', status: inv.status, invitedAt: inv.invited_at ?? null, respondedAt: inv.responded_at ?? null, declineReason: inv.decline_reason ?? null, declinedBy: (inv.declined_by ?? null) as 'supplier' | 'regional_manager' | null }))
@@ -411,19 +415,21 @@ async function buildRegionalTicketDetail(
   // survives. Documents (COC/invoice/VO PDFs) stay as links in their own cards;
   // the completion before/after ALSO remain in the sign-off card for in-context
   // review — so a few images intentionally appear in both places.
-  const photoGroups: { label: string; urls: string[] }[] = []
-  if (Array.isArray(t.photo_urls) && t.photo_urls.length) photoGroups.push({ label: 'Logged photos', urls: t.photo_urls })
+  // kind/supplierName/submissionNo let the client tab build a specific per-photo
+  // audit label ("ABC Plumbing — Before photo 1 (Submission #2)") for the trail.
+  const photoGroups: { label: string; urls: string[]; kind: 'logged' | 'before' | 'after' | 'progress'; supplierName?: string | null; submissionNo?: number | null }[] = []
+  if (Array.isArray(t.photo_urls) && t.photo_urls.length) photoGroups.push({ label: 'Logged photos', urls: t.photo_urls, kind: 'logged' })
   for (const s of [...allSignoffs].sort((a, b) => +new Date(a.created_at) - +new Date(b.created_at))) {
-    const n = submissionNo.get(s.id)
+    const n = submissionNo.get(s.id) ?? null
     const before = (s.before_urls ?? []).filter(Boolean)
     const after = (s.after_urls ?? []).filter(Boolean)
-    if (before.length) photoGroups.push({ label: `Completion #${n} · Before`, urls: before })
-    if (after.length) photoGroups.push({ label: `Completion #${n} · After`, urls: after })
+    if (before.length) photoGroups.push({ label: `Completion #${n} · Before`, urls: before, kind: 'before', supplierName: awardedSupplierName, submissionNo: n })
+    if (after.length) photoGroups.push({ label: `Completion #${n} · After`, urls: after, kind: 'after', supplierName: awardedSupplierName, submissionNo: n })
   }
   const progressPhotoUrls = supplierUpdates
     .map(u => { const m = String(u.body).match(/^📷\s*Progress photo:\s*(\S+)/); return m ? m[1] : null })
     .filter((x): x is string => !!x)
-  if (progressPhotoUrls.length) photoGroups.push({ label: 'Supplier progress', urls: progressPhotoUrls })
+  if (progressPhotoUrls.length) photoGroups.push({ label: 'Supplier progress', urls: progressPhotoUrls, kind: 'progress', supplierName: awardedSupplierName })
 
   // Full life-of-ticket timeline (status changes, edits, attachments/photos
   // viewed, quotes, sign-offs, disputes…) for the bottom "Timeline" tab. Restated
@@ -462,7 +468,9 @@ async function buildRegionalTicketDetail(
     // body is never null on a real update row; TimelineInput expects string (narrow cast, no runtime change).
     signoffs: allSignoffs, updates: (updates ?? []) as { body: string; author_role: string | null; created_at: string }[], views: viewRows ?? [],
     supplierDeclines,
-  }).map(e => ({ ...e, label: rmFriendlyLabel(e), who: null }))
+    // Name the awarded supplier throughout the trail (post-award events belong to
+    // them) — "ABC Plumbing scheduled a visit", never a bare "the supplier".
+  }).map(e => ({ ...e, label: rmFriendlyLabel(e, { supplierName: awardedSupplierName }), who: null }))
 
   // "History" tab archived groups (superseded / not-selected quotes, declined quote
   // requests, sent-back submissions, a declined snag-fix date, variation orders).
@@ -476,14 +484,15 @@ async function buildRegionalTicketDetail(
   // Signed into a SEPARATE list — t.info_doc_urls must stay the raw stored values
   // because the page round-trips it through the add-work PATCH (append).
   const infoDocLinks = Array.isArray(t.info_doc_urls) ? ((await signList(t.info_doc_urls)) ?? []) : []
-  infoDocLinks.forEach((u, i) => documentLinks.push({ label: `Ticket document ${i + 1}`, href: u, itemType: 'attachment' }))
-  for (const q of acceptedQuotes) if (q.fileUrl) documentLinks.push({ label: `${q.supplierName}'s quote`, href: q.fileUrl, itemType: 'quote' })
+  infoDocLinks.forEach((u, i) => documentLinks.push({ label: ticketDocLabel(i + 1), href: u, itemType: 'attachment' }))
+  for (const q of acceptedQuotes) if (q.fileUrl) documentLinks.push({ label: quoteLabel(q.supplierName, q.quoteRef), href: q.fileUrl, itemType: 'quote' })
   for (const s of [acceptedSignoff, ...pendingSignoffs].filter(s => s !== null)) {
-    if (s.coc_url) documentLinks.push({ label: 'Certificate of Completion (COC)', href: s.coc_url, itemType: 'coc' })
-    if (s.invoice_url) documentLinks.push({ label: 'Invoice', href: s.invoice_url, itemType: 'invoice' })
+    const n = submissionNo.get(s.id) ?? null
+    if (s.coc_url) documentLinks.push({ label: cocLabel(awardedSupplierName, n), href: s.coc_url, itemType: 'coc' })
+    if (s.invoice_url) documentLinks.push({ label: invoiceLabel(awardedSupplierName, n), href: s.invoice_url, itemType: 'invoice' })
   }
   ;(variations ?? []).forEach((v, i) => {
-    if (Array.isArray(v.file_urls)) v.file_urls.forEach((u, j) => documentLinks.push({ label: `Variation order ${i + 1} · Attachment ${j + 1}`, href: u, itemType: 'attachment' }))
+    if (Array.isArray(v.file_urls)) v.file_urls.forEach((u, j) => documentLinks.push({ label: variationAttachmentLabel(j + 1, awardedSupplierName, (variations ?? []).length > 1 ? i + 1 : null), href: u, itemType: 'attachment' }))
   })
 
   // "Quotes" tab — a read-only record of the quotes on the ticket: the approved one

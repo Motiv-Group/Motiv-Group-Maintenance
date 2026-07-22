@@ -8,6 +8,7 @@ import { FileText, ChevronRight, MessageSquare, ClipboardCheck, Image as ImageIc
 import { PhotoThumbs } from '@/components/ui/PhotoThumbs'
 import { TicketChat } from '@/components/chat/TicketChat'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
+import { cocLabel, invoiceLabel, completionPhotoLabel, variationAttachmentLabel } from '@/lib/attachment-labels'
 import { formatDateTime, formatCurrency } from '@/lib/utils'
 import { Modal } from './modal'
 import { post, errMsg } from './shared'
@@ -162,6 +163,13 @@ function docName(url: string, fallback: string): string {
   } catch { return fallback }
 }
 
+// Pull the round number out of a submission label like "Submission #2" so audit
+// labels can carry it; undefined when the label doesn't encode a number.
+function submissionNoFrom(label?: string | null): number | undefined {
+  const m = (label ?? '').match(/#\s*(\d+)/)
+  return m ? parseInt(m[1], 10) : undefined
+}
+
 const REVIEW_LABEL = 'text-[11px] font-semibold uppercase tracking-wide text-[var(--text-faint)]'
 
 // A document row (COC / invoice): red PDF tile + filename + uploaded time, with
@@ -211,6 +219,8 @@ export function SignoffReviewPanel({ ticketId, s, onDone }: { ticketId: string; 
   const [sub, setSub] = useState<'evidence' | 'snag' | 'chat' | null>(null)
   const [allPhotos, setAllPhotos] = useState(false)   // "View all" tile expands the strip in place
   const photos = [...s.beforeUrls, ...s.afterUrls]
+  const beforeCount = s.beforeUrls.length
+  const submissionNo = submissionNoFrom(s.label)      // round number for audit labels (COC/invoice/photos)
   const closeSub = () => setSub(null)
 
   async function approve() {
@@ -245,7 +255,10 @@ export function SignoffReviewPanel({ ticketId, s, onDone }: { ticketId: string; 
         <div className={REVIEW_LABEL}>Proof of completion ({photos.length} photo{photos.length === 1 ? '' : 's'})</div>
         <div className="mt-2">
           {photos.length
-            ? <PhotoThumbs urls={photos} ticketId={ticketId} label="Completion photo" limit={allPhotos ? undefined : 5} onMore={() => setAllPhotos(true)} />
+            ? <PhotoThumbs urls={photos} ticketId={ticketId} label="Completion photo" limit={allPhotos ? undefined : 5} onMore={() => setAllPhotos(true)}
+                trackLabel={(i) => i < beforeCount
+                  ? completionPhotoLabel('before', i + 1, s.supplierName, submissionNo)
+                  : completionPhotoLabel('after', i - beforeCount + 1, s.supplierName, submissionNo)} />
             : <span className="text-sm text-[var(--text-faint)]">No photos</span>}
         </div>
       </div>
@@ -253,14 +266,14 @@ export function SignoffReviewPanel({ ticketId, s, onDone }: { ticketId: string; 
       <div>
         <div className={REVIEW_LABEL}>Certificate of compliance (COC)</div>
         <div className="mt-2">
-          {s.cocUrl ? <DocRow ticketId={ticketId} url={s.cocUrl} itemType="coc" itemLabel="COC" fallbackName="COC.pdf" uploadedAt={s.createdAt} viewLabel="View COC" /> : <span className="text-sm text-[var(--text-faint)]">No certificate uploaded</span>}
+          {s.cocUrl ? <DocRow ticketId={ticketId} url={s.cocUrl} itemType="coc" itemLabel={cocLabel(s.supplierName, submissionNo)} fallbackName="COC.pdf" uploadedAt={s.createdAt} viewLabel="View COC" /> : <span className="text-sm text-[var(--text-faint)]">No certificate uploaded</span>}
         </div>
       </div>
 
       {s.invoiceUrl && (
         <div>
           <div className={REVIEW_LABEL}>Invoice</div>
-          <div className="mt-2"><DocRow ticketId={ticketId} url={s.invoiceUrl} itemType="invoice" itemLabel="Invoice" fallbackName="Invoice.pdf" uploadedAt={s.createdAt} viewLabel="View invoice" /></div>
+          <div className="mt-2"><DocRow ticketId={ticketId} url={s.invoiceUrl} itemType="invoice" itemLabel={invoiceLabel(s.supplierName, submissionNo)} fallbackName="Invoice.pdf" uploadedAt={s.createdAt} viewLabel="View invoice" /></div>
         </div>
       )}
 
@@ -459,7 +472,7 @@ export function VariationReviewPanel({ ticketId, vo, onDone }: { ticketId: strin
               {imageFiles.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {imageFiles.map(f => (
-                    <ViewTrackedLink key={f.n} ticketId={ticketId} itemType="attachment" itemLabel={`Variation order attachment ${f.n}`} href={f.url} className="block h-16 w-16 overflow-hidden rounded-lg ring-1 ring-[var(--border)]">
+                    <ViewTrackedLink key={f.n} ticketId={ticketId} itemType="attachment" itemLabel={variationAttachmentLabel(f.n, vo.supplierName)} href={f.url} className="block h-16 w-16 overflow-hidden rounded-lg ring-1 ring-[var(--border)]">
                       {/* eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL; next/image can't optimize it */}
                       <img src={f.url} alt={`Variation order attachment ${f.n}`} loading="lazy" className="h-full w-full object-cover" />
                     </ViewTrackedLink>
@@ -469,7 +482,7 @@ export function VariationReviewPanel({ ticketId, vo, onDone }: { ticketId: strin
               {docFiles.length > 0 && (
                 <div className="mt-3 space-y-2">
                   {docFiles.map(f => (
-                    <ViewTrackedLink key={f.n} ticketId={ticketId} itemType="attachment" itemLabel={`Variation order attachment ${f.n}`} href={f.url} className="flex items-center gap-2 rounded-lg bg-[var(--surface)] px-3 py-2 ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)]">
+                    <ViewTrackedLink key={f.n} ticketId={ticketId} itemType="attachment" itemLabel={variationAttachmentLabel(f.n, vo.supplierName)} href={f.url} className="flex items-center gap-2 rounded-lg bg-[var(--surface)] px-3 py-2 ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)]">
                       <FileText size={15} className="shrink-0 text-[var(--text-faint)]" />
                       <span className="min-w-0 truncate text-[13px] font-medium text-blue-600 dark:text-blue-400">{docName(f.url, `Attachment ${f.n}`)}</span>
                     </ViewTrackedLink>

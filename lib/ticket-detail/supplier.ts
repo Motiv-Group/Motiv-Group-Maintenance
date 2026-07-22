@@ -17,7 +17,7 @@ import { deriveDueDates } from '@/lib/health/priority'
 import { computeTicketSla } from '@/lib/health/sla'
 import { isActive } from '@/lib/health/types'
 import type { HealthTicket, Priority } from '@/lib/health/types'
-import { buildTicketTimeline } from '@/lib/ticket-timeline'
+import { buildTicketTimeline, supplierFriendlyLabel } from '@/lib/ticket-timeline'
 import { supplierStatusMeta, storeLabel } from '@/lib/utils'
 import type { QuoteSummaryStatus } from '@/components/workflow/QuoteSummary'
 import type { Database } from '@/lib/database.types'
@@ -373,10 +373,10 @@ export async function loadSupplierTicketDetail(ticketId: string) {
         updates: (updates ?? []).map(u => ({ body: u.body ?? '', author_role: u.author_role, created_at: u.created_at })),
         views: viewRows ?? [],
       }
-  // Default (neutral) labels + actor — the RM-voice rmFriendlyLabel says "You
-  // requested quotes", which is wrong from the supplier's side (the client/RM
-  // requested them). The default labels read "Quote requested" with the actor.
-  const timelineItems = buildTicketTimeline(supplierTimelineInput)
+  // Client-voiced: the whole client side (RM + store manager) reads "the client";
+  // the supplier's own actions read "you"/"your". Actor baked into the sentence, so
+  // the separate "who" line drops away (mirrors the RM view's style).
+  const timelineItems = buildTicketTimeline(supplierTimelineInput).map(e => ({ ...e, label: supplierFriendlyLabel(e), who: null }))
 
   const data = {
     t, store, storeName, disputeStore, companyName, supplierCompanyName, customer, editorName, quoteRequestedAt,

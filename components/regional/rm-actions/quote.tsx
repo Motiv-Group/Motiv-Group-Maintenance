@@ -8,6 +8,7 @@ import { CalendarClock, Info, FileText, ChevronRight, Store, ShieldCheck, Clock,
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { QuoteSummary } from '@/components/workflow/QuoteSummary'
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils'
+import { quoteLabel } from '@/lib/attachment-labels'
 import { Modal } from './modal'
 import { post, errMsg, PANEL_META } from './shared'
 
@@ -57,7 +58,7 @@ export function QuoteReviewCard({ ticketId, quotes }: { ticketId: string; quotes
             </div>
           )}
           {q.description && <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{q.description}</p>}
-          {q.fileUrl && <ViewTrackedLink ticketId={ticketId} itemType="quote" itemLabel={`${q.supplierName}'s quote`} href={q.fileUrl} className="text-sm text-[#f59e0b] underline">View attachment</ViewTrackedLink>}
+          {q.fileUrl && <ViewTrackedLink ticketId={ticketId} itemType="quote" itemLabel={quoteLabel(q.supplierName, q.quoteRef)} href={q.fileUrl} className="text-sm text-[#f59e0b] underline">View attachment</ViewTrackedLink>}
 
           {declineFor === q.id ? (
             <div className="space-y-2 pt-1">

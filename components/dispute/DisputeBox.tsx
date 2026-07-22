@@ -11,6 +11,7 @@ import { MessageSquareWarning, Paperclip, X, Send, ShieldCheck, ShieldX, FileTex
 import { Modal } from '@/components/ui/Modal'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { formatCurrency, formatDateTime } from '@/lib/utils'
+import { disputeEvidenceLabel } from '@/lib/attachment-labels'
 import { useScrollLock } from '@/lib/useScrollLock'
 
 // Reason quick-picks per dispute origin (folded into the first thread message).
@@ -474,7 +475,7 @@ function DisputeConversation({ ticketId, viewerRole, initial, close }: {
       {/* Chat thread */}
       {msgs.length > 0 && (
         <div className="max-h-[440px] space-y-3 overflow-y-auto rounded-xl bg-[var(--app-bg)] p-3 ring-1 ring-[var(--border)]">
-          {msgs.map(m => <MessageBubble key={m.id} ticketId={ticketId} m={m} viewerRole={viewerRole} />)}
+          {msgs.map(m => <MessageBubble key={m.id} ticketId={ticketId} m={m} viewerRole={viewerRole} supplierName={ctx?.supplierName ?? undefined} />)}
         </div>
       )}
 
@@ -517,7 +518,7 @@ function useDisputePoll(ticketId: string, live: boolean): { snap: DisputeSnapsho
 // neutral card, system notes centred. The raise message's "Reason: …" prefix
 // renders as its own chip; attachments render as file cards (image thumbnail or
 // FileText + basename) with a view-tracked Preview link. No file sizes (not stored).
-function MessageBubble({ ticketId, m, viewerRole }: { ticketId: string; m: DisputeMessage; viewerRole: 'supplier' | 'regional_manager' }) {
+function MessageBubble({ ticketId, m, viewerRole, supplierName }: { ticketId: string; m: DisputeMessage; viewerRole: 'supplier' | 'regional_manager'; supplierName?: string }) {
   // A system note (e.g. "Dispute created and SLA timer paused") sits centred.
   if (m.author_role === 'system') {
     return (
@@ -551,7 +552,7 @@ function MessageBubble({ ticketId, m, viewerRole }: { ticketId: string; m: Dispu
                   ? <img src={u} alt="" className="h-12 w-12 shrink-0 rounded object-cover" />
                   : <span className={`grid h-12 w-12 shrink-0 place-items-center rounded ${mine ? 'bg-white/15 text-white' : 'bg-blue-500/15 text-blue-600 dark:text-blue-400'}`}><FileText size={18} /></span>}
                 <span className={`min-w-0 flex-1 truncate text-[11px] font-medium ${mine ? 'text-white' : 'text-[var(--text)]'}`}>{attachmentName(u)}</span>
-                <ViewTrackedLink ticketId={ticketId} itemType="attachment" itemLabel={attachmentName(u)} href={u}
+                <ViewTrackedLink ticketId={ticketId} itemType="attachment" itemLabel={disputeEvidenceLabel(j + 1, supplierName)} href={u}
                   className={`shrink-0 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold ring-1 transition ${mine ? 'text-white ring-white/40 hover:bg-white/10' : 'text-blue-600 ring-[var(--border)] hover:bg-[var(--hover)] dark:text-blue-400'}`}>Preview</ViewTrackedLink>
               </div>
             ))}
@@ -583,6 +584,9 @@ export function DisputeThread({ ticketId, dispute, messages, viewerRole, readOnl
   const fresh = snap && snap.dispute.id === dispute.id ? snap : null
   const d = fresh?.dispute ?? dispute
   const msgs = fresh?.messages ?? messages
+  // Supplier company from the polled snapshot (server props carry no context) — used
+  // only to enrich the evidence audit label; undefined until the first poll lands.
+  const ctx = fresh?.context ?? null
   // The dispute left the open set (the other side confirmed/resolved it) — re-render
   // the server page ONCE so the resolved banner + next-action block take over (the
   // ref guard stops the every-poll snapshot objects from refresh-looping).
@@ -622,7 +626,7 @@ export function DisputeThread({ ticketId, dispute, messages, viewerRole, readOnl
           left (surface); see MessageBubble. */}
       {msgs.length > 0 && (
         <div className="max-h-[440px] space-y-3 overflow-y-auto rounded-xl bg-[var(--app-bg)] p-3 ring-1 ring-[var(--border)]">
-          {msgs.map(m => <MessageBubble key={m.id} ticketId={ticketId} m={m} viewerRole={viewerRole} />)}
+          {msgs.map(m => <MessageBubble key={m.id} ticketId={ticketId} m={m} viewerRole={viewerRole} supplierName={ctx?.supplierName ?? undefined} />)}
         </div>
       )}
 

@@ -15,7 +15,7 @@ import { TicketBadges } from '@/components/client/ticketBadges'
 import { ChatFab } from '@/components/chat/TicketChat'
 import { chatUnreadCounts, smChatAdded } from '@/lib/chat-unread'
 import { EditedLine } from '@/components/ui/EditedLine'
-import { buildTicketTimeline, filterTimelineForSm } from '@/lib/ticket-timeline'
+import { buildTicketTimeline, filterTimelineForSm, smFriendlyLabel } from '@/lib/ticket-timeline'
 import { formatDateTime, clientVisibleStatus, storeLabel, PRIORITY_LEVEL_LABELS, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
 import type { StoreManagerTicket } from '@/lib/health/data'
 import type { TicketStatus } from '@/lib/types'
@@ -56,7 +56,7 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
   // Editor names for the description "edited" line + the per-edit timeline events —
   // one lookup covering the single-slot editor and every ticket_edits editor.
   const editorIds = [...new Set([t.edited_by, ...(editRows ?? []).map(e => e.editor_id)])].filter((x): x is string => !!x)
-  const [editorNames, visitSupplier, visitTech, signedPhotoUrls, signedDocUrls, chatAddedSet, chatCounts, smStoreName] = await Promise.all([
+  const [editorNames, visitSupplier, visitTech, signedPhotoUrls, signedDocUrls, chatAddedSet, chatCounts, smStoreName, awardedSupplierName] = await Promise.all([
     editorIds.length
       ? admin.from('user_profiles').select('id, full_name').in('id', editorIds).then(r => new Map<string, string | null>((r.data ?? []).map(p => [p.id, p.full_name])))
       : new Map<string, string | null>(),
@@ -69,6 +69,8 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
     t.supplier_id ? chatUnreadCounts(admin, userId, [t.id], { smViewer: true }) : ({} as Record<string, number>),
     // Store label for the info-requested review sheet (store_id is non-null here — the guard above matched it).
     admin.from('stores').select('name, sub_store').eq('id', t.store_id ?? '').maybeSingle().then(r => (r.data ? storeLabel(r.data.name, r.data.sub_store) : null)),
+    // Awarded supplier's trade name — names the supplier on the timeline (unconditional, unlike visitSupplier).
+    t.supplier_id ? admin.from('suppliers').select('company_name').eq('id', t.supplier_id).single().then(r => r.data?.company_name ?? null) : null,
   ])
   const chatAdded = !!t.supplier_id && chatAddedSet.has(t.id)
   const editorName = t.edited_by ? (editorNames.get(t.edited_by) ?? null) : null
@@ -119,7 +121,9 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
     // Supplier progress notes now surface in the Timeline (the Activity tab is gone).
     updates: (updates ?? []) as { body: string; author_role: string | null; created_at: string }[],
   })
-  const smTimeline = filterTimelineForSm(events)
+  // Client-side voice: RM reads "the regional manager", the SM's own actions read
+  // "you", the awarded supplier is named. Actor baked in → the "who" line drops.
+  const smTimeline = filterTimelineForSm(events).map(e => ({ ...e, label: smFriendlyLabel(e, { supplierName: awardedSupplierName }), who: null }))
 
   return (
     <div className="space-y-4">
