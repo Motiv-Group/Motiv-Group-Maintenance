@@ -1,7 +1,8 @@
 import 'server-only'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { createAdminClient } from '@/lib/supabase/server'
 import type { Database } from '@/lib/database.types'
-import { ok, degraded, errored, type ProviderResult } from './types'
+import { ok, degraded, unconfigured, errored, type ProviderResult } from './types'
 
 export interface TableStat { table: string; rows: number | null; bytes: number | null }
 export interface SupabaseStats {
@@ -34,12 +35,27 @@ interface AdminDbStatsPayload {
 }
 type AdminDbStatsRpc = (fn: 'admin_db_stats') => PromiseLike<{ data: unknown; error: { message: string } | null }>
 
-export async function getSupabaseStats(): Promise<ProviderResult<SupabaseStats>> {
-  // Service-role env is required app-wide, so Supabase is always "configured".
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY || !process.env.NEXT_PUBLIC_SUPABASE_URL) {
-    return errored('Supabase env vars are missing.')
+// Two switchable targets: the live production database (the app's own Supabase
+// project) or a separate dev database. Dev needs its own service-role credentials.
+export type SupabaseTarget = 'prod' | 'dev'
+
+function resolveClient(target: SupabaseTarget): { db?: SupabaseClient<Database>; unconfiguredMsg?: string; erroredMsg?: string } {
+  if (target === 'dev') {
+    const url = process.env.SUPABASE_URL_DEV
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY_DEV
+    if (!url || !key) return { unconfiguredMsg: 'Set SUPABASE_URL_DEV and SUPABASE_SERVICE_ROLE_KEY_DEV to show the dev database here. (Apply the admin_db_stats migration to that project too for size gauges.)' }
+    return { db: createClient<Database>(url, key, { auth: { persistSession: false } }) }
   }
-  const db = createAdminClient()
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY || !process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    return { erroredMsg: 'Supabase env vars are missing.' }
+  }
+  return { db: createAdminClient() as unknown as SupabaseClient<Database> }
+}
+
+export async function getSupabaseStats(target: SupabaseTarget = 'prod'): Promise<ProviderResult<SupabaseStats>> {
+  const { db, unconfiguredMsg, erroredMsg } = resolveClient(target)
+  if (unconfiguredMsg) return unconfigured(unconfiguredMsg)
+  if (erroredMsg || !db) return errored(erroredMsg ?? 'Supabase is not configured.')
 
   // Preferred path: one RPC round-trip that returns db size, storage size,
   // auth user count, and per-table row/size estimates (see the

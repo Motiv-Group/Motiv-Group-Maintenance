@@ -33,18 +33,29 @@ interface VercelApiDeployment {
 interface VercelApiProject { name?: string }
 interface VercelApiDomain { name: string; verified?: boolean }
 
-function auth() {
-  const token = process.env.VERCEL_API_TOKEN
-  const projectId = process.env.VERCEL_PROJECT_ID
-  const teamId = process.env.VERCEL_TEAM_ID
-  return { token, projectId, teamId }
+// Two switchable targets: the main app project, or a separate marketing "website"
+// project. The website reuses the same token/team by default, overridable via
+// *_WEBSITE env vars if it lives under a different Vercel account/team.
+export type VercelTarget = 'app' | 'website'
+
+function auth(target: VercelTarget) {
+  if (target === 'website') {
+    return {
+      token: process.env.VERCEL_API_TOKEN_WEBSITE ?? process.env.VERCEL_API_TOKEN,
+      projectId: process.env.VERCEL_PROJECT_ID_WEBSITE,
+      teamId: process.env.VERCEL_TEAM_ID_WEBSITE ?? process.env.VERCEL_TEAM_ID,
+    }
+  }
+  return { token: process.env.VERCEL_API_TOKEN, projectId: process.env.VERCEL_PROJECT_ID, teamId: process.env.VERCEL_TEAM_ID }
 }
 function teamQ(teamId?: string) { return teamId ? `&teamId=${encodeURIComponent(teamId)}` : '' }
 
-export async function getVercelStats(): Promise<ProviderResult<VercelStats>> {
-  const { token, projectId, teamId } = auth()
+export async function getVercelStats(target: VercelTarget = 'app'): Promise<ProviderResult<VercelStats>> {
+  const { token, projectId, teamId } = auth(target)
   if (!token || !projectId) {
-    return unconfigured('Set VERCEL_API_TOKEN and VERCEL_PROJECT_ID to show deployments, build status and domains here.')
+    return unconfigured(target === 'website'
+      ? 'Set VERCEL_PROJECT_ID_WEBSITE (and VERCEL_API_TOKEN_WEBSITE if the marketing site uses a different token/team) to show the website deployment here.'
+      : 'Set VERCEL_API_TOKEN and VERCEL_PROJECT_ID to show deployments, build status and domains here.')
   }
   const headers = { Authorization: `Bearer ${token}` }
 

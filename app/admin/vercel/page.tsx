@@ -2,10 +2,11 @@ export const dynamic = 'force-dynamic'
 
 import { Triangle, Rocket, Globe, GitBranch } from 'lucide-react'
 import { requireMasterAdmin } from '@/lib/health/guard'
-import { getVercelStats, type VercelDeployment } from '@/lib/admin/vercel'
+import { getVercelStats, type VercelDeployment, type VercelTarget } from '@/lib/admin/vercel'
 import { Card } from '@/components/exec/ui'
 import { InfoTip } from '@/components/ui/InfoTip'
 import { ProviderHeader, StatTile, Notice } from '@/components/admin/ui'
+import { InfraTargetToggle } from '@/components/admin/InfraTargetToggle'
 
 const STATE_CLS: Record<string, string> = {
   READY:     'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 ring-emerald-500/30',
@@ -23,9 +24,10 @@ function when(ms: number | null): string {
   return new Date(ms).toLocaleString('en-ZA', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
 
-export default async function VercelAdminPage() {
+export default async function VercelAdminPage({ searchParams }: { searchParams: Promise<{ target?: string }> }) {
   await requireMasterAdmin()
-  const res = await getVercelStats()
+  const target: VercelTarget = (await searchParams).target === 'website' ? 'website' : 'app'
+  const res = await getVercelStats(target)
   const d = res.data
 
   const readyCount = d?.deployments.filter((x) => x.state === 'READY').length ?? 0
@@ -33,6 +35,10 @@ export default async function VercelAdminPage() {
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs text-[var(--text-muted)]">Viewing: <span className="font-semibold text-[var(--text)]">{target === 'website' ? 'Marketing website' : 'Production app'}</span></p>
+        <InfraTargetToggle options={[{ key: 'app', label: 'Prod app' }, { key: 'website', label: 'Website' }]} current={target} />
+      </div>
       <ProviderHeader
         name="Vercel"
         icon={<Triangle className="text-[var(--text)]" size={20} />}
