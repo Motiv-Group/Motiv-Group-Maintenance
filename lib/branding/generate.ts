@@ -1,4 +1,4 @@
-import sharp from 'sharp'
+import sharp, { type OutputInfo } from 'sharp'
 import JSZip from 'jszip'
 import pngToIco from 'png-to-ico'
 
@@ -60,7 +60,7 @@ function hexToRgb(hex: string): Rgb {
  * alpha (e.g. white text at alpha 0), which colour-based trim would not remove.
  */
 async function trimTransparent(buf: Buffer, label: string): Promise<Buffer> {
-  let raw: { data: Buffer; info: sharp.OutputInfo }
+  let raw: { data: Buffer; info: OutputInfo }
   try {
     raw = await sharp(buf).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
   } catch {
