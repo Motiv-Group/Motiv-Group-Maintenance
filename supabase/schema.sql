@@ -2323,3 +2323,28 @@ create policy "rm_executive_links read" on public.rm_executive_links for select
     or executive_user_id = auth.uid()
     or (company_id = public.app_company_id() and public.app_is_company_wide())
   );
+
+-- ---------------------------------------------------------------------------
+-- PER-RM PROJECT ACCESS (migration 20260726_project_rm_access)
+-- ---------------------------------------------------------------------------
+-- Which projects each regional manager may see (none / one / many). The system
+-- admin manages the list from Accounts; new projects start with no RMs. Locked
+-- join table, service-role writes only.
+create table if not exists public.project_regional_users (
+  project_id  uuid not null references public.projects(id) on delete cascade,
+  rm_user_id  uuid not null references public.user_profiles(id) on delete cascade,
+  company_id  uuid references public.companies(id) on delete cascade,
+  created_at  timestamptz not null default now(),
+  primary key (project_id, rm_user_id)
+);
+create index if not exists project_regional_users_rm_idx      on public.project_regional_users (rm_user_id);
+create index if not exists project_regional_users_company_idx on public.project_regional_users (company_id);
+
+alter table public.project_regional_users enable row level security;
+
+drop policy if exists "project_regional_users read" on public.project_regional_users;
+create policy "project_regional_users read" on public.project_regional_users for select
+  using (
+    rm_user_id = auth.uid()
+    or (company_id = public.app_company_id() and public.app_is_company_wide())
+  );

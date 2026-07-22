@@ -948,6 +948,27 @@ export interface Database {
         }
         Relationships: []
       }
+      project_regional_users: {
+        Row: {
+          project_id: string
+          rm_user_id: string
+          company_id: string | null
+          created_at: string
+        }
+        Insert: {
+          project_id?: string
+          rm_user_id?: string
+          company_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          project_id?: string
+          rm_user_id?: string
+          company_id?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       project_stores: {
         Row: {
           id: string

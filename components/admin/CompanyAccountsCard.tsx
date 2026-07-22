@@ -9,6 +9,7 @@ import { CompanyInviteModal } from './CompanyInviteModal'
 import { CompanyBulkImportModal } from './CompanyBulkImportModal'
 import { SupplierInviteModal } from './SupplierInviteModal'
 import { SupplierBulkImportModal } from './SupplierBulkImportModal'
+import { RmProjectSelect } from './RmProjectSelect'
 import type { RegionOpt, ProjectOpt } from './AddAccountForm'
 
 export type MemberRow = {
@@ -18,6 +19,8 @@ export type MemberRow = {
   role: 'executive' | 'regional_manager' | 'store_manager'
   location: string
   lastSignIn: string | null
+  /** RM only: project ids this RM is assigned to (per-RM project access). */
+  projectIds?: string[]
 }
 export type SupplierRow = { id: string; name: string; verified: boolean; isMotiv: boolean; pending: boolean }
 export type CompanyGroup = {
@@ -104,12 +107,19 @@ export function CompanyAccountsCard({ group, regions, projects, defaultOpen = fa
                 </div>
                 <ul className="space-y-1">
                   {rows.map(m => (
-                    <li key={m.id} className="flex items-center justify-between gap-3 rounded-lg bg-[var(--surface-2)] px-3 py-2 text-sm">
-                      <div className="min-w-0">
-                        <p className="text-[var(--text)] truncate">{m.name || '—'}</p>
-                        <p className="text-xs text-[var(--text-muted)] break-all sm:break-normal sm:truncate">{m.email}{m.location !== '—' && <span className="text-[var(--text-faint)]"> · {m.location}</span>}</p>
+                    <li key={m.id} className="rounded-lg bg-[var(--surface-2)] px-3 py-2 text-sm">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-[var(--text)] truncate">{m.name || '—'}</p>
+                          <p className="text-xs text-[var(--text-muted)] break-all sm:break-normal sm:truncate">{m.email}{m.location !== '—' && <span className="text-[var(--text-faint)]"> · {m.location}</span>}</p>
+                        </div>
+                        <span className="shrink-0 text-xs whitespace-nowrap"><LastSignIn iso={m.lastSignIn} /></span>
                       </div>
-                      <span className="shrink-0 text-xs whitespace-nowrap"><LastSignIn iso={m.lastSignIn} /></span>
+                      {m.role === 'regional_manager' && projects.length > 0 && (
+                        <div className="mt-2">
+                          <RmProjectSelect companyId={group.id} rmUserId={m.id} projects={projects.map(p => ({ id: p.id, name: p.name }))} initial={m.projectIds ?? []} />
+                        </div>
+                      )}
                     </li>
                   ))}
                 </ul>
