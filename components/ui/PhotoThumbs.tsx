@@ -11,7 +11,7 @@ import { useScrollLock } from '@/lib/useScrollLock'
  * view-tracking POST the old ViewTrackedLink recorded, so the audit trail
  * still shows "viewed Photo 2".
  */
-export function PhotoThumbs({ urls, ticketId, label = 'Photo', limit, onMore, trackLabel }: {
+export function PhotoThumbs({ urls, ticketId, label = 'Photo', limit, onMore, trackLabels }: {
   urls: string[]
   ticketId?: string
   label?: string
@@ -22,11 +22,11 @@ export function PhotoThumbs({ urls, ticketId, label = 'Photo', limit, onMore, tr
    *  (e.g. expand in place) instead of opening the lightbox; the separate
    *  "View all N photos" text link is not rendered. */
   onMore?: () => void
-  /** Audit label for the i-th photo (0-based) recorded in the "Viewed …" trail.
-   *  Lets a caller supply the full, specific label (supplier + round, e.g.
-   *  "ABC Plumbing — Before photo 1 (Submission #2)") instead of "<label> N".
-   *  Falls back to `${label} ${i+1}` when omitted. */
-  trackLabel?: (i: number) => string
+  /** Per-photo audit labels for the "Viewed …" trail, index-aligned with `urls`
+   *  (e.g. "ABC Plumbing — Before photo 1 (Submission #2)"). A plain string[], NOT
+   *  a function, so SERVER components can pass it without the "Functions cannot be
+   *  passed to Client Components" RSC error. Falls back to `${label} ${i+1}`. */
+  trackLabels?: string[]
 }) {
   const [open, setOpen] = useState<number | null>(null)
 
@@ -37,9 +37,9 @@ export function PhotoThumbs({ urls, ticketId, label = 'Photo', limit, onMore, tr
     if (!ticketId) return
     fetch(`/api/tickets/${ticketId}/view`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ itemType: 'photo', itemLabel: trackLabel ? trackLabel(i) : `${label} ${i + 1}` }),
+      body: JSON.stringify({ itemType: 'photo', itemLabel: trackLabels?.[i] ?? `${label} ${i + 1}` }),
     }).catch(() => {})
-  }, [ticketId, label, trackLabel])
+  }, [ticketId, label, trackLabels])
 
   const show = (i: number) => { setOpen(i); track(i) }
   const step = useCallback((d: 1 | -1) => {

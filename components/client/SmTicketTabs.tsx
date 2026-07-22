@@ -54,7 +54,7 @@ export function SmTicketTabs({
 
       {tab === 'photos' && (
         <div className="space-y-4">
-          {photoUrls.length ? <PhotoThumbs urls={photoUrls} ticketId={ticketId} label="Job photo" trackLabel={(i) => ticketPhotoLabel(i + 1)} /> : <p className="text-sm text-[var(--text-faint)]">No photos attached.</p>}
+          {photoUrls.length ? <PhotoThumbs urls={photoUrls} ticketId={ticketId} label="Job photo" trackLabels={photoUrls.map((_, i) => ticketPhotoLabel(i + 1))} /> : <p className="text-sm text-[var(--text-faint)]">No photos attached.</p>}
         </div>
       )}
 

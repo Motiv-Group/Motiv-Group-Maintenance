@@ -74,9 +74,9 @@ export function CompletionBody({ ticketId, beforeUrls = [], afterUrls = [], cocU
               urls={photos}
               ticketId={ticketId}
               label="Completion photo"
-              trackLabel={(i) => i < beforeUrls.length
-                ? completionPhotoLabel('before', i + 1, undefined, undefined)
-                : completionPhotoLabel('after', i - beforeUrls.length + 1, undefined, undefined)}
+              trackLabels={photos.map((_, i) => i < beforeUrls.length
+                ? completionPhotoLabel('before', i + 1)
+                : completionPhotoLabel('after', i - beforeUrls.length + 1))}
             />
           : <span className="text-sm text-[var(--text-faint)]">No photos uploaded</span>}
       </div>

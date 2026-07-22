@@ -256,9 +256,9 @@ export function SignoffReviewPanel({ ticketId, s, onDone }: { ticketId: string; 
         <div className="mt-2">
           {photos.length
             ? <PhotoThumbs urls={photos} ticketId={ticketId} label="Completion photo" limit={allPhotos ? undefined : 5} onMore={() => setAllPhotos(true)}
-                trackLabel={(i) => i < beforeCount
+                trackLabels={photos.map((_, i) => i < beforeCount
                   ? completionPhotoLabel('before', i + 1, s.supplierName, submissionNo)
-                  : completionPhotoLabel('after', i - beforeCount + 1, s.supplierName, submissionNo)} />
+                  : completionPhotoLabel('after', i - beforeCount + 1, s.supplierName, submissionNo))} />
             : <span className="text-sm text-[var(--text-faint)]">No photos</span>}
         </div>
       </div>
