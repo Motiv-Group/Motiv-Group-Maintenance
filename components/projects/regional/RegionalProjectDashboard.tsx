@@ -11,6 +11,7 @@ import { SegmentedProgressBar } from '@/components/projects/SegmentedProgressBar
 import { ViewToggle } from '@/components/projects/ViewToggle'
 import { STORE_STATUS_LABEL, STORE_STATUS_PILL, OVERDUE_PILL } from '@/components/projects/statusStyles'
 import { milestoneSteps, milestoneCounts, stageLabel, MILESTONE_LABELS } from '@/lib/projects/progress'
+import { ProjectReportButton } from '@/components/projects/regional/ProjectReportButton'
 import type { ProjectRow, ProjectSummary, StoreRow } from '@/lib/projects/data'
 
 type StatusFilter = 'all' | 'not_started' | 'in_progress' | 'complete' | 'overdue'
@@ -54,7 +55,10 @@ export function RegionalProjectDashboard({ project, summary, stores }: { project
 
   return (
     <div className="space-y-5">
-      <Link href="/regional/projects" className="text-xs text-[var(--text-muted)] hover:text-[var(--text)]">← All projects</Link>
+      <div className="flex items-center justify-between gap-3">
+        <Link href="/regional/projects" className="text-xs text-[var(--text-muted)] hover:text-[var(--text)]">← All projects</Link>
+        <ProjectReportButton projectId={project.id} projectName={project.name} />
+      </div>
 
       {/* Hero */}
       <Card className="overflow-hidden">
