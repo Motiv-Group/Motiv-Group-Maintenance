@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic'
 
-import { Triangle, Rocket, Globe, GitBranch } from 'lucide-react'
+import { Triangle, Rocket, Globe, GitBranch, Activity, BarChart3, ExternalLink } from 'lucide-react'
 import { requireMasterAdmin } from '@/lib/health/guard'
 import { getVercelStats, type VercelDeployment, type VercelTarget } from '@/lib/admin/vercel'
 import { Card } from '@/components/exec/ui'
@@ -152,6 +152,48 @@ export default async function VercelAdminPage({ searchParams }: { searchParams: 
           )}
         </>
       )}
+
+      {/* Speed Insights + Web Analytics — enabled via the app (<SpeedInsights/> +
+          <Analytics/> in the root layout, so they cover every page including /admin).
+          Live numbers live in the Vercel dashboard: the API doesn't expose this data
+          on the Hobby plan, so we surface status + a deep-link rather than fake it. */}
+      <Card className="p-5 space-y-4">
+        <h2 className="text-sm font-bold text-[var(--text)] flex items-center gap-2">
+          <Activity size={15} className="text-blue-500" /> Performance &amp; analytics
+          <InfoTip title="Performance & analytics">Speed Insights measures real-user Core Web Vitals; Web Analytics counts page views + visitors. Both collect from production visitors and are viewable in the Vercel dashboard.</InfoTip>
+        </h2>
+        <div className="space-y-2.5">
+          <AnalyticsRow
+            icon={<Activity size={16} className="text-blue-500" />}
+            title="Speed Insights"
+            desc="Real-user Core Web Vitals — RES, FCP, LCP, INP, CLS, TTFB."
+          />
+          <AnalyticsRow
+            icon={<BarChart3 size={16} className="text-blue-500" />}
+            title="Web Analytics"
+            desc="Page views, unique visitors, top pages and referrers."
+          />
+        </div>
+        <Notice variant="info">
+          Both are <b>enabled</b> and collect from real production visitors. The live charts (Real Experience Score, page views) aren&apos;t exposed by Vercel&apos;s API on the Hobby plan — open the Vercel dashboard to view them.
+        </Notice>
+      </Card>
+    </div>
+  )
+}
+
+function AnalyticsRow({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl bg-[var(--surface-2)] px-3.5 py-3 ring-1 ring-[var(--border)]">
+      <span className="shrink-0">{icon}</span>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold text-[var(--text)]">{title}</p>
+        <p className="text-[12px] text-[var(--text-muted)]">{desc}</p>
+      </div>
+      <span className="shrink-0 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">Enabled</span>
+      <a href="https://vercel.com/dashboard" target="_blank" rel="noopener noreferrer" className="shrink-0 inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:underline dark:text-blue-400">
+        Open <ExternalLink size={12} />
+      </a>
     </div>
   )
 }
