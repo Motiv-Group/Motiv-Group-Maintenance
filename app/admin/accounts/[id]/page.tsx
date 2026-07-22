@@ -31,13 +31,14 @@ export default async function AdminCompanyDetailPage(props: { params: Promise<{ 
   const { data: company } = await db.from('companies').select('id, name, logo_url, created_at, active').eq('id', id).single()
   if (!company) notFound()
 
-  const [{ data: regions }, { data: users }, { data: ru }, { data: su }, { data: stores }, { data: projects }, { data: links }, { data: supUsers }] = await Promise.all([
+  const [{ data: regions }, { data: users }, { data: ru }, { data: su }, { data: stores }, { data: projects }, { data: pru }, { data: links }, { data: supUsers }] = await Promise.all([
     db.from('regions').select('id, name, region_code, company_id').eq('active', true).order('name'),
     db.from('user_profiles').select('id, full_name, email, role, company_id').eq('company_id', id).in('role', ['executive', 'regional_manager', 'store_manager']),
     db.from('regional_users').select('user_id, region_id'),
     db.from('store_users').select('user_id, store_id'),
     db.from('stores').select('id, branch_code, region_id'),
-    db.from('projects').select('id, name, company_id').is('archived_at', null).order('name'),
+    db.from('projects').select('id, name, company_id').eq('company_id', id).is('archived_at', null).order('name'),
+    db.from('project_regional_users').select('rm_user_id, project_id').eq('company_id', id),
     db.from('company_suppliers').select('company_id, supplier_id').eq('company_id', id),
     db.from('supplier_users').select('user_id, supplier_id'),
   ])
@@ -56,6 +57,8 @@ export default async function AdminCompanyDetailPage(props: { params: Promise<{ 
   for (const r of (ru ?? [])) { const a = rmRegions.get(r.user_id) ?? []; const l = regionLabelById.get(r.region_id); if (l) a.push(l); rmRegions.set(r.user_id, a) }
   const smBranch = new Map<string, string>()
   for (const s of (su ?? [])) { const store = storeById.get(s.store_id); if (store?.branch_code && !smBranch.has(s.user_id)) smBranch.set(s.user_id, store.branch_code) }
+  const rmProjects = new Map<string, string[]>()
+  for (const p of (pru ?? [])) { const a = rmProjects.get(p.rm_user_id) ?? []; a.push(p.project_id); rmProjects.set(p.rm_user_id, a) }
 
   const signIns = await loadLastSignIns(db)
   const locationFor = (role: Role, uid: string): string => {
@@ -71,6 +74,7 @@ export default async function AdminCompanyDetailPage(props: { params: Promise<{ 
   const members: MemberRow[] = (users ?? []).map(u => ({
     id: u.id, name: u.full_name ?? '', email: u.email ?? '—', role: u.role as Role,
     location: locationFor(u.role as Role, u.id), lastSignIn: signIns.get(u.id) ?? null,
+    ...(u.role === 'regional_manager' ? { projectIds: rmProjects.get(u.id) ?? [] } : {}),
   }))
   const supplierRows: SupplierRow[] = (suppliers ?? []).map(s => ({
     id: s.id, name: s.company_name, verified: s.verification_status === 'verified',

@@ -154,10 +154,20 @@ const MILESTONE_COLS =
 
 /** Project list with computed stats. Same for admin + RM (no internal fields are on
  *  these rows — internal notes live in project_notes). Excludes archived by default. */
-export async function loadProjects(companyId: string, includeArchived = false): Promise<ProjectSummary[]> {
+// `rmUserId` scopes the list to the projects that regional manager is assigned to
+// (project_regional_users) — an RM sees only their projects, none if unassigned.
+// Omit it for admin/company-wide loads (every project in the company).
+export async function loadProjects(companyId: string, includeArchived = false, rmUserId?: string): Promise<ProjectSummary[]> {
   const admin = createAdminClient()
+  let allowedIds: Set<string> | null = null
+  if (rmUserId) {
+    const { data: links } = await admin.from('project_regional_users').select('project_id').eq('rm_user_id', rmUserId)
+    allowedIds = new Set((links ?? []).map(l => l.project_id))
+    if (!allowedIds.size) return []
+  }
   let q = admin.from('projects').select('*').eq('company_id', companyId)
   if (!includeArchived) q = q.is('archived_at', null)
+  if (allowedIds) q = q.in('id', [...allowedIds])
   const { data: projects } = await q.order('created_at', { ascending: false })
   const list = projects ?? []
   if (!list.length) return []
@@ -189,8 +199,11 @@ export async function loadProjects(companyId: string, includeArchived = false): 
 export async function loadProject(
   companyId: string,
   projectId: string,
+  rmUserId?: string,
 ): Promise<{ project: ProjectRow; stores: StoreRow[]; summary: ProjectSummary } | null> {
   const admin = createAdminClient()
+  // An RM may only open a project they're assigned to (else 404 — same as wrong company).
+  if (rmUserId && !(await rmCanSeeProject(admin, rmUserId, projectId))) return null
   const { data: project } = await admin.from('projects').select('*').eq('id', projectId).eq('company_id', companyId).single()
   if (!project) return null
   const { data: stores } = await admin
@@ -205,10 +218,17 @@ export async function loadProject(
   return { project, stores: rows, summary }
 }
 
+// Whether a regional manager is assigned to a project (per-RM project access).
+export async function rmCanSeeProject(admin: ReturnType<typeof createAdminClient>, rmUserId: string, projectId: string): Promise<boolean> {
+  const { data } = await admin.from('project_regional_users').select('project_id').eq('rm_user_id', rmUserId).eq('project_id', projectId).maybeSingle()
+  return !!data
+}
+
 /** One store + its signed files. Returns null if not found / wrong company. */
 export async function loadProjectStore(
   companyId: string,
   storeId: string,
+  rmUserId?: string,
 ): Promise<{ store: StoreRow; project: ProjectRow; files: ProjectFileView[] } | null> {
   const admin = createAdminClient()
   // The store and its files both key on storeId, so fetch them together instead of
@@ -218,6 +238,8 @@ export async function loadProjectStore(
     admin.from('project_files').select('*').eq('project_store_id', storeId).order('sort_order', { ascending: true }),
   ])
   if (!store) return null
+  // An RM may only open a store inside a project they're assigned to.
+  if (rmUserId && !(await rmCanSeeProject(admin, rmUserId, store.project_id))) return null
   // The project needs store.project_id, so it follows; its signing runs alongside.
   const [{ data: project }, signed] = await Promise.all([
     admin.from('projects').select('*').eq('id', store.project_id).single(),
