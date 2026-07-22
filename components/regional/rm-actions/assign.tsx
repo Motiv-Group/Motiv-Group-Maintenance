@@ -343,7 +343,7 @@ export function ViewAssignButton({ ticketId, summary, suppliers, motivSuppliers 
 
                   {ticket.photoUrls.length > 0 && (
                     <SheetSection label="Images">
-                      <PhotoThumbs urls={ticket.photoUrls} ticketId={ticketId} label="Job photo" trackLabel={(i) => ticketPhotoLabel(i + 1)} limit={5} />
+                      <PhotoThumbs urls={ticket.photoUrls} ticketId={ticketId} label="Job photo" trackLabels={ticket.photoUrls.map((_, i) => ticketPhotoLabel(i + 1))} limit={5} />
                     </SheetSection>
                   )}
 

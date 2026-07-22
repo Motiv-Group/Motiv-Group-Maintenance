@@ -69,7 +69,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
   // ── Lower tabbed section (mirrors the RM ticket detail). Each tab's content, or
   // null when it has nothing — DetailTabs drops the empty ones. ──────────────────
   const photosTab = totalPhotos > 0
-    ? <PhotoThumbs urls={t.photo_urls as string[]} ticketId={t.id} label="Job photo" trackLabel={(i) => ticketPhotoLabel(i + 1)} />
+    ? <PhotoThumbs urls={t.photo_urls as string[]} ticketId={t.id} label="Job photo" trackLabels={(t.photo_urls as string[]).map((_, i) => ticketPhotoLabel(i + 1))} />
     : null
   // Documents tab — the ticket's logged documents (signed). Mirrors the SM Documents
   // tab row styling; DetailTabs drops the tab when there are none.

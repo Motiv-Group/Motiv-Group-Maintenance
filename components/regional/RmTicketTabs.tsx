@@ -104,7 +104,7 @@ export function RmTicketTabs({
             {photoGroups.map((g, i) => (
               <div key={i} className="space-y-1.5">
                 <p className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">{g.label}</p>
-                <PhotoThumbs urls={g.urls} ticketId={ticketId} label={g.label} trackLabel={photoTrackLabel(g)} />
+                <PhotoThumbs urls={g.urls} ticketId={ticketId} label={g.label} trackLabels={g.urls.map((_, i) => photoTrackLabel(g)(i))} />
               </div>
             ))}
           </div>
