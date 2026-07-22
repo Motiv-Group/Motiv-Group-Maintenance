@@ -24,6 +24,7 @@ import { EditedLine } from '@/components/ui/EditedLine'
 import { TicketTimeline } from '@/components/ui/TicketTimeline'
 import { DetailTabs } from '@/components/ui/DetailTabs'
 import { formatCurrency, formatDateTime, supplierStatusMeta, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
+import { ticketDocLabel, ticketPhotoLabel, variationAttachmentLabel } from '@/lib/attachment-labels'
 import { loadSupplierTicketDetail } from '@/lib/ticket-detail/supplier'
 
 // Derive a readable filename from a signed document URL (mirrors the SM Documents tab).
@@ -68,7 +69,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
   // ── Lower tabbed section (mirrors the RM ticket detail). Each tab's content, or
   // null when it has nothing — DetailTabs drops the empty ones. ──────────────────
   const photosTab = totalPhotos > 0
-    ? <PhotoThumbs urls={t.photo_urls as string[]} ticketId={t.id} label="Job photo" />
+    ? <PhotoThumbs urls={t.photo_urls as string[]} ticketId={t.id} label="Job photo" trackLabel={(i) => ticketPhotoLabel(i + 1)} />
     : null
   // Documents tab — the ticket's logged documents (signed). Mirrors the SM Documents
   // tab row styling; DetailTabs drops the tab when there are none.
@@ -76,7 +77,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
     ? (<ul className="space-y-1">
         {infoDocUrls.map((u, i) => (
           <li key={i}>
-            <ViewTrackedLink ticketId={t.id} itemType="attachment" itemLabel={docName(u)} href={u} className="flex items-center justify-between gap-2 rounded-lg bg-[var(--surface-2)] px-3 py-2 transition hover:bg-[var(--hover)]">
+            <ViewTrackedLink ticketId={t.id} itemType="attachment" itemLabel={ticketDocLabel(i + 1)} href={u} className="flex items-center justify-between gap-2 rounded-lg bg-[var(--surface-2)] px-3 py-2 transition hover:bg-[var(--hover)]">
               <span className="flex min-w-0 items-center gap-2 text-sm text-[var(--text)]"><FileText size={14} className="shrink-0 text-blue-500" /> <span className="truncate">{docName(u)}</span></span>
               <Download size={14} className="shrink-0 text-[var(--text-faint)]" />
             </ViewTrackedLink>
@@ -87,7 +88,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
   const quotesTab = quoteTabRows.length > 0
     ? (<div className="space-y-2">{quoteTabRows.map((q, i, arr) => (
         <QuoteSummary key={q.id} title={arr.length > 1 ? `Quote #${arr.length - i}` : 'Your submitted quote'} status={quoteStatusOf(q.status)} ticketId={t.id} collapsible declineReason={q.decline_reason ?? declineReason}
-          quote={{ id: q.id, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, description: q.description ?? null, fileUrl: q.file_url ?? null, validUntil: q.valid_until ?? null, createdAt: q.created_at, quoteRef: q.quote_ref ?? null }}
+          quote={{ id: q.id, supplierName: supplierCompanyName ?? null, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, description: q.description ?? null, fileUrl: q.file_url ?? null, validUntil: q.valid_until ?? null, createdAt: q.created_at, quoteRef: q.quote_ref ?? null }}
           schedule={q.status === 'accepted' && t.scheduled_at ? { at: t.scheduled_at, proposed: t.schedule_status === 'proposed', technician: scheduledTechName, audience: 'supplier' } : q.proposed_schedule_at ? { at: q.proposed_schedule_at, proposed: true, audience: 'supplier' } : null} />
       ))}</div>)
     : null
@@ -127,7 +128,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
               )}
               {Array.isArray(v.file_urls) && v.file_urls.length > 0 && (
                 <div className="flex flex-wrap gap-x-3 gap-y-1 pt-0.5">
-                  {v.file_urls.map((u: string, j: number) => <ViewTrackedLink key={j} ticketId={t.id} itemType="attachment" itemLabel={`${arr.length > 1 ? `Variation #${arr.length - i}` : 'Variation order'} attachment ${j + 1}`} href={u} className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:underline"><FileText size={12} /> Attachment {j + 1}</ViewTrackedLink>)}
+                  {v.file_urls.map((u: string, j: number) => <ViewTrackedLink key={j} ticketId={t.id} itemType="attachment" itemLabel={variationAttachmentLabel(j + 1, supplierCompanyName, arr.length > 1 ? arr.length - i : undefined)} href={u} className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:underline"><FileText size={12} /> Attachment {j + 1}</ViewTrackedLink>)}
                 </div>
               )}
             </div>
@@ -164,7 +165,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
           <ArchiveGroup label="Quotes">
             {historyDeclinedQuotes.map((q, i, arr) => (
               <QuoteSummary key={q.id} title={arr.length > 1 ? `Quote #${arr.length - i}` : 'Your submitted quote'} status={quoteStatusOf(q.status)} ticketId={t.id} collapsible declineReason={q.decline_reason ?? declineReason}
-                quote={{ id: q.id, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, description: q.description ?? null, fileUrl: q.file_url ?? null, validUntil: q.valid_until ?? null, createdAt: q.created_at, declinedAt: q.updated_at ?? null, quoteRef: q.quote_ref ?? null }} />
+                quote={{ id: q.id, supplierName: supplierCompanyName ?? null, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, description: q.description ?? null, fileUrl: q.file_url ?? null, validUntil: q.valid_until ?? null, createdAt: q.created_at, declinedAt: q.updated_at ?? null, quoteRef: q.quote_ref ?? null }} />
             ))}
           </ArchiveGroup>
         )}
@@ -416,7 +417,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
                 <p className="text-sm text-[var(--text-muted)]">You will be notified of any updates on this ticket.</p>
               </div>
               <SupplierQuoteSubmittedActions ticketId={t.id} canDecline={canDecline} decline={declineDetails}
-                quote={latestQuote ? { id: latestQuote.id, amount: latestQuote.amount, amountInclVat: latestQuote.amount_incl_vat ?? null, description: latestQuote.description ?? null, fileUrl: latestQuote.file_url ?? null, validUntil: latestQuote.valid_until ?? null, createdAt: latestQuote.created_at, quoteRef: latestQuote.quote_ref ?? null } : null}
+                quote={latestQuote ? { id: latestQuote.id, supplierName: supplierCompanyName ?? null, amount: latestQuote.amount, amountInclVat: latestQuote.amount_incl_vat ?? null, description: latestQuote.description ?? null, fileUrl: latestQuote.file_url ?? null, validUntil: latestQuote.valid_until ?? null, createdAt: latestQuote.created_at, quoteRef: latestQuote.quote_ref ?? null } : null}
                 schedule={latestQuote?.proposed_schedule_at ? { at: latestQuote.proposed_schedule_at, proposed: true, audience: 'supplier' } : null} />
             </div>
           )}

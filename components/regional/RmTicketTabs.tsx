@@ -5,8 +5,20 @@ import { Card } from '@/components/exec/ui'
 import { PhotoThumbs } from '@/components/ui/PhotoThumbs'
 import { TicketTimeline } from '@/components/ui/TicketTimeline'
 import type { TimelineEvent } from '@/lib/ticket-timeline'
+import { ticketPhotoLabel, completionPhotoLabel, progressPhotoLabel } from '@/lib/attachment-labels'
 
-type PhotoGroup = { label: string; urls: string[] }
+type PhotoGroup = { label: string; urls: string[]; kind?: 'logged' | 'before' | 'after' | 'progress'; supplierName?: string | null; submissionNo?: number | null }
+
+// Specific per-photo audit label for a group ("ABC Plumbing — Before photo 1
+// (Submission #2)"), so the timeline "Viewed …" row is never vague.
+function photoTrackLabel(g: PhotoGroup): (i: number) => string {
+  return (i: number) => {
+    if (g.kind === 'logged') return ticketPhotoLabel(i + 1)
+    if (g.kind === 'before' || g.kind === 'after') return completionPhotoLabel(g.kind, i + 1, g.supplierName, g.submissionNo)
+    if (g.kind === 'progress') return progressPhotoLabel(i + 1, g.supplierName)
+    return `${g.label} ${i + 1}`
+  }
+}
 type Tab = 'photos' | 'documents' | 'quotes' | 'completion' | 'variations' | 'dispute' | 'timeline' | 'history'
 
 /** Lower tabbed section of the RM ticket detail — Photos (every image on the
@@ -92,7 +104,7 @@ export function RmTicketTabs({
             {photoGroups.map((g, i) => (
               <div key={i} className="space-y-1.5">
                 <p className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">{g.label}</p>
-                <PhotoThumbs urls={g.urls} ticketId={ticketId} label={g.label} />
+                <PhotoThumbs urls={g.urls} ticketId={ticketId} label={g.label} trackLabel={photoTrackLabel(g)} />
               </div>
             ))}
           </div>

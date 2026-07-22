@@ -198,11 +198,13 @@ export function buildTicketTimeline(t: TimelineInput): TimelineEvent[] {
   if (editRows.length) {
     for (const e of editRows) {
       const isExtraWork = (e.note ?? '').toLowerCase() === 'added extra work'
-      const who = e.byName ?? (e.byRole ? ROLE_LABEL[e.byRole] ?? e.byRole : null)
+      // Actor is the editor's ROLE, never their name — person names never appear on
+      // any timeline (the friendly-voice narrators bake in the role instead).
+      const who = e.byRole ? (ROLE_LABEL[e.byRole] ?? e.byRole) : null
       push(e.at, isExtraWork ? 'Extra work added to the ticket' : `Ticket edited${e.note ? ` — ${e.note}` : ''}`, 'edited', who)
     }
   } else {
-    push(t.editedAt, `Ticket edited${t.editNote ? ` — ${t.editNote}` : ''}`, 'edited', t.editedByName)
+    push(t.editedAt, `Ticket edited${t.editNote ? ` — ${t.editNote}` : ''}`, 'edited', null)
   }
 
   for (const u of t.updates ?? []) push(u.created_at, u.body, 'update', ROLE_LABEL[u.author_role ?? ''] ?? (u.author_role ?? 'System'))
@@ -214,19 +216,25 @@ export function buildTicketTimeline(t: TimelineInput): TimelineEvent[] {
   return t.startAt ? sorted.filter(e => +new Date(e.at) >= +new Date(t.startAt!)) : sorted
 }
 
-// Restate one audit event as a friendly, store-manager-style sentence for the RM
-// Timeline tab — the actor is baked into the sentence (so the "who" line drops
-// away) while every detail (supplier names, reasons) is kept. `buildTicketTimeline`
-// stays the audit voice for the supplier trail; only the RM view is re-narrated.
-function actorOf(who?: string | null): string | null {
-  if (!who) return null
-  if (who === 'Regional Manager') return 'You'
-  if (who === 'Store Manager') return 'The store manager'
-  if (who === 'Supplier') return 'The supplier'
-  if (who === 'Executive') return 'An executive'
-  if (who === 'System') return 'The system'
-  return who // a person's name (e.g. on an edit)
+// ── Friendly, per-perspective narration ──────────────────────────────────────
+// Restate each audit event as a plain sentence with the actor baked in (so the
+// separate "who" line drops away). ONE narrator serves every role via a
+// `perspective`, so the wording stays consistent across the RM / store-manager /
+// individual / supplier timelines. The rules:
+//   · Suppliers are ALWAYS named on the client-side views (RM / SM / individual) —
+//     "ABC Plumbing scheduled a visit", never a bare "the supplier". The awarded
+//     supplier's company name comes in via ctx.supplierName.
+//   · The supplier's OWN timeline is client-voiced: the whole client side (RM + SM)
+//     reads "the client"; the supplier's own actions read "you" / "your".
+//   · On the store-manager view the regional manager reads "the regional manager".
+//   · Person names never appear — only roles / company names.
+export type TimelinePerspective = 'rm' | 'sm' | 'individual' | 'supplier'
+export interface NarrateCtx {
+  /** The awarded supplier's trade-company name — names the supplier on the client-
+   *  side (RM / SM / individual) timelines instead of a generic "the supplier". */
+  supplierName?: string | null
 }
+
 /** The " — reason/note" tail of an audit label, kept verbatim on the friendly one. */
 function tailOf(label: string): string { const i = label.indexOf(' — '); return i >= 0 ? label.slice(i) : '' }
 /** The word after `key` in an audit label ("Quote requested from X" → X), sans any reason tail. */
@@ -234,57 +242,112 @@ function nameAfter(label: string, key: string): string | null {
   const m = label.match(new RegExp(`${key} (.+)$`)); return m ? m[1].replace(/ — .*$/, '') : null
 }
 
-export function rmFriendlyLabel(e: TimelineEvent): string {
-  const A = actorOf(e.who)
+export function narrate(e: TimelineEvent, perspective: TimelinePerspective = 'rm', ctx?: NarrateCtx): string {
+  const P = perspective
+  const name = ctx?.supplierName?.trim() || null
   const L = e.label
   const tail = tailOf(L)
+
+  // The supplier as the subject of a sentence ("<X> scheduled a visit"). On the
+  // supplier's own timeline that's "You"; elsewhere it's the company name.
+  const supSubj = P === 'supplier' ? 'You' : (name || 'The supplier')
+
+  // The client / manager side as a subject, for a given acting role. `role` says
+  // which manager acted so the store-manager view can distinguish RM vs SM.
+  const mgr = (role: 'rm' | 'sm' | 'exec'): string => {
+    if (P === 'supplier') return 'The client'
+    if (P === 'individual') return 'You' // the owner performs every manager-side action
+    if (P === 'rm') return role === 'sm' ? 'The store manager' : role === 'exec' ? 'An executive' : 'You'
+    // store-manager view
+    return role === 'rm' ? 'The regional manager' : role === 'exec' ? 'An executive' : 'You'
+  }
+
+  // Actor for free-form events (updates / edits / views) keyed by ROLE_LABEL string.
+  const actorForRole = (who: string | null | undefined): string => {
+    if (who === 'Supplier') return supSubj
+    if (who === 'Regional Manager') return mgr('rm')
+    if (who === 'Store Manager') return mgr('sm')
+    if (who === 'Executive') return mgr('exec')
+    if (who === 'System') return 'The system'
+    return who || 'Someone'
+  }
+
   switch (e.tone) {
-    case 'logged': return 'The store manager logged the ticket'
-    case 'info_added': return 'The store manager added the requested information'
+    case 'logged':
+      return P === 'individual' ? 'You logged the job' : `${mgr('sm')} logged the ticket`
+    case 'info_added':
+      return `${mgr('sm')} added the requested information`
     case 'info_requested':
-      if (/on COC & POC/.test(L)) return `You requested more evidence on the completion${tail}`
-      if (/stands/.test(L)) return 'The supplier withdrew the dispute — the request stands'
-      if (/Proposed to resolve/.test(L)) return `${A ?? 'Someone'} proposed to drop the request`
-      if (/Proposed to keep/.test(L)) return `${A ?? 'Someone'} proposed that the request stands`
-      return `You requested more information${tail}`
+      if (/on COC & POC/.test(L)) return `${mgr('rm')} requested more evidence on the completion${tail}`
+      if (/stands/.test(L)) return `${supSubj} withdrew the dispute — the request stands`
+      if (/Proposed to resolve/.test(L)) return `${actorForRole(e.who)} proposed to drop the request`
+      if (/Proposed to keep/.test(L)) return `${actorForRole(e.who)} proposed that the request stands`
+      return `${mgr('rm')} requested more information${tail}`
     case 'quote_requested': {
-      if (/Revised/.test(L)) return 'You asked for a revised quote'
-      const n = nameAfter(L, 'from'); return n ? `You requested a quote from ${n}` : 'You requested quotes from suppliers'
+      if (/Revised/.test(L)) return P === 'supplier' ? 'The client asked you for a revised quote' : `${mgr('rm')} asked for a revised quote`
+      if (P === 'supplier') return 'The client requested a quote'
+      const n = nameAfter(L, 'from')
+      return n ? `${mgr('rm')} requested a quote from ${n}` : `${mgr('rm')} requested quotes from suppliers`
     }
-    case 'quote_submitted': { const n = nameAfter(L, 'by'); return n ? `${n} submitted a quote` : 'The supplier submitted a quote' }
+    case 'quote_submitted': {
+      if (P === 'supplier') return 'You submitted a quote'
+      const n = nameAfter(L, 'by')
+      return `${n || 'The supplier'} submitted a quote`
+    }
     case 'quote_approved': {
-      if (/retracted/i.test(L)) return 'You reopened the variation order for review'
-      const m = L.match(/— (.+)$/); return m ? `You approved ${m[1]}'s quote` : 'You approved the quote'
+      if (/retracted/i.test(L)) return `${mgr('rm')} reopened the variation order for review`
+      if (P === 'supplier') return 'The client approved your quote'
+      const m = L.match(/— (.+)$/)
+      return m ? `${mgr('rm')} approved ${m[1]}'s quote` : `${mgr('rm')} approved the quote`
     }
     case 'quote_declined': {
-      if (/request declined by/.test(L)) { const n = nameAfter(L, 'by'); return `${n ?? 'A supplier'} declined the quote request` }
-      if (/Dispute raised/.test(L)) return `The supplier raised a dispute${tail}`
-      if (/Snag schedule declined/.test(L)) return `You declined the snag-fix date${tail}`
-      const m = L.match(/— (.+)$/); return m ? `You declined ${m[1]}'s quote` : 'You declined the quote'
+      if (/request declined by/.test(L)) {
+        if (P === 'supplier') return 'You declined the quote request'
+        const n = nameAfter(L, 'by'); return `${n || 'A supplier'} declined the quote request`
+      }
+      if (/Dispute raised/.test(L)) return `${supSubj} raised a dispute${tail}`
+      if (/Snag schedule declined/.test(L)) return `${mgr('rm')} declined the snag-fix date${tail}`
+      if (P === 'supplier') return 'The client declined your quote'
+      const m = L.match(/— (.+)$/)
+      return m ? `${mgr('rm')} declined ${m[1]}'s quote` : `${mgr('rm')} declined the quote`
     }
     case 'scheduled':
-      if (/Snag accepted/.test(L)) return 'The supplier accepted the snag'
-      if (/Snag fix proposed/.test(L)) return 'The supplier proposed a snag-fix date'
-      if (/Snag schedule approved/.test(L)) return 'You approved the snag-fix date'
-      if (/Marked job in progress/.test(L)) return 'The supplier started work'
-      return 'The supplier scheduled a visit'
-    case 'variation': return 'The supplier raised a variation order'
-    case 'variation_approved': return 'You approved the variation order'
-    case 'variation_declined': return `You declined the variation order${tail}`
-    case 'completion_submitted': return 'The supplier submitted the completion'
-    case 'completion_approved': return /retracted/i.test(L) ? `You retracted the request — reopened for review${tail}` : 'You approved the completion'
-    case 'completion_rejected': return 'You snagged the completion'
+      if (/Snag accepted/.test(L)) return `${supSubj} accepted the snag`
+      if (/Snag fix proposed/.test(L)) return `${supSubj} proposed a snag-fix date`
+      if (/Snag schedule approved/.test(L)) return `${mgr('rm')} approved the snag-fix date`
+      if (/Marked job in progress/.test(L)) return `${supSubj} started the job`
+      return `${supSubj} scheduled a visit`
+    case 'variation': return `${supSubj} raised a variation order`
+    case 'variation_approved':
+      return P === 'supplier' ? 'The client approved your variation order' : `${mgr('rm')} approved the variation order`
+    case 'variation_declined':
+      return P === 'supplier' ? `The client declined your variation order${tail}` : `${mgr('rm')} declined the variation order${tail}`
+    case 'completion_submitted': return `${supSubj} submitted the completion`
+    case 'completion_approved':
+      if (/retracted/i.test(L)) return P === 'supplier' ? `The client reopened it for review${tail}` : `${mgr('rm')} retracted the request — reopened for review${tail}`
+      return P === 'supplier' ? 'The client approved the completion' : `${mgr('rm')} approved the completion`
+    case 'completion_rejected':
+      return P === 'supplier' ? 'The client snagged the completion' : `${mgr('rm')} snagged the completion`
     case 'completed': return 'The job was completed'
     case 'cancelled': return /Declined/.test(L) ? 'Declined — no further updates on this ticket' : `The ticket was cancelled${tail}`
     case 'edited':
-      if (/proposal cancelled/.test(L)) return `${A ?? 'Someone'} cancelled their dispute proposal`
-      if (/Extra work added/.test(L)) return `${A ?? 'You'} added extra work to the ticket`
-      return A ? `${A} edited the ticket${tail}` : `The ticket was edited${tail}`
-    case 'update': return A ? `${A}: ${L}` : L
-    case 'viewed': return `${A ?? 'Someone'} viewed ${L.replace(/^Viewed /, '')}`
+      if (/proposal cancelled/.test(L)) return `${actorForRole(e.who)} cancelled their dispute proposal`
+      if (/Extra work added/.test(L)) return `${actorForRole(e.who)} added extra work to the ticket`
+      return e.who ? `${actorForRole(e.who)} edited the ticket${tail}` : `The ticket was edited${tail}`
+    case 'update': return `${actorForRole(e.who)}: ${L}`
+    case 'viewed': return `${actorForRole(e.who)} viewed ${L.replace(/^Viewed /, '')}`
     default: return L
   }
 }
+
+/** RM-view narration (2nd person for the RM; suppliers named). */
+export const rmFriendlyLabel = (e: TimelineEvent, ctx?: NarrateCtx): string => narrate(e, 'rm', ctx)
+/** Store-manager-view narration (RM = "the regional manager"; awarded supplier named). */
+export const smFriendlyLabel = (e: TimelineEvent, ctx?: NarrateCtx): string => narrate(e, 'sm', ctx)
+/** Individual-owner narration (owner = "you"; awarded supplier named). */
+export const individualFriendlyLabel = (e: TimelineEvent, ctx?: NarrateCtx): string => narrate(e, 'individual', ctx)
+/** Supplier-view narration (client-voiced: client side = "the client"; own actions = "you"). */
+export const supplierFriendlyLabel = (e: TimelineEvent, ctx?: NarrateCtx): string => narrate(e, 'supplier', ctx)
 
 // ── Store-Manager view filter ────────────────────────────────────────────────
 // The SM sees the ticket's OPERATIONAL story, not the commercial internals:

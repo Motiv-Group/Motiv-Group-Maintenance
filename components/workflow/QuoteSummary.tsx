@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { CheckCircle2, FileText, XCircle, ChevronDown, Calendar } from 'lucide-react'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils'
+import { quoteLabel } from '@/lib/attachment-labels'
 
 export type QuoteSummaryStatus = 'pending' | 'accepted' | 'declined' | 'awarded'
 
@@ -84,7 +85,7 @@ export function QuoteSummary({ quote, status, title, schedule, collapsible = fal
   const attName = quote.fileUrl ? fileName(quote.fileUrl) : null
   const fileLink = (label: ReactNode, className: string) => quote.fileUrl && (
     ticketId
-      ? <ViewTrackedLink ticketId={ticketId} itemType="quote" itemLabel={`${title ?? quote.supplierName ?? 'Quote'} attachment`} href={quote.fileUrl} className={className}>{label}</ViewTrackedLink>
+      ? <ViewTrackedLink ticketId={ticketId} itemType="quote" itemLabel={quoteLabel(quote.supplierName ?? undefined, quote.quoteRef ?? undefined)} href={quote.fileUrl} className={className}>{label}</ViewTrackedLink>
       : <a href={quote.fileUrl} target="_blank" rel="noopener noreferrer" className={className}>{label}</a>
   )
 

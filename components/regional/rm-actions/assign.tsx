@@ -15,6 +15,7 @@ import { post, errMsg, PANEL_META, type SupplierChoice } from './shared'
 // function declarations, only referenced at render time.
 import { MoreMenu, MoreActionItem, RmAddWorkForm, RequestInfoButton, RmEditTicketForm, CancelTicketCard } from './ticket'
 import { SheetHeader, SheetSection, InfoRows, SheetFooter } from '@/components/workflow/TicketInfoSheet'
+import { ticketPhotoLabel, ticketDocLabel } from '@/lib/attachment-labels'
 
 // ── Assign suppliers (button → modal: searchable, sortable, paginated table) ─
 
@@ -342,7 +343,7 @@ export function ViewAssignButton({ ticketId, summary, suppliers, motivSuppliers 
 
                   {ticket.photoUrls.length > 0 && (
                     <SheetSection label="Images">
-                      <PhotoThumbs urls={ticket.photoUrls} ticketId={ticketId} label="Job photo" limit={5} />
+                      <PhotoThumbs urls={ticket.photoUrls} ticketId={ticketId} label="Job photo" trackLabel={(i) => ticketPhotoLabel(i + 1)} limit={5} />
                     </SheetSection>
                   )}
 
@@ -353,7 +354,7 @@ export function ViewAssignButton({ ticketId, summary, suppliers, motivSuppliers 
                       <ul className="space-y-2">
                         {ticket.infoDocs!.map((u, i) => (
                           <li key={i}>
-                            <ViewTrackedLink ticketId={ticketId} itemType="attachment" itemLabel={`Ticket document ${i + 1}`} href={u} className="flex items-center gap-2.5 rounded-xl ring-1 ring-[var(--border)] bg-[var(--surface)] px-3.5 py-3 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--hover)]">
+                            <ViewTrackedLink ticketId={ticketId} itemType="attachment" itemLabel={ticketDocLabel(i + 1)} href={u} className="flex items-center gap-2.5 rounded-xl ring-1 ring-[var(--border)] bg-[var(--surface)] px-3.5 py-3 text-sm font-medium text-[var(--text)] transition hover:bg-[var(--hover)]">
                               <FileText size={16} className="text-blue-600 dark:text-blue-400 shrink-0" />
                               <span className="truncate">{docName(u, i)}</span>
                             </ViewTrackedLink>

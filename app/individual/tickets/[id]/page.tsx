@@ -13,7 +13,7 @@ import { QuoteSummary, type QuoteSummaryStatus } from '@/components/workflow/Quo
 import { SupplierStatusList, QuoteReviewCard, ApproveSignoffCard, RequestEvidenceButton, RaiseSnagButton, VariationReviewCard, CloseOutButton, AcceptSnagScheduleCard, type ReviewQuote } from '@/components/regional/RmTicketActions'
 import { IndividualTicketActionBar } from '@/components/individual/IndividualTicketActionBar'
 import { TicketTimeline } from '@/components/ui/TicketTimeline'
-import { buildTicketTimeline } from '@/lib/ticket-timeline'
+import { buildTicketTimeline, individualFriendlyLabel } from '@/lib/ticket-timeline'
 import { isTerminalStatus } from '@/lib/workflow'
 import { DisputeThread } from '@/components/dispute/DisputeBox'
 import { ChatFab } from '@/components/chat/TicketChat'
@@ -134,7 +134,9 @@ export default async function IndividualTicketDetailPage(props: { params: Promis
     disputes: disputes.map(d => ({ origin: d.origin, status: d.status, outcome: d.outcome, created_at: d.created_at, resolved_at: d.resolved_at, reason: d.resolution_note })),
     disputeMessages: (disputeMsgRows ?? []).map(m => ({ author_role: m.author_role, body: m.body, created_at: m.created_at })),
     signoffs: (signoffs ?? []).map(s => ({ status: s.status, created_at: s.created_at, reviewed_at: s.reviewed_at, reject_reason: s.reject_reason })),
-  }).map(e => ({ ...e, who: e.who === 'Regional Manager' ? 'You' : e.who }))
+    // Owner-voiced: the individual performs every manager-side action ("You …") and
+    // the awarded supplier is named. Actor baked in → the "who" line drops away.
+  }).map(e => ({ ...e, label: individualFriendlyLabel(e, { supplierName: t.supplier_id ? (nameById.get(t.supplier_id) ?? null) : null }), who: null }))
 
   return (
     <div className="space-y-5">

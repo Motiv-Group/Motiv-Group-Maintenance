@@ -28,6 +28,7 @@ import {
   byUrgencyThenNewest, EmptyQueue, isActive, isCriticalPriority, MetricButton, priorityBadgeClass,
   QueueCard, queueCtaClass, QueueRowBadges, QueueRowNextStep, QueueRowShell, QueueRowTitle,
 } from '@/components/workqueue/shared'
+import { quoteLabel, cocLabel, invoiceLabel, completionPhotoLabel, variationAttachmentLabel, ticketPhotoLabel, ticketDocLabel } from '@/lib/attachment-labels'
 
 type QueueFilter = 'all' | 'to_quote' | 'attend' | 'evidence' | 'snags' | 'sla'
 
@@ -240,14 +241,14 @@ function SubmitQuoteSheet({ ticket, company, onClose }: { ticket: SupplierTicket
                 </SheetSection>
                 {ctx.photoUrls.length > 0 && (
                   <SheetSection label="Images">
-                    <PhotoThumbs urls={ctx.photoUrls} ticketId={ticket.id} label="Job photo" limit={5} />
+                    <PhotoThumbs urls={ctx.photoUrls} ticketId={ticket.id} label="Job photo" limit={5} trackLabel={(i) => ticketPhotoLabel(i + 1)} />
                   </SheetSection>
                 )}
                 {ctx.infoDocs.length > 0 && (
                   <SheetSection label="Documents">
                     <div className="space-y-2">
                       {ctx.infoDocs.map((u, i) => (
-                        <ViewTrackedLink key={i} ticketId={ticket.id} itemType="attachment" itemLabel={`Ticket document ${i + 1}`} href={u}
+                        <ViewTrackedLink key={i} ticketId={ticket.id} itemType="attachment" itemLabel={ticketDocLabel(i + 1)} href={u}
                           className="flex items-center gap-2.5 rounded-xl bg-[var(--surface)] px-3.5 py-3 text-sm font-medium text-[var(--text)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)]">
                           <FileText size={16} className="shrink-0 text-blue-600 dark:text-blue-400" />
                           <span className="truncate">{docBasename(u, `Document ${i + 1}`)}</span>
@@ -384,7 +385,7 @@ function DeclinedQuoteSheet({ ticket, company, onClose }: { ticket: SupplierTick
                       </div>
                       {declined.description && <p className="whitespace-pre-line break-words text-sm text-[var(--text-muted)]">{declined.description}</p>}
                       {declined.fileUrl && (
-                        <ViewTrackedLink ticketId={ticket.id} itemType="quote" itemLabel="Declined quote" href={declined.fileUrl}
+                        <ViewTrackedLink ticketId={ticket.id} itemType="quote" itemLabel={quoteLabel(undefined, declined.quoteRef)} href={declined.fileUrl}
                           className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:underline">
                           <FileText size={15} /> View quote attachment
                         </ViewTrackedLink>
@@ -425,7 +426,7 @@ function DeclinedQuoteSheet({ ticket, company, onClose }: { ticket: SupplierTick
                     {ctx.photoUrls.length > 0 && (
                       <div>
                         <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-[var(--text-faint)]">Photos ({ctx.photoUrls.length})</p>
-                        <PhotoThumbs urls={ctx.photoUrls} ticketId={ticket.id} label="Job photo" limit={5} />
+                        <PhotoThumbs urls={ctx.photoUrls} ticketId={ticket.id} label="Job photo" limit={5} trackLabel={(i) => ticketPhotoLabel(i + 1)} />
                         <p className="mt-1.5 flex items-center gap-1.5 text-xs text-[var(--text-faint)]"><Info size={12} className="shrink-0" /> Click any photo to view full size</p>
                       </div>
                     )}
@@ -632,7 +633,7 @@ function ViewVoModal({ ticket, company, onClose }: { ticket: SupplierTicketRow; 
                           <div key={i} className="flex min-w-0 items-center gap-3 rounded-xl bg-[var(--surface)] p-3 ring-1 ring-[var(--border)]">
                             <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-red-500/15 text-red-500"><FileText size={16} /></span>
                             <p className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--text)]">{docBasename(u, `Attachment ${i + 1}`)}</p>
-                            <ViewTrackedLink ticketId={ticket.id} itemType="attachment" itemLabel={`Declined VO attachment ${i + 1}`} href={u}
+                            <ViewTrackedLink ticketId={ticket.id} itemType="attachment" itemLabel={variationAttachmentLabel(i + 1, undefined, undefined)} href={u}
                               className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold text-[var(--text)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)]">
                               <Eye size={14} /> Preview
                             </ViewTrackedLink>
@@ -797,7 +798,7 @@ function SnagSheet({ ticket, company, onClose }: { ticket: SupplierTicketRow; co
                     {photos.length > 0 && (
                       <>
                         <p className="mb-1.5 text-sm text-[var(--text-muted)]">{ctx.afterUrls.length ? 'After photos submitted' : 'Photos submitted'}</p>
-                        <PhotoThumbs urls={photos} ticketId={ticket.id} label={ctx.afterUrls.length ? 'After photo' : 'Before photo'} limit={4} />
+                        <PhotoThumbs urls={photos} ticketId={ticket.id} label={ctx.afterUrls.length ? 'After photo' : 'Before photo'} limit={4} trackLabel={(i) => completionPhotoLabel(ctx.afterUrls.length ? 'after' : 'before', i + 1, undefined, undefined)} />
                       </>
                     )}
                   </div>
@@ -813,7 +814,7 @@ function SnagSheet({ ticket, company, onClose }: { ticket: SupplierTicketRow; co
                               {ctx.submittedAt && <p className="text-xs text-[var(--text-muted)]">Uploaded {formatDateTime(ctx.submittedAt)}</p>}
                             </div>
                           </div>
-                          <ViewTrackedLink ticketId={ticket.id} itemType="coc" itemLabel="COC" href={ctx.cocUrl}
+                          <ViewTrackedLink ticketId={ticket.id} itemType="coc" itemLabel={cocLabel(undefined, undefined)} href={ctx.cocUrl}
                             className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-[var(--text)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)]">
                             <Eye size={15} /> View certificate
                           </ViewTrackedLink>
@@ -821,7 +822,7 @@ function SnagSheet({ ticket, company, onClose }: { ticket: SupplierTicketRow; co
                       </div>
                     )}
                     {ctx.invoiceUrl && (
-                      <ViewTrackedLink ticketId={ticket.id} itemType="invoice" itemLabel="Invoice" href={ctx.invoiceUrl}
+                      <ViewTrackedLink ticketId={ticket.id} itemType="invoice" itemLabel={invoiceLabel(undefined, undefined)} href={ctx.invoiceUrl}
                         className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:underline">
                         <FileText size={15} /> View invoice
                       </ViewTrackedLink>

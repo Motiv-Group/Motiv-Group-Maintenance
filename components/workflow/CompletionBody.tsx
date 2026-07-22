@@ -7,6 +7,7 @@ import { FileText, ExternalLink, Info } from 'lucide-react'
 import { PhotoThumbs } from '@/components/ui/PhotoThumbs'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { formatDateTime } from '@/lib/utils'
+import { cocLabel, invoiceLabel, completionPhotoLabel } from '@/lib/attachment-labels'
 
 const GROUP_LABEL = 'mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-faint)]'
 
@@ -19,8 +20,8 @@ function docName(url: string, fallback: string): string {
   } catch { return fallback }
 }
 
-function DocCard({ ticketId, url, itemType, itemLabel, uploadedAt }: {
-  ticketId: string; url: string; itemType: 'coc' | 'invoice'; itemLabel: string; uploadedAt?: string | null
+function DocCard({ ticketId, url, itemType, itemLabel, auditLabel, uploadedAt }: {
+  ticketId: string; url: string; itemType: 'coc' | 'invoice'; itemLabel: string; auditLabel: string; uploadedAt?: string | null
 }) {
   return (
     <div className="rounded-lg bg-[var(--surface)] p-3 ring-1 ring-[var(--border)]">
@@ -32,7 +33,7 @@ function DocCard({ ticketId, url, itemType, itemLabel, uploadedAt }: {
           {uploadedAt && <p className="text-[11px] text-[var(--text-faint)]">Uploaded {formatDateTime(uploadedAt)}</p>}
         </div>
       </div>
-      <ViewTrackedLink ticketId={ticketId} itemType={itemType} itemLabel={itemLabel} href={url} className="mt-2.5 inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 transition hover:underline dark:text-blue-400"><ExternalLink size={13} /> View document</ViewTrackedLink>
+      <ViewTrackedLink ticketId={ticketId} itemType={itemType} itemLabel={auditLabel} href={url} className="mt-2.5 inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 transition hover:underline dark:text-blue-400"><ExternalLink size={13} /> View document</ViewTrackedLink>
     </div>
   )
 }
@@ -69,7 +70,14 @@ export function CompletionBody({ ticketId, beforeUrls = [], afterUrls = [], cocU
       <div className="md:pr-5">
         <div className={GROUP_LABEL}>Proof of completion{photos.length > 0 && ` (${photos.length} photo${photos.length === 1 ? '' : 's'})`}</div>
         {photos.length
-          ? <PhotoThumbs urls={photos} ticketId={ticketId} label="Completion photo" />
+          ? <PhotoThumbs
+              urls={photos}
+              ticketId={ticketId}
+              label="Completion photo"
+              trackLabel={(i) => i < beforeUrls.length
+                ? completionPhotoLabel('before', i + 1, undefined, undefined)
+                : completionPhotoLabel('after', i - beforeUrls.length + 1, undefined, undefined)}
+            />
           : <span className="text-sm text-[var(--text-faint)]">No photos uploaded</span>}
       </div>
 
@@ -78,9 +86,9 @@ export function CompletionBody({ ticketId, beforeUrls = [], afterUrls = [], cocU
         <div className={GROUP_LABEL}>Certificate of Compliance (COC)</div>
         <div className="space-y-2">
           {cocUrl
-            ? <DocCard ticketId={ticketId} url={cocUrl} itemType="coc" itemLabel="Completion COC" uploadedAt={uploadedAt} />
+            ? <DocCard ticketId={ticketId} url={cocUrl} itemType="coc" itemLabel="Completion COC" auditLabel={cocLabel(undefined, undefined)} uploadedAt={uploadedAt} />
             : <span className="text-sm text-[var(--text-faint)]">No certificate uploaded</span>}
-          {invoiceUrl && <DocCard ticketId={ticketId} url={invoiceUrl} itemType="invoice" itemLabel="Completion invoice" uploadedAt={uploadedAt} />}
+          {invoiceUrl && <DocCard ticketId={ticketId} url={invoiceUrl} itemType="invoice" itemLabel="Completion invoice" auditLabel={invoiceLabel(undefined, undefined)} uploadedAt={uploadedAt} />}
         </div>
       </div>
 
