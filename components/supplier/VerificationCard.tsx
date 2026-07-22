@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { uploadOne } from '@/lib/upload'
 import { Card } from '@/components/exec/ui'
+import { useFileDrop } from '@/components/ui/useFileDrop'
 import { ShieldCheck, Upload, CheckCircle2, FileText } from 'lucide-react'
 
 // Pending self-signup suppliers see this on the dashboard: an "under review"
@@ -48,6 +49,11 @@ export function VerificationCard() {
 
   const has = (kind: string) => docs.some(d => d.kind === kind)
 
+  function addFiles(kind: string, files: File[]) {
+    const f = files[0]
+    if (f) upload(kind, f)
+  }
+
   return (
     <Card className={`p-5 space-y-4 ring-1 ${verified ? 'ring-emerald-500/30' : 'ring-amber-500/30'}`}>
       <div className="flex items-start gap-3">
@@ -64,28 +70,58 @@ export function VerificationCard() {
 
       <ul className="space-y-2">
         {DOC_TYPES.map(d => (
-          <li key={d.kind} className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border)] px-3.5 py-2.5">
-            <span className="flex items-center gap-2 text-sm text-[var(--text)] min-w-0">
-              {has(d.kind)
-                ? <CheckCircle2 size={16} className="shrink-0 text-emerald-500" />
-                : <FileText size={16} className="shrink-0 text-[var(--text-faint)]" />}
-              <span className="truncate">{d.label}</span>
-            </span>
-            <label className={`shrink-0 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium cursor-pointer transition ${
-              has(d.kind)
-                ? 'border border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--hover)]'
-                : 'bg-blue-600 hover:bg-blue-500 text-white'
-            } ${busyKind === d.kind ? 'opacity-60 pointer-events-none' : ''}`}>
-              <Upload size={13} /> {busyKind === d.kind ? 'Uploading…' : has(d.kind) ? 'Replace' : 'Upload'}
-              <input type="file" accept="application/pdf,image/*" className="hidden"
-                onChange={e => { const f = e.target.files?.[0]; if (f) upload(d.kind, f); e.target.value = '' }} />
-            </label>
-          </li>
+          <DocRow
+            key={d.kind}
+            kind={d.kind}
+            label={d.label}
+            has={has(d.kind)}
+            busy={busyKind === d.kind}
+            onFiles={files => addFiles(d.kind, files)}
+          />
         ))}
       </ul>
 
       {error && <div className="text-sm text-red-500 bg-red-500/10 rounded-lg px-3 py-2">{error}</div>}
       <p className="text-[11px] text-[var(--text-faint)]">PDF or photo, up to 15 MB. Documents are stored privately and only visible to the Motiv review team.</p>
     </Card>
+  )
+}
+
+const DOC_ACCEPT = 'application/pdf,image/*'
+
+function DocRow({ kind, label, has, busy, onFiles }: {
+  kind: string
+  label: string
+  has: boolean
+  busy: boolean
+  onFiles: (files: File[]) => void
+}) {
+  const { isDragging, dropProps } = useFileDrop({ onFiles, accept: DOC_ACCEPT, multiple: false, disabled: busy })
+
+  return (
+    <li
+      {...dropProps}
+      className={`flex items-center justify-between gap-3 rounded-xl border px-3.5 py-2.5 transition ${
+        isDragging ? 'border-blue-500 ring-2 ring-blue-500 bg-blue-500/5' : 'border-[var(--border)]'
+      }`}
+    >
+      <span className="flex items-center gap-2 text-sm text-[var(--text)] min-w-0">
+        {isDragging
+          ? <Upload size={16} className="shrink-0 text-blue-500" />
+          : has
+            ? <CheckCircle2 size={16} className="shrink-0 text-emerald-500" />
+            : <FileText size={16} className="shrink-0 text-[var(--text-faint)]" />}
+        <span className="truncate">{isDragging ? 'Drop file here' : label}</span>
+      </span>
+      <label className={`shrink-0 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium cursor-pointer transition ${
+        has
+          ? 'border border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--hover)]'
+          : 'bg-blue-600 hover:bg-blue-500 text-white'
+      } ${busy ? 'opacity-60 pointer-events-none' : ''}`}>
+        <Upload size={13} /> {busy ? 'Uploading…' : has ? 'Replace' : 'Upload'}
+        <input type="file" accept={DOC_ACCEPT} className="hidden"
+          onChange={e => { onFiles(Array.from(e.target.files ?? [])); e.target.value = '' }} />
+      </label>
+    </li>
   )
 }

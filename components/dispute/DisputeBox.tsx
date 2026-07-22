@@ -13,6 +13,10 @@ import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { formatCurrency, formatDateTime } from '@/lib/utils'
 import { disputeEvidenceLabel } from '@/lib/attachment-labels'
 import { useScrollLock } from '@/lib/useScrollLock'
+import { useFileDrop } from '@/components/ui/useFileDrop'
+
+// The accept string shared by every dispute file input (composer + raise dropzone).
+const DISPUTE_ACCEPT = 'image/*,.pdf,.doc,.docx'
 
 // Reason quick-picks per dispute origin (folded into the first thread message).
 const DISPUTE_REASONS: Record<string, string[]> = {
@@ -118,6 +122,9 @@ function Composer({ ticketId, action, submitLabel, placeholder, onDone }: { tick
   // Keep each file's index in `files` so remove works from either list.
   const images = files.map((f, i) => ({ f, i })).filter(({ f }) => f.type.startsWith('image/'))
   const docs = files.map((f, i) => ({ f, i })).filter(({ f }) => !f.type.startsWith('image/'))
+  // Single append path for both the picker and drag-and-drop (same cap + clear).
+  const addFiles = (picked: File[]) => { setFiles(p => [...p, ...picked].slice(0, 10)); setErr('') }
+  const { isDragging, dropProps } = useFileDrop({ onFiles: addFiles, accept: DISPUTE_ACCEPT, multiple: true, disabled: busy })
 
   async function submit() {
     if (!text.trim() && !files.length) { setErr('Add a message or attach evidence.'); return }
@@ -135,7 +142,10 @@ function Composer({ ticketId, action, submitLabel, placeholder, onDone }: { tick
   }
 
   return (
-    <div className="space-y-2 rounded-xl bg-[var(--input-bg)] p-2.5 ring-1 ring-[var(--border)]">
+    <div {...dropProps} className={`relative space-y-2 rounded-xl bg-[var(--input-bg)] p-2.5 ring-1 transition ${isDragging ? 'ring-2 ring-blue-500 bg-blue-500/5' : 'ring-[var(--border)]'}`}>
+      {isDragging && (
+        <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center rounded-xl bg-blue-500/5 text-sm font-semibold text-blue-600 dark:text-blue-400">Drop files here</div>
+      )}
       <textarea value={text} onChange={e => setText(e.target.value.slice(0, MAX_DISPUTE_CHARS))} placeholder={placeholder} rows={3}
         className="w-full resize-none bg-transparent px-1 py-0.5 text-sm text-[var(--text)] placeholder-[var(--text-faint)] outline-none" />
       {/* Picked images preview as thumbnails (like the photo uploaders); documents
@@ -167,7 +177,7 @@ function Composer({ ticketId, action, submitLabel, placeholder, onDone }: { tick
       <div className="flex items-center gap-2">
         <label aria-label="Attach evidence" className="grid h-10 w-10 shrink-0 cursor-pointer place-items-center rounded-lg text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)]">
           <Paperclip size={16} />
-          <input type="file" accept="image/*,.pdf,.doc,.docx" multiple className="hidden" onChange={e => { setFiles(p => [...p, ...Array.from(e.target.files ?? [])].slice(0, 10)); setErr('') }} />
+          <input type="file" accept={DISPUTE_ACCEPT} multiple className="hidden" onChange={e => addFiles(Array.from(e.target.files ?? []))} />
         </label>
         <span className="ml-auto shrink-0 text-[11px] tabular-nums text-[var(--text-faint)]">{text.length}/{MAX_DISPUTE_CHARS}</span>
         <button onClick={submit} disabled={busy} className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:opacity-50">
@@ -198,9 +208,10 @@ export function RaiseDisputeButton({ ticketId, origin, subjectTitle, jobRef, sto
   const what = origin === 'snag' ? 'snag' : origin === 'variation' ? 'variation-order decline' : origin === 'quote_declined' ? 'quote decline' : 'evidence request'
   const reset = () => { setReason(''); setText(''); setFiles([]); setErr('') }
   const close = () => { setOpen(false); reset(); onClose?.() }
-  // Snapshot the live FileList before the input is cleared (lazy reads inside the
-  // state updater would find it already emptied).
-  const addFiles = (list: FileList | null) => { const picked = Array.from(list ?? []); setFiles(p => [...p, ...picked].slice(0, MAX_DISPUTE_FILES)); setErr('') }
+  // Single append path for both the picker and drag-and-drop. The picker snapshots
+  // the live FileList to File[] before the input is cleared.
+  const addFiles = (picked: File[]) => { setFiles(p => [...p, ...picked].slice(0, MAX_DISPUTE_FILES)); setErr('') }
+  const { isDragging, dropProps } = useFileDrop({ onFiles: addFiles, accept: DISPUTE_ACCEPT, multiple: true, disabled: busy })
 
   async function submit() {
     if (!reason) { setErr('Choose a reason for the dispute.'); return }
@@ -273,9 +284,8 @@ export function RaiseDisputeButton({ ticketId, origin, subjectTitle, jobRef, sto
               {/* Evidence dropzone */}
               <div>
                 <label className="mb-1.5 block text-sm font-semibold text-[var(--text)]">Add evidence <span className="font-normal text-[var(--text-faint)]">(optional)</span></label>
-                <label
-                  onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); addFiles(e.dataTransfer.files) }}
-                  className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border-2 border-dashed border-[var(--border)] px-4 py-4 transition hover:border-blue-500/60 hover:bg-[var(--hover)]">
+                <label {...dropProps}
+                  className={`flex cursor-pointer items-center justify-between gap-3 rounded-xl border-2 border-dashed px-4 py-4 transition ${isDragging ? 'border-blue-500 bg-blue-500/5' : 'border-[var(--border)] hover:border-blue-500/60 hover:bg-[var(--hover)]'}`}>
                   <span className="flex min-w-0 items-center gap-3">
                     <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400"><Paperclip size={18} /></span>
                     <span className="min-w-0">
@@ -285,7 +295,7 @@ export function RaiseDisputeButton({ ticketId, origin, subjectTitle, jobRef, sto
                   </span>
                   {/* The whole dropzone label is clickable — the pill is desktop-only. */}
                   <span className="hidden shrink-0 rounded-lg px-3 py-1.5 text-sm font-semibold text-blue-600 ring-1 ring-[var(--border)] transition hover:bg-blue-500/10 dark:text-blue-400 sm:inline-flex">Browse files</span>
-                  <input type="file" accept="image/*,.pdf,.doc,.docx" multiple className="hidden" onChange={e => { addFiles(e.target.files); e.currentTarget.value = '' }} />
+                  <input type="file" accept={DISPUTE_ACCEPT} multiple className="hidden" onChange={e => { addFiles(Array.from(e.target.files ?? [])); e.currentTarget.value = '' }} />
                 </label>
                 {files.length > 0 ? (
                   <div className="mt-2 space-y-1">

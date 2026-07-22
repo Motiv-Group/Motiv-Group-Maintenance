@@ -7,6 +7,7 @@ import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { Pencil, Plus, Camera, Info, X, ChevronDown, MessageSquare, XCircle, Send, AlertCircle, Trash2, FileUp, FileText } from 'lucide-react'
 import { uploadFiles } from '@/lib/upload'
+import { useFileDrop } from '@/components/ui/useFileDrop'
 import { formatDateTime } from '@/lib/utils'
 import { StarInput } from '@/components/ui/Stars'
 import { TicketChat } from '@/components/chat/TicketChat'
@@ -447,19 +448,26 @@ export function RmAddWorkForm({ ticketId, description, photoUrls, docUrls, title
   // empty MIME type (Android WebView), so require-image would silently drop it —
   // the `accept="image/*"` picker already limits selection, and the upload route
   // accepts an empty type, so only reject a clearly non-image type here.
-  // Snapshot the LIVE FileList synchronously: the input's value is cleared right
-  // after this call, and reading the list lazily inside the state updater (which
-  // runs after the handler) would find it already emptied — zero photos added.
-  const addFiles = (list: FileList | null) => {
-    const picked = Array.from(list ?? []).filter(f => !f.type || f.type.startsWith('image/'))
-    setFiles(p => [...p, ...picked].slice(0, MAX_WORK_PHOTOS))
+  // Takes a File[] so BOTH the <input onChange> (Array.from of the live FileList,
+  // snapshotted synchronously before the input value is cleared) and drag-drop
+  // route through the same validation/cap path.
+  const addFiles = (picked: File[]) => {
+    const imgs = picked.filter(f => !f.type || f.type.startsWith('image/'))
+    setFiles(p => [...p, ...imgs].slice(0, MAX_WORK_PHOTOS))
   }
-  // Documents (PDF/Word) — same live-FileList snapshot rule as addFiles above;
-  // non-image only (the accept list already limits the picker), capped at 5.
-  const addDocs = (list: FileList | null) => {
-    const picked = Array.from(list ?? []).filter(f => !f.type.startsWith('image/'))
-    setDocs(p => [...p, ...picked].slice(0, MAX_WORK_DOCS))
+  // Documents (PDF/Word) — non-image only (the accept list already limits the
+  // picker), capped at 5. Same File[] path shared by input + drag-drop.
+  const addDocs = (picked: File[]) => {
+    const dcs = picked.filter(f => !f.type.startsWith('image/'))
+    setDocs(p => [...p, ...dcs].slice(0, MAX_WORK_DOCS))
   }
+
+  // Drag-and-drop mirrors each input's accept/multiple/at-capacity condition and
+  // funnels dropped files through the same addFiles/addDocs handlers.
+  const photosFull = files.length >= MAX_WORK_PHOTOS
+  const docsFull = docs.length >= MAX_WORK_DOCS
+  const { isDragging: photoDragging, dropProps: photoDrop } = useFileDrop({ onFiles: addFiles, accept: 'image/*', multiple: true, disabled: photosFull })
+  const { isDragging: docDragging, dropProps: docDrop } = useFileDrop({ onFiles: addDocs, accept: WORK_DOC_ACCEPT, multiple: true, disabled: docsFull })
 
   async function submit() {
     if (!text.trim()) { setErr('Describe the extra work needed.'); return }
@@ -506,11 +514,11 @@ export function RmAddWorkForm({ ticketId, description, photoUrls, docUrls, title
             <p className="mb-2 text-sm font-medium text-[var(--text)]">Add photos <span className="font-normal text-[var(--text-faint)]">(optional)</span></p>
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
               {files.length < MAX_WORK_PHOTOS && (
-                <label className="flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-[var(--border)] p-2 text-center text-[var(--text-muted)] transition hover:border-blue-500 hover:bg-[var(--hover)]">
+                <label {...photoDrop} className={`flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed p-2 text-center text-[var(--text-muted)] transition hover:border-blue-500 hover:bg-[var(--hover)] ${photoDragging ? 'border-blue-500 bg-blue-500/5 ring-2 ring-blue-500' : 'border-[var(--border)]'}`}>
                   <Camera size={20} className="text-[var(--text-faint)]" />
-                  <span className="text-[11px] font-medium leading-tight">Upload photos</span>
+                  <span className="text-[11px] font-medium leading-tight">{photoDragging ? 'Drop photos here' : 'Upload photos'}</span>
                   <span className="text-[10px] leading-tight text-[var(--text-faint)]">PNG, JPG up to 10MB</span>
-                  <input type="file" accept="image/*" multiple className="hidden" onChange={e => { addFiles(e.target.files); e.currentTarget.value = '' }} />
+                  <input type="file" accept="image/*" multiple className="hidden" onChange={e => { addFiles(Array.from(e.target.files ?? [])); e.currentTarget.value = '' }} />
                 </label>
               )}
               {files.map((f, i) => (
@@ -529,10 +537,10 @@ export function RmAddWorkForm({ ticketId, description, photoUrls, docUrls, title
           <div>
             <p className="mb-2 text-sm font-medium text-[var(--text)]">Attach documents <span className="font-normal text-[var(--text-faint)]">(optional)</span></p>
             {docs.length < MAX_WORK_DOCS && (
-              <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-[var(--border)] px-3 py-3 text-sm font-medium text-[var(--text-muted)] transition hover:border-blue-500 hover:bg-[var(--hover)]">
-                <FileUp size={16} className="shrink-0 text-[var(--text-faint)]" /> Choose documents
+              <label {...docDrop} className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed px-3 py-3 text-sm font-medium text-[var(--text-muted)] transition hover:border-blue-500 hover:bg-[var(--hover)] ${docDragging ? 'border-blue-500 bg-blue-500/5 ring-2 ring-blue-500' : 'border-[var(--border)]'}`}>
+                <FileUp size={16} className="shrink-0 text-[var(--text-faint)]" /> {docDragging ? 'Drop documents here' : 'Choose documents'}
                 <span className="text-[11px] font-normal text-[var(--text-faint)]">PDF or Word</span>
-                <input type="file" accept={WORK_DOC_ACCEPT} multiple className="hidden" onChange={e => { addDocs(e.target.files); e.currentTarget.value = '' }} />
+                <input type="file" accept={WORK_DOC_ACCEPT} multiple className="hidden" onChange={e => { addDocs(Array.from(e.target.files ?? [])); e.currentTarget.value = '' }} />
               </label>
             )}
             {docs.length > 0 && (

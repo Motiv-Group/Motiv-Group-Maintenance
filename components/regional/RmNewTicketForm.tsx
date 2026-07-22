@@ -10,6 +10,7 @@ import { ImagePlus, Camera, X, Check, ArrowRight, ArrowLeft, Search, Store as St
 import { createClient } from '@/lib/supabase/client'
 import { uploadTicketPhotos } from '@/lib/upload'
 import { useScrollLock } from '@/lib/useScrollLock'
+import { useFileDrop } from '@/components/ui/useFileDrop'
 import { OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
 import { categoryVisual } from '@/lib/categoryVisual'
 
@@ -55,6 +56,9 @@ export function RmNewTicketForm({ stores, suppliers }: { stores: { id: string; n
     const imgs = incoming.filter(f => !f.type || f.type.startsWith('image/'))
     setFiles(prev => [...prev, ...imgs].slice(0, MAX_PHOTOS))
   }
+
+  // Drag-and-drop for the photos step — routes dropped images through the same addFiles path.
+  const { isDragging, dropProps } = useFileDrop({ onFiles: addFiles, accept: 'image/*', multiple: true, disabled: !remaining })
 
   const storeName = stores.find(s => s.id === storeId)?.name ?? ''
   const impactLabel = impact ? OPERATIONAL_IMPACT_LABELS[impact] : ''
@@ -203,9 +207,8 @@ export function RmNewTicketForm({ stores, suppliers }: { stores: { id: string; n
             <legend className="text-sm font-semibold text-[var(--text)]">Add photos</legend>
             <p className="text-xs text-[var(--text-muted)] mt-0.5 mb-3">Minimum 2, up to 5. Clear shots help the contractor quote faster.</p>
             <div
-              onDragOver={e => e.preventDefault()}
-              onDrop={e => { e.preventDefault(); addFiles(Array.from(e.dataTransfer.files)) }}
-              className="rounded-xl border border-dashed border-slate-300 dark:border-slate-600 p-3"
+              {...dropProps}
+              className={`rounded-xl border border-dashed p-3 transition ${isDragging ? 'border-blue-500 ring-2 ring-blue-500 bg-blue-500/5' : 'border-slate-300 dark:border-slate-600'}`}
             >
               <div className="grid grid-cols-2 gap-3">
                 <label className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-[var(--text)] text-sm font-medium transition ${remaining ? 'cursor-pointer hover:border-emerald-500/60' : 'opacity-50 cursor-not-allowed'}`}>
@@ -217,7 +220,7 @@ export function RmNewTicketForm({ stores, suppliers }: { stores: { id: string; n
                   <input type="file" accept="image/*" capture="environment" disabled={!remaining} className="hidden" onChange={e => { addFiles(Array.from(e.target.files ?? [])); e.target.value = '' }} />
                 </label>
               </div>
-              <p className="text-center text-[11px] text-[var(--text-faint)] mt-2.5">{remaining} of {MAX_PHOTOS} slots remaining · drag &amp; drop also works</p>
+              <p className={`text-center text-[11px] mt-2.5 ${isDragging ? 'font-semibold text-blue-500' : 'text-[var(--text-faint)]'}`}>{isDragging ? 'Drop photos here' : <>{remaining} of {MAX_PHOTOS} slots remaining · drag &amp; drop also works</>}</p>
 
               {files.length > 0 && (
                 <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">

@@ -10,7 +10,10 @@ import { Modal } from '@/components/ui/Modal'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { MessageSquare, Paperclip, Send, X, FileText, Image as ImageIcon, Loader2 } from 'lucide-react'
 import { uploadOne } from '@/lib/upload'
+import { useFileDrop } from '@/components/ui/useFileDrop'
 import { formatDateTime } from '@/lib/utils'
+
+const ATTACH_ACCEPT = 'image/*,.pdf,.doc,.docx'
 
 export type ChatViewerRole = 'supplier' | 'regional_manager' | 'store_manager' | 'individual'
 
@@ -212,6 +215,17 @@ function ChatComposer({ ticketId, onSent }: { ticketId: string; onSent: () => vo
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
 
+  // Shared path for picked (input onChange) and dropped files — same validation,
+  // limit and state update, so drag-and-drop behaves exactly like the picker.
+  function addFiles(picked: File[]) {
+    if (!picked.length) return
+    setFiles(p => [...p, ...picked].slice(0, MAX_FILES))
+    setErr('')
+  }
+
+  const atCapacity = busy || files.length >= MAX_FILES
+  const { isDragging, dropProps } = useFileDrop({ onFiles: addFiles, accept: ATTACH_ACCEPT, multiple: true, disabled: atCapacity })
+
   async function submit() {
     if (!text.trim() && !files.length) { setErr('Add a message or attach a file.'); return }
     setBusy(true); setErr('')
@@ -226,7 +240,12 @@ function ChatComposer({ ticketId, onSent }: { ticketId: string; onSent: () => vo
   }
 
   return (
-    <div className="space-y-2.5">
+    <div {...dropProps} className={`relative space-y-2.5 rounded-xl transition ${isDragging ? 'p-2 ring-2 ring-blue-500 bg-blue-500/5' : ''}`}>
+      {isDragging && (
+        <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center rounded-xl text-sm font-semibold text-blue-600 dark:text-blue-400">
+          <span className="flex items-center gap-1.5"><Paperclip size={15} /> Drop files here</span>
+        </div>
+      )}
       <textarea value={text} onChange={e => setText(e.target.value.slice(0, MAX_CHARS))} placeholder="Write a message…" rows={2}
         onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); submit() } }}
         className="w-full rounded-xl bg-[var(--input-bg)] px-3 py-2.5 text-sm text-[var(--text)] ring-1 ring-[var(--border)] outline-none placeholder-[var(--text-faint)] focus:ring-blue-500/40" />
@@ -245,7 +264,7 @@ function ChatComposer({ ticketId, onSent }: { ticketId: string; onSent: () => vo
         <label className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-xl px-3 py-2 text-sm text-[var(--text)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)]">
           <Paperclip size={15} /> Attach
           {/* Snapshot the FileList before clearing the input — a lazy read inside the updater finds it emptied. */}
-          <input type="file" accept="image/*,.pdf,.doc,.docx" multiple className="hidden" onChange={e => { const picked = Array.from(e.target.files ?? []); setFiles(p => [...p, ...picked].slice(0, MAX_FILES)); setErr(''); e.currentTarget.value = '' }} />
+          <input type="file" accept={ATTACH_ACCEPT} multiple className="hidden" onChange={e => { addFiles(Array.from(e.target.files ?? [])); e.currentTarget.value = '' }} />
         </label>
         <button onClick={submit} disabled={busy} className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-blue-600 py-2 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:opacity-50">
           {busy ? <><Loader2 size={14} className="animate-spin" /> Sending…</> : <><Send size={14} /> Send</>}
