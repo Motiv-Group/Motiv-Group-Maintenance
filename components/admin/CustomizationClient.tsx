@@ -6,9 +6,11 @@
 // own; the heavy sections (logo, colours) live in ./customization/*.
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, Image as ImageIcon, LifeBuoy, Loader2, Monitor, Moon, Paintbrush, Plus, Smartphone, Sun, Type, X } from 'lucide-react'
+import { Check, CheckCircle2, Download, ExternalLink, Image as ImageIcon, LayoutGrid, LifeBuoy, Loader2, LogIn, Monitor, Moon, Palette, Paintbrush, Plus, Rocket, Smartphone, Sun, Type, X } from 'lucide-react'
 import type { AppSettings } from '@/lib/settings'
 import { DEFAULT_INSTALL_ANDROID, DEFAULT_INSTALL_IOS } from '@/lib/settings'
+import { formatDate } from '@/lib/utils'
+import { Card } from '@/components/exec/ui'
 import { DarkTile, Field, SaveRow, Section, inputCls, postForm, postJson, useAsyncSave, validateImage } from '@/components/admin/customization/shared'
 import { useFileDrop } from '@/components/ui/useFileDrop'
 import { LogoSection } from '@/components/admin/customization/LogoSection'
@@ -18,33 +20,197 @@ import { EmailsSection } from '@/components/admin/customization/EmailsSection'
 
 type SettingsResponse = { ok: true; settings: AppSettings }
 
+type TabKey = 'branding' | 'colours' | 'login' | 'app'
+const TABS: { key: TabKey; label: string; icon: typeof Type }[] = [
+  { key: 'branding', label: 'Branding', icon: Type },
+  { key: 'colours', label: 'Colours', icon: Palette },
+  { key: 'login', label: 'Login screen', icon: LogIn },
+  { key: 'app', label: 'App & email', icon: LayoutGrid },
+]
+
 export function CustomizationClient({ initial }: { initial: AppSettings }) {
+  const [tab, setTab] = useState<TabKey>('branding')
   const iconSrc = initial.branding.files['icon-192.png'] ?? '/icon-192.png'
   const symbolSrc = initial.branding.files['symbol.png'] ?? '/brand/motiv-symbol.png'
   const wordmarkSrc = initial.branding.files['wordmark.png'] ?? '/brand/motiv-wordmark.png'
   const lockupSrc = initial.branding.files['lockup.png'] ?? '/brand/motiv-lockup.png'
 
   return (
-    <div className="max-w-4xl space-y-6">
-      <div>
-        <h1 className="flex items-center gap-2 text-2xl font-bold text-[var(--text)]">
-          <Paintbrush size={22} className="text-blue-600 dark:text-blue-400" /> Customize
-        </h1>
-        <p className="mt-0.5 text-sm text-[var(--text-muted)]">
-          Control how the app looks for everyone — its name, logo, colours and login screen. Changes here apply to all users; nothing needs a developer unless a section says so.
-        </p>
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="flex items-center gap-2 text-2xl font-bold text-[var(--text)]">
+            <Paintbrush size={22} className="text-blue-600 dark:text-blue-400" /> Customize
+          </h1>
+          <p className="mt-0.5 text-sm text-[var(--text-muted)]">
+            Control how the app looks for everyone — name, logo, colours and login screen. Changes apply to all users automatically.
+          </p>
+        </div>
+        <a href="/auth/login" target="_blank" rel="noopener noreferrer"
+          className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl px-3 text-sm font-semibold text-[var(--text)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)]">
+          Preview in new tab <ExternalLink size={14} />
+        </a>
       </div>
 
-      <IdentitySection initialName={initial.appName} initialTagline={initial.tagline} iconSrc={iconSrc} />
-      <LogoSection initialBranding={initial.branding} />
-      <LogoLayoutSection initialLayout={initial.logo} symbolUrl={symbolSrc} wordmarkUrl={wordmarkSrc} lockupUrl={lockupSrc} custom={initial.branding.version != null} />
-      <ColoursSection initialColors={initial.colors} initialButtonColor={initial.authButtonColor} appName={initial.appName} symbolSrc={symbolSrc} />
-      <LoginBackgroundsSection initialUrls={initial.authBgUrls} />
-      <SupportSection initialEmail={initial.supportEmail} initialPhone={initial.supportPhone} />
-      <MobileAppSection initialAndroid={initial.appInstallAndroid} initialIos={initial.appInstallIos} initialUrl={initial.appDownloadUrl} />
-      <EmailsSection initialEmails={initial.emails} branding={initial.branding} />
-      <AppearanceSection initialTheme={initial.defaultTheme} />
+      {/* Sub-tabs */}
+      <div className="flex gap-1 overflow-x-auto border-b border-[var(--border)]">
+        {TABS.map(t => {
+          const active = tab === t.key
+          return (
+            <button key={t.key} type="button" onClick={() => setTab(t.key)}
+              className={`inline-flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-semibold transition ${
+                active ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text)]'
+              }`}>
+              <t.icon size={15} /> {t.label}
+            </button>
+          )
+        })}
+      </div>
+
+      {tab === 'branding' && (
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
+          <div className="min-w-0 space-y-6">
+            <IdentitySection initialName={initial.appName} initialTagline={initial.tagline} iconSrc={iconSrc} />
+            <LogoSection initialBranding={initial.branding} />
+            <LogoLayoutSection initialLayout={initial.logo} symbolUrl={symbolSrc} wordmarkUrl={wordmarkSrc} lockupUrl={lockupSrc} custom={initial.branding.version != null} />
+          </div>
+          <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
+            <LivePreview appName={initial.appName} iconSrc={iconSrc} wordmarkSrc={wordmarkSrc} lockupSrc={lockupSrc} authButtonColor={initial.authButtonColor} />
+            <DeploymentStatus branding={initial.branding} />
+          </div>
+        </div>
+      )}
+
+      {tab === 'colours' && (
+        <div className="max-w-4xl">
+          <ColoursSection initialColors={initial.colors} initialButtonColor={initial.authButtonColor} appName={initial.appName} symbolSrc={symbolSrc} />
+        </div>
+      )}
+
+      {tab === 'login' && (
+        <div className="max-w-4xl space-y-6">
+          <LoginBackgroundsSection initialUrls={initial.authBgUrls} />
+          <SupportSection initialEmail={initial.supportEmail} initialPhone={initial.supportPhone} />
+        </div>
+      )}
+
+      {tab === 'app' && (
+        <div className="max-w-4xl space-y-6">
+          <AppearanceSection initialTheme={initial.defaultTheme} />
+          <MobileAppSection initialAndroid={initial.appInstallAndroid} initialIos={initial.appInstallIos} initialUrl={initial.appDownloadUrl} />
+          <EmailsSection initialEmails={initial.emails} branding={initial.branding} />
+        </div>
+      )}
     </div>
+  )
+}
+
+/* --------------------------- Live preview (right rail) --------------------- */
+
+function LivePreview({ appName, iconSrc, wordmarkSrc, lockupSrc, authButtonColor }: {
+  appName: string
+  iconSrc: string
+  wordmarkSrc: string
+  lockupSrc: string
+  authButtonColor: string | null
+}) {
+  const name = appName.trim() || 'Motiv'
+  const btn = authButtonColor || '#2563eb'
+  return (
+    <Card className="p-4">
+      <h2 className="mb-3 text-sm font-bold text-[var(--text)]">Live preview</h2>
+      <div className="grid grid-cols-2 gap-3">
+        {/* Login screen */}
+        <div className="space-y-1">
+          <div className="flex aspect-[4/3] flex-col items-center justify-center gap-2 rounded-xl bg-[#0E1016] p-3">
+            {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary storage URLs */}
+            <img src={lockupSrc} alt="" className="max-h-6 max-w-[80%] object-contain" />
+            <div className="h-1.5 w-16 rounded bg-white/15" />
+            <div className="h-4 w-16 rounded" style={{ backgroundColor: btn }} />
+          </div>
+          <p className="text-center text-[10px] text-[var(--text-faint)]">Login screen</p>
+        </div>
+        {/* Sidebar header */}
+        <div className="space-y-1">
+          <div className="flex aspect-[4/3] flex-col gap-1.5 rounded-xl bg-[#0E1016] p-3">
+            {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary storage URLs */}
+            <img src={wordmarkSrc} alt="" className="max-h-4 max-w-[70%] object-contain" />
+            <div className="mt-1 h-2 w-full rounded bg-white/10" />
+            <div className="h-2 w-4/5 rounded bg-white/10" />
+          </div>
+          <p className="text-center text-[10px] text-[var(--text-faint)]">Sidebar header</p>
+        </div>
+        {/* Mobile home screen */}
+        <div className="space-y-1">
+          <div className="flex aspect-[4/3] flex-col items-center justify-center gap-1.5 rounded-xl bg-gradient-to-b from-slate-700 to-slate-900 p-3">
+            {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary storage URLs */}
+            <img src={iconSrc} alt="" className="h-9 w-9 rounded-xl" />
+            <span className="max-w-full truncate text-[10px] text-white/90">{name}</span>
+          </div>
+          <p className="text-center text-[10px] text-[var(--text-faint)]">Mobile home screen</p>
+        </div>
+        {/* Browser tab */}
+        <div className="space-y-1">
+          <div className="flex aspect-[4/3] items-start rounded-xl bg-[var(--surface-2)] p-3 ring-1 ring-[var(--border)]">
+            <div className="flex w-full items-center gap-1.5 rounded-lg bg-[var(--surface)] px-2 py-1.5 ring-1 ring-[var(--border)]">
+              {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary storage URLs */}
+              <img src={iconSrc} alt="" className="h-3.5 w-3.5 rounded-[3px]" />
+              <span className="truncate text-[11px] text-[var(--text)]">{name}</span>
+              <X size={10} className="ml-auto shrink-0 text-[var(--text-faint)]" />
+            </div>
+          </div>
+          <p className="text-center text-[10px] text-[var(--text-faint)]">Browser tab</p>
+        </div>
+      </div>
+    </Card>
+  )
+}
+
+/* ------------------------- Deployment status (right rail) ------------------ */
+
+function DeploymentStatus({ branding }: { branding: AppSettings['branding'] }) {
+  const custom = branding.version != null
+  const appliedOn = custom && branding.version != null && branding.version > 1e11
+    ? formatDate(new Date(branding.version).toISOString())
+    : null
+  const rows: { label: string; hint: string; state: 'active' | 'ready' | 'pending'; icon: typeof Rocket }[] = [
+    { label: 'Web & PWA', hint: 'Updated automatically', state: 'active', icon: Rocket },
+    { label: 'Android package', hint: branding.zipUrl ? 'Included in the asset pack (zip)' : 'Upload a logo to generate', state: branding.zipUrl ? 'ready' : 'pending', icon: Smartphone },
+    { label: 'Code repository', hint: 'Manual update required', state: 'pending', icon: Download },
+  ]
+  const badge = (s: 'active' | 'ready' | 'pending') =>
+    s === 'active' ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+    : s === 'ready' ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400'
+    : 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
+  const badgeText = (s: 'active' | 'ready' | 'pending') => s === 'active' ? 'Active' : s === 'ready' ? 'Ready' : 'Pending'
+
+  return (
+    <Card className="p-4">
+      <h2 className="mb-1 text-sm font-bold text-[var(--text)]">Deployment status</h2>
+      <p className="mb-3 text-[11px] text-[var(--text-muted)]">Web + PWA apply instantly. The Android app and code repo pick up new branding from the asset pack on their next rebuild.</p>
+      <div className="space-y-2">
+        {rows.map(r => (
+          <div key={r.label} className="flex items-center gap-2.5 rounded-xl bg-[var(--surface-2)] px-3 py-2.5 ring-1 ring-[var(--border)]">
+            <r.icon size={15} className="shrink-0 text-[var(--text-muted)]" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-[var(--text)]">{r.label}</p>
+              <p className="text-[11px] text-[var(--text-faint)]">{r.hint}</p>
+            </div>
+            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${badge(r.state)}`}>{badgeText(r.state)}</span>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 flex items-center gap-1.5 text-[11px] text-[var(--text-muted)]">
+        {custom
+          ? <><CheckCircle2 size={13} className="text-emerald-500" /> Custom branding active{appliedOn ? ` since ${appliedOn}` : ''}.</>
+          : <>Using the built-in Motiv branding.</>}
+      </div>
+      {branding.zipUrl && (
+        <a href={branding.zipUrl} download className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500">
+          <Download size={15} /> Download asset pack (.zip)
+        </a>
+      )}
+    </Card>
   )
 }
 

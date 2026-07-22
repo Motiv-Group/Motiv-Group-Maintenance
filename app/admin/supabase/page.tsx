@@ -2,19 +2,25 @@ export const dynamic = 'force-dynamic'
 
 import { Database, HardDrive, Users, Table2 } from 'lucide-react'
 import { requireMasterAdmin } from '@/lib/health/guard'
-import { getSupabaseStats } from '@/lib/admin/supabase-stats'
+import { getSupabaseStats, type SupabaseTarget } from '@/lib/admin/supabase-stats'
 import { Card } from '@/components/exec/ui'
 import { InfoTip } from '@/components/ui/InfoTip'
 import { ProviderHeader, StatTile, UsageBar, Notice } from '@/components/admin/ui'
+import { InfraTargetToggle } from '@/components/admin/InfraTargetToggle'
 import { FREE_LIMITS, formatBytes, formatNumber } from '@/lib/admin/limits'
 
-export default async function SupabaseAdminPage() {
+export default async function SupabaseAdminPage({ searchParams }: { searchParams: Promise<{ target?: string }> }) {
   await requireMasterAdmin()
-  const res = await getSupabaseStats()
+  const target: SupabaseTarget = (await searchParams).target === 'dev' ? 'dev' : 'prod'
+  const res = await getSupabaseStats(target)
   const d = res.data
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs text-[var(--text-muted)]">Viewing: <span className="font-semibold text-[var(--text)]">{target === 'dev' ? 'Dev database' : 'Production database'}</span></p>
+        <InfraTargetToggle options={[{ key: 'prod', label: 'Prod DB' }, { key: 'dev', label: 'Dev DB' }]} current={target} />
+      </div>
       <ProviderHeader
         name="Supabase"
         icon={<Database className="text-emerald-500" size={22} />}

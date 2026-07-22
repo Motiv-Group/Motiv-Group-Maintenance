@@ -47,6 +47,39 @@ for (const [role, cfg] of Object.entries(TABS)) {
   })
 }
 
+// Ticket DETAIL pages — the class of bug the nav-only matrix missed (a detail
+// page can throw a server error / error boundary even when its list renders fine).
+// Open a seeded ticket's detail for every role that can see it and assert it
+// renders without an error boundary.
+test.describe('ticket detail pages render', () => {
+  const cases: { role: string; paths: (f: SeedResult) => string[] }[] = [
+    { role: 'regional_manager', paths: f => [f.awardedTicketId, f.openTicketId, f.closeoutTicketId, f.completedTicketId].map(id => `/regional/tickets/${id}`) },
+    { role: 'store_manager', paths: f => [f.awardedTicketId, f.openTicketId, f.closeoutTicketId, f.completedTicketId].map(id => `/client/tickets/${id}`) },
+    { role: 'supplier', paths: f => [f.awardedTicketId, f.closeoutTicketId, f.completedTicketId].map(id => `/supplier/tickets/${id}`) },
+  ]
+  for (const c of cases) {
+    test(`${c.role} ticket detail renders`, async ({ browser }) => {
+      const f = fixture()
+      const ctx = await browser.newContext({ storageState: stateFor(c.role) })
+      const page = await ctx.newPage()
+      // A Server Component passing a function to a Client Component throws
+      // "Functions cannot be passed directly to Client Components" — which crashes
+      // the page but doesn't always trip the "Something went wrong" boundary text in
+      // dev, so watch the console/page-error stream for it explicitly.
+      const renderErrors: string[] = []
+      const capture = (text: string) => { if (/Functions cannot be passed directly to Client Components|Maximum update depth|Objects are not valid as a React child/i.test(text)) renderErrors.push(text) }
+      page.on('pageerror', e => capture(String(e?.message ?? e)))
+      page.on('console', m => { if (m.type() === 'error') capture(m.text()) })
+      try {
+        for (const p of c.paths(f)) await expectRendered(page, p)
+      } finally {
+        await ctx.close()
+      }
+      expect(renderErrors, `RSC/render errors on ${c.role} detail:\n${renderErrors.join('\n')}`).toEqual([])
+    })
+  }
+})
+
 test.describe('cross-supplier isolation', () => {
   test.use({ storageState: stateFor('supplier-b') })
 

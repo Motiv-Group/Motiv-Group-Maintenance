@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Crown, Building2, Store, MapPin, Loader2 } from 'lucide-react'
+import { Crown, Building2, Store, MapPin, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { Card } from '@/components/exec/ui'
 
 type Opt = { id: string; label: string }
@@ -101,7 +101,7 @@ function StoreRegionRow({ store, regions }: { store: LinkerStoreRow; regions: Op
   )
 }
 
-export function HierarchyLinker({ companyId, executives, regions, stores, storeRows, rms, sms }: {
+export function HierarchyLinker({ companyId, executives, regions, stores, storeRows, rms, sms, kpis, unassignedStores }: {
   companyId: string
   executives: LinkerExec[]
   regions: Opt[]
@@ -109,10 +109,48 @@ export function HierarchyLinker({ companyId, executives, regions, stores, storeR
   storeRows: LinkerStoreRow[]
   rms: LinkerRM[]
   sms: LinkerSM[]
+  kpis: { executives: number; rms: number; sms: number }
+  unassignedStores: LinkerStoreRow[]
 }) {
   const execOpts: Opt[] = executives.map(e => ({ id: e.id, label: e.name }))
+  const kpiCards: { label: string; value: number; Icon: typeof Crown }[] = [
+    { label: 'Executives', value: kpis.executives, Icon: Crown },
+    { label: 'Regional Managers', value: kpis.rms, Icon: Building2 },
+    { label: 'Store Managers', value: kpis.sms, Icon: Store },
+  ]
   return (
     <div className="space-y-5">
+      {/* KPI row */}
+      <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
+        {kpiCards.map(({ label, value, Icon }) => (
+          <Card key={label} className="p-3 sm:p-4">
+            <Icon size={16} className="text-[var(--text-muted)]" />
+            <p className="mt-1.5 text-xl font-bold text-[var(--text)] sm:text-2xl">{value}</p>
+            <p className="text-[11px] leading-tight text-[var(--text-muted)] sm:text-xs">{label}</p>
+          </Card>
+        ))}
+      </div>
+
+      {/* Unassigned stores — stores whose region has no RM, or which have no region at all. */}
+      <Card className="p-4">
+        <h2 className="text-sm font-bold text-[var(--text)] flex items-center gap-2 mb-1"><AlertTriangle size={15} className="text-amber-500" /> Unassigned stores ({unassignedStores.length})</h2>
+        <p className="mb-3 text-xs text-[var(--text-muted)]">Stores with no region, or whose region has no Regional Manager linked, are not overseen by anyone. Assign a region below or link an RM to their region.</p>
+        {unassignedStores.length ? (
+          <div className="space-y-2">
+            {unassignedStores.map(s => (
+              <div key={s.id} className="flex flex-wrap items-start gap-x-2 gap-y-1 rounded-xl bg-amber-500/10 p-3 ring-1 ring-amber-500/30">
+                <p className="min-w-0 flex-1 basis-full line-clamp-2 break-words text-sm font-semibold text-[var(--text)] sm:basis-auto sm:line-clamp-1">{s.label}</p>
+                <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-400">
+                  <AlertTriangle size={11} /> {s.regionId == null ? 'No region' : 'Region has no regional manager'}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-500"><CheckCircle2 size={14} /> Every store is covered by a regional manager.</p>
+        )}
+      </Card>
+
       {/* Executives */}
       <Card className="p-4">
         <h2 className="text-sm font-bold text-[var(--text)] flex items-center gap-2 mb-2"><Crown size={15} className="text-[var(--text-muted)]" /> Executives ({executives.length})</h2>

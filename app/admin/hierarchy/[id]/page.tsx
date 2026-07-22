@@ -60,6 +60,13 @@ export default async function AdminHierarchyCompanyPage(props: { params: Promise
     storeIds: (smStores.get(u.id) ?? []).filter(sid => companyStoreIds.has(sid)),
   }))
 
+  // A region "has an RM" when a regional_users row links it to one of this company's RMs.
+  const rmIds = new Set(rms.map(r => r.id))
+  const regionsWithRm = new Set((ru ?? []).filter(r => rmIds.has(r.user_id)).map(r => r.region_id))
+  // Stores are unassigned when they have no region, or their region has no RM linked.
+  const unassignedStores: LinkerStoreRow[] = storeRows.filter(s => s.regionId == null || !regionsWithRm.has(s.regionId))
+  const kpis = { executives: executives.length, rms: rms.length, sms: sms.length }
+
   return (
     <div className="space-y-5">
       <BackLink fallbackHref="/admin/hierarchy" label="Back to hierarchy" />
@@ -74,7 +81,7 @@ export default async function AdminHierarchyCompanyPage(props: { params: Promise
         </div>
       </div>
 
-      <HierarchyLinker companyId={company.id} executives={executives} regions={regionOpts} stores={storeOpts} storeRows={storeRows} rms={rms} sms={sms} />
+      <HierarchyLinker companyId={company.id} executives={executives} regions={regionOpts} stores={storeOpts} storeRows={storeRows} rms={rms} sms={sms} kpis={kpis} unassignedStores={unassignedStores} />
     </div>
   )
 }

@@ -241,7 +241,7 @@ function SubmitQuoteSheet({ ticket, company, onClose }: { ticket: SupplierTicket
                 </SheetSection>
                 {ctx.photoUrls.length > 0 && (
                   <SheetSection label="Images">
-                    <PhotoThumbs urls={ctx.photoUrls} ticketId={ticket.id} label="Job photo" limit={5} trackLabel={(i) => ticketPhotoLabel(i + 1)} />
+                    <PhotoThumbs urls={ctx.photoUrls} ticketId={ticket.id} label="Job photo" limit={5} trackLabels={ctx.photoUrls.map((_, i) => ticketPhotoLabel(i + 1))} />
                   </SheetSection>
                 )}
                 {ctx.infoDocs.length > 0 && (
@@ -426,7 +426,7 @@ function DeclinedQuoteSheet({ ticket, company, onClose }: { ticket: SupplierTick
                     {ctx.photoUrls.length > 0 && (
                       <div>
                         <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-[var(--text-faint)]">Photos ({ctx.photoUrls.length})</p>
-                        <PhotoThumbs urls={ctx.photoUrls} ticketId={ticket.id} label="Job photo" limit={5} trackLabel={(i) => ticketPhotoLabel(i + 1)} />
+                        <PhotoThumbs urls={ctx.photoUrls} ticketId={ticket.id} label="Job photo" limit={5} trackLabels={ctx.photoUrls.map((_, i) => ticketPhotoLabel(i + 1))} />
                         <p className="mt-1.5 flex items-center gap-1.5 text-xs text-[var(--text-faint)]"><Info size={12} className="shrink-0" /> Click any photo to view full size</p>
                       </div>
                     )}
@@ -798,7 +798,7 @@ function SnagSheet({ ticket, company, onClose }: { ticket: SupplierTicketRow; co
                     {photos.length > 0 && (
                       <>
                         <p className="mb-1.5 text-sm text-[var(--text-muted)]">{ctx.afterUrls.length ? 'After photos submitted' : 'Photos submitted'}</p>
-                        <PhotoThumbs urls={photos} ticketId={ticket.id} label={ctx.afterUrls.length ? 'After photo' : 'Before photo'} limit={4} trackLabel={(i) => completionPhotoLabel(ctx.afterUrls.length ? 'after' : 'before', i + 1, undefined, undefined)} />
+                        <PhotoThumbs urls={photos} ticketId={ticket.id} label={ctx.afterUrls.length ? 'After photo' : 'Before photo'} limit={4} trackLabels={photos.map((_, i) => completionPhotoLabel(ctx.afterUrls.length ? 'after' : 'before', i + 1))} />
                       </>
                     )}
                   </div>
