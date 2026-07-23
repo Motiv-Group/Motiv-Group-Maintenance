@@ -1,8 +1,13 @@
+'use client'
+
 import Image from 'next/image'
+import { useEffect, useRef, useState } from 'react'
 
 // Company avatar: the uploaded logo when present, else a deterministic monogram
 // (initials + a colour derived from the name so the same company is always the
-// same colour). Server-safe — no client hooks. Size in px.
+// same colour). Client component so a broken/missing logo URL falls back to the
+// monogram via onError instead of rendering the browser's torn-image glyph with
+// the alt text spilling out of the avatar box. Size in px.
 const PALETTE = [
   { bg: '#1e3a8a', fg: '#dbeafe' }, // blue
   { bg: '#065f46', fg: '#d1fae5' }, // emerald
@@ -33,15 +38,28 @@ export function CompanyAvatar({ name, logoUrl, size = 40, className = '' }: {
   size?: number
   className?: string
 }) {
+  const [broken, setBroken] = useState(false)
+  const imgRef = useRef<HTMLImageElement>(null)
+  // Reset on URL change (admin re-uploads a working logo), and catch the case
+  // where the image already failed before React attached onError (hydration
+  // race): a complete img with zero natural size means it errored.
+  useEffect(() => {
+    setBroken(false)
+    const el = imgRef.current
+    if (el && el.complete && el.naturalWidth === 0) setBroken(true)
+  }, [logoUrl])
+
   const rounded = 'rounded-xl'
-  if (logoUrl) {
+  if (logoUrl && !broken) {
     return (
       <Image
+        ref={imgRef}
         src={logoUrl}
         alt={`${name} logo`}
         width={size}
         height={size}
-        className={`${rounded} object-cover ring-1 ring-[var(--border)] bg-white ${className}`}
+        onError={() => setBroken(true)}
+        className={`${rounded} shrink-0 overflow-hidden object-cover ring-1 ring-[var(--border)] bg-white ${className}`}
         style={{ width: size, height: size }}
         unoptimized
       />
@@ -50,7 +68,7 @@ export function CompanyAvatar({ name, logoUrl, size = 40, className = '' }: {
   const c = colourFor(name)
   return (
     <span
-      className={`${rounded} inline-flex shrink-0 items-center justify-center font-bold ring-1 ring-black/5 ${className}`}
+      className={`${rounded} inline-flex shrink-0 items-center justify-center overflow-hidden font-bold ring-1 ring-black/5 ${className}`}
       style={{ width: size, height: size, backgroundColor: c.bg, color: c.fg, fontSize: size * 0.38 }}
       aria-hidden
     >
