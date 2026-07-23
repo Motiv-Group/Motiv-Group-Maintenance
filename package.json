@@ -39,7 +39,7 @@
     "react-dropzone": "^19.1.1",
     "react-hook-form": "^7.82.0",
     "sharp": "^0.35.3",
-    "tailwind-merge": "^2.4.0",
+    "tailwind-merge": "^3.6.0",
     "unpdf": "^1.6.2",
     "web-push": "^3.6.7",
     "xlsx": "file:vendor/xlsx-0.20.3.tgz",
