@@ -22,16 +22,18 @@ export function buildProjectExcel(project: ProjectRow, summary: ProjectSummary, 
     ['Generated', generatedAt],
     [],
   ]
-  const cols = ['Branch code', 'Store', 'Town', 'Status', 'Progress %', 'On site', 'Before', 'After', 'Sign-off', 'Overdue']
+  const cols = ['Branch code', 'Store', 'Town', 'Status', 'Progress %', 'Start date', 'End date', 'On site', 'Before', 'After', 'Sign-off']
   const rows: (string | number)[][] = stores.map(s => [
     s.branch_code, s.store_name ?? '', s.town ?? '',
     STATUS_LABEL[s.status] ?? s.status, s.progress,
+    d(s.start_date), d(s.end_date),
     d(s.on_site_completed_at), d(s.before_photos_completed_at), d(s.after_photos_completed_at), d(s.signoff_completed_at),
-    s.overdue ? 'Yes' : '',
   ])
 
   const ws = XLSX.utils.aoa_to_sheet([...header, cols, ...rows])
-  ws['!cols'] = [{ wch: 16 }, { wch: 28 }, { wch: 18 }, { wch: 14 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 9 }]
+  ws['!cols'] = [{ wch: 16 }, { wch: 28 }, { wch: 18 }, { wch: 14 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }]
+  // Autofilter on the column-header row so every heading is filterable in Excel.
+  ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: header.length, c: 0 }, e: { r: header.length + rows.length, c: cols.length - 1 } }) }
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, 'Stores')
   return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer
