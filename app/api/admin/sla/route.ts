@@ -8,10 +8,11 @@ import { parseJsonBody } from '@/lib/validate'
 import { FALLBACK_SLA } from '@/lib/health/constants'
 import type { Priority } from '@/lib/health/types'
 
-// POST /api/admin/sla — system_admin edits the PLATFORM-GLOBAL SLA rules
-// (sla_rules rows with company_id NULL). The health engine resolves
-// company row → global row → FALLBACK_SLA, so saving here changes every
-// company that has no override of its own. Values are minutes.
+// POST /api/admin/sla — system_admin edits SLA rules. companyId NULL (or absent)
+// edits the PLATFORM-DEFAULT "Motiv SLA"; a companyId edits that company's override.
+// The health engine resolves company row → Motiv (NULL) row → FALLBACK_SLA. The
+// `reset` action deletes a company's rows so it falls back to the Motiv SLA again.
+// Values are minutes.
 
 const PRIORITIES: Priority[] = ['P1', 'P2', 'P3', 'P4']
 // 5 minutes … 4 weeks — wide enough for any sane window, tight enough to stop typos.
@@ -23,9 +24,17 @@ const RuleSchema = z.object({
   resolution_mins: MINS,
   internal_decision_mins: MINS,
 })
-const BodySchema = z.object({
-  rules: z.object({ P1: RuleSchema, P2: RuleSchema, P3: RuleSchema, P4: RuleSchema }),
-})
+const BodySchema = z.union([
+  z.object({
+    action: z.literal('reset'),
+    companyId: z.string().uuid(),
+  }),
+  z.object({
+    action: z.undefined().optional(),
+    companyId: z.string().uuid().nullable().optional(),
+    rules: z.object({ P1: RuleSchema, P2: RuleSchema, P3: RuleSchema, P4: RuleSchema }),
+  }),
+])
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -39,11 +48,30 @@ export async function POST(request: Request) {
 
   const parsed = await parseJsonBody(request, BodySchema)
   if (!parsed.ok) return parsed.error
-  const { rules } = parsed.data
+  const body = parsed.data
+  const companyId = body.companyId ?? null
 
+  // Any companyId supplied must be a real company (the admin client bypasses RLS).
+  if (companyId) {
+    const { data: co } = await admin.from('companies').select('id').eq('id', companyId).maybeSingle()
+    if (!co) return NextResponse.json({ error: 'Company not found.' }, { status: 400 })
+  }
+
+  // Reset — drop this company's rows so it inherits the Motiv (NULL) SLA again.
+  if ('action' in body && body.action === 'reset') {
+    const { error } = await admin.from('sla_rules').delete().eq('company_id', body.companyId)
+    if (error) return NextResponse.json({ error: `Could not reset: ${error.message}` }, { status: 500 })
+    await logAudit(admin, { actorId: user.id, companyId, action: 'admin.sla_rules_reset', entityType: 'sla_rules', entityId: companyId })
+    revalidatePath('/', 'layout')
+    return NextResponse.json({ ok: true })
+  }
+
+  const { rules } = body
   // sla_rules has no unique (company_id, priority) index — update the existing
-  // global row by id when present, insert otherwise (never create duplicates).
-  const { data: existing } = await admin.from('sla_rules').select('id, priority').is('company_id', null)
+  // row by id when present, insert otherwise (never create duplicates). Scope the
+  // "existing" lookup to this exact target (NULL for Motiv, else the company).
+  const existingQ = admin.from('sla_rules').select('id, priority')
+  const { data: existing } = await (companyId ? existingQ.eq('company_id', companyId) : existingQ.is('company_id', null))
   const now = new Date().toISOString()
   for (const p of PRIORITIES) {
     const r = rules[p]
@@ -52,13 +80,13 @@ export async function POST(request: Request) {
       const { error } = await admin.from('sla_rules').update({ ...r, updated_at: now }).eq('id', row.id)
       if (error) return NextResponse.json({ error: `Could not save ${p}: ${error.message}` }, { status: 500 })
     } else {
-      const { error } = await admin.from('sla_rules').insert({ company_id: null, priority: p, ...r })
+      const { error } = await admin.from('sla_rules').insert({ company_id: companyId, priority: p, ...r })
       if (error) return NextResponse.json({ error: `Could not save ${p}: ${error.message}` }, { status: 500 })
     }
   }
 
   await logAudit(admin, {
-    actorId: user.id, action: 'admin.sla_rules_save', entityType: 'sla_rules', entityId: 'global',
+    actorId: user.id, companyId, action: 'admin.sla_rules_save', entityType: 'sla_rules', entityId: companyId ?? 'motiv',
     metadata: { rules },
   })
   // Dashboards compute live from these rules — refresh every role's pages.

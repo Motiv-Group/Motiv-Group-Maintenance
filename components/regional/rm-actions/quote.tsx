@@ -8,12 +8,15 @@ import { CalendarClock, Info, FileText, ChevronRight, Store, ShieldCheck, Clock,
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { QuoteSummary } from '@/components/workflow/QuoteSummary'
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils'
+import { quoteLabel } from '@/lib/attachment-labels'
 import { Modal } from './modal'
 import { post, errMsg, PANEL_META } from './shared'
 
 // ── Quote review (approve / decline with reason) ────────────────
-export interface ReviewQuote { id: string; supplierName: string; amount: number; amountInclVat: number | null; description: string | null; fileUrl: string | null; createdAt: string; proposedScheduleAt?: string | null }
+export interface ReviewQuote { id: string; supplierName: string; amount: number; amountInclVat: number | null; description: string | null; fileUrl: string | null; createdAt: string; proposedScheduleAt?: string | null; quoteRef?: string | null }
 const DECLINE_REASONS = ['Price too high', 'Scope unclear / incomplete', 'Choosing another supplier', 'Lead time too long', 'Other']
+// Choosing someone else ≠ asking this supplier to revise — this reason never offers the re-quote checkbox.
+const NO_REQUOTE_REASON = 'Choosing another supplier'
 
 export function QuoteReviewCard({ ticketId, quotes }: { ticketId: string; quotes: ReviewQuote[] }) {
   const router = useRouter()
@@ -46,7 +49,7 @@ export function QuoteReviewCard({ ticketId, quotes }: { ticketId: string; quotes
             <span className="text-sm font-semibold text-[var(--text)] min-w-0 truncate">{q.supplierName}</span>
             <span className="text-base font-bold text-[var(--text)] shrink-0">{formatCurrency(q.amount)}</span>
           </div>
-          <p className="text-[11px] text-[var(--text-faint)]">Received {formatDateTime(q.createdAt)}{q.amountInclVat ? ` · incl VAT ${formatCurrency(q.amountInclVat)}` : ''}</p>
+          <p className="text-[11px] text-[var(--text-faint)]">Received {formatDateTime(q.createdAt)}{q.amountInclVat ? ` · incl VAT ${formatCurrency(q.amountInclVat)}` : ''}{q.quoteRef ? ` · ${q.quoteRef}` : ''}</p>
           {q.proposedScheduleAt && (
             <div className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-500/10 ring-1 ring-indigo-500/30 px-2.5 py-1 text-[13px]">
               <CalendarClock size={14} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
@@ -55,7 +58,7 @@ export function QuoteReviewCard({ ticketId, quotes }: { ticketId: string; quotes
             </div>
           )}
           {q.description && <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{q.description}</p>}
-          {q.fileUrl && <ViewTrackedLink ticketId={ticketId} itemType="quote" itemLabel={`${q.supplierName}'s quote`} href={q.fileUrl} className="text-sm text-[#f59e0b] underline">View attachment</ViewTrackedLink>}
+          {q.fileUrl && <ViewTrackedLink ticketId={ticketId} itemType="quote" itemLabel={quoteLabel(q.supplierName, q.quoteRef)} href={q.fileUrl} className="text-sm text-[#f59e0b] underline">View attachment</ViewTrackedLink>}
 
           {declineFor === q.id ? (
             <div className="space-y-2 pt-1">
@@ -92,7 +95,7 @@ export function QuoteReviewCard({ ticketId, quotes }: { ticketId: string; quotes
 // a clickable item that pops up the full quote (amount, visit, description,
 // attachment) with Approve / Decline — those actions live in both the pop-up and
 // on the block row. Replaces the standalone "Quotes" section.
-export interface QuotePanelQuote { id: string; amount: number; amountInclVat: number | null; description: string | null; fileUrl: string | null; createdAt: string; validUntil?: string | null; proposedScheduleAt?: string | null }
+export interface QuotePanelQuote { id: string; amount: number; amountInclVat: number | null; description: string | null; fileUrl: string | null; createdAt: string; validUntil?: string | null; proposedScheduleAt?: string | null; quoteRef?: string | null }
 export interface QuotePanelRow { supplierId: string; name: string; requestedAt: string | null; kind: 'waiting' | 'received' | 'accepted' | 'declined'; declineReason: string | null; quote: QuotePanelQuote | null }
 
 export function RmQuotePanel({ ticketId, rows, canReQuote }: { ticketId: string; rows: QuotePanelRow[]; canReQuote: boolean }) {
@@ -177,7 +180,7 @@ export function RmQuotePanel({ ticketId, rows, canReQuote }: { ticketId: string;
       {active?.quote && (
         <Modal title="Review quote" maxWidth="max-w-5xl" onClose={() => setOpenId(null)}>
           <QuoteSummary
-            quote={{ id: active.quote.id, supplierName: active.name, amount: active.quote.amount, amountInclVat: active.quote.amountInclVat, description: active.quote.description, fileUrl: active.quote.fileUrl, validUntil: active.quote.validUntil ?? null, createdAt: active.quote.createdAt }}
+            quote={{ id: active.quote.id, supplierName: active.name, amount: active.quote.amount, amountInclVat: active.quote.amountInclVat, description: active.quote.description, fileUrl: active.quote.fileUrl, validUntil: active.quote.validUntil ?? null, createdAt: active.quote.createdAt, quoteRef: active.quote.quoteRef ?? null }}
             status={active.kind === 'accepted' ? 'accepted' : active.kind === 'declined' ? 'declined' : 'pending'}
             title={`${active.name}'s quote`}
             schedule={active.quote.proposedScheduleAt ? { at: active.quote.proposedScheduleAt, proposed: true, audience: 'rm' } : null}
@@ -187,12 +190,14 @@ export function RmQuotePanel({ ticketId, rows, canReQuote }: { ticketId: string;
           {active.kind === 'received' && (
             mode === 'decline' ? (
               <div className="space-y-2 pt-1">
-                <select className={input} value={reason} onChange={e => setReason(e.target.value)}>{DECLINE_REASONS.map(r => <option key={r} value={r}>{r}</option>)}</select>
+                <select className={input} value={reason} onChange={e => { setReason(e.target.value); if (e.target.value === NO_REQUOTE_REASON) setRequote(false) }}>{DECLINE_REASONS.map(r => <option key={r} value={r}>{r}</option>)}</select>
                 {reason === 'Other' && <textarea className={`${input} min-h-[60px]`} placeholder="Reason…" value={other} onChange={e => setOther(e.target.value)} />}
-                <label className="flex items-start gap-2 rounded-lg bg-[var(--input-bg)] px-3 py-2 text-sm text-[var(--text-muted)] ring-1 ring-[var(--border)]">
-                  <input type="checkbox" checked={requote} onChange={e => setRequote(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-blue-600" />
-                  Also ask this supplier to submit a revised quote
-                </label>
+                {reason !== NO_REQUOTE_REASON && (
+                  <label className="flex items-start gap-2 rounded-lg bg-[var(--input-bg)] px-3 py-2 text-sm text-[var(--text-muted)] ring-1 ring-[var(--border)]">
+                    <input type="checkbox" checked={requote} onChange={e => setRequote(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-blue-600" />
+                    Also ask this supplier to submit a revised quote
+                  </label>
+                )}
                 <div className="flex gap-2">
                   <button onClick={() => decide(active.quote!.id, 'decline')} disabled={busy} className="flex-1 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold disabled:opacity-50">Confirm decline</button>
                   <button onClick={() => setMode('view')} className="flex-1 py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm">Back</button>
@@ -324,7 +329,7 @@ export function QuoteComparison({ ticketId, rows, onClose }: { ticketId: string;
               </div>
               <div className="border-t border-[var(--border)]">
                 <button type="button" onClick={() => setDetailFor(detailFor === r.supplierId ? null : r.supplierId)} className="flex w-full items-center justify-center gap-1 py-2.5 text-sm font-semibold text-emerald-600 transition hover:bg-[var(--hover)] dark:text-emerald-400">View quote details <ChevronRight size={15} className={detailFor === r.supplierId ? 'rotate-90 transition-transform' : 'transition-transform'} /></button>
-                {detailFor === r.supplierId && <div className="px-4 pb-4"><QuoteSummary quote={{ id: q.id, supplierName: r.name, amount: q.amount, amountInclVat: q.amountInclVat, description: q.description, fileUrl: q.fileUrl, validUntil: q.validUntil ?? null, createdAt: q.createdAt }} status="pending" title={`${r.name}'s quote`} schedule={q.proposedScheduleAt ? { at: q.proposedScheduleAt, proposed: true } : null} ticketId={ticketId} /></div>}
+                {detailFor === r.supplierId && <div className="px-4 pb-4"><QuoteSummary quote={{ id: q.id, supplierName: r.name, amount: q.amount, amountInclVat: q.amountInclVat, description: q.description, fileUrl: q.fileUrl, validUntil: q.validUntil ?? null, createdAt: q.createdAt, quoteRef: q.quoteRef ?? null }} status="pending" title={`${r.name}'s quote`} schedule={q.proposedScheduleAt ? { at: q.proposedScheduleAt, proposed: true } : null} ticketId={ticketId} /></div>}
               </div>
             </div>
           )
@@ -335,12 +340,14 @@ export function QuoteComparison({ ticketId, rows, onClose }: { ticketId: string;
       {declineMode && selected && (
         <div className="space-y-2 rounded-xl bg-[var(--input-bg)] p-3 ring-1 ring-[var(--border)]">
           <p className="text-sm text-[var(--text)]">Decline <span className="font-semibold">{selected.name}</span>&apos;s quote — choose a reason:</p>
-          <select className={input} value={reason} onChange={e => setReason(e.target.value)}>{DECLINE_REASONS.map(r => <option key={r} value={r}>{r}</option>)}</select>
+          <select className={input} value={reason} onChange={e => { setReason(e.target.value); if (e.target.value === NO_REQUOTE_REASON) setRequote(false) }}>{DECLINE_REASONS.map(r => <option key={r} value={r}>{r}</option>)}</select>
           {reason === 'Other' && <textarea className={`${input} min-h-[60px]`} placeholder="Reason…" value={other} onChange={e => setOther(e.target.value)} />}
-          <label className="flex items-start gap-2 text-sm text-[var(--text-muted)]">
-            <input type="checkbox" checked={requote} onChange={e => setRequote(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-blue-600" />
-            Also ask this supplier to submit a revised quote
-          </label>
+          {reason !== NO_REQUOTE_REASON && (
+            <label className="flex items-start gap-2 text-sm text-[var(--text-muted)]">
+              <input type="checkbox" checked={requote} onChange={e => setRequote(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-blue-600" />
+              Also ask this supplier to submit a revised quote
+            </label>
+          )}
         </div>
       )}
 

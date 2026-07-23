@@ -2,8 +2,9 @@ export const dynamic = 'force-dynamic'
 
 import { ShieldCheck } from 'lucide-react'
 import { requireStoreManagerV3 } from '@/lib/health/guard'
-import { assembleStoreManagerDashboard } from '@/lib/health/data'
+import { assembleStoreManagerDashboard, type StoreManagerTicket } from '@/lib/health/data'
 import { createAdminClient } from '@/lib/supabase/server'
+import { signManyUrls } from '@/lib/storage'
 import { Card } from '@/components/exec/ui'
 import { DashboardHealthHeader } from '@/components/exec/DashboardHealthHeader'
 import { getDailyBriefing } from '@/lib/briefing/generate'
@@ -25,11 +26,13 @@ export default async function StoreOverviewPage() {
   const d = await assembleStoreManagerDashboard(companyId, storeIds)
   const h = d.health
   const briefingScopeId = storeIds.slice().sort().join(',')
-  const [briefing, todayVisits, chatUnread] = await Promise.all([
+  const [briefing, todayVisits, chatUnread, photoSigned] = await Promise.all([
     getDailyBriefing({ companyId, scope: 'store', scopeId: briefingScopeId, role: 'store_manager', facts: storeFacts(d) }),
     loadTodayVisits(storeIds),
     // Unread ticket-chat messages per ticket — only tickets the RM added the SM to count.
     chatUnreadCounts(createAdminClient(), userId, d.tickets.map(t => t.id), { smViewer: true }),
+    // Signed DISPLAY photo urls for the info-requested review sheets (raw storage paths can't render).
+    signInfoRequestPhotos(d.tickets),
   ])
   const greeting = (() => { const x = new Date().getHours(); return x < 12 ? 'Good morning' : x < 17 ? 'Good afternoon' : 'Good evening' })()
 
@@ -62,9 +65,19 @@ export default async function StoreOverviewPage() {
         storeName={d.branch || d.storeName}
         generatedAt={d.generatedAt}
         chatUnread={chatUnread}
+        photoSigned={photoSigned}
       />
     </div>
   )
+}
+
+// Signed display urls per info-requested ticket only — the review sheet shows
+// the photos; the Add-Info form still PATCHes the raw stored paths.
+async function signInfoRequestPhotos(tickets: StoreManagerTicket[]): Promise<Record<string, string[]>> {
+  const targets = tickets.filter(t => t.status === 'info_requested' && t.photoUrls.length > 0)
+  if (!targets.length) return {}
+  const signed = await Promise.all(targets.map(t => signManyUrls(t.photoUrls)))
+  return Object.fromEntries(targets.map((t, i) => [t.id, signed[i]]))
 }
 
 async function loadTodayVisits(storeIds: string[]): Promise<TodayVisit[]> {

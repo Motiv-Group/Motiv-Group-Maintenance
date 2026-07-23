@@ -42,7 +42,7 @@ export function IndividualTicketActionBar({ ticketId, canAssign, hasSupplier, ca
           <AssignSuppliersButton ticketId={ticketId} suppliers={[]} motivSuppliers={motivSuppliers} declinedSupplierIds={declinedSupplierIds} awaitingById={awaitingById}
             trigger={open => <button onClick={open} className={primaryCls}>{assignLabel}</button>} />
           {hasMenu && (
-            <MoreMenu>
+            <MoreMenu inline align="right">
               {hasSupplier && <MoreActionItem icon={<MessageSquare size={16} />} label="Chat with supplier" onClick={() => setActive('chat')} />}
               {canCancel && <MoreActionItem icon={<XCircle size={16} />} label="Cancel ticket" tone="danger" onClick={() => setActive('cancel')} />}
             </MoreMenu>

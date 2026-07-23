@@ -10,14 +10,17 @@ type Admin = ReturnType<typeof createAdminClient>
 type TicketRow = Database['public']['Tables']['tickets']['Row']
 
 // Durable per-round log → a "Quote requested from <supplier>" audit event.
+// Non-blocking: a failed insert must never break the workflow move itself, but it
+// must be visible — a silently-missing row means a hole in the audit trail.
 export async function logQuoteRequest(admin: Admin, ticket: TicketRow, supplierId: string | null | undefined, now: string) {
-  await admin.from('ticket_quote_requests').insert({ company_id: ticket.company_id, ticket_id: ticket.id, supplier_id: supplierId ?? ticket.supplier_id ?? null, requested_at: now })
+  const { error } = await admin.from('ticket_quote_requests').insert({ company_id: ticket.company_id, ticket_id: ticket.id, supplier_id: supplierId ?? ticket.supplier_id ?? null, requested_at: now })
+  if (error) console.error('[ticket-workflow] quote-request log insert failed:', ticket.id, error.message)
 }
 
 // Targeted notifications for the moves that need someone else to act next.
 export async function notifyNextActors(admin: Admin, ticket: TicketRow, action: string, actorName: string | null, opts?: { scheduleProposed?: boolean; scheduledAt?: string; declineReason?: string | null }) {
   const toSupplier = ['validate', 'request_quote', 'require_assessment', 'request_evidence', 'raise_snag', 'assign_snag', 'approve_variation', 'reject_variation', 'accept_schedule', 'approve_snag', 'decline_snag_schedule', 'approve', 'close_out']
-  const toRegion   = ['submit_quote', 'submit_completion', 'submit_variation', 'resolve_snag', 'resubmit', 'accept_snag', 'start_snag']
+  const toRegion   = ['submit_quote', 'submit_completion', 'submit_variation', 'resolve_snag', 'resubmit', 'accept_snag', 'update_snag_schedule', 'start_snag']
   // The store manager is told whenever a visit is scheduled / agreed so they can
   // expect the supplier on site.
   const toStore    = ['request_info', 'close_out', 'reject', 'schedule', 'accept_schedule', 'accept_snag']
@@ -56,6 +59,7 @@ export async function notifyNextActors(admin: Admin, ticket: TicketRow, action: 
     // "resubmit" = the store manager supplied the info the RM asked for.
     const regionMsg = action === 'resubmit' ? 'The store manager added the information you requested.'
       : action === 'accept_snag' ? `A snag fix was proposed${when ? ` for ${when}` : ''}. Approve it to confirm.`
+      : action === 'update_snag_schedule' ? `The proposed snag fix was updated${when ? ` to ${when}` : ''}. Approve it to confirm.`
       : `This ticket has an update: ${action.replace(/_/g, ' ')}.`
     await push(admin, ids, ticket.company_id, ticket.id, title, regionMsg, `/regional/tickets/${ticket.id}`)
   }
@@ -69,6 +73,7 @@ export async function notifyNextActors(admin: Admin, ticket: TicketRow, action: 
       : action === 'submit_completion' ? 'The completion was submitted. Review it and sign off.'
       : action === 'submit_variation' ? 'A variation order was submitted. Review it when you can.'
       : action === 'accept_snag' ? `A snag fix was proposed${when ? ` for ${when}` : ''}. Approve it to confirm.`
+      : action === 'update_snag_schedule' ? `The proposed snag fix was updated${when ? ` to ${when}` : ''}. Approve it to confirm.`
       : `Your ticket has an update: ${action.replace(/_/g, ' ')}.`
     await push(admin, [ticket.created_by], ticket.company_id, ticket.id, title, owMsg, `/individual/tickets/${ticket.id}`)
   }

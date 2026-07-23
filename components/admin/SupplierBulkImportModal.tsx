@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { CheckCircle2, XCircle } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { errMsg } from '@/components/ui/errMsg'
+import { useFileDrop } from '@/components/ui/useFileDrop'
 
 function parseCsv(text: string): Record<string, string>[] {
   const lines = text.replace(/\r\n?/g, '\n').split('\n').filter(l => l.trim())
@@ -40,6 +41,13 @@ export function SupplierBulkImportModal({ companyId, companyName, onClose }: { c
     } catch (e) { setErr(errMsg(e)) } finally { setBusy(false) }
   }
 
+  async function addFiles(files: File[]) {
+    const f = files[0]
+    if (f) setText(await f.text())
+  }
+
+  const { isDragging, dropProps } = useFileDrop({ onFiles: addFiles, accept: '.csv,text/csv', multiple: false })
+
   const okCount = results?.filter(r => r.ok).length ?? 0
   const failCount = results?.filter(r => !r.ok).length ?? 0
 
@@ -54,14 +62,21 @@ export function SupplierBulkImportModal({ companyId, companyName, onClose }: { c
 
           <p className="text-[11px] text-[var(--text-muted)]">First row = headers. Columns: <span className="font-mono text-[var(--text)]">supplier_name, email, phone, address</span>. Existing suppliers are linked; new ones get a set-up email.</p>
 
-          <textarea value={text} onChange={e => setText(e.target.value)} rows={6}
-            placeholder={`supplier_name,email,phone,address\nBrightSpark Electrical,ops@brightspark.co.za,0712345678,12 Trade Rd`}
-            className="w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-xs font-mono placeholder-[var(--text-faint)] outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500/60" />
+          <div {...dropProps} className={`relative rounded-xl transition ${isDragging ? 'ring-2 ring-blue-500 bg-blue-500/5' : ''}`}>
+            <textarea value={text} onChange={e => setText(e.target.value)} rows={6}
+              placeholder={`supplier_name,email,phone,address\nBrightSpark Electrical,ops@brightspark.co.za,0712345678,12 Trade Rd`}
+              className="w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-xs font-mono placeholder-[var(--text-faint)] outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500/60" />
+            {isDragging && (
+              <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-[var(--surface)]/80 pointer-events-none">
+                <span className="text-sm font-semibold text-blue-500">Drop CSV file here</span>
+              </div>
+            )}
+          </div>
 
           <div className="flex items-center gap-2">
             <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl ring-1 ring-[var(--border)] text-sm text-[var(--text)] cursor-pointer hover:bg-[var(--hover)] transition shrink-0">
               Choose CSV
-              <input type="file" accept=".csv,text/csv" className="hidden" onChange={async e => { const f = e.target.files?.[0]; if (f) setText(await f.text()); e.target.value = '' }} />
+              <input type="file" accept=".csv,text/csv" className="hidden" onChange={async e => { await addFiles(Array.from(e.target.files ?? [])); e.target.value = '' }} />
             </label>
             <button onClick={importRows} disabled={busy || !text.trim()} className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition disabled:opacity-50">
               {busy ? 'Importing…' : 'Import & invite'}

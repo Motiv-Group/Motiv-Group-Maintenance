@@ -5,8 +5,9 @@
 import { useState, useMemo, useEffect, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
-import { Pencil, Plus, Camera, Info, X, ChevronDown, MessageSquare, XCircle, Send, AlertCircle, Trash2 } from 'lucide-react'
+import { Pencil, Plus, Camera, Info, X, ChevronDown, MoreVertical, MessageSquare, XCircle, Send, AlertCircle, Trash2, FileUp, FileText } from 'lucide-react'
 import { uploadFiles } from '@/lib/upload'
+import { useFileDrop } from '@/components/ui/useFileDrop'
 import { formatDateTime } from '@/lib/utils'
 import { StarInput } from '@/components/ui/Stars'
 import { TicketChat } from '@/components/chat/TicketChat'
@@ -18,18 +19,24 @@ import { AssignSuppliersButton } from './assign'
 // drops a floating menu of secondary/destructive actions. It ONLY renders the menu
 // buttons; the actual modals live as siblings in RmTicketActionBar driven by lifted
 // state, so opening one is instant and doesn't depend on the menu staying mounted.
-export function MoreMenu({ children, fullWidth = false, label = 'More', up = false, align = 'right' }: { children: ReactNode; fullWidth?: boolean; label?: string; up?: boolean; align?: 'left' | 'right' }) {
+// `inline` (opt-in) renders the dropdown as an absolutely-positioned element
+// INSIDE this trigger's relative wrapper instead of portalling to <body> — so it
+// stays within the parent block (e.g. the SM Next-action card) and can't escape
+// into the card below. Every existing caller leaves it false (portalled).
+export function MoreMenu({ children, fullWidth = false, label = 'More', up = false, align = 'right', inline = false, iconOnly = false }: { children: ReactNode; fullWidth?: boolean; label?: string; up?: boolean; align?: 'left' | 'right'; inline?: boolean; iconOnly?: boolean }) {
   const [open, setOpen] = useState(false)
   const btnRef = useRef<HTMLButtonElement>(null)
+  const wrapRef = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null)
 
   // The menu is PORTALLED to <body> and fixed-positioned against the trigger, so
   // it's never clipped by a pop-up's `overflow-y-auto` body (which also clips
   // overflow-x, cutting the old absolute menu off to the side). Left is clamped
   // into the viewport so a 256px menu can't run off a phone edge. Scroll/resize
-  // just closes it — simpler and correct vs. live repositioning.
+  // just closes it — simpler and correct vs. live repositioning. Skipped in
+  // `inline` mode, which positions against the wrapper and needs no portal.
   useEffect(() => {
-    if (!open) return
+    if (!open || inline) return
     const place = () => {
       const b = btnRef.current?.getBoundingClientRect()
       if (!b) return
@@ -43,21 +50,46 @@ export function MoreMenu({ children, fullWidth = false, label = 'More', up = fal
     window.addEventListener('scroll', onMove, true)
     window.addEventListener('resize', onMove)
     return () => { window.removeEventListener('scroll', onMove, true); window.removeEventListener('resize', onMove) }
-  }, [open, align, up])
+  }, [open, align, up, inline])
+
+  // Inline mode has no portal + click-catcher, so close on any outside click via
+  // a document listener scoped to while it's open. Clicks on the trigger/panel
+  // are inside the wrapper, so they don't self-close (the panel handles its own).
+  useEffect(() => {
+    if (!open || !inline) return
+    const onDown = (e: MouseEvent) => { if (!wrapRef.current?.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [open, inline])
 
   return (
-    <div className={`relative ${fullWidth ? '' : 'shrink-0'}`}>
+    <div ref={wrapRef} className={`relative ${fullWidth ? '' : 'shrink-0'}`}>
       <button
         ref={btnRef}
         type="button"
         onClick={() => setOpen(o => !o)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className={`${fullWidth ? 'w-full justify-center' : ''} flex items-center gap-1.5 py-2.5 px-4 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm font-semibold hover:bg-[var(--hover)] transition`}
+        aria-label={iconOnly ? label : undefined}
+        className={iconOnly
+          ? 'grid h-10 w-10 place-items-center rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--hover)] transition sm:h-9 sm:w-9'
+          : `${fullWidth ? 'w-full justify-center' : ''} flex items-center gap-1.5 py-2.5 px-4 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm font-semibold hover:bg-[var(--hover)] transition`}
       >
-        {label} <ChevronDown size={15} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+        {iconOnly ? <MoreVertical size={18} /> : <>{label} <ChevronDown size={15} className={`transition-transform ${open ? 'rotate-180' : ''}`} /></>}
       </button>
-      {open && pos && createPortal(
+      {/* Inline: absolutely-positioned panel INSIDE the relative wrapper (right/left
+          per `align`, below/above per `up`). Right-aligned + capped width keep it
+          off the 375px viewport edge. Same panel styling as the portalled menu. */}
+      {open && inline && (
+        <div
+          role="menu"
+          onClick={() => setOpen(false)}
+          className={`absolute z-10 ${up ? 'bottom-full mb-2' : 'top-full mt-2'} ${align === 'left' ? 'left-0' : 'right-0'} w-56 max-w-[calc(100vw-2rem)] rounded-xl bg-[var(--surface-2)] ring-1 ring-[var(--border)] shadow-lg shadow-black/20 p-1.5 space-y-0.5`}
+        >
+          {children}
+        </div>
+      )}
+      {open && !inline && pos && createPortal(
         <>
           {/* Outside-click catcher (below the menu, above everything else). */}
           <button aria-hidden tabIndex={-1} onClick={() => setOpen(false)} className="fixed inset-0 z-[110] cursor-default" />
@@ -85,7 +117,7 @@ type ActionKey = 'addwork' | 'info' | 'edit' | 'cancel' | 'chat'
 // active) so they open instantly — the previous approach kept them inside the
 // collapsing menu, which felt laggy/buggy.
 // Client component (a Server Component may not pass the click handlers).
-export function RmTicketActionBar({ ticketId, status, canAssign, canAssignSupplier, canCancel, canEdit, hasSupplier = false, jobRef, suppliers, motivSuppliers, motivAccess = 'none', declinedSupplierIds, awaitingById, description, photoUrls, title, category, impact, priority }: {
+export function RmTicketActionBar({ ticketId, status, canAssign, canAssignSupplier, canCancel, canEdit, hasSupplier = false, jobRef, suppliers, motivSuppliers, motivAccess = 'none', declinedSupplierIds, awaitingById, description, photoUrls, docUrls, title, category, impact, priority }: {
   ticketId: string
   status: string
   canAssign: boolean
@@ -101,6 +133,7 @@ export function RmTicketActionBar({ ticketId, status, canAssign, canAssignSuppli
   awaitingById: Record<string, 'invited' | 'quoted'>
   description: string
   photoUrls: string[]
+  docUrls: string[]
   title: string
   category: string
   impact: string
@@ -126,7 +159,7 @@ export function RmTicketActionBar({ ticketId, status, canAssign, canAssignSuppli
           <AssignSuppliersButton ticketId={ticketId} suppliers={suppliers} motivSuppliers={motivSuppliers} motivAccess={motivAccess} declinedSupplierIds={declinedSupplierIds} awaitingById={awaitingById}
             trigger={open => <button onClick={open} className={primaryCls}>{assignLabel}</button>} />
           {hasMenu && (
-            <MoreMenu>
+            <MoreMenu inline align="right">
               {canAssign && <MoreActionItem icon={<Plus size={16} />} label="Add extra work" onClick={() => setActive('addwork')} />}
               {showRequestInfo && <MoreActionItem icon={<MessageSquare size={16} />} label="Request more info" onClick={() => setActive('info')} />}
               {hasSupplier && <MoreActionItem icon={<MessageSquare size={16} />} label="Chat with supplier" onClick={() => setActive('chat')} />}
@@ -146,11 +179,12 @@ export function RmTicketActionBar({ ticketId, status, canAssign, canAssignSuppli
       ) : null}
 
       {/* Action modals — mounted only while active, so they appear instantly. */}
-      {active === 'addwork' && <RmAddWorkForm defaultOpen onClose={done} ticketId={ticketId} description={description} photoUrls={photoUrls} title={title} category={category} impact={impact} />}
+      {active === 'addwork' && <RmAddWorkForm defaultOpen onClose={done} ticketId={ticketId} description={description} photoUrls={photoUrls} docUrls={docUrls} title={title} category={category} impact={impact} />}
       {active === 'info' && <RequestInfoButton defaultOpen onClose={done} ticketId={ticketId} />}
       {active === 'edit' && <RmEditTicketForm defaultOpen onClose={done} ticketId={ticketId} initial={{ title, category, impact, priority, description }} />}
       {active === 'cancel' && <CancelTicketCard defaultOpen onClose={done} ticketId={ticketId} jobRef={jobRef} />}
-      {active === 'chat' && <TicketChat defaultOpen onClose={done} ticketId={ticketId} viewerRole="regional_manager" />}
+      {/* Chat opens as a sibling — the supplier is awarded once hasSupplier is set. */}
+      {active === 'chat' && <TicketChat ticketId={ticketId} viewerRole="regional_manager" defaultOpen onClose={done} />}
     </>
   )
 }
@@ -395,13 +429,16 @@ export function RmEditTicketForm({ ticketId, initial, defaultOpen = false, onClo
 // ── RM adds extra work to the ticket (before a supplier is assigned) ─
 const MAX_WORK_CHARS = 1000
 const MAX_WORK_PHOTOS = 5
-export function RmAddWorkForm({ ticketId, description, photoUrls, title, category, impact, defaultOpen = false, onClose, trigger }: {
-  ticketId: string; description: string; photoUrls: string[]; title: string; category: string; impact: string; defaultOpen?: boolean; onClose?: () => void; trigger?: (open: () => void) => ReactNode
+const MAX_WORK_DOCS = 5
+const WORK_DOC_ACCEPT = '.pdf,.doc,.docx,application/pdf'
+export function RmAddWorkForm({ ticketId, description, photoUrls, docUrls, title, category, impact, defaultOpen = false, onClose, trigger }: {
+  ticketId: string; description: string; photoUrls: string[]; docUrls: string[]; title: string; category: string; impact: string; defaultOpen?: boolean; onClose?: () => void; trigger?: (open: () => void) => ReactNode
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(defaultOpen)
   const [text, setText] = useState('')
   const [files, setFiles] = useState<File[]>([])
+  const [docs, setDocs] = useState<File[]>([])
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const close = () => { setOpen(false); onClose?.() }
@@ -414,25 +451,44 @@ export function RmAddWorkForm({ ticketId, description, photoUrls, title, categor
   // empty MIME type (Android WebView), so require-image would silently drop it —
   // the `accept="image/*"` picker already limits selection, and the upload route
   // accepts an empty type, so only reject a clearly non-image type here.
-  // Snapshot the LIVE FileList synchronously: the input's value is cleared right
-  // after this call, and reading the list lazily inside the state updater (which
-  // runs after the handler) would find it already emptied — zero photos added.
-  const addFiles = (list: FileList | null) => {
-    const picked = Array.from(list ?? []).filter(f => !f.type || f.type.startsWith('image/'))
-    setFiles(p => [...p, ...picked].slice(0, MAX_WORK_PHOTOS))
+  // Takes a File[] so BOTH the <input onChange> (Array.from of the live FileList,
+  // snapshotted synchronously before the input value is cleared) and drag-drop
+  // route through the same validation/cap path.
+  const addFiles = (picked: File[]) => {
+    const imgs = picked.filter(f => !f.type || f.type.startsWith('image/'))
+    setFiles(p => [...p, ...imgs].slice(0, MAX_WORK_PHOTOS))
   }
+  // Documents (PDF/Word) — non-image only (the accept list already limits the
+  // picker), capped at 5. Same File[] path shared by input + drag-drop.
+  const addDocs = (picked: File[]) => {
+    const dcs = picked.filter(f => !f.type.startsWith('image/'))
+    setDocs(p => [...p, ...dcs].slice(0, MAX_WORK_DOCS))
+  }
+
+  // Drag-and-drop mirrors each input's accept/multiple/at-capacity condition and
+  // funnels dropped files through the same addFiles/addDocs handlers.
+  const photosFull = files.length >= MAX_WORK_PHOTOS
+  const docsFull = docs.length >= MAX_WORK_DOCS
+  const { isDragging: photoDragging, dropProps: photoDrop } = useFileDrop({ onFiles: addFiles, accept: 'image/*', multiple: true, disabled: photosFull })
+  const { isDragging: docDragging, dropProps: docDrop } = useFileDrop({ onFiles: addDocs, accept: WORK_DOC_ACCEPT, multiple: true, disabled: docsFull })
 
   async function submit() {
     if (!text.trim()) { setErr('Describe the extra work needed.'); return }
     setBusy(true); setErr('')
     try {
-      const { urls: newUrls, failed } = await uploadFiles(files, 'ticket-photos')
-      if (failed.length) { setErr(`Couldn't upload ${failed.length} photo${failed.length > 1 ? 's' : ''}. Check the file type and try again.`); setBusy(false); return }
+      // Photos → ticket-photos, documents → ticket-docs (same buckets as the SM flows).
+      const [{ urls: newUrls, failed }, { urls: newDocUrls, failed: docFailed }] = await Promise.all([
+        uploadFiles(files, 'ticket-photos'),
+        uploadFiles(docs, 'ticket-docs'),
+      ])
+      const nFailed = failed.length + docFailed.length
+      if (nFailed) { setErr(`Couldn't upload ${nFailed} file${nFailed > 1 ? 's' : ''}. Check the file type and try again.`); setBusy(false); return }
       const newDescription = `${description}\n\n— Extra Work: ${text.trim()}`
       // The ticket endpoint is PATCH-only — POSTing here was the "something went wrong".
-      const res = await fetch(`/api/tickets/${ticketId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, description: newDescription, category, operational_impact: impact, photo_urls: [...photoUrls, ...newUrls], edit_note: 'added extra work' }) })
+      // Docs append to info_doc_urls exactly like the SM add-info flow (existing + new).
+      const res = await fetch(`/api/tickets/${ticketId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, description: newDescription, category, operational_impact: impact, photo_urls: [...photoUrls, ...newUrls], info_doc_urls: [...docUrls, ...newDocUrls], edit_note: 'added extra work' }) })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to add the extra work.')
-      setBusy(false); setText(''); setFiles([]); close(); router.refresh()
+      setBusy(false); setText(''); setFiles([]); setDocs([]); close(); router.refresh()
     } catch (e) { setErr(errMsg(e)); setBusy(false) }
   }
 
@@ -461,11 +517,11 @@ export function RmAddWorkForm({ ticketId, description, photoUrls, title, categor
             <p className="mb-2 text-sm font-medium text-[var(--text)]">Add photos <span className="font-normal text-[var(--text-faint)]">(optional)</span></p>
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
               {files.length < MAX_WORK_PHOTOS && (
-                <label className="flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-[var(--border)] p-2 text-center text-[var(--text-muted)] transition hover:border-blue-500 hover:bg-[var(--hover)]">
+                <label {...photoDrop} className={`flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed p-2 text-center text-[var(--text-muted)] transition hover:border-blue-500 hover:bg-[var(--hover)] ${photoDragging ? 'border-blue-500 bg-blue-500/5 ring-2 ring-blue-500' : 'border-[var(--border)]'}`}>
                   <Camera size={20} className="text-[var(--text-faint)]" />
-                  <span className="text-[11px] font-medium leading-tight">Upload photos</span>
+                  <span className="text-[11px] font-medium leading-tight">{photoDragging ? 'Drop photos here' : 'Upload photos'}</span>
                   <span className="text-[10px] leading-tight text-[var(--text-faint)]">PNG, JPG up to 10MB</span>
-                  <input type="file" accept="image/*" multiple className="hidden" onChange={e => { addFiles(e.target.files); e.currentTarget.value = '' }} />
+                  <input type="file" accept="image/*" multiple className="hidden" onChange={e => { addFiles(Array.from(e.target.files ?? [])); e.currentTarget.value = '' }} />
                 </label>
               )}
               {files.map((f, i) => (
@@ -477,6 +533,29 @@ export function RmAddWorkForm({ ticketId, description, photoUrls, title, categor
               ))}
             </div>
             <p className="mt-2 text-xs text-[var(--text-faint)]">{files.length} of {MAX_WORK_PHOTOS} photos added</p>
+          </div>
+
+          {/* Documents — compact picker row + chosen-file list with remove. Uploaded
+              to ticket-docs and appended to info_doc_urls (SM add-info pattern). */}
+          <div>
+            <p className="mb-2 text-sm font-medium text-[var(--text)]">Attach documents <span className="font-normal text-[var(--text-faint)]">(optional)</span></p>
+            {docs.length < MAX_WORK_DOCS && (
+              <label {...docDrop} className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed px-3 py-3 text-sm font-medium text-[var(--text-muted)] transition hover:border-blue-500 hover:bg-[var(--hover)] ${docDragging ? 'border-blue-500 bg-blue-500/5 ring-2 ring-blue-500' : 'border-[var(--border)]'}`}>
+                <FileUp size={16} className="shrink-0 text-[var(--text-faint)]" /> {docDragging ? 'Drop documents here' : 'Choose documents'}
+                <span className="text-[11px] font-normal text-[var(--text-faint)]">PDF or Word</span>
+                <input type="file" accept={WORK_DOC_ACCEPT} multiple className="hidden" onChange={e => { addDocs(Array.from(e.target.files ?? [])); e.currentTarget.value = '' }} />
+              </label>
+            )}
+            {docs.length > 0 && (
+              <ul className="mt-2 space-y-1">
+                {docs.map((d, i) => (
+                  <li key={i} className="flex items-center justify-between gap-2 rounded-lg bg-[var(--surface-2)] px-3 py-2">
+                    <span className="flex min-w-0 items-center gap-2 text-sm text-[var(--text)]"><FileText size={14} className="shrink-0 text-blue-500" /> <span className="truncate">{d.name}</span></span>
+                    <button type="button" onClick={() => setDocs(p => p.filter((_, j) => j !== i))} aria-label="Remove document" className="shrink-0 text-[var(--text-faint)] hover:text-red-500" title="Remove"><X size={14} /></button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           {/* Info callout */}
@@ -583,11 +662,30 @@ export function CancelTicketCard({ ticketId, jobRef, defaultOpen = false, onClos
   )
 }
 
+// ── Supplier rating block (shared by the close-out flows) ───────
+// The REQUIRED 1–5 star score + optional comment card used by CloseOutButton
+// below AND the RM Today queue's close-out pop-up (RegionalPriorityWorkQueue's
+// CloseOutConfirm) so both flows stay identical.
+export function SupplierRatingCard({ score, comment, onScore, onComment }: { score: number; comment: string; onScore: (v: number) => void; onComment: (v: string) => void }) {
+  return (
+    <div className="space-y-2 rounded-xl p-4 ring-1 ring-[var(--border)]">
+      <p className="text-sm font-semibold text-[var(--text)]">Rate the supplier <span className="text-red-500">*</span></p>
+      <StarInput value={score} onChange={onScore} />
+      <p className="text-[11px] text-[var(--text-faint)]">Tap a star to rate</p>
+      <div className="relative">
+        <textarea maxLength={250} value={comment} onChange={e => onComment(e.target.value.slice(0, 250))} placeholder="Comment on the supplier's work (optional)"
+          className="min-h-[64px] w-full rounded-lg bg-[var(--input-bg)] px-3 py-2 pb-6 text-sm text-[var(--text)] ring-1 ring-[var(--border)]" />
+        <span className="pointer-events-none absolute bottom-2 right-3 text-[11px] tabular-nums text-[var(--text-faint)]">{comment.length}/250</span>
+      </div>
+    </div>
+  )
+}
+
 // ── Final close-out — greyed until the supplier confirms no more VOs ─
 // The confirm pop-up asks for the supplier rating (moved here from the sign-off
 // approval): a REQUIRED 1–5 star score + optional comment, posted to /api/ratings
-// before the close_out transition. Used by the RM ticket page AND the individual
-// (job-owner) ticket page — /api/ratings accepts both roles.
+// before the close_out transition. Used by the RM ticket page (via CloseOutBar)
+// AND the individual (job-owner) ticket page — /api/ratings accepts both roles.
 export function CloseOutButton({ ticketId, voConfirmed }: { ticketId: string; voConfirmed: boolean }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -614,16 +712,7 @@ export function CloseOutButton({ ticketId, voConfirmed }: { ticketId: string; vo
       {open && (
         <Modal title="Final close-out" onClose={close}>
           <p className="-mt-1 text-sm text-[var(--text-muted)]">Rate the supplier&apos;s work to complete the job — the ticket is closed once you confirm.</p>
-          <div className="space-y-2 rounded-xl p-4 ring-1 ring-[var(--border)]">
-            <p className="text-sm font-semibold text-[var(--text)]">Rate the supplier <span className="text-red-500">*</span></p>
-            <StarInput value={score} onChange={v => { setScore(v); setErr('') }} />
-            <p className="text-[11px] text-[var(--text-faint)]">Tap a star to rate</p>
-            <div className="relative">
-              <textarea maxLength={250} value={comment} onChange={e => setComment(e.target.value.slice(0, 250))} placeholder="Comment on the supplier's work (optional)"
-                className="min-h-[64px] w-full rounded-lg bg-[var(--input-bg)] px-3 py-2 pb-6 text-sm text-[var(--text)] ring-1 ring-[var(--border)]" />
-              <span className="pointer-events-none absolute bottom-2 right-3 text-[11px] tabular-nums text-[var(--text-faint)]">{comment.length}/250</span>
-            </div>
-          </div>
+          <SupplierRatingCard score={score} comment={comment} onScore={v => { setScore(v); setErr('') }} onComment={setComment} />
           {err && <p className="text-xs text-red-500">{err}</p>}
           <div className="flex gap-2">
             <button onClick={close} disabled={busy} className="flex-1 py-2.5 rounded-xl ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm font-medium disabled:opacity-50">Cancel</button>
@@ -632,5 +721,25 @@ export function CloseOutButton({ ticketId, voConfirmed }: { ticketId: string; vo
         </Modal>
       )}
     </div>
+  )
+}
+
+// ── Close-out area (RM ticket page) — Final close-out + a small "More" beside it
+// holding the secondary chat entry. The chat modal is a sibling driven by lifted
+// state (same pattern as RmTicketActionBar); the menu opens up-right since the
+// button sits near the bottom of the Next-action card.
+// Client component (a Server Component may not pass the click handlers).
+export function CloseOutBar({ ticketId, voConfirmed }: { ticketId: string; voConfirmed: boolean }) {
+  const [chat, setChat] = useState(false)
+  return (
+    <>
+      <div className="flex items-end gap-2">
+        <div className="min-w-0 flex-1"><CloseOutButton ticketId={ticketId} voConfirmed={voConfirmed} /></div>
+        <MoreMenu inline up align="right">
+          <MoreActionItem icon={<MessageSquare size={16} />} label="Chat with the supplier" onClick={() => setChat(true)} />
+        </MoreMenu>
+      </div>
+      {chat && <TicketChat ticketId={ticketId} viewerRole="regional_manager" defaultOpen onClose={() => setChat(false)} />}
+    </>
   )
 }

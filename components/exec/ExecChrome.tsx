@@ -3,13 +3,17 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { Globe2, Map as MapIcon, Store, Truck, Gavel, Bell, Settings, LogOut, FileBarChart, LayoutDashboard, Ticket, ClipboardCheck, AlertTriangle, ReceiptText, BarChart2, Users, CalendarClock, Network, ScrollText, Database, Triangle, Mail, Zap, ShieldAlert, FolderKanban, Paintbrush, Timer } from 'lucide-react'
+import { Globe2, Map as MapIcon, Store, Truck, Gavel, Bell, Settings, LogOut, FileBarChart, LayoutDashboard, Ticket, ClipboardCheck, AlertTriangle, ReceiptText, BarChart2, Users, CalendarClock, Network, ScrollText, Database, Triangle, Mail, Zap, ShieldAlert, FolderKanban, Paintbrush, Timer, Wallet, Server, ChevronDown } from 'lucide-react'
+import { useState } from 'react'
 import { MotivLogo } from '@/components/ui/MotivLogo'
 import { ContextSwitcher } from '@/components/ui/ContextSwitcher'
 import { SwipeNav } from '@/components/ui/SwipeNav'
 import { UserAvatar } from '@/components/ui/UserAvatar'
 
 interface ChromeTab { href: string; label: string; icon: React.ElementType }
+// A collapsible sidebar section (desktop only) — a labelled parent with child tabs.
+// Used for the admin "Infrastructure" group (Supabase/Vercel/Resend/Upstash/Sentry).
+interface ChromeGroup { label: string; icon: React.ElementType; children: ChromeTab[] }
 type SearchParamsLike = { get(name: string): string | null }
 // A small status pill shown under the name in the sidebar/header profile block
 // (e.g. a supplier's "Pending verification" / "Verified"). Kept gentle by design.
@@ -80,15 +84,24 @@ const ADMIN_TABS: ChromeTab[] = [
   { href: '/admin/sla',       label: 'SLA',       icon: Timer },
   { href: '/admin/audit',     label: 'Audit',     icon: ScrollText },
 ]
+// Desktop sidebar: the business tabs + Finance + Customize, with the 5 provider
+// panels tucked into a collapsible "Infrastructure" group (INFRA_GROUP) below.
 const ADMIN_DESKTOP_TABS: ChromeTab[] = [
   ...ADMIN_TABS,
+  { href: '/admin/finance', label: 'Finance', icon: Wallet },
   { href: '/admin/customization', label: 'Customize', icon: Paintbrush },
-  { href: '/admin/supabase', label: 'Supabase', icon: Database },
-  { href: '/admin/vercel',   label: 'Vercel',   icon: Triangle },
-  { href: '/admin/resend',   label: 'Resend',   icon: Mail },
-  { href: '/admin/upstash',  label: 'Upstash',  icon: Zap },
-  { href: '/admin/sentry',   label: 'Sentry',   icon: ShieldAlert },
 ]
+const INFRA_GROUP: ChromeGroup = {
+  label: 'Infrastructure',
+  icon: Server,
+  children: [
+    { href: '/admin/supabase', label: 'Supabase', icon: Database },
+    { href: '/admin/vercel',   label: 'Vercel',   icon: Triangle },
+    { href: '/admin/resend',   label: 'Resend',   icon: Mail },
+    { href: '/admin/upstash',  label: 'Upstash',  icon: Zap },
+    { href: '/admin/sentry',   label: 'Sentry',   icon: ShieldAlert },
+  ],
+}
 const VARIANTS = {
   exec:     { tabs: EXEC_TABS, roleLabel: 'Executive', base: '/executive', reports: true },
   regional: { tabs: REGIONAL_TABS, roleLabel: 'Regional Manager', base: '/regional', reports: true },
@@ -100,8 +113,8 @@ const VARIANTS = {
 
 export function ExecChrome({
   children, userName, variant = 'exec', unreadCount = 0, contextLabel,
-  contextOptions, activeContextId, contextCookie, accountStatus = null, avatarUrl = null,
-}: { children: ReactNode; userName: string | null; variant?: keyof typeof VARIANTS; unreadCount?: number; contextLabel?: string | null; contextOptions?: { id: string; label: string }[]; activeContextId?: string | null; contextCookie?: string; accountStatus?: AccountStatus | null; avatarUrl?: string | null }) {
+  contextOptions, activeContextId, contextCookie, accountStatus = null, avatarUrl = null, tabBadges = {},
+}: { children: ReactNode; userName: string | null; variant?: keyof typeof VARIANTS; unreadCount?: number; contextLabel?: string | null; contextOptions?: { id: string; label: string }[]; activeContextId?: string | null; contextCookie?: string; accountStatus?: AccountStatus | null; avatarUrl?: string | null; tabBadges?: Record<string, number> }) {
   const { tabs, roleLabel, base, reports } = VARIANTS[variant]
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -137,6 +150,8 @@ export function ExecChrome({
         avatarUrl={avatarUrl}
         accountStatus={accountStatus}
         tabs={isStore ? STORE_DESKTOP_TABS : isAdmin ? ADMIN_DESKTOP_TABS : isExec ? EXEC_DESKTOP_TABS : tabs}
+        groups={isAdmin ? [INFRA_GROUP] : undefined}
+        tabBadges={tabBadges}
         home={home}
         notificationsHref={`${base}/notifications`}
         isActive={(href) => isStore
@@ -183,10 +198,16 @@ export function ExecChrome({
         <div className={`${wrap} mx-auto flex items-stretch h-20 justify-around`}>
           {tabs.map(({ href, label, icon: Icon }) => {
             const active = isActiveHref(href, home, pathname, searchParams)
+            const badge = tabBadges[href] ?? 0
             return (
               <Link key={href} href={href}
                 className={`flex flex-col items-center justify-center gap-1 flex-1 text-[11px] font-medium transition-colors ${active ? 'text-blue-400' : 'text-gray-400 hover:text-gray-200'}`}>
-                <Icon size={22} strokeWidth={active ? 2.4 : 1.8} />
+                <span className="relative">
+                  <Icon size={22} strokeWidth={active ? 2.4 : 1.8} />
+                  {badge > 0 && (
+                    <span className="absolute -top-1 -right-2 min-w-[15px] h-[15px] px-0.5 bg-red-500 text-white text-[9px] font-semibold rounded-full flex items-center justify-center">{badge > 9 ? '9+' : badge}</span>
+                  )}
+                </span>
                 {label}
               </Link>
             )
@@ -225,6 +246,8 @@ function DesktopSidebar({
   avatarUrl,
   accountStatus,
   tabs,
+  groups,
+  tabBadges = {},
   home,
   notificationsHref,
   isActive,
@@ -240,6 +263,8 @@ function DesktopSidebar({
   avatarUrl?: string | null
   accountStatus?: AccountStatus | null
   tabs: ChromeTab[]
+  groups?: ChromeGroup[]
+  tabBadges?: Record<string, number>
   home: string
   notificationsHref: string
   isActive: (href: string) => boolean
@@ -269,6 +294,7 @@ function DesktopSidebar({
         <div className="space-y-1">
           {tabs.map(({ href, label, icon: Icon }) => {
             const active = isActive(href)
+            const badge = tabBadges[href] ?? 0
             return (
               <Link
                 key={href}
@@ -281,9 +307,11 @@ function DesktopSidebar({
               >
                 <Icon size={18} className={active ? 'text-blue-300' : 'text-gray-400'} />
                 <span>{label}</span>
+                {badge > 0 && <span className="ml-auto rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] text-white">{badge > 9 ? '9+' : badge}</span>}
               </Link>
             )
           })}
+          {(groups ?? []).map(g => <SidebarGroup key={g.label} group={g} isActive={isActive} />)}
         </div>
       </nav>
 
@@ -312,6 +340,50 @@ function DesktopSidebar({
         </div>
       </div>
     </aside>
+  )
+}
+
+// A collapsible sidebar section (e.g. admin "Infrastructure"). Starts open when any
+// child is the active route, so the current page is always visible; the header
+// toggles it and highlights when collapsed-but-active.
+function SidebarGroup({ group, isActive }: { group: ChromeGroup; isActive: (href: string) => boolean }) {
+  const anyActive = group.children.some(c => isActive(c.href))
+  const [open, setOpen] = useState(anyActive)
+  const { icon: Icon } = group
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+        className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition ${
+          anyActive && !open ? 'text-white' : 'text-gray-300 hover:bg-white/[0.06] hover:text-white'
+        }`}
+      >
+        <Icon size={18} className={anyActive ? 'text-blue-300' : 'text-gray-400'} />
+        <span>{group.label}</span>
+        <ChevronDown size={16} className={`ml-auto text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="mt-1 space-y-1 pl-3">
+          {group.children.map(({ href, label, icon: ChildIcon }) => {
+            const active = isActive(href)
+            return (
+              <Link
+                key={href}
+                href={href}
+                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
+                  active ? 'bg-blue-600/25 text-white ring-1 ring-blue-500/30' : 'text-gray-300 hover:bg-white/[0.06] hover:text-white'
+                }`}
+              >
+                <ChildIcon size={16} className={active ? 'text-blue-300' : 'text-gray-400'} />
+                <span>{label}</span>
+              </Link>
+            )
+          })}
+        </div>
+      )}
+    </div>
   )
 }
 

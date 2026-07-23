@@ -10,7 +10,10 @@ import { Modal } from '@/components/ui/Modal'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { MessageSquare, Paperclip, Send, X, FileText, Image as ImageIcon, Loader2 } from 'lucide-react'
 import { uploadOne } from '@/lib/upload'
+import { useFileDrop } from '@/components/ui/useFileDrop'
 import { formatDateTime } from '@/lib/utils'
+
+const ATTACH_ACCEPT = 'image/*,.pdf,.doc,.docx'
 
 export type ChatViewerRole = 'supplier' | 'regional_manager' | 'store_manager' | 'individual'
 
@@ -24,12 +27,16 @@ interface ChatMessage {
 }
 
 const OTHER_LABEL: Record<ChatViewerRole, string> = {
-  supplier: 'regional manager',
+  supplier: 'client',
   regional_manager: 'supplier',
   store_manager: 'team',
   individual: 'supplier',
 }
 const ROLE_LABEL: Record<string, string> = { supplier: 'Supplier', regional_manager: 'Regional Manager', store_manager: 'Store Manager', individual: 'Client' }
+// The supplier's counterparty is presented as "the client" — RM-authored bubbles
+// read "Client" on the supplier's side only; other viewers keep the real labels.
+const roleLabelFor = (authorRole: string, viewerRole: ChatViewerRole) =>
+  viewerRole === 'supplier' && authorRole === 'regional_manager' ? 'Client' : (ROLE_LABEL[authorRole] ?? authorRole)
 const AVATAR_CLS: Record<string, string> = {
   supplier: 'bg-blue-500/20 text-blue-700 dark:text-blue-300',
   regional_manager: 'bg-teal-500/20 text-teal-700 dark:text-teal-300',
@@ -52,6 +59,22 @@ async function uploadAttachment(file: File): Promise<string> {
 const MAX_CHARS = 2000
 const MAX_FILES = 5
 const POLL_MS = 6000
+
+// Inline full-width outline button ("Chat with the supplier / client") — the
+// next-action-block chat entry, sitting BELOW the informational callouts. A
+// client wrapper so a Server Component can drop it in without passing a function
+// `trigger` across the RSC boundary.
+export function TicketChatInline({ ticketId, viewerRole, unread = false }: { ticketId: string; viewerRole: ChatViewerRole; unread?: boolean }) {
+  return (
+    <TicketChat ticketId={ticketId} viewerRole={viewerRole} trigger={open => (
+      <button type="button" onClick={open}
+        className="flex w-full items-center justify-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-semibold text-[var(--text)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)]">
+        <MessageSquare size={16} /> Chat with the {OTHER_LABEL[viewerRole]}
+        {unread && <span className="h-2 w-2 rounded-full bg-blue-500" />}
+      </button>
+    )} />
+  )
+}
 
 // Header entry point: a compact message icon (with an unread dot) that opens the
 // chat. A client wrapper so a Server Component can drop it in without passing a
@@ -156,7 +179,7 @@ function ChatBody({ ticketId, viewerRole, onClose }: { ticketId: string; viewerR
                     <span className={`mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full text-[11px] font-bold ${AVATAR_CLS[m.author_role] ?? AVATAR_CLS.supplier}`}>{roleInitial(m.author_role)}</span>
                     <div className={`min-w-0 max-w-[82%] rounded-2xl px-3.5 py-2.5 ${mine ? 'rounded-tr-sm bg-blue-600 text-white' : 'rounded-tl-sm bg-[var(--surface)] text-[var(--text)] ring-1 ring-[var(--border)]'}`}>
                       <div className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                        <span className={`text-[11px] font-bold ${mine ? 'text-white' : 'text-[var(--text)]'}`}>{mine ? 'You' : (ROLE_LABEL[m.author_role] ?? m.author_role)}</span>
+                        <span className={`text-[11px] font-bold ${mine ? 'text-white' : 'text-[var(--text)]'}`}>{mine ? 'You' : roleLabelFor(m.author_role, viewerRole)}</span>
                         <span className={`text-[10px] ${mine ? 'text-white/60' : 'text-[var(--text-faint)]'}`}>{formatDateTime(m.created_at)}</span>
                       </div>
                       {m.body && <p className="whitespace-pre-line break-words text-sm">{m.body}</p>}
@@ -192,6 +215,17 @@ function ChatComposer({ ticketId, onSent }: { ticketId: string; onSent: () => vo
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
 
+  // Shared path for picked (input onChange) and dropped files — same validation,
+  // limit and state update, so drag-and-drop behaves exactly like the picker.
+  function addFiles(picked: File[]) {
+    if (!picked.length) return
+    setFiles(p => [...p, ...picked].slice(0, MAX_FILES))
+    setErr('')
+  }
+
+  const atCapacity = busy || files.length >= MAX_FILES
+  const { isDragging, dropProps } = useFileDrop({ onFiles: addFiles, accept: ATTACH_ACCEPT, multiple: true, disabled: atCapacity })
+
   async function submit() {
     if (!text.trim() && !files.length) { setErr('Add a message or attach a file.'); return }
     setBusy(true); setErr('')
@@ -206,7 +240,12 @@ function ChatComposer({ ticketId, onSent }: { ticketId: string; onSent: () => vo
   }
 
   return (
-    <div className="space-y-2.5">
+    <div {...dropProps} className={`relative space-y-2.5 rounded-xl transition ${isDragging ? 'p-2 ring-2 ring-blue-500 bg-blue-500/5' : ''}`}>
+      {isDragging && (
+        <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center rounded-xl text-sm font-semibold text-blue-600 dark:text-blue-400">
+          <span className="flex items-center gap-1.5"><Paperclip size={15} /> Drop files here</span>
+        </div>
+      )}
       <textarea value={text} onChange={e => setText(e.target.value.slice(0, MAX_CHARS))} placeholder="Write a message…" rows={2}
         onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); submit() } }}
         className="w-full rounded-xl bg-[var(--input-bg)] px-3 py-2.5 text-sm text-[var(--text)] ring-1 ring-[var(--border)] outline-none placeholder-[var(--text-faint)] focus:ring-blue-500/40" />
@@ -225,7 +264,7 @@ function ChatComposer({ ticketId, onSent }: { ticketId: string; onSent: () => vo
         <label className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-xl px-3 py-2 text-sm text-[var(--text)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)]">
           <Paperclip size={15} /> Attach
           {/* Snapshot the FileList before clearing the input — a lazy read inside the updater finds it emptied. */}
-          <input type="file" accept="image/*,.pdf,.doc,.docx" multiple className="hidden" onChange={e => { const picked = Array.from(e.target.files ?? []); setFiles(p => [...p, ...picked].slice(0, MAX_FILES)); setErr(''); e.currentTarget.value = '' }} />
+          <input type="file" accept={ATTACH_ACCEPT} multiple className="hidden" onChange={e => { addFiles(Array.from(e.target.files ?? [])); e.currentTarget.value = '' }} />
         </label>
         <button onClick={submit} disabled={busy} className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-blue-600 py-2 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:opacity-50">
           {busy ? <><Loader2 size={14} className="animate-spin" /> Sending…</> : <><Send size={14} /> Send</>}

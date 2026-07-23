@@ -17,7 +17,7 @@ import { deriveDueDates } from '@/lib/health/priority'
 import { computeTicketSla } from '@/lib/health/sla'
 import { isActive } from '@/lib/health/types'
 import type { HealthTicket, Priority } from '@/lib/health/types'
-import { buildTicketTimeline } from '@/lib/ticket-timeline'
+import { buildTicketTimeline, supplierFriendlyLabel } from '@/lib/ticket-timeline'
 import { supplierStatusMeta, storeLabel } from '@/lib/utils'
 import type { QuoteSummaryStatus } from '@/components/workflow/QuoteSummary'
 import type { Database } from '@/lib/database.types'
@@ -46,7 +46,7 @@ export async function loadSupplierTicketDetail(ticketId: string) {
     admin.from('stores').select('name, sub_store, branch_code').eq('id', t.store_id ?? '').single(),
     admin.from('ticket_updates').select('body, author_role, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
     admin.from('ticket_suppliers').select('supplier_id, status, invited_at, decline_reason, responded_at, declined_by, requote_requested_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).maybeSingle(),
-    admin.from('quotes').select('id, amount, amount_incl_vat, description, file_url, status, valid_until, proposed_schedule_at, decline_reason, created_at, updated_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).order('created_at', { ascending: false }),
+    admin.from('quotes').select('id, amount, amount_incl_vat, description, file_url, status, valid_until, proposed_schedule_at, decline_reason, created_at, updated_at, quote_ref').eq('ticket_id', t.id).in('supplier_id', supplierIds).order('created_at', { ascending: false }),
     admin.from('technicians').select('id, name').in('supplier_id', supplierIds).eq('active', true).order('name'),
     admin.from('signoffs').select('id, before_urls, after_urls, coc_url, invoice_url, status, notes, reject_reason, reviewed_at, created_at').eq('ticket_id', t.id).in('supplier_id', supplierIds).order('created_at', { ascending: false }),
     admin.from('snags').select('description, required_correction, severity, status, scheduled_at, schedule_status, assigned_at, schedule_agreed_at, schedule_declined_at, schedule_decline_reason, created_at').eq('ticket_id', t.id).order('created_at', { ascending: false }),
@@ -85,6 +85,9 @@ export async function loadSupplierTicketDetail(ticketId: string) {
   // evidence URL to a short-lived signed URL in place, so all the render sites below
   // (ticket photos, signoff cards, quotes, variations, disputes) get readable links.
   if (Array.isArray(t.photo_urls)) t.photo_urls = await signManyUrls(t.photo_urls)
+  // Ticket documents logged with the ticket → signed for the Documents tab (supplier-
+  // scoped: the page already gates access). Kept in its own list; t stays untouched.
+  const infoDocUrls = Array.isArray(t.info_doc_urls) ? await signManyUrls(t.info_doc_urls) : []
   await Promise.all([
     ...(signoffRows ?? []).map(async s => {
       if (Array.isArray(s.before_urls)) s.before_urls = await signManyUrls(s.before_urls)
@@ -185,7 +188,10 @@ export async function loadSupplierTicketDetail(ticketId: string) {
   // Show the actual decline reason (the RM's reason for a declined quote, or the
   // supplier's own reason if they declined the request), falling back to the
   // courteous "not selected" message when no reason was captured.
-  const declineMessage = declineReason || DEFAULT_DECLINE_REASON
+  // "Choosing another supplier" is a normal competitive outcome — the supplier sees
+  // the courteous not-selected message instead of the raw reason, with no dispute.
+  const politeDecline = declinedBy === 'regional_manager' && declineReason === 'Choosing another supplier'
+  const declineMessage = politeDecline ? DEFAULT_DECLINE_REASON : (declineReason || DEFAULT_DECLINE_REASON)
   // This supplier's OWN view of the status — never leak another supplier's progress
   // (e.g. the ticket reading "Quoted" because a different supplier quoted). Awarded →
   // the real status; their own quote in → "Quoted"; nothing submitted → "Quote requested".
@@ -219,6 +225,12 @@ export async function loadSupplierTicketDetail(ticketId: string) {
   const myQuoteRequests = allRequestRows
     .filter(r => (r.supplier_id !== null && supplierIds.includes(r.supplier_id)) || (r.supplier_id === null && r.requested_at === earliestRequestAt))
     .map(r => r.requested_at).filter(Boolean)
+  // Belt-and-braces: union in this supplier's OWN invite stamps (invited_at +
+  // requote_requested_at) so their trail shows the request round even when the
+  // durable-log insert silently failed. Same-round stamps share the timestamp, so
+  // the engine's dedup collapses them. Cross-supplier isolation holds — the invite
+  // row is already scoped to the caller's org (`.in('supplier_id', supplierIds)`).
+  for (const at of [invite?.invited_at, invite?.requote_requested_at]) if (at && !myQuoteRequests.includes(at)) myQuoteRequests.push(at)
   // Trail starts at this supplier's EARLIEST involvement (first request / quote /
   // decline) — a re-invite resets invited_at to "now", so anchoring to it would hide
   // durable events from earlier rounds; the first quote request is the true start.
@@ -314,7 +326,7 @@ export async function loadSupplierTicketDetail(ticketId: string) {
     if (awarded && ['in_progress', 'snag_in_progress', 'snag_resolved'].includes(t.status)) return { mode: 'act', msg: 'Upload the COC & POC', sub: 'Once the work is done, upload the certificate of completion and proof-of-completion photos below.' }
     if (awarded && t.status === 'submitted_for_signoff') return { mode: 'wait', msg: '', sub: '' }
     if (awarded && t.status === 'variation_review') return { mode: 'wait', msg: '', sub: '' }
-    if (awarded && (t.status === 'approved_closeout' || t.status === 'vo_declined')) return { mode: 'act', msg: 'Raise any variation orders', sub: 'Your COC & POC were approved — raise a variation order for any extra work, or confirm there are none so the manager can close out.' }
+    if (awarded && (t.status === 'approved_closeout' || t.status === 'vo_declined')) return { mode: 'act', msg: 'Raise any variation orders', sub: 'Your COC & POC were approved — raise a variation order for any extra work, or confirm there are none so the client can close out.' }
     return { mode: 'wait', msg: supplierStatusMeta(supplierStatus).label, sub: 'No action needed from you right now.' }
   })()
 
@@ -361,22 +373,22 @@ export async function loadSupplierTicketDetail(ticketId: string) {
         updates: (updates ?? []).map(u => ({ body: u.body ?? '', author_role: u.author_role, created_at: u.created_at })),
         views: viewRows ?? [],
       }
-  // Default (neutral) labels + actor — the RM-voice rmFriendlyLabel says "You
-  // requested quotes", which is wrong from the supplier's side (the client/RM
-  // requested them). The default labels read "Quote requested" with the actor.
-  const timelineItems = buildTicketTimeline(supplierTimelineInput)
+  // Client-voiced: the whole client side (RM + store manager) reads "the client";
+  // the supplier's own actions read "you"/"your". Actor baked into the sentence, so
+  // the separate "who" line drops away (mirrors the RM view's style).
+  const timelineItems = buildTicketTimeline(supplierTimelineInput).map(e => ({ ...e, label: supplierFriendlyLabel(e), who: null }))
 
   const data = {
     t, store, storeName, disputeStore, companyName, supplierCompanyName, customer, editorName, quoteRequestedAt,
     latestSnag, snagFixApproved, snagScheduleActive, declinedSnag, scheduledTechName,
     awarded, chatUnread, chatUnreadCount, declinedForMe, dueAt, overdue, declineDetails, sla, breached, now,
-    latestQuote, canSubmitQuote, declineReason, declinedBy, declinedByLabel, declineMessage, supplierStatus, reQuoteByRm,
+    latestQuote, canSubmitQuote, declineReason, declinedBy, declinedByLabel, declineMessage, politeDecline, supplierStatus, reQuoteByRm,
     quoteStatusOf, requoteReason,
     pendingSignoffs, rejectedSignoffs, acceptedSignoff, submissionLabel, roundBySignoff, liveSnag, liveEvidence, archivedSuperseded,
     variations, variationCount, latestVoRejectReason, canDecline,
     disputes, msgsByDispute, openDispute, resolvedDisputes, disputeSubject,
     nextAction, timelineItems,
-    totalPhotos, quoteTabRows, historyDeclinedQuotes, updates: updates ?? [], declineRows: declineRows ?? [],
+    totalPhotos, infoDocUrls, quoteTabRows, historyDeclinedQuotes, updates: updates ?? [], declineRows: declineRows ?? [],
   }
   return { kind: 'ok' as const, data }
 }

@@ -335,6 +335,10 @@ async function loadRegionPrevHealth(db: DB, companyId: string, now: Date): Promi
   return m
 }
 
+// Narrow a ticket_disputes.outcome (plain text in the DB) to the row-shape union.
+const disputeOutcome = (o: string | null | undefined): 'upheld' | 'withdrawn' | null =>
+  o === 'upheld' || o === 'withdrawn' ? o : null
+
 // ============================================================
 // REGIONAL DASHBOARD (scoped to a regional manager's regions)
 // ============================================================
@@ -357,11 +361,21 @@ export interface RegionalTicketRow {
   disputed: boolean
   // The open dispute's latest message is from the supplier (awaiting the RM's reply).
   disputeUnread: boolean
+  // Most recently RESOLVED dispute's outcome + origin — phrases the post-resolution
+  // next step. Null when none, or while an OPEN dispute exists (open wins — the
+  // disputed flag above covers that).
+  lastDisputeOutcome: 'upheld' | 'withdrawn' | null
+  lastDisputeOrigin: string | null
   // Suppliers already on this ticket (invited/quoted) and those who declined it —
   // so the "Assign supplier" picker (from the Today queue) can grey out the ones
   // already engaged and flag the ones who declined before.
   engagedSupplierIds: Record<string, 'invited' | 'quoted'>
   declinedSupplierIds: string[]
+  // Latest snag's schedule state + description — drives the RM snag rows (the
+  // proposed/declined fix date and what the snag is about).
+  snagScheduledAt: string | null
+  snagScheduleStatus: string | null
+  snagDescription: string | null
 }
 export interface RegionalDashboardData {
   portfolio: RegionalHealthResult
@@ -415,6 +429,11 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
   // Tickets with an OPEN dispute → the badge reads "Dispute" everywhere.
   const { data: openDisputeRows } = ticketIds.length ? await db.from('ticket_disputes').select('ticket_id').eq('status', 'open').in('ticket_id', ticketIds) : { data: null }
   const disputedIds = new Set<string>((openDisputeRows ?? []).map(d => d.ticket_id))
+  // Latest RESOLVED dispute per ticket (newest resolved_at wins) → the queues'
+  // post-resolution next-step copy. Suppressed on rows with an open dispute.
+  const { data: resolvedDisputeRows } = ticketIds.length ? await db.from('ticket_disputes').select('ticket_id, outcome, origin, resolved_at').eq('status', 'resolved').in('ticket_id', ticketIds).order('resolved_at', { ascending: false, nullsFirst: false }) : { data: null }
+  const lastResolvedDispute = new Map<string, { outcome: string | null; origin: string | null }>()
+  for (const d of resolvedDisputeRows ?? []) if (!lastResolvedDispute.has(d.ticket_id)) lastResolvedDispute.set(d.ticket_id, d)
   // Latest dispute-message author per open-dispute ticket → "new message" flag (a
   // message from the supplier awaits the RM's reply).
   const { data: dmsgR } = disputedIds.size ? await db.from('ticket_dispute_messages').select('ticket_id, author_role, created_at').in('ticket_id', [...disputedIds]).order('created_at', { ascending: false }) : { data: null }
@@ -433,6 +452,11 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
       const a = declinedByTicket.get(r.ticket_id) ?? []; a.push(r.supplier_id); declinedByTicket.set(r.ticket_id, a)
     }
   }
+  // Latest snag per ticket (newest first) — schedule state + description for the
+  // RM ticket rows (proposed/declined fix date; a declined date survives on the row).
+  const { data: snagRows } = ticketIds.length ? await db.from('snags').select('ticket_id, scheduled_at, schedule_status, description, created_at').in('ticket_id', ticketIds).order('created_at', { ascending: false }) : { data: null }
+  const latestSnagByTicket = new Map<string, { scheduled_at: string | null; schedule_status: string | null; description: string | null }>()
+  for (const s of snagRows ?? []) if (s.ticket_id && !latestSnagByTicket.has(s.ticket_id)) latestSnagByTicket.set(s.ticket_id, s)
   const firstQuoteAt = new Map<string, string>(); const acceptedQuoteAt = new Map<string, string>()
   // Region-wide quote value totals (R) by status, for the RM "Quote Value" KPI.
   let acceptedQuoteValue = 0, pendingQuoteValue = 0
@@ -472,8 +496,13 @@ export async function assembleRegionalDashboard(companyId: string, regionIds: st
       voNoneConfirmed: !!t.vo_none_confirmed_at,
       disputed: disputedIds.has(t.id),
       disputeUnread: disputedIds.has(t.id) && latestDisputeAuthor.get(t.id) === 'supplier',
+      lastDisputeOutcome: disputedIds.has(t.id) ? null : disputeOutcome(lastResolvedDispute.get(t.id)?.outcome),
+      lastDisputeOrigin: disputedIds.has(t.id) ? null : (lastResolvedDispute.get(t.id)?.origin ?? null),
       engagedSupplierIds: engagedByTicket.get(t.id) ?? {},
       declinedSupplierIds: declinedByTicket.get(t.id) ?? [],
+      snagScheduledAt: latestSnagByTicket.get(t.id)?.scheduled_at ?? null,
+      snagScheduleStatus: latestSnagByTicket.get(t.id)?.schedule_status ?? null,
+      snagDescription: latestSnagByTicket.get(t.id)?.description ?? null,
       }
     })
 
@@ -662,16 +691,35 @@ export interface SupplierTicketRow {
   quotedByMe: boolean; awardedToMe: boolean
   // The supplier confirmed there are no further variation orders (ready for the RM's close-out).
   voNoneConfirmed: boolean
+  // The ticket has at least one APPROVED variation order (own awarded jobs only).
+  hasApprovedVo: boolean
   // An open dispute on their awarded job — the badge reads "Dispute".
   disputed: boolean
   // The open dispute's latest message is from the RM (awaiting the supplier's reply).
   disputeUnread: boolean
+  // Most recently RESOLVED dispute's outcome + origin — phrases the post-resolution
+  // next step. Null when none, or while an OPEN dispute exists (open wins — the
+  // disputed flag above covers that).
+  lastDisputeOutcome: 'upheld' | 'withdrawn' | null
+  lastDisputeOrigin: string | null
   // Why the manager raised the latest snag (newest rejected signoff's reason).
   snagReason: string | null
   // The manager's "more evidence" request message (only while status = evidence_requested).
   evidenceRequestReason: string | null
+  // The RM declined this supplier's quote and asked them to re-quote (re-invited).
+  requoteRequested: boolean
+  // Why their quote was declined (shown in the re-quote flow).
+  declineReason: string | null
+  // The viewer opened the ticket AFTER the decline (ticket_reads watermark) — a
+  // plainly-declined row drops off the Today queue once this is true.
+  declineSeen: boolean
+  // Latest snag's schedule state — after the RM declines a proposed snag-fix date
+  // the declined date + reason survive on the snag row and drive the reschedule CTA.
+  snagScheduledAt: string | null
+  snagScheduleStatus: string | null
+  snagScheduleDeclineReason: string | null
 }
-export interface SupplierQuoteRow { id: string; ticketId: string; ticketTitle: string; ticketStatus: string; storeName: string; branchCode: string | null; amount: number; amountInclVat: number | null; status: string; createdAt: string; category: string | null; priority: Priority; jobRef: string | null; description: string | null; validUntil: string | null; proposedScheduleAt: string | null; reQuoteRequested: boolean }
+export interface SupplierQuoteRow { id: string; ticketId: string; ticketTitle: string; ticketStatus: string; storeName: string; branchCode: string | null; amount: number; amountInclVat: number | null; status: string; createdAt: string; category: string | null; priority: Priority; jobRef: string | null; quoteRef: string | null; description: string | null; validUntil: string | null; proposedScheduleAt: string | null; reQuoteRequested: boolean }
 export interface SupplierSignoffRow { id: string; ticketId: string; ticketTitle: string; ticketStatus: string; storeName: string; branchCode: string | null; status: string; createdAt: string; category: string | null; priority: Priority; description: string | null; jobRef: string | null; photoCount: number; certCount: number; decidedAt: string | null; decidedBy: string | null }
 export interface SupplierDashboardData {
   perf: SupplierPerformance
@@ -684,7 +732,9 @@ export interface SupplierDashboardData {
   generatedAt: string
 }
 
-export async function assembleSupplierDashboard(companyId: string | null, supplierIds: string[], now: Date = new Date()): Promise<SupplierDashboardData> {
+// `viewerId` (the signed-in supplier user) powers the declineSeen watermark —
+// optional so list/stats pages that don't need it skip the ticket_reads lookup.
+export async function assembleSupplierDashboard(companyId: string | null, supplierIds: string[], now: Date = new Date(), viewerId?: string): Promise<SupplierDashboardData> {
   const db = createAdminClient()
   const emptyPerf = calculateSupplierPerformance('none', [], (p) => FALLBACK_SLA[p], now)
   if (!supplierIds.length) return { perf: emptyPerf, company: '', kpis: { open: 0, overdue: 0, dueToday: 0, pendingQuotes: 0, awaitingSignoff: 0, evidenceMissing: 0, scheduled: 0 }, tickets: [], quotes: [], signoffs: [], rating: { avg: 5, count: 0 }, generatedAt: now.toISOString() }
@@ -728,12 +778,18 @@ export async function assembleSupplierDashboard(companyId: string | null, suppli
   const storeBranch = new Map((storesRaw ?? []).map(s => [s.id, s.branch_code ?? null]))
   const titleOf = new Map(tickets.map(t => [t.id, t.title ?? 'Ticket']))
 
-  const [{ data: quotesRaw }, { data: signoffsRaw }, { data: ratingRows }, { data: companyRow }] = await Promise.all([
-    db.from('quotes').select('id, ticket_id, amount, amount_incl_vat, status, created_at, updated_at, valid_until, proposed_schedule_at').in('supplier_id', supplierIds).order('created_at', { ascending: false }),
+  const [{ data: quotesRaw }, { data: signoffsRaw }, { data: ratingRows }, { data: companyRow }, { data: snagRows }, { data: readRows }] = await Promise.all([
+    db.from('quotes').select('id, ticket_id, amount, amount_incl_vat, status, created_at, updated_at, valid_until, proposed_schedule_at, decline_reason, quote_ref').in('supplier_id', supplierIds).order('created_at', { ascending: false }),
     db.from('signoffs').select('id, ticket_id, status, created_at, before_urls, after_urls, coc_url, invoice_url, reviewed_at, reviewed_by, reject_reason').in('supplier_id', supplierIds).order('created_at', { ascending: false }),
     db.from('ratings').select('score').in('supplier_id', supplierIds),
     companyId ? db.from('companies').select('name').eq('id', companyId).maybeSingle() : Promise.resolve({ data: null as { name: string } | null }),
+    // Own-org snags only (cross-supplier isolation) — the latest snag per ticket
+    // carries the schedule state for the reschedule CTA after an RM decline.
+    db.from('snags').select('ticket_id, scheduled_at, schedule_status, schedule_decline_reason, created_at').in('supplier_id', supplierIds).order('created_at', { ascending: false }),
+    // THIS viewer's "last seen" watermarks — drives declineSeen (own rows only).
+    viewerId && tickets.length ? db.from('ticket_reads').select('ticket_id, last_seen_at').eq('user_id', viewerId).in('ticket_id', tickets.map(t => t.id)) : Promise.resolve({ data: null as { ticket_id: string; last_seen_at: string }[] | null }),
   ])
+  const lastSeenByTicket = new Map((readRows ?? []).map(r => [r.ticket_id, r.last_seen_at]))
   // Manager names for the "decided by" line on each sign-off.
   const reviewerIds = [...new Set((signoffsRaw ?? []).map(s => s.reviewed_by).filter((id): id is string => !!id))]
   const { data: reviewerRows } = reviewerIds.length ? await db.from('user_profiles').select('id, full_name').in('id', reviewerIds) : { data: null }
@@ -743,6 +799,16 @@ export async function assembleSupplierDashboard(companyId: string | null, suppli
   const snagReasonByTicket = new Map<string, string>()
   for (const s of (signoffsRaw ?? []).slice().sort((a, b) => +new Date(a.created_at) - +new Date(b.created_at))) {
     if (s.status === 'rejected' && s.reject_reason) snagReasonByTicket.set(s.ticket_id, s.reject_reason)
+  }
+  // Latest snag per ticket (rows arrive newest-first) — schedule state incl. a
+  // declined proposed date, which now survives on the snag row.
+  const latestSnagByTicket = new Map<string, { scheduled_at: string | null; schedule_status: string | null; schedule_decline_reason: string | null }>()
+  for (const s of snagRows ?? []) if (s.ticket_id && !latestSnagByTicket.has(s.ticket_id)) latestSnagByTicket.set(s.ticket_id, s)
+  // Why THIS supplier's latest declined quote was declined — shown when the RM has
+  // asked them to re-quote (newest declined quote with a reason wins).
+  const declineReasonByTicket = new Map<string, string>()
+  for (const q of (quotesRaw ?? []).slice().sort((a, b) => +new Date(a.created_at) - +new Date(b.created_at))) {
+    if (q.status === 'declined' && q.decline_reason) declineReasonByTicket.set(q.ticket_id, q.decline_reason)
   }
   const ratingScores = (ratingRows ?? []).map(r => Number(r.score)).filter(n => Number.isFinite(n))
   // Suppliers start at a full 5★ and degrade as real ratings arrive.
@@ -767,6 +833,17 @@ export async function assembleSupplierDashboard(companyId: string | null, suppli
   const ownedIdList = Array.from(ownedIds)
   const { data: openDisputeRows } = ownedIdList.length ? await db.from('ticket_disputes').select('ticket_id').eq('status', 'open').in('ticket_id', ownedIdList) : { data: null }
   const disputedIds = new Set<string>((openDisputeRows ?? []).map(d => d.ticket_id))
+  // Latest RESOLVED dispute per awarded job (newest resolved_at wins; ownedIdList
+  // scoping = cross-supplier isolation) → the queue's post-resolution next-step
+  // copy. Suppressed on rows with an open dispute.
+  const { data: resolvedDisputeRows } = ownedIdList.length ? await db.from('ticket_disputes').select('ticket_id, outcome, origin, resolved_at').eq('status', 'resolved').in('ticket_id', ownedIdList).order('resolved_at', { ascending: false, nullsFirst: false }) : { data: null }
+  const lastResolvedDispute = new Map<string, { outcome: string | null; origin: string | null }>()
+  for (const d of resolvedDisputeRows ?? []) if (!lastResolvedDispute.has(d.ticket_id)) lastResolvedDispute.set(d.ticket_id, d)
+  // Approved variation orders per ticket → hasApprovedVo. Ticket-id scoping
+  // suffices for isolation: ownedIdList is already this supplier's awarded work
+  // (VOs belong to the awarded org), so no supplier_id filter is needed.
+  const { data: approvedVoRows } = ownedIdList.length ? await db.from('ticket_variations').select('ticket_id').eq('status', 'approved').in('ticket_id', ownedIdList) : { data: null }
+  const approvedVoIds = new Set<string>((approvedVoRows ?? []).map(v => v.ticket_id))
   // Latest dispute-message author per open-dispute ticket → "new message" flag (a
   // message from the RM awaits the supplier's reply).
   const { data: dmsgS } = disputedIds.size ? await db.from('ticket_dispute_messages').select('ticket_id, author_role, created_at').in('ticket_id', [...disputedIds]).order('created_at', { ascending: false }) : { data: null }
@@ -822,10 +899,22 @@ export async function assembleSupplierDashboard(companyId: string | null, suppli
       declinedBy: declinedForMe ? (declinedByOf.get(t.id) ?? null) : null,
       quotedByMe, awardedToMe,
       voNoneConfirmed: !!raw.vo_none_confirmed_at,
+      hasApprovedVo: awardedToMe && approvedVoIds.has(t.id),
       disputed: awardedToMe && disputedIds.has(t.id),
       disputeUnread: awardedToMe && disputedIds.has(t.id) && latestDisputeAuthor.get(t.id) === 'regional_manager',
+      lastDisputeOutcome: awardedToMe && !disputedIds.has(t.id) ? disputeOutcome(lastResolvedDispute.get(t.id)?.outcome) : null,
+      lastDisputeOrigin: awardedToMe && !disputedIds.has(t.id) ? (lastResolvedDispute.get(t.id)?.origin ?? null) : null,
       snagReason: snagReasonByTicket.get(t.id) ?? null,
       evidenceRequestReason: t.status === 'evidence_requested' ? (raw.evidence_request_reason ?? null) : null,
+      // Re-quote = re-invited (status 'invited') AND a prior re-quote request stamp.
+      requoteRequested: !awardedToMe && myInviteStatus.get(t.id) === 'invited' && !!requoteAt.get(t.id),
+      declineReason: declineReasonByTicket.get(t.id) ?? null,
+      // Viewed after the decline → the plainly-declined row leaves the Today queue.
+      declineSeen: declinedForMe && !!declinedInviteAt.get(t.id) && !!lastSeenByTicket.get(t.id)
+        && new Date(lastSeenByTicket.get(t.id)!).getTime() > new Date(declinedInviteAt.get(t.id)!).getTime(),
+      snagScheduledAt: latestSnagByTicket.get(t.id)?.scheduled_at ?? null,
+      snagScheduleStatus: latestSnagByTicket.get(t.id)?.schedule_status ?? null,
+      snagScheduleDeclineReason: latestSnagByTicket.get(t.id)?.schedule_decline_reason ?? null,
     })
   }
   // Active first, then unacknowledged, then oldest — keeps the dashboard queues useful.
@@ -839,7 +928,7 @@ export async function assembleSupplierDashboard(companyId: string | null, suppli
     company: companyRow?.name ?? '',
     kpis: { open, overdue, dueToday, pendingQuotes, awaitingSignoff, evidenceMissing, scheduled },
     tickets: rows,
-    quotes: (quotesRaw ?? []).map(q => { const rq: Partial<TicketRow> = rawById.get(q.ticket_id) ?? {}; return { id: q.id, ticketId: q.ticket_id, ticketTitle: titleOf.get(q.ticket_id) ?? 'Ticket', ticketStatus: rq.status ?? '', storeName: storeName.get(storeOf(q.ticket_id) ?? '') ?? (rq.company_id ? 'Store' : 'Individual'), branchCode: storeBranch.get(storeOf(q.ticket_id) ?? '') ?? null, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, status: q.status, createdAt: q.created_at, category: rq.category ?? null, priority: priorityOf(rq), jobRef: rq.job_ref ?? null, description: rq.description ?? null, validUntil: q.valid_until ?? null, proposedScheduleAt: q.proposed_schedule_at ?? null, reQuoteRequested: !!requoteAt.get(q.ticket_id) } }),
+    quotes: (quotesRaw ?? []).map(q => { const rq: Partial<TicketRow> = rawById.get(q.ticket_id) ?? {}; return { id: q.id, ticketId: q.ticket_id, ticketTitle: titleOf.get(q.ticket_id) ?? 'Ticket', ticketStatus: rq.status ?? '', storeName: storeName.get(storeOf(q.ticket_id) ?? '') ?? (rq.company_id ? 'Store' : 'Individual'), branchCode: storeBranch.get(storeOf(q.ticket_id) ?? '') ?? null, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, status: q.status, createdAt: q.created_at, category: rq.category ?? null, priority: priorityOf(rq), jobRef: rq.job_ref ?? null, quoteRef: q.quote_ref ?? null, description: rq.description ?? null, validUntil: q.valid_until ?? null, proposedScheduleAt: q.proposed_schedule_at ?? null, reQuoteRequested: !!requoteAt.get(q.ticket_id) } }),
     // A completed ticket drops off the Sign-off tab entirely (nothing left to do).
     signoffs: (signoffsRaw ?? []).filter(s => (rawById.get(s.ticket_id)?.status) !== 'completed').map(s => { const rq: Partial<TicketRow> = rawById.get(s.ticket_id) ?? {}; return { id: s.id, ticketId: s.ticket_id, ticketTitle: titleOf.get(s.ticket_id) ?? 'Ticket', ticketStatus: rq.status ?? '', storeName: storeName.get(storeOf(s.ticket_id) ?? '') ?? (rq.company_id ? 'Store' : 'Individual'), branchCode: storeBranch.get(storeOf(s.ticket_id) ?? '') ?? null, status: s.status, createdAt: s.created_at, category: rq.category ?? null, priority: priorityOf(rq), description: rq.description ?? null, jobRef: rq.job_ref ?? null, photoCount: ((s.before_urls ?? []).length + (s.after_urls ?? []).length), certCount: (s.coc_url ? 1 : 0) + (s.invoice_url ? 1 : 0), decidedAt: s.reviewed_at ?? null, decidedBy: s.reviewed_by ? (reviewerName.get(s.reviewed_by) ?? null) : null } }),
     rating,

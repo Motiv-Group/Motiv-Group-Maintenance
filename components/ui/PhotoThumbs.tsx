@@ -11,13 +11,22 @@ import { useScrollLock } from '@/lib/useScrollLock'
  * view-tracking POST the old ViewTrackedLink recorded, so the audit trail
  * still shows "viewed Photo 2".
  */
-export function PhotoThumbs({ urls, ticketId, label = 'Photo', limit }: {
+export function PhotoThumbs({ urls, ticketId, label = 'Photo', limit, onMore, trackLabels }: {
   urls: string[]
   ticketId?: string
   label?: string
   /** Cap the number of tiles: shows limit-1 thumbnails + a "+N" overflow tile and
    *  a "View all N photos" link. The lightbox still steps through every photo. */
   limit?: number
+  /** When set, the overflow tile reads "View all / N photos" and calls this
+   *  (e.g. expand in place) instead of opening the lightbox; the separate
+   *  "View all N photos" text link is not rendered. */
+  onMore?: () => void
+  /** Per-photo audit labels for the "Viewed …" trail, index-aligned with `urls`
+   *  (e.g. "ABC Plumbing — Before photo 1 (Submission #2)"). A plain string[], NOT
+   *  a function, so SERVER components can pass it without the "Functions cannot be
+   *  passed to Client Components" RSC error. Falls back to `${label} ${i+1}`. */
+  trackLabels?: string[]
 }) {
   const [open, setOpen] = useState<number | null>(null)
 
@@ -28,9 +37,9 @@ export function PhotoThumbs({ urls, ticketId, label = 'Photo', limit }: {
     if (!ticketId) return
     fetch(`/api/tickets/${ticketId}/view`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ itemType: 'photo', itemLabel: `${label} ${i + 1}` }),
+      body: JSON.stringify({ itemType: 'photo', itemLabel: trackLabels?.[i] ?? `${label} ${i + 1}` }),
     }).catch(() => {})
-  }, [ticketId, label])
+  }, [ticketId, label, trackLabels])
 
   const show = (i: number) => { setOpen(i); track(i) }
   const step = useCallback((d: 1 | -1) => {
@@ -77,15 +86,15 @@ export function PhotoThumbs({ urls, ticketId, label = 'Photo', limit }: {
         ))}
         {truncated && (
           <button
-            type="button" onClick={() => show(limit! - 1)}
+            type="button" onClick={onMore ?? (() => show(limit! - 1))}
             className="grid h-20 w-20 sm:h-24 sm:w-24 place-items-center rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface-2)] text-sm font-semibold text-[var(--text-muted)] transition hover:bg-[var(--hover)] focus:outline-none focus:ring-2 focus:ring-blue-500/60"
             title={`View all ${urls.length} ${label.toLowerCase()}s`}
           >
-            +{moreCount}
+            {onMore ? <span className="px-1 text-center text-xs leading-tight">View all<br />{urls.length} photos</span> : <>+{moreCount}</>}
           </button>
         )}
       </div>
-      {truncated && (
+      {truncated && !onMore && (
         <button type="button" onClick={() => show(0)} className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-blue-600 transition hover:underline dark:text-blue-400">
           View all {urls.length} photos <ChevronRight size={15} />
         </button>

@@ -13,6 +13,7 @@ const BodySchema = z.object({
   regionIds: z.array(z.string()).optional(),
   storeIds: z.array(z.string()).optional(),
   execUserIds: z.array(z.string()).optional(),
+  projectIds: z.array(z.string()).optional(),
 })
 
 // POST /api/admin/hierarchy — system_admin manages the org-chart links for one
@@ -73,6 +74,20 @@ export async function POST(request: Request) {
       if (storeIds.length) await admin.from('store_users').insert(storeIds.map(store_id => ({ user_id: smUserId, store_id })))
       await logAudit(admin, { actorId: user.id, companyId, action: 'admin.set_sm_stores', entityType: 'user', entityId: smUserId, metadata: { count: storeIds.length } })
       return done('Stores updated.')
+    }
+
+    if (action === 'set_rm_projects') {
+      const rmUserId = String(parsed.data.userId ?? '')
+      const projectIds = parsed.data.projectIds ?? []
+      if (!rmUserId || !(await requireUser(rmUserId, 'regional_manager'))) return bad('Regional manager not in this company.')
+      if (projectIds.length) {
+        const { data: valid } = await admin.from('projects').select('id').eq('company_id', companyId).in('id', projectIds)
+        if ((valid ?? []).length !== projectIds.length) return bad('One or more projects are not in this company.')
+      }
+      await admin.from('project_regional_users').delete().eq('rm_user_id', rmUserId)
+      if (projectIds.length) await admin.from('project_regional_users').insert(projectIds.map(project_id => ({ rm_user_id: rmUserId, project_id, company_id: companyId })))
+      await logAudit(admin, { actorId: user.id, companyId, action: 'admin.set_rm_projects', entityType: 'user', entityId: rmUserId, metadata: { count: projectIds.length } })
+      return done('Project access updated.')
     }
 
     if (action === 'set_rm_execs') {

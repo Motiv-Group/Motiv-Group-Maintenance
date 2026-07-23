@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { LayoutGrid, List, Table2, Search, ArrowRight, CalendarClock, CheckCircle2, AlertTriangle, MapPin } from 'lucide-react'
 import { Card } from '@/components/exec/ui'
 import { formatDate } from '@/lib/utils'
@@ -10,11 +11,14 @@ import { SegmentedProgressBar } from '@/components/projects/SegmentedProgressBar
 import { ViewToggle } from '@/components/projects/ViewToggle'
 import { STORE_STATUS_LABEL, STORE_STATUS_PILL, OVERDUE_PILL } from '@/components/projects/statusStyles'
 import { milestoneSteps, milestoneCounts, stageLabel, MILESTONE_LABELS } from '@/lib/projects/progress'
+import { ProjectReportButton } from '@/components/projects/regional/ProjectReportButton'
 import type { ProjectRow, ProjectSummary, StoreRow } from '@/lib/projects/data'
 
 type StatusFilter = 'all' | 'not_started' | 'in_progress' | 'complete' | 'overdue'
 
 export function RegionalProjectDashboard({ project, summary, stores }: { project: ProjectRow; summary: ProjectSummary; stores: StoreRow[] }) {
+  const router = useRouter()
+  const storeHref = (storeId: string) => `/regional/projects/${project.id}/stores/${storeId}`
   const [view, setView] = useState<'cards' | 'table'>('table')
   // Phones get their own compact grid/list switch (the cards/table one above is sm+).
   const [mobileView, setMobileView] = useState<'grid' | 'list'>('grid')
@@ -24,8 +28,10 @@ export function RegionalProjectDashboard({ project, summary, stores }: { project
 
   const counts = useMemo(() => milestoneCounts(stores), [stores])
   const daysLeft = daysUntil(project.end_date)
-  const endingSoon = useMemo(() => stores.filter((s) => withinDays(s.end_date, 7) && s.progress < 100).length, [stores])
-  const startingSoon = useMemo(() => stores.filter((s) => withinDays(s.start_date, 7)).length, [stores])
+  // "This week" counts use the SA calendar week (Mon–Sun), not a rolling 7 days.
+  const week = useMemo(() => saWeekBounds(), [])
+  const endingSoon = useMemo(() => stores.filter((s) => inThisWeek(s.end_date, week) && s.progress < 100).length, [stores, week])
+  const startingSoon = useMemo(() => stores.filter((s) => inThisWeek(s.start_date, week)).length, [stores, week])
   const recentlyDone = useMemo(() => stores.filter((s) => s.progress >= 100 && recentlyUpdated(s.updated_at, 7)).length, [stores])
 
   const filtered = useMemo(() => {
@@ -49,7 +55,10 @@ export function RegionalProjectDashboard({ project, summary, stores }: { project
 
   return (
     <div className="space-y-5">
-      <Link href="/regional/projects" className="text-xs text-[var(--text-muted)] hover:text-[var(--text)]">← All projects</Link>
+      <div className="flex items-center justify-between gap-3">
+        <Link href="/regional/projects" className="text-xs text-[var(--text-muted)] hover:text-[var(--text)]">← All projects</Link>
+        <ProjectReportButton projectId={project.id} projectName={project.name} />
+      </div>
 
       {/* Hero */}
       <Card className="overflow-hidden">
@@ -232,8 +241,12 @@ export function RegionalProjectDashboard({ project, summary, stores }: { project
               </thead>
               <tbody>
                 {filtered.map((s) => (
-                  <tr key={s.id} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)]">
-                    <td className="px-3 py-2"><Link href={`/regional/projects/${project.id}/stores/${s.id}`} className="text-[var(--text)] hover:text-blue-500">{s.store_name ?? '—'}</Link></td>
+                  // The whole row is clickable; prefetch the store detail (its skeleton)
+                  // on hover so the click lands instantly. The store-name link stays for
+                  // keyboard/screen-reader navigation.
+                  <tr key={s.id} onClick={() => router.push(storeHref(s.id))} onMouseEnter={() => router.prefetch(storeHref(s.id))}
+                    className="cursor-pointer border-b border-[var(--border)] last:border-0 hover:bg-[var(--hover)]">
+                    <td className="px-3 py-2"><Link href={storeHref(s.id)} onClick={e => e.stopPropagation()} className="text-[var(--text)] hover:text-blue-500">{s.store_name ?? '—'}</Link></td>
                     <td className="px-3 py-2 text-[var(--text-muted)]">{s.branch_code}</td>
                     <td className="px-3 py-2 text-[var(--text-muted)] hidden md:table-cell">{s.town ?? '—'}</td>
                     <td className="px-3 py-2 text-[var(--text-muted)] hidden lg:table-cell">{formatDate(s.start_date) || '—'}</td>
@@ -245,7 +258,7 @@ export function RegionalProjectDashboard({ project, summary, stores }: { project
                       </div>
                     </td>
                     <td className="px-3 py-2"><span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${s.overdue ? OVERDUE_PILL : STORE_STATUS_PILL[s.status]}`}>{s.overdue ? 'Overdue' : STORE_STATUS_LABEL[s.status]}</span></td>
-                    <td className="px-3 py-2 text-right"><Link href={`/regional/projects/${project.id}/stores/${s.id}`} className="text-blue-500"><ArrowRight size={15} className="inline" /></Link></td>
+                    <td className="px-3 py-2 text-right"><ArrowRight size={15} className="inline text-blue-500" /></td>
                   </tr>
                 ))}
               </tbody>
@@ -285,9 +298,22 @@ function daysUntil(date: string | null): number | null {
   if (Number.isNaN(d.getTime())) return null
   return Math.ceil((d.getTime() - Date.now()) / 86400000)
 }
-function withinDays(date: string | null, days: number): boolean {
-  const d = daysUntil(date)
-  return d != null && d >= 0 && d <= days
+// "This week" = the CURRENT CALENDAR WEEK, Monday 00:00 → Sunday 24:00 in SA time
+// (Africa/Johannesburg is UTC+2 year-round — no DST), returned as UTC ms bounds.
+// Date-only values (store start/end dates parse to UTC midnight) land correctly:
+// Monday 00:00 UTC ≥ the Sunday-22:00-UTC week start, Sunday 00:00 UTC < the end.
+const SA_OFFSET_MS = 2 * 3600000
+function saWeekBounds(nowMs: number = Date.now()): { start: number; end: number } {
+  const sa = new Date(nowMs + SA_OFFSET_MS)            // SA wall clock, read via UTC getters
+  const dow = (sa.getUTCDay() + 6) % 7                 // 0 = Monday … 6 = Sunday
+  const startSa = Date.UTC(sa.getUTCFullYear(), sa.getUTCMonth(), sa.getUTCDate() - dow)
+  const start = startSa - SA_OFFSET_MS
+  return { start, end: start + 7 * 86400000 }
+}
+function inThisWeek(date: string | null, week: { start: number; end: number }): boolean {
+  if (!date) return false
+  const t = new Date(date).getTime()
+  return !Number.isNaN(t) && t >= week.start && t < week.end
 }
 function recentlyUpdated(iso: string, days: number): boolean {
   const t = new Date(iso).getTime()

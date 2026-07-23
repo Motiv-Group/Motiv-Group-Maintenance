@@ -34,8 +34,26 @@ export default async function SupplierLayout({ children }: { children: React.Rea
   }
 
   const unreadCount = await getUnreadCount()
+
+  // Quotes-tab badge: RM-declined quote requests the viewer hasn't opened since
+  // the decline (mirrors the Today queue's declineSeen watermark — opening the
+  // ticket clears it). A re-quote resets the invite to 'invited', so those drop
+  // out here automatically.
+  let quotesBadge = 0
+  const { data: declinedInv } = supplierIds.length
+    ? await admin.from('ticket_suppliers').select('ticket_id, responded_at').in('supplier_id', supplierIds).eq('status', 'declined').eq('declined_by', 'regional_manager')
+    : { data: null }
+  if (declinedInv?.length) {
+    const { data: reads } = await admin.from('ticket_reads').select('ticket_id, last_seen_at').eq('user_id', userId).in('ticket_id', declinedInv.map(r => r.ticket_id))
+    const seenAt = new Map((reads ?? []).map(r => [r.ticket_id, r.last_seen_at]))
+    quotesBadge = declinedInv.filter(r => {
+      const seen = seenAt.get(r.ticket_id)
+      return !seen || !r.responded_at || new Date(seen).getTime() <= new Date(r.responded_at).getTime()
+    }).length
+  }
+
   return (
-    <ExecChrome userName={fullName} variant="supplier" unreadCount={unreadCount} accountStatus={accountStatus} avatarUrl={avatarUrl}>
+    <ExecChrome userName={fullName} variant="supplier" unreadCount={unreadCount} accountStatus={accountStatus} avatarUrl={avatarUrl} tabBadges={{ '/supplier/quotes': quotesBadge }}>
       <RealtimeRefresh tables={['tickets', 'quotes', 'signoffs', 'snags', 'ticket_updates', 'ratings', 'notifications', 'ticket_disputes', 'ticket_dispute_messages']} />
       {needsSla ? <SlaReacceptGate signedNameDefault={fullName} /> : children}
     </ExecChrome>

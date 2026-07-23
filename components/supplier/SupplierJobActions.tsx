@@ -3,15 +3,17 @@
 // Supplier "Schedule job" action — a green button that opens a themed calendar
 // (date + 1-hour time slot, capped by the ticket priority window and operating
 // hours). The Submit COC & POC flow lives on its own page (/complete).
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { Calendar, Wrench, PlayCircle, XCircle, X, FileText, Ticket, MapPin, Info, ArrowRight, Plus } from 'lucide-react'
+import { Calendar, Wrench, PlayCircle, XCircle, X, FileText, Ticket, MapPin, Info, ArrowRight, Plus, MessageSquare, MessageSquareWarning, CheckCircle2 } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { DrawerHeader } from '@/components/exec/Drawer'
 import { SchedulePicker } from '@/components/ui/SchedulePicker'
 import { SendQuoteForm } from '@/components/admin/SendQuoteForm'
 import { MoreMenu, MoreActionItem } from '@/components/regional/RmTicketActions'
+import { RaiseDisputeButton } from '@/components/dispute/DisputeBox'
 import { QuoteSummary, type QuoteSummaryData, type QuoteSchedule } from '@/components/workflow/QuoteSummary'
+import { TicketChat } from '@/components/chat/TicketChat'
 import { createClient } from '@/lib/supabase/client'
 import { errMsg } from '@/components/ui/errMsg'
 import { formatDateTime } from '@/lib/utils'
@@ -67,7 +69,7 @@ export function DeclineWorkButton({ ticketId, jobRef, title, storeName, dueAt, d
                 <button type="button" onClick={dismiss} aria-label="Close" className="shrink-0 -m-1 rounded-lg p-1.5 text-[var(--text-faint)] transition hover:bg-[var(--hover)] hover:text-[var(--text)]"><X size={20} /></button>
               </div>
               <div className="space-y-0.5 text-sm text-[var(--text-muted)]">
-                <p>The regional manager will be notified and this request may be sent to other suppliers.</p>
+                <p>The client will be notified and this request may be sent to other suppliers.</p>
                 <p>You will no longer be able to submit a quote unless you are invited again.</p>
               </div>
 
@@ -134,7 +136,7 @@ export function SupplierQuoteBar({ ticketId, priority, createdAt, canDecline = f
       <div className="flex items-center gap-2">
         <button type="button" onClick={() => setQuoteOpen(true)} className={`${canDecline ? 'flex-1' : 'w-full'} py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition`}>Upload Quote</button>
         {canDecline && (
-          <MoreMenu>
+          <MoreMenu inline align="right">
             <MoreActionItem icon={<XCircle size={16} />} label="Decline work" tone="danger" onClick={() => setDeclineOpen(true)} />
           </MoreMenu>
         )}
@@ -159,7 +161,7 @@ export function SupplierQuoteSubmittedActions({ ticketId, canDecline = false, de
       <div className="flex items-center gap-2">
         <button type="button" onClick={() => setQuoteOpen(true)} className={`${canDecline ? 'flex-1' : 'w-full'} inline-flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold text-blue-600 dark:text-blue-400 ring-1 ring-blue-500/50 transition hover:bg-blue-500/10`}>View my quote <ArrowRight size={15} /></button>
         {canDecline && (
-          <MoreMenu>
+          <MoreMenu inline align="right">
             <MoreActionItem icon={<XCircle size={16} />} label="Decline work" tone="danger" onClick={() => setDeclineOpen(true)} />
           </MoreMenu>
         )}
@@ -177,7 +179,11 @@ export function SupplierQuoteSubmittedActions({ ticketId, canDecline = false, de
 
 // Accept a raised snag and schedule when the corrective work will happen — opens
 // the same themed calendar as Schedule job (no technician step).
-export function AcceptSnagCard({ ticketId, priority, createdAt }: { ticketId: string; priority: string; createdAt: string }) {
+// `trigger` lets a caller supply its own opener (e.g. the View-snag sheet's big
+// primary button); default stays the full-width blue button.
+// `onScheduled` fires after a successful accept so an outer sheet (e.g. the
+// View-snag pop-up that renders this via `trigger`) can close itself too.
+export function AcceptSnagCard({ ticketId, priority, createdAt, trigger, onScheduled }: { ticketId: string; priority: string; createdAt: string; trigger?: (open: () => void) => ReactNode; onScheduled?: () => void }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -185,15 +191,19 @@ export function AcceptSnagCard({ ticketId, priority, createdAt }: { ticketId: st
 
   async function doAccept(iso: string) {
     setBusy(true); setErr('')
-    try { await transition(ticketId, { action: 'accept_snag', scheduledAt: iso }); router.refresh() }
+    // Close the pop-up on success — router.refresh() doesn't reset client state,
+    // so without this the modal sits on "Scheduling…" forever.
+    try { await transition(ticketId, { action: 'accept_snag', scheduledAt: iso }); setOpen(false); setBusy(false); router.refresh(); onScheduled?.() }
     catch (e) { setErr(errMsg(e)); setBusy(false) }
   }
 
   return (
     <>
-      <button onClick={() => setOpen(true)} className="w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition flex items-center justify-center gap-1.5">
-        <Calendar size={15} /> Accept snag &amp; schedule fix
-      </button>
+      {trigger ? trigger(() => setOpen(true)) : (
+        <button onClick={() => setOpen(true)} className="w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition flex items-center justify-center gap-1.5">
+          <Calendar size={15} /> Accept snag &amp; schedule fix
+        </button>
+      )}
       {open && (
         <Modal onClose={() => setOpen(false)} maxWidth="max-w-2xl">
           {close => (
@@ -205,6 +215,101 @@ export function AcceptSnagCard({ ticketId, priority, createdAt }: { ticketId: st
           )}
         </Modal>
       )}
+    </>
+  )
+}
+
+// Move a still-pending snag schedule — the supplier proposed a time the RM
+// hasn't agreed to yet (schedule_status === 'proposed') and wants to change it.
+// Opens the same themed calendar, pre-noting the currently-proposed slot, and
+// re-proposes via update_snag_schedule (keeps the snag on 'proposed').
+export function UpdateSnagScheduleCta({ ticketId, priority, createdAt, currentScheduledAt }: { ticketId: string; priority: string; createdAt: string; currentScheduledAt: string | null }) {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+
+  async function doUpdate(iso: string) {
+    setBusy(true); setErr('')
+    // Close on success — router.refresh() alone leaves the modal on "Scheduling…".
+    try { await transition(ticketId, { action: 'update_snag_schedule', scheduledAt: iso }); setOpen(false); setBusy(false); router.refresh() }
+    catch (e) { setErr(errMsg(e)); setBusy(false) }
+  }
+
+  return (
+    <>
+      <button onClick={() => setOpen(true)} className="w-full py-2.5 rounded-lg ring-1 ring-[var(--border)] text-[var(--text)] text-sm font-semibold hover:bg-[var(--hover)] transition flex items-center justify-center gap-1.5">
+        <Calendar size={15} /> Update snag schedule
+      </button>
+      {open && (
+        <Modal onClose={() => setOpen(false)} maxWidth="max-w-2xl">
+          {close => (
+            <>
+              <DrawerHeader onClose={close} title={<p className="font-semibold text-[var(--text)]">Update the snag schedule</p>} />
+              {/* The time already proposed to the manager (still awaiting approval). */}
+              {currentScheduledAt && (
+                <div className="rounded-lg bg-amber-500/10 ring-1 ring-amber-500/30 p-3">
+                  <p className="text-sm text-[var(--text-muted)]">Currently proposed: <span className="font-semibold text-[var(--text)]">{formatDateTime(currentScheduledAt)}</span></p>
+                </div>
+              )}
+              {err && <p className="text-xs text-red-500">{err}</p>}
+              <SchedulePicker priority={priority} createdAt={createdAt} busy={busy} onConfirm={doUpdate} onCancel={close} />
+            </>
+          )}
+        </Modal>
+      )}
+    </>
+  )
+}
+
+// Re-propose the snag-fix time after the RM declined the proposal — shows the
+// declined date + reason, then the same themed calendar. Re-proposes via
+// accept_snag (the API re-proposes on 'open' snags). More → chat with the client.
+export function SnagRescheduleCta({ ticketId, priority, createdAt, declinedProposedAt, declineReason, className }: { ticketId: string; priority: string; createdAt: string; declinedProposedAt: string | null; declineReason: string | null; className?: string }) {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [chatOpen, setChatOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+
+  async function doPropose(iso: string) {
+    setBusy(true); setErr('')
+    // Close on success — router.refresh() alone leaves the modal on "Scheduling…".
+    try { await transition(ticketId, { action: 'accept_snag', scheduledAt: iso }); setOpen(false); setBusy(false); router.refresh() }
+    catch (e) { setErr(errMsg(e)); setBusy(false) }
+  }
+
+  return (
+    <>
+      <button onClick={() => setOpen(true)} className={className ?? 'w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition flex items-center justify-center gap-1.5'}>
+        <Calendar size={15} /> Re-schedule
+      </button>
+      {open && (
+        <Modal onClose={() => setOpen(false)} maxWidth="max-w-2xl">
+          {close => (
+            <>
+              <DrawerHeader onClose={close} title={<p className="font-semibold text-[var(--text)]">Schedule declined — pick a new time</p>} />
+              {/* What the RM turned down, so the supplier picks a better slot. */}
+              {(declinedProposedAt || declineReason) && (
+                <div className="rounded-lg bg-amber-500/10 ring-1 ring-amber-500/30 p-3 space-y-0.5">
+                  {declinedProposedAt && <p className="text-sm text-[var(--text-muted)]">Proposed: <span className="font-semibold text-[var(--text)]">{formatDateTime(declinedProposedAt)}</span></p>}
+                  {declineReason && <p className="text-sm text-[var(--text-muted)]">Reason: <span className="font-medium text-[var(--text)]">{declineReason}</span></p>}
+                </div>
+              )}
+              {err && <p className="text-xs text-red-500">{err}</p>}
+              <SchedulePicker priority={priority} createdAt={createdAt} busy={busy} onConfirm={doPropose} onCancel={close} />
+              {/* Sits under the picker's confirm row; `up` keeps the menu inside the sheet. */}
+              <div className="flex justify-end">
+                <MoreMenu up align="right">
+                  <MoreActionItem icon={<MessageSquare size={16} />} label="Chat with the client" onClick={() => setChatOpen(true)} />
+                </MoreMenu>
+              </div>
+            </>
+          )}
+        </Modal>
+      )}
+      {/* RM↔supplier chat, opened from More → Chat with the client (stacks over the picker). */}
+      {chatOpen && <TicketChat ticketId={ticketId} viewerRole="supplier" defaultOpen onClose={() => setChatOpen(false)} />}
     </>
   )
 }
@@ -282,17 +387,22 @@ export function MarkInProgressButton({ ticketId }: { ticketId: string }) {
 // Variation-order gate for the close-out phase (approved_closeout / vo_declined):
 // AFTER the COC/POC is approved, the supplier can raise a variation order for extra
 // work — otherwise the RM does the final close-out. On vo_declined it leads with the
-// RM's decline reason and lets the supplier re-submit a revised VO.
-export function SupplierVariationGate({ ticketId, priority, createdAt, variationCount, status, declineReason, noVosConfirmed = false }: {
+// RM's decline reason and flips the layout: the revised VO becomes the primary
+// action, with Ready for Close-out + Raise dispute under "More".
+export function SupplierVariationGate({ ticketId, priority, createdAt, variationCount, status, declineReason, noVosConfirmed = false, dispute }: {
   ticketId: string; priority: string; createdAt: string; variationCount: number
   status: 'approved_closeout' | 'vo_declined'; declineReason?: string | null; noVosConfirmed?: boolean
+  /** Raise-dispute subject details (ticket ref + store label) for the vo_declined state. */
+  dispute?: { jobRef?: string | null; store?: string | null }
 }) {
   const router = useRouter()
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [voOpen, setVoOpen] = useState(false)
-  const hasVOs = variationCount > 0 || status === 'vo_declined'
-  const raiseLabel = status === 'vo_declined' ? 'Re-submit variation order' : hasVOs ? 'Raise another variation order' : 'Raise variation order'
+  const [disputeOpen, setDisputeOpen] = useState(false)
+  const declined = status === 'vo_declined'
+  const hasVOs = variationCount > 0 || declined
+  const raiseLabel = declined ? 'Re-submit variation order' : hasVOs ? 'Raise another variation order' : 'Raise variation order'
 
   async function confirmNoVos() {
     setBusy(true); setErr('')
@@ -305,34 +415,51 @@ export function SupplierVariationGate({ ticketId, priority, createdAt, variation
 
   // Once confirmed, the VO options are locked and the RM can close out.
   if (noVosConfirmed) {
-    return <div className="rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/30 p-3.5 text-sm text-[var(--text-muted)]">You confirmed there are no further variation orders. Awaiting the manager&apos;s final close-out.</div>
+    return <div className="rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/30 p-3.5 text-sm text-[var(--text-muted)]">You confirmed there are no further variation orders. Awaiting the client&apos;s final close-out.</div>
   }
 
   return (
     <div className="space-y-3">
       {/* Only the vo_declined callout stays here; the "your COC & POC were approved…"
           line lives in the Next-action sub-heading, so it isn't said twice. */}
-      {status === 'vo_declined' && (
+      {declined && (
         <div className="rounded-xl bg-red-500/10 ring-1 ring-red-500/30 p-3.5 space-y-1">
           <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Variation order declined</p>
-          <p className="text-sm text-[var(--text)]">{declineReason || 'The regional manager declined your variation order.'}</p>
-          <p className="text-sm text-[var(--text-muted)]">Submit a revised variation order, or confirm there are none so the manager can close out.</p>
+          <p className="text-sm text-[var(--text)]">{declineReason || 'The client declined your variation order.'}</p>
+          <p className="text-sm text-[var(--text-muted)]">Submit a revised variation order, or confirm there are none so the client can close out.</p>
         </div>
       )}
-      {/* Primary = confirm no further VOs (ready for close-out); raising a VO lives
-          under "More" like the other action blocks. */}
-      <div className="flex items-center gap-2">
-        <button onClick={confirmNoVos} disabled={busy} className="flex-1 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition disabled:opacity-50">{busy ? 'Confirming…' : 'Ready for Close-out'}</button>
-        <MoreMenu up>
-          <MoreActionItem icon={<Plus size={16} />} label={raiseLabel} onClick={() => setVoOpen(true)} />
-        </MoreMenu>
-      </div>
-      <p className="text-[11px] text-[var(--text-faint)]">To raise a variation order, tap <span className="font-semibold text-[var(--text-muted)]">More → Raise VO</span>.</p>
+      {declined ? (
+        /* Declined → the revised VO is the primary action; Ready for Close-out and
+           Raise dispute live under "More". */
+        <div className="flex items-center gap-2">
+          <button onClick={() => setVoOpen(true)} className="flex-1 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition">{raiseLabel}</button>
+          <MoreMenu inline align="right">
+            <MoreActionItem icon={<CheckCircle2 size={16} />} label={busy ? 'Confirming…' : 'Ready for Close-out'} onClick={() => { if (!busy) confirmNoVos() }} />
+            <MoreActionItem icon={<MessageSquareWarning size={16} />} label="Raise dispute" tone="danger" onClick={() => setDisputeOpen(true)} />
+          </MoreMenu>
+        </div>
+      ) : (
+        /* Primary = confirm no further VOs (ready for close-out); raising a VO lives
+           under "More" like the other action blocks. */
+        <div className="flex items-center gap-2">
+          <button onClick={confirmNoVos} disabled={busy} className="flex-1 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition disabled:opacity-50">{busy ? 'Confirming…' : 'Ready for Close-out'}</button>
+          <MoreMenu inline align="right">
+            <MoreActionItem icon={<Plus size={16} />} label={raiseLabel} onClick={() => setVoOpen(true)} />
+          </MoreMenu>
+        </div>
+      )}
+      <p className="text-[11px] text-[var(--text-faint)]">{declined
+        ? <>To confirm there are no further variation orders, tap <span className="font-semibold text-[var(--text-muted)]">More → Ready for Close-out</span>.</>
+        : <>To raise a variation order, tap <span className="font-semibold text-[var(--text-muted)]">More → Raise VO</span>.</>}</p>
       {voOpen && (
         <Modal onClose={() => setVoOpen(false)} maxWidth="max-w-2xl">
           {close => <div><SendQuoteForm ticketId={ticketId} variant="variation" competitive priority={priority} createdAt={createdAt} defaultOpen onClose={close} /></div>}
         </Modal>
       )}
+      {/* Raise-dispute pop-up as a sibling driven by lifted state (mirrors the page's
+          RaiseDisputeMore pattern), so it opens instantly when the menu closes. */}
+      {disputeOpen && <RaiseDisputeButton ticketId={ticketId} origin="variation" defaultOpen subjectTitle="Variation order declined" jobRef={dispute?.jobRef} store={dispute?.store} onClose={() => setDisputeOpen(false)} />}
       {err && <p className="text-xs text-red-500">{err}</p>}
     </div>
   )
@@ -367,7 +494,8 @@ export function ScheduleJobCard({ ticketId, priority, createdAt, technicians = [
 
   async function doSchedule(iso: string) {
     setBusy(true); setErr('')
-    try { await transition(ticketId, { action: 'schedule', scheduledAt: iso, technicianId: techId || null }); router.refresh() }
+    // Close on success (same stuck-"Scheduling…" trap as AcceptSnagCard).
+    try { await transition(ticketId, { action: 'schedule', scheduledAt: iso, technicianId: techId || null }); setOpen(false); setPendingIso(null); setBusy(false); router.refresh() }
     catch (e) { setErr(errMsg(e)); setBusy(false) }
   }
   function confirm(iso: string) {

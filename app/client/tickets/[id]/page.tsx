@@ -15,8 +15,8 @@ import { TicketBadges } from '@/components/client/ticketBadges'
 import { ChatFab } from '@/components/chat/TicketChat'
 import { chatUnreadCounts, smChatAdded } from '@/lib/chat-unread'
 import { EditedLine } from '@/components/ui/EditedLine'
-import { buildTicketTimeline, filterTimelineForSm } from '@/lib/ticket-timeline'
-import { formatDateTime, clientVisibleStatus, PRIORITY_LEVEL_LABELS, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
+import { buildTicketTimeline, filterTimelineForSm, smFriendlyLabel } from '@/lib/ticket-timeline'
+import { formatDateTime, clientVisibleStatus, storeLabel, PRIORITY_LEVEL_LABELS, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
 import type { StoreManagerTicket } from '@/lib/health/data'
 import type { TicketStatus } from '@/lib/types'
 import type { Database } from '@/lib/database.types'
@@ -56,7 +56,7 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
   // Editor names for the description "edited" line + the per-edit timeline events —
   // one lookup covering the single-slot editor and every ticket_edits editor.
   const editorIds = [...new Set([t.edited_by, ...(editRows ?? []).map(e => e.editor_id)])].filter((x): x is string => !!x)
-  const [editorNames, visitSupplier, visitTech, signedPhotoUrls, signedDocUrls, chatAddedSet, chatCounts] = await Promise.all([
+  const [editorNames, visitSupplier, visitTech, signedPhotoUrls, signedDocUrls, chatAddedSet, chatCounts, smStoreName, awardedSupplierName] = await Promise.all([
     editorIds.length
       ? admin.from('user_profiles').select('id, full_name').in('id', editorIds).then(r => new Map<string, string | null>((r.data ?? []).map(p => [p.id, p.full_name])))
       : new Map<string, string | null>(),
@@ -67,6 +67,10 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
     // Ticket chat: entry points only once a supplier is awarded AND the RM added the SM.
     t.supplier_id ? smChatAdded(admin, [t.id]) : new Set<string>(),
     t.supplier_id ? chatUnreadCounts(admin, userId, [t.id], { smViewer: true }) : ({} as Record<string, number>),
+    // Store label for the info-requested review sheet (store_id is non-null here — the guard above matched it).
+    admin.from('stores').select('name, sub_store').eq('id', t.store_id ?? '').maybeSingle().then(r => (r.data ? storeLabel(r.data.name, r.data.sub_store) : null)),
+    // Awarded supplier's trade name — names the supplier on the timeline (unconditional, unlike visitSupplier).
+    t.supplier_id ? admin.from('suppliers').select('company_name').eq('id', t.supplier_id).single().then(r => r.data?.company_name ?? null) : null,
   ])
   const chatAdded = !!t.supplier_id && chatAddedSet.has(t.id)
   const editorName = t.edited_by ? (editorNames.get(t.edited_by) ?? null) : null
@@ -114,8 +118,12 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
     quotes: quoteRows ?? [],
     variations: variationRows ?? [],
     signoffs: signoffRows ?? [],
+    // Supplier progress notes now surface in the Timeline (the Activity tab is gone).
+    updates: (updates ?? []) as { body: string; author_role: string | null; created_at: string }[],
   })
-  const smTimeline = filterTimelineForSm(events)
+  // Client-side voice: RM reads "the regional manager", the SM's own actions read
+  // "you", the awarded supplier is named. Actor baked in → the "who" line drops.
+  const smTimeline = filterTimelineForSm(events).map(e => ({ ...e, label: smFriendlyLabel(e, { supplierName: awardedSupplierName }), who: null }))
 
   return (
     <div className="space-y-4">
@@ -152,7 +160,7 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
             </div>
           )}
           {t.status === 'info_requested' ? (
-            <ClientTicketActions ticketId={t.id} title={t.title} description={t.description ?? ''} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} photoUrls={photoUrlsRaw} docUrls={docUrlsRaw} requestReason={t.info_request_reason} smAdded={chatAdded} mode="add_info" />
+            <ClientTicketActions ticketId={t.id} title={t.title} description={t.description ?? ''} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} photoUrls={photoUrlsRaw} docUrls={docUrlsRaw} requestReason={t.info_request_reason} smAdded={chatAdded} mode="add_info" jobRef={t.job_ref} priority={String(t.priority)} storeName={smStoreName} createdAt={t.created_at} signedPhotoUrls={signedPhotoUrls} />
           ) : canEdit ? (
             <ClientTicketActions ticketId={t.id} title={t.title} description={t.description ?? ''} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} photoUrls={photoUrlsRaw} smAdded={chatAdded} />
           ) : (
@@ -173,7 +181,6 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
             <div>
               <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Description</div>
               <p className="text-sm text-[var(--text)] mt-0.5 whitespace-pre-line break-words">{t.description}</p>
-              <EditedLine at={t.edited_at} by={editorName} />
             </div>
             {(showVisit || showFollowUp) && <InfoRow label="Assigned supplier" value={visitSupplier ?? 'Assigned supplier'} />}
             {showVisit && t.scheduled_at && !showFollowUp && (
@@ -181,13 +188,14 @@ export default async function StoreTicketDetailPage(props: { params: Promise<{ i
             )}
             {showFollowUp && followUp && <InfoRow label="Follow-up visit" value={formatDateTime(followUp.scheduled_at)} />}
             {!showVisit && !showFollowUp && active && <InfoRow label="Assigned supplier" value="Awaiting assignment" />}
+            {/* "Last edited" sits as the final row of the information block. */}
+            <EditedLine at={t.edited_at} by={editorName} />
           </div>
         </Card>
       </div>
 
-      {/* Photos + documents · Activity · Timeline (audit trail). */}
-      {/* body is never null on a real update row — narrow cast so the tabs' Update props typecheck. */}
-      <SmTicketTabs photoUrls={signedPhotoUrls} docUrls={signedDocUrls} ticketId={t.id} updates={(updates ?? []) as { body: string; author_role: string | null; created_at: string }[]} timeline={smTimeline} />
+      {/* Photos + documents · Timeline (audit trail; supplier updates fold into it). */}
+      <SmTicketTabs photoUrls={signedPhotoUrls} docUrls={signedDocUrls} ticketId={t.id} timeline={smTimeline} />
 
       {/* Floating chat entry — only once the RM has added the SM to this ticket's chat. */}
       {chatAdded && <ChatFab ticketId={t.id} viewerRole="store_manager" unreadCount={chatCounts[t.id] ?? 0} />}

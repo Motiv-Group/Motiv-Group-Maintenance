@@ -36,7 +36,9 @@ export default function LogTicketPage() {
       subtitle="A few quick steps and we’ll take it from there."
       backHref="/client/tickets"
       backLabel="Back to tickets"
-      redirectHref="/client/tickets"
+      // On submit the SM lands back on the Today page (/client) so the new ticket
+      // appears in place via router.refresh() — not the ticket list/detail.
+      redirectHref="/client"
       submitLabel="Submit Ticket"
       contextRow={{ label: 'Store', value: storeName ?? 'Your assigned store' }}
       urgencyHint="Pick the impact on trading — this sets the priority."
