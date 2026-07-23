@@ -39,12 +39,17 @@ export function CompanyAvatar({ name, logoUrl, size = 40, className = '' }: {
   className?: string
 }) {
   const [broken, setBroken] = useState(false)
+  const [seenUrl, setSeenUrl] = useState(logoUrl)
   const imgRef = useRef<HTMLImageElement>(null)
-  // Reset on URL change (admin re-uploads a working logo), and catch the case
-  // where the image already failed before React attached onError (hydration
-  // race): a complete img with zero natural size means it errored.
-  useEffect(() => {
+  // Reset when the URL changes (admin re-uploads a working logo) — the
+  // render-phase "adjust state on prop change" pattern, so no effect fires.
+  if (logoUrl !== seenUrl) {
+    setSeenUrl(logoUrl)
     setBroken(false)
+  }
+  // Catch the hydration race where the <img> errored before React attached
+  // onError: a complete image with zero natural size failed to decode.
+  useEffect(() => {
     const el = imgRef.current
     if (el && el.complete && el.naturalWidth === 0) setBroken(true)
   }, [logoUrl])
