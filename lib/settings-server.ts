@@ -3,11 +3,13 @@
 // client code instead — this file pulls in next/headers via the Supabase client.
 
 import { cache } from 'react'
+import { unstable_cache, revalidateTag } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
 import type { Json } from '@/lib/database.types'
 import { AppSettings, DEFAULT_SETTINGS, EmailOverrides, LogoLayout, normaliseSettings } from '@/lib/settings'
 
 const KEY = 'app'
+const SETTINGS_TAG = 'app-settings'
 
 async function loadFresh(): Promise<AppSettings> {
   try {
@@ -20,8 +22,18 @@ async function loadFresh(): Promise<AppSettings> {
   }
 }
 
-/** Per-request memoised read — the root layout + pages can all call this freely. */
-export const getAppSettings = cache(loadFresh)
+// Cross-request cache: branding is read on EVERY page's root layout, so a fresh
+// (cross-region) Supabase round trip per SSR sits on the critical path of first
+// byte. Cache the result in Next's data cache and bust it on save so admin
+// branding edits still apply immediately. `cache()` then memoises within a
+// single request so layout + pages share one read.
+const loadCached = unstable_cache(loadFresh, ['app-settings'], {
+  tags: [SETTINGS_TAG],
+  revalidate: 3600, // safety refresh; explicit revalidateTag on save is the real path
+})
+
+/** Cross-request cached read — the root layout + pages can all call this freely. */
+export const getAppSettings = cache(loadCached)
 
 /** Patch + persist. Returns the normalised result. Throws on DB failure. Top-level
  *  keys are shallow-merged; `logo` is deep-merged so a partial logo patch keeps the
@@ -45,5 +57,6 @@ export async function saveAppSettings(
     // implicit index signature the generated Json column type requires.
     .upsert({ key: KEY, value: next as unknown as Json, updated_at: new Date().toISOString() }, { onConflict: 'key' })
   if (error) throw new Error(`app_settings save failed: ${error.message}`)
+  revalidateTag(SETTINGS_TAG, { expire: 0 }) // immediate purge → new branding shows on the next request
   return next
 }
