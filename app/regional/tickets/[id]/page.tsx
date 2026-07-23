@@ -3,13 +3,13 @@ export const dynamic = 'force-dynamic'
 import { redirect } from 'next/navigation'
 import { BackLink } from '@/components/ui/BackLink'
 import { CheckCircle2, FileText, Calendar, Clock, MessageSquare, Camera } from 'lucide-react'
-import { ChatFab, TicketChatIcon } from '@/components/chat/TicketChat'
+import { ChatFab, TicketChatInline } from '@/components/chat/TicketChat'
 import { BreachReason } from '@/components/workflow/BreachReason'
 import { QuoteSummary } from '@/components/workflow/QuoteSummary'
 import { Card } from '@/components/exec/ui'
 import { WorkflowActions } from '@/components/workflow/WorkflowActions'
 import { RmPipeline } from '@/components/regional/RmPipeline'
-import { RmQuotePanel, RmReviewPanel, ReQuoteButton, AcceptScheduleCard, AcceptSnagScheduleCard, VariationReviewCard, CloseOutButton, RmTicketActionBar, RmCompletionReview } from '@/components/regional/RmTicketActions'
+import { RmQuotePanel, RmReviewPanel, ReQuoteButton, AcceptScheduleCard, AcceptSnagScheduleCard, VoReviewBar, CloseOutBar, RmTicketActionBar, RmCompletionReview } from '@/components/regional/RmTicketActions'
 import { CompletionFooterNote } from '@/components/workflow/CompletionBody'
 import { ArchiveGroup } from '@/components/ticket/ArchiveGroup'
 import { SignoffCard } from '@/components/ticket/SignoffCard'
@@ -22,6 +22,7 @@ import { MarkTicketSeen } from '@/components/ui/MarkTicketSeen'
 import { DisputeThread, DisputeControls } from '@/components/dispute/DisputeBox'
 import { formatCurrency, formatDateTime, rmStatusMeta, OPERATIONAL_IMPACT_LABELS, humanizeDuration } from '@/lib/utils'
 import { loadRegionalTicketDetail, SNAG_WAIT_MSG } from '@/lib/ticket-detail/regional'
+import { quoteLabel, progressPhotoLabel, variationAttachmentLabel } from '@/lib/attachment-labels'
 
 function DetailItem({ label, value }: { label: string; value: string }) {
   return (
@@ -45,6 +46,7 @@ type DeclinedQuote = {
   createdAt: string
   declinedAt: string | null
   declineReason: string | null
+  quoteRef: string | null
 }
 function RmDeclinedQuoteCard({ q, ticketId, canReQuote, open = false }: { q: DeclinedQuote; ticketId: string; canReQuote: boolean; open?: boolean }) {
   return (
@@ -70,6 +72,7 @@ function RmDeclinedQuoteCard({ q, ticketId, canReQuote, open = false }: { q: Dec
           <DetailItem label="Incl. VAT" value={q.amountInclVat ? formatCurrency(q.amountInclVat) : '—'} />
           <DetailItem label="Received" value={formatDateTime(q.createdAt)} />
           <DetailItem label="Declined" value={q.declinedAt ? formatDateTime(q.declinedAt) : '—'} />
+          {q.quoteRef && <DetailItem label="Reference" value={q.quoteRef} />}
         </div>
         {q.description && (
           <div>
@@ -82,7 +85,7 @@ function RmDeclinedQuoteCard({ q, ticketId, canReQuote, open = false }: { q: Dec
         {(q.fileUrl || canReQuote) && (
           <div className="flex items-center justify-between gap-2 pt-1">
             {q.fileUrl
-              ? <ViewTrackedLink ticketId={ticketId} itemType="quote" itemLabel={`the declined quote (${q.supplierName})`} href={q.fileUrl} className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-500 hover:underline"><FileText size={14} /> View attached quote</ViewTrackedLink>
+              ? <ViewTrackedLink ticketId={ticketId} itemType="quote" itemLabel={quoteLabel(q.supplierName, q.quoteRef)} href={q.fileUrl} className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-500 hover:underline"><FileText size={14} /> View attached quote</ViewTrackedLink>
               : <span />}
             {canReQuote && <ReQuoteButton ticketId={ticketId} quoteId={q.id} />}
           </div>
@@ -107,7 +110,7 @@ function SupplierUpdateItem({ u, ticketId, isNew = false }: { u: { body: string;
         <span className="text-[11px] text-[var(--text-faint)]">{formatDateTime(u.created_at)}</span>
       </div>
       {photo
-        ? <ViewTrackedLink ticketId={ticketId} itemType="photo" itemLabel="Supplier progress photo" href={photo[1]} className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-500 hover:underline"><Camera size={14} /> View progress photo</ViewTrackedLink>
+        ? <ViewTrackedLink ticketId={ticketId} itemType="photo" itemLabel={progressPhotoLabel(1)} href={photo[1]} className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-500 hover:underline"><Camera size={14} /> View progress photo</ViewTrackedLink>
         : <p className="text-sm text-[var(--text)] whitespace-pre-line">{u.body}</p>}
     </li>
   )
@@ -158,7 +161,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
   // "History" tab content — everything archived (superseded / not-selected quotes,
   // declined quote requests, sent-back submissions, a declined snag-fix date),
   // grouped and labelled. Rendered inside the bottom tabbed card.
-  const hasHistory = archivedDeclinedQuotes.length > 0 || archivedRequestDeclines.length > 0 || closedWaitingRows.length > 0 || supersededSubmissions.length > 0 || !!declinedSnag || (variations ?? []).length > 0
+  const hasHistory = archivedDeclinedQuotes.length > 0 || archivedRequestDeclines.length > 0 || closedWaitingRows.length > 0 || supersededSubmissions.length > 0 || !!declinedSnag
   const historyContent = hasHistory ? (
     <div className="space-y-4">
       {archivedDeclinedQuotes.length > 0 && (
@@ -234,50 +237,55 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
           </details>
         </ArchiveGroup>
       )}
-      {(variations ?? []).length > 0 && (
-        <ArchiveGroup label="Variation orders">
-          {(variations ?? []).map((v, i) => {
-            const meta = v.status === 'approved' ? { l: 'VO accepted', c: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' }
-              : v.status === 'rejected' ? { l: 'VO rejected', c: 'bg-red-500/15 text-red-700 dark:text-red-400' }
-              : { l: 'Pending', c: 'bg-amber-500/15 text-amber-700 dark:text-amber-400' }
-            return (
-              <details key={i} className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
-                <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
-                  <span className="text-sm font-semibold text-[var(--text)] min-w-0 truncate">Variation order {i + 1}</span>
-                  <span className="flex items-center gap-2 shrink-0">
-                    {v.amount != null && <span className="text-sm text-[var(--text)] tabular-nums">{formatCurrency(v.amount)}</span>}
-                    <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 ${meta.c}`}>{meta.l}</span>
-                  </span>
-                </summary>
-                <div className="border-t border-[var(--border)] p-4 space-y-2">
-                  <p className="text-sm text-[var(--text)] whitespace-pre-line">{v.description}</p>
-                  {v.warranty && <p className="text-[13px] text-[var(--text-muted)]"><span className="font-medium text-[var(--text)]">Warranty:</span> {v.warranty}</p>}
-                  {v.reject_reason && (
-                    <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3">
-                      <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Decline reason</p>
-                      <p className="text-sm text-[var(--text)]">{v.reject_reason}</p>
-                    </div>
-                  )}
-                  {Array.isArray(v.file_urls) && v.file_urls.length > 0 && (
-                    <div className="flex flex-wrap gap-x-3 gap-y-1 pt-1">
-                      {v.file_urls.map((u: string, j: number) => (
-                        <ViewTrackedLink key={j} ticketId={t.id} itemType="attachment" itemLabel={`Variation order ${i + 1} attachment ${j + 1}`} href={u} className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"><FileText size={14} /> Attachment {j + 1}</ViewTrackedLink>
-                      ))}
-                    </div>
-                  )}
-                  <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(v.created_at)}</p>
-                </div>
-              </details>
-            )
-          })}
-        </ArchiveGroup>
-      )}
     </div>
   ) : null
 
-  // "Documents" tab — every document (PDF) on the ticket in one place: the approved
-  // quote, the COC & invoice, and any variation-order attachments. Photos have their
-  // own tab; a few docs also stay in their in-context cards (same pattern as photos).
+  // "Variation orders" tab — every VO on the ticket as a collapsible card (amount,
+  // status chip, description, warranty, decline reason, attachments). The pending
+  // VO's approve/decline controls stay in the Next action block above.
+  const variationsContent = (variations ?? []).length > 0 ? (
+    <div className="space-y-2">
+      {(variations ?? []).map((v, i) => {
+        const meta = v.status === 'approved' ? { l: 'Accepted', c: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' }
+          : v.status === 'rejected' ? { l: 'Declined', c: 'bg-red-500/15 text-red-700 dark:text-red-400' }
+          : { l: 'Pending', c: 'bg-amber-500/15 text-amber-700 dark:text-amber-400' }
+        return (
+          <details key={i} className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
+            <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
+              <span className="text-sm font-semibold text-[var(--text)] min-w-0 truncate">Variation order {i + 1}</span>
+              <span className="flex items-center gap-2 shrink-0">
+                {v.amount != null && <span className="text-sm text-[var(--text)] tabular-nums">{formatCurrency(v.amount)}</span>}
+                <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 ${meta.c}`}>{meta.l}</span>
+              </span>
+            </summary>
+            <div className="border-t border-[var(--border)] p-4 space-y-2">
+              <p className="text-sm text-[var(--text)] whitespace-pre-line">{v.description}</p>
+              {v.warranty && <p className="text-[13px] text-[var(--text-muted)]"><span className="font-medium text-[var(--text)]">Warranty:</span> {v.warranty}</p>}
+              {v.reject_reason && (
+                <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Decline reason</p>
+                  <p className="text-sm text-[var(--text)]">{v.reject_reason}</p>
+                </div>
+              )}
+              {Array.isArray(v.file_urls) && v.file_urls.length > 0 && (
+                <div className="flex flex-wrap gap-x-3 gap-y-1 pt-1">
+                  {v.file_urls.map((u: string, j: number) => (
+                    <ViewTrackedLink key={j} ticketId={t.id} itemType="attachment" itemLabel={variationAttachmentLabel(j + 1, nameById.get(t.supplier_id ?? '') ?? undefined, (variations ?? []).length > 1 ? i + 1 : undefined)} href={u} className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"><FileText size={14} /> Attachment {j + 1}</ViewTrackedLink>
+                  ))}
+                </div>
+              )}
+              <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(v.created_at)}</p>
+            </div>
+          </details>
+        )
+      })}
+    </div>
+  ) : null
+
+  // "Documents" tab — every document (PDF) on the ticket in one place: the ticket's
+  // own attachments, the approved quote, the COC & invoice, and any variation-order
+  // attachments. Photos have their own tab; a few docs also stay in their in-context
+  // cards (same pattern as photos).
   const documentsContent = documentLinks.length > 0 ? (
     <ul className="space-y-2">
       {documentLinks.map((d, i) => (
@@ -300,7 +308,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
         const isApproved = acceptedQuoteIds.has(q.id)
         return (
           <QuoteSummary key={q.id} title={q.supplierName ?? 'Supplier'} status={isApproved ? 'accepted' : 'pending'} collapsible ticketId={t.id}
-            quote={{ id: q.id, supplierName: q.supplierName, amount: q.amount, amountInclVat: q.amountInclVat ?? null, description: q.description ?? null, fileUrl: q.fileUrl ?? null, validUntil: q.validUntil ?? null, createdAt: q.createdAt }}
+            quote={{ id: q.id, supplierName: q.supplierName, amount: q.amount, amountInclVat: q.amountInclVat ?? null, description: q.description ?? null, fileUrl: q.fileUrl ?? null, validUntil: q.validUntil ?? null, createdAt: q.createdAt, quoteRef: q.quoteRef ?? null }}
             schedule={q.proposedScheduleAt ? { at: q.proposedScheduleAt, proposed: true, audience: 'rm' } : null} />
         )
       })}
@@ -329,32 +337,19 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
     body: <AcceptSnagScheduleCard ticketId={t.id} scheduledAt={latestSnag.scheduled_at} />,
   }] : []
 
-  const voReviewItems = (t.status === 'variation_review' && pendingVariation) ? [{
-    id: 'vo-review',
-    dot: 'bg-amber-500',
-    title: 'Variation order',
-    subtitle: pendingVariation.amount != null ? formatCurrency(pendingVariation.amount) : 'Extra work',
-    statusLabel: 'Awaiting your approval',
-    statusCls: 'text-amber-700 dark:text-amber-400',
-    modalTitle: 'Variation order — review',
-    body: (
-      <div className="space-y-4">
-        <div className="rounded-xl ring-1 ring-[var(--border)] p-4 space-y-2">
-          <p className="text-sm text-[var(--text)] whitespace-pre-line">{pendingVariation.description}</p>
-          {pendingVariation.warranty && <p className="text-[13px] text-[var(--text-muted)]"><span className="font-medium text-[var(--text)]">Warranty:</span> {pendingVariation.warranty}</p>}
-          {pendingVariation.amount != null && <p className="text-[13px] text-[var(--text-muted)]"><span className="font-medium text-[var(--text)]">Amount:</span> {formatCurrency(pendingVariation.amount)}</p>}
-          {Array.isArray(pendingVariation.file_urls) && pendingVariation.file_urls.length > 0 && (
-            <div className="flex flex-wrap gap-x-3 gap-y-1 pt-1">
-              {pendingVariation.file_urls.map((u: string, j: number) => (
-                <ViewTrackedLink key={j} ticketId={t.id} itemType="attachment" itemLabel={`Variation order attachment ${j + 1}`} href={u} className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"><FileText size={14} /> Attachment {j + 1}</ViewTrackedLink>
-              ))}
-            </div>
-          )}
-        </div>
-        <VariationReviewCard ticketId={t.id} />
-      </div>
-    ),
-  }] : []
+  // Close-out area (Final close-out + its "More" menu) shows for these two
+  // statuses — the standalone chat entry below then stays hidden.
+  const showCloseOut = t.status === 'approved_closeout' || t.status === 'vo_declined'
+
+  // VO review area ("View VO & approve" + its "More" menu) shows while a pending
+  // VO awaits the RM — the standalone chat entry below then stays hidden.
+  const showVoReview = t.status === 'variation_review' && !!pendingVariation
+
+  // Scheduled-visit + snag-fix dates are execution-phase info. Once the COC is
+  // approved (approved_closeout and everything past it — VO review, vo_declined,
+  // completed) the work is done and signed off, so those dates are stale history and
+  // drop out of the Ticket-information card.
+  const scheduleInfoRelevant = !['approved_closeout', 'variation_review', 'vo_declined', 'completed'].includes(t.status)
 
   return (
     <div className="space-y-5">
@@ -386,7 +381,6 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
                 return <span className={`inline-flex w-auto justify-center whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-bold sm:w-[120px] ${cls}`}>{label}</span>
               })()}
             </div>
-            {t.supplier_id && <TicketChatIcon ticketId={t.id} viewerRole="regional_manager" unread={chatUnread} />}
           </div>
         </div>
 
@@ -409,14 +403,7 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
         {/* Open dispute — the resolve controls live here; the chat is in the Dispute tab.
             A quote-decline dispute is thread-only (nothing pauses — the decline stands
             unless retracted); workflow disputes pause the disputed step. */}
-        {openDispute && (
-          <div className="space-y-2.5">
-            <p className="text-sm text-[var(--text-muted)]">{openDispute.origin === 'quote_declined'
-              ? 'A supplier disputed your quote decline — the decision stands unless you retract it.'
-              : 'This step is paused while the dispute is reviewed.'} Resolve it here, or continue the conversation in the <span className="font-semibold text-[var(--text)]">Dispute</span> tab.</p>
-            <DisputeControls ticketId={t.id} origin={openDispute.origin} viewerRole="regional_manager" pendingOutcome={openDispute.pending_outcome ?? null} pendingBy={openDispute.pending_by ?? null} />
-          </div>
-        )}
+        {openDispute && <DisputeControls ticketId={t.id} origin={openDispute.origin} viewerRole="regional_manager" pendingOutcome={openDispute.pending_outcome ?? null} pendingBy={openDispute.pending_by ?? null} />}
 
         {/* SLA breach — concise callout carrying how-late + the next action. */}
         {breached && <BreachReason action={nextAction.sub || nextAction.msg || 'This ticket is overdue — take the next action to get it back on track.'} dueAt={sla.nextActionDueAt} nowMs={now.getTime()} />}
@@ -457,10 +444,10 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
             (menu-only) so the chat entry point remains reachable.
             It's a client component so its per-action trigger render-props are created
             client-side (a Server Component can't pass functions to Client Components). */}
-        {!isTerminal && (canAssign || canCancel || !!t.supplier_id) && (
+        {!isTerminal && (canAssign || canCancel) && (
           <RmTicketActionBar ticketId={t.id} status={t.status} canAssign={canAssign} canAssignSupplier={canAssignSupplier} canCancel={canCancel} canEdit={canEdit} hasSupplier={!!t.supplier_id} jobRef={t.job_ref}
             suppliers={supplierList} motivSuppliers={motivSupplierList} motivAccess={motivAccess} declinedSupplierIds={declinedSupplierIds} awaitingById={engagedSupplierIds}
-            description={t.description ?? ''} photoUrls={Array.isArray(t.photo_urls) ? t.photo_urls : []} title={t.title} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} priority={t.priority} />
+            description={t.description ?? ''} photoUrls={Array.isArray(t.photo_urls) ? t.photo_urls : []} docUrls={Array.isArray(t.info_doc_urls) ? t.info_doc_urls : []} title={t.title} category={t.category ?? 'General'} impact={t.operational_impact ?? 'none'} priority={t.priority} />
         )}
 
         {/* Completion (COC & POC) submitted → inline summary + Approve completion,
@@ -472,13 +459,16 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
             docCount={(reviewSignoff.coc_url ? 1 : 0) + (reviewSignoff.invoice_url ? 1 : 0)}
             noteCount={reviewSignoff.notes && String(reviewSignoff.notes).trim() ? 1 : 0}
             beforeUrls={reviewSignoff.before_urls ?? []} afterUrls={reviewSignoff.after_urls ?? []}
-            cocUrl={reviewSignoff.coc_url ?? null} invoiceUrl={reviewSignoff.invoice_url ?? null} notes={reviewSignoff.notes ?? null} />
+            cocUrl={reviewSignoff.coc_url ?? null} invoiceUrl={reviewSignoff.invoice_url ?? null} notes={reviewSignoff.notes ?? null}
+            supplierName={nameById.get(t.supplier_id ?? '') ?? 'Supplier'} jobRef={t.job_ref ?? null} storeName={storeName ?? null} category={t.category ?? null} />
         )}
 
         {t.status === 'scheduled' && t.schedule_status === 'proposed' && t.scheduled_at && <AcceptScheduleCard ticketId={t.id} scheduledAt={t.scheduled_at} />}
 
-        {/* Variation order awaiting approval — compact row → pop-up (approve/decline). */}
-        <RmReviewPanel heading="Variation order" items={voReviewItems} />
+        {/* Variation order awaiting approval — "View VO & approve" opens the SAME
+            review pop-up as the Today queue (it fetches the pending VO itself);
+            the chat entry lives in the bar's "More" menu. */}
+        {showVoReview && <VoReviewBar ticketId={t.id} />}
 
         {/* Quote approved / job awarded — a positive callout while we wait for the
             supplier to start (not shown while a proposed visit time needs accepting). */}
@@ -493,10 +483,15 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
           <div className="rounded-xl bg-[#f59e0b]/10 ring-1 ring-[#f59e0b]/30 p-3.5 text-sm text-[var(--text-muted)]">Work in progress — the supplier is on site or en route to attend to the job. The completion certificate and proof-of-completion photos will follow once the work is done.</div>
         )}
 
-        {(t.status === 'approved_closeout' || t.status === 'vo_declined') && (
+        {/* Final close-out area — the green summary only for a clean approval (the
+            amber "You declined the variation order…" callout above covers
+            vo_declined); the chat entry lives in the bar's "More" menu. */}
+        {showCloseOut && (
           <>
-            <div className="rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/30 p-3.5 text-sm text-[var(--text-muted)]">COC &amp; POC approved. The supplier can still raise a variation order for extra work — otherwise finalise the close-out below once they confirm there are none.</div>
-            <CloseOutButton ticketId={t.id} voConfirmed={!!t.vo_none_confirmed_at} />
+            {t.status === 'approved_closeout' && (
+              <div className="rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/30 p-3.5 text-sm text-[var(--text-muted)]">COC &amp; POC approved. The supplier can still raise a variation order for extra work — otherwise finalise the close-out below once they confirm there are none.</div>
+            )}
+            <CloseOutBar ticketId={t.id} voConfirmed={!!t.vo_none_confirmed_at} />
           </>
         )}
 
@@ -513,6 +508,13 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
           suppliers={supplierList}
           exclude={['validate', 'reject', 'request_info', 'request_quote', 'require_assessment', 'approve_quote', 'reject_quote', 'request_revision', 'proceed_no_quote', 'schedule', 'approve', 'assign_snag', 'accept_schedule', 'approve_snag', 'decline_snag_schedule', 'approve_variation', 'reject_variation', 'request_evidence', 'raise_snag', 'close_out']}
         />
+
+        {/* Chat with the supplier — only when this block has no "More" menu to fold it
+            into (no action bar, completion review, VO review or close-out area);
+            otherwise chat lives inside that menu. Also hidden while a dispute is
+            open — the dispute-resolution panel above carries its own thread, so a
+            second chat entry is clutter. */}
+        {t.supplier_id && !isTerminal && !(canAssign || canCancel) && !reviewSignoff && !showVoReview && !showCloseOut && !openDispute && <TicketChatInline ticketId={t.id} viewerRole="regional_manager" unread={chatUnread} />}
       </Card>
 
       {/* Ticket information — aligned label→value rows, then full-width description. */}
@@ -562,8 +564,9 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
           {t.edited_at && <div className="pt-1"><EditedLine at={t.edited_at} by={editorName} /></div>}
 
           {t.info_request_reason && <p className="text-xs text-amber-600 dark:text-amber-400">Info requested: {t.info_request_reason}</p>}
-          {/* Scheduled visit — hidden once a snag fix is in play (that callout replaces it). */}
-          {t.scheduled_at && !snagScheduleActive && (
+          {/* Scheduled visit — hidden once a snag fix is in play (that callout replaces
+              it), and once the COC is approved (approved_closeout+) so the stale date drops. */}
+          {t.scheduled_at && !snagScheduleActive && scheduleInfoRelevant && (
             <div className="flex items-center gap-2.5 rounded-xl bg-indigo-500/10 ring-1 ring-indigo-500/30 px-3.5 py-3">
               <Calendar size={18} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
               <div className="min-w-0">
@@ -574,8 +577,9 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
             </div>
           )}
           {/* Snag fix schedule — only shown once the RM has approved the date (replaces
-              the original Scheduled callout above). */}
-          {snagFixApproved && (
+              the original Scheduled callout above); also drops once the COC is approved
+              (approved_closeout+), when the snag date is stale history. */}
+          {snagFixApproved && scheduleInfoRelevant && (
             <div className="flex items-center gap-2.5 rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 px-3.5 py-3">
               <Calendar size={18} className="text-amber-600 dark:text-amber-400 shrink-0" />
               <div className="min-w-0">
@@ -621,10 +625,10 @@ export default async function RegionalTicketDetailPage(props: { params: Promise<
           row → full detail + actions); its files are also in the Documents/Photos tabs. */}
       {/* Photos · Activity (supplier updates) · Timeline (the full audit trail —
           status changes, edits, attachments/photos viewed, quotes, sign-offs …). */}
-      <RmTicketTabs ticketId={t.id} photoGroups={photoGroups} updates={supplierUpdates} timeline={timelineItems} documents={documentsContent} quotes={quotesContent} completion={completionContent} dispute={disputeContent} history={historyContent}
+      <RmTicketTabs ticketId={t.id} photoGroups={photoGroups} timeline={timelineItems} documents={documentsContent} quotes={quotesContent} completion={completionContent} variations={variationsContent} dispute={disputeContent} history={historyContent}
         defaultTab={
           openDispute ? 'dispute'
-          : completionContent && ['submitted_for_signoff', 'approved_closeout', 'completed'].includes(t.status) ? 'completion'
+          : completionContent && ['submitted_for_signoff', 'approved_closeout', 'completed', 'snag', 'snag_assigned', 'snag_in_progress', 'snag_resolved'].includes(t.status) ? 'completion'
           : quotesContent && (t.status === 'quoted' || reviewQuotes.length > 0) ? 'quotes'
           : undefined
         } />

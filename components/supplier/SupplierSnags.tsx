@@ -117,7 +117,7 @@ export function SupplierSnags({ snags, company, generatedAt }: { snags: Supplier
 
       {helpOpen && (
         <Card className="p-4 text-sm text-[var(--text-muted)]">
-          <p>When the regional manager isn&apos;t satisfied with a completion they raise a <span className="font-semibold text-amber-600 dark:text-amber-400">snag</span>. Accept it and schedule the corrective work, then re-submit — or, if you disagree, <span className="font-semibold text-violet-600 dark:text-violet-400">raise a dispute</span>. Once the fix is signed off the snag is <span className="font-semibold text-emerald-600 dark:text-emerald-400">resolved</span>.</p>
+          <p>When the client isn&apos;t satisfied with a completion they raise a <span className="font-semibold text-amber-600 dark:text-amber-400">snag</span>. Accept it and schedule the corrective work, then re-submit — or, if you disagree, <span className="font-semibold text-violet-600 dark:text-violet-400">raise a dispute</span>. Once the fix is signed off the snag is <span className="font-semibold text-emerald-600 dark:text-emerald-400">resolved</span>.</p>
         </Card>
       )}
 

@@ -4,6 +4,7 @@ import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Camera, Trash2 } from 'lucide-react'
 import { UserAvatar } from '@/components/ui/UserAvatar'
+import { useFileDrop } from '@/components/ui/useFileDrop'
 import { errMsg } from '@/components/ui/errMsg'
 
 // Change/remove the signed-in user's profile picture. Shown at the top of
@@ -30,6 +31,11 @@ export function AvatarUpload({ name, avatarUrl }: { name: string | null; avatarU
     } catch (e) { setErr(errMsg(e)) } finally { setBusy(false) }
   }
 
+  // Route both the <input> picker and drag-and-drop through the same upload path.
+  function addFiles(files: File[]) { upload(files[0]) }
+
+  const { isDragging, dropProps } = useFileDrop({ onFiles: addFiles, accept: 'image/*', multiple: false, disabled: busy })
+
   async function remove() {
     setBusy(true); setErr('')
     try {
@@ -40,7 +46,7 @@ export function AvatarUpload({ name, avatarUrl }: { name: string | null; avatarU
   }
 
   return (
-    <div className="flex items-center gap-4">
+    <div {...dropProps} className={`flex items-center gap-4 rounded-2xl transition ${isDragging ? 'ring-2 ring-blue-500 bg-blue-500/5' : ''}`}>
       <UserAvatar name={name} avatarUrl={url} size={64} className="ring-1 ring-[var(--border)]" />
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
@@ -54,9 +60,9 @@ export function AvatarUpload({ name, avatarUrl }: { name: string | null; avatarU
               <Trash2 size={15} /> Remove
             </button>
           )}
-          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={e => { upload(e.target.files?.[0]); e.target.value = '' }} />
+          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={e => { addFiles(Array.from(e.target.files ?? [])); e.target.value = '' }} />
         </div>
-        <p className="mt-1 text-[11px] text-[var(--text-faint)]">PNG, JPEG or WebP · up to 8MB · squared automatically.</p>
+        <p className="mt-1 text-[11px] text-[var(--text-faint)]">{isDragging ? 'Drop image here…' : 'PNG, JPEG or WebP · up to 8MB · squared automatically.'}</p>
         {err && <p className="mt-1 text-xs text-red-500">{err}</p>}
       </div>
     </div>

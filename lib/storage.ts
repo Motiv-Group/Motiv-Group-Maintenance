@@ -41,6 +41,30 @@ export async function signedUrl(stored: string | null | undefined, ttlSeconds = 
   }
 }
 
+/** Server-only: download the RAW bytes of a private object (for bundling the
+ *  original file into a ZIP). Returns null on any failure so one bad file can't
+ *  break the whole export. */
+export async function downloadStorageObject(stored: string | null | undefined): Promise<{ bytes: Buffer; contentType: string } | null> {
+  const bp = bucketAndPath(stored ?? '')
+  if (!bp) return null
+  try {
+    const admin = createAdminClient()
+    const { data, error } = await admin.storage.from(bp.bucket).download(bp.path)
+    if (error || !data) return null
+    return { bytes: Buffer.from(await data.arrayBuffer()), contentType: data.type || 'application/octet-stream' }
+  } catch {
+    return null
+  }
+}
+
+/** The file extension (lowercase, no dot) from a stored path/URL, or 'bin'. */
+export function extOf(stored: string): string {
+  const bp = bucketAndPath(stored)
+  const p = bp?.path ?? stored
+  const m = p.match(/\.([a-z0-9]{1,5})(?:\?|$)/i)
+  return m ? m[1].toLowerCase() : 'bin'
+}
+
 /** Batch variant — signs a list, preserving order, dropping nulls.
  *  Uses ONE createSignedUrls storage API call per bucket (instead of one round
  *  trip per file), which matters on detail pages signing 10-20 URLs. Falls back

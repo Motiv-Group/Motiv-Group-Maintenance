@@ -103,7 +103,7 @@ export function SupplierReviews({ reviews, now }: { reviews: SupplierReview[]; n
         <div>
           <Link href="/supplier" className="mb-1 inline-flex items-center gap-1.5 text-sm text-[var(--text-muted)] transition hover:text-[var(--text)]"><ArrowLeft size={15} /> Back to dashboard</Link>
           <h1 className="text-2xl font-bold text-[var(--text)]">My Reviews</h1>
-          <p className="mt-0.5 text-sm text-[var(--text-muted)]">See feedback from store and regional managers for your completed work.</p>
+          <p className="mt-0.5 text-sm text-[var(--text-muted)]">See feedback from your clients for your completed work.</p>
         </div>
       </div>
 
@@ -170,7 +170,7 @@ export function SupplierReviews({ reviews, now }: { reviews: SupplierReview[]; n
 
           <div className="flex items-start gap-2.5 rounded-xl bg-blue-500/10 ring-1 ring-blue-500/25 px-3.5 py-3">
             <Info size={16} className="mt-0.5 shrink-0 text-blue-600 dark:text-blue-400" />
-            <p className="text-sm text-[var(--text-muted)]">Reviews are written by the store and regional managers after they sign off your completed jobs. You can&apos;t edit or remove them.</p>
+            <p className="text-sm text-[var(--text-muted)]">Reviews are written by your clients after they sign off your completed jobs. You can&apos;t edit or remove them.</p>
           </div>
 
           {pageRows.length ? (

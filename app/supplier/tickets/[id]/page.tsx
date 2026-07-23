@@ -1,30 +1,36 @@
 export const dynamic = 'force-dynamic'
 
 import { redirect } from 'next/navigation'
-import { ClipboardCheck, FileText, Calendar, Clock, CheckCircle2, Info } from 'lucide-react'
+import { ClipboardCheck, FileText, Calendar, ChevronDown, Clock, CheckCircle2, Info, Download } from 'lucide-react'
 import { SubmitCompletionForm } from '@/components/supplier/SubmitCompletionForm'
 import { BackLink } from '@/components/ui/BackLink'
+import { MarkTicketSeen } from '@/components/ui/MarkTicketSeen'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { PhotoThumbs } from '@/components/ui/PhotoThumbs'
-import { ChatFab, TicketChatIcon } from '@/components/chat/TicketChat'
+import { ChatFab } from '@/components/chat/TicketChat'
 import { BreachReason } from '@/components/workflow/BreachReason'
 import { Card } from '@/components/exec/ui'
 import { WorkflowActions } from '@/components/workflow/WorkflowActions'
 import { RmPipeline } from '@/components/regional/RmPipeline'
-import { SupplierAttachments } from '@/components/workflow/SupplierAttachments'
 import { CompletionFooterNote } from '@/components/workflow/CompletionBody'
 import { QuoteSummary } from '@/components/workflow/QuoteSummary'
 import { ArchiveGroup } from '@/components/ticket/ArchiveGroup'
 import { SignoffCard } from '@/components/ticket/SignoffCard'
-import { MarkInProgressButton, DeclineWorkButton, AcceptSnagCard, StartSnagButton, SupplierVariationGate, SupplierQuoteBar, SupplierQuoteSubmittedActions } from '@/components/supplier/SupplierJobActions'
+import { MarkInProgressButton, DeclineWorkButton, AcceptSnagCard, SnagRescheduleCta, StartSnagButton, SupplierVariationGate, SupplierQuoteBar, SupplierQuoteSubmittedActions, UpdateSnagScheduleCta } from '@/components/supplier/SupplierJobActions'
 import { PopupForm } from '@/components/supplier/PopupForm'
-import { RaiseDisputeButton, RaiseDisputeMore, DisputeThread, DisputeControls } from '@/components/dispute/DisputeBox'
+import { RaiseDisputeMore, DisputeThread, DisputeControls } from '@/components/dispute/DisputeBox'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { EditedLine } from '@/components/ui/EditedLine'
 import { TicketTimeline } from '@/components/ui/TicketTimeline'
 import { DetailTabs } from '@/components/ui/DetailTabs'
 import { formatCurrency, formatDateTime, supplierStatusMeta, OPERATIONAL_IMPACT_LABELS } from '@/lib/utils'
+import { ticketDocLabel, ticketPhotoLabel, variationAttachmentLabel } from '@/lib/attachment-labels'
 import { loadSupplierTicketDetail } from '@/lib/ticket-detail/supplier'
+
+// Derive a readable filename from a signed document URL (mirrors the SM Documents tab).
+function docName(url: string): string {
+  try { return decodeURIComponent(url.split('?')[0].split('/').pop() || 'Document') } catch { return 'Document' }
+}
 
 export default async function SupplierTicketDetailPage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params
@@ -40,7 +46,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
     variations, variationCount, latestVoRejectReason, canDecline,
     disputes, msgsByDispute, openDispute, resolvedDisputes, disputeSubject,
     nextAction, timelineItems,
-    totalPhotos, quoteTabRows, historyDeclinedQuotes, updates, declineRows,
+    totalPhotos, infoDocUrls, quoteTabRows, historyDeclinedQuotes, declineRows,
   } = result.data
 
   // While a dispute is open the paused step's action area shows the resolve controls
@@ -52,22 +58,44 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
     </div>
   ) : null
 
+  // Approved VOs, oldest first (rows load newest-first) — shown as a summary card
+  // in the close-out gate so the supplier sees what extra work was agreed.
+  const approvedVos = variations.filter(v => v.status === 'approved').reverse()
+
+  // Once the COC is approved (close-out stage onward) the scheduled-visit / snag-fix
+  // callouts are history — hide them from the Ticket-information card.
+  const closedOut = ['approved_closeout', 'vo_declined', 'completed'].includes(t.status)
+
   // ── Lower tabbed section (mirrors the RM ticket detail). Each tab's content, or
   // null when it has nothing — DetailTabs drops the empty ones. ──────────────────
   const photosTab = totalPhotos > 0
-    ? <PhotoThumbs urls={t.photo_urls as string[]} ticketId={t.id} />
+    ? <PhotoThumbs urls={t.photo_urls as string[]} ticketId={t.id} label="Job photo" trackLabels={(t.photo_urls as string[]).map((_, i) => ticketPhotoLabel(i + 1))} />
+    : null
+  // Documents tab — the ticket's logged documents (signed). Mirrors the SM Documents
+  // tab row styling; DetailTabs drops the tab when there are none.
+  const documentsTab = infoDocUrls.length > 0
+    ? (<ul className="space-y-1">
+        {infoDocUrls.map((u, i) => (
+          <li key={i}>
+            <ViewTrackedLink ticketId={t.id} itemType="attachment" itemLabel={ticketDocLabel(i + 1)} href={u} className="flex items-center justify-between gap-2 rounded-lg bg-[var(--surface-2)] px-3 py-2 transition hover:bg-[var(--hover)]">
+              <span className="flex min-w-0 items-center gap-2 text-sm text-[var(--text)]"><FileText size={14} className="shrink-0 text-blue-500" /> <span className="truncate">{docName(u)}</span></span>
+              <Download size={14} className="shrink-0 text-[var(--text-faint)]" />
+            </ViewTrackedLink>
+          </li>
+        ))}
+      </ul>)
     : null
   const quotesTab = quoteTabRows.length > 0
     ? (<div className="space-y-2">{quoteTabRows.map((q, i, arr) => (
         <QuoteSummary key={q.id} title={arr.length > 1 ? `Quote #${arr.length - i}` : 'Your submitted quote'} status={quoteStatusOf(q.status)} ticketId={t.id} collapsible declineReason={q.decline_reason ?? declineReason}
-          quote={{ id: q.id, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, description: q.description ?? null, fileUrl: q.file_url ?? null, validUntil: q.valid_until ?? null, createdAt: q.created_at }}
+          quote={{ id: q.id, supplierName: supplierCompanyName ?? null, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, description: q.description ?? null, fileUrl: q.file_url ?? null, validUntil: q.valid_until ?? null, createdAt: q.created_at, quoteRef: q.quote_ref ?? null }}
           schedule={q.status === 'accepted' && t.scheduled_at ? { at: t.scheduled_at, proposed: t.schedule_status === 'proposed', technician: scheduledTechName, audience: 'supplier' } : q.proposed_schedule_at ? { at: q.proposed_schedule_at, proposed: true, audience: 'supplier' } : null} />
       ))}</div>)
     : null
   const completionTab = (liveEvidence || pendingSignoffs.length > 0 || acceptedSignoff)
     ? (<div className="space-y-3">
         {liveEvidence && <SignoffCard s={liveEvidence} ticketId={t.id} icon={ClipboardCheck} chevron title={submissionLabel(liveEvidence)} reason={roundBySignoff.get(liveEvidence.id)?.reason ?? liveEvidence.reject_reason} collapsible defaultOpen />}
-        {pendingSignoffs.map(s => <SignoffCard key={s.id} s={s} ticketId={t.id} icon={ClipboardCheck} chevron title={submissionLabel(s)} collapsible defaultOpen footer={<CompletionFooterNote>You will be notified once the Regional Manager has reviewed and signed off.</CompletionFooterNote>} />)}
+        {pendingSignoffs.map(s => <SignoffCard key={s.id} s={s} ticketId={t.id} icon={ClipboardCheck} chevron title={submissionLabel(s)} collapsible defaultOpen footer={<CompletionFooterNote>You will be notified once the client has reviewed and signed off.</CompletionFooterNote>} />)}
         {acceptedSignoff && <SignoffCard s={acceptedSignoff} ticketId={t.id} icon={ClipboardCheck} chevron title="Completion" collapsible />}
       </div>)
     : null
@@ -76,11 +104,13 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
     : null
   const voTab = variations.length > 0
     ? (<div className="space-y-3">{variations.map((v, i, arr) => {
-        const st = v.status === 'approved' ? { label: 'Approved', ring: 'ring-emerald-500/40', bg: 'bg-emerald-500/5', badge: 'text-emerald-700 dark:text-emerald-400 bg-emerald-500/15' }
-          : v.status === 'rejected' ? { label: 'Declined', ring: 'ring-red-500/40', bg: 'bg-red-500/5', badge: 'text-red-700 dark:text-red-400 bg-red-500/15' }
-          : { label: 'Pending approval', ring: 'ring-amber-500/40', bg: 'bg-amber-500/5', badge: 'text-amber-700 dark:text-amber-400 bg-amber-500/15' }
+        // Neutral card + status chip (matches the Completion/Quotes cards) — only the
+        // decline-reason callout inside stays red-tinted.
+        const st = v.status === 'approved' ? { label: 'Approved', badge: 'text-emerald-700 dark:text-emerald-400 bg-emerald-500/15' }
+          : v.status === 'rejected' ? { label: 'Declined', badge: 'text-red-700 dark:text-red-400 bg-red-500/15' }
+          : { label: 'Pending approval', badge: 'text-amber-700 dark:text-amber-400 bg-amber-500/15' }
         return (
-          <div key={i} className={`rounded-xl ring-1 ${st.ring} ${st.bg} overflow-hidden`}>
+          <div key={i} className="rounded-xl bg-[var(--surface)] ring-1 ring-[var(--border)] overflow-hidden">
             <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-[var(--border)]">
               <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)] min-w-0"><FileText size={15} className="text-blue-600 dark:text-blue-400 shrink-0" /><span className="truncate">{arr.length > 1 ? `Variation #${arr.length - i}` : 'Variation order'}</span></span>
               <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 shrink-0 ${st.badge}`}>{st.label}</span>
@@ -98,7 +128,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
               )}
               {Array.isArray(v.file_urls) && v.file_urls.length > 0 && (
                 <div className="flex flex-wrap gap-x-3 gap-y-1 pt-0.5">
-                  {v.file_urls.map((u: string, j: number) => <ViewTrackedLink key={j} ticketId={t.id} itemType="attachment" itemLabel={`${arr.length > 1 ? `Variation #${arr.length - i}` : 'Variation order'} attachment ${j + 1}`} href={u} className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:underline"><FileText size={12} /> Attachment {j + 1}</ViewTrackedLink>)}
+                  {v.file_urls.map((u: string, j: number) => <ViewTrackedLink key={j} ticketId={t.id} itemType="attachment" itemLabel={variationAttachmentLabel(j + 1, supplierCompanyName, arr.length > 1 ? arr.length - i : undefined)} href={u} className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:underline"><FileText size={12} /> Attachment {j + 1}</ViewTrackedLink>)}
                 </div>
               )}
             </div>
@@ -129,28 +159,13 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
         ))}
       </div>)
     : null
-  const activityTab = (awarded || updates.length > 0)
-    ? (<div className="space-y-4">
-        {awarded && <div><h3 className="text-sm font-bold text-[var(--text)] mb-3">Post an update</h3><SupplierAttachments ticketId={t.id} /></div>}
-        {updates.length > 0 && (
-          <div>
-            {updates.map((u, i) => (
-              <div key={i} className="border-b border-[var(--border)] py-2.5 last:border-0">
-                <p className="text-sm text-[var(--text)] whitespace-pre-line">{u.body}</p>
-                <p className="text-[11px] text-[var(--text-faint)]">{u.author_role === 'supplier' ? 'You' : 'Client'} · {formatDateTime(u.created_at)}</p>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>)
-    : null
   const archiveTab = (historyDeclinedQuotes.length > 0 || declineRows.length > 0 || archivedSuperseded.length > 0 || !!declinedSnag)
     ? (<div className="space-y-4">
         {historyDeclinedQuotes.length > 0 && (
           <ArchiveGroup label="Quotes">
             {historyDeclinedQuotes.map((q, i, arr) => (
               <QuoteSummary key={q.id} title={arr.length > 1 ? `Quote #${arr.length - i}` : 'Your submitted quote'} status={quoteStatusOf(q.status)} ticketId={t.id} collapsible declineReason={q.decline_reason ?? declineReason}
-                quote={{ id: q.id, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, description: q.description ?? null, fileUrl: q.file_url ?? null, validUntil: q.valid_until ?? null, createdAt: q.created_at, declinedAt: q.updated_at ?? null }} />
+                quote={{ id: q.id, supplierName: supplierCompanyName ?? null, amount: q.amount, amountInclVat: q.amount_incl_vat ?? null, description: q.description ?? null, fileUrl: q.file_url ?? null, validUntil: q.valid_until ?? null, createdAt: q.created_at, declinedAt: q.updated_at ?? null, quoteRef: q.quote_ref ?? null }} />
             ))}
           </ArchiveGroup>
         )}
@@ -184,19 +199,23 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
         )}
         {declinedSnag && (
           <ArchiveGroup label="Snag schedule">
-            <details className="rounded-xl ring-1 ring-[var(--border)] overflow-hidden">
-              <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-[var(--text)] truncate">Snag schedule declined</p>
-                  <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(declinedSnag.schedule_declined_at)}</p>
-                </div>
-                <span className="text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:text-red-400 bg-red-500/15 rounded-full px-2 py-0.5 shrink-0">Declined</span>
+            {/* Same collapsible row layout as the Submissions cards above (icon +
+                title · date + status chip + chevron). */}
+            <details className="group rounded-xl bg-[var(--surface)] ring-1 ring-[var(--border)] overflow-hidden">
+              <summary className="flex items-center gap-2 px-4 py-2.5 cursor-pointer list-none hover:bg-[var(--hover)] transition">
+                <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                  <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)] min-w-0"><Calendar size={15} className="text-red-500 shrink-0" /><span className="truncate">Snag schedule · {formatDateTime(declinedSnag.schedule_declined_at)}</span></span>
+                  <span className="text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 shrink-0 bg-red-500/15 text-red-700 dark:text-red-400">Declined</span>
+                </span>
+                <ChevronDown size={16} className="shrink-0 text-[var(--text-faint)] transition-transform group-open:rotate-180" />
               </summary>
-              <div className="border-t border-[var(--border)] p-4">
+              <div className="border-t border-[var(--border)] p-4 space-y-2">
+                {declinedSnag.scheduled_at && <p className="text-sm text-[var(--text-muted)]">Proposed: <span className="font-semibold text-[var(--text)]">{formatDateTime(declinedSnag.scheduled_at)}</span></p>}
                 <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/30 p-3">
                   <p className="text-[11px] font-bold uppercase tracking-wide text-red-700 dark:text-red-400">Reason</p>
                   <p className="text-sm text-[var(--text)]">{declinedSnag.schedule_decline_reason || 'No reason provided.'}</p>
                 </div>
+                <p className="text-[11px] text-[var(--text-faint)]">Declined {formatDateTime(declinedSnag.schedule_declined_at)}</p>
               </div>
             </details>
           </ArchiveGroup>
@@ -207,6 +226,9 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
 
   return (
     <div className="space-y-5">
+      {/* Bump this supplier user's "last seen" watermark — a plainly-declined
+          ticket drops off their Today queue once they've opened it here. */}
+      <MarkTicketSeen ticketId={t.id} latestUpdateAt={t.updated_at} />
       <BackLink fallbackHref="/supplier/tickets" label="Back to tickets" />
 
       {/* Header — stepper + ref/title/badges (same layout as the RM ticket detail). */}
@@ -229,7 +251,6 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
                 return <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full w-full text-center ${cls}`}>{label}</span>
               })()}
             </div>
-            {awarded && <TicketChatIcon ticketId={t.id} viewerRole="supplier" unread={chatUnread} />}
           </div>
         </div>
         {!declinedForMe && <RmPipeline status={supplierStatus} />}
@@ -237,18 +258,11 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
       {/* Off the ticket → no "Next step", just why this quote request was declined. */}
       {declinedForMe ? (
         <div className="rounded-2xl bg-red-500/10 ring-1 ring-red-500/40 p-5 space-y-1">
-          {/* "Quote declined" once they'd submitted a quote; otherwise the request itself. */}
+          {/* "Quote declined" once they'd submitted a quote; otherwise the request itself.
+              A decline is final on this side — no dispute entry (any open dispute thread
+              still lives in the Dispute tab). */}
           <p className="text-sm font-bold text-red-700 dark:text-red-400">{latestQuote ? 'Quote declined' : 'Quote request declined'}{declinedByLabel}</p>
           <p className="text-sm text-[var(--text)]">{declineMessage}</p>
-          {/* The client declined this org — they may dispute it (thread-only, no workflow
-              pause; the conversation lives in the Dispute tab once raised). Hidden while
-              their own dispute is already open. */}
-          {declinedBy === 'regional_manager' && !openDispute && (
-            <div className="pt-2">
-              <RaiseDisputeButton ticketId={t.id} origin="quote_declined" label="Dispute the decline"
-                subjectTitle={latestQuote ? 'Quote declined' : 'Quote request declined'} jobRef={t.job_ref} store={disputeStore} />
-            </div>
-          )}
         </div>
       ) : (
         <div className="grid gap-4 lg:grid-cols-2 items-stretch">
@@ -277,7 +291,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
             <div className="rounded-lg bg-amber-500/10 ring-1 ring-amber-500/30 p-3 flex items-start gap-2.5">
               <Clock size={16} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
               <div className="space-y-0.5">
-                <p className="text-sm font-bold text-amber-700 dark:text-amber-400">The regional manager requested a re-quote</p>
+                <p className="text-sm font-bold text-amber-700 dark:text-amber-400">The client requested a re-quote</p>
                 {requoteReason && <p className="text-sm font-medium text-red-600 dark:text-red-400"><span className="font-semibold">Reason declined:</span> {requoteReason}</p>}
                 <p className="text-sm text-[var(--text-muted)]">Your previous quote request for this ticket was declined. Please submit a new quote below.</p>
               </div>
@@ -300,6 +314,10 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
               )}
               {openDispute ? (
                 disputeAction
+              ) : latestSnag?.schedule_status === 'declined' ? (
+                /* RM declined the proposed time — Re-schedule replaces Accept (no
+                   Raise dispute here; the client chat lives under the CTA's More). */
+                <SnagRescheduleCta ticketId={t.id} priority={t.priority} createdAt={t.created_at} declinedProposedAt={latestSnag.scheduled_at ?? null} declineReason={latestSnag.schedule_decline_reason ?? null} />
               ) : (
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
                   <div className="flex-1"><AcceptSnagCard ticketId={t.id} priority={t.priority} createdAt={t.created_at} /></div>
@@ -311,7 +329,13 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
           {awarded && t.status === 'snag_assigned' && (
             latestSnag?.schedule_status === 'agreed'
               ? <StartSnagButton ticketId={t.id} />
-              : <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 flex items-start gap-2.5"><Clock size={16} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" /><p className="text-sm text-[var(--text-muted)]">Snag fix proposed{latestSnag?.scheduled_at ? ` for ${formatDateTime(latestSnag.scheduled_at)}` : ''} — awaiting the manager&apos;s approval before you can start.</p></div>
+              : (
+                <div className="space-y-3">
+                  <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 flex items-start gap-2.5"><Clock size={16} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" /><p className="text-sm text-[var(--text-muted)]">Snag fix proposed{latestSnag?.scheduled_at ? ` for ${formatDateTime(latestSnag.scheduled_at)}` : ''} — awaiting the client&apos;s approval before you can start.</p></div>
+                  {/* Still proposed (not yet approved/declined) → let the supplier change the date/time. */}
+                  {latestSnag?.schedule_status === 'proposed' && <UpdateSnagScheduleCta ticketId={t.id} priority={t.priority} createdAt={t.created_at} currentScheduledAt={latestSnag?.scheduled_at ?? null} />}
+                </div>
+              )
           )}
           {awarded && ['in_progress', 'snag_resolved', 'snag_in_progress', 'evidence_requested'].includes(t.status) && (
             <div className="space-y-3">
@@ -336,7 +360,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
           {awarded && t.status === 'variation_review' && (
             <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3.5 flex items-start gap-2.5">
               <Clock size={16} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
-              <p className="text-sm text-[var(--text-muted)]">Variation order submitted — awaiting approval from the regional manager.</p>
+              <p className="text-sm text-[var(--text-muted)]">Variation order submitted — awaiting approval from the client.</p>
             </div>
           )}
           {awarded && t.status === 'submitted_for_signoff' && (
@@ -346,7 +370,7 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
                 <div className="min-w-0">
                   <p className="text-sm font-bold text-[var(--text)]">Certificate and proof of completion submitted</p>
                   {pendingSignoffs[0]?.created_at && <p className="mt-0.5 text-[13px] text-[var(--text-faint)]">{formatDateTime(pendingSignoffs[0].created_at)}</p>}
-                  <p className="mt-2 text-sm text-[var(--text-muted)]">Awaiting Regional Manager approval.</p>
+                  <p className="mt-2 text-sm text-[var(--text-muted)]">Awaiting the client&apos;s approval.</p>
                   <p className="text-sm text-[var(--text-muted)]">You will be notified when a decision is made.</p>
                 </div>
               </div>
@@ -354,14 +378,26 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
           )}
           {/* Close-out stage → the supplier may raise a variation order for extra work;
               otherwise the RM does the final close-out. On a declined VO the supplier
-              can also dispute the decline (paused while the dispute is open). */}
+              can also dispute the decline (via the gate's "More" — paused while the
+              dispute is open). */}
           {awarded && (t.status === 'approved_closeout' || t.status === 'vo_declined') && (
             openDispute && t.status === 'vo_declined' ? (
               disputeAction
             ) : (
               <div className="space-y-3">
-                <SupplierVariationGate ticketId={t.id} priority={t.priority} createdAt={t.created_at} variationCount={variationCount} status={t.status as 'approved_closeout' | 'vo_declined'} declineReason={latestVoRejectReason} noVosConfirmed={!!t.vo_none_confirmed_at} />
-                {t.status === 'vo_declined' && !openDispute && <RaiseDisputeButton ticketId={t.id} origin="variation" subjectTitle="Variation order declined" jobRef={t.job_ref} store={disputeStore} />}
+                {/* What was already approved, so the supplier sees the agreed extras. */}
+                {approvedVos.length > 0 && (
+                  <div className="rounded-xl bg-[var(--surface)] ring-1 ring-[var(--border)] p-3.5 space-y-1.5">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-faint)]">Approved variation order{approvedVos.length > 1 ? 's' : ''}</p>
+                    {approvedVos.map((v, i) => (
+                      <div key={i} className="flex items-baseline justify-between gap-3 text-sm">
+                        <span className="min-w-0 truncate text-[var(--text-muted)]">{v.description || 'Variation order'}</span>
+                        {v.amount != null && <span className="shrink-0 font-semibold text-[var(--text)] tabular-nums">{formatCurrency(v.amount)}</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <SupplierVariationGate ticketId={t.id} priority={t.priority} createdAt={t.created_at} variationCount={variationCount} status={t.status as 'approved_closeout' | 'vo_declined'} declineReason={latestVoRejectReason} noVosConfirmed={!!t.vo_none_confirmed_at} dispute={{ jobRef: t.job_ref, store: disputeStore }} />
               </div>
             )
           )}
@@ -374,14 +410,14 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
             <div className="space-y-4">
               <div>
                 <p className="flex items-center gap-2 text-base font-bold text-[var(--text)]"><CheckCircle2 size={18} className="shrink-0 text-emerald-500" /> Quote submitted</p>
-                <p className="mt-1 text-sm text-[var(--text-muted)]">Thank you! Your quote has been submitted to the regional manager for review.</p>
+                <p className="mt-1 text-sm text-[var(--text-muted)]">Thank you! Your quote has been submitted to the client for review.</p>
               </div>
               <div className="flex items-start gap-2.5 rounded-xl bg-blue-500/10 ring-1 ring-blue-500/25 px-3.5 py-3">
                 <Info size={16} className="mt-0.5 shrink-0 text-blue-600 dark:text-blue-400" />
                 <p className="text-sm text-[var(--text-muted)]">You will be notified of any updates on this ticket.</p>
               </div>
               <SupplierQuoteSubmittedActions ticketId={t.id} canDecline={canDecline} decline={declineDetails}
-                quote={latestQuote ? { id: latestQuote.id, amount: latestQuote.amount, amountInclVat: latestQuote.amount_incl_vat ?? null, description: latestQuote.description ?? null, fileUrl: latestQuote.file_url ?? null, validUntil: latestQuote.valid_until ?? null, createdAt: latestQuote.created_at } : null}
+                quote={latestQuote ? { id: latestQuote.id, supplierName: supplierCompanyName ?? null, amount: latestQuote.amount, amountInclVat: latestQuote.amount_incl_vat ?? null, description: latestQuote.description ?? null, fileUrl: latestQuote.file_url ?? null, validUntil: latestQuote.valid_until ?? null, createdAt: latestQuote.created_at, quoteRef: latestQuote.quote_ref ?? null } : null}
                 schedule={latestQuote?.proposed_schedule_at ? { at: latestQuote.proposed_schedule_at, proposed: true, audience: 'supplier' } : null} />
             </div>
           )}
@@ -412,18 +448,19 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
             <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1">Description</div>
             <p className="text-sm text-[var(--text-muted)] whitespace-pre-line">{t.description}</p>
           </div>
-          {/* Scheduled visit — hidden once a snag fix is in play (that callout replaces it). */}
-          {t.scheduled_at && !snagScheduleActive && (
+          {/* Scheduled visit — hidden once a snag fix is in play (that callout replaces it)
+              and once the COC is approved (close-out onward, so it's no longer live). */}
+          {t.scheduled_at && !snagScheduleActive && !closedOut && (
             <div className="flex items-center gap-2.5 rounded-xl bg-indigo-500/10 ring-1 ring-indigo-500/30 px-3.5 py-3">
               <Calendar size={18} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
               <div className="min-w-0">
                 <p className="text-[11px] uppercase tracking-wide font-semibold text-indigo-700 dark:text-indigo-400">Scheduled{t.schedule_status === 'proposed' ? ' · proposed' : ''}</p>
                 <p className="text-sm font-bold text-[var(--text)]">{formatDateTime(t.scheduled_at)}{scheduledTechName ? ` · ${scheduledTechName}` : ''}</p>
-                {t.schedule_status === 'proposed' && <p className="text-[11px] text-amber-600 dark:text-amber-400">Past the SLA window — awaiting the manager&apos;s acceptance.</p>}
+                {t.schedule_status === 'proposed' && <p className="text-[11px] text-amber-600 dark:text-amber-400">Past the SLA window — awaiting the client&apos;s acceptance.</p>}
               </div>
             </div>
           )}
-          {snagFixApproved && (
+          {snagFixApproved && !closedOut && (
             <div className="flex items-center gap-2.5 rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 px-3.5 py-3">
               <Calendar size={18} className="text-amber-600 dark:text-amber-400 shrink-0" />
               <div className="min-w-0">
@@ -451,12 +488,12 @@ export default async function SupplierTicketDetailPage(props: { params: Promise<
         }
         tabs={[
           { key: 'photos', label: `Photos${totalPhotos ? ` (${totalPhotos})` : ''}`, content: photosTab },
+          { key: 'documents', label: `Documents${infoDocUrls.length ? ` (${infoDocUrls.length})` : ''}`, content: documentsTab },
           { key: 'quotes', label: 'Quotes', content: quotesTab },
           { key: 'completion', label: 'Completion', content: completionTab },
           { key: 'variations', label: 'Variation Orders', content: voTab },
           { key: 'snag', label: 'Snag', content: snagTab },
           { key: 'dispute', label: 'Dispute', content: disputeTab },
-          { key: 'activity', label: `Activity${updates.length ? ` (${updates.length})` : ''}`, content: activityTab },
           { key: 'archive', label: 'History', content: archiveTab },
           { key: 'timeline', label: 'Timeline', content: timelineTab },
         ]}

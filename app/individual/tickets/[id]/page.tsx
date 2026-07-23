@@ -13,7 +13,7 @@ import { QuoteSummary, type QuoteSummaryStatus } from '@/components/workflow/Quo
 import { SupplierStatusList, QuoteReviewCard, ApproveSignoffCard, RequestEvidenceButton, RaiseSnagButton, VariationReviewCard, CloseOutButton, AcceptSnagScheduleCard, type ReviewQuote } from '@/components/regional/RmTicketActions'
 import { IndividualTicketActionBar } from '@/components/individual/IndividualTicketActionBar'
 import { TicketTimeline } from '@/components/ui/TicketTimeline'
-import { buildTicketTimeline } from '@/lib/ticket-timeline'
+import { buildTicketTimeline, individualFriendlyLabel } from '@/lib/ticket-timeline'
 import { isTerminalStatus } from '@/lib/workflow'
 import { DisputeThread } from '@/components/dispute/DisputeBox'
 import { ChatFab } from '@/components/chat/TicketChat'
@@ -29,7 +29,7 @@ export default async function IndividualTicketDetailPage(props: { params: Promis
   const [{ userId }, { data: t }, { data: quotes }, { data: signoffs }, { data: invites }, { data: motiv }, { data: snags }, { data: disputeRows }, { data: disputeMsgRows }, { data: disputeExtra }, { data: variations }, { data: snagEvents }, { data: requestRows }, { data: editRows }] = await Promise.all([
     requireIndividual(),
     admin.from('tickets').select('*').eq('id', params.id).single(),
-    admin.from('quotes').select('id, supplier_id, amount, amount_incl_vat, description, file_url, status, valid_until, proposed_schedule_at, created_at, updated_at').eq('ticket_id', params.id).order('created_at', { ascending: false }),
+    admin.from('quotes').select('id, supplier_id, amount, amount_incl_vat, description, file_url, status, valid_until, proposed_schedule_at, created_at, updated_at, quote_ref').eq('ticket_id', params.id).order('created_at', { ascending: false }),
     admin.from('signoffs').select('id, before_urls, after_urls, coc_url, invoice_url, status, notes, reject_reason, reviewed_at, created_at').eq('ticket_id', params.id).order('created_at', { ascending: false }),
     admin.from('ticket_suppliers').select('supplier_id, status, invited_at, decline_reason').eq('ticket_id', params.id),
     admin.from('suppliers').select('id, company_name').eq('is_motiv', true).eq('active', true).order('company_name'),
@@ -95,7 +95,7 @@ export default async function IndividualTicketDetailPage(props: { params: Promis
   const supplierStatusRows = inviteRows.map(r => ({ name: nameById.get(r.supplier_id) ?? 'Supplier', status: r.status, invitedAt: r.invited_at, declineReason: r.decline_reason }))
   const reviewQuotes: ReviewQuote[] = quoteRows.filter(q => q.status === 'pending').map(q => ({
     id: q.id, supplierName: (q.supplier_id ? nameById.get(q.supplier_id) : undefined) ?? 'Supplier', amount: q.amount, amountInclVat: q.amount_incl_vat ?? null,
-    description: q.description ?? null, fileUrl: q.file_url ?? null, createdAt: q.created_at, proposedScheduleAt: q.proposed_schedule_at ?? null,
+    description: q.description ?? null, fileUrl: q.file_url ?? null, createdAt: q.created_at, proposedScheduleAt: q.proposed_schedule_at ?? null, quoteRef: q.quote_ref ?? null,
   }))
   const canAssign = ASSIGNABLE.includes(t.status)
 
@@ -109,7 +109,14 @@ export default async function IndividualTicketDetailPage(props: { params: Promis
   const timelineItems = buildTicketTimeline({
     createdAt: t.created_at, status: t.status, updatedAt: t.updated_at,
     quoteRequestedAt: t.first_quote_requested_at ?? t.quote_requested_at,
-    quoteRequests: (requestRows ?? []).map(r => ({ at: r.requested_at, supplierName: r.supplier_id ? (nameById.get(r.supplier_id) ?? null) : null })),
+    // Union of the durable log AND the ticket_suppliers invites — belt-and-braces
+    // so an invite always yields a "Quote requested from X" event even when the
+    // durable-log insert silently failed. Same-round rows share the same timestamp
+    // + name, so the engine's `${at}|${name}` dedup collapses them to one event.
+    quoteRequests: [
+      ...(requestRows ?? []).map(r => ({ at: r.requested_at, supplierName: r.supplier_id ? (nameById.get(r.supplier_id) ?? null) : null })),
+      ...inviteRows.filter(r => r.invited_at).map(r => ({ at: r.invited_at, supplierName: nameById.get(r.supplier_id) ?? null })),
+    ],
     quoteSubmittedAt: t.quote_submitted_at,
     quoteApprovedAt: t.quote_decision_status === 'approved' ? t.quote_decided_at : null,
     scheduledAt: t.scheduled_at, completedAt: t.completed_at,
@@ -127,7 +134,9 @@ export default async function IndividualTicketDetailPage(props: { params: Promis
     disputes: disputes.map(d => ({ origin: d.origin, status: d.status, outcome: d.outcome, created_at: d.created_at, resolved_at: d.resolved_at, reason: d.resolution_note })),
     disputeMessages: (disputeMsgRows ?? []).map(m => ({ author_role: m.author_role, body: m.body, created_at: m.created_at })),
     signoffs: (signoffs ?? []).map(s => ({ status: s.status, created_at: s.created_at, reviewed_at: s.reviewed_at, reject_reason: s.reject_reason })),
-  }).map(e => ({ ...e, who: e.who === 'Regional Manager' ? 'You' : e.who }))
+    // Owner-voiced: the individual performs every manager-side action ("You …") and
+    // the awarded supplier is named. Actor baked in → the "who" line drops away.
+  }).map(e => ({ ...e, label: individualFriendlyLabel(e, { supplierName: t.supplier_id ? (nameById.get(t.supplier_id) ?? null) : null }), who: null }))
 
   return (
     <div className="space-y-5">
@@ -149,7 +158,7 @@ export default async function IndividualTicketDetailPage(props: { params: Promis
         {photos.length > 0 && (
           <div>
             <div className="text-[11px] uppercase tracking-wide text-[var(--text-faint)] mb-1.5 flex items-center gap-1.5"><ImageIcon size={12} /> Photos</div>
-            <PhotoThumbs urls={photos} ticketId={t.id} />
+            <PhotoThumbs urls={photos} ticketId={t.id} label="Job photo" />
           </div>
         )}
       </Card>
@@ -162,7 +171,7 @@ export default async function IndividualTicketDetailPage(props: { params: Promis
           {reviewQuotes.length > 0 && <QuoteReviewCard ticketId={t.id} quotes={reviewQuotes} />}
           {acceptedQuote && (
             <QuoteSummary title={`Approved · ${(acceptedQuote.supplier_id ? nameById.get(acceptedQuote.supplier_id) : undefined) ?? 'Supplier'}`} status="accepted"
-              quote={{ id: acceptedQuote.id, amount: acceptedQuote.amount, amountInclVat: acceptedQuote.amount_incl_vat ?? null, description: acceptedQuote.description ?? null, fileUrl: acceptedQuote.file_url ?? null, validUntil: acceptedQuote.valid_until ?? null, createdAt: acceptedQuote.created_at }} />
+              quote={{ id: acceptedQuote.id, amount: acceptedQuote.amount, amountInclVat: acceptedQuote.amount_incl_vat ?? null, description: acceptedQuote.description ?? null, fileUrl: acceptedQuote.file_url ?? null, validUntil: acceptedQuote.valid_until ?? null, createdAt: acceptedQuote.created_at, quoteRef: acceptedQuote.quote_ref ?? null }} />
           )}
         </Card>
       )}

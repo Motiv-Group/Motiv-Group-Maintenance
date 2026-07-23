@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { CheckCircle2, FileText, XCircle, ChevronDown, Calendar } from 'lucide-react'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils'
+import { quoteLabel } from '@/lib/attachment-labels'
 
 export type QuoteSummaryStatus = 'pending' | 'accepted' | 'declined' | 'awarded'
 
@@ -18,6 +19,8 @@ export interface QuoteSummaryData {
   createdAt: string
   /** When the quote was declined — shown on a declined card. */
   declinedAt?: string | null
+  /** Human quote reference ("Q-YYYY-NNNNN") — null on pre-migration quotes. */
+  quoteRef?: string | null
 }
 
 const BADGE: Record<QuoteSummaryStatus, { label: string; cls: string }> = {
@@ -82,7 +85,7 @@ export function QuoteSummary({ quote, status, title, schedule, collapsible = fal
   const attName = quote.fileUrl ? fileName(quote.fileUrl) : null
   const fileLink = (label: ReactNode, className: string) => quote.fileUrl && (
     ticketId
-      ? <ViewTrackedLink ticketId={ticketId} itemType="quote" itemLabel={`${title ?? quote.supplierName ?? 'Quote'} attachment`} href={quote.fileUrl} className={className}>{label}</ViewTrackedLink>
+      ? <ViewTrackedLink ticketId={ticketId} itemType="quote" itemLabel={quoteLabel(quote.supplierName ?? undefined, quote.quoteRef ?? undefined)} href={quote.fileUrl} className={className}>{label}</ViewTrackedLink>
       : <a href={quote.fileUrl} target="_blank" rel="noopener noreferrer" className={className}>{label}</a>
   )
 
@@ -114,7 +117,7 @@ export function QuoteSummary({ quote, status, title, schedule, collapsible = fal
 
         {/* Submitted + proposed visit */}
         <div className="space-y-3 sm:border-l sm:border-[var(--border)] sm:pl-5 lg:pr-5">
-          <DateItem label="Submitted" value={formatDateTime(quote.createdAt)} />
+          <DateItem label="Submitted" value={formatDateTime(quote.createdAt)} suffix={quote.quoteRef} />
           {schedule && <DateItem label="Proposed visit" value={formatDateTime(schedule.at)} suffix={schedule.technician} proposed={schedule.proposed} />}
         </div>
 

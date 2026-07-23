@@ -15,10 +15,14 @@ export type QuoteKind = 'requested' | 'pending' | 'accepted' | 'declined'
 export interface SupplierQuoteItem {
   key: string; ticketId: string; storeName: string; jobRef: string | null; category: string | null; priority: string; description: string | null
   kind: QuoteKind; at: string
+  /** Human quote reference ("Q-YYYY-NNNNN") — submitted quotes only, null pre-migration. */
+  quoteRef?: string | null
   proposedVisit: string | null; validUntil: string | null; amount: number | null; amountInclVat: number | null
   declinedLabel?: string | null
   /** RM asked this supplier to re-submit after the decline (shown on the declined row). */
   reQuoteRequested?: boolean
+  /** Client-declined and not opened since — the row carries a "New" marker until then. */
+  declineUnseen?: boolean
 }
 
 const STATUS: Record<QuoteKind, { label: string; badge: string; tab: string; ring: string }> = {
@@ -37,8 +41,9 @@ const PRIO: Record<string, { label: string; cls: string; rank: number }> = {
   P4: { label: 'Low',    cls: 'bg-slate-500/15 text-slate-600 dark:text-slate-300',    rank: 3 },
 }
 const rankOf = (p: string) => PRIO[p]?.rank ?? 9
-// Shared badge geometry so the priority + status pills are exactly the same size.
-const BADGE = 'inline-flex items-center justify-center rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide min-w-[96px]'
+// Shared badge geometry — fixed width (fits the longest label, "Re-quote requested")
+// so every stacked chip in the table lines up exactly, desktop and mobile.
+const BADGE = 'inline-flex items-center justify-center rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide w-40 text-center whitespace-nowrap'
 
 const SEL = 'appearance-none rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm pl-9 pr-8 py-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/40'
 
@@ -56,7 +61,7 @@ export function SupplierQuotesTable({ items }: { items: SupplierQuoteItem[] }) {
     const term = q.trim().toLowerCase()
     const rows = items.filter(i => {
       if (tab !== 'all' && i.kind !== tab) return false
-      if (term && !`${i.storeName} ${i.jobRef ?? ''} ${i.category ?? ''} ${i.description ?? ''}`.toLowerCase().includes(term)) return false
+      if (term && !`${i.storeName} ${i.jobRef ?? ''} ${i.quoteRef ?? ''} ${i.category ?? ''} ${i.description ?? ''}`.toLowerCase().includes(term)) return false
       return true
     })
     const cmp: Record<string, (a: SupplierQuoteItem, b: SupplierQuoteItem) => number> = {
@@ -119,9 +124,9 @@ export function SupplierQuotesTable({ items }: { items: SupplierQuoteItem[] }) {
 
         {/* Desktop table */}
         <div className="hidden overflow-x-auto lg:block">
-          <table className="w-full min-w-[980px] text-sm">
+          <table className="w-full min-w-[1100px] text-sm">
             <thead><tr className="border-b border-[var(--border)] text-left text-[11px] uppercase tracking-wide text-[var(--text-faint)]">
-              <th className="px-4 py-2.5 font-medium">Store / Ticket</th><th className="px-3 font-medium">Request / Submitted</th><th className="px-3 font-medium">Proposed visit</th><th className="px-3 font-medium">Valid until</th><th className="px-3 font-medium">Amount (excl. VAT)</th><th className="px-3 font-medium">Status</th><th className="px-3"></th>
+              <th className="px-4 py-2.5 font-medium">Store / Ticket</th><th className="px-3 font-medium">Category</th><th className="px-3 font-medium">Request / Submitted</th><th className="px-3 font-medium">Proposed visit</th><th className="px-3 font-medium">Valid until</th><th className="px-3 font-medium">Amount (excl. VAT)</th><th className="px-3 font-medium">Status</th><th className="px-3"></th>
             </tr></thead>
             <tbody>
               {pageRows.map(i => (
@@ -131,11 +136,12 @@ export function SupplierQuotesTable({ items }: { items: SupplierQuoteItem[] }) {
                       <CategoryIcon category={i.category ?? i.storeName} priority={i.priority} />
                       <span className="min-w-0">
                         <span className="block truncate font-semibold text-[var(--text)]">{i.storeName}</span>
-                        <span className="block truncate text-[11px] text-[var(--text-faint)]">{[i.jobRef, i.category].filter(Boolean).join(' · ')}</span>
+                        <span className="block truncate text-[11px] text-[var(--text-faint)]">{[i.jobRef, i.quoteRef].filter(Boolean).join(' · ')}</span>
                         {i.description && <span className="block max-w-[280px] truncate text-[11px] text-[var(--text-muted)]">{i.description}</span>}
                       </span>
                     </Link>
                   </td>
+                  <td className="px-3 text-[var(--text)]">{i.category ?? <span className="text-[var(--text-faint)]">–</span>}</td>
                   <td className="px-3"><p className="text-[11px] text-[var(--text-faint)]">{i.kind === 'requested' ? 'Requested' : 'Submitted'}</p><p className="flex items-center gap-1.5 text-[var(--text)]"><Calendar size={13} className="text-[var(--text-faint)]" /> {formatDateTime(i.at)}</p></td>
                   <td className="px-3 text-[var(--text)]">{i.proposedVisit ? <span className="flex items-center gap-1.5"><Calendar size={13} className="text-[var(--text-faint)]" /> {formatDateTime(i.proposedVisit)}</span> : <span className="text-[var(--text-faint)]">–</span>}</td>
                   <td className="px-3 text-[var(--text)]">{i.validUntil ? <span className="flex items-center gap-1.5"><Calendar size={13} className="text-[var(--text-faint)]" /> {formatDate(i.validUntil)}</span> : <span className="text-[var(--text-faint)]">–</span>}</td>
@@ -143,14 +149,16 @@ export function SupplierQuotesTable({ items }: { items: SupplierQuoteItem[] }) {
                   <td className="px-3">
                     <div className="flex w-fit flex-col items-stretch gap-1">
                       {PRIO[i.priority] && <span className={`${BADGE} ${PRIO[i.priority].cls}`}>{PRIO[i.priority].label}</span>}
-                      <span className={`${BADGE} ${STATUS[i.kind].badge}`}>{i.declinedLabel ?? STATUS[i.kind].label}</span>
-                      {i.kind === 'declined' && i.reQuoteRequested && <span className={`${BADGE} bg-amber-500/15 text-amber-700 dark:text-amber-400`}>Re-quote requested</span>}
+                      {/* Re-quote pending → the Declined chip is suppressed; the amber chip (carrying any unseen dot) is the status. */}
+                      {i.kind === 'declined' && i.reQuoteRequested
+                        ? <span className={`${BADGE} bg-amber-500/15 text-amber-700 dark:text-amber-400`}>Re-quote requested{i.declineUnseen && <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-red-500" aria-label="New" />}</span>
+                        : <span className={`${BADGE} ${STATUS[i.kind].badge}`}>{i.declinedLabel ?? STATUS[i.kind].label}{i.declineUnseen && <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-red-500" aria-label="New" />}</span>}
                     </div>
                   </td>
                   <td className="px-3 text-right"><Link href={`/supplier/tickets/${i.ticketId}`} aria-label="Open ticket" className="inline-flex rounded-lg p-1.5 text-[var(--text-faint)] transition group-hover:text-[var(--text)]"><Chev size={16} /></Link></td>
                 </tr>
               ))}
-              {!pageRows.length && <tr><td colSpan={7} className="py-10 text-center text-[var(--text-faint)]">{items.length ? 'No quotes match your filters.' : 'No quotes yet.'}</td></tr>}
+              {!pageRows.length && <tr><td colSpan={8} className="py-10 text-center text-[var(--text-faint)]">{items.length ? 'No quotes match your filters.' : 'No quotes yet.'}</td></tr>}
             </tbody>
           </table>
         </div>
@@ -167,11 +175,13 @@ export function SupplierQuotesTable({ items }: { items: SupplierQuoteItem[] }) {
                       <p className="line-clamp-2 break-words text-sm font-semibold text-[var(--text)]">{i.storeName}</p>
                       <span className="flex w-fit shrink-0 flex-col items-stretch gap-1">
                         {PRIO[i.priority] && <span className={`${BADGE} ${PRIO[i.priority].cls}`}>{PRIO[i.priority].label}</span>}
-                        <span className={`${BADGE} ${STATUS[i.kind].badge}`}>{i.declinedLabel ?? STATUS[i.kind].label}</span>
-                        {i.kind === 'declined' && i.reQuoteRequested && <span className={`${BADGE} bg-amber-500/15 text-amber-700 dark:text-amber-400`}>Re-quote requested</span>}
+                        {/* Re-quote pending → the Declined chip is suppressed; the amber chip (carrying any unseen dot) is the status. */}
+                        {i.kind === 'declined' && i.reQuoteRequested
+                          ? <span className={`${BADGE} bg-amber-500/15 text-amber-700 dark:text-amber-400`}>Re-quote requested{i.declineUnseen && <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-red-500" aria-label="New" />}</span>
+                          : <span className={`${BADGE} ${STATUS[i.kind].badge}`}>{i.declinedLabel ?? STATUS[i.kind].label}{i.declineUnseen && <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-red-500" aria-label="New" />}</span>}
                       </span>
                     </div>
-                    <p className="truncate text-[11px] text-[var(--text-faint)]">{[i.jobRef, i.category].filter(Boolean).join(' · ')}</p>
+                    <p className="truncate text-[11px] text-[var(--text-faint)]">{[i.jobRef, i.quoteRef, i.category].filter(Boolean).join(' · ')}</p>
                     <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px] text-[var(--text-muted)]">
                       <span>{i.kind === 'requested' ? 'Requested' : 'Submitted'} {formatDateTime(i.at)}</span>
                       {i.amount != null && <span className="font-semibold text-[var(--text)]">{formatCurrency(i.amount)}</span>}

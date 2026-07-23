@@ -7,6 +7,7 @@ import { useState, type ChangeEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { CheckCircle2, Download, ImageIcon, ImageUp, Loader2, Sparkles } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
+import { useFileDrop } from '@/components/ui/useFileDrop'
 import { formatDate } from '@/lib/utils'
 import type { AppSettings, BrandingState } from '@/lib/settings'
 import { Callout, DarkTile, Section, postForm, postJson, useAsyncSave, validateImage } from './shared'
@@ -31,6 +32,50 @@ const GENERATED: { key: string; label: string }[] = [
   { key: 'apple-touch-icon.png', label: 'Apple touch icon' },
 ]
 
+// One upload slot — its own drag-and-drop target sharing the parent's addFiles.
+function SlotCard({ slot, chosen, previewSrc, generating, err, onPick, onDropFiles }: {
+  slot: { key: SlotKey; title: string; desc: string; fileKey: string; fallback: string }
+  chosen: Picked | null
+  previewSrc: string
+  generating: boolean
+  err?: string
+  onPick: (e: ChangeEvent<HTMLInputElement>) => void
+  onDropFiles: (files: File[]) => void
+}) {
+  const src = chosen?.url ?? previewSrc
+  const { isDragging, dropProps } = useFileDrop({
+    onFiles: onDropFiles,
+    accept: 'image/png,image/webp',
+    multiple: false,
+    disabled: generating,
+  })
+  return (
+    <div className="min-w-0 space-y-2">
+      <div>
+        <div className="text-xs font-semibold text-[var(--text)]">{slot.title}</div>
+        <div className="text-[11px] leading-snug text-[var(--text-faint)]">{slot.desc}</div>
+      </div>
+      <div {...dropProps} className={`relative rounded-xl transition ${isDragging ? 'ring-2 ring-blue-500' : ''}`}>
+        <DarkTile className="grid h-28 place-items-center p-3">
+          {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary storage URLs; next/image is not worth configuring for previews */}
+          <img src={src} alt={`${slot.title} preview`} className="max-h-full max-w-full object-contain" />
+        </DarkTile>
+        {isDragging && (
+          <div className="pointer-events-none absolute inset-0 grid place-items-center rounded-xl bg-blue-500/10 text-[11px] font-semibold text-blue-600 dark:text-blue-400">
+            Drop image here
+          </div>
+        )}
+      </div>
+      <label className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-[var(--surface-2)] px-2.5 py-1.5 text-xs font-semibold text-blue-600 ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] dark:text-blue-400 ${generating ? 'pointer-events-none opacity-50' : ''}`}>
+        <input type="file" accept="image/png,image/webp" className="sr-only" disabled={generating} onChange={onPick} />
+        <ImageUp size={13} /> {chosen ? 'Change image' : 'Choose image'}
+      </label>
+      {chosen && <p className="text-[10px] font-semibold text-amber-600 dark:text-amber-400">New image selected — not applied yet</p>}
+      {err && <p className="text-[11px] text-red-600 dark:text-red-400">{err}</p>}
+    </div>
+  )
+}
+
 export function LogoSection({ initialBranding }: { initialBranding: BrandingState }) {
   const router = useRouter()
   const [branding, setBranding] = useState<BrandingState>(initialBranding)
@@ -49,9 +94,10 @@ export function LogoSection({ initialBranding }: { initialBranding: BrandingStat
     ? formatDate(new Date(branding.version).toISOString())
     : null
 
-  function pick(key: SlotKey, e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    e.target.value = ''
+  // Core selection logic — shared by the <input onChange> and drag-and-drop.
+  // These slots are single-file, so only the first file is used.
+  function addFiles(key: SlotKey, files: File[]) {
+    const file = files[0]
     if (!file) return
     const err = validateImage(file, ['image/png', 'image/webp'])
     setFileErr((prev) => ({ ...prev, [key]: err ?? undefined }))
@@ -60,6 +106,12 @@ export function LogoSection({ initialBranding }: { initialBranding: BrandingStat
     if (old) URL.revokeObjectURL(old.url)
     const url = URL.createObjectURL(file)
     setPicked((prev) => ({ ...prev, [key]: { file, url } }))
+  }
+
+  function pick(key: SlotKey, e: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? [])
+    e.target.value = ''
+    addFiles(key, files)
   }
 
   async function generate() {
@@ -95,28 +147,18 @@ export function LogoSection({ initialBranding }: { initialBranding: BrandingStat
     >
       {/* Three upload slots — stack on mobile, side by side from sm. */}
       <div className="grid gap-4 sm:grid-cols-3">
-        {SLOTS.map((slot) => {
-          const chosen = picked[slot.key]
-          const src = chosen?.url ?? branding.files[slot.fileKey] ?? slot.fallback
-          return (
-            <div key={slot.key} className="min-w-0 space-y-2">
-              <div>
-                <div className="text-xs font-semibold text-[var(--text)]">{slot.title}</div>
-                <div className="text-[11px] leading-snug text-[var(--text-faint)]">{slot.desc}</div>
-              </div>
-              <DarkTile className="grid h-28 place-items-center p-3">
-                {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary storage URLs; next/image is not worth configuring for previews */}
-                <img src={src} alt={`${slot.title} preview`} className="max-h-full max-w-full object-contain" />
-              </DarkTile>
-              <label className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-[var(--surface-2)] px-2.5 py-1.5 text-xs font-semibold text-blue-600 ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)] dark:text-blue-400 ${generating ? 'pointer-events-none opacity-50' : ''}`}>
-                <input type="file" accept="image/png,image/webp" className="sr-only" disabled={generating} onChange={(e) => pick(slot.key, e)} />
-                <ImageUp size={13} /> {chosen ? 'Change image' : 'Choose image'}
-              </label>
-              {chosen && <p className="text-[10px] font-semibold text-amber-600 dark:text-amber-400">New image selected — not applied yet</p>}
-              {fileErr[slot.key] && <p className="text-[11px] text-red-600 dark:text-red-400">{fileErr[slot.key]}</p>}
-            </div>
-          )
-        })}
+        {SLOTS.map((slot) => (
+          <SlotCard
+            key={slot.key}
+            slot={slot}
+            chosen={picked[slot.key]}
+            previewSrc={branding.files[slot.fileKey] ?? slot.fallback}
+            generating={generating}
+            err={fileErr[slot.key]}
+            onPick={(e) => pick(slot.key, e)}
+            onDropFiles={(files) => addFiles(slot.key, files)}
+          />
+        ))}
       </div>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">

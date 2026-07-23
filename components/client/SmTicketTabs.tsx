@@ -6,33 +6,31 @@ import { Card } from '@/components/exec/ui'
 import { PhotoThumbs } from '@/components/ui/PhotoThumbs'
 import { TicketTimeline } from '@/components/ui/TicketTimeline'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
-import { formatDateTime } from '@/lib/utils'
+import { ticketPhotoLabel, ticketDocLabel } from '@/lib/attachment-labels'
 import type { TimelineEvent } from '@/lib/ticket-timeline'
 
-type Update = { body: string; created_at: string }
-type Tab = 'photos' | 'activity' | 'timeline'
+type Tab = 'photos' | 'documents' | 'timeline'
 
 function docName(url: string): string {
   try { return decodeURIComponent(url.split('?')[0].split('/').pop() || 'Document') } catch { return 'Document' }
 }
 
 // Lower tabbed section of the SM ticket detail — only content a store manager
-// may see: attachments (photos + documents), the activity notes, and the
-// Timeline (the shared engine's SM-safe subset — see filterTimelineForSm).
-// No internal Documents/Comments/History.
+// may see: attachments (photos + documents) and the Timeline (the shared
+// engine's SM-safe subset — see filterTimelineForSm; supplier updates fold
+// into it). No internal Documents/Comments/History.
 export function SmTicketTabs({
-  photoUrls, docUrls, ticketId, updates, timeline,
+  photoUrls, docUrls, ticketId, timeline,
 }: {
   photoUrls: string[]
   docUrls: string[]
   ticketId: string
-  updates: Update[]
   timeline: TimelineEvent[]
 }) {
-  const [tab, setTab] = useState<Tab>(photoUrls.length || docUrls.length ? 'photos' : 'timeline')
+  const [tab, setTab] = useState<Tab>(photoUrls.length ? 'photos' : docUrls.length ? 'documents' : 'timeline')
   const tabs: { key: Tab; label: string }[] = [
     { key: 'photos', label: `Photos${photoUrls.length ? ` (${photoUrls.length})` : ''}` },
-    { key: 'activity', label: `Activity${updates.length ? ` (${updates.length})` : ''}` },
+    ...(docUrls.length > 0 ? [{ key: 'documents' as Tab, label: `Documents${docUrls.length ? ` (${docUrls.length})` : ''}` }] : []),
     { key: 'timeline', label: 'Timeline' },
   ]
 
@@ -56,36 +54,21 @@ export function SmTicketTabs({
 
       {tab === 'photos' && (
         <div className="space-y-4">
-          {photoUrls.length ? <PhotoThumbs urls={photoUrls} ticketId={ticketId} /> : <p className="text-sm text-[var(--text-faint)]">No photos attached.</p>}
-          {docUrls.length > 0 && (
-            <div>
-              <p className="mb-1.5 text-[11px] uppercase tracking-wide text-[var(--text-faint)]">Documents</p>
-              <ul className="space-y-1">
-                {docUrls.map((u, i) => (
-                  <li key={i}>
-                    <ViewTrackedLink ticketId={ticketId} itemType="attachment" itemLabel={docName(u)} href={u} className="flex items-center justify-between gap-2 rounded-lg bg-[var(--surface-2)] px-3 py-2 transition hover:bg-[var(--hover)]">
-                      <span className="flex min-w-0 items-center gap-2 text-sm text-[var(--text)]"><FileText size={14} className="shrink-0 text-blue-500" /> <span className="truncate">{docName(u)}</span></span>
-                      <Download size={14} className="shrink-0 text-[var(--text-faint)]" />
-                    </ViewTrackedLink>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          {photoUrls.length ? <PhotoThumbs urls={photoUrls} ticketId={ticketId} label="Job photo" trackLabels={photoUrls.map((_, i) => ticketPhotoLabel(i + 1))} /> : <p className="text-sm text-[var(--text-faint)]">No photos attached.</p>}
         </div>
       )}
 
-      {tab === 'activity' && (
-        updates.length ? (
-          <div>
-            {updates.map((u, i) => (
-              <div key={i} className="border-b border-[var(--border)] py-2.5 last:border-0">
-                <p className="text-sm text-[var(--text)]">{u.body}</p>
-                <p className="text-[11px] text-[var(--text-faint)]">{formatDateTime(u.created_at)}</p>
-              </div>
-            ))}
-          </div>
-        ) : <p className="text-sm text-[var(--text-faint)]">No updates yet.</p>
+      {tab === 'documents' && (
+        <ul className="space-y-1">
+          {docUrls.map((u, i) => (
+            <li key={i}>
+              <ViewTrackedLink ticketId={ticketId} itemType="attachment" itemLabel={ticketDocLabel(i + 1)} href={u} className="flex items-center justify-between gap-2 rounded-lg bg-[var(--surface-2)] px-3 py-2 transition hover:bg-[var(--hover)]">
+                <span className="flex min-w-0 items-center gap-2 text-sm text-[var(--text)]"><FileText size={14} className="shrink-0 text-blue-500" /> <span className="truncate">{docName(u)}</span></span>
+                <Download size={14} className="shrink-0 text-[var(--text-faint)]" />
+              </ViewTrackedLink>
+            </li>
+          ))}
+        </ul>
       )}
 
       {tab === 'timeline' && <TicketTimeline items={timeline} />}

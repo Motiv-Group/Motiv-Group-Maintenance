@@ -10,11 +10,13 @@ import { signManyUrls } from '@/lib/storage'
 import { stampFreshness } from '@/lib/workflow'
 import type { Database } from '@/lib/database.types'
 
+// Message/note text is capped server-side (the composer already caps at 1000
+// client-side) so an oversized body can't be posted straight to the API.
 const BodySchema = z.object({
-  action: z.string().optional(),
-  body: z.any().optional(),
+  action: z.string().max(40).optional(),
+  body: z.string().max(1000).nullable().optional(),
   evidenceUrls: z.array(z.any()).optional(),
-  note: z.any().optional(),
+  note: z.string().max(1000).nullable().optional(),
 })
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -64,13 +66,21 @@ async function callerSupplierOrgs(admin: Admin, userId: string): Promise<string[
 }
 // The org (if any) whose quote/invite the RM declined on this ticket, restricted
 // to the caller's orgs — the seat for a 'quote_declined' dispute. The decline
-// nulls tickets.supplier_id, so this is resolved from ticket_suppliers.
+// nulls tickets.supplier_id, so this is resolved from ticket_suppliers / quotes.
 async function declinedOrgFor(admin: Admin, ticketId: string, orgIds: string[]): Promise<string | null> {
   if (!orgIds.length) return null
+  // Fresh RM decline that was NOT asked to re-quote: the invite still reads 'declined'.
   const { data } = await admin.from('ticket_suppliers')
     .select('supplier_id, status, declined_by').eq('ticket_id', ticketId).in('supplier_id', orgIds)
-  const hit = (data ?? []).find(r => r.supplier_id && orgIds.includes(r.supplier_id) && r.status === 'declined' && r.declined_by === 'regional_manager')
-  return hit?.supplier_id ?? null
+  const invite = (data ?? []).find(r => r.supplier_id && orgIds.includes(r.supplier_id) && r.status === 'declined' && r.declined_by === 'regional_manager')
+  if (invite?.supplier_id) return invite.supplier_id
+  // Re-quote path: the RM decline resets ticket_suppliers.status back to 'invited',
+  // so the declined-invite evidence is gone — but the RM-declined QUOTE row survives.
+  // Fall back to it, still scoped to the caller's OWN orgs (cross-supplier isolation holds).
+  const { data: q } = await admin.from('quotes')
+    .select('supplier_id, status').eq('ticket_id', ticketId).eq('status', 'declined').in('supplier_id', orgIds)
+  const quote = (q ?? []).find(r => r.supplier_id && orgIds.includes(r.supplier_id))
+  return quote?.supplier_id ?? null
 }
 
 // Resolve a dispute. outcome 'withdrawn' = the RM's request is DROPPED/retracted;
@@ -152,7 +162,7 @@ export async function GET(_req: Request, props: { params: Promise<{ id: string }
   const { data: prof } = await admin.from('user_profiles').select('role, company_id').eq('id', user.id).single()
   const role = prof?.role
   const isIndividual = role === 'individual'
-  const { data: ticket } = await admin.from('tickets').select('id, company_id, region_id, store_id, supplier_id, created_by').eq('id', id).single()
+  const { data: ticket } = await admin.from('tickets').select('id, company_id, region_id, store_id, supplier_id, created_by, job_ref').eq('id', id).single()
   if (!ticket) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   let ok = false
@@ -193,8 +203,27 @@ export async function GET(_req: Request, props: { params: Promise<{ id: string }
     ...m, evidence_urls: Array.isArray(m.evidence_urls) ? await signManyUrls(m.evidence_urls as string[]) : [],
   })))
 
+  // Header context for the conversation pop-up — the disputing org's name, the
+  // job ref + store, and (variation disputes) the disputed VO's amount. Null-safe:
+  // legacy disputes carry no supplier_id (→ the awarded org), standalone tickets
+  // have no store, and old VOs have no amount_incl_vat. The org is the DISPUTE's
+  // own org, so a supplier only ever sees their own name (cross-supplier isolation
+  // holds — the dispute itself was already scoped above).
+  const orgId = dispute.supplier_id ?? ticket.supplier_id
+  const { data: org } = orgId ? await admin.from('suppliers').select('company_name').eq('id', orgId).maybeSingle() : { data: null }
+  const { data: storeRow } = ticket.store_id ? await admin.from('stores').select('name').eq('id', ticket.store_id).maybeSingle() : { data: null }
+  let voAmount: number | null = null
+  let voAmountInclVat: number | null = null
+  if (dispute.origin === 'variation') {
+    // The disputed VO is the latest DECLINED one (mirrors the resolve/reopen logic).
+    const { data: vo } = await admin.from('ticket_variations').select('amount, amount_incl_vat').eq('ticket_id', id).eq('status', 'rejected').order('created_at', { ascending: false }).limit(1).maybeSingle()
+    voAmount = vo?.amount ?? null
+    voAmountInclVat = vo?.amount_incl_vat ?? null
+  }
+  const context = { supplierName: org?.company_name ?? null, jobRef: ticket.job_ref ?? null, store: storeRow?.name ?? null, amount: voAmount, amountInclVat: voAmountInclVat }
+
   const what = originWord(dispute.origin)
-  return NextResponse.json({ dispute, messages, viewerRole, subject: `${what[0].toUpperCase()}${what.slice(1)}` })
+  return NextResponse.json({ dispute, messages, viewerRole, subject: `${what[0].toUpperCase()}${what.slice(1)}`, context })
 }
 
 export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
@@ -339,11 +368,11 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     const what = originWord(openDispute.origin)
     const { error: pErr } = await admin.from('ticket_disputes').update({ pending_outcome: proposed, pending_by: actingRole, pending_at: now }).eq('id', openDispute.id)
     if (pErr) return NextResponse.json({ error: 'Proposals are not available yet — the latest database migration needs to be applied.' }, { status: 503 })
-    const label = proposed === 'withdrawn' ? `proposed to resolve the dispute — drop the ${what}` : `proposed to uphold the ${what} — it stands`
+    const label = proposed === 'withdrawn' ? `proposed to resolve the dispute — drop the ${what}` : `proposed to keep the ${what} — it stands`
     await admin.from('ticket_dispute_messages').insert({ dispute_id: openDispute.id, ticket_id: ticketId, author_id: user.id, author_role: actingRole, body: `${roleName(actingRole)} ${label}. Awaiting the other party's agreement.${note ? ` — ${note}` : ''}`, evidence_urls: [], created_at: now })
     await admin.from('tickets').update({ updated_at: now, ...stampFreshness(actingRole, now) }).eq('id', ticketId)
     if (actingRole === 'supplier') await notifyResolver(admin, ticket, title, 'The supplier has proposed resolving the dispute. Confirm to drop the request.')
-    else await push(admin, await supplierIds(admin, openDispute.supplier_id ?? ticket.supplier_id), ticket.company_id ?? '', ticketId, title, 'The manager has proposed upholding the request. Confirm to agree.', `/supplier/tickets/${ticketId}`)
+    else await push(admin, await supplierIds(admin, openDispute.supplier_id ?? ticket.supplier_id), ticket.company_id ?? '', ticketId, title, 'The manager has proposed keeping the request. Confirm to agree.', `/supplier/tickets/${ticketId}`)
   } else if (action === 'confirm') {
     // The OTHER party agrees to the pending proposal → resolve with its outcome.
     if (!openDispute) return NextResponse.json({ error: 'No open dispute on this ticket.' }, { status: 409 })

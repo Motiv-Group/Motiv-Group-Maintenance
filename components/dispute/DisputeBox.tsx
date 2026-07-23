@@ -3,15 +3,20 @@
 // Supplier↔RM dispute thread over a snag or a "more evidence" request. The supplier
 // raises it (pausing the snag/evidence step); both sides post messages + evidence in
 // a free-flowing numbered thread until the RM resolves it as upheld or withdrawn.
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { uploadOne } from '@/lib/upload'
 import type { ReactNode } from 'react'
-import { MessageSquareWarning, Paperclip, X, Send, ShieldCheck, ShieldX, FileText, Image as ImageIcon, Loader2, ClipboardList, ChevronDown } from 'lucide-react'
+import { MessageSquareWarning, Paperclip, X, Send, ShieldCheck, ShieldX, FileText, Image as ImageIcon, Loader2, ClipboardList, ChevronDown, XCircle, RefreshCw, Info } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { ViewTrackedLink } from '@/components/ui/ViewTrackedLink'
-import { formatDateTime } from '@/lib/utils'
+import { formatCurrency, formatDateTime } from '@/lib/utils'
+import { disputeEvidenceLabel } from '@/lib/attachment-labels'
 import { useScrollLock } from '@/lib/useScrollLock'
+import { useFileDrop } from '@/components/ui/useFileDrop'
+
+// The accept string shared by every dispute file input (composer + raise dropzone).
+const DISPUTE_ACCEPT = 'image/*,.pdf,.doc,.docx'
 
 // Reason quick-picks per dispute origin (folded into the first thread message).
 const DISPUTE_REASONS: Record<string, string[]> = {
@@ -63,6 +68,10 @@ export interface DisputeRecord {
 const originWord = (o: string) => o === 'snag' ? 'snag' : o === 'variation' ? 'variation order' : o === 'quote_declined' ? 'quote decline' : 'evidence request'
 
 const ROLE_LABEL: Record<string, string> = { supplier: 'Supplier', regional_manager: 'Regional Manager', system: 'System' }
+// The supplier's counterparty is presented as "the client" — RM-authored bubbles
+// read "Client" on the supplier's side only; the RM view keeps the real labels.
+const roleLabelFor = (authorRole: string, viewerRole: string) =>
+  viewerRole === 'supplier' && authorRole === 'regional_manager' ? 'Client' : (ROLE_LABEL[authorRole] ?? authorRole)
 
 // Chat avatar tint + initial per author role.
 const AVATAR_CLS: Record<string, string> = {
@@ -93,7 +102,13 @@ async function uploadEvidence(_ticketId: string, file: File): Promise<string> {
   return uploadOne(file, bucket)
 }
 
-// Message + evidence composer, shared by the initial raise and each reply.
+// Client-side caps shared by the raise form and the reply composer. NOTE: the API
+// does not enforce a body length — 1000 is the app-wide client cap.
+const MAX_DISPUTE_CHARS = 1000
+const MAX_DISPUTE_FILES = 5
+
+// Message + evidence composer (each reply): a rounded card — textarea + picked-file
+// previews, then a paperclip attach button, the character counter and a blue Send.
 function Composer({ ticketId, action, submitLabel, placeholder, onDone }: { ticketId: string; action: 'raise' | 'reply'; submitLabel: string; placeholder: string; onDone?: () => void }) {
   const router = useRouter()
   const [text, setText] = useState('')
@@ -107,6 +122,9 @@ function Composer({ ticketId, action, submitLabel, placeholder, onDone }: { tick
   // Keep each file's index in `files` so remove works from either list.
   const images = files.map((f, i) => ({ f, i })).filter(({ f }) => f.type.startsWith('image/'))
   const docs = files.map((f, i) => ({ f, i })).filter(({ f }) => !f.type.startsWith('image/'))
+  // Single append path for both the picker and drag-and-drop (same cap + clear).
+  const addFiles = (picked: File[]) => { setFiles(p => [...p, ...picked].slice(0, 10)); setErr('') }
+  const { isDragging, dropProps } = useFileDrop({ onFiles: addFiles, accept: DISPUTE_ACCEPT, multiple: true, disabled: busy })
 
   async function submit() {
     if (!text.trim() && !files.length) { setErr('Add a message or attach evidence.'); return }
@@ -124,9 +142,12 @@ function Composer({ ticketId, action, submitLabel, placeholder, onDone }: { tick
   }
 
   return (
-    <div className="space-y-2.5">
-      <textarea value={text} onChange={e => setText(e.target.value)} placeholder={placeholder} rows={3}
-        className="w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-sm placeholder-[var(--text-faint)] focus:ring-blue-500/40 outline-none" />
+    <div {...dropProps} className={`relative space-y-2 rounded-xl bg-[var(--input-bg)] p-2.5 ring-1 transition ${isDragging ? 'ring-2 ring-blue-500 bg-blue-500/5' : 'ring-[var(--border)]'}`}>
+      {isDragging && (
+        <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center rounded-xl bg-blue-500/5 text-sm font-semibold text-blue-600 dark:text-blue-400">Drop files here</div>
+      )}
+      <textarea value={text} onChange={e => setText(e.target.value.slice(0, MAX_DISPUTE_CHARS))} placeholder={placeholder} rows={3}
+        className="w-full resize-none bg-transparent px-1 py-0.5 text-sm text-[var(--text)] placeholder-[var(--text-faint)] outline-none" />
       {/* Picked images preview as thumbnails (like the photo uploaders); documents
           keep the compact text rows. */}
       {images.length > 0 && (
@@ -154,11 +175,12 @@ function Composer({ ticketId, action, submitLabel, placeholder, onDone }: { tick
       )}
       {err && <p className="text-xs text-red-500">{err}</p>}
       <div className="flex items-center gap-2">
-        <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl ring-1 ring-[var(--border)] text-sm text-[var(--text)] cursor-pointer hover:bg-[var(--hover)] transition shrink-0">
-          <Paperclip size={15} /> Attach
-          <input type="file" accept="image/*,.pdf,.doc,.docx" multiple className="hidden" onChange={e => { setFiles(p => [...p, ...Array.from(e.target.files ?? [])].slice(0, 10)); setErr('') }} />
+        <label aria-label="Attach evidence" className="grid h-10 w-10 shrink-0 cursor-pointer place-items-center rounded-lg text-[var(--text-muted)] ring-1 ring-[var(--border)] transition hover:bg-[var(--hover)]">
+          <Paperclip size={16} />
+          <input type="file" accept={DISPUTE_ACCEPT} multiple className="hidden" onChange={e => addFiles(Array.from(e.target.files ?? []))} />
         </label>
-        <button onClick={submit} disabled={busy} className="flex-1 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition disabled:opacity-50 flex items-center justify-center gap-1.5">
+        <span className="ml-auto shrink-0 text-[11px] tabular-nums text-[var(--text-faint)]">{text.length}/{MAX_DISPUTE_CHARS}</span>
+        <button onClick={submit} disabled={busy} className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:opacity-50">
           {busy ? <><Loader2 size={14} className="animate-spin" /> Sending…</> : <><Send size={14} /> {submitLabel}</>}
         </button>
       </div>
@@ -168,8 +190,6 @@ function Composer({ ticketId, action, submitLabel, placeholder, onDone }: { tick
 
 // Supplier-only raise-dispute pop-up. `trigger` lets it live inside a "More" menu
 // (renders a custom opener); without it, the default full-width red button shows.
-const MAX_DISPUTE_CHARS = 1000
-const MAX_DISPUTE_FILES = 5
 export function RaiseDisputeButton({ ticketId, origin, subjectTitle, jobRef, store, trigger, label, defaultOpen = false, onClose }: {
   ticketId: string; origin: 'snag' | 'evidence' | 'variation' | 'quote_declined'
   subjectTitle?: string | null; jobRef?: string | null; store?: string | null
@@ -188,9 +208,10 @@ export function RaiseDisputeButton({ ticketId, origin, subjectTitle, jobRef, sto
   const what = origin === 'snag' ? 'snag' : origin === 'variation' ? 'variation-order decline' : origin === 'quote_declined' ? 'quote decline' : 'evidence request'
   const reset = () => { setReason(''); setText(''); setFiles([]); setErr('') }
   const close = () => { setOpen(false); reset(); onClose?.() }
-  // Snapshot the live FileList before the input is cleared (lazy reads inside the
-  // state updater would find it already emptied).
-  const addFiles = (list: FileList | null) => { const picked = Array.from(list ?? []); setFiles(p => [...p, ...picked].slice(0, MAX_DISPUTE_FILES)); setErr('') }
+  // Single append path for both the picker and drag-and-drop. The picker snapshots
+  // the live FileList to File[] before the input is cleared.
+  const addFiles = (picked: File[]) => { setFiles(p => [...p, ...picked].slice(0, MAX_DISPUTE_FILES)); setErr('') }
+  const { isDragging, dropProps } = useFileDrop({ onFiles: addFiles, accept: DISPUTE_ACCEPT, multiple: true, disabled: busy })
 
   async function submit() {
     if (!reason) { setErr('Choose a reason for the dispute.'); return }
@@ -263,9 +284,8 @@ export function RaiseDisputeButton({ ticketId, origin, subjectTitle, jobRef, sto
               {/* Evidence dropzone */}
               <div>
                 <label className="mb-1.5 block text-sm font-semibold text-[var(--text)]">Add evidence <span className="font-normal text-[var(--text-faint)]">(optional)</span></label>
-                <label
-                  onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); addFiles(e.dataTransfer.files) }}
-                  className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border-2 border-dashed border-[var(--border)] px-4 py-4 transition hover:border-blue-500/60 hover:bg-[var(--hover)]">
+                <label {...dropProps}
+                  className={`flex cursor-pointer items-center justify-between gap-3 rounded-xl border-2 border-dashed px-4 py-4 transition ${isDragging ? 'border-blue-500 bg-blue-500/5' : 'border-[var(--border)] hover:border-blue-500/60 hover:bg-[var(--hover)]'}`}>
                   <span className="flex min-w-0 items-center gap-3">
                     <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400"><Paperclip size={18} /></span>
                     <span className="min-w-0">
@@ -275,7 +295,7 @@ export function RaiseDisputeButton({ ticketId, origin, subjectTitle, jobRef, sto
                   </span>
                   {/* The whole dropzone label is clickable — the pill is desktop-only. */}
                   <span className="hidden shrink-0 rounded-lg px-3 py-1.5 text-sm font-semibold text-blue-600 ring-1 ring-[var(--border)] transition hover:bg-blue-500/10 dark:text-blue-400 sm:inline-flex">Browse files</span>
-                  <input type="file" accept="image/*,.pdf,.doc,.docx" multiple className="hidden" onChange={e => { addFiles(e.target.files); e.currentTarget.value = '' }} />
+                  <input type="file" accept={DISPUTE_ACCEPT} multiple className="hidden" onChange={e => { addFiles(Array.from(e.target.files ?? [])); e.currentTarget.value = '' }} />
                 </label>
                 {files.length > 0 ? (
                   <div className="mt-2 space-y-1">
@@ -337,12 +357,12 @@ export function RaiseDisputeMore(props: { ticketId: string; origin: 'snag' | 'ev
 }
 
 // Today-queue "View dispute" pop-up — fetches the ticket's open dispute + messages
-// on open and shows the full chat + resolve controls in place (no navigation).
+// on open and shows the full conversation sheet in place (no navigation).
 export function DisputeReviewButton({ ticketId, viewerRole, trigger }: {
   ticketId: string; viewerRole: 'supplier' | 'regional_manager'; trigger: (open: () => void) => ReactNode
 }) {
   const [open, setOpen] = useState(false)
-  const [data, setData] = useState<{ dispute: DisputeRecord; messages: DisputeMessage[]; subject: string | null } | null>(null)
+  const [data, setData] = useState<DisputeSnapshot | null>(null)
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
   useEffect(() => {
@@ -362,21 +382,194 @@ export function DisputeReviewButton({ ticketId, viewerRole, trigger }: {
       {trigger(() => setOpen(true))}
       {open && (
         <Modal onClose={() => setOpen(false)} maxWidth="max-w-2xl">
-          {close => (
+          {close => (loading || err || !data) ? (
             <>
-              <div className="flex items-center justify-between gap-3">
-                <h3 className="flex items-center gap-2 text-lg font-bold text-[var(--text)]"><MessageSquareWarning size={19} className="text-red-500" /> Dispute conversation</h3>
-                <button type="button" onClick={close} aria-label="Close" className="-m-1 rounded-lg p-1.5 text-[var(--text-faint)] transition hover:bg-[var(--hover)] hover:text-[var(--text)]"><X size={18} /></button>
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-red-500/15 text-red-500"><MessageSquareWarning size={20} /></span>
+                  <h3 className="text-lg font-bold text-[var(--text)]">Dispute conversation</h3>
+                </div>
+                <button type="button" onClick={close} aria-label="Close" className="-m-1 shrink-0 rounded-lg p-1.5 text-[var(--text-faint)] transition hover:bg-[var(--hover)] hover:text-[var(--text)]"><X size={18} /></button>
               </div>
               {loading ? <p className="py-4 text-center text-sm text-[var(--text-faint)]">Loading…</p>
                 : err ? <p className="text-sm text-red-500">{err}</p>
-                : data ? <DisputeThread ticketId={ticketId} dispute={data.dispute} messages={data.messages} viewerRole={viewerRole} subject={data.subject} />
                 : <p className="py-4 text-center text-sm text-[var(--text-faint)]">No open dispute on this ticket.</p>}
             </>
+          ) : (
+            <DisputeConversation ticketId={ticketId} viewerRole={viewerRole} initial={data} close={close} />
           )}
         </Modal>
       )}
     </>
+  )
+}
+
+// Header context the GET resolves alongside the dispute (all fields null-safe).
+export interface DisputeContext {
+  supplierName: string | null; jobRef: string | null; store: string | null
+  /** Disputed VO amounts (variation disputes only) — omit "incl. VAT" when the incl figure is absent. */
+  amount: number | null; amountInclVat: number | null
+}
+// One server copy of the open dispute + its thread, as returned by the GET.
+type DisputeSnapshot = { dispute: DisputeRecord; messages: DisputeMessage[]; subject: string | null; context?: DisputeContext | null }
+
+// The "Dispute conversation" sheet body (reference layout): red-alert header with
+// a "{supplier} · {job ref} · {store}" context line, an amber who-acts-next status
+// bar, the REGARDING label, the chat thread, the reply composer and the resolve
+// option cards. Kept live by the 6s poll; used only inside DisputeReviewButton's
+// Modal — the inline DisputeThread keeps its own (compact) layout.
+function DisputeConversation({ ticketId, viewerRole, initial, close }: {
+  ticketId: string; viewerRole: 'supplier' | 'regional_manager'; initial: DisputeSnapshot; close: () => void
+}) {
+  const router = useRouter()
+  const live = initial.dispute.status === 'open'
+  const { snap, refresh } = useDisputePoll(ticketId, live)
+  const fresh = snap && snap.dispute.id === initial.dispute.id ? snap : null
+  const d = fresh?.dispute ?? initial.dispute
+  const msgs = fresh?.messages ?? initial.messages
+  const ctx = fresh?.context ?? initial.context ?? null
+  // The dispute left the open set while the sheet is up (both sides agreed — the
+  // GET only serves OPEN disputes, so the outcome itself isn't known here): flip
+  // to the resolved flavour + re-render the queue page ONCE (ref-guarded).
+  const gone = live && snap !== undefined && (snap === null || snap.dispute.id !== initial.dispute.id)
+  const bumped = useRef(false)
+  useEffect(() => {
+    if (gone && !bumped.current) { bumped.current = true; router.refresh() }
+  }, [gone, router])
+
+  const isOpen = d.status === 'open' && !gone
+  const what = originWord(d.origin)
+  // Who acts next: the supplier always raises, so with no pending proposal the
+  // resolver (RM) decides; a pending proposal awaits the other side's agreement.
+  const pending = isOpen && !!d.pending_outcome && !!d.pending_by
+  const other = viewerRole === 'supplier' ? 'client' : 'supplier'
+  const proposalText = d.pending_outcome === 'withdrawn' ? `drop the ${what}` : `keep the ${what} — it stands`
+  const whoActs = pending
+    ? (d.pending_by === viewerRole ? `Waiting for the ${other} to confirm your proposal to ${proposalText}` : `The ${other} proposed to ${proposalText} — your agreement is needed`)
+    : viewerRole === 'regional_manager' ? 'Awaiting your decision' : 'Awaiting the client’s decision'
+  // Header context line — whatever the GET could resolve, dot-joined. The VO amount
+  // shows the incl-VAT figure when stored; old VOs only have the ex-VAT amount
+  // (never computed here), shown without the "incl. VAT" suffix.
+  const amountPart = d.origin === 'variation'
+    ? (ctx?.amountInclVat != null ? `${formatCurrency(ctx.amountInclVat)} incl. VAT` : ctx?.amount != null ? formatCurrency(ctx.amount) : null)
+    : null
+  const contextLine = [ctx?.supplierName, ctx?.jobRef, ctx?.store, amountPart].filter(Boolean).join(' · ')
+
+  return (
+    <>
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-red-500/15 text-red-500"><MessageSquareWarning size={20} /></span>
+          <div className="min-w-0">
+            <h3 className="text-lg font-bold text-[var(--text)]">Dispute conversation</h3>
+            {contextLine && <p className="truncate text-xs text-[var(--text-muted)]">{contextLine}</p>}
+          </div>
+        </div>
+        <button type="button" onClick={close} aria-label="Close" className="-m-1 shrink-0 rounded-lg p-1.5 text-[var(--text-faint)] transition hover:bg-[var(--hover)] hover:text-[var(--text)]"><X size={18} /></button>
+      </div>
+
+      {/* Status bar */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl bg-[var(--surface-2)] px-3.5 py-2.5 ring-1 ring-[var(--border)]">
+        <span className="flex shrink-0 items-center gap-2 text-sm font-bold text-[var(--text)]">
+          <span className={`h-2 w-2 rounded-full ${isOpen ? 'bg-amber-500' : 'bg-[var(--text-faint)]'}`} aria-hidden />
+          {isOpen ? 'Dispute open' : 'Resolved'}
+        </span>
+        <span className="hidden h-4 w-px bg-[var(--border)] sm:block" aria-hidden />
+        <span className="min-w-0 text-xs text-[var(--text-muted)]">{isOpen ? whoActs : 'This dispute has been resolved — the ticket reflects the outcome.'}</span>
+      </div>
+
+      {/* What the dispute concerns */}
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-faint)]">Regarding {what}</p>
+
+      {/* Chat thread */}
+      {msgs.length > 0 && (
+        <div className="max-h-[440px] space-y-3 overflow-y-auto rounded-xl bg-[var(--app-bg)] p-3 ring-1 ring-[var(--border)]">
+          {msgs.map(m => <MessageBubble key={m.id} ticketId={ticketId} m={m} viewerRole={viewerRole} supplierName={ctx?.supplierName ?? undefined} />)}
+        </div>
+      )}
+
+      {/* Reply + resolve while the dispute is open */}
+      {isOpen && <Composer ticketId={ticketId} action="reply" submitLabel="Send" placeholder="Write a reply or add evidence…" onDone={refresh} />}
+      {isOpen && <DisputeControls ticketId={ticketId} origin={d.origin} viewerRole={viewerRole} pendingOutcome={d.pending_outcome ?? null} pendingBy={d.pending_by ?? null} poll={false} onAction={refresh} variant="cards" />}
+    </>
+  )
+}
+
+// Poll the open-dispute GET while `live` (mirrors TicketChat — deny-all RLS means
+// no browser Realtime, so a plain interval keeps both sides' threads + proposal
+// state current). `snap` stays undefined until the first fetch lands, then holds
+// the latest server copy — or null once the server reports no open dispute
+// (resolved). `refresh` forces an immediate refetch (used right after a send /
+// propose / confirm so the UI flips without waiting out the interval).
+const POLL_MS = 6000
+function useDisputePoll(ticketId: string, live: boolean): { snap: DisputeSnapshot | null | undefined; refresh: () => void } {
+  const [snap, setSnap] = useState<DisputeSnapshot | null | undefined>(undefined)
+  const [tick, setTick] = useState(0)
+  useEffect(() => {
+    if (!live) return
+    let on = true
+    const load = async () => {
+      try {
+        const r = await fetch(`/api/tickets/${ticketId}/dispute`)
+        const d = await r.json()
+        if (on && !d?.error) setSnap(d?.dispute ? d : null)
+      } catch { /* transient failure — keep the last copy */ }
+    }
+    load()
+    const t = setInterval(() => { if (on) load() }, POLL_MS)
+    return () => { on = false; clearInterval(t) }
+  }, [ticketId, live, tick])
+  return { snap, refresh: () => setTick(n => n + 1) }
+}
+
+// One thread message, shared by the pop-up sheet and the inline thread. Own
+// messages sit right in a blue bubble ("You · {role}"), the other side left in a
+// neutral card, system notes centred. The raise message's "Reason: …" prefix
+// renders as its own chip; attachments render as file cards (image thumbnail or
+// FileText + basename) with a view-tracked Preview link. No file sizes (not stored).
+function MessageBubble({ ticketId, m, viewerRole, supplierName }: { ticketId: string; m: DisputeMessage; viewerRole: 'supplier' | 'regional_manager'; supplierName?: string }) {
+  // A system note (e.g. "Dispute created and SLA timer paused") sits centred.
+  if (m.author_role === 'system') {
+    return (
+      <div className="flex justify-center">
+        <span className="rounded-lg bg-[var(--surface-2)] px-3 py-1.5 text-center text-[11px] text-[var(--text-muted)]">System · {formatDateTime(m.created_at)}{m.body ? ` — ${m.body}` : ''}</span>
+      </div>
+    )
+  }
+  const mine = m.author_role === viewerRole
+  const { reason, rest } = splitReason(m.body ?? '')
+  const urls = m.evidence_urls ?? []
+  return (
+    <div className={`flex items-start gap-2 ${mine ? 'flex-row-reverse' : ''}`}>
+      <span className={`mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full text-[11px] font-bold ${AVATAR_CLS[m.author_role] ?? AVATAR_CLS.system}`}>{roleInitial(m.author_role)}</span>
+      <div className={`min-w-0 max-w-[82%] rounded-2xl px-3.5 py-2.5 ${mine ? 'rounded-tr-sm bg-blue-600 text-white' : 'rounded-tl-sm bg-[var(--surface)] text-[var(--text)] ring-1 ring-[var(--border)]'}`}>
+        <div className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+          <span className={`text-[11px] font-bold ${mine ? 'text-white' : 'text-[var(--text)]'}`}>{mine ? 'You' : roleLabelFor(m.author_role, viewerRole)}{mine ? ` · ${ROLE_LABEL[m.author_role] ?? ''}` : ''}</span>
+          <span className={`text-[10px] ${mine ? 'text-white/60' : 'text-[var(--text-faint)]'}`}>{formatDateTime(m.created_at)}</span>
+        </div>
+        {reason && (
+          <span className={`mb-1.5 inline-block rounded-md px-2 py-0.5 text-[11px] font-semibold ${mine ? 'bg-white/15 text-white' : 'bg-violet-500/15 text-violet-700 dark:text-violet-300'}`}>Reason: {reason}</span>
+        )}
+        {rest && <p className="whitespace-pre-line break-words text-sm">{rest}</p>}
+        {urls.length > 0 && (
+          <div className="mt-2 space-y-1.5">
+            <p className={`text-[10px] font-semibold uppercase tracking-wide ${mine ? 'text-white/70' : 'text-[var(--text-faint)]'}`}>Attachment{urls.length === 1 ? '' : `s (${urls.length})`}</p>
+            {urls.map((u, j) => (
+              <div key={j} className={`flex items-center gap-2.5 rounded-lg p-1.5 ${mine ? 'bg-white/10' : 'bg-[var(--surface-2)] ring-1 ring-[var(--border)]'}`}>
+                {isImageUrl(u)
+                  /* eslint-disable-next-line @next/next/no-img-element -- signed remote evidence thumbnail */
+                  ? <img src={u} alt="" className="h-12 w-12 shrink-0 rounded object-cover" />
+                  : <span className={`grid h-12 w-12 shrink-0 place-items-center rounded ${mine ? 'bg-white/15 text-white' : 'bg-blue-500/15 text-blue-600 dark:text-blue-400'}`}><FileText size={18} /></span>}
+                <span className={`min-w-0 flex-1 truncate text-[11px] font-medium ${mine ? 'text-white' : 'text-[var(--text)]'}`}>{attachmentName(u)}</span>
+                <ViewTrackedLink ticketId={ticketId} itemType="attachment" itemLabel={disputeEvidenceLabel(j + 1, supplierName)} href={u}
+                  className={`shrink-0 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold ring-1 transition ${mine ? 'text-white ring-white/40 hover:bg-white/10' : 'text-blue-600 ring-[var(--border)] hover:bg-[var(--hover)] dark:text-blue-400'}`}>Preview</ViewTrackedLink>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -390,8 +583,33 @@ export function DisputeThread({ ticketId, dispute, messages, viewerRole, readOnl
   /** Hide the resolve/propose controls (the supplier surfaces them in the Next-action block instead). */
   hideControls?: boolean
 }) {
-  const isOpen = dispute.status === 'open' && !readOnly
-  const what = originWord(dispute.origin)
+  const router = useRouter()
+  // The server-rendered props are a point-in-time copy — while the dispute is open,
+  // poll the GET so the other side's replies + proposals appear without a manual
+  // refresh, and feed the live pending state down to the inline controls. Apply the
+  // polled copy only when it is THIS dispute (the GET returns the ticket's current
+  // open dispute, which can differ on a multi-dispute ticket).
+  const wantLive = dispute.status === 'open' && !readOnly
+  const { snap, refresh } = useDisputePoll(ticketId, wantLive)
+  const fresh = snap && snap.dispute.id === dispute.id ? snap : null
+  const d = fresh?.dispute ?? dispute
+  const msgs = fresh?.messages ?? messages
+  // Supplier company from the polled snapshot (server props carry no context) — used
+  // only to enrich the evidence audit label; undefined until the first poll lands.
+  const ctx = fresh?.context ?? null
+  // The dispute left the open set (the other side confirmed/resolved it) — re-render
+  // the server page ONCE so the resolved banner + next-action block take over (the
+  // ref guard stops the every-poll snapshot objects from refresh-looping).
+  const bumped = useRef(false)
+  useEffect(() => {
+    if (!wantLive || snap === undefined) return
+    if (snap === null || snap.dispute.id !== dispute.id) {
+      if (!bumped.current) { bumped.current = true; router.refresh() }
+    } else bumped.current = false
+  }, [wantLive, snap, dispute.id, router])
+
+  const isOpen = d.status === 'open' && !readOnly
+  const what = originWord(d.origin)
   const What = `${what[0].toUpperCase()}${what.slice(1)}`
 
   return (
@@ -399,113 +617,130 @@ export function DisputeThread({ ticketId, dispute, messages, viewerRole, readOnl
       {subject && (
         <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-faint)]">Regarding {subject}</p>
       )}
-      {dispute.status === 'resolved' && (
-        <div className={`rounded-lg p-3 ring-1 ${dispute.outcome === 'withdrawn' ? 'bg-emerald-500/10 ring-emerald-500/30' : 'bg-amber-500/10 ring-amber-500/30'}`}>
-          <p className={`text-[11px] font-bold uppercase tracking-wide ${dispute.outcome === 'withdrawn' ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}`}>
-            {dispute.outcome === 'withdrawn'
-              ? (dispute.origin === 'variation' ? 'Variation-order decline retracted — reopened for review'
-                : dispute.origin === 'quote_declined' ? 'Quote decline retracted — the manager will revisit the quote'
+      {d.status === 'resolved' && (
+        <div className={`rounded-lg p-3 ring-1 ${d.outcome === 'withdrawn' ? 'bg-emerald-500/10 ring-emerald-500/30' : 'bg-amber-500/10 ring-amber-500/30'}`}>
+          <p className={`text-[11px] font-bold uppercase tracking-wide ${d.outcome === 'withdrawn' ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}`}>
+            {d.outcome === 'withdrawn'
+              ? (d.origin === 'variation' ? 'Variation-order decline retracted — reopened for review'
+                : d.origin === 'quote_declined' ? `Quote decline retracted — ${viewerRole === 'supplier' ? 'the client' : 'the manager'} will revisit the quote`
                 : `${What} retracted — dropped`)
-              : (dispute.origin === 'variation' ? 'Variation-order decline upheld — stays declined'
-                : dispute.origin === 'quote_declined' ? 'Quote decline upheld — the decision stands'
+              : (d.origin === 'variation' ? 'Variation-order decline upheld — stays declined'
+                : d.origin === 'quote_declined' ? 'Quote decline upheld — the decision stands'
                 : `${What} upheld — stands`)}
           </p>
-          {dispute.resolution_note && <p className="text-sm text-[var(--text)]">{dispute.resolution_note}</p>}
+          {d.resolution_note && <p className="text-sm text-[var(--text)]">{d.resolution_note}</p>}
         </div>
       )}
 
       {/* Chat thread — the viewer's own messages sit right (blue), the other side's
-          left (surface). Attachments keep a running count PER SIDE across the whole
-          thread ("Evidence Supplier 1/2…", "Evidence RM 1/2…") for stable references. */}
-      {messages.length > 0 && (
+          left (surface); see MessageBubble. */}
+      {msgs.length > 0 && (
         <div className="max-h-[440px] space-y-3 overflow-y-auto rounded-xl bg-[var(--app-bg)] p-3 ring-1 ring-[var(--border)]">
-          {messages.map(m => {
-            // A system note (e.g. "Dispute created and SLA timer paused") sits centred.
-            if (m.author_role === 'system') {
-              return (
-                <div key={m.id} className="flex justify-center">
-                  <span className="rounded-lg bg-[var(--surface-2)] px-3 py-1.5 text-center text-[11px] text-[var(--text-muted)]">System · {formatDateTime(m.created_at)}{m.body ? ` — ${m.body}` : ''}</span>
-                </div>
-              )
-            }
-            const mine = m.author_role === viewerRole
-            const { reason, rest } = splitReason(m.body ?? '')
-            const urls = m.evidence_urls ?? []
-            return (
-              <div key={m.id} className={`flex items-start gap-2 ${mine ? 'flex-row-reverse' : ''}`}>
-                <span className={`mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full text-[11px] font-bold ${AVATAR_CLS[m.author_role] ?? AVATAR_CLS.system}`}>{roleInitial(m.author_role)}</span>
-                <div className={`min-w-0 max-w-[82%] rounded-2xl px-3.5 py-2.5 ${mine ? 'rounded-tr-sm bg-blue-600 text-white' : 'rounded-tl-sm bg-[var(--surface)] text-[var(--text)] ring-1 ring-[var(--border)]'}`}>
-                  <div className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                    <span className={`text-[11px] font-bold ${mine ? 'text-white' : 'text-[var(--text)]'}`}>{mine ? 'You' : (ROLE_LABEL[m.author_role] ?? m.author_role)}{mine ? ` · ${ROLE_LABEL[m.author_role] ?? ''}` : ''}</span>
-                    <span className={`text-[10px] ${mine ? 'text-white/60' : 'text-[var(--text-faint)]'}`}>{formatDateTime(m.created_at)}</span>
-                  </div>
-                  {reason && (
-                    <span className={`mb-1.5 inline-block rounded-md px-2 py-0.5 text-[11px] font-semibold ${mine ? 'bg-white/15 text-white' : 'bg-violet-500/15 text-violet-700 dark:text-violet-300'}`}>Reason: {reason}</span>
-                  )}
-                  {rest && <p className="whitespace-pre-line break-words text-sm">{rest}</p>}
-                  {urls.length > 0 && (
-                    <div className="mt-2 space-y-1.5">
-                      <p className={`text-[10px] font-semibold uppercase tracking-wide ${mine ? 'text-white/70' : 'text-[var(--text-faint)]'}`}>Attachment{urls.length === 1 ? '' : `s (${urls.length})`}</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {urls.map((u, j) => (
-                          <ViewTrackedLink key={j} ticketId={ticketId} itemType="attachment" itemLabel={attachmentName(u)} href={u}
-                            className={`flex max-w-[200px] items-center gap-2 rounded-lg p-1.5 pr-2.5 transition ${mine ? 'bg-white/10 hover:bg-white/20' : 'bg-[var(--surface-2)] ring-1 ring-[var(--border)] hover:bg-[var(--hover)]'}`}>
-                            {isImageUrl(u)
-                              /* eslint-disable-next-line @next/next/no-img-element -- signed remote evidence thumbnail */
-                              ? <img src={u} alt="" className="h-9 w-9 shrink-0 rounded object-cover" />
-                              : <span className={`grid h-9 w-9 shrink-0 place-items-center rounded ${mine ? 'bg-white/15 text-white' : 'bg-blue-500/15 text-blue-600 dark:text-blue-400'}`}><FileText size={16} /></span>}
-                            <span className={`min-w-0 truncate text-[11px] font-medium ${mine ? 'text-white' : 'text-[var(--text)]'}`}>{attachmentName(u)}</span>
-                          </ViewTrackedLink>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )
-          })}
+          {msgs.map(m => <MessageBubble key={m.id} ticketId={ticketId} m={m} viewerRole={viewerRole} supplierName={ctx?.supplierName ?? undefined} />)}
         </div>
       )}
 
-      {/* Reply while open */}
-      {isOpen && <Composer ticketId={ticketId} action="reply" submitLabel="Send" placeholder="Write a reply or add evidence…" />}
+      {/* Reply while open — a successful send refetches the thread immediately so
+          the new message lands without waiting out the poll interval. */}
+      {isOpen && <Composer ticketId={ticketId} action="reply" submitLabel="Send" placeholder="Write a reply or add evidence…" onDone={refresh} />}
 
       {/* Negotiation controls: either side can concede unilaterally, or propose an
           outcome the other must confirm (propose → confirm). Hidden when the caller
-          renders them elsewhere (supplier → Next-action block). */}
-      {isOpen && !hideControls && <DisputeControls ticketId={ticketId} origin={dispute.origin} viewerRole={viewerRole} pendingOutcome={dispute.pending_outcome ?? null} pendingBy={dispute.pending_by ?? null} />}
+          renders them elsewhere (supplier → Next-action block). The thread already
+          polls, so the inline controls skip their own poll and ride its live state. */}
+      {isOpen && !hideControls && <DisputeControls ticketId={ticketId} origin={d.origin} viewerRole={viewerRole} pendingOutcome={d.pending_outcome ?? null} pendingBy={d.pending_by ?? null} poll={false} onAction={refresh} />}
     </div>
   )
 }
 
+// Pop-up resolve-card copy — the SAME actions as the inline buttons mapped onto
+// two option cards (destructive red = the request stays; constructive emerald =
+// it's dropped/reopened). RM: propose-keep / retract; supplier: propose-drop /
+// withdraw. No new actions — origin only changes the nouns. PROPOSE cards end
+// with an agreement note (the other side must confirm); retract/withdraw resolve
+// immediately, so they carry none.
+type ResolveCard = { tone: 'red' | 'emerald'; title: string; body: string; action: string; busyLabel: string }
+function resolveCards(viewerRole: 'supplier' | 'regional_manager', origin: string): ResolveCard[] {
+  const what = originWord(origin)
+  if (viewerRole === 'regional_manager') {
+    const keep: ResolveCard = {
+      tone: 'red', action: 'propose', busyLabel: 'Proposing…',
+      ...(origin === 'variation' ? { title: 'Keep variation order declined', body: 'Uphold the original decision. The variation order will remain declined and the dispute will be closed. Both parties must agree.' }
+        : origin === 'quote_declined' ? { title: 'Keep quote declined', body: 'Uphold the original decision. The quote will remain declined and the dispute will be closed. Both parties must agree.' }
+        : origin === 'snag' ? { title: 'Keep the snag', body: 'Uphold the snag — the supplier must still correct the work, and the dispute will be closed. Both parties must agree.' }
+        : { title: 'Keep the evidence request', body: 'Uphold the request — the supplier must still provide the evidence, and the dispute will be closed. Both parties must agree.' }),
+    }
+    const drop: ResolveCard = {
+      tone: 'emerald', action: 'retract', busyLabel: 'Retracting…',
+      ...(origin === 'variation' ? { title: 'Reopen variation order', body: 'Reopen the variation order for further review or editing. The supplier will be notified.' }
+        : origin === 'quote_declined' ? { title: 'Retract the decline', body: 'Retract the quote decline — you will revisit the quote. The supplier will be notified.' }
+        : origin === 'snag' ? { title: 'Drop the snag', body: 'Drop the snag — the submission goes back under review for approval. The supplier will be notified.' }
+        : { title: 'Drop the evidence request', body: 'Drop the request — the submission goes back under review for approval. The supplier will be notified.' }),
+    }
+    return [keep, drop]
+  }
+  // Supplier: propose-to-resolve first (mirrors the inline button order), then the
+  // unilateral concede.
+  return [
+    { tone: 'emerald', action: 'propose', busyLabel: 'Proposing…', title: 'Propose to resolve', body: `Propose dropping the ${what}. Both parties must agree before the dispute closes.` },
+    { tone: 'red', action: 'withdraw', busyLabel: 'Withdrawing…', title: 'Withdraw dispute', body: `Accept the ${what} and close the dispute — it stands.` },
+  ]
+}
+
 // Dispute resolution. Each side can CONCEDE unilaterally (supplier withdraws → the
 // request stands; RM retracts → it's dropped), or PROPOSE an outcome the OTHER side
-// must confirm (supplier proposes to resolve/drop; RM proposes to uphold/keep).
-export function DisputeControls({ ticketId, origin, viewerRole, pendingOutcome, pendingBy }: {
+// must confirm (supplier proposes to resolve/drop; RM proposes to keep — 'upheld').
+export function DisputeControls({ ticketId, origin, viewerRole, pendingOutcome, pendingBy, poll = true, onAction, variant = 'inline' }: {
   ticketId: string; origin: string; viewerRole: 'supplier' | 'regional_manager'
   pendingOutcome: string | null; pendingBy: string | null
+  /** Skip the internal poll when a parent (DisputeThread) already feeds live props. */
+  poll?: boolean
+  /** Extra refetch fired after a successful action (the parent thread's refresh). */
+  onAction?: () => void
+  /** 'cards' = the pop-up's side-by-side resolve option cards; 'inline' = the compact button stack. */
+  variant?: 'inline' | 'cards'
 }) {
   const router = useRouter()
   const [busy, setBusy] = useState('')
   const [err, setErr] = useState('')
   const what = originWord(origin)
+  // Standalone usages (the next-action blocks) render from server props that go
+  // stale — poll the GET so the other side's proposal flips these buttons live.
+  // The polled copy applies only while it still matches this block's dispute
+  // (same origin); once it doesn't (resolved / superseded), the pending state
+  // clears and the server page re-renders ONCE (ref-guarded against loops).
+  const { snap, refresh } = useDisputePoll(ticketId, poll)
+  const polled = poll ? snap : undefined
+  const match = polled && polled.dispute.origin === origin ? polled.dispute : undefined
+  const gone = polled !== undefined && !match
+  const pOutcome = match ? (match.pending_outcome ?? null) : gone ? null : pendingOutcome
+  const pBy = match ? (match.pending_by ?? null) : gone ? null : pendingBy
+  const bumped = useRef(false)
+  useEffect(() => {
+    if (!poll || snap === undefined) return
+    if (snap === null || snap.dispute.origin !== origin) {
+      if (!bumped.current) { bumped.current = true; router.refresh() }
+    } else bumped.current = false
+  }, [poll, snap, origin, router])
 
   async function act(action: string) {
     setBusy(action); setErr('')
     try {
       const res = await fetch(`/api/tickets/${ticketId}/dispute`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed')
-      router.refresh()
+      // Refetch the dispute right away so propose/confirm/cancel feedback shows
+      // without waiting out the poll interval, then re-render the server page.
+      refresh(); onAction?.(); router.refresh()
     } catch (e) { setErr(errMsg(e)) }
     // Always clear busy — router.refresh() keeps this client component mounted, so
     // without this the buttons stay disabled after a successful action (e.g. cancel).
     finally { setBusy('') }
   }
 
-  const pending = !!pendingOutcome && !!pendingBy
-  const iAmProposer = pending && pendingBy === viewerRole
+  const pending = !!pOutcome && !!pBy
+  const iAmProposer = pending && pBy === viewerRole
   // 'withdrawn' = a proposal to DROP the request; 'upheld' = keep it (stands).
-  const proposalText = pendingOutcome === 'withdrawn' ? `drop the ${what}` : `keep the ${what} — it stands`
+  const proposalText = pOutcome === 'withdrawn' ? `drop the ${what}` : `keep the ${what} — it stands`
   const otherLabel = (r: string) => r === 'supplier' ? 'supplier' : 'client'
 
   // Role action set (propose + solo concede). Hidden for the proposer while waiting.
@@ -516,25 +751,61 @@ export function DisputeControls({ ticketId, origin, viewerRole, pendingOutcome, 
     </>
   ) : (
     <>
-      <button onClick={() => act('propose')} disabled={!!busy} className="w-full py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition disabled:opacity-50">{busy === 'propose' ? 'Proposing…' : `Propose to uphold the ${what}`}</button>
+      <button onClick={() => act('propose')} disabled={!!busy} className="w-full py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition disabled:opacity-50">{busy === 'propose' ? 'Proposing…' : `Propose to keep the ${what}`}</button>
       <button onClick={() => act('retract')} disabled={!!busy} className="w-full py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition disabled:opacity-50 flex items-center justify-center gap-1.5"><ShieldX size={14} /> {busy === 'retract' ? 'Retracting…' : `Retract the ${what}`}</button>
     </>
   )
 
+  // Pending-proposal boxes, shared by both variants (the cards variant restyles
+  // nothing here — the existing propose/confirm/cancel semantics stay as-is).
+  const pendingMine = pending && iAmProposer && (
+    <div className="rounded-lg ring-1 ring-[#f59e0b]/30 bg-[#f59e0b]/10 p-2.5 space-y-2">
+      <p className="text-sm text-[var(--text)]">Waiting for the {otherLabel(viewerRole === 'supplier' ? 'regional_manager' : 'supplier')} to confirm your proposal to <span className="font-semibold">{proposalText}</span>.</p>
+      <button onClick={() => act('cancel')} disabled={!!busy} className="w-full py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm font-semibold disabled:opacity-50">{busy === 'cancel' ? 'Cancelling…' : 'Cancel proposal'}</button>
+    </div>
+  )
+  const pendingTheirs = pending && !iAmProposer && (
+    <div className="rounded-lg ring-1 ring-[#f59e0b]/30 bg-[#f59e0b]/10 p-2.5 space-y-2">
+      <p className="text-sm text-[var(--text)]">The {otherLabel(pBy!)} proposed to <span className="font-semibold">{proposalText}</span>. Both sides must agree.</p>
+      <button onClick={() => act('confirm')} disabled={!!busy} className="w-full py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold disabled:opacity-50">{busy === 'confirm' ? 'Agreeing…' : 'Agree'}</button>
+    </div>
+  )
+
+  // Pop-up variant: the same actions as side-by-side option cards (destructive
+  // red / constructive emerald), stacked on phones.
+  if (variant === 'cards') {
+    return (
+      <div className="space-y-3">
+        {pendingMine}
+        {pendingTheirs}
+        {!(pending && iAmProposer) && (
+          <>
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-faint)]">{pending ? 'Or resolve it another way' : 'Resolve the dispute'}</p>
+              <p className="mt-0.5 text-xs text-[var(--text-muted)]">Choose how you want to resolve this dispute.</p>
+            </div>
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+              {resolveCards(viewerRole, origin).map(c => (
+                <button key={c.action} type="button" onClick={() => act(c.action)} disabled={!!busy}
+                  className={`rounded-xl bg-[var(--surface)] p-3.5 text-left ring-1 transition disabled:opacity-50 ${c.tone === 'red' ? 'ring-red-500/40 hover:bg-red-500/5' : 'ring-emerald-500/40 hover:bg-emerald-500/5'}`}>
+                  <span className={`mb-2 grid h-9 w-9 place-items-center rounded-full ${c.tone === 'red' ? 'bg-red-500/15 text-red-500' : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'}`}>{c.tone === 'red' ? <XCircle size={18} /> : <RefreshCw size={18} />}</span>
+                  <span className="block text-sm font-bold text-[var(--text)]">{busy === c.action ? c.busyLabel : c.title}</span>
+                  <span className="mt-1 block text-xs leading-relaxed text-[var(--text-muted)]">{c.body}</span>
+                </button>
+              ))}
+            </div>
+            <p className="flex items-start gap-1.5 text-xs text-blue-600 dark:text-blue-400"><Info size={14} className="mt-px shrink-0" /> You can add a comment on the next step to explain your decision (optional).</p>
+          </>
+        )}
+        {err && <p className="text-xs text-red-500">{err}</p>}
+      </div>
+    )
+  }
+
   return (
     <div className="rounded-xl ring-1 ring-[var(--border)] bg-[var(--input-bg)] p-3 space-y-2.5">
-      {pending && iAmProposer && (
-        <div className="rounded-lg ring-1 ring-[#f59e0b]/30 bg-[#f59e0b]/10 p-2.5 space-y-2">
-          <p className="text-sm text-[var(--text)]">Waiting for the {otherLabel(viewerRole === 'supplier' ? 'regional_manager' : 'supplier')} to confirm your proposal to <span className="font-semibold">{proposalText}</span>.</p>
-          <button onClick={() => act('cancel')} disabled={!!busy} className="w-full py-2 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm font-semibold disabled:opacity-50">{busy === 'cancel' ? 'Cancelling…' : 'Cancel proposal'}</button>
-        </div>
-      )}
-      {pending && !iAmProposer && (
-        <div className="rounded-lg ring-1 ring-[#f59e0b]/30 bg-[#f59e0b]/10 p-2.5 space-y-2">
-          <p className="text-sm text-[var(--text)]">The {otherLabel(pendingBy!)} proposed to <span className="font-semibold">{proposalText}</span>. Both sides must agree.</p>
-          <button onClick={() => act('confirm')} disabled={!!busy} className="w-full py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold disabled:opacity-50">{busy === 'confirm' ? 'Agreeing…' : 'Agree'}</button>
-        </div>
-      )}
+      {pendingMine}
+      {pendingTheirs}
       {/* The proposer just waits; everyone else gets the action set (which counter-
           proposes / concedes). */}
       {!(pending && iAmProposer) && (

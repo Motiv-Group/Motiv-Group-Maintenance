@@ -32,7 +32,7 @@ function nextStep(p: Phase, ticketStatus: string): { Icon: typeof Clock; cls: st
     if (['approved_closeout', 'vo_declined'].includes(ticketStatus)) return { Icon: ArrowRight, cls: green, title: 'Confirm additional work', desc: 'Raise a variation order for extra work, or confirm there are none' }
     return { Icon: CheckCircle2, cls: green, title: 'Approved', desc: 'No further action needed' }
   }
-  return { Icon: Clock, cls: 'text-[var(--text-muted)] ring-[var(--border)]', title: 'No action needed', desc: 'Waiting for the manager to review' }
+  return { Icon: Clock, cls: 'text-[var(--text-muted)] ring-[var(--border)]', title: 'No action needed', desc: 'Waiting for the client to review' }
 }
 
 function StatCard({ icon, tone, value, title, sub, active, onClick }: { icon: ReactNode; tone: string; value: number; title: string; sub: string; active: boolean; onClick: () => void }) {
@@ -116,7 +116,7 @@ export function SupplierSignoff({ signoffs }: { signoffs: SupplierSignoffRow[] }
 
       {helpOpen && (
         <Card className="p-4 text-sm text-[var(--text-muted)]">
-          <p>You submit the COC &amp; proof-of-completion photos; the regional manager reviews and either <span className="font-semibold text-emerald-600 dark:text-emerald-400">approves</span> (you can then raise any extra work), <span className="font-semibold text-amber-600 dark:text-amber-400">requests changes</span> (update and resubmit), or leaves it <span className="font-semibold text-blue-600 dark:text-blue-400">awaiting review</span>. You can&apos;t mark jobs complete yourself.</p>
+          <p>You submit the COC &amp; proof-of-completion photos; the client reviews and either <span className="font-semibold text-emerald-600 dark:text-emerald-400">approves</span> (you can then raise any extra work), <span className="font-semibold text-amber-600 dark:text-amber-400">requests changes</span> (update and resubmit), or leaves it <span className="font-semibold text-blue-600 dark:text-blue-400">awaiting review</span>. You can&apos;t mark jobs complete yourself.</p>
         </Card>
       )}
 

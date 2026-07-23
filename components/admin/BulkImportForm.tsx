@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Upload, CheckCircle2, XCircle, ChevronDown } from 'lucide-react'
 import { Card } from '@/components/exec/ui'
 import { errMsg } from '@/components/ui/errMsg'
+import { useFileDrop } from '@/components/ui/useFileDrop'
 
 type Role = 'executive' | 'regional_manager' | 'store_manager'
 
@@ -35,6 +36,13 @@ export function BulkImportForm() {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [results, setResults] = useState<{ label: string; ok: boolean; error?: string }[] | null>(null)
+
+  async function addFiles(files: File[]) {
+    const f = files[0]
+    if (f) setText(await f.text())
+  }
+
+  const { isDragging, dropProps } = useFileDrop({ onFiles: addFiles, accept: '.csv,text/csv', multiple: false, disabled: busy })
 
   async function importRows() {
     setErr(''); setResults(null)
@@ -77,9 +85,9 @@ export function BulkImportForm() {
         className="w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-xs font-mono placeholder-[var(--text-faint)] outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500/60" />
 
       <div className="flex items-center gap-2">
-        <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl ring-1 ring-[var(--border)] text-sm text-[var(--text)] cursor-pointer hover:bg-[var(--hover)] transition shrink-0">
-          Choose CSV file
-          <input type="file" accept=".csv,text/csv" className="hidden" onChange={async e => { const f = e.target.files?.[0]; if (f) setText(await f.text()); e.target.value = '' }} />
+        <label {...dropProps} className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl ring-1 text-sm text-[var(--text)] cursor-pointer transition shrink-0 ${isDragging ? 'ring-2 ring-blue-500 bg-blue-500/5' : 'ring-[var(--border)] hover:bg-[var(--hover)]'}`}>
+          {isDragging ? 'Drop CSV here' : 'Choose CSV file'}
+          <input type="file" accept=".csv,text/csv" className="hidden" onChange={async e => { await addFiles(Array.from(e.target.files ?? [])); e.target.value = '' }} />
         </label>
         <button onClick={importRows} disabled={busy || !text.trim()} className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition disabled:opacity-50">
           {busy ? 'Importing…' : 'Import & invite'}

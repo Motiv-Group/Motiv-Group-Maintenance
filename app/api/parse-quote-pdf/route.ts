@@ -14,8 +14,12 @@ const MAX_FILE_BYTES = 15 * 1024 * 1024 // 15 MB/file — caps DoS + Groq spend
 const GROQ_API_KEY = process.env.GROQ_API_KEY!
 const GROQ_BASE    = 'https://api.groq.com/openai/v1'
 
-const TEXT_MODEL   = 'llama-3.3-70b-versatile'
-const VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct'
+const TEXT_MODEL     = 'llama-3.3-70b-versatile'
+// Groq free-tier rate limits are PER-MODEL (separate tokens-per-day pools), so when the
+// primary model's TPD quota is exhausted (429) the smaller model still has headroom.
+// Lower quality, but fine for a 1–3 sentence description.
+const FALLBACK_MODEL = 'llama-3.1-8b-instant'
+const VISION_MODEL   = 'meta-llama/llama-4-scout-17b-16e-instruct'
 
 const IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
 const EXCEL_TYPES = [
@@ -158,11 +162,11 @@ Return ONLY a JSON object with these keys:
 Do NOT output any monetary amounts. Return only the JSON object.`
 
 async function llmDescribe(text: string, today: string): Promise<{ description: string | null; valid_until: string | null }> {
-  const res = await fetchWithRetry(`${GROQ_BASE}/chat/completions`, {
+  const call = (model: string) => fetchWithRetry(`${GROQ_BASE}/chat/completions`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: TEXT_MODEL,
+      model,
       response_format: { type: 'json_object' },
       temperature: 0,
       max_tokens: 300,
@@ -172,6 +176,13 @@ async function llmDescribe(text: string, today: string): Promise<{ description: 
       ],
     }),
   }, { timeoutMs: 30_000, retries: 1, label: 'groq-quote-text' })
+
+  let res = await call(TEXT_MODEL)
+  if (!res.ok) {
+    // Per-model quota exhausted (429 TPD) or other failure — one shot on the fallback model.
+    console.warn(`[parse-quote-pdf] ${TEXT_MODEL} failed (${res.status}), retrying with ${FALLBACK_MODEL}:`, await res.text())
+    res = await call(FALLBACK_MODEL)
+  }
   if (!res.ok) throw new Error(`Groq LLM error: ${await res.text()}`)
   const json = await res.json() as { choices: Array<{ message: { content: string } }> }
   const parsed = parseJsonResponse(json.choices[0].message.content)

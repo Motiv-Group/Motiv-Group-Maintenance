@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { UploadCloud, FileSpreadsheet, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
+import { useFileDrop } from '@/components/ui/useFileDrop'
 import type { ImportPreview } from '@/lib/projects/import'
 
 interface Counts {
@@ -43,14 +44,26 @@ export function ImportWizard({ projectId, onClose }: { projectId: string; onClos
     setMode(data.counts.existingOnProject > 0 ? 'update' : 'add_new')
   }
 
-  function onPick(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0]
+  function addFiles(files: File[]) {
+    const f = files[0]
     if (!f) return
     setFile(f)
     setPreview(null)
     setCounts(null)
     runPreview(f)
   }
+
+  function onPick(e: React.ChangeEvent<HTMLInputElement>) {
+    addFiles(Array.from(e.target.files ?? []))
+    e.target.value = ''
+  }
+
+  const { isDragging, dropProps } = useFileDrop({
+    onFiles: addFiles,
+    accept: '.xlsx,.xls,.csv',
+    multiple: false,
+    disabled: busy,
+  })
 
   async function confirmImport(close: () => void) {
     if (!file) return
@@ -84,9 +97,14 @@ export function ImportWizard({ projectId, onClose }: { projectId: string; onClos
             </div>
           ) : (
             <>
-              <label className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-[var(--border)] p-6 cursor-pointer hover:bg-[var(--hover)]">
-                <UploadCloud size={26} className="text-[var(--text-faint)]" />
-                <span className="text-sm text-[var(--text)]">{file ? file.name : 'Choose an .xlsx or .csv file'}</span>
+              <label
+                {...dropProps}
+                className={`flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-6 cursor-pointer transition-colors ${
+                  isDragging ? 'border-blue-500 ring-2 ring-blue-500 bg-blue-500/5' : 'border-[var(--border)] hover:bg-[var(--hover)]'
+                }`}
+              >
+                <UploadCloud size={26} className={isDragging ? 'text-blue-500' : 'text-[var(--text-faint)]'} />
+                <span className="text-sm text-[var(--text)]">{isDragging ? 'Drop file here' : file ? file.name : 'Choose or drop an .xlsx or .csv file'}</span>
                 <span className="text-[11px] text-[var(--text-faint)]">Columns: Branch Code · Store Name · Town · RFID m² · Start · End</span>
                 <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={onPick} />
               </label>

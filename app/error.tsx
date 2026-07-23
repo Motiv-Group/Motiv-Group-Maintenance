@@ -2,12 +2,16 @@
 
 import { useEffect } from 'react'
 import * as Sentry from '@sentry/nextjs'
+import { reloadIfChunkError } from '@/lib/chunk-reload'
 
 // Route-segment error boundary. Renders INSIDE the root layout, so it must NOT
 // render its own <html>/<body> — the layout already provides them. Errors in the
 // root layout itself are caught by app/global-error.tsx instead.
 export default function Error({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
+    // Stale-chunk errors after a deploy: reload once to fetch fresh chunks instead
+    // of showing an error page. Skip reporting those (they're transient, not a bug).
+    if (reloadIfChunkError(error)) return
     // Client render errors aren't covered by onRequestError — report explicitly
     // (no-ops when the DSN is unset).
     Sentry.captureException(error)

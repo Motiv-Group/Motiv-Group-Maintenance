@@ -27,6 +27,8 @@ export interface SeedResult {
   supplierBId: string
   awardedTicketId: string
   openTicketId: string
+  closeoutTicketId: string
+  completedTicketId: string
 }
 
 const makeAdmin = (url: string, key: string) =>
@@ -130,7 +132,42 @@ export async function seed(): Promise<SeedResult> {
   await link('ticket_suppliers', { ticket_id: awardedTicketId, supplier_id: supplierAId })
   const openTicketId = await ticket(`${E2E_TAG} open ticket`, { status: 'open' })
 
-  return { companyId, regionId, storeId, supplierAId, supplierBId, awardedTicketId, openTicketId }
+  // End-of-life tickets carrying a completion (COC + invoice + before/after) — the
+  // close-out and completed states. These exercise the completion / documents /
+  // timeline render paths the nav-only smoke matrix never opened.
+  // A completion carries: an accepted quote (with ref + file), a signoff (COC +
+  // invoice + before/after photos), and an approved variation with an attachment —
+  // the full data a real end-of-life ticket's detail page renders.
+  const completionData = async (ticketId: string) => {
+    const { data: hit } = await admin.from('signoffs').select('id').eq('ticket_id', ticketId).limit(1).maybeSingle()
+    if (hit) return
+    const sErr = (await admin.from('signoffs').insert({
+      ticket_id: ticketId, supplier_id: supplierAId, company_id: companyId, status: 'accepted',
+      coc_url: `${E2E_TAG}/coc.pdf`, invoice_url: `${E2E_TAG}/invoice.pdf`,
+      before_urls: [`${E2E_TAG}/before-1.jpg`], after_urls: [`${E2E_TAG}/after-1.jpg`],
+      reviewed_at: new Date().toISOString(),
+    })).error
+    if (sErr) throw new Error(`signoff: ${sErr.message}`)
+    const qErr = (await admin.from('quotes').insert({
+      ticket_id: ticketId, supplier_id: supplierAId, company_id: companyId, status: 'accepted',
+      amount: 1000, amount_incl_vat: 1150, description: 'seeded quote', quote_ref: 'Q-E2E-1', file_url: `${E2E_TAG}/quote.pdf`,
+    })).error
+    if (qErr) throw new Error(`quote: ${qErr.message}`)
+    const vErr = (await admin.from('ticket_variations').insert({
+      ticket_id: ticketId, supplier_id: supplierAId, company_id: companyId, status: 'approved',
+      description: 'seeded variation', amount: 200, warranty: '12 months', reviewed_at: new Date().toISOString(), file_urls: [`${E2E_TAG}/vo-1.pdf`],
+    })).error
+    if (vErr) throw new Error(`variation: ${vErr.message}`)
+  }
+  const signoff = completionData
+  const closeoutTicketId = await ticket(`${E2E_TAG} closeout ticket`, { status: 'approved_closeout', supplier_id: supplierAId })
+  await link('ticket_suppliers', { ticket_id: closeoutTicketId, supplier_id: supplierAId })
+  await signoff(closeoutTicketId)
+  const completedTicketId = await ticket(`${E2E_TAG} completed ticket`, { status: 'completed', supplier_id: supplierAId })
+  await link('ticket_suppliers', { ticket_id: completedTicketId, supplier_id: supplierAId })
+  await signoff(completedTicketId)
+
+  return { companyId, regionId, storeId, supplierAId, supplierBId, awardedTicketId, openTicketId, closeoutTicketId, completedTicketId }
 }
 
 export async function teardown(): Promise<void> {

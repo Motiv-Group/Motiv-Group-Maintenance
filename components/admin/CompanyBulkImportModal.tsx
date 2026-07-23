@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { CheckCircle2, XCircle } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { errMsg } from '@/components/ui/errMsg'
+import { useFileDrop } from '@/components/ui/useFileDrop'
 
 type Role = 'executive' | 'regional_manager' | 'store_manager'
 
@@ -35,6 +36,14 @@ export function CompanyBulkImportModal({ companyName, onClose }: { companyName: 
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [results, setResults] = useState<{ label: string; ok: boolean; error?: string }[] | null>(null)
+
+  // Load the first CSV file's text into the textarea — shared by <input onChange> and drop.
+  async function addFiles(files: File[]) {
+    const f = files[0]
+    if (f) setText(await f.text())
+  }
+
+  const { isDragging, dropProps } = useFileDrop({ onFiles: addFiles, accept: '.csv,text/csv', multiple: false, disabled: busy })
 
   async function importRows() {
     setErr(''); setResults(null)
@@ -75,14 +84,21 @@ export function CompanyBulkImportModal({ companyName, onClose }: { companyName: 
 
           <p className="text-[11px] text-[var(--text-muted)]">First row = headers. Columns: <span className="font-mono text-[var(--text)]">{cols}</span>. Region matched by name (created if new). Each new account gets an email activation link.</p>
 
-          <textarea value={text} onChange={e => setText(e.target.value)} rows={6}
-            placeholder={`region_name,region_code,store_name,branch_name,branch_code,full_name,email,phone,address\nGauteng,GP,Acme Sandton,Sandton City,SND01,Jane Smith,jane@acme.com,0712345678,123 Main St`}
-            className="w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-xs font-mono placeholder-[var(--text-faint)] outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500/60" />
+          <div {...dropProps} className={`relative rounded-xl transition ${isDragging ? 'ring-2 ring-blue-500 bg-blue-500/5' : ''}`}>
+            <textarea value={text} onChange={e => setText(e.target.value)} rows={6}
+              placeholder={`region_name,region_code,store_name,branch_name,branch_code,full_name,email,phone,address\nGauteng,GP,Acme Sandton,Sandton City,SND01,Jane Smith,jane@acme.com,0712345678,123 Main St`}
+              className="w-full px-3 py-2.5 rounded-xl bg-[var(--input-bg)] ring-1 ring-[var(--border)] text-[var(--text)] text-xs font-mono placeholder-[var(--text-faint)] outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500/60" />
+            {isDragging && (
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl bg-blue-500/5 text-xs font-semibold text-blue-500">
+                Drop CSV here
+              </div>
+            )}
+          </div>
 
           <div className="flex items-center gap-2">
             <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl ring-1 ring-[var(--border)] text-sm text-[var(--text)] cursor-pointer hover:bg-[var(--hover)] transition shrink-0">
               Choose CSV
-              <input type="file" accept=".csv,text/csv" className="hidden" onChange={async e => { const f = e.target.files?.[0]; if (f) setText(await f.text()); e.target.value = '' }} />
+              <input type="file" accept=".csv,text/csv" className="hidden" onChange={async e => { await addFiles(Array.from(e.target.files ?? [])); e.target.value = '' }} />
             </label>
             <button onClick={importRows} disabled={busy || !text.trim()} className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition disabled:opacity-50">
               {busy ? 'Importing…' : 'Import & invite'}
