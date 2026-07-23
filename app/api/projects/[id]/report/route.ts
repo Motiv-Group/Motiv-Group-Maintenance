@@ -134,7 +134,7 @@ async function generate(admin: ReturnType<typeof createAdminClient>, companyId: 
 
   const name = slug(data.project.name)
   const summaryPdf = (opts.pdf || opts.zip) ? await renderProjectReport(baseReport(renderStores)) : null
-  const summaryXlsx = (opts.excel || opts.zip) ? buildProjectExcel(data.project, summary, stores, generatedAt) : null
+  const summaryXlsx = (opts.excel || opts.zip) ? await buildProjectExcel(data.project, summary, stores, generatedAt, brandHex) : null
 
   await logAudit(admin, { actorId, companyId, action: 'project.report_generated', entityType: 'project', entityId: projectId, metadata: { stores: stores.length, formats: { pdf: opts.pdf, excel: opts.excel }, scope: opts.scope, zip: opts.zip } })
 

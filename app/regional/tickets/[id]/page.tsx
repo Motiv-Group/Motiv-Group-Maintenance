@@ -1,5 +1,6 @@
 export const dynamic = 'force-dynamic'
 
+import type { JSX } from 'react' // React 19: JSX is no longer a global namespace
 import { redirect } from 'next/navigation'
 import { BackLink } from '@/components/ui/BackLink'
 import { CheckCircle2, FileText, Calendar, Clock, MessageSquare, Camera } from 'lucide-react'
