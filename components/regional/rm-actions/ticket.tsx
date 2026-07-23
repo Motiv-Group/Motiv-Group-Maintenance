@@ -5,7 +5,7 @@
 import { useState, useMemo, useEffect, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
-import { Pencil, Plus, Camera, Info, X, ChevronDown, MessageSquare, XCircle, Send, AlertCircle, Trash2, FileUp, FileText } from 'lucide-react'
+import { Pencil, Plus, Camera, Info, X, ChevronDown, MoreVertical, MessageSquare, XCircle, Send, AlertCircle, Trash2, FileUp, FileText } from 'lucide-react'
 import { uploadFiles } from '@/lib/upload'
 import { useFileDrop } from '@/components/ui/useFileDrop'
 import { formatDateTime } from '@/lib/utils'
@@ -23,7 +23,7 @@ import { AssignSuppliersButton } from './assign'
 // INSIDE this trigger's relative wrapper instead of portalling to <body> — so it
 // stays within the parent block (e.g. the SM Next-action card) and can't escape
 // into the card below. Every existing caller leaves it false (portalled).
-export function MoreMenu({ children, fullWidth = false, label = 'More', up = false, align = 'right', inline = false }: { children: ReactNode; fullWidth?: boolean; label?: string; up?: boolean; align?: 'left' | 'right'; inline?: boolean }) {
+export function MoreMenu({ children, fullWidth = false, label = 'More', up = false, align = 'right', inline = false, iconOnly = false }: { children: ReactNode; fullWidth?: boolean; label?: string; up?: boolean; align?: 'left' | 'right'; inline?: boolean; iconOnly?: boolean }) {
   const [open, setOpen] = useState(false)
   const btnRef = useRef<HTMLButtonElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -70,9 +70,12 @@ export function MoreMenu({ children, fullWidth = false, label = 'More', up = fal
         onClick={() => setOpen(o => !o)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className={`${fullWidth ? 'w-full justify-center' : ''} flex items-center gap-1.5 py-2.5 px-4 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm font-semibold hover:bg-[var(--hover)] transition`}
+        aria-label={iconOnly ? label : undefined}
+        className={iconOnly
+          ? 'grid h-10 w-10 place-items-center rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--hover)] transition sm:h-9 sm:w-9'
+          : `${fullWidth ? 'w-full justify-center' : ''} flex items-center gap-1.5 py-2.5 px-4 rounded-lg ring-1 ring-[var(--border)] text-[var(--text-muted)] text-sm font-semibold hover:bg-[var(--hover)] transition`}
       >
-        {label} <ChevronDown size={15} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+        {iconOnly ? <MoreVertical size={18} /> : <>{label} <ChevronDown size={15} className={`transition-transform ${open ? 'rotate-180' : ''}`} /></>}
       </button>
       {/* Inline: absolutely-positioned panel INSIDE the relative wrapper (right/left
           per `align`, below/above per `up`). Right-aligned + capped width keep it
