@@ -128,9 +128,16 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         </BrandingProvider>
         {/* Real-user Core Web Vitals + page-view analytics. Both inject their script
             client-side via the trusted React bundle → allowed by the strict-dynamic
-            CSP; they beacon same-origin (/_vercel/*), covered by connect-src 'self'. */}
-        <SpeedInsights />
-        <Analytics />
+            CSP; they beacon same-origin (/_vercel/*), covered by connect-src 'self'.
+            Only mount on the Production deployment — preview deploys and local dev
+            would otherwise pollute the prod dataset with non-user traffic (automated
+            browsers, US-region test loads). VERCEL_ENV is read server-side here. */}
+        {process.env.VERCEL_ENV === 'production' && (
+          <>
+            <SpeedInsights />
+            <Analytics />
+          </>
+        )}
       </body>
     </html>
   )
