@@ -8,16 +8,19 @@ import { logAudit } from '@/lib/audit'
 import { getAppSettings } from '@/lib/settings-server'
 import { effectiveBrandHex, type AppSettings } from '@/lib/settings'
 import { formatDate } from '@/lib/utils'
-import { loadProjectReportData } from '@/lib/reports/data'
+import { loadProjectReportData, type ReportPhoto, type StoreRow, type ProjectSummary } from '@/lib/reports/data'
 import { rmCanSeeProject } from '@/lib/projects/data'
 import { renderProjectReport, type RenderStore, type RenderReport, type RenderPhoto } from '@/lib/reports/ProjectReport'
 import { photoToDataUri } from '@/lib/reports/photos'
+import { buildProjectExcel } from '@/lib/reports/projectExcel'
+import { buildProjectZip, safeName, type ZipStore } from '@/lib/reports/projectZip'
+import { downloadStorageObject, extOf } from '@/lib/storage'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
 
-// Cap before/after photos per store — keeps the PDF + function memory light on the
-// free tier (a full 173-page full-res report would blow the Hobby limits).
+// Cap before/after photos EMBEDDED in a PDF — keeps the PDF + function memory light on
+// the free tier. The ZIP bundles the full-res originals separately (uncapped).
 const MAX_PHOTOS_PER_GROUP = 3
 
 const STORE_STATUS_LABEL: Record<string, string> = {
@@ -26,15 +29,32 @@ const STORE_STATUS_LABEL: Record<string, string> = {
 const cap = (s: string) => s ? s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, ' ') : s
 const slug = (s: string) => (s || 'project').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'project'
 
-// POST /api/projects/[id]/report — generate an on-brand PDF report for the project
-// and stream it back as a download. Gated to a system_admin or the regional manager
-// assigned to the project; rate-limited (generation is expensive); audited.
-export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+interface ReportOptions { pdf: boolean; excel: boolean; scope: 'all' | 'completed'; zip: boolean }
+
+// Body is optional (a bare POST → the legacy plain-PDF behaviour). Unknown/extra keys ignored.
+function parseOptions(body: unknown): ReportOptions {
+  const b = (body && typeof body === 'object') ? body as Record<string, unknown> : {}
+  const pdf = b.pdf === undefined ? true : !!b.pdf
+  const excel = !!b.excel
+  return {
+    pdf: pdf || (!pdf && !excel), // always keep at least one format
+    excel,
+    scope: b.scope === 'completed' ? 'completed' : 'all',
+    zip: !!b.zip,
+  }
+}
+
+// POST /api/projects/[id]/report — generate an on-brand export for the project and
+// stream it back as a download (PDF, Excel, or a master ZIP with a folder per store).
+// Gated to a system_admin or the RM assigned to the project; rate-limited; audited.
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: projectId } = await params
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   if (!(await rateLimit(`project-report:${user.id}`, 6, 60_000))) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+
+  const opts = parseOptions(await req.json().catch(() => ({})))
 
   const admin = createAdminClient()
   const { data: me } = await admin.from('user_profiles').select('role, company_id').eq('id', user.id).single()
@@ -54,34 +74,36 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   if (!companyId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   try {
-    return await generate(admin, companyId, projectId, user.id)
+    return await generate(admin, companyId, projectId, user.id, opts)
   } catch (e) {
-    // Surface the real failure (react-pdf / sharp / data) instead of a blank 500,
-    // so a broken deploy is diagnosable from Sentry + the client message.
     Sentry.captureException(e, { tags: { route: 'project-report' }, extra: { projectId, companyId } })
     console.error('[project-report] generation failed:', e)
     return NextResponse.json({ error: 'Report generation failed. This has been logged — try again shortly.' }, { status: 500 })
   }
 }
 
-async function generate(admin: ReturnType<typeof createAdminClient>, companyId: string, projectId: string, actorId: string): Promise<NextResponse> {
+async function generate(admin: ReturnType<typeof createAdminClient>, companyId: string, projectId: string, actorId: string, opts: ReportOptions): Promise<NextResponse> {
   const data = await loadProjectReportData(companyId, projectId) // access already enforced above
   if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const settings = await getAppSettings()
   const brandHex = effectiveBrandHex(settings.colors)['600']
   const logoDataUri = await resolveLogo(settings)
+  const generatedAt = formatDate(new Date().toISOString())
 
-  const capPhotos = async (list: { url: string; caption: string | null }[]): Promise<RenderPhoto[]> => {
+  // Scope filter: all stores, or only the fully-complete ones.
+  const stores = opts.scope === 'completed' ? data.stores.filter(s => s.status === 'complete') : data.stores
+  const summary = recomputeSummary(data.summary, stores)
+
+  const capPhotos = async (list: ReportPhoto[]): Promise<RenderPhoto[]> => {
     const chosen = list.slice(0, MAX_PHOTOS_PER_GROUP)
     const uris = await Promise.all(chosen.map(x => photoToDataUri(x.url)))
     return uris.flatMap((dataUri, i) => dataUri ? [{ dataUri, caption: chosen[i].caption }] : [])
   }
-
-  const stores: RenderStore[] = await Promise.all(data.stores.map(async (st): Promise<RenderStore> => {
-    const p = data.photosByStore[st.id] ?? { before: [], after: [] }
+  const d = (v: string | null | undefined) => (v ? formatDate(v) : null)
+  const renderStores: RenderStore[] = await Promise.all(stores.map(async (st): Promise<RenderStore> => {
+    const p = data.photosByStore[st.id] ?? { before: [], after: [], coc: [] }
     const [before, after] = await Promise.all([capPhotos(p.before), capPhotos(p.after)])
-    const d = (v: string | null | undefined) => (v ? formatDate(v) : null)
     return {
       branchCode: st.branch_code, name: st.store_name ?? '', town: st.town ?? null,
       progress: st.progress, statusLabel: STORE_STATUS_LABEL[st.status] ?? cap(st.status), overdue: st.overdue,
@@ -96,28 +118,83 @@ async function generate(admin: ReturnType<typeof createAdminClient>, companyId: 
     }
   }))
 
-  const report: RenderReport = {
+  const baseReport = (rs: RenderStore[]): RenderReport => ({
     appName: settings.appName || 'Motiv',
-    brandHex, logoDataUri, generatedAt: formatDate(new Date().toISOString()),
+    brandHex, logoDataUri, generatedAt,
     project: {
       name: data.project.name, client: data.project.client_name ?? null, region: null,
-      statusLabel: cap(data.summary.status),
-      startDate: data.summary.start_date ? formatDate(data.summary.start_date) : null,
-      endDate: data.summary.end_date ? formatDate(data.summary.end_date) : null,
-      progress: data.summary.progress,
+      statusLabel: cap(summary.status),
+      startDate: summary.start_date ? formatDate(summary.start_date) : null,
+      endDate: summary.end_date ? formatDate(summary.end_date) : null,
+      progress: summary.progress,
     },
-    summary: { stores: data.summary.storeCount, completed: data.summary.completed, inProgress: data.summary.inProgress, notStarted: data.summary.notStarted, overdue: data.summary.overdue },
-    stores,
+    summary: { stores: summary.storeCount, completed: summary.completed, inProgress: summary.inProgress, notStarted: summary.notStarted, overdue: summary.overdue },
+    stores: rs,
+  })
+
+  const name = slug(data.project.name)
+  const summaryPdf = (opts.pdf || opts.zip) ? await renderProjectReport(baseReport(renderStores)) : null
+  const summaryXlsx = (opts.excel || opts.zip) ? buildProjectExcel(data.project, summary, stores, generatedAt) : null
+
+  await logAudit(admin, { actorId, companyId, action: 'project.report_generated', entityType: 'project', entityId: projectId, metadata: { stores: stores.length, formats: { pdf: opts.pdf, excel: opts.excel }, scope: opts.scope, zip: opts.zip } })
+
+  // ── ZIP: one master archive (summary at root + a folder per store) ──
+  if (opts.zip) {
+    const zipStores: ZipStore[] = await Promise.all(stores.map(async (st, i): Promise<ZipStore> => {
+      const storePdf = await renderProjectReport(baseReport([renderStores[i]]))
+      const p = data.photosByStore[st.id] ?? { before: [], after: [], coc: [] }
+      const photos = await collectPhotos(p)
+      return { folder: safeName(`${st.branch_code}-${st.store_name ?? ''}`), pdf: storePdf, photos }
+    }))
+    const zip = await buildProjectZip({
+      slug: name,
+      summaryPdf: opts.pdf ? summaryPdf : null,
+      summaryXlsx: opts.excel ? summaryXlsx : null,
+      stores: zipStores,
+    })
+    return download(zip, 'application/zip', `${name}-report.zip`)
   }
 
-  const pdf = await renderProjectReport(report)
-  await logAudit(admin, { actorId, companyId, action: 'project.report_generated', entityType: 'project', entityId: projectId, metadata: { stores: stores.length } })
+  // ── No ZIP: single file, or a small 2-file zip when both formats are picked ──
+  if (opts.pdf && opts.excel) {
+    const zip = await buildProjectZip({ slug: name, summaryPdf, summaryXlsx, stores: [] })
+    return download(zip, 'application/zip', `${name}-report.zip`)
+  }
+  if (opts.excel && summaryXlsx) return download(summaryXlsx, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', `${name}-report.xlsx`)
+  return download(summaryPdf!, 'application/pdf', `${name}-report.pdf`)
+}
 
-  return new NextResponse(new Uint8Array(pdf), {
+// Download all original before/after/COC photos for a store, named by category.
+async function collectPhotos(p: { before: ReportPhoto[]; after: ReportPhoto[]; coc: ReportPhoto[] }): Promise<{ name: string; bytes: Buffer }[]> {
+  const groups: [string, ReportPhoto[]][] = [['before', p.before], ['after', p.after], ['COC', p.coc]]
+  const out: { name: string; bytes: Buffer }[] = []
+  for (const [label, list] of groups) {
+    const dls = await Promise.all(list.map(x => downloadStorageObject(x.path).then(r => ({ r, ext: extOf(x.path) }))))
+    dls.forEach(({ r, ext }, i) => {
+      if (r) out.push({ name: `${label}_${String(i + 1).padStart(2, '0')}.${ext}`, bytes: r.bytes })
+    })
+  }
+  return out
+}
+
+function recomputeSummary(base: ProjectSummary, stores: StoreRow[]): ProjectSummary {
+  return {
+    ...base,
+    storeCount: stores.length,
+    completed: stores.filter(s => s.status === 'complete').length,
+    inProgress: stores.filter(s => s.status !== 'complete' && s.status !== 'not_started').length,
+    notStarted: stores.filter(s => s.status === 'not_started').length,
+    overdue: stores.filter(s => s.overdue).length,
+    progress: stores.length ? Math.round(stores.reduce((a, s) => a + s.progress, 0) / stores.length) : 0,
+  }
+}
+
+function download(body: Buffer, contentType: string, filename: string): NextResponse {
+  return new NextResponse(new Uint8Array(body), {
     status: 200,
     headers: {
-      'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="${slug(data.project.name)}-report.pdf"`,
+      'Content-Type': contentType,
+      'Content-Disposition': `attachment; filename="${filename}"`,
       'Cache-Control': 'no-store',
     },
   })
