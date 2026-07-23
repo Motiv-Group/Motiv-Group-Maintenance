@@ -1,12 +1,12 @@
 export const dynamic = 'force-dynamic'
 
-import { UsersRound, User } from 'lucide-react'
+import { UsersRound } from 'lucide-react'
 import { requireMasterAdmin } from '@/lib/health/guard'
 import { createAdminClient } from '@/lib/supabase/server'
-import { Card } from '@/components/exec/ui'
 import { InfoTip } from '@/components/ui/InfoTip'
 import { CreateCompanyButton } from '@/components/admin/CreateCompanyButton'
-import { CompanyListRow, type CompanyListItem } from '@/components/admin/CompanyListRow'
+import { AccountsListView } from '@/components/admin/AccountsListView'
+import { type CompanyListItem } from '@/components/admin/CompanyListRow'
 import type { RegionOpt, ProjectOpt } from '@/components/admin/AddAccountForm'
 
 async function loadLastSignIns(admin: ReturnType<typeof createAdminClient>): Promise<Map<string, string | null>> {
@@ -73,6 +73,7 @@ export default async function AdminAccountsPage() {
   })
 
   const totalAccounts = (users ?? []).length
+  const pendingTotal = items.reduce((n, c) => n + c.pending, 0)
   const indIds = (individuals ?? []).map(i => i.id)
   const indActiveWeek = indIds.filter(id => { const d = daysAgo(signIns.get(id) ?? null); return d != null && d <= 7 }).length
 
@@ -84,30 +85,19 @@ export default async function AdminAccountsPage() {
             <UsersRound className="text-blue-600 dark:text-blue-400" size={22} /> Accounts
             <InfoTip title="Accounts" align="left">One row per company. Open a company to see its Executives, Regional Managers, Store Managers and Suppliers and to invite more — individually or by bulk CSV. Individuals and self-signup suppliers register themselves.</InfoTip>
           </h1>
-          <p className="text-sm text-[var(--text-muted)] mt-0.5">{companies?.length ?? 0} companies · {totalAccounts} accounts</p>
+          <p className="text-sm text-[var(--text-muted)] mt-0.5">Manage companies and users across the platform.</p>
         </div>
         <CreateCompanyButton />
       </div>
 
-      {/* Individuals — self-signup standalone accounts, not under any company. */}
-      <Card className="p-4 flex items-center gap-3">
-        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-slate-500/15 text-slate-600 dark:text-slate-300"><User size={20} /></span>
-        <div className="min-w-0 flex-1">
-          <p className="font-semibold text-[var(--text)]">Individuals</p>
-          <p className="text-xs text-[var(--text-muted)]">Public self-signup · standalone jobs, no company</p>
-        </div>
-        <div className="text-right shrink-0">
-          <p className="text-xl font-bold text-[var(--text)]">{indIds.length}</p>
-          <p className="text-[11px] text-[var(--text-faint)]"><span className="text-emerald-600 dark:text-emerald-400">{indActiveWeek} active this week</span></p>
-        </div>
-      </Card>
-
-      <div className="space-y-2.5">
-        {items.map(item => <CompanyListRow key={item.id} item={item} regions={regionOpts} projects={projectOpts} />)}
-        {!items.length && (
-          <Card className="p-8 text-center"><p className="text-sm text-[var(--text-muted)]">No companies yet. Create one to start inviting accounts.</p></Card>
-        )}
-      </div>
+      <AccountsListView
+        companies={items}
+        totalUsers={totalAccounts}
+        pendingTotal={pendingTotal}
+        individuals={{ total: indIds.length, activeWeek: indActiveWeek }}
+        regions={regionOpts}
+        projects={projectOpts}
+      />
     </div>
   )
 }
