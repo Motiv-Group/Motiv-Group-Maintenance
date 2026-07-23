@@ -43,7 +43,7 @@ jobs:
       # a lockfile-only restore key so most pushes still get a warm cache. Cuts
       # the `next build` step's minutes; safe because next validates its cache.
       - name: Restore Next.js build cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .next/cache
           key: nextjs-${{ hashFiles('package-lock.json') }}-${{ hashFiles('**/*.ts', '**/*.tsx') }}
